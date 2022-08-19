@@ -401,9 +401,9 @@ class T2I:
         sd = pl_sd["state_dict"]
         model = instantiate_from_config(config.model)
         m, u = model.load_state_dict(sd, strict=False)
-        model.half()
         model.cuda()
         model.eval()
+        model.half()
         return model
 
     def _load_img(self,path):
