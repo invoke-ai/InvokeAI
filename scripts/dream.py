@@ -5,11 +5,12 @@ import atexit
 import os
 
 # readline unavailable on windows systems
-try:
-    import readline
-    readline_available = True
-except:
-    readline_available = False
+#try:
+#    import readline
+#    readline_available = True
+#except:
+# pyreadline doesn't support unicode
+readline_available = False
 
 debugging = True
 
