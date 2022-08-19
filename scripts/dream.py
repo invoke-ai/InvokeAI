@@ -63,7 +63,7 @@ def main():
     print("\n* Initialization done! Awaiting your command (-h for help, q to quit)...")
 
     log_path   = os.path.join(opt.outdir,"dream_log.txt")
-    with open(log_path,'a') as log:
+    with open(log_path,'ab') as log:
         cmd_parser = create_cmd_parser()
         main_loop(t2i,cmd_parser,log)
         log.close()
@@ -137,7 +137,7 @@ def _output_for_individual(switches,results,logfile):
                                 f'"{switches[0]}"',
                                 *switches[1:],f'-S {r[1]}'])
         print(log_message)
-        logfile.write(log_message+"\n")
+        logfile.write((log_message+"\n").encode("utf-8"))
         logfile.flush()
 
 def _output_for_grid(switches,results,logfile):
@@ -146,11 +146,11 @@ def _output_for_grid(switches,results,logfile):
                             f'"{switches[0]}"',
                             *switches[1:],f'-S {results[0][1]}'])
     print(log_message)
-    logfile.write(log_message+"\n")
+    logfile.write((log_message+"\n").encode("utf-8"))
     all_seeds   = [row[1] for row in results]
     log_message = f'    seeds for individual rows: {all_seeds}'
     print(log_message)
-    logfile.write(log_message+"\n")
+    logfile.write((log_message+"\n").encode("utf-8"))
 
 def create_argv_parser():
     parser = argparse.ArgumentParser(description="Parse script's command line args")
