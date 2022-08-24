@@ -1,4 +1,4 @@
-#this repo hes been integrated into the original with bigfixes
+# this repo hes been integrated into the original with bigfixes
 original repo : https://github.com/lstein/stable-diffusion
 
 # Stable Diffusion Dream Script
