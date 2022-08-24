@@ -1,3 +1,6 @@
+#this repo hes been integrated into the original with bigfixes
+original repo : https://github.com/lstein/stable-diffusion
+
 # Stable Diffusion Dream Script
 
 This is a fork of CompVis/stable-diffusion, the wonderful open source
