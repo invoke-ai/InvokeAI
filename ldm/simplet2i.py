@@ -507,7 +507,7 @@ The vast majority of these arguments default to reasonable values.
         w, h = image.size
         print(f"loaded input image of size ({w}, {h}) from {path}")
         w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-        image = image.resize((w, h), resample=Image.Resampling.LANCZOS)
+        image = image.resize((self.width, self.height), resample=Image.Resampling.LANCZOS)
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
