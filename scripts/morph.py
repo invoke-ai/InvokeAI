@@ -107,7 +107,7 @@ def init() -> None:
         try:
             done = user_loop(cmd_parser, infile_lines)
         except KeyboardInterrupt:
-            done = True
+            print("Task cancelled. Enter q if you want to quit.")
 
 
 def user_loop(
@@ -222,7 +222,7 @@ def generate(cmd_opts: argparse.Namespace) -> None:
             if not cmd_opts.init_img:
                 results.append(t2i.txt2img(
                     # removes dictionary entries with 'invalid_keys'
-                    **{k: v for k, v in t2i_args if k not in invalid_keys}
+                    **{k: v for k, v in t2i_args.items() if k not in invalid_keys}
                 ))
             else:
                 assert os.path.exists(opt.init_img), f"No file found at {cmd_opts.init_img}. On Linux systems, pressing <tab> after -I will autocomplete a list of possible image files."
