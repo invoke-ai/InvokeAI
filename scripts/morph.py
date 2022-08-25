@@ -99,6 +99,7 @@ def init() -> None:
         sys.exit(1)
 
     print("Initialisation complete.")
+    print("('help' for help, 'q' to quit, 'cd' to change output dir, 'pwd' to print output dir)")
 
     cmd_parser = parse_cmd()
 
