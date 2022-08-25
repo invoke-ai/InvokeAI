@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 
 import argparse
