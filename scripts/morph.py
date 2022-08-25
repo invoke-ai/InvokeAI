@@ -3,7 +3,7 @@
 
 import argparse
 import shlex
-import atexit
+#import atexit
 import os
 import sys
 import copy
@@ -208,6 +208,9 @@ def user_loop(
 def generate(cmd_opts: argparse.Namespace) -> None:
     results = []
 
+    # cmd_opts that are not to be given to t2i.txt2img and t2i.img2img
+    invalid_keys = ("repeats", "feedback")
+
     for r in range(cmd_opts.repeats + 1):
         t2i_args = eval_params(copy.deepcopy(vars(cmd_opts)), r)
 
@@ -217,7 +220,10 @@ def generate(cmd_opts: argparse.Namespace) -> None:
 
         try:
             if not cmd_opts.init_img:
-                results.append(t2i.txt2img(**t2i_args))
+                results.append(t2i.txt2img(
+                    # removes dictionary entries with 'invalid_keys'
+                    **{k: v for k, v in t2i_args if k not in invalid_keys}
+                ))
             else:
                 assert os.path.exists(opt.init_img), f"No file found at {cmd_opts.init_img}. On Linux systems, pressing <tab> after -I will autocomplete a list of possible image files."
 
@@ -229,6 +235,31 @@ def generate(cmd_opts: argparse.Namespace) -> None:
         except AssertionError as e:
             print(e)
             return
+
+    write_log(cmd_opts, results)
+
+
+def write_log(cmd_opts: argparse.Namespace, results: list) -> None:
+    pass
+
+
+def normalise_args(opts: argparse.Namespace) -> list:
+    args = []
+
+    args.append(f"\"{opts.prompt}\"")
+    args.append(f"-s {opts.steps or t2i.steps}")
+    args.append(f"-b {opts.batch_size or t2i.batch_size}")
+    args.append(f"-W {opts.width or t2i.width}")
+    args.append(f"-H {opts.height or t2i.height}")
+    args.append(f"-C {opts.cfg_scale or t2i.cfg_scale}")
+    args.append(f"-m {t2i.sampler_name}")
+    args.append(f"-r {opts.repeats}")
+    opts.feedback and args.append("-B")
+    opts.init_img and args.append(f"-I {opts.init_img}")
+    opts.strength and opt.init_img and args.append(f"-f {opts.strength}")
+    opts.full_precision and args.append("-F")
+
+    return args
 
 
 def eval_params(t2i_args: vars, r: int) -> vars:
@@ -326,7 +357,7 @@ def parse_cmd() -> argparse.ArgumentParser:
             help="strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely")
     add_arg("-r", "--repeats", type=int, default=0,
             help="number of times values are incremented")
-    add_arg("-F", "--feedback", action="store_true",
+    add_arg("-B", "--feedback", action="store_true",
             help="feeds the first generated image back into the next one as an init_img")
     add_arg("-x", "--skip_normalize", action="store_true",
             help="skip subprompt weight normalization")

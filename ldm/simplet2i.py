@@ -173,8 +173,6 @@ The vast majority of these arguments default to reasonable values.
         embedding_path=None,
         init_img=None,
         skip_normalize=False,
-        repeats=None,  # note the "repeats" option is an unused hack caused by how options are passed
-        feedback=None,  # same goes for "feedback"
     ):
         """
         Generate an image from the prompt, writing iteration images into the outdir
@@ -316,8 +314,6 @@ The vast majority of these arguments default to reasonable values.
         strength=None,
         embedding_path=None,
         skip_normalize=False,
-        repeats=None,  # note the "repeats" option is an unused hack caused by how options are passed
-        feedback=None,  # same goes for "feedback"
     ):
         """
         Generate an image from the prompt and the initial image, writing iteration images into the outdir
