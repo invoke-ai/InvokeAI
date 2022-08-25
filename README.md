@@ -1,3 +1,16 @@
+# small to do list
+reconstruct prompt
+
+prompt tp png (more metadata)
+
+more descriptive filenames (cfg, steps, etc...)
+
+readline setup
+
+logging
+
+prompt morphing with weighting
+
 # Stable Diffusion Dream Script
 
 This is a fork of CompVis/stable-diffusion, the wonderful open source
