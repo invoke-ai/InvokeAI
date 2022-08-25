@@ -69,6 +69,7 @@ import time
 import math
 import re
 import traceback
+import PIL
 
 from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim     import DDIMSampler
@@ -301,6 +302,9 @@ The vast majority of these arguments default to reasonable values.
         iterations = iterations or self.iterations
         strength   = strength   or self.strength
         embedding_path = embedding_path or self.embedding_path
+        width      = width      or self.width
+        height     = height     or self.height
+        
 
         assert strength<1.0 and strength>=0.0, "strength (-f) must be >=0.0 and <1.0"
         assert cfg_scale>1.0, "CFG_Scale (-C) must be >1.0"
@@ -426,6 +430,7 @@ The vast majority of these arguments default to reasonable values.
         return images
 
     def _make_grid(self,samples,seeds,batch_size,iterations,outdir):
+    
         images = list()
         n_rows = batch_size if batch_size>1 else int(math.sqrt(batch_size * iterations))
         # save as grid
@@ -502,16 +507,33 @@ The vast majority of these arguments default to reasonable values.
             model.half()
         return model
 
-    def _load_img(self,path):
+    def _load_img(self,path,width=None,height=None):
+    
+        width      = width      or self.width
+        height     = height     or self.height
+        
+        #if self.custominitsize:
         image = Image.open(path).convert("RGB")
         w, h = image.size
-        print(f"loaded input image of size ({w}, {h}) from {path}")
-        w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-        image = image.resize((self.width, self.height), resample=Image.Resampling.LANCZOS)
+        #print(f"loaded input image of size ({w}, {h}) from {path}")
+        #w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+        #image = image.resize((w, h), resample=PIL.Image.LANCZOS)
+        image = image.resize((self.width, self.height), resample=PIL.Resampling.LANCZOS)
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
         return 2.*image - 1.
+        
+        #else:
+        '''image = Image.open(path).convert("RGB")
+        w, h = image.size
+        print(f"loaded input image of size ({w}, {h}) from {path}")
+        w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+        image = image.resize((w, h), resample=Image.Resampling.LANCZOS)
+        image = np.array(image).astype(np.float32) / 255.0
+        image = image[None].transpose(0, 3, 1, 2)
+        image = torch.from_numpy(image)
+        return 2.*image - 1.'''
 
     def _unique_filename(self,outdir,previousname=None,seed=0,isbatch=False,grid_count=None):
         revision = 1
