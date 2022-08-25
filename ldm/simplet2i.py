@@ -513,7 +513,7 @@ The vast majority of these arguments default to reasonable values.
         height     = height     or self.height
         
         #if self.custominitsize:
-        image = Image.open(path).convert("RGB")
+        '''image = Image.open(path).convert("RGB")
         w, h = image.size
         #print(f"loaded input image of size ({w}, {h}) from {path}")
         #w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
@@ -522,10 +522,10 @@ The vast majority of these arguments default to reasonable values.
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
-        return 2.*image - 1.
+        return 2.*image - 1.'''
         
         #else:
-        '''image = Image.open(path).convert("RGB")
+        image = Image.open(path).convert("RGB")
         w, h = image.size
         print(f"loaded input image of size ({w}, {h}) from {path}")
         w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
@@ -533,7 +533,7 @@ The vast majority of these arguments default to reasonable values.
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
-        return 2.*image - 1.'''
+        return 2.*image - 1.
 
     def _unique_filename(self,outdir,previousname=None,seed=0,isbatch=False,grid_count=None):
         revision = 1
