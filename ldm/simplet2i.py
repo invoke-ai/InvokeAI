@@ -288,9 +288,6 @@ The vast majority of these arguments default to reasonable values.
                                                 batch_size=batch_size,
                                                 iterations=iterations,
                                                 outdir=outdir)
-        except KeyboardInterrupt:
-            print('*interrupted*')
-            print('Partial results will be returned; if --grid was requested, nothing will be returned.')
         except RuntimeError as e:
             print(str(e))
 
