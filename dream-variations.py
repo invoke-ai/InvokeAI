@@ -62,7 +62,7 @@ t2i.load_model()
 #   outputs = t2i.txt2img("elf queen with rainbow hair, golden hour. colored pencil drawing by rossdraws andrei riabovitchev trending on artstation", start_code=code, seed=seed)
 
 # generate variants
-strength = 0.05
+strength = 0.10
 prompt = "elf queen with rainbow hair, golden hour. colored pencil drawing by rossdraws andrei riabovitchev trending on artstation"
 
 print("generating base image")
