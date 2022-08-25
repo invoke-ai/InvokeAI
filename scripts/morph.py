@@ -412,7 +412,7 @@ def parse_cmd() -> argparse.ArgumentParser:
     add_arg("-r", "--repeats", type=int, default=0,
             help="number of times values are incremented")
     add_arg("-B", "--feedback", action="store_true",
-                help="feeds the first generated image back into the next one as an init_img")
+            help="feeds the first generated image back into the next one as an init_img")
     add_arg("-x", "--skip_normalize", action="store_true",
             help="skip subprompt weight normalization")
 
