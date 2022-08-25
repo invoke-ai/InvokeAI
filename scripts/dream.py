@@ -160,12 +160,12 @@ def user_loop(
     if elements[0] == "cd":
         new_dir = change_dir(elements)
 
-        # skip if new_dir is empty
-        if not new_dir:
-            return False
+        # only set dir if not empty
+        if new_dir:
+            t2i.outdir = new_dir
 
-        t2i.outdir = new_dir
         del new_dir
+        return False
 
     # print output directory
     if elements[0] == "pwd":
