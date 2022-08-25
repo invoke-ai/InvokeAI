@@ -29,7 +29,7 @@ t2i = T2I(outdir      = <path>        // outputs/txt2img-samples
 # do the slow model initialization
 t2i.load_model()
 
-# Do the fast inference & image generation. Any options passed here 
+# Do the fast inference & image generation. Any options passed here
 # override the default values assigned during class initialization
 # Will call load_model() if the model was not previously loaded.
 # The method returns a list of images. Each row of the list is a sub-list of [filename,seed]
@@ -45,7 +45,7 @@ for row in results:
 results = t2i.img2img(prompt   = "an astronaut riding a horse"
                       outdir   = "./outputs/img2img-samples"
                       init_img = "./sketches/horse+rider.png")
-                 
+
 for row in results:
     print(f'filename={row[0]}')
     print(f'seed    ={row[1]}')
@@ -158,7 +158,7 @@ The vast majority of these arguments default to reasonable values.
     def txt2img(self,prompt,outdir=None,batch_size=None,iterations=None,
                 steps=None,seed=None,grid=None,individual=None,width=None,height=None,
                 cfg_scale=None,ddim_eta=None,strength=None,embedding_path=None,init_img=None,
-                skip_normalize=False,variants=None):    # note the "variants" option is an unused hack caused by how options are passed
+                skip_normalize=False,variants=None,start_code=None):    # note the "variants" option is an unused hack caused by how options are passed
         """
         Generate an image from the prompt, writing iteration images into the outdir
         The output is a list of lists in the format: [[filename1,seed1], [filename2,seed2],...]
@@ -186,19 +186,19 @@ The vast majority of these arguments default to reasonable values.
             grid = self.grid
         if individual:
             grid = False
-        
+
         data = [batch_size * [prompt]]
 
         # make directories and establish names for the output files
         os.makedirs(outdir, exist_ok=True)
 
-        start_code = None
-        if self.fixed_code:
-            start_code = torch.randn([batch_size,
-                                      self.latent_channels,
-                                      height // self.downsampling_factor,
-                                      width  // self.downsampling_factor],
-                                     device=self.device)
+
+        # if self.fixed_code:
+        #     start_code = torch.randn([batch_size,
+        #                               self.latent_channels,
+        #                               height // self.downsampling_factor,
+        #                               width  // self.downsampling_factor],
+        #                              device=self.device)
 
         precision_scope = autocast if self.precision=="autocast" else nullcontext
         sampler         = self.sampler
@@ -281,7 +281,7 @@ The vast majority of these arguments default to reasonable values.
         print(f'{image_count} images generated in',"%4.2fs"% (toc-tic))
 
         return images
-        
+
     # There is lots of shared code between this and txt2img and should be refactored.
     @torch.no_grad()
     def img2img(self,prompt,outdir=None,init_img=None,batch_size=None,iterations=None,
@@ -319,7 +319,7 @@ The vast majority of these arguments default to reasonable values.
             grid = self.grid
         if individual:
             grid = False
-        
+
         data = [batch_size * [prompt]]
 
         # PLMS sampler not supported yet, so ignore previous sampler
@@ -345,7 +345,7 @@ The vast majority of these arguments default to reasonable values.
         except AssertionError:
             print(f"strength must be between 0.0 and 1.0, but received value {strength}")
             return []
-        
+
         t_enc = int(strength * steps)
         print(f"target t_enc is {t_enc} steps")
 
@@ -485,7 +485,7 @@ The vast majority of these arguments default to reasonable values.
             print(msg)
 
         return self.model
-                
+
     def _load_model_from_config(self, config, ckpt):
         print(f"Loading model from {ckpt}")
         pl_sd = torch.load(ckpt, map_location="cpu")
@@ -530,7 +530,7 @@ The vast majority of these arguments default to reasonable values.
                 filename = f'{basecount:06}.{seed}.01.png'
             else:
                 filename = f'{basecount:06}.{seed}.png'
-            
+
             return os.path.join(outdir,filename)
 
         else:
@@ -540,7 +540,7 @@ The vast majority of these arguments default to reasonable values.
                 return self._unique_filename(outdir,previousname,seed)
 
             basecount = int(x.groups()[0])
-            series = 0 
+            series = 0
             finished = False
             while not finished:
                 series += 1
@@ -552,7 +552,7 @@ The vast majority of these arguments default to reasonable values.
 
     def _split_weighted_subprompts(text):
         """
-        grabs all text up to the first occurrence of ':' 
+        grabs all text up to the first occurrence of ':'
         uses the grabbed text as a sub-prompt, and takes the value following ':' as weight
         if ':' has no value defined, defaults to 1.0
         repeats until no text remaining
@@ -568,7 +568,7 @@ The vast majority of these arguments default to reasonable values.
                 remaining -= idx
                 # remove from main text
                 text = text[idx+1:]
-                # find value for weight 
+                # find value for weight
                 if " " in text:
                     idx = text.index(" ") # first occurence
                 else: # no space, read to end
