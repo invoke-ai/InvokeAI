@@ -1,6 +1,4 @@
 # small to do list
-reconstruct prompt
-
 readline setup
 
 prompt morphing with weighting
