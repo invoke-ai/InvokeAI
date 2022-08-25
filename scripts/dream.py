@@ -230,7 +230,7 @@ def generate(cmd_opts: argparse.Namespace) -> None:
             if not cmd_opts.init_img:
                 results.append([img + [t2i_args] for img in t2i.txt2img(**t2i_args)])
             else:
-                assert os.path.exists(opt.init_img), f"No file found at {cmd_opts.init_img}. On Linux systems, pressing <tab> after -I will autocomplete a list of possible image files."
+                assert os.path.exists(cmd_opts.init_img), f"No file found at {cmd_opts.init_img}. On Linux systems, pressing <tab> after -I will autocomplete a list of possible image files."
 
                 if cmd_opts.width or cmd_opts.height:
                     print("Warning: width and height options are ignored when modifying an init image")
