@@ -1,13 +1,7 @@
 # small to do list
 reconstruct prompt
 
-prompt tp png (more metadata)
-
-more descriptive filenames (cfg, steps, etc...)
-
 readline setup
-
-logging
 
 prompt morphing with weighting
 

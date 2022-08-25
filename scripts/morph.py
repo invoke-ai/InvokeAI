@@ -11,6 +11,7 @@ from PIL import Image, PngImagePlugin
 
 skip_load_model = False
 t2i = None
+log_path = ""
 
 # check if readline is available
 try:
@@ -68,6 +69,7 @@ def init() -> None:
     )
 
     # set up logging
+    global log_path
     log_path = os.path.join(argv_opts.outdir, "morph_log.txt")
 
     # ensure output directory
@@ -108,6 +110,8 @@ def init() -> None:
             done = user_loop(cmd_parser, infile_lines)
         except KeyboardInterrupt:
             print("Task cancelled. Enter q if you want to quit.")
+        except EOFError:
+            return True
 
 
 def user_loop(
@@ -215,22 +219,22 @@ def generate(cmd_opts: argparse.Namespace) -> None:
         t2i_args = eval_params(copy.deepcopy(vars(cmd_opts)), r)
 
         # in feedback mode: replaces the init_img with the first image from the last result
-        if cmd_opts.feedback:
+        if cmd_opts.feedback and results:
             t2i_args = {**t2i_args, "init_img": results[-1][0][0]}
+
+        # applies invalid keys
+        t2i_args = {k: v for k, v in t2i_args.items() if k not in invalid_keys}
 
         try:
             if not cmd_opts.init_img:
-                results.append(t2i.txt2img(
-                    # removes dictionary entries with 'invalid_keys'
-                    **{k: v for k, v in t2i_args.items() if k not in invalid_keys}
-                ))
+                results.append([img + [t2i_args] for img in t2i.txt2img(**t2i_args)])
             else:
                 assert os.path.exists(opt.init_img), f"No file found at {cmd_opts.init_img}. On Linux systems, pressing <tab> after -I will autocomplete a list of possible image files."
 
                 if cmd_opts.width or cmd_opts.height:
                     print("Warning: width and height options are ignored when modifying an init image")
 
-                results.append(t2i.img2img(**t2i_args))
+                results.append([img + [t2i_args] for img in t2i.img2img(**t2i_args)])
 
         except AssertionError as e:
             print(e)
@@ -240,26 +244,80 @@ def generate(cmd_opts: argparse.Namespace) -> None:
 
 
 def write_log(cmd_opts: argparse.Namespace, results: list) -> None:
-    pass
+    log_message = []
+
+    last_seed = None
+    img_num = 1
+    batch_size = cmd_opts.batch_size or t2i.batch_size
+    seen = []
+
+    seeds = [img[1] for result in results for img in result]
+    if batch_size > 1:
+        seeds = f"(seeds for each batch row: {seeds})"
+    else:
+        seeds = f"(seeds for individual images: {seeds})"
+
+    for repeat in results:
+        for result in repeat:
+            seed = result[1]
+            prompt_str = normalise_args(result[2])
+            log_message.append(f"# {result[0]}: {prompt_str} -S {seed}")
+
+            if batch_size > 1:
+                if seed != lasts_seed:
+                    img_num = 1
+                else:
+                    img_num += 1
+
+                log_message[-1] += f" # (batch image {img_num} of {batch_size})"
+                last_seed = seed
+
+            print(log_message[-1])
+            log_message[-1] += "\n"
+
+            if result[0] not in seen:
+                seen.append(result[0])
+
+                try:
+                    if cmd_opts.grid:
+                        write_prompt_to_png(result[0], f"{prompt_str} -g -S {seed} {seeds}")
+                    else:
+                        write_prompt_to_png(result[0], f"{prompt_str} -S {seed}")
+                except FileNotFoundError:
+                    print(f"Could not open file '{result[0]}' for reading.")
+
+    log_message = [normalise_args(vars(cmd_opts)) + "\n"] + log_message
+    print("Prompt:", log_message[0], end="")
+
+    with open(log_path, "a") as file:
+        file.writelines(log_message)
 
 
-def normalise_args(opts: argparse.Namespace) -> list:
+def normalise_args(opts: dict) -> str:
     args = []
 
-    args.append(f"\"{opts.prompt}\"")
-    args.append(f"-s {opts.steps or t2i.steps}")
-    args.append(f"-b {opts.batch_size or t2i.batch_size}")
-    args.append(f"-W {opts.width or t2i.width}")
-    args.append(f"-H {opts.height or t2i.height}")
-    args.append(f"-C {opts.cfg_scale or t2i.cfg_scale}")
-    args.append(f"-m {t2i.sampler_name}")
-    args.append(f"-r {opts.repeats}")
-    opts.feedback and args.append("-B")
-    opts.init_img and args.append(f"-I {opts.init_img}")
-    opts.strength and opt.init_img and args.append(f"-f {opts.strength}")
-    opts.full_precision and args.append("-F")
+    args.append(f"\"{opts.get('prompt')}\"")
+    args.append(f"-s {opts.get('steps') or t2i.steps}")
+    args.append(f"-b {opts.get('batch_size') or t2i.batch_size}")
+    args.append(f"-W {opts.get('width') or t2i.width}")
+    args.append(f"-H {opts.get('height') or t2i.height}")
+    args.append(f"-C {opts.get('cfg_scale') or t2i.cfg_scale}")
+    #args.append(f"-m {t2i.sampler_name}")
+    opts.get("repeats") and args.append(f"-r {opts.get('repeats')}")
+    opts.get("feedback") and args.append("-B")
+    opts.get("init_img") and args.append(f"-I {opts.get('init_img')}")
+    opts.get("strength") and opts.get("init_img") and args.append(f"-f {opts.get('strength')}")
+    #t2i.full_precision and args.append("-F")
 
-    return args
+    return " ".join(args)
+
+
+def write_prompt_to_png(path, prompt) -> None:
+    info = PngImagePlugin.PngInfo()
+    info.add_text("Dream", prompt)
+
+    with Image.open(path) as img:
+        img.save(path, "PNG", pnginfo=info)
 
 
 def eval_params(t2i_args: vars, r: int) -> vars:
