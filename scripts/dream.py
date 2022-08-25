@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+# Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
+
 import argparse
 import shlex
 import atexit
 import os
 import sys
+import copy
 from PIL import Image,PngImagePlugin
 
 # readline unavailable on windows systems
@@ -57,7 +60,9 @@ def main():
               weights=weights,
               full_precision=opt.full_precision,
               config=config,
-              latent_diffusion_weights=opt.laion400m # this is solely for recreating the prompt
+              latent_diffusion_weights=opt.laion400m, # this is solely for recreating the prompt
+              embedding_path=opt.embedding_path,
+              device=opt.device
     )
 
     # make sure the output directory exists
@@ -76,8 +81,7 @@ def main():
         exit(-1)
 
     # preload the model
-    if not debugging:
-        t2i.load_model()
+    t2i.load_model()
     print("\n* Initialization done! Awaiting your command (-h for help, 'q' to quit, 'cd' to change output dir, 'pwd' to print output dir)...")
 
     log_path   = os.path.join(opt.outdir,'dream_log.txt')
@@ -106,6 +110,10 @@ def main_loop(t2i,parser,log,infile):
 
         if command.startswith(('#','//')):
             continue
+
+        # before splitting, escape single quotes so as not to mess
+        # up the parser
+        command = command.replace("'","\\'")
 
         try:
             elements = shlex.split(command)
@@ -158,12 +166,44 @@ def main_loop(t2i,parser,log,infile):
             print("Try again with a prompt!")
             continue
 
-        if opt.init_img is None:
-            results = t2i.txt2img(**vars(opt))
-        else:
-            results = t2i.img2img(**vars(opt))
+        try:
+            if opt.init_img is None:
+                results = t2i.txt2img(**vars(opt))
+            else:
+                assert os.path.exists(opt.init_img),f"No file found at {opt.init_img}. On Linux systems, pressing <tab> after -I will autocomplete a list of possible image files."
+                if None not in (opt.width,opt.height):
+                    print('Warning: width and height options are ignored when modifying an init image')
+                results = t2i.img2img(**vars(opt))
+        except AssertionError as e:
+            print(e)
+            continue
+
+
+        allVariantResults = []
+        if opt.variants is not None:
+            print(f"Generating {opt.variants} variant(s)...")
+            newopt = copy.deepcopy(opt)
+            newopt.iterations = 1
+            newopt.variants = None
+            for r in results:
+                newopt.init_img = r[0]
+                print(f"\t generating variant for {newopt.init_img}")
+                for j in range(0, opt.variants):
+                    try:
+                        variantResults = t2i.img2img(**vars(newopt))
+                        allVariantResults.append([newopt,variantResults])
+                    except AssertionError as e:
+                        print(e)
+                        continue
+            print(f"{opt.variants} Variants generated!")
+
         print("Outputs:")
         write_log_message(t2i,opt,results,log)
+            
+        if allVariantResults:
+            print("Variant outputs:")
+            for vr in allVariantResults:
+                write_log_message(t2i,vr[0],vr[1],log)
             
 
     print("goodbye!")
@@ -220,6 +260,9 @@ def _reconstruct_switches(t2i,opt):
     switches.append(f'-W{opt.width        or t2i.width}')
     switches.append(f'-H{opt.height       or t2i.height}')
     switches.append(f'-C{opt.cfg_scale    or t2i.cfg_scale}')
+    switches.append(f'-m{t2i.sampler_name}')
+    if opt.variants:
+        switches.append(f'-v{opt.variants}')
     if opt.init_img:
         switches.append(f'-I{opt.init_img}')
     if opt.strength and opt.init_img is not None:
@@ -260,14 +303,22 @@ def create_argv_parser():
                         help="number of images to produce per iteration (faster, but doesn't generate individual seeds")
     parser.add_argument('--sampler','-m',
                         dest="sampler_name",
-                        choices=['plms','ddim', 'klms'],
-                        default='klms',
-                        help="which sampler to use (klms) - can only be set on command line")
+                        choices=['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms'],
+                        default='k_lms',
+                        help="which sampler to use (k_lms) - can only be set on command line")
     parser.add_argument('--outdir',
                         '-o',
                         type=str,
                         default="outputs/img-samples",
                         help="directory in which to place generated images and a log of prompts and seeds")
+    parser.add_argument('--embedding_path',
+                        type=str,
+                        help="Path to a pre-trained embedding manager checkpoint - can only be set on command line")
+    parser.add_argument('--device',
+                        '-d',
+                        type=str,
+                        default="cuda",
+                        help="device to run stable diffusion on. defaults to cuda `torch.cuda.current_device()` if avalible")
     return parser
                         
     
@@ -283,8 +334,9 @@ def create_cmd_parser():
     parser.add_argument('-C','--cfg_scale',default=7.5,type=float,help="prompt configuration scale")
     parser.add_argument('-g','--grid',action='store_true',help="generate a grid")
     parser.add_argument('-i','--individual',action='store_true',help="generate individual files (default)")
-    parser.add_argument('-I','--init_img',type=str,help="path to input image (supersedes width and height)")
+    parser.add_argument('-I','--init_img',type=str,help="path to input image for img2img mode (supersedes width and height)")
     parser.add_argument('-f','--strength',default=0.75,type=float,help="strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely")
+    parser.add_argument('-v','--variants',type=int,help="in img2img mode, the first generated image will get passed back to img2img to generate the requested number of variants")
     parser.add_argument('-x','--skip_normalize',action='store_true',help="skip subprompt weight normalization")
     return parser
 
@@ -293,7 +345,7 @@ if readline_available:
         readline.set_completer(Completer(['cd','pwd',
                                           '--steps','-s','--seed','-S','--iterations','-n','--batch_size','-b',
                                           '--width','-W','--height','-H','--cfg_scale','-C','--grid','-g',
-                                          '--individual','-i','--init_img','-I','--strength','-f']).complete)
+                                          '--individual','-i','--init_img','-I','--strength','-f','-v','--variants']).complete)
         readline.set_completer_delims(" ")
         readline.parse_and_bind('tab: complete')
         load_history()
@@ -374,3 +426,4 @@ if readline_available:
 
 if __name__ == "__main__":
     main()
+
