@@ -122,6 +122,10 @@ and give you an enhanced 2x upscaled result.
 a koala bear dancing with a panda bear -G 0.5
 ```
 
+While Stable Diffusion is running, you will see the original image that
+has been generated. This image will be upscaled to a higher resolution
+version after Stable Diffusion has completed image generation.
+   
 ~~~~
 (ldm) ~/stable-diffusion$ python3 ./scripts/dream.py --gfpgan
 * Initializing, be patient...
