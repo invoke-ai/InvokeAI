@@ -316,6 +316,20 @@ class T2I:
                     iter_images = next(images_iterator)
                     generated_iterations.append([iter_images, seed])
                     for image in iter_images:
+                        try:
+                            # if gfpgan strength is none or less than or equal to 0.0 then 
+                            # don't even attempt to use GFPGAN.
+                            # if the user specified a value of -G that satisifies the condition and 
+                            # --gfpgan wasn't specified, at startup then
+                            # the net result is a message gets printed - nothing else happens.
+                            if gfpgan_strength is not None and gfpgan_strength > 0.0:
+                                image = self._run_gfpgan(
+                                    image, gfpgan_strength
+                                )
+                        except Exception as e:
+                            print(
+                                f'Error running GFPGAN - Your image was not enhanced.\n{e}'
+                            )
                         results.append([image, seed])
                         if image_callback is not None:
                             image_callback(image, seed)
@@ -346,7 +360,13 @@ class T2I:
             print('Are you sure your system has an adequate NVIDIA GPU?')
 
         toc = time.time()
-        print(f'{len(results)} images generated in', '%4.2fs' % (toc - tic))
+        
+        num_of_images_generated = len(results)
+        if gfpgan_strength > 0:
+            num_of_images_generated = len(results)/2
+
+        print(f'{num_of_images_generated} images generated in',
+              "%4.2fs" % (toc-tic))
         return results
 
     @torch.no_grad()
