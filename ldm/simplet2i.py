@@ -310,46 +310,32 @@ class T2I:
                     height=height,
                 )
 
-            generated_iterations = []
-            with scope(self.device.type), self.model.ema_scope():
-                for n in trange(iterations, desc="Sampling"):
-                    seed_everything(seed)
-                    iter_images = next(images_iterator)
-                    generated_iterations.append([iter_images, seed])
-                    for image in iter_images:
-                        try:
-                            # if gfpgan strength is none or less than or equal to 0.0 then 
-                            # don't even attempt to use GFPGAN.
-                            # if the user specified a value of -G that satisifies the condition and 
-                            # --gfpgan wasn't specified, at startup then
-                            # the net result is a message gets printed - nothing else happens.
-                            if gfpgan_strength is not None and gfpgan_strength > 0.0:
-                                image = self._run_gfpgan(
-                                    image, gfpgan_strength
-                                )
-                        except Exception as e:
-                            print(
-                                f'Error running GFPGAN - Your image was not enhanced.\n{e}'
-                            )
-                        results.append([image, seed])
-                        if image_callback is not None:
-                            image_callback(image, seed)
-                    seed = self._new_seed()
+          generated_iterations = []
+                      with scope(self.device.type), self.model.ema_scope():
+                          for n in trange(iterations, desc="Sampling"):
+                              seed_everything(seed)
+                              iter_images = next(images_iterator)
+                              generated_iterations.append([iter_images, seed])
+                              for image in iter_images:
+                                  results.append([image, seed])
+                                  if image_callback is not None:
+                                      image_callback(image, seed)
+                              seed = self._new_seed()
 
-                if gfpgan_strength > 0:
-                    for iteration in generated_iterations:
-                        for image in iteration[0]:
-                            try:
-                                if gfpgan_strength > 0:
-                                    image = self._run_gfpgan(
-                                        image, gfpgan_strength)
-                            except Exception as e:
-                                print(
-                                    f"Error running GFPGAN - Your image was not enhanced.\n{e}")
-                            results.append([image, iteration[1]])
-                            if image_callback is not None:
-                                image_callback(
-                                    image, iteration[1], upscaled=True)
+                          if gfpgan_strength > 0:
+                              for iteration in generated_iterations:
+                                  for image in iteration[0]:
+                                      try:
+                                          if gfpgan_strength > 0:
+                                              image = self._run_gfpgan(
+                                                  image, gfpgan_strength)
+                                      except Exception as e:
+                                          print(
+                                              f"Error running GFPGAN - Your image was not enhanced.\n{e}")
+                                      results.append([image, iteration[1]])
+                                      if image_callback is not None:
+                                          image_callback(
+                                              image, iteration[1], upscaled=True)
 
         except KeyboardInterrupt:
             print('*interrupted*')
