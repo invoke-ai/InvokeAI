@@ -311,23 +311,30 @@ class T2I:
                 )
 
             with scope(self.device.type), self.model.ema_scope():
-                for n in trange(iterations, desc='Sampling'):
+                for n in trange(iterations, desc="Sampling"):
                     seed_everything(seed)
                     iter_images = next(images_iterator)
+                    generated_iterations.append([iter_images, seed])
                     for image in iter_images:
-                        try:
-                            if gfpgan_strength > 0:
-                                image = self._run_gfpgan(
-                                    image, gfpgan_strength
-                                )
-                        except Exception as e:
-                            print(
-                                f'Error running GFPGAN - Your image was not enhanced.\n{e}'
-                            )
                         results.append([image, seed])
                         if image_callback is not None:
                             image_callback(image, seed)
                     seed = self._new_seed()
+
+                if gfpgan_strength > 0:
+                    for iteration in generated_iterations:
+                        for image in iteration[0]:
+                            try:
+                                if gfpgan_strength > 0:
+                                    image = self._run_gfpgan(
+                                        image, gfpgan_strength)
+                            except Exception as e:
+                                print(
+                                    f"Error running GFPGAN - Your image was not enhanced.\n{e}")
+                            results.append([image, iteration[1]])
+                            if image_callback is not None:
+                                image_callback(
+                                    image, iteration[1], upscaled=True)
 
         except KeyboardInterrupt:
             print('*interrupted*')
@@ -616,7 +623,7 @@ class T2I:
         return prompts, weights
 
     def _run_gfpgan(self, image, strength):
-        print("\n* Loading GFPGAN...")
+        print("\n* Loading GFPGAN & Upscaling Results...")
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             warnings.filterwarnings("ignore", category=UserWarning)
