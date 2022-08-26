@@ -318,6 +318,8 @@ class T2I:
                             print(
                                 f'Error running GFPGAN - Your image was not enhanced.\n{e}'
                             )
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
                         results.append([image, seed])
                         if image_callback is not None:
                             image_callback(image, seed)
