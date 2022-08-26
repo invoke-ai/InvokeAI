@@ -1,29 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
-:root{
+@import 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap';
+:root {
     --font: #6671A9;
     --placeholder_font: #adb2cd;
     --border_container: #E8F0F8;
     --field_border: #b2bdc7;
     --field_border_focus:#6671A9; 
     --field_font: #6671A9;
+    --button: #6387A6;
 }
 
-*{
+* {
     box-sizing: border-box;
 }
-body{
+body {
     margin: 0;
     color: var(--font);  
     font-family: 'Montserrat', sans-serif; 
     overflow: auto;
-    background-image: url("background.png");
+    background-image: url("background.jpg");
     background-size: cover;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
 }
-#content-wrapper{
+#content-wrapper {
     width: 100%;
     display: flex;
     flex-wrap: wrap;
@@ -50,13 +51,13 @@ body{
     display: flex;
     flex-wrap: wrap;
 }
-#search{
+#search {
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
 
 }
-#results{
+#results {
     width: 60%;
     align-items: flex-start;
     justify-content: space-between;
@@ -64,15 +65,15 @@ body{
     padding: 20px 30px;
 }
 
-fieldset{
+fieldset {
     border: none;
 }
 /*---------------------PROMPT-FIELD---------------------*/
-h2{
+h2 {
     color: var(--font) !important;
     padding: 10px 0;
 }
-h2 span{
+h2 span {
     /*background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);*/
     background: linear-gradient(-450deg, #CC648F, #3C308C, #171640, #6387A6, #A0E3F2);
 	background-size: 200% 200%;
@@ -90,22 +91,22 @@ h2 span{
     font-size: 14px;
     transition: ease all 0.2s;
 }
-#prompt::placeholder{
+#prompt::placeholder {
     color: var(--placeholder_font);
     font-size: 16px !important;
 }
 
-#prompt:focus{
+#prompt:focus {
     border: solid 2px var(--field_border_focus);
     outline: none;
 }
 
-/*---------------------CONFIG FIELDS---------------------*/
+/*---------------------CONFIG-FIELDS---------------------*/
 #generate-form {
     min-width: 100%;
 }
 
-#configs-container{
+#configs-container {
     width: 100%;
     background-color: #f1f1f1;
     border-radius: 8px;
@@ -117,7 +118,7 @@ h2 span{
     align-items: center;
 }
 
-.config-container{
+.config-container {
     flex-basis: auto;
     display: flex;
     flex-direction: column;
@@ -126,15 +127,13 @@ h2 span{
     align-items: flex-start;
     padding: 10px;
 }
-.config-container label{
+.config-container label {
     font-size: 14px;
     font-weight: 500;
     margin-bottom: 10px;
 }
 
-.config-container input, .config-container select{
-    width: 100%;
-    display: block;
+.config-container input, .config-container select {
     text-align: right;
     border: solid 2px var(--field_border);
     border-radius: 7px;
@@ -145,12 +144,11 @@ h2 span{
     transition: ease all 0.2s;
 }
 
-.config-container input:focus, .config-container select:focus{
-    border-color: var(--interactivo);
+.config-container input:focus, .config-container select:focus {
     outline: none;
 }
 
-.config-container input[type=file]{
+.config-container input[type=file] {
     width: 100% !important;
     flex-basis: auto;
     padding: 15px;
@@ -158,43 +156,40 @@ h2 span{
     cursor: pointer;
     background-color: white;
 }
+#seed-container{
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    column-gap: 5px;
+}
+
 #seed{
     width: 110px;
 }
-/*
-#seed {
-    width: 100%;
-    flex-basis: 100%;
-    display: inline-block;
-    flex-direction: row;
-}
-#reset {
-    font-size: 14px;
-    width: 20%;
-    flex-basis: 20%;
-    display: inline-block;
-    flex-direction: row;
-}
-*/
 
-/*---------------------BOTON-SUBMIT---------------------*/
-#submit, #reset {
-    width: 100%;
+/*---------------------BUTTON-SUBMIT-AND-RESET---------------------*/
+#submit, #reset{
     font-size: 16px;
-    margin-top: 20px;
-    background-color: var(--interactivo);
     border-radius: 8px;
     color: white;
-    padding: 10px;
     outline: none;
     border: none;
     cursor: pointer;
-    /*background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);*/
-    background: linear-gradient(-45deg, #CC648F, #3C308C, #171640, #6387A6, #A0E3F2);
-	background-size: 200% 200%;
+}
+#reset {
+    width: 30px;
+    padding: 5px 0;
+    background-color: var(--button);
 }
 #submit {
+    width: 100%;
     padding: 10px 20px;
+    margin-top: 20px;
+    padding: 10px;
+    background: linear-gradient(-45deg, #CC648F, #3C308C, #171640, #6387A6, #A0E3F2);
+	background-size: 200% 200%;
 }
 
 #submit:hover, #reset:hover{
@@ -233,7 +228,6 @@ h2 span{
     outline: none;
     border: none;
     cursor: pointer;
-    /*background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);*/
     background-color:  #3C308C;
 }
 
@@ -248,7 +242,7 @@ input[type="number"] {
 }
 
 
-/*----------Responsive----------*/
+/*----------RESPONSIVE----------*/
 @media only screen and (max-width: 1879px){
     #results{
         justify-content: center;
