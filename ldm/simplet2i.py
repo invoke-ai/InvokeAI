@@ -22,6 +22,7 @@ import transformers
 import time
 import re
 import traceback
+import warnings
 
 from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
@@ -135,7 +136,11 @@ class T2I:
         embedding_path=None,
         latent_diffusion_weights=False,  # just to keep track of this parameter when regenerating prompt
         device='cuda',
-        gfpgan=None,
+        gfpgan_upscale=2,
+        gfpgan_bg_upsampler='realesrgan',
+        gfpgan_bg_tile=400,
+        gfpgan_model_path='experiments/pretrained_models/GFPGANv1.3.pth',
+        gfpgan_dir='../GFPGAN'
     ):
         self.batch_size = batch_size
         self.iterations = iterations
@@ -157,7 +162,13 @@ class T2I:
         self.sampler = None
         self.latent_diffusion_weights = latent_diffusion_weights
         self.device = device
-        self.gfpgan = gfpgan
+        self.gfpgan = None
+        self.gfpgan_upscale = gfpgan_upscale
+        self.gfpgan_bg_upsampler = gfpgan_bg_upsampler
+        self.gfpgan_bg_tile = gfpgan_bg_tile
+        self.gfpgan_model_path = gfpgan_model_path
+        self.gfpgan_dir = gfpgan_dir
+          
         if seed is None:
             self.seed = self._new_seed()
         else:
@@ -605,6 +616,28 @@ class T2I:
         return prompts, weights
 
     def _run_gfpgan(self, image, strength):
+        print("\n* Loading GFPGAN...")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            warnings.filterwarnings("ignore", category=UserWarning)
+                    
+            try:
+                model_path = os.path.join(
+                    self.gfpgan_dir, self.gfpgan_model_path)
+                if not os.path.isfile(model_path):
+                    raise Exception(
+                        "GFPGAN model not found at path "+model_path)
+                sys.path.append(os.path.abspath(self.gfpgan_dir))
+                from gfpgan import GFPGANer
+                bg_upsampler = self._load_gfpgan_bg_upsampler(
+                    self.gfpgan_bg_upsampler, self.gfpgan_bg_tile)
+                self.gfpgan = GFPGANer(model_path=model_path, upscale=self.gfpgan_upscale,
+                                       arch='clean', channel_multiplier=2, bg_upsampler=bg_upsampler)
+            except Exception:
+                import traceback
+                print("Error loading GFPGAN:", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
+          
         if self.gfpgan is None:
             print(
                 f'GFPGAN not initialized, it must be loaded via the --gfpgan argument'
@@ -627,4 +660,30 @@ class T2I:
                 image = image.resize(res.size)
             res = Image.blend(image, res, strength)
 
+        torch.cuda.empty_cache()
+        self.gfpgan = None
+          
         return res
+
+    def _load_gfpgan_bg_upsampler(self, bg_upsampler, bg_tile=400):
+        if bg_upsampler == 'realesrgan':
+            if not torch.cuda.is_available():  # CPU
+                warnings.warn('The unoptimized RealESRGAN is slow on CPU. We do not use it. '
+                              'If you really want to use it, please modify the corresponding codes.')
+                bg_upsampler = None
+            else:
+                from basicsr.archs.rrdbnet_arch import RRDBNet
+                from realesrgan import RealESRGANer
+                model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64,
+                                num_block=23, num_grow_ch=32, scale=2)
+                bg_upsampler = RealESRGANer(
+                    scale=2,
+                    model_path='https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth',
+                    model=model,
+                    tile=bg_tile,
+                    tile_pad=10,
+                    pre_pad=0,
+                    half=True)  # need to set False in CPU mode
+        else:
+            bg_upsampler = None
+        return bg_upsampler
