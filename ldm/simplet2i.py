@@ -310,6 +310,7 @@ class T2I:
                     height=height,
                 )
 
+            generated_iterations = []
             with scope(self.device.type), self.model.ema_scope():
                 for n in trange(iterations, desc="Sampling"):
                     seed_everything(seed)
