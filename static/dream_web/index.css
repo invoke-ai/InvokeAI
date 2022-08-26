@@ -15,7 +15,7 @@ body{
     color: var(--font);  
     font-family: 'Montserrat', sans-serif; 
     overflow: auto;
-    background-image: url("3v2.png");
+    background-image: url("background.png");
     background-size: cover;
     display: flex;
     flex-wrap: wrap;
