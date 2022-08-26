@@ -1,61 +1,273 @@
-* {
-    font-family: 'Arial';
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
+:root{
+    --font: #6671A9;
+    --placeholder_font: #adb2cd;
+    --border: #E8F0F8;
+    --field_border: #b2bdc7;/* #6671A9;*/
+    --fuente_campo: #6671A9;
+}
+
+*{
+    box-sizing: border-box;
+}
+body{
+    margin: 0;
+    color: var(--font);  
+    font-family: 'Montserrat', sans-serif; 
+    overflow: auto;
+    background-image: url("3v2.png");
+    background-size: cover;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+}
+#content-wrapper{
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-content: space-between;
+    align-items: flex-start;
+    row-gap: 30px;
+    min-height: 550px;
+    padding: 50px 0;
 }
 #header {
-    text-decoration: dotted underline;
+    font-weight: 700;
+    color: white;
 }
-#search {
-    margin-top: 20vh;
-    margin-left: auto;
-    margin-right: auto;
-    max-width: 800px;
+#search, #results {
+    width: 60%;
+    margin: 0 auto;
+    padding: 10px 30px;
+    background-color: white;
+    border: solid 2px var(--border);
+    border-radius: 20px;
+    box-shadow: 0px 0px 30px -30px black;
+    display: flex;
+    flex-wrap: wrap;
+}
+#search{
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
 
-    text-align: center;
 }
-fieldset {
+#results{
+    width: 60%;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-direction: row;
+    padding: 20px 30px;
+}
+
+fieldset{
     border: none;
 }
-#fieldset-search {
-    display: flex;
+/*---------------------PROMPT-FIELD---------------------*/
+h2{
+    color: var(--font) !important;
+    padding: 10px 0;
+}
+h2 span{
+    /*background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);*/
+    background: linear-gradient(-450deg, #CC648F, #3C308C, #171640, #6387A6, #A0E3F2);
+	background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 #prompt {
-    flex-grow: 1;
+    width: 100%;
+    font-size: 18px !important;
+    border: solid 2px var(--field_border);
+    border-radius: 7px;
+    padding: 15px;
+    color: var(--fuente_campo);
+    font-weight: 600;
+    font-size: 14px;
+    transition: ease all 0.2s;
+}
+#prompt::placeholder{
+    color: var(--placeholder_font);
+    font-size: 16px !important;
+}
 
-    border-radius: 20px 0px 0px 20px;
-    padding: 5px 10px 5px 10px;
-    border: 1px solid black;
-    border-right: none;
+#prompt:focus{
+    border: solid 2px var(--interactivo);
     outline: none;
 }
+
+/*---------------------CONFIG FIELDS---------------------*/
+#generate-form {
+    min-width: 100%;
+}
+
+#configs-container{
+    width: 100%;
+    background-color: #f1f1f1;
+    border-radius: 8px;
+    padding: 5px 15px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.config-container{
+    flex-basis: auto;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 10px;
+}
+.config-container label{
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+.config-container input, .config-container select{
+    width: 100%;
+    display: block;
+    text-align: right;
+    border: solid 2px var(--field_border);
+    border-radius: 7px;
+    padding: 5px;
+    color: var(--fuente_campo);
+    font-weight: 600;
+    font-size: 14px;
+    transition: ease all 0.2s;
+}
+
+.config-container input:focus, .config-container select:focus{
+    border-color: var(--interactivo);
+    outline: none;
+}
+
+.config-container input[type=file]{
+    width: 100% !important;
+    flex-basis: auto;
+    padding: 15px;
+    flex-grow: 3;
+    cursor: pointer;
+    background-color: white;
+}
+#seed{
+    width: 110px;
+}
+/*
+#seed {
+    width: 100%;
+    flex-basis: 100%;
+    display: inline-block;
+    flex-direction: row;
+}
+#reset {
+    font-size: 14px;
+    width: 20%;
+    flex-basis: 20%;
+    display: inline-block;
+    flex-direction: row;
+}
+*/
+
+/*---------------------BOTON-SUBMIT---------------------*/
+#submit, #reset {
+    width: 100%;
+    font-size: 16px;
+    margin-top: 20px;
+    background-color: var(--interactivo);
+    border-radius: 8px;
+    color: white;
+    padding: 10px;
+    outline: none;
+    border: none;
+    cursor: pointer;
+    /*background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);*/
+    background: linear-gradient(-45deg, #CC648F, #3C308C, #171640, #6387A6, #A0E3F2);
+	background-size: 200% 200%;
+}
 #submit {
-    border-radius: 0px 20px 20px 0px;
-    padding: 5px 10px 5px 10px;
-    border: 1px solid black;
+    padding: 10px 20px;
 }
-#results {
+
+#submit:hover, #reset:hover{
+    background-color:rgb(3, 128, 201);
+	animation: gradient 1.1s ease infinite;
+}
+
+@keyframes gradient {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+/*---------------------ABOUT---------------------*/
+#about{
     text-align: center;
-    max-width: 1000px;
-    margin: auto;
-    padding-top: 10px;
+    margin-top: 20px;
 }
+/*-------------------UP--------------------------*/
+#up{
+    width: 100px;
+    text-align: center;
+    text-decoration: none;
+    font-size: 16px;
+    margin: 10px 10px 0 0;
+    background-color: var(--interactivo);
+    border-radius: 8px;
+    color: white;
+    padding: 10px;
+    outline: none;
+    border: none;
+    cursor: pointer;
+    /*background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);*/
+    background-color:  #3C308C;
+}
+
 img {
     cursor: pointer;
-    height: 30vh;
     border-radius: 5px;
     margin: 10px;
 }
-#fieldset-config {
-    line-height:2em;
-}
+
 input[type="number"] {
     width: 60px;
 }
-#seed {
-    width: 150px;
+
+
+/*----------Responsive----------*/
+@media only screen and (max-width: 1879px){
+    #results{
+        justify-content: center;
+    }
 }
-hr {
-    width: 200px;
+@media only screen and (max-width: 1150px){
+    #results, #search{
+        width: 80%;
+    }
 }
-label {
-    white-space: nowrap;
+@media only screen and (max-width: 800px){
+    #results, #search{
+        width: 90%;
+    }
+}
+@media only screen and (max-width: 650px){
+    img {
+        width: 100%;
+        cursor: pointer;
+        border-radius: 5px;
+        margin: 10px;
+    }
 }
