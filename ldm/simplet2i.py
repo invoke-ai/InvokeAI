@@ -320,6 +320,7 @@ class T2I:
                             )
                         if torch.cuda.is_available():
                             torch.cuda.empty_cache()
+                            torch.cuda.ipc_collect()
                         results.append([image, seed])
                         if image_callback is not None:
                             image_callback(image, seed)
