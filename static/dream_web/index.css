@@ -2,9 +2,10 @@
 :root{
     --font: #6671A9;
     --placeholder_font: #adb2cd;
-    --border: #E8F0F8;
-    --field_border: #b2bdc7;/* #6671A9;*/
-    --fuente_campo: #6671A9;
+    --border_container: #E8F0F8;
+    --field_border: #b2bdc7;
+    --field_border_focus:#6671A9; 
+    --field_font: #6671A9;
 }
 
 *{
@@ -43,7 +44,7 @@ body{
     margin: 0 auto;
     padding: 10px 30px;
     background-color: white;
-    border: solid 2px var(--border);
+    border: solid 2px var(--border_container);
     border-radius: 20px;
     box-shadow: 0px 0px 30px -30px black;
     display: flex;
@@ -84,7 +85,7 @@ h2 span{
     border: solid 2px var(--field_border);
     border-radius: 7px;
     padding: 15px;
-    color: var(--fuente_campo);
+    color: var(--field_font);
     font-weight: 600;
     font-size: 14px;
     transition: ease all 0.2s;
@@ -95,7 +96,7 @@ h2 span{
 }
 
 #prompt:focus{
-    border: solid 2px var(--interactivo);
+    border: solid 2px var(--field_border_focus);
     outline: none;
 }
 
@@ -138,7 +139,7 @@ h2 span{
     border: solid 2px var(--field_border);
     border-radius: 7px;
     padding: 5px;
-    color: var(--fuente_campo);
+    color: var(--field_font);
     font-weight: 600;
     font-size: 14px;
     transition: ease all 0.2s;
