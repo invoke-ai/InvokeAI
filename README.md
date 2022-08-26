@@ -105,11 +105,22 @@ Users whose GPU machines are isolated from the Internet (e.g. on a
 University cluster) should be aware that the first time you run
 dream.py with GFPGAN turned on, it will try to download model files
 from the Internet. To rectify this, you may run `python3
-scripts/preload_models.pl` after you have installed GFPGAN and all its
+scripts/preload_models.py` after you have installed GFPGAN and all its
 dependencies.
 
-Now, you can run this script by adding the **--gfpgan** option. Any
-issues with GFPGAN will be reported on initialization.
+You can set the GFPGAN related arguments at initialization if you want
+to modify them from the defaults.
+   
+GFPGAN can be activated by passing -G along with your prompt.
+G takes in values between 0.0 and 1.0 determining how strong the effect   
+of GFPGAN will be. GFPGAN is disabled at 0.
+
+The following command will run GFPGAN on your output at half strength
+and give you an enhanced 2x upscaled result.
+   
+```
+a koala bear dancing with a panda bear -G 0.5
+```
 
 ~~~~
 (ldm) ~/stable-diffusion$ python3 ./scripts/dream.py --gfpgan
