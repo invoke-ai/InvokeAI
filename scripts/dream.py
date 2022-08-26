@@ -55,6 +55,11 @@ def main():
         latent_diffusion_weights=opt.laion400m,  # this is solely for recreating the prompt
         embedding_path=opt.embedding_path,
         device=opt.device,
+        gfpgan_dir=opt.gfpgan_dir,
+        gfpgan_model_path=opt.gfpgan_model_path,
+        gfpgan_bg_upsampler=opt.gfpgan_bg_upsampler,
+        gfpgan_bg_tile=opt.gfpgan_bg_tile,
+        gfpgan_upscale=opt.gfpgan_upscale
     )
 
     # make sure the output directory exists
