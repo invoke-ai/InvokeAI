@@ -172,7 +172,7 @@ class T2I:
         """
         results = self.prompt2image(prompt, **kwargs)
         pngwriter = PngWriter(
-            outdir, prompt, kwargs.get('batch_size', self.batch_size)
+            outdir, prompt, kwargs.get('batch_size', self.batch_size), kwargs.get('filename')
         )
         for r in results:
             metadata_str = f'prompt2png("{prompt}" {kwargs} seed={r[1]}'   # gets written into the PNG

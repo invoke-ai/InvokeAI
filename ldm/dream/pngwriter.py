@@ -15,21 +15,27 @@ from PIL import Image, PngImagePlugin
 
 # -------------------image generation utils-----
 class PngWriter:
-    def __init__(self, outdir, prompt=None, batch_size=1):
+    def __init__(self, outdir, prompt=None, batch_size=1, filename=None):
         self.outdir = outdir
         self.batch_size = batch_size
         self.prompt = prompt
+        self.filename = filename
         self.filepath = None
         self.files_written = []
         os.makedirs(outdir, exist_ok=True)
 
     def write_image(self, image, seed):
-        self.filepath = self.unique_filename(
-            seed, self.filepath
-        )   # will increment name in some sensible way
+        if self.filename:
+            self.filepath = os.path.join(self.outdir, self.filename)
+        else:
+            self.filepath = self.unique_filename(
+                seed, self.filepath
+            )   # will increment name in some sensible way
         try:
             prompt = f'{self.prompt} -S{seed}'
-            self.save_image_and_prompt_to_png(image, prompt, self.filepath)
+            self.save_image_and_prompt_to_png(
+                image, prompt, self.filepath
+            )
         except IOError as e:
             print(e)
         self.files_written.append([self.filepath, seed])
