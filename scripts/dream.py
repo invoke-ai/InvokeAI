@@ -5,6 +5,7 @@ import argparse
 import shlex
 import os
 import sys
+import re
 import copy
 import warnings
 import ldm.dream.readline
@@ -30,6 +31,9 @@ def main():
         config = 'configs/stable-diffusion/v1-inference.yaml'
         weights = 'models/ldm/stable-diffusion-v1/model.ckpt'
 
+    if not opt.directory_name_from_prompt:
+        opt.directory_name_from_prompt = "n"
+
     print('* Initializing, be patient...\n')
     sys.path.append('.')
     from pytorch_lightning import logging
@@ -54,7 +58,8 @@ def main():
         config=config,
         latent_diffusion_weights=opt.laion400m,  # this is solely for recreating the prompt
         embedding_path=opt.embedding_path,
-        device=opt.device,
+        device=opt.device
+        #directory_name_from_prompt=opt.directory_name_from_prompt
     )
 
     # make sure the output directory exists
@@ -117,13 +122,13 @@ def main():
     log_path = os.path.join(opt.outdir, 'dream_log.txt')
     with open(log_path, 'a') as log:
         cmd_parser = create_cmd_parser()
-        main_loop(t2i, opt.outdir, cmd_parser, log, infile)
+        main_loop(t2i, opt.outdir, opt.directory_name_from_prompt, cmd_parser, log, infile)
         log.close()
     if infile:
         infile.close()
 
 
-def main_loop(t2i, outdir, parser, log, infile):
+def main_loop(t2i, outdir, directory_name_from_prompt, parser, log, infile):
     """prompt/read/execute loop"""
     done = False
     last_seeds = []
@@ -210,6 +215,22 @@ def main_loop(t2i, outdir, parser, log, infile):
         individual_images = not opt.grid
 
         try:
+            print ('\ndirectory_name_from_prompt is ' + directory_name_from_prompt + '.\n')
+            if directory_name_from_prompt != "n":
+
+                if directory_name_from_prompt == "simple":
+                    #this line will replace any non-alphanumeric characters in the prompt with underscores to make sanitized folder names:
+                    outdir = outdir + "/" + re.sub('[^A-Za-z0-9]+', '_', opt.prompt)
+                else:
+                    #this line will just leave the prompt as-is and use it as the folder name:
+                    outdir = outdir + "/" + opt.prompt
+
+                print ("\nWriting files to directory: \"" + outdir +"\"\n")
+            
+                # make sure the output directory exists
+                if not os.path.exists(outdir):
+                    os.makedirs(outdir)
+            
             file_writer = PngWriter(outdir, normalized_prompt, opt.batch_size)
             callback = file_writer.write_image if individual_images else None
 
@@ -391,6 +412,14 @@ def create_argv_parser():
         type=str,
         default='cuda',
         help='device to run stable diffusion on. defaults to cuda `torch.cuda.current_device()` if avalible',
+    )
+    parser.add_argument(
+        '--directory_name_from_prompt',
+        '-p',
+        type=str,
+        nargs='?',
+        const='y',
+        help='Output images are placed in subdirectories named using the prompt string. Only used if --directory_name_from_prompt or -p is specified.\nIf set to \"simple\" then all non-alphanumeric characters in the prompt will be replaced by underscores for the folder name.',
     )
     # GFPGAN related args
     parser.add_argument(
