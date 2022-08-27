@@ -132,8 +132,11 @@ def main_loop(t2i, outdir, directory_name_from_prompt, parser, log, infile):
     """prompt/read/execute loop"""
     done = False
     last_seeds = []
+    original_outdir = outdir
 
     while not done:
+        #reset outdir to original
+        outdir = original_outdir
         try:
             command = infile.readline() if infile else input('dream> ')
         except EOFError:
