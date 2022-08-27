@@ -319,7 +319,7 @@ def create_cmd_parser():
     parser.add_argument('-W', '--width', type=int, default=512,
                         help="image width, multiple of 64")
     parser.add_argument('-H', '--height', type=int,
-                        default=768, help="image height, multiple of 64")
+                        default=512, help="image height, multiple of 64")
     parser.add_argument('-C', '--cfg_scale', default=7.5,
                         type=float, help="prompt configuration scale")
     parser.add_argument('-g', '--grid', action='store_true',
