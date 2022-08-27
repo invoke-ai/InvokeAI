@@ -453,7 +453,7 @@ def create_argv_parser():
         '--web',
         dest='web',
         action='store_true',
-        help='start in the web server mode.',
+        help='start in web server mode.',
     )
     return parser
 

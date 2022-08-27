@@ -155,7 +155,7 @@ a few seconds to image generation. However, if can afford a 3090s with
 ## Barebones Web Server
 
 As of version 1.10, this distribution comes with a bare bones web
-server (see screenshot). To use it, run this script by adding the **--web** option.
+server (see screenshot). To use it, run the *dream.py* script by adding the **--web** option.
 
 You can then connect to the server by pointing your web browser at
 http://localhost:9090, or to the network name or IP address of the server.
