@@ -5,7 +5,8 @@ SAMPLES_DIR=${OUT_DIR}
 python scripts/dream.py \
     --from_file ${PROMPT_FILE} \
     --outdir ${OUT_DIR} \
-    --sampler plms
+    --sampler plms \
+    --full_precision
 
 # original output by CompVis/stable-diffusion
 IMAGE1=".dev_scripts/images/v1_4_astronaut_rides_horse_plms_step50_seed42.png"
