@@ -52,6 +52,8 @@ async function generateSubmit(form) {
     let formData = Object.fromEntries(new FormData(form));
     formData.initimg = formData.initimg.name !== '' ? await toBase64(formData.initimg) : null;
 
+    document.querySelector('progress').setAttribute('max', formData.steps);
+
     // Post as JSON, using Fetch streaming to get results
     fetch(form.action, {
         method: form.method,
@@ -69,10 +71,13 @@ async function generateSubmit(form) {
 
                 if (data.event == 'result') {
                     noOutputs = false;
+                    document.querySelector("#no-results-message")?.remove();
 
                     for (let [file, seed] of data.files) {
-                        appendOutput(file, seed, data.config)
+                        appendOutput(file, seed, data.config);
                     }
+                } else if (data.event == 'step') {
+                    document.querySelector('progress').setAttribute('value', data.step.toString());
                 }
             }
         }
@@ -80,10 +85,9 @@ async function generateSubmit(form) {
         // Re-enable form, remove no-results-message
         form.querySelector('fieldset').removeAttribute('disabled');
         document.querySelector("#prompt").value = prompt;
+        document.querySelector('progress').setAttribute('value', '0');
 
-        if (!noOutputs) {
-            document.querySelector("#no-results-message")?.remove();
-        } else {
+        if (noOutputs) {
             alert("Error occurred while generating.");
         }
     });
