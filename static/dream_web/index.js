@@ -59,11 +59,12 @@ async function generateSubmit(form) {
         method: form.method,
         body: JSON.stringify(formData),
     }).then(async (response) => {
-        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+        const reader = response.body.getReader();
 
         let noOutputs = true;
         while (true) {
-            const {value, done} = await reader.read();
+            let {value, done} = await reader.read();
+            value = new TextDecoder().decode(value);
             if (done) break;
 
             for (let event of value.split('\n').filter(e => e !== '')) {
