@@ -9,6 +9,7 @@ import copy
 import warnings
 import ldm.dream.readline
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
+from dream_server import DreamServer, ThreadingDreamServer
 
 debugging = False
 
@@ -117,7 +118,26 @@ def main():
     log_path = os.path.join(opt.outdir, 'dream_log.txt')
     with open(log_path, 'a') as log:
         cmd_parser = create_cmd_parser()
-        main_loop(t2i, opt.outdir, cmd_parser, log, infile)
+        if (opt.web):
+            print('\n* --web was specified, starting web server...')
+            # Change working directory to the stable-diffusion directory
+            os.chdir(
+                os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
+            )
+
+            # Start server
+            DreamServer.model = t2i
+            dream_server = ThreadingDreamServer(("0.0.0.0", 9090))
+            print("\n\n* Started Stable Diffusion dream server! Point your browser at http://localhost:9090 or use the host's DNS name or IP address. *")
+
+            try:
+                dream_server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+
+            dream_server.server_close()
+        else:
+            main_loop(t2i, opt.outdir, cmd_parser, log, infile)
         log.close()
     if infile:
         infile.close()
@@ -428,6 +448,12 @@ def create_argv_parser():
         type=str,
         default='../GFPGAN',
         help='indicates the directory containing the GFPGAN code. Only used if --gfpgan is specified',
+    )
+    parser.add_argument(
+        '--web',
+        dest='web',
+        action='store_true',
+        help='start in the web server mode.',
     )
     return parser
 
