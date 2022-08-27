@@ -86,6 +86,7 @@ class DreamServer(BaseHTTPRequestHandler):
         result = {'outputs': outputs}
         self.wfile.write(bytes(json.dumps(result), "utf-8"))
 
+
 class ThreadingDreamServer(ThreadingHTTPServer):
     def __init__(self, server_address):
-        super(ThreadingDreamServer,self).__init__(server_address, DreamServer)
+        super(ThreadingDreamServer, self).__init__(server_address, DreamServer)

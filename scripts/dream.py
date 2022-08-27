@@ -111,10 +111,6 @@ def main():
                 print('Error loading GFPGAN:', file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
 
-    print(
-        "\n* Initialization done! Awaiting your command (-h for help, 'q' to quit, 'cd' to change output dir, 'pwd' to print output dir)..."
-    )
-
     log_path = os.path.join(opt.outdir, 'dream_log.txt')
     with open(log_path, 'a') as log:
         cmd_parser = create_cmd_parser()
@@ -128,6 +124,9 @@ def main():
 
 
 def main_loop(t2i, outdir, parser, log, infile):
+    print(
+        "\n* Initialization done! Awaiting your command (-h for help, 'q' to quit, 'cd' to change output dir, 'pwd' to print output dir)..."
+    )
     """prompt/read/execute loop"""
     done = False
     last_seeds = []
@@ -247,6 +246,7 @@ def main_loop(t2i, outdir, parser, log, infile):
 
     print('goodbye!')
 
+
 def dream_server_loop(t2i):
     print('\n* --web was specified, starting web server...')
     # Change working directory to the stable-diffusion directory
@@ -257,7 +257,8 @@ def dream_server_loop(t2i):
     # Start server
     DreamServer.model = t2i
     dream_server = ThreadingDreamServer(("0.0.0.0", 9090))
-    print("\n\n* Started Stable Diffusion dream server! Point your browser at http://localhost:9090 or use the host's DNS name or IP address. *")
+    print("\nStarted Stable Diffusion dream server!")
+    print("Point your browser at http://localhost:9090 or use the host's DNS name or IP address.")
 
     try:
         dream_server.serve_forever()
@@ -265,6 +266,7 @@ def dream_server_loop(t2i):
         pass
 
     dream_server.server_close()
+
 
 def load_gfpgan_bg_upsampler(bg_upsampler, bg_tile=400):
     import torch
