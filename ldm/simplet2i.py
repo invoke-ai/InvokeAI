@@ -293,25 +293,25 @@ The vast majority of these arguments default to reasonable values.
 
             if upscale is not None or gfpgan_strength > 0:
                 for result in results:
+                    image, seed = result
                     try:
                         if upscale is not None:
                             from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
                             image = real_esrgan_upscale(
-                                result[0], upscale[1], int(upscale[0]), prompt, result[1])
+                                image, upscale[1], int(upscale[0]), prompt, seed)
                         if gfpgan_strength > 0:
                             from ldm.gfpgan.gfpgan_tools import _run_gfpgan
                             image = _run_gfpgan(
-                                image, gfpgan_strength, prompt, result[1], 1)
+                                image, gfpgan_strength, prompt, seed, 1)
                     except Exception as e:
                         print(
                             f"Error running RealESRGAN - Your image was not upscaled.\n{e}")
                     if image_callback is not None:
                         if save_original:
-                            image_callback(
-                                image, result[1],)
+                            image_callback(image, seed)
                         else:
                             image_callback(
-                                image, result[1], upscaled=True)
+                                image, seed, upscaled=True)
 
         except KeyboardInterrupt:
             print('*interrupted*')
