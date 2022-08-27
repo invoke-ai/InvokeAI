@@ -118,24 +118,8 @@ def main():
     log_path = os.path.join(opt.outdir, 'dream_log.txt')
     with open(log_path, 'a') as log:
         cmd_parser = create_cmd_parser()
-        if (opt.web):
-            print('\n* --web was specified, starting web server...')
-            # Change working directory to the stable-diffusion directory
-            os.chdir(
-                os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
-            )
-
-            # Start server
-            DreamServer.model = t2i
-            dream_server = ThreadingDreamServer(("0.0.0.0", 9090))
-            print("\n\n* Started Stable Diffusion dream server! Point your browser at http://localhost:9090 or use the host's DNS name or IP address. *")
-
-            try:
-                dream_server.serve_forever()
-            except KeyboardInterrupt:
-                pass
-
-            dream_server.server_close()
+        if opt.web:
+            dream_server_loop(t2i)
         else:
             main_loop(t2i, opt.outdir, cmd_parser, log, infile)
         log.close()
@@ -263,6 +247,24 @@ def main_loop(t2i, outdir, parser, log, infile):
 
     print('goodbye!')
 
+def dream_server_loop(t2i):
+    print('\n* --web was specified, starting web server...')
+    # Change working directory to the stable-diffusion directory
+    os.chdir(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    )
+
+    # Start server
+    DreamServer.model = t2i
+    dream_server = ThreadingDreamServer(("0.0.0.0", 9090))
+    print("\n\n* Started Stable Diffusion dream server! Point your browser at http://localhost:9090 or use the host's DNS name or IP address. *")
+
+    try:
+        dream_server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+    dream_server.server_close()
 
 def load_gfpgan_bg_upsampler(bg_upsampler, bg_tile=400):
     import torch
