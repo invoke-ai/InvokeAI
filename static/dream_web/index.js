@@ -7,12 +7,11 @@ function toBase64(file) {
     });
 }
 
-function appendOutput(output) {
+function appendOutput(src, seed, config) {
     let outputNode = document.createElement("img");
-    outputNode.src = output[0];
+    outputNode.src = src;
 
-    let outputConfig = output[2];
-    let altText = output[1].toString() + " | " + outputConfig.prompt;
+    let altText = seed.toString() + " | " + config.prompt;
     outputNode.alt = altText;
     outputNode.title = altText;
 
@@ -20,20 +19,14 @@ function appendOutput(output) {
     outputNode.addEventListener('click', () => {
         let form = document.querySelector("#generate-form");
         for (const [k, v] of new FormData(form)) {
-            form.querySelector(`*[name=${k}]`).value = outputConfig[k];
+            form.querySelector(`*[name=${k}]`).value = config[k];
         }
-        document.querySelector("#seed").value = output[1];
+        document.querySelector("#seed").value = seed;
 
         saveFields(document.querySelector("#generate-form"));
     });
 
     document.querySelector("#results").prepend(outputNode);
-}
-
-function appendOutputs(outputs) {
-    for (const output of outputs) {
-        appendOutput(output);
-    }
 }
 
 function saveFields(form) {
@@ -59,20 +52,37 @@ async function generateSubmit(form) {
     let formData = Object.fromEntries(new FormData(form));
     formData.initimg = formData.initimg.name !== '' ? await toBase64(formData.initimg) : null;
 
-    // Post as JSON
+    // Post as JSON, using Fetch streaming to get results
     fetch(form.action, {
         method: form.method,
         body: JSON.stringify(formData),
-    }).then(async (result) => {
-        let data = await result.json();
+    }).then(async (response) => {
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+        let noOutputs = true;
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+
+            for (let event of value.split('\n').filter(e => e !== '')) {
+                const data = JSON.parse(event);
+
+                if (data.event == 'result') {
+                    noOutputs = false;
+
+                    for (let [file, seed] of data.files) {
+                        appendOutput(file, seed, data.config)
+                    }
+                }
+            }
+        }
 
         // Re-enable form, remove no-results-message
         form.querySelector('fieldset').removeAttribute('disabled');
         document.querySelector("#prompt").value = prompt;
 
-        if (data.outputs.length != 0) {
+        if (!noOutputs) {
             document.querySelector("#no-results-message")?.remove();
-            appendOutputs(data.outputs);
         } else {
             alert("Error occurred while generating.");
         }

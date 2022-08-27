@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 print("Loading model...")
 from ldm.simplet2i import T2I
+from ldm.dream.pngwriter import PngWriter
 model = T2I(sampler_name='k_lms')
 
 # to get rid of annoying warning messages from pytorch
@@ -56,16 +57,44 @@ class DreamServer(BaseHTTPRequestHandler):
 
         print(f"Request to generate with prompt: {prompt}")
 
-        outputs = []
+        def image_done(image, seed):
+            config = post_data.copy() # Shallow copy
+            config['initimg'] = ''
+
+            # Write PNGs
+            pngwriter = PngWriter(
+                "./outputs/img-samples/", config['prompt'], 1
+            )
+            # metadata_str = f'prompt2png({json.dumps(config)} seed={seed}' # gets written into the PNG
+            pngwriter.write_image(image, seed)
+
+            # Append post_data to log
+            with open("./outputs/img-samples/dream_web_log.txt", "a") as log:
+                for file_path, _ in pngwriter.files_written:
+                    log.write(f"{file_path}: {json.dumps(config)}\n")
+
+            self.wfile.write(bytes(json.dumps(
+                {'event':'result', 'files':pngwriter.files_written, 'config':config}
+            ) + '\n',"utf-8"))
+
+        def image_progress(image, step):
+            self.wfile.write(bytes(json.dumps(
+                {'event':'step', 'step':step}
+            ) + '\n',"utf-8"))
+
+        # outputs = []
         if initimg is None:
             # Run txt2img
-            outputs = model.txt2img(prompt,
-                                    iterations=iterations,
-                                    cfg_scale = cfgscale,
-                                    width = width,
-                                    height = height,
-                                    seed = seed,
-                                    steps = steps)
+            model.prompt2image(prompt,
+                               iterations=iterations,
+                               cfg_scale = cfgscale,
+                               width = width,
+                               height = height,
+                               seed = seed,
+                               steps = steps,
+
+                               step_callback=image_progress,
+                               image_callback=image_done)
         else:
             # Decode initimg as base64 to temp file
             with open("./img2img-tmp.png", "wb") as f:
@@ -73,27 +102,19 @@ class DreamServer(BaseHTTPRequestHandler):
                 f.write(base64.b64decode(initimg))
 
                 # Run img2img
-                outputs = model.img2img(prompt,
-                                        init_img = "./img2img-tmp.png",
-                                        iterations = iterations,
-                                        cfg_scale = cfgscale,
-                                        seed = seed,
-                                        steps = steps)
+                model.prompt2image(prompt,
+                                   init_img = "./img2img-tmp.png",
+                                   iterations = iterations,
+                                   cfg_scale = cfgscale,
+                                   seed = seed,
+                                   steps = steps,
+
+                                   step_callback=image_progress,
+                                   image_callback=image_done)
             # Remove the temp file
             os.remove("./img2img-tmp.png")
 
-        print(f"Prompt generated with output: {outputs}")
-
-        post_data['initimg'] = '' # Don't send init image back
-
-        # Append post_data to log
-        with open("./outputs/img-samples/dream_web_log.txt", "a") as log:
-            for output in outputs:
-                log.write(f"{output[0]}: {json.dumps(post_data)}\n")
-
-        outputs = [x + [post_data] for x in outputs] # Append config to each output
-        result = {'outputs': outputs}
-        self.wfile.write(bytes(json.dumps(result), "utf-8"))
+        print(f"Prompt generated!")
 
 if __name__ == "__main__":
     # Change working directory to the stable-diffusion directory
