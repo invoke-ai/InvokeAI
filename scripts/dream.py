@@ -115,7 +115,7 @@ def main():
     )
 
     log_path = os.path.join(opt.outdir, 'dream_log.txt')
-    with open(log_path, 'a') as log:
+    with open(log_path, 'ab') as log:
         cmd_parser = create_cmd_parser()
         main_loop(t2i, opt.outdir, cmd_parser, log, infile)
         log.close()
@@ -320,7 +320,7 @@ def write_log_message(t2i, prompt, results, logfile):
         log_message = f'{r[0]}: {prompt} -S{seed}'
 
         print(log_message)
-        logfile.write(log_message + '\n')
+        logfile.write((log_message + '\n').encode('utf-8'))
         logfile.flush()
 
 
