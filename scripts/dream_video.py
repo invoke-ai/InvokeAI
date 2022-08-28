@@ -2,6 +2,7 @@ import argparse
 import string
 import os
 import cv2
+from tqdm import tqdm
 from ldm.simplet2i import T2I
 from random import choice
 import PIL
@@ -14,11 +15,11 @@ def get_vid_path():
 
 def prompt2vid(**config):
     prompt = config["prompt"]
-    n_frames = config["n_frames"] or 0
+    n_frames = config["n_frames"]
     initial_image = config["init_img"]
-    fps = config["fps"] or 30.0
-    cfg_scale = config["cfg_scale"] or 7.5
-    strength = config["strength"] or 0.2
+    fps = config["fps"] if "fps" in config else 30.0
+    cfg_scale = config["cfg_scale"] if "cfg_scale" in config else 7.5
+    strength = config["strength"] if "strength" in config else 0.8
 
     vid_path = get_vid_path()
     frames_path = os.path.join(vid_path, "frames")
@@ -36,7 +37,7 @@ def prompt2vid(**config):
     next_frame.save(next_frame_filename)
     video_writer.write(cv2.imread(next_frame_filename))
     
-    for i in range(n_frames):
+    for i in tqdm(range(n_frames), desc="Creating Video"):
         images = _t2i.prompt2image(prompt, init_img=next_frame_filename, strength=strength, cfg_scale=cfg_scale)
         
         next_frame, _seed = choice(images)
@@ -70,7 +71,7 @@ def create_parser():
         "-f",
         "--strength",
         type=float,
-        default=0.2,
+        default=0.8,
         help="The strength applied to img2img per frame"
     )
     parser.add_argument(
