@@ -296,6 +296,22 @@ Credit goes to @rinongal and the repository located at
 https://github.com/rinongal/textual_inversion Please see the
 repository and associated paper for details and limitations.
 
+## Creating Videos from Prompts
+
+dream_video.py creates a video by running img2img for each movie frame, cropping and rescaling the image (zooming in) and running img2img on the rescaled image again.
+
+dream_video.py can be called on the CLI like this:
+
+`python scripts/dream_video.py "prompt" -F <frame count> [-I <initial-image>]`
+
+It can also be used as a module:
+
+```py
+import dream_video
+
+dream_video.prompt2vid(prompt="Prompt", n_frames=120)
+```
+
 ## Changes
 
  * v1.11 (26 August 2022)
