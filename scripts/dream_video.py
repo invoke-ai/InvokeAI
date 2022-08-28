@@ -10,8 +10,8 @@ from PIL.Image import Resampling
 
 _t2i = T2I()
 
-def get_vid_path():
-    return os.path.join(".", "outputs", "vid-samples")
+def get_vid_path(prompt=""):
+    return os.path.join(".", "outputs", "vid-samples", prompt)
 
 def prompt2vid(**config):
     prompt = config["prompt"]
@@ -21,7 +21,7 @@ def prompt2vid(**config):
     cfg_scale = config["cfg_scale"] if "cfg_scale" in config else 7.5
     strength = config["strength"] if "strength" in config else 0.8
 
-    vid_path = get_vid_path()
+    vid_path = get_vid_path(prompt)
     frames_path = os.path.join(vid_path, "frames")
     os.makedirs(frames_path, exist_ok=True)
     
