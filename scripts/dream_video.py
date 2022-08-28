@@ -15,7 +15,10 @@ def prompt2vid(prompt, n_frames, initial_image = None, **config):
     vid_path = get_vid_path()
     os.makedirs(vid_path, exist_ok=True)
     
-    next_frame = PIL.Image.open(initial_image)
+    if initial_image:
+        next_frame = PIL.Image.open(initial_image)
+    else:
+        next_frame, _seed = _t2i.prompt2image(prompt, steps=50)[0]
     next_frame_filename = os.path.join(vid_path, "0.png")
     next_frame.save(next_frame_filename)
     for i in range(n_frames):
@@ -41,7 +44,8 @@ def create_parser():
     parser.add_argument(
         "-I",
         "--init_img",
-        type=str
+        type=str,
+        default=None
     )
     return parser
 
