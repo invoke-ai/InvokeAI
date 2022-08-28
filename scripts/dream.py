@@ -508,6 +508,12 @@ def create_cmd_parser():
         action='store_true',
         help='skip subprompt weight normalization',
     )
+    parser.add_argument(
+        '-t',
+        '--log_tokenization',
+        action='store_true',
+        help='shows how the prompt is split into tokens'
+    )
     return parser
 
 

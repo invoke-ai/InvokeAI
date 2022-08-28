@@ -210,6 +210,7 @@ class T2I:
         strength=None,
         gfpgan_strength=None,
         variants=None,
+        log_tokenization=False,
         **args,
     ):   # eat up additional cruft
         """
@@ -250,6 +251,7 @@ class T2I:
         batch_size = batch_size or self.batch_size
         iterations = iterations or self.iterations
         strength = strength or self.strength
+        self.log_tokenization = log_tokenization
 
         model = (
             self.load_model()
@@ -448,6 +450,7 @@ class T2I:
                 weight = weights[i]
                 if not skip_normalize:
                     weight = weight / totalWeight
+                self._log_tokenization(subprompts[i])
                 c = torch.add(
                     c,
                     self.model.get_learned_conditioning(
@@ -456,6 +459,7 @@ class T2I:
                     alpha=weight,
                 )
         else:   # just standard 1 prompt
+            self._log_tokenization(prompt)
             c = self.model.get_learned_conditioning(batch_size * [prompt])
         return (uc, c)
 
@@ -637,3 +641,20 @@ class T2I:
             res = Image.blend(image, res, strength)
 
         return res
+
+    # shows how the prompt is tokenized 
+    # usually tokens have '</w>' to indicate end-of-word, 
+    # but for readability it has been replaced with ' '
+    def _log_tokenization(self, text):
+        if not self.log_tokenization:
+            return
+        tokens = self.model.cond_stage_model.tokenizer._tokenize(text)
+        tokenized = ""
+        tokenCount = 0
+        for t in tokens:
+            token = t.replace('</w>',' ')
+            # alternate color
+            s = (tokenCount % 6) + 1
+            tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
+            tokenCount += 1
+        print(f"\nTokens ({tokenCount}):\n{tokenized}\x1b[0m")
