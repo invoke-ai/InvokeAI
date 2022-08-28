@@ -105,7 +105,7 @@ Users whose GPU machines are isolated from the Internet (e.g. on a
 University cluster) should be aware that the first time you run
 dream.py with GFPGAN turned on, it will try to download model files
 from the Internet. To rectify this, you may run `python3
-scripts/preload_models.pl` after you have installed GFPGAN and all its
+scripts/preload_models.py` after you have installed GFPGAN and all its
 dependencies.
 
 Now, you can run this script by adding the **--gfpgan** option. Any
