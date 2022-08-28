@@ -12,7 +12,14 @@ _t2i = T2I()
 def get_vid_path():
     return os.path.join(".", "outputs", "vid-samples")
 
-def prompt2vid(prompt, n_frames, initial_image = None, **config):
+def prompt2vid(**config):
+    prompt = config["prompt"]
+    n_frames = config["n_frames"] or 0
+    initial_image = config["init_img"]
+    fps = config["fps"] or 30.0
+    cfg_scale = config["cfg_scale"] or 7.5
+    strength = config["strength"] or 0.2
+
     vid_path = get_vid_path()
     frames_path = os.path.join(vid_path, "frames")
     os.makedirs(frames_path, exist_ok=True)
@@ -20,17 +27,17 @@ def prompt2vid(prompt, n_frames, initial_image = None, **config):
     if initial_image:
         next_frame = PIL.Image.open(initial_image)
     else:
-        next_frame, _seed = _t2i.prompt2image(prompt, steps=50)[0]
+        next_frame, _seed = _t2i.prompt2image(prompt, steps=50, cfg_scale=cfg_scale)[0]
     
     w, h = next_frame.size
-    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 1, 30.0, (w, h))
+    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 1, fps, (w, h))
 
     next_frame_filename = os.path.join(frames_path, "0.png")
     next_frame.save(next_frame_filename)
     video_writer.write(cv2.imread(next_frame_filename))
     
     for i in range(n_frames):
-        images = _t2i.prompt2image(prompt, init_img=next_frame_filename, strength=0.2, **config)
+        images = _t2i.prompt2image(prompt, init_img=next_frame_filename, strength=strength, cfg_scale=cfg_scale)
         
         next_frame, _seed = choice(images)
         w, h = next_frame.size
@@ -59,6 +66,27 @@ def create_parser():
         type=str,
         default=None
     )
+    parser.add_argument(
+        "-f",
+        "--strength",
+        type=float,
+        default=0.2,
+        help="The strength applied to img2img per frame"
+    )
+    parser.add_argument(
+        "-P",
+        "--fps",
+        type=float,
+        default=30.0,
+        help="Frames per Second of the result video"
+    )
+    parser.add_argument(
+        "-C",
+        "--cfg_scale",
+        type=float,
+        default=7.5,
+        help="Prompt configuration scale"
+    )
     return parser
 
 if __name__ == "__main__":
@@ -69,4 +97,5 @@ if __name__ == "__main__":
     _t2i.load_model()
 
     print(opt)
-    prompt2vid(opt.prompt, opt.n_frames, opt.init_img)
+    print(vars(opt))
+    prompt2vid(**vars(opt))
