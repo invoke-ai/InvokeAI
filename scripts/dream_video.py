@@ -23,7 +23,7 @@ def prompt2vid(prompt, n_frames, initial_image = None, **config):
         next_frame, _seed = _t2i.prompt2image(prompt, steps=50)[0]
     
     w, h = next_frame.size
-    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 1, 0, (w, h))
+    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 1, 30.0, (w, h))
 
     next_frame_filename = os.path.join(frames_path, "0.png")
     next_frame.save(next_frame_filename)
