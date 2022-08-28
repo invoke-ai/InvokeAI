@@ -650,11 +650,18 @@ class T2I:
             return
         tokens = self.model.cond_stage_model.tokenizer._tokenize(text)
         tokenized = ""
-        tokenCount = 0
-        for t in tokens:
-            token = t.replace('</w>',' ')
+        discarded = ""
+        usedTokens = 0
+        totalTokens = len(tokens)
+        for i in range(0,totalTokens):                
+            token = tokens[i].replace('</w>',' ')
             # alternate color
-            s = (tokenCount % 6) + 1
-            tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
-            tokenCount += 1
-        print(f"\nTokens ({tokenCount}):\n{tokenized}\x1b[0m")
+            s = (usedTokens % 6) + 1
+            if i < self.model.cond_stage_model.max_length:
+                tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
+                usedTokens += 1
+            else: # over max token length
+                discarded = discarded + f"\x1b[0;3{s};40m{token}"
+        print(f"\nTokens ({usedTokens}):\n{tokenized}\x1b[0m")
+        if discarded != "":
+            print(f"Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m")
