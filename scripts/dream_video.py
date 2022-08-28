@@ -33,6 +33,7 @@ def prompt2vid(**config):
     w, h = next_frame.size
     video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 1, fps, (w, h))
 
+    # write first frame
     next_frame_filename = os.path.join(frames_path, "0.png")
     next_frame.save(next_frame_filename)
     video_writer.write(cv2.imread(next_frame_filename))
@@ -41,10 +42,17 @@ def prompt2vid(**config):
         images = _t2i.prompt2image(prompt, init_img=next_frame_filename, strength=strength, cfg_scale=cfg_scale)
         
         next_frame, _seed = choice(images)
+        
+        # calculate the area to crop for the generated image
         w, h = next_frame.size
-        crop_box = (int(w * 0.01), int(h * 0.01), int(w * 0.99), int(h * 0.99))
+        crop_w, crop_h = int(w * pow(0.5, 1 / fps)), int(h * pow(0.5, 1 / fps)) # magn. by 2x per second
+        inset_x, inset_y = int((w - crop_w) / 2), int((h - crop_h) / 2)
+        crop_box = (inset_x, inset_y, w - inset_x, h - inset_y)
+        
+        # resize to original size
         next_frame = next_frame.crop(crop_box).resize((w, h), resample=Resampling.BICUBIC)
         
+        # save and write to video
         next_frame_filename = os.path.join(frames_path, f"{i}.png")
         next_frame.save(next_frame_filename)
         video_writer.write(cv2.imread(next_frame_filename))
@@ -92,11 +100,9 @@ def create_parser():
 
 if __name__ == "__main__":
     parser = create_parser()
-    opt = parser.parse_args()
+    opt = vars(parser.parse_args())
 
     print("Initializing Model, please wait...")
     _t2i.load_model()
 
-    print(opt)
-    print(vars(opt))
-    prompt2vid(**vars(opt))
+    prompt2vid(**opt)
