@@ -1,6 +1,7 @@
 import argparse
 import string
 import os
+import cv2
 from ldm.simplet2i import T2I
 from random import choice
 import PIL
@@ -13,14 +14,21 @@ def get_vid_path():
 
 def prompt2vid(prompt, n_frames, initial_image = None, **config):
     vid_path = get_vid_path()
-    os.makedirs(vid_path, exist_ok=True)
+    frames_path = os.path.join(vid_path, "frames")
+    os.makedirs(frames_path, exist_ok=True)
     
     if initial_image:
         next_frame = PIL.Image.open(initial_image)
     else:
         next_frame, _seed = _t2i.prompt2image(prompt, steps=50)[0]
-    next_frame_filename = os.path.join(vid_path, "0.png")
+    
+    w, h = next_frame.size
+    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 1, 0, (w, h))
+
+    next_frame_filename = os.path.join(frames_path, "0.png")
     next_frame.save(next_frame_filename)
+    video_writer.write(cv2.imread(next_frame_filename))
+    
     for i in range(n_frames):
         images = _t2i.prompt2image(prompt, init_img=next_frame_filename, strength=0.2, **config)
         
@@ -29,8 +37,12 @@ def prompt2vid(prompt, n_frames, initial_image = None, **config):
         crop_box = (int(w * 0.01), int(h * 0.01), int(w * 0.99), int(h * 0.99))
         next_frame = next_frame.crop(crop_box).resize((w, h), resample=Resampling.BICUBIC)
         
-        next_frame_filename = os.path.join(vid_path, f"{i}.png")
+        next_frame_filename = os.path.join(frames_path, f"{i}.png")
         next_frame.save(next_frame_filename)
+        video_writer.write(cv2.imread(next_frame_filename))
+    
+    cv2.destroyAllWindows()
+    video_writer.release()
 
 def create_parser():
     parser = argparse.ArgumentParser(description="Parse Arguments for dream_video")
