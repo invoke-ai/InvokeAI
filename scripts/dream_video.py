@@ -20,6 +20,7 @@ def prompt2vid(**config):
     fps = config["fps"] if "fps" in config else 30.0
     cfg_scale = config["cfg_scale"] if "cfg_scale" in config else 7.5
     strength = config["strength"] if "strength" in config else 0.8
+    zoom_speed = config["zoom_speed"] if "zoom_speed" in config else 2.0
 
     vid_path = get_vid_path(prompt)
     frames_path = os.path.join(vid_path, "frames")
@@ -45,7 +46,7 @@ def prompt2vid(**config):
         
         # calculate the area to crop for the generated image
         w, h = next_frame.size
-        crop_w, crop_h = int(w * pow(0.5, 1 / fps)), int(h * pow(0.5, 1 / fps)) # magn. by 2x per second
+        crop_w, crop_h = int(w / zoom_speed ** (1 / fps)), int(h / zoom_speed ** (1 / fps)) # magn. by (zoom_speed)x per second
         inset_x, inset_y = int((w - crop_w) / 2), int((h - crop_h) / 2)
         crop_box = (inset_x, inset_y, w - inset_x, h - inset_y)
         
@@ -95,6 +96,13 @@ def create_parser():
         type=float,
         default=7.5,
         help="Prompt configuration scale"
+    )
+    parser.add_argument(
+        "-z",
+        "--zoom_speed",
+        type=float,
+        default=2.0,
+        help="Factor to zoom in by each second"
     )
     return parser
 
