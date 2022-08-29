@@ -1,14 +1,18 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
     <title>Stable Diffusion Dream Server</title>
     <link rel="icon" href="data:,">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <link rel="stylesheet" href="static/dream_web/index.css">
+    <link rel="stylesheet" id="themeStylesheetLink" href="static/dream_web/themes/theme_1.css">
     <script src="static/dream_web/index.js"></script>
   </head>
   <body>
     <div id="content-wrapper">
+      <select id="theme-selector">
+        <option value="theme_1" selected>Theme 1</option>
+        <option value="theme_2">Theme 2</option>
+      </select>
       <div id="search">
         <h2 id="header">Stable Diffusion <span>Dream Server</span></h2>
         <form id="generate-form" method="post" action="#">
@@ -79,6 +83,7 @@
         <!--Bug: After pressing it, the "Generate" button does not work."-->
         <!--<a href="#search" id="up">Up! &#8593;</a>-->
       </div>
+      <script src="static/dream_web/theme.js"></script>
     </div>
   </body>
 </html>
