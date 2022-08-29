@@ -31,8 +31,7 @@ class PLMSSampler(object):
     def register_buffer(self, name, attr):
         if type(attr) == torch.Tensor:
             if attr.device != torch.device(self.device):
-                attr = attr.to(torch.device(self.device))
-
+                attr = attr.to(torch.float32).to(torch.device(self.device))
         setattr(self, name, attr)
 
     def make_schedule(
