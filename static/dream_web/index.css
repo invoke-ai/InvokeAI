@@ -1,4 +1,3 @@
-@import 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap';
 :root {
     --font: #6671A9;
     --placeholder_font: #adb2cd;
@@ -15,7 +14,7 @@
 body {
     margin: 0;
     color: var(--font);  
-    font-family: 'Montserrat', sans-serif; 
+    font-family: Arial,Helvetica Neue,Helvetica,sans-serif; 
     overflow: auto;
     background-image: url("background.jpg");
     background-size: cover;
