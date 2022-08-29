@@ -10,6 +10,7 @@ import copy
 import warnings
 import ldm.dream.readline
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
+from pathvalidate import sanitize_filepath
 
 debugging = False
 
@@ -132,6 +133,7 @@ def main_loop(t2i, outdir, directory_name_from_prompt, parser, log, infile):
     """prompt/read/execute loop"""
     done = False
     last_seeds = []
+
     original_outdir = outdir
 
     while not done:
@@ -222,11 +224,17 @@ def main_loop(t2i, outdir, directory_name_from_prompt, parser, log, infile):
             if directory_name_from_prompt != "n":
 
                 if directory_name_from_prompt == "simple":
-                    #this line will replace any non-alphanumeric characters in the prompt with underscores to make sanitized folder names:
+                    #this line will replace any non-alphanumeric characters in the prompt with underscores to make super-sanitized folder names:
                     outdir = outdir + "/" + re.sub('[^A-Za-z0-9]+', '_', opt.prompt)
                 else:
-                    #this line will just leave the prompt as-is and use it as the folder name:
-                    outdir = outdir + "/" + opt.prompt
+                    #this line will just minimally sanitize the prompt using pathvalidate to clear bad characters from the folder name:
+                    outdir = outdir + "/" + sanitize_filepath(opt.prompt)
+
+                if ( len(outdir) > 255):
+                    print ("\nPrompt string is " + str(len(outdir)) + " characters in length. \nTruncating to 255 chars to avoid running into filesystem limitations.\n")
+                    #truncate the length of the directory name to 255 characters
+                    outdir = outdir[:255]
+
 
                 print ("\nWriting files to directory: \"" + outdir +"\"\n")
             
