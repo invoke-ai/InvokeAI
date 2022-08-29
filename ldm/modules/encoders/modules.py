@@ -12,6 +12,15 @@ from ldm.modules.x_transformer import (
 )  # TODO: can we directly rely on lucidrains code and simply add this as a reuirement? --> test
 
 
+def get_default_device_type():
+    if torch.cuda.is_available():
+        return 'cuda'
+    elif torch.backends.mps.is_available():
+        return 'mps'
+    else:
+        return 'cpu'
+
+
 def _expand_mask(mask, dtype, tgt_len=None):
     """
     Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
@@ -67,7 +76,12 @@ class TransformerEmbedder(AbstractEncoder):
     """Some transformer encoder layers"""
 
     def __init__(
-        self, n_embed, n_layer, vocab_size, max_seq_len=77, device='cuda'
+        self,
+        n_embed,
+        n_layer,
+        vocab_size,
+        max_seq_len=77,
+        device=get_default_device_type(),
     ):
         super().__init__()
         self.device = device
@@ -89,7 +103,9 @@ class TransformerEmbedder(AbstractEncoder):
 class BERTTokenizer(AbstractEncoder):
     """Uses a pretrained BERT tokenizer by huggingface. Vocab size: 30522 (?)"""
 
-    def __init__(self, device='cuda', vq_interface=True, max_length=77):
+    def __init__(
+        self, device=get_default_device_type(), vq_interface=True, max_length=77
+    ):
         super().__init__()
         from transformers import (
             BertTokenizerFast,
@@ -145,7 +161,7 @@ class BERTEmbedder(AbstractEncoder):
         n_layer,
         vocab_size=30522,
         max_seq_len=77,
-        device='cuda',
+        device=get_default_device_type(),
         use_tokenizer=True,
         embedding_dropout=0.0,
     ):
@@ -230,7 +246,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     def __init__(
         self,
         version='openai/clip-vit-large-patch14',
-        device='cuda',
+        device=get_default_device_type(),
         max_length=77,
     ):
         super().__init__()
@@ -455,13 +471,13 @@ class FrozenCLIPTextEmbedder(nn.Module):
     def __init__(
         self,
         version='ViT-L/14',
-        device='cuda',
+        device=get_default_device_type(),
         max_length=77,
         n_repeat=1,
         normalize=True,
     ):
         super().__init__()
-        self.model, _ = clip.load(version, jit=False, device='cpu')
+        self.model, _ = clip.load(version, jit=False, device=device)
         self.device = device
         self.max_length = max_length
         self.n_repeat = n_repeat
@@ -496,7 +512,7 @@ class FrozenClipImageEmbedder(nn.Module):
         self,
         model,
         jit=False,
-        device='cuda' if torch.cuda.is_available() else 'cpu',
+        device=get_default_device_type(),
         antialias=False,
     ):
         super().__init__()

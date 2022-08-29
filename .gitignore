@@ -176,3 +176,6 @@ src
 logs/
 **/__pycache__/
 outputs
+
+# If it's a Mac
+.DS_Store

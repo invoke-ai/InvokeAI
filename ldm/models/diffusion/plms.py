@@ -13,12 +13,20 @@ from ldm.modules.diffusionmodules.util import (
 
 
 class PLMSSampler(object):
-    def __init__(self, model, schedule='linear', device='cuda', **kwargs):
+    def __init__(self, model, schedule='linear', device='', **kwargs):
         super().__init__()
         self.model = model
         self.ddpm_num_timesteps = model.num_timesteps
         self.schedule = schedule
-        self.device = device
+        if device == '':
+            if torch.cuda.is_available():
+                self.device = 'cuda'
+            elif torch.backends.mps.is_available():
+                self.device = 'mps'
+            else:
+                self.device = 'cpu'
+        else:
+            self.device = device
 
     def register_buffer(self, name, attr):
         if type(attr) == torch.Tensor:

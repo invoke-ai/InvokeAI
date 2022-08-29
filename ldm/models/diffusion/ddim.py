@@ -14,17 +14,25 @@ from ldm.modules.diffusionmodules.util import (
 
 
 class DDIMSampler(object):
-    def __init__(self, model, schedule='linear', device='cuda', **kwargs):
+    def __init__(self, model, schedule='linear', device='', **kwargs):
         super().__init__()
         self.model = model
         self.ddpm_num_timesteps = model.num_timesteps
         self.schedule = schedule
-        self.device = device
+        if device == '':
+            if torch.cuda.is_available():
+                self.device = 'cuda'
+            elif torch.backends.mps.is_available():
+                self.device = 'mps'
+            else:
+                self.device = 'cpu'
+        else:
+            self.device = device
 
     def register_buffer(self, name, attr):
         if type(attr) == torch.Tensor:
             if attr.device != torch.device(self.device):
-                attr = attr.to(torch.device(self.device))
+                attr = attr.to(torch.float32).to(torch.device(self.device))
         setattr(self, name, attr)
 
     def make_schedule(
