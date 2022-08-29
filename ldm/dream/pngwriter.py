@@ -14,8 +14,6 @@ from math import sqrt, floor, ceil
 from PIL import Image, PngImagePlugin
 
 # -------------------image generation utils-----
-
-
 class PngWriter:
     def __init__(self, outdir, prompt=None, batch_size=1):
         self.outdir = outdir
@@ -25,19 +23,18 @@ class PngWriter:
         self.files_written = []
         os.makedirs(outdir, exist_ok=True)
 
-    def write_image(self, image, seed, upscaled=False):
+    def write_image(self, image, seed):
         self.filepath = self.unique_filename(
-            seed, upscaled, self.filepath
+            seed, self.filepath
         )   # will increment name in some sensible way
         try:
             prompt = f'{self.prompt} -S{seed}'
             self.save_image_and_prompt_to_png(image, prompt, self.filepath)
         except IOError as e:
             print(e)
-        if not upscaled:
-            self.files_written.append([self.filepath, seed])
+        self.files_written.append([self.filepath, seed])
 
-    def unique_filename(self, seed, upscaled=False, previouspath=None):
+    def unique_filename(self, seed, previouspath=None):
         revision = 1
 
         if previouspath is None:
@@ -60,7 +57,7 @@ class PngWriter:
             basename = os.path.basename(previouspath)
             x = re.match('^(\d+)\..*\.png', basename)
             if not x:
-                return self.unique_filename(seed, upscaled, previouspath)
+                return self.unique_filename(seed, previouspath)
 
             basecount = int(x.groups()[0])
             series = 0
@@ -71,8 +68,6 @@ class PngWriter:
                 if self.batch_size > 1 or os.path.exists(
                     os.path.join(self.outdir, filename)
                 ):
-                    if upscaled:
-                        break
                     filename = f'{basecount:06}.{seed}.{series:02}.png'
                 finished = not os.path.exists(
                     os.path.join(self.outdir, filename)
@@ -106,8 +101,6 @@ class PromptFormatter:
         self.t2i = t2i
         self.opt = opt
 
-    # note: the t2i object should provide all these values.
-    # there should be no need to or against opt values
     def normalize_prompt(self):
         """Normalize the prompt and switches"""
         t2i = self.t2i
@@ -120,15 +113,13 @@ class PromptFormatter:
         switches.append(f'-W{opt.width        or t2i.width}')
         switches.append(f'-H{opt.height       or t2i.height}')
         switches.append(f'-C{opt.cfg_scale    or t2i.cfg_scale}')
-        switches.append(f'-A{opt.sampler_name or t2i.sampler_name}')
+        switches.append(f'-m{t2i.sampler_name}')
         if opt.init_img:
             switches.append(f'-I{opt.init_img}')
         if opt.strength and opt.init_img is not None:
             switches.append(f'-f{opt.strength or t2i.strength}')
         if opt.gfpgan_strength:
             switches.append(f'-G{opt.gfpgan_strength}')
-        if opt.upscale:
-            switches.append(f'-U {" ".join([str(u) for u in opt.upscale])}')
         if t2i.full_precision:
             switches.append('-F')
         return ' '.join(switches)
