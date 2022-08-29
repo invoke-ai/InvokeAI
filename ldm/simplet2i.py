@@ -753,7 +753,7 @@ class T2I:
         dot = np.sum(v0 * v1)
         # If absolute value of dot product is almost 1, vectors are ~colineal, so use lerp
         if np.abs(dot) > DOT_THRESHOLD:
-            return lerp(t, v0_copy, v1_copy)
+            return v0_copy*(1.0-t)+v1_copy*t # lerp
         # Calculate initial angle between v0 and v1
         theta_0 = np.arccos(dot)
         sin_theta_0 = np.sin(theta_0)
