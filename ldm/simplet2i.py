@@ -212,6 +212,8 @@ class T2I:
         upscale=None,
         variants=None,
         sampler_name=None,
+        seed_fuzz=None,
+        seed_fuzz_target=None,
         **args,
     ):   # eat up additional cruft
         """
@@ -231,6 +233,8 @@ class T2I:
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
            variants                        // if >0, the 1st generated image will be passed back to img2img to generate the requested number of variants
            image_callback                  // a function or method that will be called each time an image is generated
+           seed_fuzz                       // optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)
+           seed_fuzz_target                // optional target seed that -S noise is slerped to (interpolate one image to another)
 
         To use the callback, define a function of method that receives two arguments, an Image object
         and the seed. You can then do whatever you like with the image, including converting it to
@@ -304,6 +308,8 @@ class T2I:
                     skip_normalize=skip_normalize,
                     width=width,
                     height=height,
+                    seed_fuzz=seed_fuzz,
+                    seed_fuzz_target=seed_fuzz_target,
                 )
 
             with scope(self.device.type), self.model.ema_scope():
@@ -390,12 +396,16 @@ class T2I:
         skip_normalize,
         width,
         height,
+        seed_fuzz,
+        seed_fuzz_target,
     ):
         """
         An infinite iterator of images from the prompt.
         """
 
         sampler = self.sampler
+
+        base_x_T, target_x_T = self._seed_fuzz(width, height, seed_fuzz, seed_fuzz_target)
 
         while True:
             uc, c = self._get_uc_and_c(prompt, batch_size, skip_normalize)
@@ -404,6 +414,9 @@ class T2I:
                 height // self.downsampling_factor,
                 width // self.downsampling_factor,
             ]
+
+            x_T = self._seed_fuzz_slerp(width, height, steps, seed_fuzz, seed_fuzz_target, base_x_T, target_x_T)
+            
             samples, _ = sampler.sample(
                 S=steps,
                 conditioning=c,
@@ -413,6 +426,7 @@ class T2I:
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
                 eta=ddim_eta,
+                x_T = x_T
             )
             yield self._samples_to_images(samples)
 
@@ -516,6 +530,54 @@ class T2I:
     def _new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
         return self.seed
+
+    def _seed_fuzz(self, width:int, height:int, seed_fuzz:float, seed_fuzz_target:int) -> "tuple[torch.Tensor,torch.Tensor]":
+        base_x_T = None
+        target_x_T = None
+        if seed_fuzz is not None:
+            seed_fuzz = max(0.0, min(1.0, seed_fuzz))
+            # seed fuzz, base noise is made from seed provided with -S
+            base_x_T = torch.randn([self.batch_size,
+                                    self.latent_channels,
+                                    height // self.downsampling_factor,
+                                    width  // self.downsampling_factor],
+                                    device=self.device)
+            if seed_fuzz_target is not None:
+                # has target seed, store initial seed
+                initialSeed = torch.initial_seed()
+                seed_everything(seed_fuzz_target) # seed with target
+                target_x_T = torch.randn([self.batch_size,
+                                self.latent_channels,
+                                height // self.downsampling_factor,
+                                width  // self.downsampling_factor],
+                                device=self.device)
+                # back to our initialSeed (is this correct? it works...)
+                seed_everything(initialSeed)
+        return base_x_T, target_x_T
+
+    def _seed_fuzz_slerp(self, 
+        width:int, height:int, steps:int, 
+        seed_fuzz:float, seed_fuzz_target:int, 
+        base_x_T:torch.Tensor, target_x_T:torch.Tensor) -> torch.Tensor:
+        x_T = None
+        if seed_fuzz is not None:
+            seed_fuzz = max(0.0, min(1.0, seed_fuzz))
+            # no target seed, get random noise
+            if seed_fuzz_target is None:
+                target_x_T = torch.randn([self.batch_size,
+                                self.latent_channels,
+                                height // self.downsampling_factor,
+                                width  // self.downsampling_factor],
+                                device=self.device)
+
+            # slerp base -> target using seed_fuzz amount
+            x_T = self.slerp(seed_fuzz, base_x_T, target_x_T)
+
+            # only for ksampler!
+            if isinstance(self.sampler, KSampler):
+                # KSampler does not do it when x_T provided
+                x_T = x_T * self.sampler.model.get_sigmas(steps)[0]
+        return x_T
 
     def _get_device(self):
         if torch.cuda.is_available():
@@ -661,3 +723,49 @@ class T2I:
                     weights.append(1.0)
                 remaining = 0
         return prompts, weights
+
+    def slerp(self, t, v0, v1, DOT_THRESHOLD=0.9995):
+        '''
+        Spherical linear interpolation
+        Args:
+            t (float/np.ndarray): Float value between 0.0 and 1.0
+            v0 (np.ndarray): Starting vector
+            v1 (np.ndarray): Final vector
+            DOT_THRESHOLD (float): Threshold for considering the two vectors as
+                                colineal. Not recommended to alter this.
+        Returns:
+            v2 (np.ndarray): Interpolation vector between v0 and v1
+        '''
+        c = False
+        if not isinstance(v0,np.ndarray):
+            c = True
+            v0 = v0.detach().cpu().numpy()
+        if not isinstance(v1,np.ndarray):
+            c = True
+            v1 = v1.detach().cpu().numpy()
+        # Copy the vectors to reuse them later
+        v0_copy = np.copy(v0)
+        v1_copy = np.copy(v1)
+        # Normalize the vectors to get the directions and angles
+        v0 = v0 / np.linalg.norm(v0)
+        v1 = v1 / np.linalg.norm(v1)
+        # Dot product with the normalized vectors (can't use np.dot in W)
+        dot = np.sum(v0 * v1)
+        # If absolute value of dot product is almost 1, vectors are ~colineal, so use lerp
+        if np.abs(dot) > DOT_THRESHOLD:
+            return lerp(t, v0_copy, v1_copy)
+        # Calculate initial angle between v0 and v1
+        theta_0 = np.arccos(dot)
+        sin_theta_0 = np.sin(theta_0)
+        # Angle at timestep t
+        theta_t = theta_0 * t
+        sin_theta_t = np.sin(theta_t)
+        # Finish the slerp algorithm
+        s0 = np.sin(theta_0 - theta_t) / sin_theta_0
+        s1 = sin_theta_t / sin_theta_0
+        v2 = s0 * v0_copy + s1 * v1_copy
+        if c:
+            res = torch.from_numpy(v2).to(self.device)
+        else:
+            res = v2
+        return res

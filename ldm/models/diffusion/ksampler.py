@@ -63,7 +63,7 @@ class KSampler(object):
     ):
 
         sigmas = self.model.get_sigmas(S)
-        if x_T:
+        if x_T is not None:
             x = x_T
         else:
             x = (
