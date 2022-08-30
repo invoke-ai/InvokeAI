@@ -1,7 +1,8 @@
 import argparse
-import string
 import os
+import string
 import cv2
+from datetime import datetime
 from tqdm import tqdm
 from ldm.simplet2i import T2I
 from random import choice
@@ -10,8 +11,18 @@ from PIL.Image import Resampling
 
 _t2i = T2I()
 
-def get_vid_path(prompt=""):
-    return os.path.join(".", "outputs", "vid-samples", prompt)
+def get_folder_name(prompt = ""):
+    now = datetime.now()
+    
+    prompt_parts = prompt.split()
+    first_word = prompt_parts[0] if len(prompt_parts) > 0 else ""
+    
+    h, m, s = (str(t).ljust(2, "0") for t in [now.hour, now.minute, now.second])
+
+    return f"video-{first_word}-{now.year}-{now.month}-{now.day}-{h}{m}{s}"
+
+def get_vid_path(prompt = ""):
+    return os.path.join(".", "outputs", "vid-samples", get_folder_name(prompt))
 
 def prompt2vid(**config):
     prompt = config["prompt"]
