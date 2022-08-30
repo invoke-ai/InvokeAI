@@ -274,6 +274,9 @@ class T2I:
         assert (
             0.0 <= strength <= 1.0
         ), 'can only work with strength in [0.0, 1.0]'
+        assert (
+            0.0 <= variant_amount <= 1.0
+        ), '-v --variant_amount must be in 0.0 to 1.0 range'
         w = int(width / 64) * 64
         h = int(height / 64) * 64
         if h != height or w != width:
