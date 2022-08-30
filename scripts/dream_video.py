@@ -19,7 +19,7 @@ def get_folder_name(prompt = ""):
     
     h, m, s = (str(t).ljust(2, "0") for t in [now.hour, now.minute, now.second])
 
-    return f"video-{first_word}-{now.year}-{now.month}-{now.day}-{h}{m}{s}"
+    return f"{first_word}-{now.year}-{now.month}-{now.day}-{h}{m}{s}"
 
 def get_vid_path(prompt = ""):
     return os.path.join(".", "outputs", "vid-samples", get_folder_name(prompt))
