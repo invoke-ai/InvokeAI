@@ -15,15 +15,17 @@ text-to-image generator. This fork supports:
 
 3. A basic Web interface that allows you to run a local web server for
    generating images in your browser.
+   
+4. A notebook for running the code on Google Colab.
 
-4. Upscaling and face fixing using the optional ESRGAN and GFPGAN
+5. Upscaling and face fixing using the optional ESRGAN and GFPGAN
    packages.
 
-5. Weighted subprompts for prompt tuning.
+6. Weighted subprompts for prompt tuning.
 
-6. Textual inversion for customization of the prompt language and images.
+7. Textual inversion for customization of the prompt language and images.
 
-7. ...and more!
+8. ...and more!
 
 This fork is rapidly evolving, so use the Issues panel to report bugs
 and make feature requests, and check back periodically for
@@ -83,6 +85,10 @@ dream> q
 00010.png: "ashley judd riding a camel" -s150 -S 1362479620
 00011.png: "there's a fly in my soup" -n6 -g -S 2685670268
 ```
+
+<p align='center'>
+<img src="static/dream-py-demo.png"/>
+</p>
 
 The dream> prompt's arguments are pretty much identical to those used
 in the Discord bot, except you don't need to type "!dream" (it doesn't
