@@ -198,10 +198,11 @@ def main():
         opt.ckpt = "models/ldm/text2img-large/model.ckpt"
         opt.outdir = "outputs/txt2img-samples-laion400m"
 
-    seed_everything(opt.seed)
 
     config = OmegaConf.load(f"{opt.config}")
     model = load_model_from_config(config, f"{opt.ckpt}")
+
+    seed_everything(opt.seed)
 
     device = torch.device(get_device())
     model = model.to(device)
@@ -248,12 +249,14 @@ def main():
 
     start_code = None
     if opt.fixed_code:
-        start_code = torch.randn(
-            [opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f], device="cpu"
-        ).to(torch.device(device))
+        shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
+        if device.type == 'mps':
+            start_code = torch.randn(rand_size, device='cpu').to(device)
+        else:
+            torch.randn(rand_size, device=device)
 
     precision_scope = autocast if opt.precision=="autocast" else nullcontext
-    if device.type == 'mps':
+    if device.type in ['mps', 'cpu']:
         precision_scope = nullcontext # have to use f32 on mps
     with torch.no_grad():
         with precision_scope(device.type):

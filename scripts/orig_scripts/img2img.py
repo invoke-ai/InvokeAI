@@ -249,7 +249,7 @@ def main():
     print(f"target t_enc is {t_enc} steps")
 
     precision_scope = autocast if opt.precision == "autocast" else nullcontext
-    if device.type == 'mps':
+    if device.type in ['mps', 'cpu']:
         precision_scope = nullcontext # have to use f32 on mps
     with torch.no_grad():
         with precision_scope(device.type):
