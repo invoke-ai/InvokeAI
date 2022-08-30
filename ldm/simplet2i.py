@@ -7,7 +7,6 @@
 import torch
 import numpy as np
 import random
-import sys
 import os
 from omegaconf import OmegaConf
 from PIL import Image
@@ -21,13 +20,14 @@ from contextlib import contextmanager, nullcontext
 import transformers
 import time
 import re
-import traceback
+import sys
 
 from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.dream.pngwriter import PngWriter
+from ldm.dream.image_util import InitImageResizer
 
 """Simplified text to image API for stable diffusion/latent diffusion
 
@@ -123,6 +123,7 @@ class T2I:
         cfg_scale=7.5,
         weights='models/ldm/stable-diffusion-v1/model.ckpt',
         config='configs/stable-diffusion/v1-inference.yaml',
+        grid=False,
         width=512,
         height=512,
         sampler_name='klms',
@@ -133,9 +134,9 @@ class T2I:
         full_precision=False,
         strength=0.75,  # default in scripts/img2img.py
         embedding_path=None,
-        latent_diffusion_weights=False,  # just to keep track of this parameter when regenerating prompt
+        # just to keep track of this parameter when regenerating prompt
+        latent_diffusion_weights=False,
         device='cuda',
-        gfpgan=None,
     ):
         self.batch_size = batch_size
         self.iterations = iterations
@@ -148,6 +149,7 @@ class T2I:
         self.sampler_name = sampler_name
         self.latent_channels = latent_channels
         self.downsampling_factor = downsampling_factor
+        self.grid = grid
         self.ddim_eta = ddim_eta
         self.precision = precision
         self.full_precision = full_precision
@@ -157,7 +159,8 @@ class T2I:
         self.sampler = None
         self.latent_diffusion_weights = latent_diffusion_weights
         self.device = device
-        self.gfpgan = gfpgan
+
+        self.session_peakmem = torch.cuda.max_memory_allocated()
         if seed is None:
             self.seed = self._new_seed()
         else:
@@ -175,16 +178,15 @@ class T2I:
             outdir, prompt, kwargs.get('batch_size', self.batch_size)
         )
         for r in results:
-            metadata_str = f'prompt2png("{prompt}" {kwargs} seed={r[1]}'   # gets written into the PNG
             pngwriter.write_image(r[0], r[1])
         return pngwriter.files_written
 
     def txt2img(self, prompt, **kwargs):
-        outdir = kwargs.get('outdir', 'outputs/img-samples')
+        outdir = kwargs.pop('outdir', 'outputs/img-samples')
         return self.prompt2png(prompt, outdir, **kwargs)
 
     def img2img(self, prompt, **kwargs):
-        outdir = kwargs.get('outdir', 'outputs/img-samples')
+        outdir = kwargs.pop('outdir', 'outputs/img-samples')
         assert (
             'init_img' in kwargs
         ), 'call to img2img() must include the init_img argument'
@@ -202,14 +204,18 @@ class T2I:
         ddim_eta=None,
         skip_normalize=False,
         image_callback=None,
-        # these are specific to txt2img
+        step_callback=None,
         width=None,
         height=None,
         # these are specific to img2img
         init_img=None,
         strength=None,
-        gfpgan_strength=None,
+        gfpgan_strength=0,
+        save_original=False,
+        upscale=None,
         variants=None,
+        sampler_name=None,
+        log_tokenization=False,
         **args,
     ):   # eat up additional cruft
         """
@@ -228,9 +234,14 @@ class T2I:
            gfpgan_strength                 // strength for GFPGAN. 0.0 preserves image exactly, 1.0 replaces it completely
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
            variants                        // if >0, the 1st generated image will be passed back to img2img to generate the requested number of variants
+           step_callback                   // a function or method that will be called each step
            image_callback                  // a function or method that will be called each time an image is generated
 
-        To use the callback, define a function of method that receives two arguments, an Image object
+        To use the step callback, define a function that receives two arguments:
+        - Image GPU data
+        - The step number
+
+        To use the image callback, define a function of method that receives two arguments, an Image object
         and the seed. You can then do whatever you like with the image, including converting it to
         different formats and manipulating it. For example:
 
@@ -250,6 +261,7 @@ class T2I:
         batch_size = batch_size or self.batch_size
         iterations = iterations or self.iterations
         strength = strength or self.strength
+        self.log_tokenization = log_tokenization
 
         model = (
             self.load_model()
@@ -258,18 +270,25 @@ class T2I:
         assert (
             0.0 <= strength <= 1.0
         ), 'can only work with strength in [0.0, 1.0]'
-        w = int(width / 64) * 64
-        h = int(height / 64) * 64
+        w, h = map(
+            lambda x: x - x % 64, (width, height)
+        )  # resize to integer multiple of 64
+
         if h != height or w != width:
             print(
-                f'Height and width must be multiples of 64. Resizing to {h}x{w}'
+                f'Height and width must be multiples of 64. Resizing to {h}x{w}.'
             )
             height = h
-            width = w
+            width  = w
 
         scope = autocast if self.precision == 'autocast' else nullcontext
 
+        if sampler_name and (sampler_name != self.sampler_name):
+            self.sampler_name = sampler_name
+            self._set_sampler()
+
         tic = time.time()
+        torch.cuda.torch.cuda.reset_peak_memory_stats()
         results = list()
 
         try:
@@ -284,7 +303,10 @@ class T2I:
                     ddim_eta=ddim_eta,
                     skip_normalize=skip_normalize,
                     init_img=init_img,
+                    width=width,
+                    height=height,
                     strength=strength,
+                    callback=step_callback,
                 )
             else:
                 images_iterator = self._txt2img(
@@ -297,31 +319,53 @@ class T2I:
                     skip_normalize=skip_normalize,
                     width=width,
                     height=height,
+                    callback=step_callback,
                 )
 
             with scope(self.device.type), self.model.ema_scope():
-                for n in trange(iterations, desc='Sampling'):
+                for n in trange(iterations, desc='Generating'):
                     seed_everything(seed)
                     iter_images = next(images_iterator)
                     for image in iter_images:
-                        try:
-                            # if gfpgan strength is none or less than or equal to 0.0 then 
-                            # don't even attempt to use GFPGAN.
-                            # if the user specified a value of -G that satisifies the condition and 
-                            # --gfpgan wasn't specified, at startup then
-                            # the net result is a message gets printed - nothing else happens.
-                            if gfpgan_strength is not None and gfpgan_strength > 0.0:
-                                image = self._run_gfpgan(
-                                    image, gfpgan_strength
-                                )
-                        except Exception as e:
-                            print(
-                                f'Error running GFPGAN - Your image was not enhanced.\n{e}'
-                            )
                         results.append([image, seed])
                         if image_callback is not None:
                             image_callback(image, seed)
                     seed = self._new_seed()
+
+                if upscale is not None or gfpgan_strength > 0:
+                    for result in results:
+                        image, seed = result
+                        try:
+                            if upscale is not None:
+                                from ldm.gfpgan.gfpgan_tools import (
+                                    real_esrgan_upscale,
+                                )
+                                if len(upscale) < 2:
+                                    upscale.append(0.75)
+                                image = real_esrgan_upscale(
+                                    image,
+                                    upscale[1],
+                                    int(upscale[0]),
+                                    prompt,
+                                    seed,
+                                )
+                            if gfpgan_strength > 0:
+                                from ldm.gfpgan.gfpgan_tools import _run_gfpgan
+
+                                image = _run_gfpgan(
+                                    image, gfpgan_strength, prompt, seed, 1
+                                )
+                        except Exception as e:
+                            print(
+                                f'Error running RealESRGAN - Your image was not upscaled.\n{e}'
+                            )
+                        if image_callback is not None:
+                            if save_original:
+                                image_callback(image, seed)
+                            else:
+                                image_callback(image, seed, upscaled=True)
+                        else: # no callback passed, so we simply replace old image with rescaled one
+                            result[0] = image
 
         except KeyboardInterrupt:
             print('*interrupted*')
@@ -333,7 +377,21 @@ class T2I:
             print('Are you sure your system has an adequate NVIDIA GPU?')
 
         toc = time.time()
-        print(f'{len(results)} images generated in', '%4.2fs' % (toc - tic))
+        self.session_peakmem = max(
+            self.session_peakmem, torch.cuda.max_memory_allocated()
+        )
+        print('Usage stats:')
+        print(
+            f'   {len(results)} image(s) generated in', '%4.2fs' % (toc - tic)
+        )
+        print(
+            f'   Max VRAM used for this generation:',
+            '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
+        )
+        print(
+            f'   Max VRAM used since script start: ',
+            '%4.2fG' % (self.session_peakmem / 1e9),
+        )
         return results
 
     @torch.no_grad()
@@ -348,6 +406,7 @@ class T2I:
         skip_normalize,
         width,
         height,
+        callback,
     ):
         """
         An infinite iterator of images from the prompt.
@@ -371,6 +430,7 @@ class T2I:
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
                 eta=ddim_eta,
+                img_callback=callback
             )
             yield self._samples_to_images(samples)
 
@@ -385,7 +445,10 @@ class T2I:
         ddim_eta,
         skip_normalize,
         init_img,
+        width,
+        height,
         strength,
+        callback, # Currently not implemented for img2img
     ):
         """
         An infinite iterator of images from the prompt and the initial image
@@ -400,7 +463,7 @@ class T2I:
         else:
             sampler = self.sampler
 
-        init_image = self._load_img(init_img).to(self.device)
+        init_image = self._load_img(init_img,width,height).to(self.device)
         init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
         with precision_scope(self.device.type):
             init_latent = self.model.get_first_stage_encoding(
@@ -426,6 +489,7 @@ class T2I:
                 z_enc,
                 c,
                 t_enc,
+                img_callback=callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
             )
@@ -448,6 +512,7 @@ class T2I:
                 weight = weights[i]
                 if not skip_normalize:
                     weight = weight / totalWeight
+                self._log_tokenization(subprompts[i])
                 c = torch.add(
                     c,
                     self.model.get_learned_conditioning(
@@ -456,6 +521,7 @@ class T2I:
                     alpha=weight,
                 )
         else:   # just standard 1 prompt
+            self._log_tokenization(prompt)
             c = self.model.get_learned_conditioning(batch_size * [prompt])
         return (uc, c)
 
@@ -492,45 +558,49 @@ class T2I:
                 self.device = self._get_device()
                 model = self._load_model_from_config(config, self.weights)
                 if self.embedding_path is not None:
-                    model.embedding_manager.load(self.embedding_path)
+                    model.embedding_manager.load(
+                        self.embedding_path, self.full_precision
+                    )
                 self.model = model.to(self.device)
                 # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
                 self.model.cond_stage_model.device = self.device
             except AttributeError:
+                import traceback
+                print('Error loading model. Only the CUDA backend is supported',file=sys.stderr)
+                print(traceback.format_exc(),file=sys.stderr)
                 raise SystemExit
 
-            msg = f'setting sampler to {self.sampler_name}'
-            if self.sampler_name == 'plms':
-                self.sampler = PLMSSampler(self.model, device=self.device)
-            elif self.sampler_name == 'ddim':
-                self.sampler = DDIMSampler(self.model, device=self.device)
-            elif self.sampler_name == 'k_dpm_2_a':
-                self.sampler = KSampler(
-                    self.model, 'dpm_2_ancestral', device=self.device
-                )
-            elif self.sampler_name == 'k_dpm_2':
-                self.sampler = KSampler(
-                    self.model, 'dpm_2', device=self.device
-                )
-            elif self.sampler_name == 'k_euler_a':
-                self.sampler = KSampler(
-                    self.model, 'euler_ancestral', device=self.device
-                )
-            elif self.sampler_name == 'k_euler':
-                self.sampler = KSampler(
-                    self.model, 'euler', device=self.device
-                )
-            elif self.sampler_name == 'k_heun':
-                self.sampler = KSampler(self.model, 'heun', device=self.device)
-            elif self.sampler_name == 'k_lms':
-                self.sampler = KSampler(self.model, 'lms', device=self.device)
-            else:
-                msg = f'unsupported sampler {self.sampler_name}, defaulting to plms'
-                self.sampler = PLMSSampler(self.model, device=self.device)
-
-            print(msg)
+            self._set_sampler()
 
         return self.model
+
+    def _set_sampler(self):
+        msg = f'>> Setting Sampler to {self.sampler_name}'
+        if self.sampler_name == 'plms':
+            self.sampler = PLMSSampler(self.model, device=self.device)
+        elif self.sampler_name == 'ddim':
+            self.sampler = DDIMSampler(self.model, device=self.device)
+        elif self.sampler_name == 'k_dpm_2_a':
+            self.sampler = KSampler(
+                self.model, 'dpm_2_ancestral', device=self.device
+            )
+        elif self.sampler_name == 'k_dpm_2':
+            self.sampler = KSampler(self.model, 'dpm_2', device=self.device)
+        elif self.sampler_name == 'k_euler_a':
+            self.sampler = KSampler(
+                self.model, 'euler_ancestral', device=self.device
+            )
+        elif self.sampler_name == 'k_euler':
+            self.sampler = KSampler(self.model, 'euler', device=self.device)
+        elif self.sampler_name == 'k_heun':
+            self.sampler = KSampler(self.model, 'heun', device=self.device)
+        elif self.sampler_name == 'k_lms':
+            self.sampler = KSampler(self.model, 'lms', device=self.device)
+        else:
+            msg = f'>> Unsupported Sampler: {self.sampler_name}, Defaulting to plms'
+            self.sampler = PLMSSampler(self.model, device=self.device)
+
+        print(msg)
 
     def _load_model_from_config(self, config, ckpt):
         print(f'Loading model from {ckpt}')
@@ -548,19 +618,20 @@ class T2I:
             )
         else:
             print(
-                'Using half precision math. Call with --full_precision to use slower but more accurate full precision.'
+                'Using half precision math. Call with --full_precision to use more accurate but VRAM-intensive full precision.'
             )
             model.half()
         return model
 
-    def _load_img(self, path):
-        image = Image.open(path).convert('RGB')
-        w, h = image.size
-        print(f'loaded input image of size ({w}, {h}) from {path}')
-        w, h = map(
-            lambda x: x - x % 32, (w, h)
-        )  # resize to integer multiple of 32
-        image = image.resize((w, h), resample=Image.Resampling.LANCZOS)
+    def _load_img(self, path, width, height):
+        print(f'image path = {path}, cwd = {os.getcwd()}')
+        with Image.open(path) as img:
+            image = img.convert('RGB')
+        print(f'loaded input image of size {image.width}x{image.height} from {path}')
+
+        image = InitImageResizer(image).resize(width,height)
+        print(f'resized input image to size {image.width}x{image.height}')
+
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
@@ -612,28 +683,27 @@ class T2I:
                     weights.append(1.0)
                 remaining = 0
         return prompts, weights
-
-    def _run_gfpgan(self, image, strength):
-        if self.gfpgan is None:
-            print(
-                f'GFPGAN not initialized, it must be loaded via the --gfpgan argument'
-            )
-            return image
-
-        image = image.convert('RGB')
-
-        cropped_faces, restored_faces, restored_img = self.gfpgan.enhance(
-            np.array(image, dtype=np.uint8),
-            has_aligned=False,
-            only_center_face=False,
-            paste_back=True,
-        )
-        res = Image.fromarray(restored_img)
-
-        if strength < 1.0:
-            # Resize the image to the new image if the sizes have changed
-            if restored_img.size != image.size:
-                image = image.resize(res.size)
-            res = Image.blend(image, res, strength)
-
-        return res
+        
+    # shows how the prompt is tokenized 
+    # usually tokens have '</w>' to indicate end-of-word, 
+    # but for readability it has been replaced with ' '
+    def _log_tokenization(self, text):
+        if not self.log_tokenization:
+            return
+        tokens = self.model.cond_stage_model.tokenizer._tokenize(text)
+        tokenized = ""
+        discarded = ""
+        usedTokens = 0
+        totalTokens = len(tokens)
+        for i in range(0,totalTokens):                
+            token = tokens[i].replace('</w>',' ')
+            # alternate color
+            s = (usedTokens % 6) + 1
+            if i < self.model.cond_stage_model.max_length:
+                tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
+                usedTokens += 1
+            else: # over max token length
+                discarded = discarded + f"\x1b[0;3{s};40m{token}"
+        print(f"\nTokens ({usedTokens}):\n{tokenized}\x1b[0m")
+        if discarded != "":
+            print(f"Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m")

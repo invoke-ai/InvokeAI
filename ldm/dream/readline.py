@@ -23,7 +23,7 @@ class Completer:
         buffer = readline.get_line_buffer()
 
         if text.startswith(('-I', '--init_img')):
-            return self._path_completions(text, state, ('.png'))
+            return self._path_completions(text, state, ('.png','.jpg','.jpeg'))
 
         if buffer.strip().endswith('cd') or text.startswith(('.', '/')):
             return self._path_completions(text, state, ())
@@ -86,32 +86,27 @@ if readline_available:
     readline.set_completer(
         Completer(
             [
-                'cd',
-                'pwd',
-                '--steps',
-                '-s',
-                '--seed',
-                '-S',
-                '--iterations',
-                '-n',
-                '--batch_size',
-                '-b',
-                '--width',
-                '-W',
-                '--height',
-                '-H',
-                '--cfg_scale',
-                '-C',
-                '--grid',
-                '-g',
-                '--individual',
-                '-i',
-                '--init_img',
-                '-I',
-                '--strength',
-                '-f',
-                '-v',
-                '--variants',
+                '--steps','-s',
+                '--seed','-S',
+                '--iterations','-n',
+                '--batch_size','-b',
+                '--width','-W','--height','-H',
+                '--cfg_scale','-C',
+                '--grid','-g',
+                '--individual','-i',
+                '--init_img','-I',
+                '--strength','-f',
+                '--variants','-v',
+                '--outdir','-o',
+                '--sampler','-A','-m',
+                '--embedding_path',
+                '--device',
+                '--grid','-g',
+                '--gfpgan_strength','-G',
+                '--upscale','-U',
+                '-save_orig','--save_original',
+                '--skip_normalize','-x',
+                '--log_tokenization','t',
             ]
         ).complete
     )
