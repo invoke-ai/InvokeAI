@@ -329,8 +329,15 @@ class T2I:
 
             with scope(self.device.type), self.model.ema_scope():
                 for n in trange(iterations, desc='Generating'):
-                    seed_everything(seed)
-                    iter_images = next(images_iterator)
+                    seed_everything(seed) 
+
+                    iter_images,iter_seed = next(images_iterator)
+                    # image iterator can modify the seed (during variations)
+                    # this is a workaround until we have objects for containing gen info 
+                    # also wanted to keep it so self.seed is only modified by _new_seed()
+                    if iter_seed is not None:
+                        seed = iter_seed
+                    
                     for image in iter_images:
                         results.append([image, seed])
                         if image_callback is not None:
@@ -420,8 +427,8 @@ class T2I:
         """
 
         sampler = self.sampler
-
-        base_x_T, target_x_T = self._get_variation_noise(width, height, variant_amount, variant_seed)
+        
+        base_x_T = self._get_base_noise(width, height, variant_amount)
 
         while True:
             uc, c = self._get_uc_and_c(prompt, batch_size, skip_normalize)
@@ -431,7 +438,7 @@ class T2I:
                 width // self.downsampling_factor,
             ]
 
-            x_T = self._apply_variation_slerp(width, height, variant_amount, variant_seed, base_x_T, target_x_T)
+            x_T,seed = self._apply_variation_slerp(width, height, variant_amount, variant_seed, base_x_T)
             
             samples, _ = sampler.sample(
                 S=steps,
@@ -445,7 +452,7 @@ class T2I:
                 img_callback=callback,
                 x_T = x_T
             )
-            yield self._samples_to_images(samples)
+            yield self._samples_to_images(samples),seed
 
     @torch.no_grad()
     def _img2img(
@@ -503,7 +510,7 @@ class T2I:
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
             )
-            yield self._samples_to_images(samples)
+            yield self._samples_to_images(samples),None
 
     # TODO: does this actually need to run every loop? does anything in it vary by random seed?
     def _get_uc_and_c(self, prompt, batch_size, skip_normalize):
@@ -551,51 +558,49 @@ class T2I:
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
         return self.seed
 
-    def _get_variation_noise(self, width:int, height:int, variant_amount:float, variant_seed:int) -> "tuple[torch.Tensor,torch.Tensor]":
+    def _get_base_noise(self, width:int, height:int, variant_amount:float) -> torch.Tensor:
         base_x_T = None
-        target_x_T = None
         if variant_amount != 0.0:
             variant_amount = max(0.0, min(1.0, variant_amount))
-            # base noise is made from our initial seed or seed provided with -S
+            # base noise is made from whatever our seed currently is
             base_x_T = torch.randn([self.batch_size,
                                     self.latent_channels,
                                     height // self.downsampling_factor,
                                     width  // self.downsampling_factor],
                                     device=self.device)
-            if variant_seed is not None:
-                # store initial seed
-                initialSeed = torch.initial_seed()
-                # generate target noise from the provided variant seed
-                seed_everything(variant_seed)
-                target_x_T = torch.randn([self.batch_size,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                                device=self.device)
-                # switch back to the initial seed
-                seed_everything(initialSeed)
-        return base_x_T, target_x_T
+        return base_x_T
 
     def _apply_variation_slerp(self, 
-        width:int, height:int, 
+        width:int, height:int,
         variant_amount:float, variant_seed:int, 
-        base_x_T:torch.Tensor, target_x_T:torch.Tensor) -> torch.Tensor:
+        base_x_T:torch.Tensor) -> "[torch.Tensor,int]":
         x_T = None
+        seed = None
         if variant_amount != 0.0:
             variant_amount = max(0.0, min(1.0, variant_amount))
             # no variant seed specified, generate random noise
             if variant_seed is None:
-                # important note, 
-                target_x_T = torch.randn([self.batch_size,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                                device=self.device)
+                # TODO refactor seed overall?
+                # for now I use uptime to seed variations, 
+                # otherwise you get the same set of variations 
+                # from a seed provided with -S
+                # as seed_everything is used in prompt2image, 
+                # which "restarts" the sequence of seeds.
+                seed = time.monotonic_ns() % np.iinfo(np.uint32).max
+            else: # use variant seed for noise
+                seed = variant_seed
+            
+            seed_everything(seed)
+
+            target_x_T = torch.randn([self.batch_size,
+                self.latent_channels,
+                height // self.downsampling_factor,
+                width  // self.downsampling_factor],
+                device=self.device)
 
             # slerp base -> target using variant amount
             x_T = self.slerp(variant_amount, base_x_T, target_x_T)
-        
-        return x_T
+        return x_T, seed
 
     def _get_device(self):
         if torch.cuda.is_available():
