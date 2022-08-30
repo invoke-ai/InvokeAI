@@ -1,4 +1,4 @@
-from ldm.modules.encoders.modules import BERTTokenizer
+from ldm.modules.encoders.modules import FrozenCLIPEmbedder, BERTEmbedder
 from ldm.modules.embedding_manager import EmbeddingManager
 
 import argparse, os
@@ -6,7 +6,7 @@ from functools import partial
 
 import torch
 
-def get_placeholder_loop(placeholder_string, tokenizer):
+def get_placeholder_loop(placeholder_string, embedder, is_sd):
     
     new_placeholder   = None
     
@@ -16,10 +16,28 @@ def get_placeholder_loop(placeholder_string, tokenizer):
         else:
             new_placeholder = input(f"Placeholder string '{new_placeholder}' maps to more than a single token. Please enter another string: ")
 
-        token = tokenizer(new_placeholder)
+        token = get_clip_token_for_string(embedder.tokenizer, new_placeholder) if is_sd else get_bert_token_for_string(embedder.tknz_fn, new_placeholder)
 
-        if torch.count_nonzero(token) == 3:
-            return new_placeholder, token[0, 1]
+        if token is not None:
+            return new_placeholder, token
+            
+def get_clip_token_for_string(tokenizer, string):
+    batch_encoding = tokenizer(string, truncation=True, max_length=77, return_length=True,
+                               return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
+    tokens = batch_encoding["input_ids"]
+
+    if torch.count_nonzero(tokens - 49407) == 2:
+        return tokens[0, 1]
+    
+    return None
+
+def get_bert_token_for_string(tokenizer, string):
+    token = tokenizer(string)
+    if torch.count_nonzero(token) == 3:
+        return token[0, 1]
+
+    return None
+
 
 if __name__ == "__main__":
 
@@ -40,10 +58,20 @@ if __name__ == "__main__":
         help="Output path for the merged manager",
     )
 
+    parser.add_argument(
+        "-sd", "--stable_diffusion",
+        action="store_true",
+        help="Flag to denote that we are merging stable diffusion embeddings"
+    )
+
     args = parser.parse_args()
 
-    tokenizer = BERTTokenizer(vq_interface=False, max_length=77)
-    EmbeddingManager = partial(EmbeddingManager, tokenizer, ["*"])
+    if args.stable_diffusion:
+        embedder = FrozenCLIPEmbedder().cuda()
+    else:
+        embedder = BERTEmbedder(n_embed=1280, n_layer=32).cuda()
+
+    EmbeddingManager = partial(EmbeddingManager, embedder, ["*"])
 
     string_to_token_dict = {}    
     string_to_param_dict = torch.nn.ParameterDict()
@@ -63,7 +91,7 @@ if __name__ == "__main__":
 
                 placeholder_to_src[placeholder_string] = manager_ckpt
             else:
-                new_placeholder, new_token = get_placeholder_loop(placeholder_string, tokenizer)
+                new_placeholder, new_token = get_placeholder_loop(placeholder_string, embedder, is_sd=args.stable_diffusion)
                 string_to_token_dict[new_placeholder] = new_token
                 string_to_param_dict[new_placeholder] = manager.string_to_param_dict[placeholder_string]
 
