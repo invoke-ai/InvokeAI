@@ -216,7 +216,7 @@ class T2I:
         variants=None,
         sampler_name=None,
         log_tokenization=False,
-        variant_amount=None,
+        variant_amount=0.0,
         variant_seed=None,
         **args,
     ):   # eat up additional cruft
@@ -554,7 +554,7 @@ class T2I:
     def _get_variation_noise(self, width:int, height:int, variant_amount:float, variant_seed:int) -> "tuple[torch.Tensor,torch.Tensor]":
         base_x_T = None
         target_x_T = None
-        if variant_amount is not None:
+        if variant_amount != 0.0:
             variant_amount = max(0.0, min(1.0, variant_amount))
             # base noise is made from our initial seed or seed provided with -S
             base_x_T = torch.randn([self.batch_size,
@@ -581,10 +581,11 @@ class T2I:
         variant_amount:float, variant_seed:int, 
         base_x_T:torch.Tensor, target_x_T:torch.Tensor) -> torch.Tensor:
         x_T = None
-        if variant_amount is not None:
+        if variant_amount != 0.0:
             variant_amount = max(0.0, min(1.0, variant_amount))
             # no variant seed specified, generate random noise
             if variant_seed is None:
+                # important note, 
                 target_x_T = torch.randn([self.batch_size,
                                 self.latent_channels,
                                 height // self.downsampling_factor,

@@ -517,7 +517,7 @@ def create_cmd_parser():
     parser.add_argument(
         '-v',
         '--variant_amount',
-        default=None,
+        default=0.0,
         type=float,
         help='0.0 to 1.0 value controlling percentage of variation noise applied'
     )
