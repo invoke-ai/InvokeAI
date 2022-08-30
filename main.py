@@ -80,7 +80,7 @@ def get_parser(**parser_kwargs):
         nargs='*',
         metavar='base_config.yaml',
         help='paths to base configs. Loaded from left-to-right. '
-             'Parameters can be overwritten or added with command-line options of the form `--key value`.',
+        'Parameters can be overwritten or added with command-line options of the form `--key value`.',
         default=list(),
     )
     parser.add_argument(
@@ -143,16 +143,16 @@ def get_parser(**parser_kwargs):
     )
 
     parser.add_argument(
-        '--datadir_in_name', 
-        type=str2bool, 
-        nargs='?', 
-        const=True, 
-        default=True, 
+        '--datadir_in_name',
+        type=str2bool,
+        nargs='?',
+        const=True,
+        default=True,
         help='Prepend the final directory in the data_root to the output directory name',
     )
 
     parser.add_argument(
-        '--actual_resume', 
+        '--actual_resume',
         type=str,
         default='',
         help='Path to model to actually resume from',
@@ -165,9 +165,9 @@ def get_parser(**parser_kwargs):
     )
 
     parser.add_argument(
-        '--embedding_manager_ckpt', 
-        type=str, 
-        default='', 
+        '--embedding_manager_ckpt',
+        type=str,
+        default='',
         help='Initialize embedding manager from a checkpoint',
     )
     parser.add_argument(
@@ -223,15 +223,15 @@ def worker_init_fn(_):
 
 class DataModuleFromConfig(pl.LightningDataModule):
     def __init__(
-        self, 
-        batch_size, 
-        train=None, 
-        validation=None, 
-        test=None, 
+        self,
+        batch_size,
+        train=None,
+        validation=None,
+        test=None,
         predict=None,
-        wrap=False, 
-        num_workers=None, 
-        shuffle_test_loader=False, 
+        wrap=False,
+        num_workers=None,
+        shuffle_test_loader=False,
         use_worker_init_fn=False,
         shuffle_val_dataloader=False,
     ):
@@ -282,16 +282,16 @@ class DataModuleFromConfig(pl.LightningDataModule):
         else:
             init_fn = None
         return DataLoader(
-            self.datasets['train'], 
+            self.datasets['train'],
             batch_size=self.batch_size,
-            num_workers=self.num_workers, 
+            num_workers=self.num_workers,
             shuffle=False if is_iterable_dataset else True,
             worker_init_fn=init_fn,
         )
 
     def _val_dataloader(self, shuffle=False):
         if (
-            isinstance(self.datasets['validation'], Txt2ImgIterableBaseDataset) 
+            isinstance(self.datasets['validation'], Txt2ImgIterableBaseDataset)
             or self.use_worker_init_fn
         ):
             init_fn = worker_init_fn
@@ -318,10 +318,10 @@ class DataModuleFromConfig(pl.LightningDataModule):
         shuffle = shuffle and (not is_iterable_dataset)
 
         return DataLoader(
-            self.datasets['test'], 
+            self.datasets['test'],
             batch_size=self.batch_size,
-            num_workers=self.num_workers, 
-            worker_init_fn=init_fn, 
+            num_workers=self.num_workers,
+            worker_init_fn=init_fn,
             shuffle=shuffle,
         )
 
@@ -334,9 +334,9 @@ class DataModuleFromConfig(pl.LightningDataModule):
         else:
             init_fn = None
         return DataLoader(
-            self.datasets['predict'], 
+            self.datasets['predict'],
             batch_size=self.batch_size,
-            num_workers=self.num_workers, 
+            num_workers=self.num_workers,
             worker_init_fn=init_fn,
         )
 
@@ -369,11 +369,11 @@ class SetupCallback(Callback):
 
             if 'callbacks' in self.lightning_config:
                 if (
-                    'metrics_over_trainsteps_checkpoint' 
+                    'metrics_over_trainsteps_checkpoint'
                     in self.lightning_config['callbacks']
                 ):
                     os.makedirs(
-                        os.path.join(self.ckptdir, 'trainstep_checkpoints'), 
+                        os.path.join(self.ckptdir, 'trainstep_checkpoints'),
                         exist_ok=True,
                     )
             print('Project config')
@@ -406,14 +406,14 @@ class SetupCallback(Callback):
 
 class ImageLogger(Callback):
     def __init__(
-        self, 
-        batch_frequency, 
-        max_images, 
-        clamp=True, 
+        self,
+        batch_frequency,
+        max_images,
+        clamp=True,
         increase_log_steps=True,
-        rescale=True, 
-        disabled=False, 
-        log_on_batch_idx=False, 
+        rescale=True,
+        disabled=False,
+        log_on_batch_idx=False,
         log_first_step=False,
         log_images_kwargs=None,
     ):
@@ -470,11 +470,11 @@ class ImageLogger(Callback):
             batch_idx if self.log_on_batch_idx else pl_module.global_step
         )
         if (
-            self.check_frequency(check_idx) 
+            self.check_frequency(check_idx)
             and hasattr(  # batch_idx % self.batch_freq == 0
                 pl_module, 'log_images'
             ) 
-            and callable(pl_module.log_images) 
+            and callable(pl_module.log_images)
             and self.max_images > 0
         ):
             logger = type(pl_module.logger)
@@ -497,11 +497,11 @@ class ImageLogger(Callback):
                         images[k] = torch.clamp(images[k], -1.0, 1.0)
 
             self.log_local(
-                pl_module.logger.save_dir, 
-                split, 
+                pl_module.logger.save_dir,
+                split,
                 images,
-                pl_module.global_step, 
-                pl_module.current_epoch, 
+                pl_module.global_step,
+                pl_module.current_epoch,
                 batch_idx,
             )
 
@@ -677,7 +677,8 @@ if __name__ == '__main__':
 
         if opt.datadir_in_name:
             now = os.path.basename(os.path.normpath(opt.data_root)) + now
-            
+
+
         nowname = now + name + opt.postfix
         logdir = os.path.join(opt.logdir, nowname)
 
@@ -885,7 +886,7 @@ if __name__ == '__main__':
 
         # configure learning rate
         bs, base_lr = (
-            config.data.params.batch_size, 
+            config.data.params.batch_size,
             config.model.base_learning_rate,
         )
         if not cpu:
@@ -906,10 +907,10 @@ if __name__ == '__main__':
             model.learning_rate = accumulate_grad_batches * ngpu * bs * base_lr
             print(
                 'Setting learning rate to {:.2e} = {} (accumulate_grad_batches) * {} (num_gpus) * {} (batchsize) * {:.2e} (base_lr)'.format(
-                    model.learning_rate, 
-                    accumulate_grad_batches, 
-                    ngpu, 
-                    bs, 
+                    model.learning_rate,
+                    accumulate_grad_batches,
+                    ngpu,
+                    bs,
                     base_lr,
                 )
             )
@@ -963,4 +964,3 @@ if __name__ == '__main__':
             os.rename(logdir, dst)
         # if trainer.global_rank == 0:
         #     print(trainer.profiler.summary())
-            
