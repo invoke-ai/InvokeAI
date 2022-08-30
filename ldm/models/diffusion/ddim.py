@@ -14,12 +14,12 @@ from ldm.modules.diffusionmodules.util import (
 
 
 class DDIMSampler(object):
-    def __init__(self, model, schedule='linear', device='', **kwargs):
+    def __init__(self, model, schedule='linear', device=None, **kwargs):
         super().__init__()
         self.model = model
         self.ddpm_num_timesteps = model.num_timesteps
         self.schedule = schedule
-        if device == '':
+        if not device:
             if torch.cuda.is_available():
                 self.device = 'cuda'
             elif torch.backends.mps.is_available():
