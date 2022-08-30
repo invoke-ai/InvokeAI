@@ -463,18 +463,18 @@ def create_cmd_parser():
         help=f'Switch to a different sampler. Supported samplers: {", ".join(SAMPLER_CHOICES)}',
     )
     parser.add_argument(
-        '-z',
-        '--seed_fuzz',
+        '-v',
+        '--variant_amount',
         default=None,
         type=float,
-        help='optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)'
+        help='0.0 to 1.0 value controlling percentage of variation noise applied'
     )
     parser.add_argument(
-        '-Z',
-        '--seed_fuzz_target',
+        '-V',
+        '--variant_seed',
         default=None,
         type=int,
-        help='optional target seed that -S noise is slerped to (interpolate one image to another)'
+        help='manually seed the variation noise, instead of using randomly generated noise'
     )
     return parser
 

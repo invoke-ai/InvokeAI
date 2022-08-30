@@ -212,8 +212,8 @@ class T2I:
         upscale=None,
         variants=None,
         sampler_name=None,
-        seed_fuzz=None,
-        seed_fuzz_target=None,
+        variant_amount=None,
+        variant_seed=None,
         **args,
     ):   # eat up additional cruft
         """
@@ -233,8 +233,8 @@ class T2I:
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
            variants                        // if >0, the 1st generated image will be passed back to img2img to generate the requested number of variants
            image_callback                  // a function or method that will be called each time an image is generated
-           seed_fuzz                       // optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)
-           seed_fuzz_target                // optional target seed that -S noise is slerped to (interpolate one image to another)
+           variant_amount                  // optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)
+           variant_seed                    // optional target seed that -S noise is slerped to (interpolate one image to another)
 
         To use the callback, define a function of method that receives two arguments, an Image object
         and the seed. You can then do whatever you like with the image, including converting it to
@@ -308,8 +308,8 @@ class T2I:
                     skip_normalize=skip_normalize,
                     width=width,
                     height=height,
-                    seed_fuzz=seed_fuzz,
-                    seed_fuzz_target=seed_fuzz_target,
+                    variant_amount=variant_amount,
+                    variant_seed=variant_seed,
                 )
 
             with scope(self.device.type), self.model.ema_scope():
@@ -396,8 +396,8 @@ class T2I:
         skip_normalize,
         width,
         height,
-        seed_fuzz,
-        seed_fuzz_target,
+        variant_amount,
+        variant_seed,
     ):
         """
         An infinite iterator of images from the prompt.
@@ -405,7 +405,7 @@ class T2I:
 
         sampler = self.sampler
 
-        base_x_T, target_x_T = self._seed_fuzz(width, height, seed_fuzz, seed_fuzz_target)
+        base_x_T, target_x_T = self._get_variation_noise(width, height, variant_amount, variant_seed)
 
         while True:
             uc, c = self._get_uc_and_c(prompt, batch_size, skip_normalize)
@@ -415,7 +415,7 @@ class T2I:
                 width // self.downsampling_factor,
             ]
 
-            x_T = self._seed_fuzz_slerp(width, height, steps, seed_fuzz, seed_fuzz_target, base_x_T, target_x_T)
+            x_T = self._apply_variation_slerp(width, height, steps, variant_amount, variant_seed, base_x_T, target_x_T)
             
             samples, _ = sampler.sample(
                 S=steps,
@@ -531,47 +531,48 @@ class T2I:
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
         return self.seed
 
-    def _seed_fuzz(self, width:int, height:int, seed_fuzz:float, seed_fuzz_target:int) -> "tuple[torch.Tensor,torch.Tensor]":
+    def _get_variation_noise(self, width:int, height:int, variant_amount:float, variant_seed:int) -> "tuple[torch.Tensor,torch.Tensor]":
         base_x_T = None
         target_x_T = None
-        if seed_fuzz is not None:
-            seed_fuzz = max(0.0, min(1.0, seed_fuzz))
-            # seed fuzz, base noise is made from seed provided with -S
+        if variant_amount is not None:
+            variant_amount = max(0.0, min(1.0, variant_amount))
+            # base noise is made from our initial seed or seed provided with -S
             base_x_T = torch.randn([self.batch_size,
                                     self.latent_channels,
                                     height // self.downsampling_factor,
                                     width  // self.downsampling_factor],
                                     device=self.device)
-            if seed_fuzz_target is not None:
-                # has target seed, store initial seed
+            if variant_seed is not None:
+                # store initial seed
                 initialSeed = torch.initial_seed()
-                seed_everything(seed_fuzz_target) # seed with target
+                # generate target noise from the provided variant seed
+                seed_everything(variant_seed)
                 target_x_T = torch.randn([self.batch_size,
                                 self.latent_channels,
                                 height // self.downsampling_factor,
                                 width  // self.downsampling_factor],
                                 device=self.device)
-                # back to our initialSeed (is this correct? it works...)
+                # switch back to the initial seed
                 seed_everything(initialSeed)
         return base_x_T, target_x_T
 
-    def _seed_fuzz_slerp(self, 
+    def _apply_variation_slerp(self, 
         width:int, height:int, steps:int, 
-        seed_fuzz:float, seed_fuzz_target:int, 
+        variant_amount:float, variant_seed:int, 
         base_x_T:torch.Tensor, target_x_T:torch.Tensor) -> torch.Tensor:
         x_T = None
-        if seed_fuzz is not None:
-            seed_fuzz = max(0.0, min(1.0, seed_fuzz))
-            # no target seed, get random noise
-            if seed_fuzz_target is None:
+        if variant_amount is not None:
+            variant_amount = max(0.0, min(1.0, variant_amount))
+            # no variant seed specified, generate random noise
+            if variant_seed is None:
                 target_x_T = torch.randn([self.batch_size,
                                 self.latent_channels,
                                 height // self.downsampling_factor,
                                 width  // self.downsampling_factor],
                                 device=self.device)
 
-            # slerp base -> target using seed_fuzz amount
-            x_T = self.slerp(seed_fuzz, base_x_T, target_x_T)
+            # slerp base -> target using variant amount
+            x_T = self.slerp(variant_amount, base_x_T, target_x_T)
 
             # only for ksampler!
             if isinstance(self.sampler, KSampler):
