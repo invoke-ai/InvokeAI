@@ -122,6 +122,7 @@ class T2I:
         cfg_scale=7.5,
         weights='models/ldm/stable-diffusion-v1/model.ckpt',
         config='configs/stable-diffusion/v1-inference.yaml',
+        grid=False,
         width=512,
         height=512,
         sampler_name='klms',
@@ -147,6 +148,7 @@ class T2I:
         self.sampler_name = sampler_name
         self.latent_channels = latent_channels
         self.downsampling_factor = downsampling_factor
+        self.grid = grid
         self.ddim_eta = ddim_eta
         self.precision = precision
         self.full_precision = full_precision
@@ -201,6 +203,7 @@ class T2I:
         ddim_eta=None,
         skip_normalize=False,
         image_callback=None,
+        step_callback=None,
         # these are specific to txt2img
         width=None,
         height=None,
@@ -212,6 +215,9 @@ class T2I:
         upscale=None,
         variants=None,
         sampler_name=None,
+        variant_amount=None,
+        variant_seed=None,
+        log_tokenization=False,
         variant_amount=None,
         variant_seed=None,
         **args,
@@ -232,11 +238,16 @@ class T2I:
            gfpgan_strength                 // strength for GFPGAN. 0.0 preserves image exactly, 1.0 replaces it completely
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
            variants                        // if >0, the 1st generated image will be passed back to img2img to generate the requested number of variants
+           step_callback                   // a function or method that will be called each step
            image_callback                  // a function or method that will be called each time an image is generated
            variant_amount                  // optional 0-1 value to slerp from -S noise to random noise (allows variations on an image)
            variant_seed                    // optional target seed that -S noise is slerped to (interpolate one image to another)
 
-        To use the callback, define a function of method that receives two arguments, an Image object
+        To use the step callback, define a function that receives two arguments:
+        - Image GPU data
+        - The step number
+
+        To use the image callback, define a function of method that receives two arguments, an Image object
         and the seed. You can then do whatever you like with the image, including converting it to
         different formats and manipulating it. For example:
 
@@ -256,6 +267,7 @@ class T2I:
         batch_size = batch_size or self.batch_size
         iterations = iterations or self.iterations
         strength = strength or self.strength
+        self.log_tokenization = log_tokenization
 
         model = (
             self.load_model()
@@ -296,6 +308,7 @@ class T2I:
                     skip_normalize=skip_normalize,
                     init_img=init_img,
                     strength=strength,
+                    callback=step_callback,
                 )
             else:
                 images_iterator = self._txt2img(
@@ -308,6 +321,7 @@ class T2I:
                     skip_normalize=skip_normalize,
                     width=width,
                     height=height,
+                    callback=step_callback,
                     variant_amount=variant_amount,
                     variant_seed=variant_seed,
                 )
@@ -396,6 +410,7 @@ class T2I:
         skip_normalize,
         width,
         height,
+        callback,
         variant_amount,
         variant_seed,
     ):
@@ -426,6 +441,7 @@ class T2I:
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
                 eta=ddim_eta,
+                img_callback=callback,
                 x_T = x_T
             )
             yield self._samples_to_images(samples)
@@ -442,6 +458,7 @@ class T2I:
         skip_normalize,
         init_img,
         strength,
+        callback, # Currently not implemented for img2img
     ):
         """
         An infinite iterator of images from the prompt and the initial image
@@ -504,6 +521,7 @@ class T2I:
                 weight = weights[i]
                 if not skip_normalize:
                     weight = weight / totalWeight
+                self._log_tokenization(subprompts[i])
                 c = torch.add(
                     c,
                     self.model.get_learned_conditioning(
@@ -512,6 +530,7 @@ class T2I:
                     alpha=weight,
                 )
         else:   # just standard 1 prompt
+            self._log_tokenization(prompt)
             c = self.model.get_learned_conditioning(batch_size * [prompt])
         return (uc, c)
 
@@ -724,6 +743,30 @@ class T2I:
                     weights.append(1.0)
                 remaining = 0
         return prompts, weights
+        
+    # shows how the prompt is tokenized 
+    # usually tokens have '</w>' to indicate end-of-word, 
+    # but for readability it has been replaced with ' '
+    def _log_tokenization(self, text):
+        if not self.log_tokenization:
+            return
+        tokens = self.model.cond_stage_model.tokenizer._tokenize(text)
+        tokenized = ""
+        discarded = ""
+        usedTokens = 0
+        totalTokens = len(tokens)
+        for i in range(0,totalTokens):                
+            token = tokens[i].replace('</w>',' ')
+            # alternate color
+            s = (usedTokens % 6) + 1
+            if i < self.model.cond_stage_model.max_length:
+                tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
+                usedTokens += 1
+            else: # over max token length
+                discarded = discarded + f"\x1b[0;3{s};40m{token}"
+        print(f"\nTokens ({usedTokens}):\n{tokenized}\x1b[0m")
+        if discarded != "":
+            print(f"Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m")
 
     def slerp(self, t, v0, v1, DOT_THRESHOLD=0.9995):
         '''
