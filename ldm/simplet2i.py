@@ -215,8 +215,6 @@ class T2I:
         upscale=None,
         variants=None,
         sampler_name=None,
-        variant_amount=None,
-        variant_seed=None,
         log_tokenization=False,
         variant_amount=None,
         variant_seed=None,
