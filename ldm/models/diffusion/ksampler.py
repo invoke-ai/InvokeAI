@@ -67,7 +67,7 @@ class KSampler(object):
 
         sigmas = self.model.get_sigmas(S)
         if x_T is not None:
-            x = x_T
+            x = x_T * sigmas[0]
         else:
             x = (
                 torch.randn([batch_size, *shape], device=self.device)

@@ -431,7 +431,7 @@ class T2I:
                 width // self.downsampling_factor,
             ]
 
-            x_T = self._apply_variation_slerp(width, height, steps, variant_amount, variant_seed, base_x_T, target_x_T)
+            x_T = self._apply_variation_slerp(width, height, variant_amount, variant_seed, base_x_T, target_x_T)
             
             samples, _ = sampler.sample(
                 S=steps,
@@ -577,7 +577,7 @@ class T2I:
         return base_x_T, target_x_T
 
     def _apply_variation_slerp(self, 
-        width:int, height:int, steps:int, 
+        width:int, height:int, 
         variant_amount:float, variant_seed:int, 
         base_x_T:torch.Tensor, target_x_T:torch.Tensor) -> torch.Tensor:
         x_T = None
@@ -594,11 +594,7 @@ class T2I:
 
             # slerp base -> target using variant amount
             x_T = self.slerp(variant_amount, base_x_T, target_x_T)
-
-            # only for ksampler!
-            if isinstance(self.sampler, KSampler):
-                # KSampler does not do it when x_T provided
-                x_T = x_T * self.sampler.model.get_sigmas(steps)[0]
+        
         return x_T
 
     def _get_device(self):
