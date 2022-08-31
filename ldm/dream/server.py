@@ -179,6 +179,8 @@ class DreamServer(BaseHTTPRequestHandler):
                                             sampler_name    = sampler_name,
                                             gfpgan_strength=gfpgan_strength,
                                             upscale         = upscale,
+                                            width           = width,
+                                            height          = height,
                                             step_callback=image_progress,
                                             image_callback=image_done)
                 finally:
