@@ -89,7 +89,7 @@ class DreamServer(BaseHTTPRequestHandler):
         images_generated = 0    # helps keep track of when upscaling is started
         images_upscaled = 0     # helps keep track of when upscaling is completed
         pngwriter = PngWriter(
-            "./outputs/img-samples/", config['prompt'], 1
+            "./outputs/img-samples/", config['prompt']
         )
 
         # if upscaling is requested, then this will be called twice, once when
@@ -129,9 +129,7 @@ class DreamServer(BaseHTTPRequestHandler):
                         {'event':action,'processed_file_cnt':f'{x}/{iterations}'}
                     ) + '\n',"utf-8"))
 
-        # TODO: refactor PngWriter:
-        # it doesn't need to know if batch_size > 1, just if this is _part of a batch_
-        step_writer = PngWriter('./outputs/intermediates/', prompt, 2)
+        step_writer = PngWriter('./outputs/intermediates/', prompt)
         def image_progress(sample, step):
             if self.canceled.is_set():
                 self.wfile.write(bytes(json.dumps({'event':'canceled'}) + '\n', 'utf-8'))
