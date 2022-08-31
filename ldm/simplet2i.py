@@ -23,12 +23,12 @@ import re
 import sys
 
 from ldm.util import instantiate_from_config
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.plms import PLMSSampler
+from ldm.models.diffusion.ddim     import DDIMSampler
+from ldm.models.diffusion.plms     import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
-from ldm.dream.pngwriter import PngWriter
-from ldm.dream.image_util import InitImageResizer
-from ldm.dream.devices import choose_torch_device
+from ldm.dream.pngwriter           import PngWriter
+from ldm.dream.image_util          import InitImageResizer
+from ldm.dream.devices             import choose_torch_device
 
 """Simplified text to image API for stable diffusion/latent diffusion
 
@@ -262,17 +262,8 @@ class T2I:
         assert (
             0.0 <= strength <= 1.0
         ), 'can only work with strength in [0.0, 1.0]'
-        w, h = map(
-            lambda x: x - x % 64, (width, height)
-        )  # resize to integer multiple of 64
 
-        if h != height or w != width:
-            print(
-                f'Height and width must be multiples of 64. Resizing to {h}x{w}.'
-            )
-            height = h
-            width  = w
-
+        width, height, _ = self._resolution_check(width, height, log=True)
         scope = autocast if self.precision == 'autocast' else nullcontext
 
         if sampler_name and (sampler_name != self.sampler_name):
@@ -353,7 +344,7 @@ class T2I:
                                 image_callback(image, seed)
                             else:
                                 image_callback(image, seed, upscaled=True)
-                        else: # no callback passed, so we simply replace old image with rescaled one
+                        else:  # no callback passed, so we simply replace old image with rescaled one
                             result[0] = image
 
         except KeyboardInterrupt:
@@ -435,7 +426,7 @@ class T2I:
         width,
         height,
         strength,
-        callback, # Currently not implemented for img2img
+        callback,  # Currently not implemented for img2img
     ):
         """
         An infinite iterator of images from the prompt and the initial image
@@ -444,13 +435,13 @@ class T2I:
         # PLMS sampler not supported yet, so ignore previous sampler
         if self.sampler_name != 'ddim':
             print(
-                f"sampler '{self.sampler_name}' is not yet supported. Using DDM sampler"
+                f"sampler '{self.sampler_name}' is not yet supported. Using DDIM sampler"
             )
             sampler = DDIMSampler(self.model, device=self.device)
         else:
             sampler = self.sampler
 
-        init_image = self._load_img(init_img,width,height).to(self.device)
+        init_image = self._load_img(init_img, width, height).to(self.device)
         with precision_scope(self.device.type):
             init_latent = self.model.get_first_stage_encoding(
                 self.model.encode_first_stage(init_image)
@@ -513,7 +504,9 @@ class T2I:
         x_samples = self.model.decode_first_stage(samples)
         x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
         if len(x_samples) != 1:
-            raise Exception(f'expected to get a single image, but got {len(x_samples)}')
+            raise Exception(
+                f'expected to get a single image, but got {len(x_samples)}'
+            )
         x_sample = 255.0 * rearrange(
             x_samples[0].cpu().numpy(), 'c h w -> h w c'
         )
@@ -544,13 +537,30 @@ class T2I:
                 self.model.cond_stage_model.device = self.device
             except AttributeError:
                 import traceback
-                print('Error loading model. Only the CUDA backend is supported',file=sys.stderr)
+                print(
+                    'Error loading model. Only the CUDA backend is supported',file=sys.stderr
+                )
                 print(traceback.format_exc(),file=sys.stderr)
                 raise SystemExit
 
             self._set_sampler()
 
         return self.model
+
+    def _resolution_check(self, width, height, log=False):
+        resize_needed = False
+        w, h = map(
+            lambda x: x - x % 64, (width, height)
+        )  # resize to integer multiple of 64
+        if h != height or w != width:
+            if log:
+                print(
+                    f'>> Provided width and height must be multiples of 64. Auto-resizing to {w}x{h}'
+                )
+            height = h
+            width = w
+            resize_needed = True
+        return width, height, resize_needed
 
     def _set_sampler(self):
         msg = f'>> Setting Sampler to {self.sampler_name}'
@@ -581,7 +591,7 @@ class T2I:
         print(msg)
 
     def _load_model_from_config(self, config, ckpt):
-        print(f'Loading model from {ckpt}')
+        print(f'>> Loading model from {ckpt}')
         pl_sd = torch.load(ckpt, map_location='cpu')
         #        if "global_step" in pl_sd:
         #            print(f"Global Step: {pl_sd['global_step']}")
@@ -604,7 +614,10 @@ class T2I:
     def _load_img(self, path, width, height):
         with Image.open(path) as img:
             image = img.convert('RGB')
-        print(f'loaded input image of size {image.width}x{image.height} from {path}')
+        print(
+            f'>> loaded input image of size {image.width}x{image.height} from {path}.',
+            f'maximum image size is {width}x{height}'
+        )
 
         # set the larger of width,height to None in order to
         # automagically retain aspect ratio without letterboxing
@@ -618,7 +631,7 @@ class T2I:
             msg    = '-H'
         
         image = InitImageResizer(image).resize(width,height)
-        print(f'resized input image to size {image.width}x{image.height} (use {msg} to adjust)')
+        print(f'>> resized input image to size {image.width}x{image.height} (use {msg} to adjust)')
 
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
@@ -642,7 +655,7 @@ class T2I:
                 prompt = text[:idx]
                 remaining -= idx
                 # remove from main text
-                text = text[idx + 1 :]
+                text = text[idx + 1:]
                 # find value for weight
                 if ' ' in text:
                     idx = text.index(' ')   # first occurence
@@ -671,7 +684,7 @@ class T2I:
                     weights.append(1.0)
                 remaining = 0
         return prompts, weights
-        
+
     # shows how the prompt is tokenized 
     # usually tokens have '</w>' to indicate end-of-word, 
     # but for readability it has been replaced with ' '
@@ -683,15 +696,21 @@ class T2I:
         discarded = ""
         usedTokens = 0
         totalTokens = len(tokens)
-        for i in range(0,totalTokens):                
+        for i in range(0,totalTokens):
             token = tokens[i].replace('</w>',' ')
             # alternate color
             s = (usedTokens % 6) + 1
             if i < self.model.cond_stage_model.max_length:
                 tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
                 usedTokens += 1
-            else: # over max token length
+            else:  # over max token length
                 discarded = discarded + f"\x1b[0;3{s};40m{token}"
-        print(f"\nTokens ({usedTokens}):\n{tokenized}\x1b[0m")
+        print(
+            f"\nTokens ({usedTokens}):\n{tokenized}\x1b[0m"
+        )
         if discarded != "":
-            print(f"Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m")
+            print(
+                f"Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m"
+            )
+
+

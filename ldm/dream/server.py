@@ -187,10 +187,8 @@ class DreamServer(BaseHTTPRequestHandler):
                     # Remove the temp file
                     os.remove("./img2img-tmp.png")
         except CanceledException:
-            print(f"Canceled.")
+            print(f">> Canceled.")
             return
-
-        print(f"Prompt generated!")
 
 
 class ThreadingDreamServer(ThreadingHTTPServer):
