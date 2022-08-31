@@ -495,11 +495,11 @@ class T2I:
             c = torch.zeros_like(uc)
             # normalize each "sub prompt" and add it
             for i in range(0, len(weighted_subprompts)):
-                prompt, weight = weighted_subprompts[i]
-                self._log_tokenization(prompt)
+                subprompt, weight = weighted_subprompts[i]
+                self._log_tokenization(subprompt)
                 c = torch.add(
                     c,
-                    self.model.get_learned_conditioning([prompt]),
+                    self.model.get_learned_conditioning([subprompt]),
                     alpha=weight,
                 )
         else:   # just standard 1 prompt
