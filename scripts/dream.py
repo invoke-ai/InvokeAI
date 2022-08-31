@@ -28,7 +28,7 @@ def main():
         width = 512
         height = 512
         config = 'configs/stable-diffusion/v1-inference.yaml'
-        weights = 'models/ldm/stable-diffusion-v1/model.ckpt'
+        weights = f'models/ldm/stable-diffusion-v1/{opt.weights}.ckpt'
 
     print('* Initializing, be patient...\n')
     sys.path.append('.')
@@ -400,6 +400,11 @@ def create_argv_parser():
         dest='web',
         action='store_true',
         help='Start in web server mode.',
+    )
+    parser.add.argument(
+        '--weights',
+        default='model',
+        help='Indicates the Stable Diffusion model to use.',
     )
     return parser
 
