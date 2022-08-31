@@ -714,7 +714,7 @@ class T2I:
         if variant_amount != 0.0:
             variant_amount = max(0.0, min(1.0, variant_amount))
             # base noise is made from whatever our seed currently is
-            base_x_T = torch.randn([self.batch_size,
+            base_x_T = torch.randn([1,
                                     self.latent_channels,
                                     height // self.downsampling_factor,
                                     width  // self.downsampling_factor],
@@ -743,7 +743,7 @@ class T2I:
             
             seed_everything(seed)
 
-            target_x_T = torch.randn([self.batch_size,
+            target_x_T = torch.randn([1,
                 self.latent_channels,
                 height // self.downsampling_factor,
                 width  // self.downsampling_factor],
