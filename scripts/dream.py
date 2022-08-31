@@ -28,7 +28,10 @@ def main():
         width = 512
         height = 512
         config = 'configs/stable-diffusion/v1-inference.yaml'
-        weights = f'models/ldm/stable-diffusion-v1/{opt.weights}.ckpt'
+        if '.ckpt' in opt.weights:
+            weights = opt.weights
+        else:
+            weights = f'models/ldm/stable-diffusion-v1/{opt.weights}.ckpt'
 
     print('* Initializing, be patient...\n')
     sys.path.append('.')
