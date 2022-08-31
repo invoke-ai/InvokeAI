@@ -731,13 +731,8 @@ class T2I:
             variant_amount = max(0.0, min(1.0, variant_amount))
             # no variant seed specified, generate random noise
             if variant_seed is None:
-                # TODO refactor seed overall?
-                # for now I use uptime to seed variations, 
-                # otherwise you get the same set of variations 
-                # from a seed provided with -S
-                # as seed_everything is used in prompt2image, 
-                # which "restarts" the sequence of seeds.
-                seed = time.monotonic_ns() % np.iinfo(np.uint32).max
+                random.seed() # reset RNG to an actually random state, so we can get a random seed
+                seed = random.randrange(0,np.iinfo(np.uint32).max)
             else: # use variant seed for noise
                 seed = variant_seed
             
