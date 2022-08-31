@@ -622,7 +622,7 @@ class T2I:
         """
         prompt_parser = re.compile("""
             (?P<prompt>     # capture group for 'prompt'
-            [^:]+           # match one or more non ':' characters
+            (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
             )               # end 'prompt'
             (?:             # non-capture group
             :+              # match one or more ':' characters  
@@ -634,7 +634,7 @@ class T2I:
             $               # else, if no ':' then match end of line
             )               # end non-capture group
         """, re.VERBOSE)
-        parsed_prompts = [(match.group("prompt"), float(match.group("weight") or 1)) for match in re.finditer(prompt_parser, text)]
+        parsed_prompts = [(match.group("prompt").replace("\\:", ":"), float(match.group("weight") or 1)) for match in re.finditer(prompt_parser, text)]
         if skip_normalize:
             return parsed_prompts
         weight_sum = sum(map(lambda x: x[1], parsed_prompts))
