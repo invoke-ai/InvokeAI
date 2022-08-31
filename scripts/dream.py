@@ -401,7 +401,7 @@ def create_argv_parser():
         action='store_true',
         help='Start in web server mode.',
     )
-    parser.add.argument(
+    parser.add_argument(
         '--weights',
         default='model',
         help='Indicates the Stable Diffusion model to use.',
