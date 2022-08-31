@@ -249,11 +249,11 @@ def main():
 
     start_code = None
     if opt.fixed_code:
-        shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
+        shape = [opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f]
         if device.type == 'mps':
-            start_code = torch.randn(rand_size, device='cpu').to(device)
+            start_code = torch.randn(shape, device='cpu').to(device)
         else:
-            torch.randn(rand_size, device=device)
+            torch.randn(shape, device=device)
 
     precision_scope = autocast if opt.precision=="autocast" else nullcontext
     if device.type in ['mps', 'cpu']:
