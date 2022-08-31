@@ -602,7 +602,6 @@ class T2I:
         return model
 
     def _load_img(self, path, width, height):
-        print(f'image path = {path}, cwd = {os.getcwd()}')
         with Image.open(path) as img:
             image = img.convert('RGB')
         print(f'loaded input image of size {image.width}x{image.height} from {path}')
