@@ -23,7 +23,7 @@ class Completer:
         buffer = readline.get_line_buffer()
 
         if text.startswith(('-I', '--init_img')):
-            return self._path_completions(text, state, ('.png'))
+            return self._path_completions(text, state, ('.png','.jpg','.jpeg'))
 
         if buffer.strip().endswith('cd') or text.startswith(('.', '/')):
             return self._path_completions(text, state, ())
@@ -89,7 +89,6 @@ if readline_available:
                 '--steps','-s',
                 '--seed','-S',
                 '--iterations','-n',
-                '--batch_size','-b',
                 '--width','-W','--height','-H',
                 '--cfg_scale','-C',
                 '--grid','-g',

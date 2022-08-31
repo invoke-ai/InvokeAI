@@ -27,6 +27,8 @@ from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.dream.pngwriter import PngWriter
+from ldm.dream.image_util import InitImageResizer
+from ldm.dream.devices import choose_torch_device
 
 """Simplified text to image API for stable diffusion/latent diffusion
 
@@ -38,7 +40,6 @@ from ldm.simplet2i import T2I
 t2i = T2I(model       = <path>        // models/ldm/stable-diffusion-v1/model.ckpt
           config      = <path>        // configs/stable-diffusion/v1-inference.yaml
           iterations  = <integer>     // how many times to run the sampling (1)
-          batch_size  = <integer>     // how many images to generate per sampling (1)
           steps       = <integer>     // 50
           seed        = <integer>     // current system time
           sampler_name= ['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms']  // k_lms
@@ -97,7 +98,6 @@ class T2I:
         model
         config
         iterations
-        batch_size
         steps
         seed
         sampler_name
@@ -115,7 +115,6 @@ class T2I:
 
     def __init__(
         self,
-        batch_size=1,
         iterations=1,
         steps=50,
         seed=None,
@@ -125,7 +124,7 @@ class T2I:
         grid=False,
         width=512,
         height=512,
-        sampler_name='klms',
+        sampler_name='k_lms',
         latent_channels=4,
         downsampling_factor=8,
         ddim_eta=0.0,  # deterministic
@@ -137,7 +136,6 @@ class T2I:
         latent_diffusion_weights=False,
         device='cuda',
     ):
-        self.batch_size = batch_size
         self.iterations = iterations
         self.width = width
         self.height = height
@@ -173,12 +171,14 @@ class T2I:
         Optional named arguments are the same as those passed to T2I and prompt2image()
         """
         results = self.prompt2image(prompt, **kwargs)
-        pngwriter = PngWriter(
-            outdir, prompt, kwargs.get('batch_size', self.batch_size)
-        )
-        for r in results:
-            pngwriter.write_image(r[0], r[1])
-        return pngwriter.files_written
+        pngwriter = PngWriter(outdir)
+        prefix = pngwriter.unique_prefix()
+        outputs = []
+        for image, seed in results:
+            name = f'{prefix}.{seed}.png'
+            path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', name)
+            outputs.append([path, seed])
+        return outputs
 
     def txt2img(self, prompt, **kwargs):
         outdir = kwargs.pop('outdir', 'outputs/img-samples')
@@ -195,7 +195,6 @@ class T2I:
         self,
         # these are common
         prompt,
-        batch_size=None,
         iterations=None,
         steps=None,
         seed=None,
@@ -204,7 +203,6 @@ class T2I:
         skip_normalize=False,
         image_callback=None,
         step_callback=None,
-        # these are specific to txt2img
         width=None,
         height=None,
         # these are specific to img2img
@@ -224,8 +222,7 @@ class T2I:
         ldm.prompt2image() is the common entry point for txt2img() and img2img()
         It takes the following arguments:
            prompt                          // prompt string (no default)
-           iterations                      // iterations (1); image count=iterations x batch_size
-           batch_size                      // images per iteration (1)
+           iterations                      // iterations (1); image count=iterations
            steps                           // refinement steps per iteration
            seed                            // seed for random number generator
            width                           // width of image, in multiples of 64 (512)
@@ -262,7 +259,6 @@ class T2I:
         height = height or self.height
         cfg_scale = cfg_scale or self.cfg_scale
         ddim_eta = ddim_eta or self.ddim_eta
-        batch_size = batch_size or self.batch_size
         iterations = iterations or self.iterations
         strength = strength or self.strength
         self.log_tokenization = log_tokenization
@@ -277,14 +273,16 @@ class T2I:
         assert (
             0.0 <= variant_amount <= 1.0
         ), '-v --variant_amount must be in 0.0 to 1.0 range'
-        w = int(width / 64) * 64
-        h = int(height / 64) * 64
+        w, h = map(
+            lambda x: x - x % 64, (width, height)
+        )  # resize to integer multiple of 64
+
         if h != height or w != width:
             print(
                 f'Height and width must be multiples of 64. Resizing to {h}x{w}.'
             )
             height = h
-            width = w
+            width  = w
 
         scope = autocast if self.precision == 'autocast' else nullcontext
 
@@ -302,12 +300,13 @@ class T2I:
                 images_iterator = self._img2img(
                     prompt,
                     precision_scope=scope,
-                    batch_size=batch_size,
                     steps=steps,
                     cfg_scale=cfg_scale,
                     ddim_eta=ddim_eta,
                     skip_normalize=skip_normalize,
                     init_img=init_img,
+                    width=width,
+                    height=height,
                     strength=strength,
                     callback=step_callback,
                 )
@@ -315,7 +314,6 @@ class T2I:
                 images_iterator = self._txt2img(
                     prompt,
                     precision_scope=scope,
-                    batch_size=batch_size,
                     steps=steps,
                     cfg_scale=cfg_scale,
                     ddim_eta=ddim_eta,
@@ -329,19 +327,16 @@ class T2I:
 
             with scope(self.device.type), self.model.ema_scope():
                 for n in trange(iterations, desc='Generating'):
-                    seed_everything(seed) 
-
-                    iter_images,iter_seed = next(images_iterator)
-                    # image iterator can modify the seed (during variations)
-                    # this is a workaround until we have objects for containing gen info 
-                    # also wanted to keep it so self.seed is only modified by _new_seed()
-                    if iter_seed is not None:
-                        seed = iter_seed
+                    seed_everything(seed)
+                    image,modified_seed = next(images_iterator)
+                    # images_iterator can modify seed when using -v  
+                    # it returns it to be used in filename/log
+                    if modified_seed is not None:
+                        seed = modified_seed
                     
-                    for image in iter_images:
-                        results.append([image, seed])
-                        if image_callback is not None:
-                            image_callback(image, seed)
+                    results.append([image, seed])
+                    if image_callback is not None:
+                        image_callback(image, seed)
                     seed = self._new_seed()
 
                 if upscale is not None or gfpgan_strength > 0:
@@ -372,10 +367,7 @@ class T2I:
                                 f'Error running RealESRGAN - Your image was not upscaled.\n{e}'
                             )
                         if image_callback is not None:
-                            if save_original:
-                                image_callback(image, seed)
-                            else:
-                                image_callback(image, seed, upscaled=True)
+                            image_callback(image, seed, upscaled=True)
                         else: # no callback passed, so we simply replace old image with rescaled one
                             result[0] = image
 
@@ -411,7 +403,6 @@ class T2I:
         self,
         prompt,
         precision_scope,
-        batch_size,
         steps,
         cfg_scale,
         ddim_eta,
@@ -431,7 +422,7 @@ class T2I:
         base_x_T = self._get_base_noise(width, height, variant_amount)
 
         while True:
-            uc, c = self._get_uc_and_c(prompt, batch_size, skip_normalize)
+            uc, c = self._get_uc_and_c(prompt, skip_normalize)
             shape = [
                 self.latent_channels,
                 height // self.downsampling_factor,
@@ -441,9 +432,9 @@ class T2I:
             x_T,seed = self._apply_variation_slerp(width, height, variant_amount, variant_seed, base_x_T)
             
             samples, _ = sampler.sample(
+                batch_size=1,
                 S=steps,
                 conditioning=c,
-                batch_size=batch_size,
                 shape=shape,
                 verbose=False,
                 unconditional_guidance_scale=cfg_scale,
@@ -452,19 +443,20 @@ class T2I:
                 img_callback=callback,
                 x_T = x_T
             )
-            yield self._samples_to_images(samples),seed
+            yield self._sample_to_image(samples),seed
 
     @torch.no_grad()
     def _img2img(
         self,
         prompt,
         precision_scope,
-        batch_size,
         steps,
         cfg_scale,
         ddim_eta,
         skip_normalize,
         init_img,
+        width,
+        height,
         strength,
         callback, # Currently not implemented for img2img
     ):
@@ -481,8 +473,7 @@ class T2I:
         else:
             sampler = self.sampler
 
-        init_image = self._load_img(init_img).to(self.device)
-        init_image = repeat(init_image, '1 ... -> b ...', b=batch_size)
+        init_image = self._load_img(init_img,width,height).to(self.device)
         with precision_scope(self.device.type):
             init_latent = self.model.get_first_stage_encoding(
                 self.model.encode_first_stage(init_image)
@@ -496,26 +487,27 @@ class T2I:
         # print(f"target t_enc is {t_enc} steps")
 
         while True:
-            uc, c = self._get_uc_and_c(prompt, batch_size, skip_normalize)
+            uc, c = self._get_uc_and_c(prompt, skip_normalize)
 
             # encode (scaled latent)
             z_enc = sampler.stochastic_encode(
-                init_latent, torch.tensor([t_enc] * batch_size).to(self.device)
+                init_latent, torch.tensor([t_enc]).to(self.device)
             )
             # decode it
             samples = sampler.decode(
                 z_enc,
                 c,
                 t_enc,
+                img_callback=callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
             )
-            yield self._samples_to_images(samples),None
+            yield self._sample_to_image(samples),None #none is to stay consistent with _txt2img
 
     # TODO: does this actually need to run every loop? does anything in it vary by random seed?
-    def _get_uc_and_c(self, prompt, batch_size, skip_normalize):
+    def _get_uc_and_c(self, prompt, skip_normalize):
 
-        uc = self.model.get_learned_conditioning(batch_size * [''])
+        uc = self.model.get_learned_conditioning([''])
 
         # weighted sub-prompts
         subprompts, weights = T2I._split_weighted_subprompts(prompt)
@@ -532,90 +524,38 @@ class T2I:
                 self._log_tokenization(subprompts[i])
                 c = torch.add(
                     c,
-                    self.model.get_learned_conditioning(
-                        batch_size * [subprompts[i]]
-                    ),
+                    self.model.get_learned_conditioning([subprompts[i]]),
                     alpha=weight,
                 )
         else:   # just standard 1 prompt
             self._log_tokenization(prompt)
-            c = self.model.get_learned_conditioning(batch_size * [prompt])
+            c = self.model.get_learned_conditioning([prompt])
         return (uc, c)
 
-    def _samples_to_images(self, samples):
+    def _sample_to_image(self, samples):
         x_samples = self.model.decode_first_stage(samples)
         x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
-        images = list()
-        for x_sample in x_samples:
-            x_sample = 255.0 * rearrange(
-                x_sample.cpu().numpy(), 'c h w -> h w c'
-            )
-            image = Image.fromarray(x_sample.astype(np.uint8))
-            images.append(image)
-        return images
+        if len(x_samples) != 1:
+            raise Exception(f'expected to get a single image, but got {len(x_samples)}')
+        x_sample = 255.0 * rearrange(
+            x_samples[0].cpu().numpy(), 'c h w -> h w c'
+        )
+        return Image.fromarray(x_sample.astype(np.uint8))
 
     def _new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
         return self.seed
 
-    def _get_base_noise(self, width:int, height:int, variant_amount:float) -> torch.Tensor:
-        base_x_T = None
-        if variant_amount != 0.0:
-            variant_amount = max(0.0, min(1.0, variant_amount))
-            # base noise is made from whatever our seed currently is
-            base_x_T = torch.randn([self.batch_size,
-                                    self.latent_channels,
-                                    height // self.downsampling_factor,
-                                    width  // self.downsampling_factor],
-                                    device=self.device)
-        return base_x_T
-
-    def _apply_variation_slerp(self, 
-        width:int, height:int,
-        variant_amount:float, variant_seed:int, 
-        base_x_T:torch.Tensor) -> "[torch.Tensor,int]":
-        x_T = None
-        seed = None
-        if variant_amount != 0.0:
-            variant_amount = max(0.0, min(1.0, variant_amount))
-            # no variant seed specified, generate random noise
-            if variant_seed is None:
-                # TODO refactor seed overall?
-                # for now I use uptime to seed variations, 
-                # otherwise you get the same set of variations 
-                # from a seed provided with -S
-                # as seed_everything is used in prompt2image, 
-                # which "restarts" the sequence of seeds.
-                seed = time.monotonic_ns() % np.iinfo(np.uint32).max
-            else: # use variant seed for noise
-                seed = variant_seed
-            
-            seed_everything(seed)
-
-            target_x_T = torch.randn([self.batch_size,
-                self.latent_channels,
-                height // self.downsampling_factor,
-                width  // self.downsampling_factor],
-                device=self.device)
-
-            # slerp base -> target using variant amount
-            x_T = self.slerp(variant_amount, base_x_T, target_x_T)
-        return x_T, seed
-
     def _get_device(self):
-        if torch.cuda.is_available():
-            return torch.device('cuda')
-        elif torch.backends.mps.is_available():
-            return torch.device('mps')
-        else:
-            return torch.device('cpu')
+        device_type = choose_torch_device()
+        return torch.device(device_type)
 
     def load_model(self):
         """Load and initialize the model from configuration variables passed at object creation time"""
         if self.model is None:
             seed_everything(self.seed)
             try:
-                config = OmegaConf.load(self.config)
+                config      = OmegaConf.load(self.config)
                 self.device = self._get_device()
                 model = self._load_model_from_config(config, self.weights)
                 if self.embedding_path is not None:
@@ -684,17 +624,15 @@ class T2I:
             model.half()
         return model
 
-    def _load_img(self, path):
+    def _load_img(self, path, width, height):
         print(f'image path = {path}, cwd = {os.getcwd()}')
         with Image.open(path) as img:
             image = img.convert('RGB')
+        print(f'loaded input image of size {image.width}x{image.height} from {path}')
 
-        w, h = image.size
-        print(f'loaded input image of size ({w}, {h}) from {path}')
-        w, h = map(
-            lambda x: x - x % 32, (w, h)
-        )  # resize to integer multiple of 32
-        image = image.resize((w, h), resample=Image.Resampling.LANCZOS)
+        image = InitImageResizer(image).resize(width,height)
+        print(f'resized input image to size {image.width}x{image.height}')
+
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
@@ -771,6 +709,50 @@ class T2I:
         if discarded != "":
             print(f"Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m")
 
+    def _get_base_noise(self, width:int, height:int, variant_amount:float) -> torch.Tensor:
+        base_x_T = None
+        if variant_amount != 0.0:
+            variant_amount = max(0.0, min(1.0, variant_amount))
+            # base noise is made from whatever our seed currently is
+            base_x_T = torch.randn([self.batch_size,
+                                    self.latent_channels,
+                                    height // self.downsampling_factor,
+                                    width  // self.downsampling_factor],
+                                    device=self.device)
+        return base_x_T
+
+    def _apply_variation_slerp(self, 
+        width:int, height:int,
+        variant_amount:float, variant_seed:int, 
+        base_x_T:torch.Tensor) -> "[torch.Tensor,int]":
+        x_T = None
+        seed = None
+        if variant_amount != 0.0:
+            variant_amount = max(0.0, min(1.0, variant_amount))
+            # no variant seed specified, generate random noise
+            if variant_seed is None:
+                # TODO refactor seed overall?
+                # for now I use uptime to seed variations, 
+                # otherwise you get the same set of variations 
+                # from a seed provided with -S
+                # as seed_everything is used in prompt2image, 
+                # which "restarts" the sequence of seeds.
+                seed = time.monotonic_ns() % np.iinfo(np.uint32).max
+            else: # use variant seed for noise
+                seed = variant_seed
+            
+            seed_everything(seed)
+
+            target_x_T = torch.randn([self.batch_size,
+                self.latent_channels,
+                height // self.downsampling_factor,
+                width  // self.downsampling_factor],
+                device=self.device)
+
+            # slerp base -> target using variant amount
+            x_T = self.slerp(variant_amount, base_x_T, target_x_T)
+        return x_T, seed
+        
     def slerp(self, t, v0, v1, DOT_THRESHOLD=0.9995):
         '''
         Spherical linear interpolation
