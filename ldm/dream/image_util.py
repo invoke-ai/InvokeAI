@@ -34,7 +34,7 @@ class InitImageResizer():
         # rw and rh are the resizing width and height for the image
         # they maintain the aspect ratio, but may not completelyl fill up
         # the requested destination size
-        (rw,rh) = (width,int(width/ar)) if im.width>=im.height else (int(height*ar),width)
+        (rw,rh) = (width,int(width/ar)) if im.width>=im.height else (int(height*ar),height)
 
         #round everything to multiples of 64
         width,height,rw,rh = map(

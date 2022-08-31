@@ -610,8 +610,19 @@ class T2I:
             image = img.convert('RGB')
         print(f'loaded input image of size {image.width}x{image.height} from {path}')
 
+        # set the larger of width,height to None in order to
+        # automagically retain aspect ratio without letterboxing
+        # This will also ensure that the image does not exceed the
+        # height x width requested by caller.
+        if image.width >= image.height:
+            height = None
+            msg    = '-W'
+        else:
+            width  = None
+            msg    = '-H'
+        
         image = InitImageResizer(image).resize(width,height)
-        print(f'resized input image to size {image.width}x{image.height}')
+        print(f'resized input image to size {image.width}x{image.height} (use {msg} to adjust)')
 
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)

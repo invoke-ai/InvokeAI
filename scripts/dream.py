@@ -110,6 +110,8 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
         name_max = 255
 
     while not done:
+
+        # TODO: move the command parsing routines into a class
         try:
             command = get_next_command(infile)
         except EOFError:
@@ -164,6 +166,7 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
         if len(opt.prompt) == 0:
             print('Try again with a prompt!')
             continue
+
         if opt.seed is not None and opt.seed < 0:   # retrieve previous value!
             try:
                 opt.seed = last_seeds[opt.seed]
@@ -273,7 +276,6 @@ def write_log_message(prompt, results, log_path):
 
     with open(log_path, 'a', encoding='utf-8') as file:
         file.writelines(log_lines)
-
 
 SAMPLER_CHOICES=[
     'ddim',
