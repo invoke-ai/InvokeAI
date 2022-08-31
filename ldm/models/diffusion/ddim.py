@@ -32,7 +32,7 @@ class DDIMSampler(object):
     def register_buffer(self, name, attr):
         if type(attr) == torch.Tensor:
             if attr.device != torch.device(self.device):
-                attr = attr.to(torch.float32).to(torch.device(self.device))
+                attr = attr.to(dtype=torch.float32, device=self.device)
         setattr(self, name, attr)
 
     def make_schedule(
