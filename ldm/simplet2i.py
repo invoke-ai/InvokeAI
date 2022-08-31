@@ -314,11 +314,10 @@ class T2I:
             with scope(self.device.type), self.model.ema_scope():
                 for n in trange(iterations, desc='Generating'):
                     seed_everything(seed)
-                    iter_images = next(images_iterator)
-                    for image in iter_images:
-                        results.append([image, seed])
-                        if image_callback is not None:
-                            image_callback(image, seed)
+                    image = next(images_iterator)
+                    results.append([image, seed])
+                    if image_callback is not None:
+                        image_callback(image, seed)
                     seed = self._new_seed()
 
                 if upscale is not None or gfpgan_strength > 0:
@@ -420,7 +419,7 @@ class T2I:
                 eta=ddim_eta,
                 img_callback=callback
             )
-            yield self._samples_to_images(samples)
+            yield self._sample_to_image(samples)
 
     @torch.no_grad()
     def _img2img(
@@ -479,7 +478,7 @@ class T2I:
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
             )
-            yield self._samples_to_images(samples)
+            yield self._sample_to_image(samples)
 
     # TODO: does this actually need to run every loop? does anything in it vary by random seed?
     def _get_uc_and_c(self, prompt, skip_normalize):
@@ -509,17 +508,15 @@ class T2I:
             c = self.model.get_learned_conditioning([prompt])
         return (uc, c)
 
-    def _samples_to_images(self, samples):
+    def _sample_to_image(self, samples):
         x_samples = self.model.decode_first_stage(samples)
         x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
-        images = list()
-        for x_sample in x_samples:
-            x_sample = 255.0 * rearrange(
-                x_sample.cpu().numpy(), 'c h w -> h w c'
-            )
-            image = Image.fromarray(x_sample.astype(np.uint8))
-            images.append(image)
-        return images
+        if len(x_samples) != 1:
+            raise Exception(f'expected to get a single image, but got {len(x_samples)}')
+        x_sample = 255.0 * rearrange(
+            x_samples[0].cpu().numpy(), 'c h w -> h w c'
+        )
+        return Image.fromarray(x_sample.astype(np.uint8))
 
     def _new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
