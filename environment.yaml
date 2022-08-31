@@ -36,4 +36,3 @@ dependencies:
     - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
     - -e git+https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion
     - -e git+https://github.com/lstein/GFPGAN@fix-dark-cast-images#egg=gfpgan
-    - -e .
