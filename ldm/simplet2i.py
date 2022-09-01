@@ -157,8 +157,7 @@ class T2I:
         self.device = device
 
         # for VRAM usage statistics
-        self.session_peakmem = torch.cuda.max_memory_allocated(
-        ) if self.device == 'cuda' else None
+        self.session_peakmem = torch.cuda.max_memory_allocated() if self.device == 'cuda' else None
 
         if seed is None:
             self.seed = self._new_seed()
