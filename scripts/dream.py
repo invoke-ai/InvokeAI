@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 
+import os
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 import argparse
 import shlex
-import os
 import re
 import sys
 import copy
@@ -54,6 +56,7 @@ def main():
         height=height,
         sampler_name=opt.sampler_name,
         weights=weights,
+        precision="full" if opt.full_precision else "autocast",
         full_precision=opt.full_precision,
         config=config,
         grid  = opt.grid,
