@@ -492,7 +492,7 @@ class T2I:
             weight = None
         else:
             weight = init_latent_set.std(0, keepdim=True)
-            init_latent = torch.normal(init_latent_set.mean(0, True), weight)
+            init_latent = torch.normal(init_latent_set.mean(0, True), 0.5 * weight)
             scale = weight.quantile(set_quantile)
             weight = weight/scale
             weight = weight.clamp(max = 1)
