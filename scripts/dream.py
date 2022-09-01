@@ -476,6 +476,13 @@ def create_cmd_parser():
         help='Path to input image for img2img mode (supersedes width and height)',
     )
     parser.add_argument(
+        '-T',
+        '-fit',
+        '--fit',
+        action='store_true',
+        help='If specified, will resize the input image to fit within the dimensions of width x height (512x512 default)',
+    )
+    parser.add_argument(
         '-f',
         '--strength',
         default=0.75,
