@@ -12,6 +12,7 @@ assignees: ''
 - VRAM: [if known]
 - CPU arch: [x86/arm]
 - OS: [Linux/Windows/macOS]
+- Python: [Anaconda/miniconda/miniforge/pyenv/other (explain)]
 - Branch: [if `git status` says anything other than "On branch main" paste it here]
 - Commit: [run `git show` and paste the line that starts with "Merge" here]
 
