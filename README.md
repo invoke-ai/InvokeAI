@@ -329,9 +329,9 @@ and introducing a new vocabulary to the fixed model.
 
 To train, prepare a folder that contains images sized at 512x512 and execute the following:
 
-```
-# As the default backend is not available on Windows, if you're using that platform, execute SET PL_TORCH_DISTRIBUTED_BACKEND=gloo
-(ldm) ~/stable-diffusion$ python3 ./main.py --base ./configs/stable-diffusion/v1-finetune.yaml \
+WINDOWS: As the default backend is not available on Windows, if you're using that platform, execute SET PL_TORCH_DISTRIBUTED_BACKEND=gloo
+    
+```(ldm) ~/stable-diffusion$ python3 ./main.py --base ./configs/stable-diffusion/v1-finetune.yaml \
                                             -t \
                                             --actual_resume ./models/ldm/stable-diffusion-v1/model.ckpt \
                                             -n my_cat \
