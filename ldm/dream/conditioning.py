@@ -30,7 +30,7 @@ class Conditioning():
                     alpha=weight,
                 )
         else:   # just standard 1 prompt
-            self.loglogger(prompt)
+            self.logger(prompt)
             c = self.model.get_learned_conditioning([prompt])
         return (uc, c)
 

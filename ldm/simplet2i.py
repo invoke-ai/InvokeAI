@@ -31,7 +31,7 @@ from ldm.models.diffusion.ksampler import KSampler
 from ldm.dream.pngwriter           import PngWriter
 from ldm.dream.image_util          import InitImageResizer
 from ldm.dream.devices             import choose_autocast_device, choose_torch_device
-from ldm.dream.conditiong          import Conditioning
+from ldm.dream.conditioning        import Conditioning
 
 """Simplified text to image API for stable diffusion/latent diffusion
 
@@ -482,7 +482,6 @@ class T2I:
         uc, c   = conditioning
 
         def make_image(x_T):
-            uc, c = self._get_uc_and_c(prompt, skip_normalize)
             shape = [
                 self.latent_channels,
                 height // self.downsampling_factor,
