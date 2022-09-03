@@ -286,7 +286,7 @@ class T2I:
                 0.0 <= variation_amount <= 1.0
         ), '-v --variation_amount must be in [0.0, 1.0]'
 
-        if len(with_variations) > 0 or variation_amount > 1.0:
+        if len(with_variations) > 0 or variation_amount > 0.0:
             assert seed is not None,\
                 'seed must be specified when using with_variations'
             if variation_amount == 0.0:
