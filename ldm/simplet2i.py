@@ -30,7 +30,8 @@ from ldm.models.diffusion.plms     import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.dream.pngwriter           import PngWriter
 from ldm.dream.image_util          import InitImageResizer
-from ldm.dream.devices import choose_autocast_device, choose_torch_device
+from ldm.dream.devices             import choose_autocast_device, choose_torch_device
+from ldm.dream.conditiong          import Conditioning
 
 """Simplified text to image API for stable diffusion/latent diffusion
 
@@ -326,6 +327,9 @@ class T2I:
             torch.cuda.reset_peak_memory_stats()
         results = list()
 
+        conditioner = Conditioning(self.model,self._log_tokenization)
+        uc, c       = conditioner.get_uc_and_c(prompt, skip_normalize)
+
         try:
             if init_img:
                 assert os.path.exists(init_img), f'{init_img}: File not found'
@@ -335,13 +339,12 @@ class T2I:
                         self.model.encode_first_stage(init_image)
                     ) # move to latent space
 
-                print(f' DEBUG: seed at make_image time ={seed}')
                 make_image = self._img2img(
                     prompt,
                     steps=steps,
                     cfg_scale=cfg_scale,
                     ddim_eta=ddim_eta,
-                    skip_normalize=skip_normalize,
+                    conditioning = (uc,c),
                     init_latent=init_latent,
                     strength=strength,
                     callback=step_callback,
@@ -352,7 +355,7 @@ class T2I:
                     steps=steps,
                     cfg_scale=cfg_scale,
                     ddim_eta=ddim_eta,
-                    skip_normalize=skip_normalize,
+                    conditioning = (uc,c),
                     width=width,
                     height=height,
                     callback=step_callback,
@@ -388,7 +391,6 @@ class T2I:
                         if self.device.type == 'mps':
                             x_T = self._get_noise(init_img,width,height)
                         # make_image will do the equivalent of get_noise itself
-                    print(f' DEBUG: seed at make_image() invocation time ={seed}')
                     image = make_image(x_T)
                     results.append([image, seed])
                     if image_callback is not None:
@@ -461,15 +463,15 @@ class T2I:
 
     @torch.no_grad()
     def _txt2img(
-        self,
-        prompt,
-        steps,
-        cfg_scale,
-        ddim_eta,
-        skip_normalize,
-        width,
-        height,
-        callback,
+            self,
+            prompt,
+            steps,
+            cfg_scale,
+            ddim_eta,
+            conditioning,
+            width,
+            height,
+            callback,
     ):
         """
         Returns a function returning an image derived from the prompt and the initial image
@@ -477,6 +479,7 @@ class T2I:
         """
 
         sampler = self.sampler
+        uc, c   = conditioning
 
         def make_image(x_T):
             uc, c = self._get_uc_and_c(prompt, skip_normalize)
@@ -506,8 +509,8 @@ class T2I:
             prompt,
             steps,
             cfg_scale,
+            conditioning,
             ddim_eta,
-            skip_normalize,
             init_latent,
             strength,
             callback,  # Currently not implemented for img2img
@@ -516,6 +519,7 @@ class T2I:
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
         """
+        uc, c = conditioning
 
         # PLMS sampler not supported yet, so ignore previous sampler
         if self.sampler_name != 'ddim':
@@ -533,7 +537,6 @@ class T2I:
         t_enc = int(strength * steps)
 
         def make_image(x_T):
-            uc, c = self._get_uc_and_c(prompt, skip_normalize)
 
             # encode (scaled latent)
             z_enc = sampler.stochastic_encode(
@@ -552,31 +555,6 @@ class T2I:
             )
             return self._sample_to_image(samples)
         return make_image
-
-    # TODO: does this actually need to run every loop? does anything in it vary by random seed?
-    def _get_uc_and_c(self, prompt, skip_normalize):
-
-        uc = self.model.get_learned_conditioning([''])
-
-        # get weighted sub-prompts
-        weighted_subprompts = T2I._split_weighted_subprompts(
-            prompt, skip_normalize)
-
-        if len(weighted_subprompts) > 1:
-            # i dont know if this is correct.. but it works
-            c = torch.zeros_like(uc)
-            # normalize each "sub prompt" and add it
-            for subprompt, weight in weighted_subprompts:
-                self._log_tokenization(subprompt)
-                c = torch.add(
-                    c,
-                    self.model.get_learned_conditioning([subprompt]),
-                    alpha=weight,
-                )
-        else:   # just standard 1 prompt
-            self._log_tokenization(prompt)
-            c = self.model.get_learned_conditioning([prompt])
-        return (uc, c)
 
     def _sample_to_image(self, samples):
         x_samples = self.model.decode_first_stage(samples)
@@ -739,41 +717,6 @@ class T2I:
             f'>> after adjusting image dimensions to be multiples of 64, init image is {image.width}x{image.height}'
             )
         return image
-
-
-    # TO DO: Move this and related weighted subprompt code into its own module.
-    def _split_weighted_subprompts(text, skip_normalize=False):
-        """
-        grabs all text up to the first occurrence of ':'
-        uses the grabbed text as a sub-prompt, and takes the value following ':' as weight
-        if ':' has no value defined, defaults to 1.0
-        repeats until no text remaining
-        """
-        prompt_parser = re.compile("""
-            (?P<prompt>     # capture group for 'prompt'
-            (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
-            )               # end 'prompt'
-            (?:             # non-capture group
-            :+              # match one or more ':' characters
-            (?P<weight>     # capture group for 'weight'
-            -?\d+(?:\.\d+)? # match positive or negative integer or decimal number
-            )?              # end weight capture group, make optional
-            \s*             # strip spaces after weight
-            |               # OR
-            $               # else, if no ':' then match end of line
-            )               # end non-capture group
-        """, re.VERBOSE)
-        parsed_prompts = [(match.group("prompt").replace("\\:", ":"), float(
-            match.group("weight") or 1)) for match in re.finditer(prompt_parser, text)]
-        if skip_normalize:
-            return parsed_prompts
-        weight_sum = sum(map(lambda x: x[1], parsed_prompts))
-        if weight_sum == 0:
-            print(
-                "Warning: Subprompt weights add up to zero. Discarding and using even weights instead.")
-            equal_weight = 1 / len(parsed_prompts)
-            return [(x[0], equal_weight) for x in parsed_prompts]
-        return [(x[0], x[1] / weight_sum) for x in parsed_prompts]
 
     # shows how the prompt is tokenized
     # usually tokens have '</w>' to indicate end-of-word,
