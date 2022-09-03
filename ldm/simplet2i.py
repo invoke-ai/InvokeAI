@@ -347,7 +347,6 @@ class T2I:
                     init_img=[init_img],
                     width=width,
                     height=height,
-                    init_latent=init_latent,
                     strength=strength,
                     callback=step_callback,
                     set_quantile=set_quantile
@@ -355,7 +354,7 @@ class T2I:
             elif init_img_set:
                 assert os.path.exists(init_img_set), f'{init_img_set}: File not found'
                 init_img_dirs = self._load_img_set(init_img_set)
-                images_iterator = self._img2img(
+                make_image = self._img2img(
                     prompt,
                     precision_scope=scope,
                     steps=steps,
@@ -531,8 +530,11 @@ class T2I:
             cfg_scale,
             ddim_eta,
             skip_normalize,
-            init_latent,
+            init_img,
+            precision_scope,
             strength,
+            width,
+            height,
             callback,  # Currently not implemented for img2img
             set_quantile
     ):
