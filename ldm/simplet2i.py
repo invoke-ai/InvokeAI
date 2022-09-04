@@ -302,9 +302,9 @@ class T2I:
                 if init_mask:
                     init_mask_image = self._load_img_mask(init_mask, width, height, fit).to(self.device)
 
-            if init_mask_image and init_image:
+            if init_mask and init_img:
                 generator = self._make_inpaint()
-            elif init_image:
+            elif init_img:
                 generator  = self._make_img2img()
             else:
                 generator  = self._make_txt2img()
