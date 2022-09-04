@@ -13,7 +13,7 @@ function appendOutput(src, seed, config) {
 
     const figureContents = `
         <a href="${src}" target="_blank">
-            <img src="${src}" alt="${altText}">
+            <img src="${src}" alt="${altText}" title="${altText}">
         </a>
         <figcaption>${seed}</figcaption>
     `;
