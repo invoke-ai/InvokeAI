@@ -359,7 +359,7 @@ class T2I:
                 )
 
             # returns a tensor filled with random numbers from a normal distribution
-            def _get_noise(self,init_img,width,height):
+            def _get_noise(init_img,width,height):
                 if init_img:
                     if self.device.type == 'mps':
                         return torch.randn_like(init_latent, device='cpu').to(self.device)
