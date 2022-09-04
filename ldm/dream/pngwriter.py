@@ -59,6 +59,8 @@ class PromptFormatter:
         switches.append(f'-H{opt.height       or t2i.height}')
         switches.append(f'-C{opt.cfg_scale    or t2i.cfg_scale}')
         switches.append(f'-A{opt.sampler_name or t2i.sampler_name}')
+# to do: put model name into the t2i object
+#        switches.append(f'--model{t2i.model_name}')
         if opt.seamless or t2i.seamless:
             switches.append(f'--seamless')
         if opt.init_img:

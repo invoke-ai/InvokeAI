@@ -53,18 +53,18 @@ def main():
     # additional parameters will be added (or overriden) during
     # the user input loop
     t2i = T2I(
-        width=width,
-        height=height,
-        sampler_name=opt.sampler_name,
-        weights=weights,
-        full_precision=opt.full_precision,
-        config=config,
-        grid  = opt.grid,
+        width          = width,
+        height         = height,
+        sampler_name   = opt.sampler_name,
+        weights        = weights,
+        full_precision = opt.full_precision,
+        config         = config,
+        grid           = opt.grid,
         # this is solely for recreating the prompt
-        latent_diffusion_weights=opt.laion400m,
-        seamless=opt.seamless,
-        embedding_path=opt.embedding_path,
-        device_type=opt.device
+        model_name     = opt.model,
+        seamless       = opt.seamless,
+        embedding_path = opt.embedding_path,
+        device_type    = opt.device
     )
 
     # make sure the output directory exists
