@@ -12,13 +12,12 @@ import time
 import re
 import sys
 import traceback
+import transformers
+
 from omegaconf import OmegaConf
 from PIL import Image
-from itertools import islice
 from torch import nn
-from torchvision.utils import make_grid
 from pytorch_lightning import seed_everything
-import transformers
 
 from ldm.util                      import instantiate_from_config
 from ldm.models.diffusion.ddim     import DDIMSampler
