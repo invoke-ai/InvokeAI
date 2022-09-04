@@ -11,7 +11,7 @@ class CanceledException(Exception):
 
 class DreamServer(BaseHTTPRequestHandler):
     model = None
-    outdir = "./outputs/img-samples/"
+    outdir = None
     canceled = Event()
 
     def do_GET(self):
