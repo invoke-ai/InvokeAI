@@ -358,6 +358,27 @@ class T2I:
                     callback=step_callback,
                 )
 
+            # returns a tensor filled with random numbers from a normal distribution
+            def _get_noise(self,init_img,width,height):
+                if init_img:
+                    if self.device.type == 'mps':
+                        return torch.randn_like(init_latent, device='cpu').to(self.device)
+                    else:
+                        return torch.randn_like(init_latent, device=self.device)
+                else:
+                    if self.device.type == 'mps':
+                        return torch.randn([1,
+                                            self.latent_channels,
+                                            height // self.downsampling_factor,
+                                            width  // self.downsampling_factor],
+                                           device='cpu').to(self.device)
+                    else:
+                        return torch.randn([1,
+                                            self.latent_channels,
+                                            height // self.downsampling_factor,
+                                            width  // self.downsampling_factor],
+                                           device=self.device)
+
             initial_noise = None
             if variation_amount > 0 or len(with_variations) > 0:
                 # use fixed initial noise plus random noise per iteration
@@ -619,27 +640,6 @@ class T2I:
                     m._orig_padding_mode = m.padding_mode
 
         return self.model
-
-    # returns a tensor filled with random numbers from a normal distribution
-    def _get_noise(self,init_img,width,height):
-        if init_img:
-            if self.device.type == 'mps':
-                return torch.randn_like(init_latent, device='cpu').to(self.device)
-            else:
-                return torch.randn_like(init_latent, device=self.device)
-        else:
-            if self.device.type == 'mps':
-                return torch.randn([1,
-                                    self.latent_channels,
-                                    height // self.downsampling_factor,
-                                    width  // self.downsampling_factor],
-                                   device='cpu').to(self.device)
-            else:
-                return torch.randn([1,
-                                    self.latent_channels,
-                                    height // self.downsampling_factor,
-                                    width  // self.downsampling_factor],
-                                   device=self.device)
 
     def _set_sampler(self):
         msg = f'>> Setting Sampler to {self.sampler_name}'
