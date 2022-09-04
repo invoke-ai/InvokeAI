@@ -433,15 +433,9 @@ class T2I:
                 )
 
             if image_callback is not None:
-                if save_original:
-                    image_callback(image, seed)
-                else:
-                    image_callback(image, seed, upscaled=True)
-            # there is a bug here. If the user asked to save_original, then
-            # results should grow to accomodate the new images. Instead, the
-            # callback is being treated properly, but the results array is not.
-            print('>> There is a bug here; original images are not being saved and named properly')
-            r[0] = image
+                image_callback(image, seed, upscaled=True)
+            else:
+                r[0] = image
 
     def _set_sampler(self):
         msg = f'>> Setting Sampler to {self.sampler_name}'
