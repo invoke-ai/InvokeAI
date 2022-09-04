@@ -193,6 +193,7 @@ class T2I:
             seamless       =    False,
             # these are specific to img2img
             init_img       =    None,
+            init_mask      =    None,
             fit            =    False,
             strength       =    None,
             gfpgan_strength=    0,
@@ -215,7 +216,8 @@ class T2I:
            height                          // height of image, in multiples of 64 (512)
            cfg_scale                       // how strongly the prompt influences the image (7.5) (must be >1)
            seamless                        // whether the generated image should tile
-           init_img                        // path to an initial image - its dimensions override width and height
+           init_img                        // path to an initial image
+           init_mask                       // path to an initial image mask for inpainting
            strength                        // strength for noising/unnoising init_img. 0.0 preserves image exactly, 1.0 replaces it completely
            gfpgan_strength                 // strength for GFPGAN. 0.0 preserves image exactly, 1.0 replaces it completely
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
@@ -288,15 +290,21 @@ class T2I:
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
 
-        results    = list()
-        init_image = None
+        results          = list()
+        init_image       = None
+        init_mask_image  = None
 
         try:
             uc, c = Conditioning(self.model,self.log_tokenization).get_uc_and_c(prompt, skip_normalize)
 
             if init_img:
-                assert os.path.exists(init_img), f'>> {init_img}: File not found'
                 init_image = self._load_img(init_img, width, height, fit).to(self.device)
+                if init_mask:
+                    init_mask_image = self._load_img_mask(init_mask, width, height, fit).to(self.device)
+
+            if init_mask_image and init_image:
+                generator = self._make_inpaint()
+            elif init_image:
                 generator  = self._make_img2img()
             else:
                 generator  = self._make_txt2img()
@@ -484,6 +492,8 @@ class T2I:
         return model
 
     def _load_img(self, path, width, height, fit=False):
+        assert os.path.exists(path), f'>> {path}: File not found'
+
         with Image.open(path) as img:
             image = img.convert('RGB')
         print(
@@ -508,6 +518,55 @@ class T2I:
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
         return 2.0 * image - 1.0
+
+    def _load_img_mask(self, path, width, height, fit=False):
+        assert os.path.exists(path), f'>> {path}: File not found'
+
+        with Image.open(path) as img:
+            image = img.convert('RGB')
+        print(
+            f'>> loaded input image of size {image.width}x{image.height} from {path}'
+        )
+
+        # needs a little refactoring here because following code is copied from _load_img()
+        if fit:
+            image = self._fit_image(image,(width,height))
+        else:
+            image = self._squeeze_image(image)
+        image = self._mask_to_image(image,invert=False)  # BUG: pass through an invert flag
+        image = np.array(image).astype(np.float32) / 255.0
+        image = image[None].transpose(0, 3, 1, 2)
+        image = torch.from_numpy(image)
+        return 2.0 * image - 1.0
+
+    # The mask is expected to have the region to be inpainted
+    # with alpha transparency. It converts it into a black/white
+    # image with the transparent part black.
+    def _mask_to_image(self, init_mask, invert=False) -> Image:
+        if self._has_transparency(init_mask):
+            # Obtain the mask from the transparency channel
+            mask = Image.new(mode="L", size=image.size, color=255)
+            mask.putdata(image.getdata(band=3))
+            if invert:
+                mask = ImageOps.invert(mask)
+            return mask
+        else:
+            print(f'>> No transparent pixels in this image. Will inpaint across entire image.')
+            return Image.new(mode="L", size=image.size, color=0)
+
+    def _has_transparency(self,image):
+        if img.info.get("transparency", None) is not None:
+            return True
+        if img.mode == "P":
+            transparent = img.info.get("transparency", -1)
+            for _, index in img.getcolors():
+                if index == transparent:
+                    return True
+        elif img.mode == "RGBA":
+            extrema = img.getextrema()
+            if extrema[3][0] < 255:
+                return True
+        return False
 
     def _squeeze_image(self,image):
         x,y,resize_needed = self._resolution_check(image.width,image.height)
