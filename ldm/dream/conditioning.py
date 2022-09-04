@@ -6,9 +6,9 @@ import re
 import torch
 
 class Conditioning():
-    def __init__(self, model, logger=None):
+    def __init__(self, model, log_tokens=False):
         self.model  = model
-        self.logger = logger if logger else lambda : None    # right way to make a noop?
+        self.logger = self.log_tokenization if log_tokens else lambda a : None    # right way to make a noop?
 
     def get_uc_and_c(self, prompt, skip_normalize=False):
         uc = self.model.get_learned_conditioning([''])
@@ -66,6 +66,28 @@ class Conditioning():
             equal_weight = 1 / len(parsed_prompts)
             return [(x[0], equal_weight) for x in parsed_prompts]
         return [(x[0], x[1] / weight_sum) for x in parsed_prompts]
-
         
+    # shows how the prompt is tokenized
+    # usually tokens have '</w>' to indicate end-of-word,
+    # but for readability it has been replaced with ' '
+    def log_tokenization(self, text):
+        tokens = self.model.cond_stage_model.tokenizer._tokenize(text)
+        tokenized = ""
+        discarded = ""
+        usedTokens = 0
+        totalTokens = len(tokens)
+        for i in range(0, totalTokens):
+            token = tokens[i].replace('</w>', ' ')
+            # alternate color
+            s = (usedTokens % 6) + 1
+            if i < self.model.cond_stage_model.max_length:
+                tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
+                usedTokens += 1
+            else:  # over max token length
+                discarded = discarded + f"\x1b[0;3{s};40m{token}"
+        print(f"\n>> Tokens ({usedTokens}):\n{tokenized}\x1b[0m")
+        if discarded != "":
+            print(
+                f">> Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m")
 
+    

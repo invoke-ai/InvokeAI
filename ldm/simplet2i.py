@@ -292,7 +292,7 @@ class T2I:
         init_image = None
 
         try:
-            uc, c = Conditioning(self.model,self._log_tokenization).get_uc_and_c(prompt, skip_normalize)
+            uc, c = Conditioning(self.model,self.log_tokenization).get_uc_and_c(prompt, skip_normalize)
 
             if init_img:
                 assert os.path.exists(init_img), f'>> {init_img}: File not found'
@@ -467,8 +467,6 @@ class T2I:
     def _load_model_from_config(self, config, ckpt):
         print(f'>> Loading model from {ckpt}')
         pl_sd = torch.load(ckpt, map_location='cpu')
-        #        if "global_step" in pl_sd:
-        #            print(f"Global Step: {pl_sd['global_step']}")
         sd = pl_sd['state_dict']
         model = instantiate_from_config(config.model)
         m, u = model.load_state_dict(sd, strict=False)
@@ -476,7 +474,7 @@ class T2I:
         model.eval()
         if self.full_precision:
             print(
-                'Using slower but more accurate full-precision math (--full_precision)'
+                '>> Using slower but more accurate full-precision math (--full_precision)'
             )
         else:
             print(
@@ -534,31 +532,6 @@ class T2I:
             f'>> after adjusting image dimensions to be multiples of 64, init image is {image.width}x{image.height}'
             )
         return image
-
-    # shows how the prompt is tokenized
-    # usually tokens have '</w>' to indicate end-of-word,
-    # but for readability it has been replaced with ' '
-    def _log_tokenization(self, text):
-        if not self.log_tokenization:
-            return
-        tokens = self.model.cond_stage_model.tokenizer._tokenize(text)
-        tokenized = ""
-        discarded = ""
-        usedTokens = 0
-        totalTokens = len(tokens)
-        for i in range(0, totalTokens):
-            token = tokens[i].replace('</w>', ' ')
-            # alternate color
-            s = (usedTokens % 6) + 1
-            if i < self.model.cond_stage_model.max_length:
-                tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
-                usedTokens += 1
-            else:  # over max token length
-                discarded = discarded + f"\x1b[0;3{s};40m{token}"
-        print(f"\nTokens ({usedTokens}):\n{tokenized}\x1b[0m")
-        if discarded != "":
-            print(
-                f"Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m")
 
     def _resolution_check(self, width, height, log=False):
         resize_needed = False

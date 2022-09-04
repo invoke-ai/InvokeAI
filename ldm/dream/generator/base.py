@@ -169,3 +169,4 @@ class Generator():
             v2 = torch.from_numpy(v2).to(self.model.device)
 
         return v2
+
