@@ -1,10 +1,8 @@
 from timeit import default_timer as timer
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor
 
 import asyncio
-import queue
 
 import discord
 from discord.ext import commands, tasks
@@ -17,8 +15,8 @@ from ldm.simplet2i import T2I
 model = T2I()
 model.load_model()
 
-loop = asyncio.get_event_loop()
-queue = asyncio.Queue()
+dreaming_loop = asyncio.get_event_loop()
+dreaming_queue = asyncio.Queue()
 
 intents = discord.Intents.default()
 intents.members = True
@@ -35,10 +33,18 @@ async def dream(ctx, *, arg):
     if ctx.author != bot.user:
         try:
             message = await ctx.reply('Your dream is queued')
-            loop.call_soon_threadsafe(queue.put_nowait, dreaming(ctx, arg, message))
+            dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, arg, message))
         except Exception as e:
-            print("dream error: {}".format(e))
-            await ctx.reply('Something is wrong...')
+            error_msg = 'Dream error: {}'.format(e)
+            print(error_msg)
+            on_bot_thread(ctx.reply(error_msg))
+
+def noop():
+    pass
+
+def on_bot_thread(coroutine):
+    bot.loop.create_task(coroutine) # add the coroutine as a task to the bot loop
+    bot.loop.call_soon_threadsafe(noop) # Force the bot.loop to clear itself
 
 async def dreaming(ctx, arg, message):
     try:
@@ -47,28 +53,30 @@ async def dreaming(ctx, arg, message):
             
             quote_text = '{}'.format(arg)
 
-            bot.loop.call_soon_threadsafe(bot.loop.create_task(message.edit(content='Dreaming for {}\'s `{}}`'.format(ctx.message.author.mention,quote_text))))
-            outputs = model.txt2img(quote_text)
-            bot.loop.call_soon_threadsafe(bot.loop.create_task(message.delete()))
+            on_bot_thread(message.edit(content='Dreaming for {}\'s `{}`'.format(ctx.message.author.mention,quote_text)))
+            outputs = model.prompt2png(quote_text, 'outputs/img-samples')
+
+            on_bot_thread(message.delete())
 
             for output in outputs:
                 output_file = discord.File(output[0], description = quote_text)
-                bot.loop.call_soon_threadsafe(bot.loop.create_task(ctx.reply(content='Dreamt in `{}s` for {}\'s `{}`\nSeed {}'.format(timer() - start,ctx.message.author.mention,quote_text, output[1]), file=output_file)))
+                msg = 'Dreamt in `{}s` for {}\'s `{}`\nSeed {}'.format(timer() - start,ctx.message.author.mention,quote_text, output[1])
+                on_bot_thread(ctx.reply(content=msg, file=output_file))
     except Exception as e:
-        print("dreaming error: {}".format(e))
-        bot.loop.call_soon_threadsafe(bot.loop.create_task(ctx.reply('Something is wrong...')))
+        error_msg = 'Dreaming error: {}'.format(e)
+        print(error_msg)
+        on_bot_thread(ctx.reply(error_msg))
 
 async def async_handler():
     while True:
-        task = await queue.get()
+        task = await dreaming_queue.get()
         await task
-        queue.task_done()
+        dreaming_queue.task_done()
 
 def thread_handler():
-    loop.create_task(async_handler())
-    loop.run_forever()
+    dreaming_loop.create_task(async_handler())
+    dreaming_loop.run_forever()
 
-model_thread = threading.Thread(target=thread_handler)
+model_thread = threading.Thread(target=thread_handler, daemon=True)
 model_thread.start()
 bot.run(settings['token'])
-sys.exit(0)
