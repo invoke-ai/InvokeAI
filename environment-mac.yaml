@@ -1,4 +1,4 @@
-name: ldm2
+name: ldm
 channels:
   - pytorch
   - conda-forge
