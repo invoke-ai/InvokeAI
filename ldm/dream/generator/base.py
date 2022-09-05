@@ -27,7 +27,7 @@ class Generator():
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
         """
-        assert False, "get_make_image() must be implemented in a descendent class"
+        raise NotImplementedError("image_iterator() must be implemented in a descendent class")
 
     def set_variation(self, seed, variation_amount, with_variations):
         self.seed             = seed
