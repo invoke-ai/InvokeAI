@@ -19,7 +19,7 @@ class Generator():
         self.downsampling_factor = 8   # never seems to change
         self.variation_amount    = 0
         self.init_latent         = None    # set by img2img and used by get_noise()
-        self.with_variations     = False
+        self.with_variations     = []
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
     def image_iterator(self,prompt,**kwargs):
