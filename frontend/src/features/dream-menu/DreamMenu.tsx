@@ -37,7 +37,8 @@ import { useSocketIOEmitters } from '../../context/socket';
 
 const DreamMenu = () => {
     const {
-        prompt,
+        isProcessing,
+        isConnected,
         imagesToGenerate,
         steps,
         cfgScale,
@@ -64,10 +65,15 @@ const DreamMenu = () => {
                         label='Generate'
                         type='submit'
                         colorScheme='green'
+                        isDisabled={!isConnected || isProcessing}
                         onClick={() => generateImage()}
                     />
                     <Spacer />
-                    <SDButton label='Cancel' colorScheme='red' />
+                    <SDButton
+                        label='Cancel'
+                        colorScheme='red'
+                        isDisabled={!isConnected && !isProcessing}
+                    />
                     <Spacer />
                     <SDButton
                         label='Reset'

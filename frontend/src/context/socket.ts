@@ -11,6 +11,7 @@ import {
     deleteImage,
     setGalleryImages,
     setIsConnected,
+    setIsProcessing,
     setProgress,
 } from '../app/sdSlice';
 import { RootState } from '../app/store';
@@ -91,7 +92,8 @@ export const useSocketIOEmitters = () => {
     } = useAppSelector((state: RootState) => state.sd);
 
     return {
-        generateImage: () =>
+        generateImage: () => {
+            dispatch(setIsProcessing(true));
             socket.emit('generateImage', {
                 prompt,
                 imagesToGenerate,
@@ -105,7 +107,8 @@ export const useSocketIOEmitters = () => {
                 gfpganStrength,
                 upscalingLevel,
                 upscalingStrength,
-            }),
+            });
+        },
         deleteImage: (id: number) => {
             socket.emit('deleteImage', images[id].url, (response: string) => {
                 response === 'ok' && dispatch(deleteImage(id));

@@ -167,6 +167,7 @@ export const sdSlice = createSlice({
     },
     addImage: (state, action: PayloadAction<SDImage>) => {
       state.images.push(action.payload);
+      state.isProcessing = false;
     },
     setProgress: (state, action: PayloadAction<number>) => {
       state.progress = action.payload;

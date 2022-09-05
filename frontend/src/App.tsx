@@ -21,7 +21,7 @@ const App = () => {
                     "header header header"
                     "menu prompt prompt"
                     "menu currentImage imageRoll"`}
-                gridTemplateRows={' 4px 48px 100px 1fr'}
+                gridTemplateRows={'4px 40px 100px 1fr'}
                 gridTemplateColumns={'250px 4fr 1fr'}
                 gap='2'
             >
