@@ -18,7 +18,6 @@ class Img2Img(Generator):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it.
-        kwargs are 'init_latent' and 'strength'
         """
 
         # PLMS sampler not supported yet, so ignore previous sampler

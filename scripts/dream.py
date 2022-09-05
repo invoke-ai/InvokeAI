@@ -567,6 +567,17 @@ def create_cmd_parser():
         help='Path to input image for img2img mode (supersedes width and height)',
     )
     parser.add_argument(
+        '-M',
+        '--mask',
+        type=str,
+        help='Path to inpainting mask; transparent areas will be painted over',
+    )
+    parser.add_argument(
+        '--invert_mask',
+        action='store_true',
+        help='Invert the inpainting mask; opaque areas will be painted over',
+    )
+    parser.add_argument(
         '-T',
         '-fit',
         '--fit',

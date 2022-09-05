@@ -15,7 +15,7 @@ import traceback
 import transformers
 
 from omegaconf import OmegaConf
-from PIL import Image
+from PIL import Image, ImageOps
 from torch import nn
 from pytorch_lightning import seed_everything
 
@@ -193,7 +193,8 @@ class T2I:
             seamless       =    False,
             # these are specific to img2img
             init_img       =    None,
-            init_mask      =    None,
+            mask           =    None,
+            invert_mask    =    False,
             fit            =    False,
             strength       =    None,
             gfpgan_strength=    0,
@@ -217,7 +218,8 @@ class T2I:
            cfg_scale                       // how strongly the prompt influences the image (7.5) (must be >1)
            seamless                        // whether the generated image should tile
            init_img                        // path to an initial image
-           init_mask                       // path to an initial image mask for inpainting
+           mask                            // path to an initial image mask for inpainting
+           invert_mask                     // paint over opaque areas, retain transparent areas
            strength                        // strength for noising/unnoising init_img. 0.0 preserves image exactly, 1.0 replaces it completely
            gfpgan_strength                 // strength for GFPGAN. 0.0 preserves image exactly, 1.0 replaces it completely
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
@@ -264,8 +266,8 @@ class T2I:
         
         assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert (
-            0.0 <= strength <= 1.0
-        ), 'can only work with strength in [0.0, 1.0]'
+            0.0 < strength < 1.0
+        ), 'img2img and inpaint strength can only work with 0.0 < strength < 1.0'
         assert (
                 0.0 <= variation_amount <= 1.0
         ), '-v --variation_amount must be in [0.0, 1.0]'
@@ -297,17 +299,18 @@ class T2I:
         try:
             uc, c = Conditioning(self.model,self.log_tokenization).get_uc_and_c(prompt, skip_normalize)
 
-            if init_img:
-                init_image = self._load_img(init_img, width, height, fit).to(self.device)
-                if init_mask:
-                    init_mask_image = self._load_img_mask(init_mask, width, height, fit).to(self.device)
-
-            if init_mask and init_img:
-                generator = self._make_inpaint()
-            elif init_img:
-                generator  = self._make_img2img()
+            if mask and init_img:
+                init_image,size1       = self._load_img(init_img, width, height,fit=fit)
+                init_image.to(self.device)
+                init_mask_image,size2  = self._load_img_mask(mask, width, height,fit=fit, invert=invert_mask)
+                init_mask_image.to(self.device)
+                assert size1==size2,f"for inpainting, the initial image and its mask must be identical sizes, instead got {size1} vs {size2}"
+                generator       = self._make_inpaint()
+            elif init_img:        # little bit of repeated code here, but makes logic clearer
+                init_image      = self._load_img(init_img, width, height, fit=fit).to(self.device)
+                generator       = self._make_img2img()
             else:
-                generator  = self._make_txt2img()
+                generator       = self._make_txt2img()
 
             generator.set_variation(self.seed, variation_amount, with_variations)
             results = generator.generate(
@@ -324,6 +327,7 @@ class T2I:
                 width          = width,
                 height         = height,
                 init_image     = init_image,   # notice that init_image is different from init_img
+                init_mask      = init_mask_image,
                 strength       = strength
             )
 
@@ -366,7 +370,7 @@ class T2I:
     def _make_img2img(self):
         if not self.generators.get('img2img'):
             from ldm.dream.generator.img2img import Img2Img
-            self.generators['img2img'] = Img2Img(self.model) # circular reference - is this bad?
+            self.generators['img2img'] = Img2Img(self.model)
         return self.generators['img2img']
 
     def _make_txt2img(self):
@@ -374,6 +378,12 @@ class T2I:
             from ldm.dream.generator.txt2img import Txt2Img
             self.generators['txt2img'] = Txt2Img(self.model)
         return self.generators['txt2img']
+
+    def _make_inpaint(self):
+        if not self.generators.get('inpaint'):
+            from ldm.dream.generator.inpaint import Inpaint
+            self.generators['inpaint'] = Inpaint(self.model)
+        return self.generators['inpaint']
 
     def load_model(self):
         """Load and initialize the model from configuration variables passed at object creation time"""
@@ -499,45 +509,43 @@ class T2I:
         print(
             f'>> loaded input image of size {image.width}x{image.height} from {path}'
         )
-
-        # The logic here is:
-        # 1. If "fit" is true, then the image will be fit into the bounding box defined
-        #    by width and height. It will do this in a way that preserves the init image's
-        #    aspect ratio while preventing letterboxing. This means that if there is
-        #    leftover horizontal space after rescaling the image to fit in the bounding box,
-        #    the generated image's width will be reduced to the rescaled init image's width.
-        #    Similarly for the vertical space.
-        # 2. Otherwise, if "fit" is false, then the image will be scaled, preserving its
-        #    aspect ratio, to the nearest multiple of 64. Large images may generate an
-        #    unexpected OOM error.
         if fit:
             image = self._fit_image(image,(width,height))
         else:
             image = self._squeeze_image(image)
+
+        size = image.size
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
-        return 2.0 * image - 1.0
+        image = 2.0 * image - 1.0 
+        return image.to(self.device),size
 
-    def _load_img_mask(self, path, width, height, fit=False):
+    def _load_img_mask(self, path, width, height, fit=False, invert=False):
         assert os.path.exists(path), f'>> {path}: File not found'
 
-        with Image.open(path) as img:
-            image = img.convert('RGB')
+        image = Image.open(path)
         print(
-            f'>> loaded input image of size {image.width}x{image.height} from {path}'
+            f'>> loaded input mask of size {image.width}x{image.height} from {path}'
         )
 
-        # needs a little refactoring here because following code is copied from _load_img()
         if fit:
             image = self._fit_image(image,(width,height))
         else:
             image = self._squeeze_image(image)
-        image = self._mask_to_image(image,invert=False)  # BUG: pass through an invert flag
-        image = np.array(image).astype(np.float32) / 255.0
+
+        # convert into a black/white mask
+        image = self._mask_to_image(image,invert)
+        image = image.convert('RGB')
+        size  = image.size
+
+        # not quite sure what's going on here. It is copied from basunjindal's implementation
+        image = image.resize((64, 64), resample=Image.Resampling.LANCZOS)
+        image = np.array(image)
+        image = image.astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
-        return 2.0 * image - 1.0
+        return image.to(self.device),size
 
     # The mask is expected to have the region to be inpainted
     # with alpha transparency. It converts it into a black/white
@@ -545,25 +553,25 @@ class T2I:
     def _mask_to_image(self, init_mask, invert=False) -> Image:
         if self._has_transparency(init_mask):
             # Obtain the mask from the transparency channel
-            mask = Image.new(mode="L", size=image.size, color=255)
-            mask.putdata(image.getdata(band=3))
+            mask = Image.new(mode="L", size=init_mask.size, color=255)
+            mask.putdata(init_mask.getdata(band=3))
             if invert:
                 mask = ImageOps.invert(mask)
             return mask
         else:
-            print(f'>> No transparent pixels in this image. Will inpaint across entire image.')
-            return Image.new(mode="L", size=image.size, color=0)
+            print(f'>> No transparent pixels in this image. Will paint across entire image.')
+            return Image.new(mode="L", size=mask.size, color=0)
 
     def _has_transparency(self,image):
-        if img.info.get("transparency", None) is not None:
+        if image.info.get("transparency", None) is not None:
             return True
-        if img.mode == "P":
-            transparent = img.info.get("transparency", -1)
-            for _, index in img.getcolors():
+        if image.mode == "P":
+            transparent = image.info.get("transparency", -1)
+            for _, index in image.getcolors():
                 if index == transparent:
                     return True
-        elif img.mode == "RGBA":
-            extrema = img.getextrema()
+        elif image.mode == "RGBA":
+            extrema = image.getextrema()
             if extrema[3][0] < 255:
                 return True
         return False

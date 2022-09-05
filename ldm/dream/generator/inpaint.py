@@ -4,6 +4,7 @@ ldm.dream.generator.inpaint descends from ldm.dream.generator
 
 import torch
 import numpy as  np
+from einops import rearrange, repeat
 from ldm.dream.devices             import choose_autocast_device
 from ldm.dream.generator.base      import Generator
 from ldm.models.diffusion.ddim     import DDIMSampler
@@ -22,6 +23,9 @@ class Inpaint(Generator):
         the time you call it.  kwargs are 'init_latent' and 'strength'
         """
 
+        init_mask = init_mask[0][0].unsqueeze(0).repeat(4,1,1).unsqueeze(0)
+        init_mask = repeat(init_mask, '1 ... -> b ...', b=1)
+
         # PLMS sampler not supported yet, so ignore previous sampler
         if not isinstance(sampler,DDIMSampler):
             print(
@@ -29,20 +33,21 @@ class Inpaint(Generator):
             )
             sampler = DDIMSampler(self.model, device=self.model.device)
 
-        sampler.make_schedule(
-            ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
-        )
+            sampler.make_schedule(
+                ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
+            )
 
         device_type,scope   = choose_autocast_device(self.model.device)
-
         with scope(device_type):
             self.init_latent = self.model.get_first_stage_encoding(
                 self.model.encode_first_stage(init_image)
             ) # move to latent space
 
-        t_enc = int(strength * steps)
+        t_enc   = int(strength * steps)
         uc, c   = conditioning
-        
+
+        print(f">> target t_enc is {t_enc} steps")
+
         def make_image(x_T):
             # encode (scaled latent)
             z_enc = sampler.stochastic_encode(
@@ -50,14 +55,17 @@ class Inpaint(Generator):
                 torch.tensor([t_enc]).to(self.model.device),
                 noise=x_T
             )
+                                       
             # decode it
             samples = sampler.decode(
                 z_enc,
                 c,
                 t_enc,
-                img_callback = step_callback,
-                unconditional_guidance_scale=cfg_scale,
-                unconditional_conditioning=uc,
+                img_callback                 = step_callback,
+                unconditional_guidance_scale = cfg_scale,
+                unconditional_conditioning = uc,
+                mask                       = init_mask,
+                init_latent                = self.init_latent
             )
             return self.sample_to_image(samples)
 
