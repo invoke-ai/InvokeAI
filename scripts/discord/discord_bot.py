@@ -11,7 +11,19 @@ from discord_config import settings
 
 # regex for text parsing
 import re
-text_parser = re.compile('^(?P<prompt>.+?)(?:\s+-+(?:seed|s)[\s=](?P<seed>\d+))?$', re.IGNORECASE)
+text_parser = re.compile("""
+^
+(?P<prompt>.+?)
+(?:
+    (?:\s+-+(?:width|w)[\s=](?P<width>\d{2,4})) |
+    (?:\s+-+(?:height|h)[\s=](?P<height>\d{2,4})) |
+    (?:\s+-+(?:steps)[\s=](?P<steps>\d{1,3})) |
+    (?:\s+-+(?:str|strength)[\s=](?P<strength>(?:\d+(?:\.\d+)?))) |
+    (?:\s+-+(?:number|n)[\s=](?P<number>\d{1})) |
+    (?:\s+-+(?:seed|s)[\s=](?P<seed>\d+))
+)*
+$
+""", re.IGNORECASE | re.VERBOSE)
 
 sys.path.append('.')
 
@@ -66,12 +78,22 @@ async def dream(ctx: commands.Context, flags: DreamFlags):
 async def dream(ctx: commands.Context, *, quote_text: str):
     if ctx.author != bot.user:
         try:
-            message = await ctx.reply('Your dream is queued')
-            dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, quote_text, message))
+            if quote_text.endswith('--help'):
+                message = await ctx.reply("""Dream help: 
+`/dream <prompt> [--width N:512] [--height N:512] [--steps N:50] [--strength N:7.5] [--number N:1] [--seed N]`
+`width`, `height`: The width and height of the image in multiples of 64. Higher numbers can crash the bot. Max: 9999
+`steps`: The number of steps to do while building the image. More steps take longer but produce a higher quality image. Max: 999
+`strength`: The strength of the prompt on the image. Must be >1. Higher numbers produce more strict prompt matches.
+`number`: The number of images to produce. Max: 9
+`seed`: The seed to use for your image. Defaults to a random number. Put in a previously used seed to get the same image, which can be then refined.
+""")
+            else:
+                message = await ctx.reply('Your dream is queued')
+                dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, quote_text, message))
         except Exception as e:
             error_msg = 'Dream error: {}'.format(e)
             print(error_msg)
-            on_bot_thread(ctx.reply(error_msg))
+            await ctx.reply(error_msg)
 
 #async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Message):
 async def dreaming(ctx: commands.Context, quote_text: str, message: discord.Message):
@@ -83,7 +105,15 @@ async def dreaming(ctx: commands.Context, quote_text: str, message: discord.Mess
 
             on_bot_thread(message.edit(content='Dreaming for {}\'s `{}`'.format(ctx.message.author.mention,quote_text)))
 
-            outputs = model.prompt2png(parsed.group('prompt'), 'outputs/img-samples', seed = parsed.group('seed'))
+            outputs = model.prompt2png(
+                parsed.group('prompt'), 
+                'outputs/img-samples', 
+                seed = parsed.group('seed'),
+                iterations = None if parsed.group('number') is None else int(parsed.group('number')),
+                cfg_scale = None if parsed.group('strength') is None else float(parsed.group('strength')),
+                steps = None if parsed.group('steps') is None else int(parsed.group('steps')),
+                height = None if parsed.group('height') is None else int(parsed.group('height')),
+                width = None if parsed.group('width') is None else int(parsed.group('width')))
             #outputs = []
 
             on_bot_thread(message.delete())
