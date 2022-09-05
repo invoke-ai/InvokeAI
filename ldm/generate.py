@@ -351,7 +351,7 @@ class Generate:
             )
         except RuntimeError as e:
             print(traceback.format_exc(), file=sys.stderr)
-            print('>> Are you sure your system has an adequate NVIDIA GPU?')
+            print('>> Are you sure your system has an adequate GPU?')
 
         toc = time.time()
         print('>> Usage stats:')
