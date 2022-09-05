@@ -65,21 +65,8 @@ class Img2Img(Generator):
     def get_noise(self,width,height):
         device      = self.model.device
         init_latent = self.init_latent
-        if init_latent is not None:
-            if device.type == 'mps':
-                return torch.randn_like(init_latent, device='cpu').to(device)
-            else:
-                return torch.randn_like(init_latent, device=device)
-
+        assert init_latent is not None,'call to get_noise() when init_latent not set'
         if device.type == 'mps':
-            return torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device='cpu').to(device)
+            return torch.randn_like(init_latent, device='cpu').to(device)
         else:
-            return torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device=device)
+            return torch.randn_like(init_latent, device=device)
