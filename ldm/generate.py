@@ -45,7 +45,6 @@ gr = Generate(model       = <path>        // models/ldm/stable-diffusion-v1/mode
           width       = <integer>     // image width, multiple of 64 (512)
           height      = <integer>     // image height, multiple of 64 (512)
           cfg_scale   = <float>       // condition-free guidance scale (7.5)
-          model_name  = <str>         // name of model using new model configuration system
           )
 
 # do the slow model initialization
@@ -99,7 +98,6 @@ class Generate:
             self,
             iterations            = 1,
             steps                 = 50,
-            seed                  = None,
             cfg_scale             = 7.5,
             weights               = 'models/ldm/stable-diffusion-v1/model.ckpt',
             config                = 'configs/stable-diffusion/v1-inference.yaml',
@@ -114,7 +112,6 @@ class Generate:
             seamless              = False,
             embedding_path        = None,
             device_type           = 'cuda',
-            model_name            = None,
     ):
         self.iterations               = iterations
         self.width                    = width
@@ -191,20 +188,21 @@ class Generate:
             step_callback  =    None,
             width          =    None,
             height         =    None,
+            sampler_name   =    None,
             seamless       =    False,
+            log_tokenization=  False,
+            with_variations =   None,
+            variation_amount =  0.0,
             # these are specific to img2img
             init_img       =    None,
             mask           =    None,
             invert_mask    =    False,
             fit            =    False,
             strength       =    None,
+            # these are specific to GFPGAN/ESRGAN
             gfpgan_strength=    0,
             save_original  =    False,
             upscale        =    None,
-            sampler_name   =    None,
-            log_tokenization=  False,
-            with_variations =   None,
-            variation_amount =  0.0,
             **args,
     ):   # eat up additional cruft
         """
@@ -304,6 +302,9 @@ class Generate:
                 log_tokens=self.log_tokenization
             )
 
+            if mask and not init_img:
+                raise AssertionError('If mask path is provided, initial image path should be provided as well')
+                
             if mask and init_img:
                 init_image,size1       = self._load_img(init_img, width, height,fit=fit)
                 init_image.to(self.device)
@@ -437,7 +438,7 @@ class Generate:
         for r in image_list:
             image, seed = r
             try:
-                if upscale:
+                if upscale is not None:
                     if len(upscale) < 2:
                         upscale.append(0.75)
                     image = real_esrgan_upscale(
