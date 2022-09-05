@@ -17,8 +17,6 @@ class DreamServer(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/":
             self.send_response(200)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
             self.send_header("Content-type", "text/html")
             self.end_headers()
             with open("./static/dream_web/index.html", "rb") as content:
@@ -36,8 +34,6 @@ class DreamServer(BaseHTTPRequestHandler):
         elif self.path == "/cancel":
             self.canceled.set()
             self.send_response(200)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(bytes('{}', 'utf8'))
@@ -60,8 +56,6 @@ class DreamServer(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
         self.send_header("Content-type", "application/json")
         self.end_headers()
 
@@ -206,11 +200,6 @@ class DreamServer(BaseHTTPRequestHandler):
             print(f"Canceled.")
             return
 
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-        self.end_headers()
 
 class ThreadingDreamServer(ThreadingHTTPServer):
     def __init__(self, server_address):
