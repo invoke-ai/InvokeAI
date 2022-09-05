@@ -1,4 +1,4 @@
-name: ldm
+name: ldm2
 channels:
   - pytorch
   - conda-forge
@@ -43,6 +43,7 @@ dependencies:
   - pip:
     - flask
     - flask_socketio
+    - eventlet
     - test-tube==0.7.5
     - transformers==4.21.2
     - torch-fidelity==0.3.0

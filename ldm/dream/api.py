@@ -1,32 +1,27 @@
 import transformers
-from ldm.simplet2i import T2I
-from pytorch_lightning import logging
 import json
 import base64
 import mimetypes
 import os
 import sys
 import time
-from flask import Flask, render_template
+import eventlet
+from pytorch_lightning import logging
+from flask import Flask
 from flask_socketio import SocketIO, emit, send
-
+from ldm.simplet2i import T2I
 from ldm.dream.pngwriter import PngWriter
 from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
-
-host = '127.0.0.1'
-port = 5000
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
+host = '127.0.0.1'
+port = 5000
+
 # CORS only for testing
 socketio = SocketIO(app, host=host, port=port,
                     cors_allowed_origins="*", logger=True, engineio_logger=True)
-
-sys.path.append('.')
-
-# these two lines prevent a horrible warning message from appearing
-# when the frozen CLIP tokenizer is imported
 
 transformers.logging.set_verbosity_error()
 
@@ -39,7 +34,7 @@ tic = time.time()
 t2i.load_model()
 print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 
-print("\n* Initialization done! Awaiting your command (-h for help, 'q' to quit)")
+print("\n* Initialization done! Ready to dream...")
 
 
 @socketio.on('message')
@@ -77,7 +72,7 @@ def generateImage(data):
     upscale = [int(upscale_level), float(upscale_strength)
                ] if upscale_level != 0 else None
     progress_images = False
-    # seed = self.model.seed if int(data['seed']) == -1 else int(data['seed'])
+    seed = t2i.seed if int(data['seed']) == -1 else int(data['seed'])
     seed = int(data['seed'])
 
     pngwriter = PngWriter("./outputs/img-samples/")
@@ -85,6 +80,7 @@ def generateImage(data):
 
     def image_progress(sample, step):
         socketio.emit('progress', (step+1) / steps)
+        eventlet.sleep(0)
 
     def image_done(image, seed, upscaled=False):
         name = f'{prefix}.{seed}.png'
@@ -92,6 +88,8 @@ def generateImage(data):
         # Append post_data to log, but only once!
         if not upscaled:
             socketio.emit('message', {'imgUrl': path})
+            socketio.emit('progress', 0)
+            eventlet.sleep(0)
 
     t2i.prompt2image(prompt,
                      iterations=iterations,
