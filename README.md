@@ -802,3 +802,15 @@ Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https
 
 Please see the original README for more information on this software
 and underlying algorithm, located in the file [README-CompViz.md](README-CompViz.md).
+
+# Discord integration
+Discord integration is provided by the `/scripts/discord/discord_bot.py` script.
+Follow the setup steps for Stable Diffusion first to get your model.ckpt file in the right place first.
+You need to make a config file based on `/scripts/discord/discord_config.py.template` at `/scripts/discord/discord_config.py`.
+You then need to run the bot with the following commands:
+
+```
+call C:\ProgramData\Miniconda3\Scripts\activate.bat
+call conda activate ldm
+python scripts/discord/discord_bot.py
+```
