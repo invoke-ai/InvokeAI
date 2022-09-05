@@ -41,6 +41,8 @@ dependencies:
   - tensorboard==2.9.0
   - torchmetrics==0.9.3
   - pip:
+    - flask
+    - flask_socketio
     - test-tube==0.7.5
     - transformers==4.21.2
     - torch-fidelity==0.3.0
