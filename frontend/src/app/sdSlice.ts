@@ -1,6 +1,8 @@
-import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { testImages, testLogs } from './testingData';
+
+// TODO: Split state into more manageable slices, this is getting unwieldy.
 
 export interface SDMetadata {
   prompt: string;
@@ -25,9 +27,11 @@ export interface SDState {
   gfpganStrength: number;
   upscalingLevel: number;
   upscalingStrength: number;
+
   // gallery
   currentImageIndex: number;
   images: Array<SDImage>;
+
   // system
   shouldDisplayInProgress: boolean;
   shouldFitToWidthHeight: boolean;
@@ -174,9 +178,9 @@ export const sdSlice = createSlice({
       state.isConnected = action.payload;
     },
     setGalleryImages: (state, action: PayloadAction<Array<any>>) => {
-      state.images = action.payload.map((img) => {
+      state.images = action.payload.map((url) => {
         return {
-          url: img.url,
+          url,
           metadata: {
             prompt: 'test',
           },

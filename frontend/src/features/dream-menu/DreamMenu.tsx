@@ -64,24 +64,7 @@ const DreamMenu = () => {
                         label='Generate'
                         type='submit'
                         colorScheme='green'
-                        onClick={() =>
-                            generateImage({
-                                prompt,
-                                imagesToGenerate,
-                                steps,
-                                cfgScale,
-                                height,
-                                width,
-                                sampler,
-                                seed,
-                                img2imgStrength,
-                                gfpganStrength,
-                                upscalingLevel,
-                                upscalingStrength,
-                                isGFPGANAvailable,
-                                isESRGANAvailable,
-                            })
-                        }
+                        onClick={() => generateImage()}
                     />
                     <Spacer />
                     <SDButton label='Cancel' colorScheme='red' />

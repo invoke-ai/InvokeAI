@@ -2,11 +2,13 @@ import { Box, IconButton, Image, VStack } from '@chakra-ui/react';
 import { RootState } from '../../app/store';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { MdDeleteForever } from 'react-icons/md';
-import { deleteImage, setCurrentImage } from '../../app/sdSlice';
+import { setCurrentImage } from '../../app/sdSlice';
+import { useSocketIOEmitters } from '../../context/socket';
 
 const ImageRoll = () => {
     const { images } = useAppSelector((state: RootState) => state.sd);
     const dispatch = useAppDispatch();
+    const { deleteImage } = useSocketIOEmitters();
 
     return (
         <VStack>
@@ -18,7 +20,8 @@ const ImageRoll = () => {
                         top={0}
                         aria-label='Delete image'
                         icon={<MdDeleteForever />}
-                        onClick={() => dispatch(deleteImage(i))}
+                        onClick={() => deleteImage(i)}
+                        // onClick={() => dispatch(deleteImage(i))}
                     />
                     <Image
                         onClick={() => dispatch(setCurrentImage(i))}

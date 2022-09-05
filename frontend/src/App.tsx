@@ -9,6 +9,7 @@ import LogViewer from './components/LogViewer';
 import { useSocketIOListeners } from './context/socket';
 
 const App = () => {
+    // Loads all socket listeners
     useSocketIOListeners();
     return (
         <>

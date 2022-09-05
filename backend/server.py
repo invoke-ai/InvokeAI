@@ -6,6 +6,8 @@ import os
 import sys
 import time
 import eventlet
+
+from pathlib import Path
 from pytorch_lightning import logging
 from flask import Flask, send_from_directory, url_for
 from flask_socketio import SocketIO
@@ -13,7 +15,6 @@ from ldm.simplet2i import T2I
 from ldm.dream.pngwriter import PngWriter
 from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
 
-# static/ is the vite build output dir
 app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 
 # serve generated images
@@ -27,9 +28,8 @@ def outputs(filename):
         filename
     )
 
-# serve the UI
 
-
+# serve the vite build
 @app.route("/", defaults={'path': ''})
 def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
@@ -47,6 +47,7 @@ socketio = SocketIO(app, cors_allowed_origins="*",
 
 transformers.logging.set_verbosity_error()
 
+# initialize with defaults, we will populate all config
 t2i = T2I()
 
 # gets rid of annoying messages about random seed
@@ -59,18 +60,32 @@ print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 print("\n* Initialization done! Ready to dream...")
 
 
-# cancel in-progress image generation
 @socketio.on('cancel')
 def handleCancel():
     print('cancel received')
 
 
 @socketio.on('generateImage')
-def handleGenerateImate(data):
-    generateImage(data)
+def handle_generate_image(data):
+    generate_image(data)
 
 
-def generateImage(data):
+@socketio.on('requestAllImages')
+def handle_request_all_images():
+    paths = Path("./outputs").rglob("*.png")
+    relative_paths = []
+    for p in paths:
+        relative_paths.append(str(p.relative_to('.')))
+    socketio.emit('sendAllImages', relative_paths)
+
+
+@socketio.on('deleteImage')
+def handle_delete_image(path):
+    Path(path).unlink(missing_ok=True)
+    return "ok"
+
+
+def generate_image(data):
     print(data)
     prompt = data['prompt']
     initimg = None
