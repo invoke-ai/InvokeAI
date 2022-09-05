@@ -40,7 +40,7 @@ def main():
     print('* Initializing, be patient...\n')
     sys.path.append('.')
     from pytorch_lightning import logging
-    from ldm.simplet2i import T2I
+    from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
@@ -52,7 +52,7 @@ def main():
     # defaults passed on the command line.
     # additional parameters will be added (or overriden) during
     # the user input loop
-    t2i = T2I(
+    t2i = Generate(
         width          = width,
         height         = height,
         sampler_name   = opt.sampler_name,
