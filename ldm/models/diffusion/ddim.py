@@ -411,8 +411,11 @@ class DDIMSampler(object):
             )
 
             if mask is not None:
-                x0_noisy = x0
-                x_dec = x0_noisy* mask + (1. - mask) * x_dec
+                assert x0 is not None
+                xdec_orig = self.model.q_sample(
+                    x0, ts
+                )  # TODO: deterministic forward pass?
+                x_dec = xdec_orig * mask + (1.0 - mask) * x_dec
 
             x_dec, _ = self.p_sample_ddim(
                 x_dec,
@@ -423,9 +426,6 @@ class DDIMSampler(object):
                 unconditional_guidance_scale=unconditional_guidance_scale,
                 unconditional_conditioning=unconditional_conditioning,
             )
-
-            if mask is not None:
-                xdec = x0 * mask + (1. - mask) * x_dec
 
             if img_callback:
                 img_callback(x_dec, i)
