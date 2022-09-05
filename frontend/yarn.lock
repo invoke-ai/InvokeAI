@@ -1938,6 +1938,11 @@ react@^18.2.0:
   dependencies:
     loose-envify "^1.1.0"
 
+redux-socket.io-middleware@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/redux-socket.io-middleware/-/redux-socket.io-middleware-1.0.4.tgz#5ab34821629383889fe871525d8c257f8416910b"
+  integrity sha512-1Uxa5i2yZ1y3PnJI1OHyhLpyT7SAbxoTr6hLJxCBykAv84UaCCQzbkz6rpXfakJLXYDJ7He0Y0/QvFr7i3mMKQ==
+
 redux-thunk@^2.4.1:
   version "2.4.1"
   resolved "https://registry.yarnpkg.com/redux-thunk/-/redux-thunk-2.4.1.tgz#0dd8042cf47868f4b29699941de03c9301a75714"

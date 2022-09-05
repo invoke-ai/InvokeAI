@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { testImages, testLogs } from './testingData';
 
@@ -21,22 +21,22 @@ export interface SDState {
   width: number;
   sampler: string;
   seed: number;
-  shouldDisplayInProgress: boolean;
   img2imgStrength: number;
-  shouldFitToWidthHeight: boolean;
   gfpganStrength: number;
   upscalingLevel: number;
   upscalingStrength: number;
   // gallery
   currentImageIndex: number;
   images: Array<SDImage>;
-  // status
+  // system
+  shouldDisplayInProgress: boolean;
+  shouldFitToWidthHeight: boolean;
   isProcessing: boolean;
   progress: number;
   log: Array<string>;
-  // system
   isGFPGANAvailable: boolean;
   isESRGANAvailable: boolean;
+  isConnected: boolean;
 }
 
 // Initial state for the main generation parameters
@@ -63,6 +63,7 @@ const initialGalleryState = {
 
 // Initial system state
 const initialSystemState = {
+  isConnected: false,
   isProcessing: false,
   progress: 0,
   log: testLogs,
@@ -160,17 +161,27 @@ export const sdSlice = createSlice({
       state.images = newImages;
       state.currentImageIndex = newCurrentImageIndex;
     },
-    addImage: (state, action: PayloadAction<string>) => {
-      state.images.push({
-        url: action.payload,
-        metadata: { prompt: `added image test prompt ${state.images.length}` },
-      });
+    addImage: (state, action: PayloadAction<SDImage>) => {
+      state.images.push(action.payload);
     },
     setProgress: (state, action: PayloadAction<number>) => {
       state.progress = action.payload;
     },
     appendLog: (state, action: PayloadAction<string>) => {
       state.log.push(action.payload);
+    },
+    setIsConnected: (state, action: PayloadAction<boolean>) => {
+      state.isConnected = action.payload;
+    },
+    setGalleryImages: (state, action: PayloadAction<Array<any>>) => {
+      state.images = action.payload.map((img) => {
+        return {
+          url: img.url,
+          metadata: {
+            prompt: 'test',
+          },
+        };
+      });
     },
   },
 });
@@ -198,6 +209,8 @@ export const {
   addImage,
   setProgress,
   appendLog,
+  setIsConnected,
+  setGalleryImages,
 } = sdSlice.actions;
 
 export default sdSlice.reducer;

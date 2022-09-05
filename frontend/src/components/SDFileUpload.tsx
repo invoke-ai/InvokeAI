@@ -45,8 +45,8 @@ const SDFileUpload = () => {
         reader.onload = () => {
           const binaryStr = reader.result;
           const base64 = base64ArrayBuffer(binaryStr);
-          const uri = 'data:image/image/png;base64,' + base64;
-          dispatch(addImage(uri));
+          const url = 'data:image/image/png;base64,' + base64;
+          dispatch(addImage({ url, metadata: { prompt: 'test' } }));
         };
         reader.readAsArrayBuffer(file);
       });

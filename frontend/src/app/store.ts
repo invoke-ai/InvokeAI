@@ -5,6 +5,9 @@ export const store = configureStore({
   reducer: {
     sd: sdReducer,
   },
+  devTools: {
+    trace: true,
+  },
 });
 
 // Infer the `RootState` and `AppDispatch` types from the store itself

@@ -19,6 +19,7 @@
     "react-dropzone": "^14.2.2",
     "react-icons": "^4.4.0",
     "react-redux": "^8.0.2",
+    "redux-socket.io-middleware": "^1.0.4",
     "socket.io-client": "^4.5.2"
   },
   "devDependencies": {

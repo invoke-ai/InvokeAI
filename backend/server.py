@@ -7,14 +7,27 @@ import sys
 import time
 import eventlet
 from pytorch_lightning import logging
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, url_for
 from flask_socketio import SocketIO
 from ldm.simplet2i import T2I
 from ldm.dream.pngwriter import PngWriter
 from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
 
+# static/ is the vite build output dir
 app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
-app.config['SECRET_KEY'] = 'secret!'
+
+# serve generated images
+app.config['OUTPUTS_FOLDER'] = "../outputs"
+
+
+@app.route('/outputs/<path:filename>')
+def outputs(filename):
+    return send_from_directory(
+        app.config['OUTPUTS_FOLDER'],
+        filename
+    )
+
+# serve the UI
 
 
 @app.route("/", defaults={'path': ''})
@@ -46,21 +59,17 @@ print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 print("\n* Initialization done! Ready to dream...")
 
 
-@socketio.on('message')
-def message(data):
-    print(data)
-
 # cancel in-progress image generation
-
-
 @socketio.on('cancel')
-def cancel():
+def handleCancel():
     print('cancel received')
-
-# generate an image
 
 
 @socketio.on('generateImage')
+def handleGenerateImate(data):
+    generateImage(data)
+
+
 def generateImage(data):
     print(data)
     prompt = data['prompt']
@@ -96,8 +105,7 @@ def generateImage(data):
         path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', name)
         # Append post_data to log, but only once!
         if not upscaled:
-            socketio.emit('message', {'imgUrl': path})
-            socketio.emit('progress', 0)
+            socketio.emit('result', {'url': os.path.relpath(path)})
             eventlet.sleep(0)
 
     t2i.prompt2image(prompt,

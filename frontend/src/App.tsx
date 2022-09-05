@@ -6,8 +6,10 @@ import ImageRoll from './features/gallery/ImageRoll';
 import CurrentImage from './features/gallery/CurrentImage';
 import SDProgress from './components/SDProgress';
 import LogViewer from './components/LogViewer';
+import { useSocketIOListeners } from './context/socket';
 
 const App = () => {
+    useSocketIOListeners();
     return (
         <>
             <Grid

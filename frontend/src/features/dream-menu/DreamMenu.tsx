@@ -1,12 +1,4 @@
-import {
-    Flex,
-    IconButton,
-    HStack,
-    Box,
-    Spacer,
-    Text,
-    Icon,
-} from '@chakra-ui/react';
+import { Flex, IconButton, HStack, Box, Spacer } from '@chakra-ui/react';
 
 import { RootState } from '../../app/store';
 
@@ -22,7 +14,6 @@ import {
     setHeight,
     setImagesToGenerate,
     setImg2imgStrength,
-    setProgress,
     setSampler,
     setSeed,
     setSteps,
@@ -42,11 +33,7 @@ import {
     UPSCALING_LEVELS,
     WIDTHS,
 } from '../../app/constants';
-// import { io } from 'socket.io-client';
-import { useContext, useEffect, useState } from 'react';
-import { SocketContext } from '../../context/socket';
-
-// const socket = io('http://localhost:9090');
+import { useSocketIOEmitters } from '../../context/socket';
 
 const DreamMenu = () => {
     const {
@@ -67,23 +54,7 @@ const DreamMenu = () => {
     } = useAppSelector((state: RootState) => state.sd);
 
     const dispatch = useAppDispatch();
-
-    const generateImage = () => {
-        // socket.emit('generateImage', {
-        //     prompt,
-        //     imagesToGenerate,
-        //     steps,
-        //     cfgScale,
-        //     height,
-        //     width,
-        //     sampler,
-        //     seed,
-        //     img2imgStrength,
-        //     gfpganStrength,
-        //     upscalingLevel,
-        //     upscalingStrength,
-        // });
-    };
+    const { generateImage } = useSocketIOEmitters();
 
     return (
         <Box>
@@ -93,7 +64,24 @@ const DreamMenu = () => {
                         label='Generate'
                         type='submit'
                         colorScheme='green'
-                        onClick={generateImage}
+                        onClick={() =>
+                            generateImage({
+                                prompt,
+                                imagesToGenerate,
+                                steps,
+                                cfgScale,
+                                height,
+                                width,
+                                sampler,
+                                seed,
+                                img2imgStrength,
+                                gfpganStrength,
+                                upscalingLevel,
+                                upscalingStrength,
+                                isGFPGANAvailable,
+                                isESRGANAvailable,
+                            })
+                        }
                     />
                     <Spacer />
                     <SDButton label='Cancel' colorScheme='red' />

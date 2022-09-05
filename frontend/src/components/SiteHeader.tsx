@@ -7,49 +7,16 @@ import {
   Spacer,
   useColorMode,
 } from '@chakra-ui/react';
-import { useContext, useEffect, useState } from 'react';
 
 import { FaSun, FaMoon, FaGithub, FaCircle } from 'react-icons/fa';
 import { MdHelp } from 'react-icons/md';
-import { SocketContext } from '../context/socket';
+import { useAppSelector } from '../app/hooks';
+import { RootState } from '../app/store';
 import SettingsModalButton from '../features/settings/SettingsModalButton';
 
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
-  const socket = useContext(SocketContext);
-  const [isConnected, setIsConnected] = useState<boolean>(socket.connected);
-
-  useEffect(() => {
-    socket.on('connect', () => {
-      setIsConnected(true);
-    });
-
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    // socket.on('message', (data) => {
-    //     console.log(data); // undefined
-    // });
-
-    // socket.on('progress', (data) => {
-    //     const progress = Math.round(data * 100);
-    //     console.log(`Progress: ${progress}%`);
-    //     dispatch(setProgress(progress));
-    // });
-
-    // socket.on('image', (data) => {
-    //     console.log(data); // undefined
-    // });
-
-    return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      // socket.off('message');
-      // socket.off('progress');
-      // socket.off('image');
-    };
-  }, [socket]);
+  const { isConnected } = useAppSelector((state: RootState) => state.sd);
 
   return (
     <Flex minWidth='max-content' alignItems='center' gap='1'>
