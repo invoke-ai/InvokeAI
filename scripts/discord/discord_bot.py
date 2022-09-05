@@ -2,6 +2,7 @@ from timeit import default_timer as timer
 import sys
 import threading
 
+import functools
 import asyncio
 
 import discord
@@ -51,26 +52,6 @@ def on_bot_thread(coroutine):
     bot.loop.create_task(coroutine) # add the coroutine as a task to the bot loop
     bot.loop.call_soon_threadsafe(noop) # Force the bot.loop to clear itself
 
-@bot.hybrid_command(
-    name="sync_dream_commands",
-    description="Sync slash commands for this bot"
-)
-@commands.guild_only()
-async def sync_command(ctx: commands.Context) -> None:
-    await bot.tree.sync(guild=discord.Object(id=ctx.guild.id))
-    await ctx.send("Synced")
-
-"""
-class DreamFlags(commands.FlagConverter):
-    prompt: str = commands.flag(description="The prompt to generate an image for", default=None)
-
-@bot.hybrid_command(
-    name="dream", 
-    description="Generate an image based on the given prompt"
-)
-async def dream(ctx: commands.Context, flags: DreamFlags):
-    print(f'flags: {flags}')
-"""
 @bot.command(
     name="dream", 
     description="Generate an image based on the given prompt"
@@ -88,14 +69,13 @@ async def dream(ctx: commands.Context, *, quote_text: str):
 `seed`: The seed to use for your image. Defaults to a random number. Put in a previously used seed to get the same image, which can be then refined.
 """)
             else:
-                message = await ctx.reply('Your dream is queued')
+                message = await ctx.reply(f'Your dream is queued. You are #{dreaming_queue.qsize()} in queue.')
                 dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, quote_text, message))
         except Exception as e:
             error_msg = 'Dream error: {}'.format(e)
             print(error_msg)
             await ctx.reply(error_msg)
 
-#async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Message):
 async def dreaming(ctx: commands.Context, quote_text: str, message: discord.Message):
     try:
         if ctx.author != bot.user:
@@ -105,6 +85,19 @@ async def dreaming(ctx: commands.Context, quote_text: str, message: discord.Mess
 
             on_bot_thread(message.edit(content='Dreaming for {}\'s `{}`'.format(ctx.message.author.mention,quote_text)))
 
+            outputs = await dreaming_loop.run_in_executor(None, functools.partial(
+                model.prompt2png,
+                parsed.group('prompt'), 
+                'outputs/img-samples', 
+                seed = parsed.group('seed'),
+                iterations = None if parsed.group('number') is None else int(parsed.group('number')),
+                cfg_scale = None if parsed.group('strength') is None else float(parsed.group('strength')),
+                steps = None if parsed.group('steps') is None else int(parsed.group('steps')),
+                height = None if parsed.group('height') is None else int(parsed.group('height')),
+                width = None if parsed.group('width') is None else int(parsed.group('width'))
+                ))
+            
+            """
             outputs = model.prompt2png(
                 parsed.group('prompt'), 
                 'outputs/img-samples', 
@@ -114,6 +107,7 @@ async def dreaming(ctx: commands.Context, quote_text: str, message: discord.Mess
                 steps = None if parsed.group('steps') is None else int(parsed.group('steps')),
                 height = None if parsed.group('height') is None else int(parsed.group('height')),
                 width = None if parsed.group('width') is None else int(parsed.group('width')))
+            """
             #outputs = []
 
             on_bot_thread(message.delete())
