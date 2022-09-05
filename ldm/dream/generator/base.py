@@ -11,12 +11,14 @@ from einops import rearrange, repeat
 from pytorch_lightning import seed_everything
 from ldm.dream.devices import choose_autocast_device
 
+downsampling = 8
+
 class Generator():
     def __init__(self,model):
         self.model               = model
         self.seed                = None
-        self.latent_channels     = 4   # never seems to change
-        self.downsampling_factor = 8   # never seems to change
+        self.latent_channels     = model.channels
+        self.downsampling_factor = downsampling   # BUG: should come from model or config
         self.variation_amount    = 0
         self.with_variations     = []
 

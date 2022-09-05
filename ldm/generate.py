@@ -557,7 +557,10 @@ class Generate:
         size  = image.size
 
         # not quite sure what's going on here. It is copied from basunjindal's implementation
-        image = image.resize((64, 64), resample=Image.Resampling.LANCZOS)
+        #        image = image.resize((64, 64), resample=Image.Resampling.LANCZOS)
+        # BUG: We need to use the model's downsample factor rather than hardcoding "8"
+        from ldm.dream.generator.base import downsampling
+        image = image.resize((size[0]//downsampling, size[1]//downsampling), resample=Image.Resampling.LANCZOS)
         image = np.array(image)
         image = image.astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
