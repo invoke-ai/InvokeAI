@@ -18,7 +18,6 @@ class Generator():
         self.latent_channels     = 4   # never seems to change
         self.downsampling_factor = 8   # never seems to change
         self.variation_amount    = 0
-        self.init_latent         = None    # set by img2img and used by get_noise()
         self.with_variations     = []
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
@@ -107,27 +106,6 @@ class Generator():
             return (seed, None)
 
     # returns a tensor filled with random numbers from a normal distribution
-    def get_noise(self,width,height):
-        device      = self.model.device
-        init_latent = self.init_latent
-        if init_latent is not None:
-            if device.type == 'mps':
-                return torch.randn_like(init_latent, device='cpu').to(device)
-            else:
-                return torch.randn_like(init_latent, device=device)
-
-        if device.type == 'mps':
-            return torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device='cpu').to(device)
-        else:
-            return torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device=device)
 
     def new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)

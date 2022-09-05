@@ -6,10 +6,10 @@ import torch
 import numpy as  np
 from einops import rearrange, repeat
 from ldm.dream.devices             import choose_autocast_device
-from ldm.dream.generator.base      import Generator
+from ldm.dream.generator.img2img   import Img2Img
 from ldm.models.diffusion.ddim     import DDIMSampler
 
-class Inpaint(Generator):
+class Inpaint(Img2Img):
     def __init__(self,model):
         super().__init__(model)
     

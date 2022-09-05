@@ -61,7 +61,6 @@ def main():
         config         = config,
         grid           = opt.grid,
         # this is solely for recreating the prompt
-        model_name     = opt.model,
         seamless       = opt.seamless,
         embedding_path = opt.embedding_path,
         device_type    = opt.device
