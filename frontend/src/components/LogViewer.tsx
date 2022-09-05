@@ -23,7 +23,7 @@ const LogViewer = () => {
                 <Flex
                     position={'fixed'}
                     left={0}
-                    bottom='5px'
+                    bottom={0}
                     height='200px'
                     width='100vw'
                     overflow='auto'
