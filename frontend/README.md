@@ -1,7 +1,6 @@
 # Stable Diffusion Web UI
 
 UI live at https://peaceful-otter-7a427f.netlify.app/
-(not any more, I'm not sure how to deploy just the frontend from a monorepo on netlify, also not sure its really necessary at this stage)
 
 ## Test and Build
 
