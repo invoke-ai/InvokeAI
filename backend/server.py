@@ -7,21 +7,25 @@ import sys
 import time
 import eventlet
 from pytorch_lightning import logging
-from flask import Flask
-from flask_socketio import SocketIO, emit, send
+from flask import Flask, send_from_directory
+from flask_socketio import SocketIO
 from ldm.simplet2i import T2I
 from ldm.dream.pngwriter import PngWriter
 from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 app.config['SECRET_KEY'] = 'secret!'
 
-host = '127.0.0.1'
-port = 5000
 
-# CORS only for testing
-socketio = SocketIO(app, host=host, port=port,
-                    cors_allowed_origins="*", logger=True, engineio_logger=True)
+@app.route("/", defaults={'path': ''})
+def serve(path):
+    return send_from_directory(app.static_folder, 'index.html')
+
+
+host = 'localhost'
+port = 9090
+
+socketio = SocketIO(app, logger=True, engineio_logger=True)
 
 transformers.logging.set_verbosity_error()
 
@@ -106,4 +110,4 @@ def generateImage(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app)
+    socketio.run(app, host=host, port=port)

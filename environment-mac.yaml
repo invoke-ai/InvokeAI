@@ -43,6 +43,7 @@ dependencies:
   - pip:
     - flask
     - flask_socketio
+    - flask_cors
     - eventlet
     - test-tube==0.7.5
     - transformers==4.21.2
