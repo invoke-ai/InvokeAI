@@ -19,10 +19,24 @@ function appendOutput(src, seed, config) {
     outputNode.addEventListener('click', () => {
         let form = document.querySelector("#generate-form");
         for (const [k, v] of new FormData(form)) {
-	    if (k == 'initimg') { continue; }
-	    form.querySelector(`*[name=${k}]`).value = config[k];
+            form.querySelector(`*[name=${k}]`).value = config[k];
         }
-        document.querySelector("#seed").value = seed;
+        if (config.variation_amount > 0 || config.with_variations != '') {
+            document.querySelector("#seed").value = config.seed;
+        } else {
+            document.querySelector("#seed").value = seed;
+        }
+
+        if (config.variation_amount > 0) {
+            let oldVarAmt = document.querySelector("#variation_amount").value
+            let oldVariations = document.querySelector("#with_variations").value
+            let varSep = ''
+            document.querySelector("#variation_amount").value = 0;
+            if (document.querySelector("#with_variations").value != '') {
+                varSep = ","
+            }
+            document.querySelector("#with_variations").value = oldVariations + varSep + seed + ':' + config.variation_amount
+        }
 
         saveFields(document.querySelector("#generate-form"));
     });
@@ -60,7 +74,6 @@ async function generateSubmit(form) {
 
     // Convert file data to base64
     let formData = Object.fromEntries(new FormData(form));
-    formData.initimg_name = formData.initimg.name
     formData.initimg = formData.initimg.name !== '' ? await toBase64(formData.initimg) : null;
 
     let strength = formData.strength;
