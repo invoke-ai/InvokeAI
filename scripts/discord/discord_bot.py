@@ -69,7 +69,13 @@ async def dream(ctx: commands.Context, *, quote_text: str):
 `seed`: The seed to use for your image. Defaults to a random number. Put in a previously used seed to get the same image, which can be then refined.
 """)
             else:
-                message = await ctx.reply(f'Your dream is queued. You are #{dreaming_queue.qsize()} in queue.')
+                if dreaming_queue.qsize() <= 0:
+                    reply = 'Your dream is queued.'
+                elif dreaming_queue.qsize() <= 1:
+                    reply = 'Your dream is queued. There is 1 dream ahead of you.'
+                else:
+                    reply = f'Your dream is queued. There are {dreaming_queue.qsize()} dreams ahead of you.'
+                message = await ctx.reply(reply)
                 dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, quote_text, message))
         except Exception as e:
             error_msg = 'Dream error: {}'.format(e)
