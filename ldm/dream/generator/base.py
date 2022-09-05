@@ -109,20 +109,12 @@ class Generator():
 
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height):
-        device         = self.model.device
-        if device.type == 'mps':
-            return torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device='cpu').to(device)
-        else:
-            return torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device=device)
-
+        """
+        Returns a tensor filled with random numbers, either form a normal distribution
+        (txt2img) or from the latent image (img2img, inpaint)
+        """
+        raise NotImplementedError("get_noise() must be implemented in a descendent class")
+    
     def new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
         return self.seed

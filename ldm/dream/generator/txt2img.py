@@ -42,3 +42,20 @@ class Txt2Img(Generator):
             return self.sample_to_image(samples)
 
         return make_image
+
+
+    # returns a tensor filled with random numbers from a normal distribution
+    def get_noise(self,width,height):
+        device         = self.model.device
+        if device.type == 'mps':
+            return torch.randn([1,
+                                self.latent_channels,
+                                height // self.downsampling_factor,
+                                width  // self.downsampling_factor],
+                               device='cpu').to(device)
+        else:
+            return torch.randn([1,
+                                self.latent_channels,
+                                height // self.downsampling_factor,
+                                width  // self.downsampling_factor],
+                               device=device)
