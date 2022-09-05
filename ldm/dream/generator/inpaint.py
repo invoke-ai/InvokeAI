@@ -48,6 +48,7 @@ class Inpaint(Generator):
 
         print(f">> target t_enc is {t_enc} steps")
 
+        @torch.no_grad()
         def make_image(x_T):
             # encode (scaled latent)
             z_enc = sampler.stochastic_encode(

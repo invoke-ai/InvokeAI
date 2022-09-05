@@ -39,7 +39,8 @@ class Img2Img(Generator):
 
         t_enc = int(strength * steps)
         uc, c   = conditioning
-        
+
+        @torch.no_grad()
         def make_image(x_T):
             # encode (scaled latent)
             z_enc = sampler.stochastic_encode(

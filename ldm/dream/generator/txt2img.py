@@ -20,6 +20,7 @@ class Txt2Img(Generator):
         """
         uc, c   = conditioning
 
+        @torch.no_grad()
         def make_image(x_T):
             shape = [
                 self.latent_channels,
