@@ -25,7 +25,12 @@ def serve(path):
 host = 'localhost'
 port = 9090
 
-socketio = SocketIO(app, logger=True, engineio_logger=True)
+# dev (allow all CORS):
+socketio = SocketIO(app, cors_allowed_origins="*",
+                    logger=True, engineio_logger=True)
+
+# production:
+# socketio = SocketIO(app, logger=True, engineio_logger=True)
 
 transformers.logging.set_verbosity_error()
 
