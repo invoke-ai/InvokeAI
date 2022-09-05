@@ -110,7 +110,7 @@ class Generator():
     def get_noise(self,width,height):
         device      = self.model.device
         init_latent = self.init_latent
-        if init_latent:
+        if init_latent is not None:
             if device.type == 'mps':
                 return torch.randn_like(init_latent, device='cpu').to(device)
             else:

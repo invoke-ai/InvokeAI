@@ -307,7 +307,8 @@ class T2I:
                 assert size1==size2,f"for inpainting, the initial image and its mask must be identical sizes, instead got {size1} vs {size2}"
                 generator       = self._make_inpaint()
             elif init_img:        # little bit of repeated code here, but makes logic clearer
-                init_image      = self._load_img(init_img, width, height, fit=fit).to(self.device)
+                init_image,_      = self._load_img(init_img, width, height, fit=fit)
+                init_image.to(self.device)
                 generator       = self._make_img2img()
             else:
                 generator       = self._make_txt2img()
