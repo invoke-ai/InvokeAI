@@ -26,7 +26,7 @@ from ldm.models.diffusion.ksampler import KSampler
 from ldm.dream.pngwriter           import PngWriter
 from ldm.dream.image_util          import InitImageResizer
 from ldm.dream.devices             import choose_torch_device
-from ldm.dream.conditioning        import Conditioning
+from ldm.dream.conditioning        import get_uc_and_c
 
 """Simplified text to image API for stable diffusion/latent diffusion
 
@@ -298,7 +298,11 @@ class Generate:
         init_mask_image  = None
 
         try:
-            uc, c = Conditioning(self.model,self.log_tokenization).get_uc_and_c(prompt, skip_normalize)
+            uc, c = get_uc_and_c(
+                prompt, model=self.model,
+                skip_normalize=skip_normalize,
+                log_tokens=self.log_tokenization
+            )
 
             if mask and init_img:
                 init_image,size1       = self._load_img(init_img, width, height,fit=fit)
