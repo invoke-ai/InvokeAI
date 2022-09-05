@@ -22,12 +22,12 @@ class Generator():
         self.with_variations     = []
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
-    def image_iterator(self,prompt,**kwargs):
+    def get_make_image(self,prompt,**kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
         """
-        assert False, "image_iterator() must be implemented in a descendent class"
+        assert False, "get_make_image() must be implemented in a descendent class"
 
     def set_variation(self, seed, variation_amount, with_variations):
         self.seed             = seed
@@ -38,7 +38,7 @@ class Generator():
                  image_callback=None, step_callback=None,
                  **kwargs):
         device_type,scope   = choose_autocast_device(self.model.device)
-        make_image          = self.image_iterator(
+        make_image          = self.get_make_image(
             prompt,
             init_image    = init_image,
             width         = width,
