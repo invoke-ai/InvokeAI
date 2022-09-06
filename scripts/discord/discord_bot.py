@@ -112,7 +112,7 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
         self.number = 1
         self.seed = None
         self.img2img = None
-        self.img2img_noise = 0.5
+        self.img2img_noise = 0.75
 
 @bot.hybrid_command(
     description="Generate an image based on the given prompt"
