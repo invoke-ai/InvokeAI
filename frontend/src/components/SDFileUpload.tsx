@@ -2,6 +2,7 @@ import { useToast } from '@chakra-ui/react';
 import { base64ArrayBuffer } from '../util/base64ArrayBuffer';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import {v4 as uuidv4} from 'uuid'
 import { useAppDispatch } from '../app/hooks';
 import { addImage } from '../app/sdSlice';
 import SDButton from './SDButton';
@@ -45,8 +46,12 @@ const SDFileUpload = () => {
         reader.onload = () => {
           const binaryStr = reader.result;
           const base64 = base64ArrayBuffer(binaryStr);
-          const url = 'data:image/image/png;base64,' + base64;
-          dispatch(addImage({ url, metadata: { prompt: 'test' } }));
+          const newImage = {
+            uuid: uuidv4(),
+            url: 'data:image/image/png;base64,' + base64,
+            metadata: { prompt: 'test' }
+          }
+          dispatch(addImage(newImage));
         };
         reader.readAsArrayBuffer(file);
       });

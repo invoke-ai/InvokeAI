@@ -12,23 +12,25 @@ const ImageRoll = () => {
 
     return (
         <VStack>
-            {images.map((image, i) => (
-                <Box key={image.url} position={'relative'}>
-                    <IconButton
-                        position={'absolute'}
-                        right={0}
-                        top={0}
-                        aria-label='Delete image'
-                        icon={<MdDeleteForever />}
-                        onClick={() => deleteImage(i)}
-                        // onClick={() => dispatch(deleteImage(i))}
-                    />
-                    <Image
-                        onClick={() => dispatch(setCurrentImage(i))}
-                        src={image.url}
-                    />
-                </Box>
-            ))}
+            {[...images].reverse().map((image) => {
+                const { url, uuid } = image;
+                return (
+                    <Box key={url} position={'relative'}>
+                        <IconButton
+                            position={'absolute'}
+                            right={0}
+                            top={0}
+                            aria-label='Delete image'
+                            icon={<MdDeleteForever />}
+                            onClick={() => deleteImage(uuid)}
+                        />
+                        <Image
+                            onClick={() => dispatch(setCurrentImage(uuid))}
+                            src={url}
+                        />
+                    </Box>
+                );
+            })}
         </VStack>
     );
 };

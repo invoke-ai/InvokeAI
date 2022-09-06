@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsc-watch --onSuccess 'yarn run vite build'",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -13,19 +13,21 @@
     "@emotion/react": "^11.10.4",
     "@emotion/styled": "^11.10.4",
     "@reduxjs/toolkit": "^1.8.5",
+    "@types/uuid": "^8.3.4",
     "framer-motion": "^7.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.2",
     "react-icons": "^4.4.0",
     "react-redux": "^8.0.2",
-    "redux-socket.io-middleware": "^1.0.4",
-    "socket.io-client": "^4.5.2"
+    "socket.io-client": "^4.5.2",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
     "@vitejs/plugin-react": "^2.0.1",
+    "tsc-watch": "^5.0.3",
     "typescript": "^4.6.4",
     "vite": "^3.0.7"
   }

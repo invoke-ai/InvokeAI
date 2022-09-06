@@ -1,24 +1,35 @@
-import { Center, Image } from '@chakra-ui/react';
+import { Center, Flex, IconButton, Image } from '@chakra-ui/react';
+import { MdDeleteForever } from 'react-icons/md';
 import { useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import fallbackImgUrl from '../../assets/images/rick.jpeg';
+import { useSocketIOEmitters } from '../../context/socket';
 
 const height = 'calc(100vh - 176px)';
 
 const CurrentImage = () => {
-    const { currentImageIndex, images } = useAppSelector(
+    const { currentImageUuid, images } = useAppSelector(
         (state: RootState) => state.sd
     );
-    const imageToDisplay = images[currentImageIndex];
-
+    const imageToDisplay = images.find(
+        (image) => image.uuid === currentImageUuid
+    );
+    const { deleteImage } = useSocketIOEmitters();
     return (
         <Center height={height}>
-            <Image
-                maxHeight={height}
-                fit='contain'
-                src={imageToDisplay?.url}
-                fallbackSrc={fallbackImgUrl}
-            />
+            {imageToDisplay && (
+                <Flex>
+                    <Image
+                        maxHeight={height}
+                        fit='contain'
+                        src={imageToDisplay?.url}
+                    />
+                    <IconButton
+                        aria-label='Delete image'
+                        icon={<MdDeleteForever />}
+                        onClick={() => deleteImage(imageToDisplay?.uuid)}
+                    />
+                </Flex>
+            )}
         </Center>
     );
 };

@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { testImages, testLogs } from './testingData';
+import { v4 as uuidv4 } from 'uuid';
 
 // TODO: Split state into more manageable slices, this is getting unwieldy.
 
@@ -9,6 +10,8 @@ export interface SDMetadata {
 }
 
 export interface SDImage {
+  // TODO: I have installed @types/uuid but cannot figure out how to use them here.
+  uuid: string;
   url: string;
   metadata: SDMetadata;
 }
@@ -29,7 +32,7 @@ export interface SDState {
   upscalingStrength: number;
 
   // gallery
-  currentImageIndex: number;
+  currentImageUuid: string;
   images: Array<SDImage>;
 
   // system
@@ -61,7 +64,7 @@ const initialDreamMenuState = {
 
 // Initial state for image viewing
 const initialGalleryState = {
-  currentImageIndex: 0,
+  currentImageUuid: '',
   images: testImages,
 };
 
@@ -131,6 +134,7 @@ export const sdSlice = createSlice({
     },
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
+      state.progress = 0;
     },
     resetSeed: (state) => {
       state.seed = -1;
@@ -141,32 +145,41 @@ export const sdSlice = createSlice({
         ...initialDreamMenuState,
       };
     },
-    setCurrentImage: (state, action: PayloadAction<number>) => {
-      const newCurrentImageIndex = action.payload;
-      const newPrompt: string =
-        state.images[newCurrentImageIndex].metadata.prompt;
+    setCurrentImage: (state, action: PayloadAction<string>) => {
+      const newCurrentImage = state.images.find(
+        (image) => image.uuid === action.payload
+      );
 
-      state.currentImageIndex = newCurrentImageIndex;
+      if (newCurrentImage) {
+        const {
+          uuid,
+          metadata: { prompt },
+        } = newCurrentImage;
 
-      if (newPrompt) {
-        state.prompt = newPrompt;
+        state.currentImageUuid = uuid;
+        state.prompt = prompt;
       }
     },
-    deleteImage: (state, action: PayloadAction<number>) => {
+    deleteImage: (state, action: PayloadAction<string>) => {
       const newImages = state.images.filter(
-        (_image, i) => i !== action.payload
+        (image) => image.uuid !== action.payload
+      );
+
+      const imageToDeleteIndex = state.images.findIndex(
+        (image) => image.uuid === action.payload
       );
 
       const newCurrentImageIndex = Math.min(
-        Math.max(state.currentImageIndex, 0),
+        Math.max(imageToDeleteIndex, 0),
         newImages.length - 1
       );
 
       state.images = newImages;
-      state.currentImageIndex = newCurrentImageIndex;
+      state.currentImageUuid = newImages[newCurrentImageIndex].uuid;
     },
     addImage: (state, action: PayloadAction<SDImage>) => {
       state.images.push(action.payload);
+      state.currentImageUuid = action.payload.uuid;
       state.isProcessing = false;
     },
     setProgress: (state, action: PayloadAction<number>) => {
@@ -179,14 +192,18 @@ export const sdSlice = createSlice({
       state.isConnected = action.payload;
     },
     setGalleryImages: (state, action: PayloadAction<Array<any>>) => {
-      state.images = action.payload.map((url) => {
+      const newGalleryImages = action.payload.map((url) => {
         return {
+          uuid: uuidv4(),
           url,
           metadata: {
             prompt: 'test',
           },
         };
       });
+      state.images = newGalleryImages;
+      state.currentImageUuid =
+        newGalleryImages[newGalleryImages.length - 1].uuid;
     },
   },
 });

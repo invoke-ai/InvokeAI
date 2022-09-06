@@ -29,7 +29,7 @@ const LogViewer = () => {
                     overflow='auto'
                     direction='column-reverse'
                     fontFamily='monospace'
-                    fontSize='xs'
+                    fontSize='sm'
                     pl={2}
                     pr={2}
                     background={bg}
@@ -47,7 +47,7 @@ const LogViewer = () => {
                 size='sm'
                 position={'fixed'}
                 left={2}
-                bottom={shouldShowLogViewer ? '164px' : 3}
+                bottom={3}
                 aria-label='Toggle Log Viewer'
                 icon={
                     shouldShowLogViewer ? <IoIosArrowDown /> : <IoIosArrowUp />

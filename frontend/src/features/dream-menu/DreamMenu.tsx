@@ -55,7 +55,7 @@ const DreamMenu = () => {
     } = useAppSelector((state: RootState) => state.sd);
 
     const dispatch = useAppDispatch();
-    const { generateImage } = useSocketIOEmitters();
+    const { generateImage, cancel } = useSocketIOEmitters();
 
     return (
         <Box>
@@ -73,6 +73,7 @@ const DreamMenu = () => {
                         label='Cancel'
                         colorScheme='red'
                         isDisabled={!isConnected && !isProcessing}
+                        onClick={() => cancel()}
                     />
                     <Spacer />
                     <SDButton

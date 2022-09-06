@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import eventlet
+from threading import Event
 
 from pathlib import Path
 from pytorch_lightning import logging
@@ -14,6 +15,13 @@ from flask_socketio import SocketIO
 from ldm.simplet2i import T2I
 from ldm.dream.pngwriter import PngWriter
 from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
+
+
+class CanceledException(Exception):
+    pass
+
+
+canceled = Event()
 
 app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 
@@ -62,12 +70,14 @@ print("\n* Initialization done! Ready to dream...")
 
 @socketio.on('cancel')
 def handleCancel():
-    print('cancel received')
+    canceled.set()
+    return "ok"
 
 
 @socketio.on('generateImage')
 def handle_generate_image(data):
     generate_image(data)
+    return "ok"
 
 
 @socketio.on('requestAllImages')
@@ -76,17 +86,19 @@ def handle_request_all_images():
     relative_paths = []
     for p in paths:
         relative_paths.append(str(p.relative_to('.')))
-    socketio.emit('sendAllImages', relative_paths)
+    return relative_paths
 
 
+# TODO: I think this needs a safety mechanism.
 @socketio.on('deleteImage')
 def handle_delete_image(path):
-    Path(path).unlink(missing_ok=True)
+    Path(path).unlink()
     return "ok"
 
 
 def generate_image(data):
     print(data)
+    canceled.clear()
     prompt = data['prompt']
     initimg = None
     strength = float(data['img2imgStrength'])
@@ -112,13 +124,14 @@ def generate_image(data):
     prefix = pngwriter.unique_prefix()
 
     def image_progress(sample, step):
+        if canceled.is_set():
+            raise CanceledException
         socketio.emit('progress', (step+1) / steps)
         eventlet.sleep(0)
 
     def image_done(image, seed, upscaled=False):
         name = f'{prefix}.{seed}.png'
         path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', name)
-        # Append post_data to log, but only once!
         if not upscaled:
             socketio.emit('result', {'url': os.path.relpath(path)})
             eventlet.sleep(0)

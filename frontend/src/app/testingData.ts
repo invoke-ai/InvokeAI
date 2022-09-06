@@ -10,6 +10,7 @@ import testImage8 from '../assets/images/test8.png';
 import testImage9 from '../assets/images/test9.png';
 import testImage10 from '../assets/images/test10.png';
 import { SDImage } from './sdSlice';
+import { v4 as uuidv4 } from 'uuid';
 
 // populate gallery for testing
 export const testImages: Array<SDImage> = [
@@ -25,6 +26,7 @@ export const testImages: Array<SDImage> = [
   testImage10,
 ].map((url, i) => {
   return {
+    uuid: uuidv4(),
     url: url,
     metadata: {
       prompt: `test image ${i} prompt`,

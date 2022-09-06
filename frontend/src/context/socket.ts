@@ -3,8 +3,10 @@ Socket.io setup.
 Context used only for socket.io activities that do not touch redux.
 */
 
+import { useToast } from '@chakra-ui/react';
 import { createContext, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { v4 as uuidv4 } from 'uuid';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import {
     addImage,
@@ -23,17 +25,31 @@ export const socket = io('http://localhost:9090');
 // to to access the single client instance
 export const SocketContext = createContext(socket);
 
-// Hook provides listeners that touch redux and initializes gallery state, called only once in App.tsx
-export const useSocketIOListeners = () => {
+// Hook sets up socketio listeners that touch redux and initializes gallery state, called only once in App.tsx
+export const useSocketIOInitialize = () => {
     const dispatch = useAppDispatch();
+    const toast = useToast();
+    socket.emit('requestAllImages', (data: Array<string>) => {
+        dispatch(setGalleryImages(data));
+    });
 
     useEffect(() => {
         socket.on('connect', () => {
             dispatch(setIsConnected(true));
+            toast({
+                title: 'Connected',
+                status: 'success',
+                isClosable: true,
+            });
         });
 
         socket.on('disconnect', () => {
             dispatch(setIsConnected(false));
+            toast({
+                title: 'Disconnected',
+                status: 'error',
+                isClosable: true,
+            });
         });
 
         socket.on('progress', (value: number) =>
@@ -43,17 +59,13 @@ export const useSocketIOListeners = () => {
         socket.on('result', (data: { url: string }) => {
             dispatch(
                 addImage({
+                    uuid: uuidv4(),
                     url: data.url,
                     metadata: {
                         prompt: 'test',
                     },
                 })
             );
-        });
-
-        socket.on('sendAllImages', (data: Array<string>) => {
-            console.log(data);
-            dispatch(setGalleryImages(data));
         });
 
         // clean up all listeners
@@ -64,8 +76,6 @@ export const useSocketIOListeners = () => {
             socket.off('result');
         };
     }, []);
-
-    socket.emit('requestAllImages');
 };
 
 // Hook provides emitters that interact with redux. Ex:
@@ -109,9 +119,20 @@ export const useSocketIOEmitters = () => {
                 upscalingStrength,
             });
         },
-        deleteImage: (id: number) => {
-            socket.emit('deleteImage', images[id].url, (response: string) => {
-                response === 'ok' && dispatch(deleteImage(id));
+        deleteImage: (uuid: string) => {
+            const imageToDelete = images.find((image) => image.uuid === uuid);
+            imageToDelete &&
+                socket.emit(
+                    'deleteImage',
+                    imageToDelete.url,
+                    (response: string) => {
+                        response === 'ok' && dispatch(deleteImage(uuid));
+                    }
+                );
+        },
+        cancel: () => {
+            socket.emit('cancel', (response: string) => {
+                response === 'ok' && dispatch(setIsProcessing(false));
             });
         },
     };

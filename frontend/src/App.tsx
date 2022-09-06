@@ -6,11 +6,11 @@ import ImageRoll from './features/gallery/ImageRoll';
 import CurrentImage from './features/gallery/CurrentImage';
 import SDProgress from './components/SDProgress';
 import LogViewer from './components/LogViewer';
-import { useSocketIOListeners } from './context/socket';
+import { useSocketIOInitialize } from './context/socket';
 
 const App = () => {
-    // Loads all socket listeners
-    useSocketIOListeners();
+    // Loads all socket listeners & loads images to gallery
+    useSocketIOInitialize();
     return (
         <>
             <Grid
@@ -22,7 +22,7 @@ const App = () => {
                     "menu prompt prompt"
                     "menu currentImage imageRoll"`}
                 gridTemplateRows={'4px 40px 100px 1fr'}
-                gridTemplateColumns={'250px 4fr 1fr'}
+                gridTemplateColumns={'2fr 8fr 1fr'}
                 gap='2'
             >
                 <GridItem area={'progressBar'}>
