@@ -32,13 +32,13 @@ const CurrentImage = () => {
                 <Flex gap={2}>
                     <Image
                         maxHeight={height}
-                        fit='contain'
                         src={imageToDisplay?.url}
                     />
                     <VStack>
                         <IconButton
                             aria-label='Delete image'
                             icon={<MdDeleteForever />}
+                            fontSize={24}
                             onClick={() => deleteImage(imageToDisplay?.uuid)}
                         />
                         <IconButton

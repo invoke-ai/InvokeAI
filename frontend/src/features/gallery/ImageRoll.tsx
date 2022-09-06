@@ -15,20 +15,12 @@ const ImageRoll = () => {
             {[...images].reverse().map((image) => {
                 const { url, uuid } = image;
                 return (
-                    <Box key={url} position={'relative'}>
-                        <IconButton
-                            position={'absolute'}
-                            right={0}
-                            top={0}
-                            aria-label='Delete image'
-                            icon={<MdDeleteForever />}
-                            onClick={() => deleteImage(uuid)}
-                        />
-                        <Image
-                            onClick={() => dispatch(setCurrentImage(uuid))}
-                            src={url}
-                        />
-                    </Box>
+                    <Image
+                        borderRadius={'md'}
+                        key={uuid}
+                        onClick={() => dispatch(setCurrentImage(uuid))}
+                        src={url}
+                    />
                 );
             })}
         </VStack>

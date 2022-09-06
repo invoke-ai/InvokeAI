@@ -11,7 +11,8 @@ import { useState } from 'react';
 import { RootState } from '../app/store';
 
 const LogViewer = () => {
-    const [shouldShowLogViewer, setShouldShowLogViewer] = useState(false);
+    const [shouldShowLogViewer, setShouldShowLogViewer] =
+        useState<boolean>(false);
     const bg = useColorModeValue('blue.50', 'blue.900');
     const borderColor = useColorModeValue('blue.500', 'blue.500');
 
@@ -33,7 +34,7 @@ const LogViewer = () => {
                     pl={2}
                     pr={2}
                     background={bg}
-                    borderTopWidth='2px'
+                    borderTopWidth='4px'
                     borderColor={borderColor}
                 >
                     <UnorderedList listStyleType='none'>

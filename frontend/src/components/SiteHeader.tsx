@@ -5,10 +5,13 @@ import {
   IconButton,
   Link,
   Spacer,
+  Text,
+  Tooltip,
   useColorMode,
 } from '@chakra-ui/react';
+import { useState } from 'react';
 
-import { FaSun, FaMoon, FaGithub, FaCircle } from 'react-icons/fa';
+import { FaSun, FaMoon, FaGithub, FaServer } from 'react-icons/fa';
 import { MdHelp } from 'react-icons/md';
 import { useAppSelector } from '../app/hooks';
 import { RootState } from '../app/store';
@@ -17,6 +20,8 @@ import SettingsModalButton from '../features/system/SettingsModalButton';
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
   const { isConnected } = useAppSelector((state: RootState) => state.system);
+  const [isStatusIconHovered, setIsStatusIconHovered] =
+    useState<boolean>(false);
 
   return (
     <Flex minWidth='max-content' alignItems='center' gap='1'>
@@ -24,14 +29,22 @@ const SiteHeader = () => {
 
       <Spacer />
 
+      {isStatusIconHovered && (
+        <Text textColor={isConnected ? 'green.500' : 'red.500'}>
+          {isConnected ? 'Connected!' : 'No Connection.'}
+        </Text>
+      )}
       <IconButton
         size={'sm'}
         variant='link'
         fontSize={20}
         mt='1px'
         aria-label='Connection Status'
-        icon={<FaCircle />}
+        icon={<FaServer />}
         color={isConnected ? 'green.500' : 'red.500'}
+        onMouseOver={() => setIsStatusIconHovered(true)}
+        onMouseOut={() => setIsStatusIconHovered(false)}
+        cursor='unset'
       />
 
       <SettingsModalButton />
