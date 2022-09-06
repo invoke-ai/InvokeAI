@@ -4,8 +4,10 @@ import threading
 
 import functools
 import asyncio
+from typing import Literal, Optional
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from discord_config import settings
@@ -52,75 +54,120 @@ def on_bot_thread(coroutine):
     bot.loop.create_task(coroutine) # add the coroutine as a task to the bot loop
     bot.loop.call_soon_threadsafe(noop) # Force the bot.loop to clear itself
 
-@bot.command(
-    name="dream", 
+@bot.hybrid_command(
+    description='Syncs the Discord bot\'s commands'
+)
+@commands.guild_only()
+@commands.is_owner()
+async def sync(ctx: commands.Context, guilds: commands.Greedy[discord.Object] = None, spec: Literal["~", "*", "^"] = None) -> None:
+    if not guilds:
+        if spec == "~":
+            synced = await ctx.bot.tree.sync(guild=ctx.guild)
+        elif spec == "*":
+            ctx.bot.tree.copy_global_to(guild=ctx.guild)
+            synced = await ctx.bot.tree.sync(guild=ctx.guild)
+        elif spec == "^":
+            ctx.bot.tree.clear_commands(guild=ctx.guild)
+            await ctx.bot.tree.sync(guild=ctx.guild)
+            synced = []
+        else:
+            synced = await ctx.bot.tree.sync()
+        await ctx.reply(
+            f"Synced {len(synced)} commands {'globally' if spec is None else 'to the current guild.'}"
+        )
+        return
+    ret = 0
+    for guild in guilds:
+        try:
+            await ctx.bot.tree.sync(guild=guild)
+        except discord.HTTPException:
+            pass
+        else:
+            ret += 1
+    await ctx.reply(f"Synced the tree to {ret}/{len(guilds)}.")
+
+class DreamFlags(commands.FlagConverter, prefix = '--'):
+    prompt: str = commands.Flag(description='The prompt to produce an image for', default=None)
+    width: int = commands.Flag(description='The width of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...2048)', default=512)
+    height: int = commands.Flag(description='The height of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...2048)', default=512)
+    steps: int = commands.Flag(description='The number of steps. Defaults to 50. Higher numbers take longer to run. (1...128)', default=50)
+    strength: float = commands.Flag(description='The strength to follow the prompt using. Defaults to 7.5. (1.01...40.0)', default=7.5)
+    number: int = commands.Flag(description='The number of images to produce. More images take more time. Defaults to 1. (1...10)', default=1)
+    seed: int = commands.Flag(description='The seed to use for your image. The same prompt + seed will produce the same image.', default=None)
+
+    def __init__(self):
+        self.prompt = None
+        self.width = 512
+        self.height = 512
+        self.steps = 50
+        self.strength = 7.5
+        self.number = 1
+        self.seed = None
+
+@bot.hybrid_command(
     description="Generate an image based on the given prompt"
 )
-async def dream(ctx: commands.Context, *, quote_text: str):
+async def dream(ctx: commands.Context, *, quote_text: str = None, flags: DreamFlags = None):
+    if flags is None:
+        flags = DreamFlags()
+
     if ctx.author != bot.user:
         try:
-            if quote_text.endswith('--help'):
-                message = await ctx.reply("""Dream help: 
-`/dream <prompt> [--width N:512] [--height N:512] [--steps N:50] [--strength N:7.5] [--number N:1] [--seed N]`
-`width`, `height`: The width and height of the image in multiples of 64. Higher numbers can crash the bot. Max: 9999
-`steps`: The number of steps to do while building the image. More steps take longer but produce a higher quality image. Max: 999
-`strength`: The strength of the prompt on the image. Must be >1. Higher numbers produce more strict prompt matches.
-`number`: The number of images to produce. Max: 9
-`seed`: The seed to use for your image. Defaults to a random number. Put in a previously used seed to get the same image, which can be then refined.
-""")
+            if (quote_text is not None):
+                flags.prompt = quote_text
+
+            flags.prompt = flags.prompt.strip()
+
+            if len(flags.prompt) < 1:
+                await ctx.reply(f'A prompt is required.')
+            elif flags.width < 64 or flags.width > 2048:
+                await ctx.reply(f'Width must be between 64 and 2048. Got `{flags.width}`.')
+            elif flags.height < 64 or flags.height > 2048:
+                await ctx.reply(f'Height must be between 64 and 2048. Got `{flags.height}`.')
+            elif flags.steps < 1 or flags.steps > 128:
+                await ctx.reply(f'Steps must be between 1 and 128. Got `{flags.steps}`.')
+            elif flags.strength <= 1.0 or flags.strength > 40.0:
+                await ctx.reply(f'Strength must be between 1.01 and 40.0. Got `{flags.strength}`.')
+            elif flags.number < 1 or flags.number > 10:
+                await ctx.reply(f'Number must be between 1 and 10. Got `{flags.number}`.')
             else:
                 if dreaming_queue.qsize() <= 0:
-                    reply = 'Your dream is queued.'
+                    message = await ctx.reply('Your dream is queued.')
                 elif dreaming_queue.qsize() <= 1:
-                    reply = 'Your dream is queued. There is 1 dream ahead of you.'
+                    message = await ctx.reply('Your dream is queued. There is 1 dream ahead of you.')
                 else:
-                    reply = f'Your dream is queued. There are {dreaming_queue.qsize()} dreams ahead of you.'
-                message = await ctx.reply(reply)
-                dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, quote_text, message))
+                    message = await ctx.reply(f'Your dream is queued. There are {dreaming_queue.qsize()} dreams ahead of you.')
+
+                dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, flags, message))
         except Exception as e:
             error_msg = 'Dream error: {}'.format(e)
             print(error_msg)
             await ctx.reply(error_msg)
 
-async def dreaming(ctx: commands.Context, quote_text: str, message: discord.Message):
+async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Message):
     try:
         if ctx.author != bot.user:
             start = timer()
             
-            parsed = text_parser.match(quote_text)
-
-            on_bot_thread(message.edit(content='Dreaming for {}\'s `{}`'.format(ctx.message.author.mention,quote_text)))
+            on_bot_thread(message.edit(content='Dreaming for {}\'s `{}`'.format(ctx.message.author.mention,flags.prompt)))
 
             outputs = await dreaming_loop.run_in_executor(None, functools.partial(
                 model.prompt2png,
-                parsed.group('prompt'), 
+                flags.prompt, 
                 'outputs/img-samples', 
-                seed = parsed.group('seed'),
-                iterations = None if parsed.group('number') is None else int(parsed.group('number')),
-                cfg_scale = None if parsed.group('strength') is None else float(parsed.group('strength')),
-                steps = None if parsed.group('steps') is None else int(parsed.group('steps')),
-                height = None if parsed.group('height') is None else int(parsed.group('height')),
-                width = None if parsed.group('width') is None else int(parsed.group('width'))
+                seed = flags.seed,
+                iterations = flags.number,
+                cfg_scale = flags.strength,
+                steps = flags.steps,
+                height = flags.height,
+                width = flags.width
                 ))
-            
-            """
-            outputs = model.prompt2png(
-                parsed.group('prompt'), 
-                'outputs/img-samples', 
-                seed = parsed.group('seed'),
-                iterations = None if parsed.group('number') is None else int(parsed.group('number')),
-                cfg_scale = None if parsed.group('strength') is None else float(parsed.group('strength')),
-                steps = None if parsed.group('steps') is None else int(parsed.group('steps')),
-                height = None if parsed.group('height') is None else int(parsed.group('height')),
-                width = None if parsed.group('width') is None else int(parsed.group('width')))
-            """
-            #outputs = []
 
             on_bot_thread(message.delete())
 
             for output in outputs:
-                output_file = discord.File(output[0], description = quote_text)
-                msg = 'Dreamt in `{}s` for {}\'s `{}`\nSeed {}'.format(timer() - start,ctx.message.author.mention,quote_text, output[1])
+                output_file = discord.File(output[0], description = flags.prompt)
+                msg = 'Dreamt in `{}s` for {}\'s `{}`\nSeed {}'.format(timer() - start, ctx.message.author.mention, flags.prompt, output[1])
                 on_bot_thread(ctx.reply(content=msg, file=output_file))
     except Exception as e:
         error_msg = 'Dreaming error: {}'.format(e)
