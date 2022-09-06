@@ -6,7 +6,7 @@ jobs:
     strategy:
       matrix:
         os: [ macos-12 ]
-    name: Build on ${{ matrix.os }} miniconda
+    name: Create Caches using ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
