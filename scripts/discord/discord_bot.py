@@ -182,7 +182,8 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 init_img = img2img_filepath
                 ))
 
-            on_bot_thread(message.delete())
+            #on_bot_thread(message.delete())
+            on_bot_thread(message.edit(content='Finished dreaming for {}\'s `{}`'.format(ctx.message.author.mention,flags.prompt)))
 
             for output in outputs:
                 output_file = discord.File(output[0], description = flags.prompt)
