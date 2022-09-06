@@ -7,10 +7,11 @@ import sys
 import time
 import eventlet
 from threading import Event
+from enum import Enum
 
 from pathlib import Path
 from pytorch_lightning import logging
-from flask import Flask, send_from_directory, url_for
+from flask import Flask, send_from_directory, url_for, jsonify
 from flask_socketio import SocketIO
 from ldm.simplet2i import T2I
 from ldm.dream.pngwriter import PngWriter
@@ -65,19 +66,26 @@ tic = time.time()
 t2i.load_model()
 print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 
-print("\n* Initialization done! Ready to dream...")
+
+def make_reponse(status, message=None, data=None):
+    response = {"status": status}
+    if message is not None:
+        response["message"] = message
+    if data is not None:
+        response["data"] = data
+    return response
 
 
 @socketio.on('cancel')
 def handleCancel():
     canceled.set()
-    return "ok"
+    return make_reponse("OK")
 
 
 @socketio.on('generateImage')
 def handle_generate_image(data):
     generate_image(data)
-    return "ok"
+    return make_reponse("OK")
 
 
 @socketio.on('requestAllImages')
@@ -86,14 +94,14 @@ def handle_request_all_images():
     relative_paths = []
     for p in paths:
         relative_paths.append(str(p.relative_to('.')))
-    return relative_paths
+    return make_reponse("OK", data=relative_paths)
 
 
 # TODO: I think this needs a safety mechanism.
 @socketio.on('deleteImage')
 def handle_delete_image(path):
     Path(path).unlink()
-    return "ok"
+    return make_reponse("OK")
 
 
 def generate_image(data):
@@ -148,6 +156,9 @@ def generate_image(data):
                      sampler_name=sampler_name,
                      step_callback=image_progress,
                      image_callback=image_done)
+
+    print(f"\nServer online: http://{host}:{port}" % (host, port)
+          )
 
 
 if __name__ == '__main__':

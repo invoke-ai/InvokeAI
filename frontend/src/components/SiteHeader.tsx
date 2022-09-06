@@ -1,24 +1,24 @@
 import {
   Flex,
   Heading,
-  Icon,
   IconButton,
   Link,
   Spacer,
   Text,
-  Tooltip,
   useColorMode,
 } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 
 import { FaSun, FaMoon, FaGithub, FaServer } from 'react-icons/fa';
 import { MdHelp } from 'react-icons/md';
 import { useAppSelector } from '../app/hooks';
 import { RootState } from '../app/store';
+import { SocketContext } from '../context/socket';
 import SettingsModalButton from '../features/system/SettingsModalButton';
 
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
+  const socket = useContext(SocketContext);
   const { isConnected } = useAppSelector((state: RootState) => state.system);
   const [isStatusIconHovered, setIsStatusIconHovered] =
     useState<boolean>(false);
@@ -31,7 +31,7 @@ const SiteHeader = () => {
 
       {isStatusIconHovered && (
         <Text textColor={isConnected ? 'green.500' : 'red.500'}>
-          {isConnected ? 'Connected!' : 'No Connection.'}
+          {isConnected ? `Connected: ${socket.id}` : 'No Connection'}
         </Text>
       )}
       <IconButton

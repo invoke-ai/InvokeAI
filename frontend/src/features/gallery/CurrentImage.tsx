@@ -25,7 +25,7 @@ const CurrentImage = () => {
     const imageToDisplay = images.find(
         (image) => image.uuid === currentImageUuid
     );
-    const { deleteImage } = useSocketIOEmitters();
+    const { emitDeleteImage } = useSocketIOEmitters();
     return (
         <Center height={height}>
             {imageToDisplay && (
@@ -39,7 +39,7 @@ const CurrentImage = () => {
                             aria-label='Delete image'
                             icon={<MdDeleteForever />}
                             fontSize={24}
-                            onClick={() => deleteImage(imageToDisplay?.uuid)}
+                            onClick={() => emitDeleteImage(imageToDisplay?.uuid)}
                         />
                         <IconButton
                             aria-label='Load image settings'

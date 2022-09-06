@@ -2,15 +2,78 @@
 
 Demo at https://peaceful-otter-7a427f.netlify.app/ (not connected to back end)
 
+## API
+
+`backend/server.py` serves the UI and provides a [socket.io](https://github.com/socketio/socket.io) API via [flask-socketio](https://github.com/miguelgrinberg/flask-socketio).
+
+### Server Listeners
+
+The server listens for these socket.io events:
+
+`cancel`
+
+-   Cancels in-progress image generation
+-   Returns ack only
+
+`generateImage`
+
+-   Accepts object of image parameters
+-   Generates an image
+-   Returns ack only (image generation function sends progress and result via separate events)
+
+`deleteImage`
+
+-   Accepts file path to image
+-   Deletes image
+-   Returns ack only
+
+`deleteAllImages` WIP
+
+-   Deletes all images in `outputs/`
+-   Returns ack only
+
+`requestAllImages`
+
+-   Returns array of all images in `outputs/`
+
+`requestCapabilities` WIP
+
+-   Returns capabilities of server (torch device, GFPGAN and ESRGAN availability, ???)
+
+`sendImage` WIP
+
+-   Accepts a File and attributes
+-   Saves image
+-   Used to save init images which are not generated images
+
+### Server Emitters
+
+`progress`
+
+-   Emitted during each step in generation
+-   Sends a number from 0 to 1 representing percentage of steps completed
+
+`result` WIP
+
+-   Emitted when an image generation has completed
+-   Sends a object:
+
+```
+{
+    url: relative_file_path,
+    metadata: image_metadata_object
+}
+```
+
 ## Test and Build
 
-from root/frontend:
+from `frontend/`:
 
--   `yarn dev` runs `tsc` in a watch mode, which runs `vite build` when `tsc` is successful
+-   `yarn dev` > runs `tsc-watch`, which runs `vite build` on successful `tsc`,
 
-from root:
+from `.`:
 
--   `python backend/server.py` from project root to serve both frontend and backend at http://localhost:9090
+-   `python backend/server.py` serves both frontend and backend at http://localhost:9090
 
 ## TODO
 

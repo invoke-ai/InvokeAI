@@ -31,8 +31,9 @@ const LogViewer = () => {
                     direction='column-reverse'
                     fontFamily='monospace'
                     fontSize='sm'
-                    pl={2}
+                    pl={0}
                     pr={2}
+                    pb={2}
                     background={bg}
                     borderTopWidth='4px'
                     borderColor={borderColor}

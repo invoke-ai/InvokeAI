@@ -54,7 +54,7 @@ const SDSettings = () => {
         useAppSelector((state: RootState) => state.system);
 
     const dispatch = useAppDispatch();
-    const { generateImage, cancel } = useSocketIOEmitters();
+    const { emitGenerateImage, emitCancel } = useSocketIOEmitters();
 
     return (
         <Box>
@@ -65,14 +65,14 @@ const SDSettings = () => {
                         type='submit'
                         colorScheme='green'
                         isDisabled={!isConnected || isProcessing}
-                        onClick={() => generateImage()}
+                        onClick={() => emitGenerateImage()}
                     />
                     <Spacer />
                     <SDButton
                         label='Cancel'
                         colorScheme='red'
-                        isDisabled={!isConnected && !isProcessing}
-                        onClick={() => cancel()}
+                        isDisabled={!isConnected || !isProcessing}
+                        onClick={() => emitCancel()}
                     />
                     <Spacer />
                     <SDButton

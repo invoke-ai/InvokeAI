@@ -27,12 +27,20 @@ export const socket = io('http://localhost:9090');
 // to to access the single client instance
 export const SocketContext = createContext(socket);
 
+interface SocketIOResponse {
+    status: 'OK' | 'ERROR';
+    message?: string;
+    data?: any;
+}
+
 // Hook sets up socketio listeners that touch redux and initializes gallery state, called only once in App.tsx
 export const useSocketIOInitialize = () => {
     const dispatch = useAppDispatch();
     const toast = useToast();
-    socket.emit('requestAllImages', (data: Array<string>) => {
-        dispatch(setGalleryImages(data));
+
+    socket.emit('requestAllImages', (response: SocketIOResponse) => {
+        console.log(response);
+        dispatch(setGalleryImages(response.data));
     });
 
     useEffect(() => {
@@ -102,13 +110,12 @@ export const useSocketIOEmitters = () => {
         gfpganStrength,
         upscalingLevel,
         upscalingStrength,
-        // images,
     } = useAppSelector((state: RootState) => state.sd);
 
     const { images } = useAppSelector((state: RootState) => state.gallery);
 
     return {
-        generateImage: () => {
+        emitGenerateImage: () => {
             dispatch(setIsProcessing(true));
             socket.emit('generateImage', {
                 prompt,
@@ -125,20 +132,20 @@ export const useSocketIOEmitters = () => {
                 upscalingStrength,
             });
         },
-        deleteImage: (uuid: string) => {
+        emitDeleteImage: (uuid: string) => {
             const imageToDelete = images.find((image) => image.uuid === uuid);
             imageToDelete &&
                 socket.emit(
                     'deleteImage',
                     imageToDelete.url,
-                    (response: string) => {
-                        response === 'ok' && dispatch(deleteImage(uuid));
+                    (response: SocketIOResponse) => {
+                        response.status === 'OK' && dispatch(deleteImage(uuid));
                     }
                 );
         },
-        cancel: () => {
-            socket.emit('cancel', (response: string) => {
-                response === 'ok' && dispatch(setIsProcessing(false));
+        emitCancel: () => {
+            socket.emit('cancel', (response: SocketIOResponse) => {
+                response.status === 'OK' && dispatch(setIsProcessing(false));
             });
         },
     };
