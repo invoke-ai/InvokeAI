@@ -8,7 +8,7 @@ const height = 'calc(100vh - 176px)';
 
 const CurrentImage = () => {
     const { currentImageUuid, images } = useAppSelector(
-        (state: RootState) => state.sd
+        (state: RootState) => state.gallery
     );
     const imageToDisplay = images.find(
         (image) => image.uuid === currentImageUuid

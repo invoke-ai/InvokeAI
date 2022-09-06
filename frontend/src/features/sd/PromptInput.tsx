@@ -1,7 +1,7 @@
 import { Textarea } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import { setPrompt } from '../../app/sdSlice';
+import { setPrompt } from '../sd/sdSlice';
 
 const PromptInput = () => {
   const { prompt } = useAppSelector((state: RootState) => state.sd);

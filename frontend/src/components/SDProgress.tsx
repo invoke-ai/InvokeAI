@@ -3,7 +3,7 @@ import { useAppSelector } from '../app/hooks';
 import { RootState } from '../app/store';
 
 const SDProgress = () => {
-    const { progress } = useAppSelector((state: RootState) => state.sd);
+    const { progress } = useAppSelector((state: RootState) => state.system);
 
     return <Progress size='xs' value={progress} />;
 };

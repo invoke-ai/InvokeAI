@@ -1,9 +1,20 @@
 import { configureStore } from '@reduxjs/toolkit';
-import sdReducer from './sdSlice';
+import sdReducer from '../features/sd/sdSlice';
+import galleryReducer from '../features/gallery/gallerySlice';
+import systemReducer from '../features/system/systemSlice';
+
+/*
+Store Slices
+- sd: image generation parameters
+- gallery: image gallery
+- system: logs, site settings, etc
+*/
 
 export const store = configureStore({
   reducer: {
     sd: sdReducer,
+    gallery: galleryReducer,
+    system: systemReducer,
   },
   // devTools: {
   //   trace: true,

@@ -9,7 +9,7 @@ import testImage7 from '../assets/images/test7.png';
 import testImage8 from '../assets/images/test8.png';
 import testImage9 from '../assets/images/test9.png';
 import testImage10 from '../assets/images/test10.png';
-import { SDImage } from './sdSlice';
+import { SDImage } from '../features/gallery/gallerySlice';
 import { v4 as uuidv4 } from 'uuid';
 
 // populate gallery for testing

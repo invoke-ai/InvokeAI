@@ -9,14 +9,16 @@ import { io } from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import {
-    addImage,
-    deleteImage,
-    setGalleryImages,
     setIsConnected,
     setIsProcessing,
     setProgress,
-} from '../app/sdSlice';
+} from '../features/system/systemSlice';
 import { RootState } from '../app/store';
+import {
+    addImage,
+    deleteImage,
+    setGalleryImages,
+} from '../features/gallery/gallerySlice';
 
 // Single instance of the client, shared across the app via two hooks and Context
 export const socket = io('http://localhost:9090');
@@ -57,15 +59,17 @@ export const useSocketIOInitialize = () => {
         );
 
         socket.on('result', (data: { url: string }) => {
+            const uuid = uuidv4();
             dispatch(
                 addImage({
-                    uuid: uuidv4(),
+                    uuid,
                     url: data.url,
                     metadata: {
                         prompt: 'test',
                     },
                 })
             );
+            dispatch(setIsProcessing(false));
         });
 
         // clean up all listeners
@@ -98,8 +102,10 @@ export const useSocketIOEmitters = () => {
         gfpganStrength,
         upscalingLevel,
         upscalingStrength,
-        images,
+        // images,
     } = useAppSelector((state: RootState) => state.sd);
+
+    const { images } = useAppSelector((state: RootState) => state.gallery);
 
     return {
         generateImage: () => {

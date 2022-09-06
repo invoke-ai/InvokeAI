@@ -20,7 +20,7 @@ import {
     setUpscalingLevel,
     setUpscalingStrength,
     setWidth,
-} from '../../app/sdSlice';
+} from '../sd/sdSlice';
 
 import SDNumberInput from '../../components/SDNumberInput';
 import SDSelect from '../../components/SDSelect';
@@ -35,10 +35,8 @@ import {
 } from '../../app/constants';
 import { useSocketIOEmitters } from '../../context/socket';
 
-const DreamMenu = () => {
+const SDSettings = () => {
     const {
-        isProcessing,
-        isConnected,
         imagesToGenerate,
         steps,
         cfgScale,
@@ -50,9 +48,10 @@ const DreamMenu = () => {
         gfpganStrength,
         upscalingLevel,
         upscalingStrength,
-        isGFPGANAvailable,
-        isESRGANAvailable,
     } = useAppSelector((state: RootState) => state.sd);
+
+    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
+        useAppSelector((state: RootState) => state.system);
 
     const dispatch = useAppDispatch();
     const { generateImage, cancel } = useSocketIOEmitters();
@@ -193,4 +192,4 @@ const DreamMenu = () => {
     );
 };
 
-export default DreamMenu;
+export default SDSettings;

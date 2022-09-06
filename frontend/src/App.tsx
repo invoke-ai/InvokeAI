@@ -1,12 +1,12 @@
 import { Grid, GridItem } from '@chakra-ui/react';
 import SiteHeader from './components/SiteHeader';
-import DreamMenu from './features/dream-menu/DreamMenu';
-import PromptInput from './features/dream-menu/PromptInput';
 import ImageRoll from './features/gallery/ImageRoll';
 import CurrentImage from './features/gallery/CurrentImage';
 import SDProgress from './components/SDProgress';
 import LogViewer from './components/LogViewer';
 import { useSocketIOInitialize } from './context/socket';
+import SDSettings from './features/sd/SDSettings';
+import PromptInput from './features/sd/PromptInput';
 
 const App = () => {
     // Loads all socket listeners & loads images to gallery
@@ -32,7 +32,7 @@ const App = () => {
                     <SiteHeader />
                 </GridItem>
                 <GridItem pl='2' area={'menu'} overflowY='scroll'>
-                    <DreamMenu />
+                    <SDSettings />
                 </GridItem>
                 <GridItem pr='2' area={'prompt'}>
                     <PromptInput />

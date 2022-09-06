@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {v4 as uuidv4} from 'uuid'
 import { useAppDispatch } from '../app/hooks';
-import { addImage } from '../app/sdSlice';
+import { addImage } from '../features/gallery/gallerySlice';
 import SDButton from './SDButton';
 
 const SDFileUpload = () => {

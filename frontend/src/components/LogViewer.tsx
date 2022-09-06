@@ -15,7 +15,7 @@ const LogViewer = () => {
     const bg = useColorModeValue('blue.50', 'blue.900');
     const borderColor = useColorModeValue('blue.500', 'blue.500');
 
-    const { log } = useAppSelector((state: RootState) => state.sd);
+    const { log } = useAppSelector((state: RootState) => state.system);
 
     return (
         <>
@@ -47,7 +47,7 @@ const LogViewer = () => {
                 size='sm'
                 position={'fixed'}
                 left={2}
-                bottom={3}
+                bottom={2}
                 aria-label='Toggle Log Viewer'
                 icon={
                     shouldShowLogViewer ? <IoIosArrowDown /> : <IoIosArrowUp />

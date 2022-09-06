@@ -12,11 +12,11 @@ import { FaSun, FaMoon, FaGithub, FaCircle } from 'react-icons/fa';
 import { MdHelp } from 'react-icons/md';
 import { useAppSelector } from '../app/hooks';
 import { RootState } from '../app/store';
-import SettingsModalButton from '../features/settings/SettingsModalButton';
+import SettingsModalButton from '../features/system/SettingsModalButton';
 
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
-  const { isConnected } = useAppSelector((state: RootState) => state.sd);
+  const { isConnected } = useAppSelector((state: RootState) => state.system);
 
   return (
     <Flex minWidth='max-content' alignItems='center' gap='1'>

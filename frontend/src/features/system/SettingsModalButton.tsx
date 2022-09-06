@@ -14,7 +14,7 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import {
     setShouldDisplayInProgress,
     setShouldFitToWidthHeight,
-} from '../../app/sdSlice';
+} from './systemSlice';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
 import SDSwitch from '../../components/SDSwitch';
@@ -22,7 +22,7 @@ import SDSwitch from '../../components/SDSwitch';
 const SettingsModalButton = () => {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { shouldDisplayInProgress, shouldFitToWidthHeight } = useAppSelector(
-        (state: RootState) => state.sd
+        (state: RootState) => state.system
     );
 
     const dispatch = useAppDispatch();
