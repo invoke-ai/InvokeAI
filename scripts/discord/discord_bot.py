@@ -193,8 +193,14 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
 
             for output in outputs:
                 output_file = discord.File(output[0], description = flags.prompt)
-                msg = 'Dreamt in `{}s` for {}\'s `{}`\nSeed {}'.format(timer() - start, ctx.message.author.mention, flags.prompt, output[1])
-                on_bot_thread(ctx.reply(content=msg, file=output_file))
+                embed = discord.Embed(
+                    title=f'Finished dreaming',
+                    description=f'Dreamt for {ctx.message.author.mention}\'s `{flags.prompt}`',
+                )
+                embed.set_image(url=f'attachment://{output_file.filename}')
+                embed.add_field(name='Seconds taken', value=format(timer() - start, '.2f'))
+                embed.add_field(name='Seed used', value=output[1])
+                on_bot_thread(ctx.reply(file=output_file,embed=embed))
     except Exception as e:
         error_msg = 'Dreaming error: {}'.format(e)
         print(error_msg)
