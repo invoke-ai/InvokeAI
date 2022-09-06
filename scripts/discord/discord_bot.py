@@ -182,8 +182,11 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 init_img = img2img_filepath
                 ))
 
-            #on_bot_thread(message.delete())
-            on_bot_thread(message.edit(content='Finished dreaming for {}\'s `{}`'.format(ctx.message.author.mention,flags.prompt)))
+            # Only delete it if it wasn't a slash command
+            if ctx.interaction is None:
+                on_bot_thread(message.delete())
+            else:
+                on_bot_thread(message.edit(content='Finished dreaming for {}\'s `{}`'.format(ctx.message.author.mention,flags.prompt)))
 
             for output in outputs:
                 output_file = discord.File(output[0], description = flags.prompt)
