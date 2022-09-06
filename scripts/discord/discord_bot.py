@@ -102,6 +102,7 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
 
     img2img: discord.Attachment = commands.Flag(description='If you want to use the img2img function, attach an image to base your new image on.', default=None)
     img2img_noise: float = commands.Flag(description='The noise/unnoising to apply to the image if based on an image. 0.0 returns the same image, 1.0 returns a new image. Defaults to 0.999.', default=0.5)
+    img2img_fit: bool = commands.Flag(description='Fit the image to the width/height provided. If false, the width/height of the image will be used', default=True)
 
     def __init__(self):
         self.prompt = None
@@ -113,6 +114,7 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
         self.seed = None
         self.img2img = None
         self.img2img_noise = 0.75
+        self.img2img_fit = True
 
 @bot.hybrid_command(
     description="Generate an image based on the given prompt"
@@ -179,7 +181,8 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 height = flags.height,
                 width = flags.width,
                 strength = flags.img2img_noise,
-                init_img = img2img_filepath
+                init_img = img2img_filepath,
+                fit = flags.img2img_fit
                 ))
 
             # Only delete it if it wasn't a slash command
