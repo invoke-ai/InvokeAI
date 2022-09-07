@@ -159,7 +159,6 @@ def generate_image(data):
     mask = data["maskPath"]
     seamless = data["seamless"]
     progress_images = data["shouldDisplayInProgress"]
-    full_precision = data["shouldUseFullPrecision"]
 
     step_writer = PngWriter("outputs/intermediates")
     step_index = 1
