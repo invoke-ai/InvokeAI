@@ -1,0 +1,13 @@
+name: Tmate
+on:
+  workflow_dispatch
+jobs:
+  build:
+    name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Run tmate
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 30
