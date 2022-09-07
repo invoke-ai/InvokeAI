@@ -28,14 +28,13 @@ export interface SDState {
   maskPath: string;
   seamless: boolean;
   shouldFitToWidthHeight: boolean;
-  shouldShowMask: boolean;
 }
 
 const initialSDState = {
   prompt: 'Cyborg pickle shooting lasers',
   imagesToGenerate: 1,
-  steps: 5,
-  realSteps: 5,
+  steps: 50,
+  realSteps: 50,
   cfgScale: 7.5,
   height: 512,
   width: 512,
@@ -47,9 +46,8 @@ const initialSDState = {
   upscalingStrength: 0.75,
   initialImagePath: '',
   maskPath: '',
-  seamless: true,
-  shouldFitToWidthHeight: false,
-  shouldShowMask: false,
+  seamless: false,
+  shouldFitToWidthHeight: true,
 };
 
 const initialState: SDState = initialSDState;
@@ -132,9 +130,6 @@ export const sdSlice = createSlice({
     resetMaskPath: (state) => {
       state.maskPath = '';
     },
-    setShouldShowMask: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowMask = Boolean(state.maskPath) && action.payload;
-    },
     resetSeed: (state) => {
       state.seed = -1;
     },
@@ -182,7 +177,6 @@ export const {
   randomizeSeed,
   resetSDState,
   setShouldFitToWidthHeight,
-  setShouldShowMask,
   setParameter,
   setAllParameters,
 } = sdSlice.actions;

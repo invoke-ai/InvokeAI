@@ -31,6 +31,7 @@ export interface SDImage {
 export interface GalleryState {
   currentImageUuid: string;
   images: Array<SDImage>;
+  intermediateImage?: SDImage;
 }
 
 const initialState: GalleryState = {
@@ -56,22 +57,28 @@ export const gallerySlice = createSlice({
       const newImages = state.images.filter(
         (image) => image.uuid !== action.payload
       );
-
       const imageToDeleteIndex = state.images.findIndex(
         (image) => image.uuid === action.payload
       );
-
       const newCurrentImageIndex = Math.min(
         Math.max(imageToDeleteIndex, 0),
         newImages.length - 1
       );
-
       state.images = newImages;
-      state.currentImageUuid = newImages[newCurrentImageIndex].uuid;
+      state.currentImageUuid = newImages[0]
+        ? newImages[newCurrentImageIndex].uuid
+        : '';
     },
     addImage: (state, action: PayloadAction<SDImage>) => {
       state.images.push(action.payload);
       state.currentImageUuid = action.payload.uuid;
+      state.intermediateImage = undefined;
+    },
+    setIntermediateImage: (state, action: PayloadAction<SDImage>) => {
+      state.intermediateImage = action.payload;
+    },
+    clearIntermediateImage: (state) => {
+      state.intermediateImage = undefined;
     },
     setGalleryImages: (state, action: PayloadAction<Array<string>>) => {
       // TODO: Revise pending metadata RFC: https://github.com/lstein/stable-diffusion/issues/266
@@ -106,7 +113,13 @@ export const gallerySlice = createSlice({
   },
 });
 
-export const { setCurrentImage, deleteImage, addImage, setGalleryImages } =
-  gallerySlice.actions;
+export const {
+  setCurrentImage,
+  deleteImage,
+  addImage,
+  setGalleryImages,
+  setIntermediateImage,
+  clearIntermediateImage,
+} = gallerySlice.actions;
 
 export default gallerySlice.reducer;

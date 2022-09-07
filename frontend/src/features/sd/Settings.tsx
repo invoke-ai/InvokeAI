@@ -47,6 +47,7 @@ import SDSwitch from '../../components/SDSwitch';
 
 const Settings = (props: ChakraProps) => {
     const {
+        prompt,
         imagesToGenerate,
         steps,
         cfgScale,
@@ -76,7 +77,7 @@ const Settings = (props: ChakraProps) => {
                     label='Generate'
                     type='submit'
                     colorScheme='green'
-                    isDisabled={!isConnected || isProcessing}
+                    isDisabled={!isConnected || isProcessing || !prompt}
                     onClick={() => emitGenerateImage()}
                 />
                 <Spacer />

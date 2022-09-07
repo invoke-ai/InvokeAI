@@ -1,23 +1,33 @@
 import {
     IconButton,
     useColorModeValue,
-    UnorderedList,
-    ListItem,
     Flex,
+    Text,
+    Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { IoIosArrowDown, IoIosArrowUp } from 'react-icons/io';
 import { RootState } from '../../app/store';
 import { setShouldShowLogViewer } from './systemSlice';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { FaAngleDoubleDown, FaMinus, FaPlus } from 'react-icons/fa';
 
 const LogViewer = () => {
     const dispatch = useAppDispatch();
-    const bg = useColorModeValue('blue.50', 'blue.900');
-    const borderColor = useColorModeValue('blue.500', 'blue.500');
+    const bg = useColorModeValue('gray.50', 'gray.900');
+    const borderColor = useColorModeValue('gray.500', 'gray.500');
+    const [shouldAutoscroll, setShouldAutoscroll] = useState<boolean>(true);
 
     const { log, shouldShowLogViewer } = useAppSelector(
         (state: RootState) => state.system
     );
+
+    const viewerRef = useRef<HTMLDivElement>(null);
+
+    useLayoutEffect(() => {
+        if (viewerRef.current !== null && shouldAutoscroll) {
+            viewerRef.current.scrollTop = viewerRef.current.scrollHeight;
+        }
+    });
 
     return (
         <>
@@ -29,36 +39,62 @@ const LogViewer = () => {
                     height='200px'
                     width='100vw'
                     overflow='auto'
-                    direction='column-reverse'
+                    direction='column'
                     fontFamily='monospace'
                     fontSize='sm'
-                    pl={0}
+                    pl={12}
                     pr={2}
                     pb={2}
-                    background={bg}
                     borderTopWidth='4px'
                     borderColor={borderColor}
+                    background={bg}
+                    ref={viewerRef}
                 >
-                    <UnorderedList listStyleType='none'>
-                        {log.map((line) => (
-                            <ListItem key={line}>{line}</ListItem>
-                        ))}
-                    </UnorderedList>
+                    {log.map((entry, i) => (
+                        <Flex gap={2} key={i}>
+                            <Text fontSize='sm' fontWeight={'semibold'}>
+                                {entry.timestamp}:
+                            </Text>
+                            <Text fontSize='sm' wordBreak={'break-all'}>
+                                {entry.message}
+                            </Text>
+                        </Flex>
+                    ))}
                 </Flex>
             )}
-            <IconButton
-                size='sm'
-                position={'fixed'}
-                left={2}
-                bottom={2}
-                aria-label='Toggle Log Viewer'
-                icon={
-                    shouldShowLogViewer ? <IoIosArrowDown /> : <IoIosArrowUp />
-                }
-                onClick={() =>
-                    dispatch(setShouldShowLogViewer(!shouldShowLogViewer))
-                }
-            />
+            {shouldShowLogViewer && (
+                <Tooltip
+                    label={
+                        shouldAutoscroll ? 'Autoscroll on' : 'Autoscroll off'
+                    }
+                >
+                    <IconButton
+                        size='sm'
+                        position={'fixed'}
+                        left={2}
+                        bottom={12}
+                        aria-label='Toggle autoscroll'
+                        variant={'solid'}
+                        colorScheme={shouldAutoscroll ? 'blue' : 'gray'}
+                        icon={<FaAngleDoubleDown />}
+                        onClick={() => setShouldAutoscroll(!shouldAutoscroll)}
+                    />
+                </Tooltip>
+            )}
+            <Tooltip label={shouldShowLogViewer ? 'Hide logs' : 'Show logs'}>
+                <IconButton
+                    size='sm'
+                    position={'fixed'}
+                    left={2}
+                    bottom={2}
+                    variant={'solid'}
+                    aria-label='Toggle Log Viewer'
+                    icon={shouldShowLogViewer ? <FaMinus /> : <FaPlus />}
+                    onClick={() =>
+                        dispatch(setShouldShowLogViewer(!shouldShowLogViewer))
+                    }
+                />
+            </Tooltip>
         </>
     );
 };

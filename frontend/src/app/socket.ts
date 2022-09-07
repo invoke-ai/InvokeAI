@@ -8,6 +8,7 @@ import {
     setIsProcessing,
     setCurrentStep,
     setSocketId,
+    addLogEntry,
 } from '../features/system/systemSlice';
 import { RootState } from '../app/store';
 import {
@@ -15,6 +16,8 @@ import {
     deleteImage,
     SDMetadata,
     setGalleryImages,
+    setIntermediateImage,
+    clearIntermediateImage,
 } from '../features/gallery/gallerySlice';
 import { setInitialImagePath, setMaskPath } from '../features/sd/sdSlice';
 
@@ -45,7 +48,7 @@ export const useSocketIOListeners = () => {
             try {
                 dispatch(setIsConnected(true));
                 dispatch(setSocketId(socket.id));
-
+                dispatch(addLogEntry(`Connected to server: ${socket.id}`));
                 // maintain sync with local images
                 socket.emit(
                     'requestAllImages',
@@ -73,6 +76,7 @@ export const useSocketIOListeners = () => {
             try {
                 dispatch(setIsConnected(false));
                 dispatch(setIsProcessing(false));
+                dispatch(addLogEntry(`Disconnected from server`));
                 toast({
                     title: 'Disconnected',
                     status: 'error',
@@ -86,11 +90,33 @@ export const useSocketIOListeners = () => {
         socket.on('progress', (data: { step: number }) => {
             try {
                 dispatch(setIsProcessing(true));
-                dispatch(setCurrentStep(data.step + 1));
+                dispatch(setCurrentStep(data.step));
             } catch (e) {
                 console.error(e);
             }
         });
+
+        socket.on(
+            'intermediateResult',
+            (data: { url: string; metadata: SDMetadata }) => {
+                try {
+                    const uuid = uuidv4();
+                    const { url, metadata } = data;
+                    dispatch(
+                        setIntermediateImage({
+                            uuid,
+                            url,
+                            metadata,
+                        })
+                    );
+                    dispatch(
+                        addLogEntry(`Intermediate image generated: ${url}`)
+                    );
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        );
 
         socket.on('result', (data: { url: string; metadata: SDMetadata }) => {
             try {
@@ -104,6 +130,7 @@ export const useSocketIOListeners = () => {
                     })
                 );
                 dispatch(setIsProcessing(false));
+                dispatch(addLogEntry(`Image generated: ${url}`));
             } catch (e) {
                 console.error(e);
             }
@@ -114,6 +141,7 @@ export const useSocketIOListeners = () => {
             socket.off('connect');
             socket.off('disconnect');
             socket.off('progress');
+            socket.off('intermediateResult');
             socket.off('result');
         };
     }, []);
@@ -144,30 +172,48 @@ export const useSocketIOEmitters = () => {
         shouldFitToWidthHeight,
     } = useAppSelector((state: RootState) => state.sd);
 
-    const { images } = useAppSelector((state: RootState) => state.gallery);
+    const { shouldDisplayInProgress } = useAppSelector(
+        (state: RootState) => state.system
+    );
+
+    const { images, intermediateImage } = useAppSelector(
+        (state: RootState) => state.gallery
+    );
+
+    const generationParameters = {
+        // from sd slice
+        prompt,
+        imagesToGenerate,
+        steps,
+        cfgScale,
+        height,
+        width,
+        sampler,
+        seed,
+        img2imgStrength,
+        gfpganStrength,
+        upscalingLevel,
+        upscalingStrength,
+        initialImagePath,
+        maskPath,
+        shouldFitToWidthHeight,
+        seamless,
+        // from system slid
+        shouldDisplayInProgress,
+    };
 
     return {
         emitGenerateImage: () => {
             dispatch(setIsProcessing(true));
             dispatch(setCurrentStep(-1));
-            socket.emit('generateImage', {
-                prompt,
-                imagesToGenerate,
-                steps,
-                cfgScale,
-                height,
-                width,
-                sampler,
-                seed,
-                img2imgStrength,
-                gfpganStrength,
-                upscalingLevel,
-                upscalingStrength,
-                initialImagePath,
-                maskPath,
-                shouldFitToWidthHeight,
-                seamless,
-            });
+            socket.emit('generateImage', generationParameters);
+            dispatch(
+                addLogEntry(
+                    `Image generation requested ${JSON.stringify(
+                        generationParameters
+                    )}`
+                )
+            );
         },
         emitDeleteImage: (uuid: string) => {
             const imageToDelete = images.find((image) => image.uuid === uuid);
@@ -176,13 +222,33 @@ export const useSocketIOEmitters = () => {
                     'deleteImage',
                     imageToDelete.url,
                     (response: SocketIOResponse) => {
-                        response.status === 'OK' && dispatch(deleteImage(uuid));
+                        if (response.status === 'OK') {
+                            dispatch(deleteImage(uuid));
+                            dispatch(
+                                addLogEntry(
+                                    `Image deleted ${imageToDelete.url}`
+                                )
+                            );
+                        }
                     }
                 );
         },
         emitCancel: () => {
             socket.emit('cancel', (response: SocketIOResponse) => {
-                response.status === 'OK' && dispatch(setIsProcessing(false));
+                if (response.status === 'OK') {
+                    dispatch(setIsProcessing(false));
+                    if (intermediateImage) {
+                        dispatch(addImage(intermediateImage));
+                        dispatch(
+                            addLogEntry(
+                                `Intermediate image saved ${intermediateImage.url}`
+                            )
+                        );
+
+                        dispatch(clearIntermediateImage());
+                    }
+                    dispatch(addLogEntry(`Image generation canceled`));
+                }
             });
         },
         emitUploadInitialImage: (file: File, name: string) => {
@@ -191,8 +257,14 @@ export const useSocketIOEmitters = () => {
                 file,
                 name,
                 (response: SocketIOResponse) => {
-                    response.status === 'OK' &&
+                    if (response.status === 'OK') {
                         dispatch(setInitialImagePath(response.data));
+                        dispatch(
+                            addLogEntry(
+                                `Initial image uploaded ${response.data}`
+                            )
+                        );
+                    }
                 }
             );
         },
@@ -204,12 +276,16 @@ export const useSocketIOEmitters = () => {
                 (response: SocketIOResponse) => {
                     response.status === 'OK' &&
                         dispatch(setMaskPath(response.data));
+                    dispatch(
+                        addLogEntry(`Mask image uploaded ${response.data}`)
+                    );
                 }
             );
         },
         emitRequestAllImages: () =>
             socket.emit('requestAllImages', (response: SocketIOResponse) => {
                 dispatch(setGalleryImages(response.data));
+                dispatch(addLogEntry(`Syncing gallery`));
             }),
     };
 };

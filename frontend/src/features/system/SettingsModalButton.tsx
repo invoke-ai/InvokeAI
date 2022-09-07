@@ -1,5 +1,8 @@
 import {
     Flex,
+    FormControl,
+    FormLabel,
+    HStack,
     IconButton,
     Modal,
     ModalBody,
@@ -8,29 +11,25 @@ import {
     ModalFooter,
     ModalHeader,
     ModalOverlay,
-    Popover,
-    PopoverArrow,
-    PopoverBody,
-    PopoverCloseButton,
-    PopoverContent,
-    PopoverHeader,
-    PopoverTrigger,
+    Switch,
     Text,
     useDisclosure,
     useToast,
 } from '@chakra-ui/react';
 import { MdSettings } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { setShouldDisplayInProgress } from './systemSlice';
+import {
+    setShouldConfirmOnDelete,
+    setShouldDisplayInProgress,
+} from './systemSlice';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
-import SDSwitch from '../../components/SDSwitch';
 import { persistor } from '../../main';
 import { useState } from 'react';
 
 const SettingsModalButton = () => {
     const { isOpen, onOpen, onClose } = useDisclosure();
-    const { shouldDisplayInProgress } = useAppSelector(
+    const { shouldDisplayInProgress, shouldConfirmOnDelete } = useAppSelector(
         (state: RootState) => state.system
     );
     const [isResetting, setIsResetting] = useState<boolean>(false);
@@ -68,17 +67,40 @@ const SettingsModalButton = () => {
                     <ModalCloseButton />
                     <ModalBody>
                         <Flex gap={5} direction='column'>
-                            <SDSwitch
-                                label='Display in-progress images'
-                                isChecked={shouldDisplayInProgress}
-                                onChange={(e) =>
-                                    dispatch(
-                                        setShouldDisplayInProgress(
-                                            e.target.checked
-                                        )
-                                    )
-                                }
-                            />
+                            <FormControl>
+                                <HStack>
+                                    <FormLabel marginBottom={1}>
+                                        Display in-progress images (slower)
+                                    </FormLabel>
+                                    <Switch
+                                        isChecked={shouldDisplayInProgress}
+                                        onChange={(e) =>
+                                            dispatch(
+                                                setShouldDisplayInProgress(
+                                                    e.target.checked
+                                                )
+                                            )
+                                        }
+                                    />
+                                </HStack>
+                            </FormControl>
+                            <FormControl>
+                                <HStack>
+                                    <FormLabel marginBottom={1}>
+                                        Confirm on delete
+                                    </FormLabel>
+                                    <Switch
+                                        isChecked={shouldConfirmOnDelete}
+                                        onChange={(e) =>
+                                            dispatch(
+                                                setShouldConfirmOnDelete(
+                                                    e.target.checked
+                                                )
+                                            )
+                                        }
+                                    />
+                                </HStack>
+                            </FormControl>
                             <SDButton
                                 label='Reset Web UI'
                                 colorScheme='orange'

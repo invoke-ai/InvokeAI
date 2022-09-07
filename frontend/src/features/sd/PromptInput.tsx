@@ -14,6 +14,7 @@ const PromptInput = () => {
       resize='none'
       size={'lg'}
       height={100}
+      isInvalid={!prompt.length}
       onChange={(e) => dispatch(setPrompt(e.target.value))}
       value={prompt}
       placeholder="I'm dreaming of..."

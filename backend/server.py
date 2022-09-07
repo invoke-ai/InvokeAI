@@ -62,13 +62,13 @@ socketio = SocketIO(app, cors_allowed_origins=cors_allowed_origins,
 transformers.logging.set_verbosity_error()
 
 # initialize with defaults, we will populate all config
-t2i = Generate()
+model = Generate()
 
 # gets rid of annoying messages about random seed
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 
 tic = time.time()
-t2i.load_model()
+model.load_model()
 print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 
 print(f"\nServer online: http://{host}:{port}")
@@ -132,37 +132,53 @@ def handle_upload_initial_image(bytes, name):
     return make_reponse("OK", data=filePath)
 
 
-def generate_image(metadata):
+def generate_image(data):
     canceled.clear()
-    prompt = metadata['prompt']
-    strength = float(metadata['img2imgStrength'])
-    iterations = int(metadata['imagesToGenerate'])
-    steps = int(metadata['steps'])
-    width = int(metadata['width'])
-    height = int(metadata['height'])
+    prompt = data['prompt']
+    strength = float(data['img2imgStrength'])
+    iterations = int(data['imagesToGenerate'])
+    steps = int(data['steps'])
+    width = int(data['width'])
+    height = int(data['height'])
     fit = False
-    cfgscale = float(metadata['cfgScale'])
-    sampler_name = metadata['sampler']
-    gfpgan_strength = float(metadata['gfpganStrength']
+    cfgscale = float(data['cfgScale'])
+    sampler_name = data['sampler']
+    gfpgan_strength = float(data['gfpganStrength']
                             ) if gfpgan_model_exists else 0
-    upscale_level = metadata['upscalingLevel']
-    upscale_strength = metadata['upscalingStrength']
+    upscale_level = data['upscalingLevel']
+    upscale_strength = data['upscalingStrength']
     upscale = [int(upscale_level), float(upscale_strength)
                ] if upscale_level != 0 else None
     progress_images = False
-    seed = t2i.seed if int(metadata['seed']) == -1 else int(metadata['seed'])
-    init_img = metadata['initialImagePath']
-    fit = metadata['shouldFitToWidthHeight']
+    seed = model.seed if int(data['seed']) == -1 else int(data['seed'])
+    init_img = data['initialImagePath']
+    fit = data['shouldFitToWidthHeight']
 
     pngwriter = PngWriter("./outputs/img-samples/")
     prefix = pngwriter.unique_prefix()
-    mask = metadata["maskPath"]
-    seamless = metadata["seamless"]
+    mask = data["maskPath"]
+    seamless = data["seamless"]
+    progress_images = data["shouldDisplayInProgress"]
+    full_precision = data["shouldUseFullPrecision"]
+
+    step_writer = PngWriter("outputs/intermediates")
+    step_index = 1
 
     def image_progress(sample, step):
         if canceled.is_set():
             raise CanceledException
-        socketio.emit('progress', {"step": step})
+
+        nonlocal step_index
+        if progress_images and step % 5 == 0 and step < steps - 1:
+            image = model.sample_to_image(sample)
+            name = f'{prefix}.{seed}.{step_index}.png'
+            metadata = f'{prompt} -S{seed} [intermediate]'
+            path = step_writer.save_image_and_prompt_to_png(
+                image, metadata, name)
+            step_index += 1
+            socketio.emit('intermediateResult', {
+                          'url': os.path.relpath(path), 'metadata': data})
+        socketio.emit('progress', {"step": step + 1})
         eventlet.sleep(0)
 
     def image_done(image, seed, upscaled=False):
@@ -170,7 +186,7 @@ def generate_image(metadata):
         path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', name)
         if not upscaled:
             socketio.emit(
-                'result', {'url': os.path.relpath(path), 'metadata': metadata})
+                'result', {'url': os.path.relpath(path), 'metadata': data})
             eventlet.sleep(0)
 
             # params yet to support
@@ -184,23 +200,24 @@ def generate_image(metadata):
             # # these are specific to GFPGAN/ESRGAN
             # save_original  =    False,
 
-    t2i.prompt2image(prompt,
-                     iterations=iterations,
-                     init_img=init_img,
-                     mask=mask,
-                     cfg_scale=cfgscale,
-                     width=width,
-                     height=height,
-                     seed=seed,
-                     steps=steps,
-                     gfpgan_strength=gfpgan_strength,
-                     upscale=upscale,
-                     sampler_name=sampler_name,
-                     step_callback=image_progress,
-                     strength=strength,
-                     image_callback=image_done,
-                     fit=fit,
-                     seamless=seamless)
+    model.prompt2image(prompt,
+                       iterations=iterations,
+                       init_img=init_img,
+                       mask=mask,
+                       cfg_scale=cfgscale,
+                       width=width,
+                       height=height,
+                       seed=seed,
+                       steps=steps,
+                       gfpgan_strength=gfpgan_strength,
+                       upscale=upscale,
+                       sampler_name=sampler_name,
+                       step_callback=image_progress,
+                       strength=strength,
+                       image_callback=image_done,
+                       fit=fit,
+                       seamless=seamless,
+                       progress_images=progress_images)
 
 
 if __name__ == '__main__':

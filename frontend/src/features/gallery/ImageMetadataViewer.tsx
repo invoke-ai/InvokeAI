@@ -16,10 +16,10 @@ type Props = {
     image: SDImage;
 };
 
-const ImageParameters = ({ image }: Props) => {
+const ImageMetadataViewer = ({ image }: Props) => {
     const dispatch = useAppDispatch();
 
-    const keys = Object.keys(image.metadata);
+    const keys = Object.keys(PARAMETERS);
 
     let metadata: Array<{
         label: string;
@@ -33,6 +33,7 @@ const ImageParameters = ({ image }: Props) => {
             metadata.push({ label: PARAMETERS[key], key, value });
         }
     });
+
     return metadata.length ? (
         <List>
             {metadata.map((parameter) => {
@@ -69,4 +70,4 @@ const ImageParameters = ({ image }: Props) => {
     );
 };
 
-export default ImageParameters;
+export default ImageMetadataViewer;

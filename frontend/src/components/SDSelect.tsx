@@ -1,5 +1,4 @@
 import {
-    ChakraProps,
     FormControl,
     FormLabel,
     HStack,
