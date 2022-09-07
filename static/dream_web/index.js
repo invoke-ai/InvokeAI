@@ -11,7 +11,14 @@ function appendOutput(src, seed, config) {
     let outputNode = document.createElement("img");
     outputNode.src = src;
 
-    let altText = seed.toString() + " | " + config.prompt;
+    var variations = config.with_variations;
+    if (parseFloat(config.variation_amount)) {
+        variations = (variations ? variations + "," : "") + seed + ":" + config.variation_amount
+    }
+
+    let baseseed = (config.with_variations || parseFloat(config.variation_amount)) ? config.seed : seed
+    let altText = baseseed + " | " + (variations ? variations + " | " : "") + config.prompt
+    
     outputNode.alt = altText;
     outputNode.title = altText;
 
@@ -21,7 +28,9 @@ function appendOutput(src, seed, config) {
         for (const [k, v] of new FormData(form)) {
             form.querySelector(`*[name=${k}]`).value = config[k];
         }
-        document.querySelector("#seed").value = seed;
+        
+        document.querySelector("#seed").value = baseseed
+        document.querySelector("#with_variations").value = variations || ''
 
         saveFields(document.querySelector("#generate-form"));
     });
@@ -142,6 +151,11 @@ window.onload = () => {
     });
     document.querySelector("#reset-seed").addEventListener('click', (e) => {
         document.querySelector("#seed").value = -1;
+        saveFields(e.target.form);
+    });
+    document.querySelector("#reset-variations").addEventListener('click', (e) => {
+        document.querySelector("#variation_amount").value = 0;
+        document.querySelector("#with_variations").value = '';
         saveFields(e.target.form);
     });
     document.querySelector("#reset-all").addEventListener('click', (e) => {
