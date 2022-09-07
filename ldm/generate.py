@@ -142,6 +142,7 @@ class Generate:
         self.generators               = {}
         self.base_generator           = None
         self.seed                     = None
+        self.output_path              = os.path.join('outputs','img-samples')
 
         if device_type == 'cuda' and not torch.cuda.is_available():
             device_type = choose_torch_device()
@@ -171,11 +172,11 @@ class Generate:
         return outputs
 
     def txt2img(self, prompt, **kwargs):
-        outdir = kwargs.pop('outdir', 'outputs/img-samples')
+        outdir = kwargs.pop('outdir', self.output_path)
         return self.prompt2png(prompt, outdir, **kwargs)
 
     def img2img(self, prompt, **kwargs):
-        outdir = kwargs.pop('outdir', 'outputs/img-samples')
+        outdir = kwargs.pop('outdir', self.output_path)
         assert (
             'init_img' in kwargs
         ), 'call to img2img() must include the init_img argument'
@@ -357,19 +358,21 @@ class Generate:
         print(
             f'>>   {len(results)} image(s) generated in', '%4.2fs' % (toc - tic)
         )
-        print(
-            f'>>   Max VRAM used for this generation:',
-            '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
-        )
 
-        if self.session_peakmem:
-            self.session_peakmem = max(
-                self.session_peakmem, torch.cuda.max_memory_allocated()
-            )
+        if self.device_type == 'cuda':
             print(
-                f'>>   Max VRAM used since script start: ',
-                '%4.2fG' % (self.session_peakmem / 1e9),
+                f'>>   Max VRAM used for this generation:',
+                '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
             )
+
+            if self.session_peakmem:
+                self.session_peakmem = max(
+                    self.session_peakmem, torch.cuda.max_memory_allocated()
+                )
+                print(
+                    f'>>   Max VRAM used since script start: ',
+                    '%4.2fG' % (self.session_peakmem / 1e9),
+                )
         return results
 
     def _make_images(self, img_path, mask_path, width, height, fit=False):
@@ -465,10 +468,11 @@ class Generate:
                     if len(upscale) < 2:
                         upscale.append(0.75)
                     image = real_esrgan_upscale(
-                        image,
-                        upscale[1],
-                        int(upscale[0]),
-                        seed,
+                        image=image,
+                        strength=upscale[1],
+                        upsampler_scale=int(upscale[0]),
+                        seed=seed,
+                        outdir=self.output_path,
                     )
                 if strength > 0:
                     image = run_gfpgan(
@@ -478,6 +482,7 @@ class Generate:
                 print(
                     f'>> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}'
                 )
+                print(traceback.format_exc(), file=sys.stderr)
 
             if image_callback is not None:
                 image_callback(image, seed, upscaled=True)

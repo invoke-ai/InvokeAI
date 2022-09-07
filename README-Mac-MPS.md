@@ -50,15 +50,24 @@ pyenv activate lstein-stable-diffusion
 # OR, 
 # 2. Installing standalone
 # install python 3, git, cmake, protobuf:
-brew install cmake protobuf rust
+brew install cmake protobuf rust unzip
 
 # install miniconda (M1 arm64 version):
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -o Miniconda3-latest-MacOSX-arm64.sh
 /bin/bash Miniconda3-latest-MacOSX-arm64.sh
 
-
 # EITHER WAY,
 # continue from here
+
+# download and install Real-ESRGAN
+REALESRGAN_GITHUB_URL="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-macos.zip"
+REALESRGAN_ARCHIVE="realesrgan.zip"
+REALESRGAN_PATH="realesrgan"
+
+curl $REALESRGAN_GITHUB_URL -o $REALESRGAN_ARCHIVE
+unzip $REALESRGAN_ARCHIVE
+rm $REALESRGAN_ARCHIVE
+chmod u+x $REALESRGAN_PATH/realesrgan-ncnn-vulkan
 
 # clone the repo
 git clone https://github.com/lstein/stable-diffusion.git

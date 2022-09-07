@@ -6,6 +6,8 @@ import numpy as np
 
 from PIL import Image
 from scripts.dream import create_argv_parser
+from ldm.dream.devices import choose_torch_device
+import subprocess
 
 arg_parser = create_argv_parser()
 opt = arg_parser.parse_args()
@@ -126,42 +128,86 @@ def _load_gfpgan_bg_upsampler(bg_upsampler, upsampler_scale, bg_tile=400):
 
     return bg_upsampler
 
+def create_tmp_image(image, seed, outdir):
+    from ldm.dream.pngwriter import PngWriter
 
-def real_esrgan_upscale(image, strength, upsampler_scale, seed):
+    pngwriter = PngWriter(outdir)
+    prefix = pngwriter.unique_prefix()
+
+    name = f'tmp_{prefix}.{seed}.png'
+    cwd = os.getcwd()
+    img_path = os.path.join(cwd, outdir, name)
+
+    image.save(img_path)
+    image.close()
+
+    return img_path
+
+def real_esrgan_upscale(image, strength, upsampler_scale, seed, outdir=None):
     print(
         f'>> Real-ESRGAN Upscaling seed:{seed} : scale:{upsampler_scale}x'
     )
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=DeprecationWarning)
-        warnings.filterwarnings('ignore', category=UserWarning)
+    # Fix the Real-ESRGAN lib that does not work with Apple Silicon
+    # Switch to the local Real-ESRGAN binary
+    if choose_torch_device() == 'mps':
+        img_path = create_tmp_image(image, seed, outdir)
+
+        cmd = [
+            './realesrgan-ncnn-vulkan',
+            '-i', str(img_path),
+            '-o', str(img_path),
+            '-s', str(upsampler_scale)
+        ]
+
+        if upsampler_scale > 2:
+            cmd.append('-n')
+            cmd.append('realesrgan-x4plus')
 
         try:
-            upsampler = _load_gfpgan_bg_upsampler(
-                opt.gfpgan_bg_upsampler, upsampler_scale, opt.gfpgan_bg_tile
-            )
+            subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                cwd="../realesrgan"
+            ).stdout.decode('utf-8')
+
+            res = Image.open(img_path).convert('RGBA')
+            os.remove(img_path)
         except Exception:
             import traceback
-
-            print('>> Error loading Real-ESRGAN:', file=sys.stderr)
+            print('>> Error ESRGAN resize failed:', file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
+    else:
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=DeprecationWarning)
+            warnings.filterwarnings('ignore', category=UserWarning)
 
-    output, img_mode = upsampler.enhance(
-        np.array(image, dtype=np.uint8),
-        outscale=upsampler_scale,
-        alpha_upsampler=opt.gfpgan_bg_upsampler,
-    )
+            try:
+                upsampler = _load_gfpgan_bg_upsampler(
+                    opt.gfpgan_bg_upsampler, upsampler_scale, opt.gfpgan_bg_tile
+                )
+            except Exception:
+                import traceback
 
-    res = Image.fromarray(output)
+                print('>> Error loading Real-ESRGAN:', file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
 
-    if strength < 1.0:
-        # Resize the image to the new image if the sizes have changed
-        if output.size != image.size:
-            image = image.resize(res.size)
-        res = Image.blend(image, res, strength)
+        output, img_mode = upsampler.enhance(
+            np.array(image, dtype=np.uint8),
+            outscale=upsampler_scale,
+            alpha_upsampler=opt.gfpgan_bg_upsampler,
+        )
 
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    upsampler = None
+        res = Image.fromarray(output)
+
+        if strength < 1.0:
+            # Resize the image to the new image if the sizes have changed
+            if output.size != image.size:
+                image = image.resize(res.size)
+            res = Image.blend(image, res, strength)
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        upsampler = None
 
     return res
