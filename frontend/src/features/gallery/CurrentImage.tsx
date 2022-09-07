@@ -3,15 +3,15 @@ import {
     Flex,
     IconButton,
     Image,
-    Menu,
-    MenuButton,
-    MenuItem,
-    MenuList,
     Tooltip,
     VStack,
 } from '@chakra-ui/react';
-import { BsThreeDots } from 'react-icons/bs';
-import { FaCopy, FaPaintBrush, FaRecycle, FaSeedling, FaUpload } from 'react-icons/fa';
+import {
+    FaCopy,
+    FaPaintBrush,
+    FaRecycle,
+    FaSeedling,
+} from 'react-icons/fa';
 import { RiBracesFill } from 'react-icons/ri';
 import { GiResize } from 'react-icons/gi';
 import { MdDeleteForever, MdFaceRetouchingNatural } from 'react-icons/md';

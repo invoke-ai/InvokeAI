@@ -1,4 +1,10 @@
-import { Flex, IconButton, HStack, Box, Spacer, Image, ChakraProps } from '@chakra-ui/react';
+import {
+    Flex,
+    IconButton,
+    HStack,
+    Spacer,
+    ChakraProps,
+} from '@chakra-ui/react';
 
 import { RootState } from '../../app/store';
 
@@ -25,7 +31,6 @@ import {
 import SDNumberInput from '../../components/SDNumberInput';
 import SDSelect from '../../components/SDSelect';
 import SDButton from '../../components/SDButton';
-import SDFileUpload from '../../components/SDFileUpload';
 
 import {
     HEIGHTS,

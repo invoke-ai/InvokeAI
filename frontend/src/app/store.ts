@@ -1,21 +1,26 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import { persistReducer } from 'redux-persist';
+import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
+
 import sdReducer from '../features/sd/sdSlice';
 import galleryReducer from '../features/gallery/gallerySlice';
 import systemReducer from '../features/system/systemSlice';
 
-/*
-Store Slices
-- sd: image generation parameters
-- gallery: image gallery
-- system: logs, site settings, etc
-*/
+const reducers = combineReducers({
+  sd: sdReducer,
+  gallery: galleryReducer,
+  system: systemReducer,
+});
+
+const persistConfig = {
+  key: 'root',
+  storage,
+};
+
+const persistedReducer = persistReducer(persistConfig, reducers);
 
 export const store = configureStore({
-  reducer: {
-    sd: sdReducer,
-    gallery: galleryReducer,
-    system: systemReducer,
-  },
+  reducer: persistedReducer,
   // devTools: {
   //   trace: true,
   // },

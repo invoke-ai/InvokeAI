@@ -15,7 +15,6 @@ import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { FaUpload } from 'react-icons/fa';
 import { RootState } from '../app/store';
 import { useSocketIOEmitters } from '../context/socket';
-import { MdDeleteForever } from 'react-icons/md';
 import { resetInitialImagePath } from '../features/sd/sdSlice';
 import { RiCloseFill } from 'react-icons/ri';
 

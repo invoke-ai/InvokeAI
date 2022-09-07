@@ -1,5 +1,5 @@
 import { FormControl, FormLabel, HStack, Switch } from '@chakra-ui/react';
-import React, { ChangeEvent } from 'react';
+import { ChangeEvent } from 'react';
 
 type Props = {
   label: string;
