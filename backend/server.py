@@ -18,15 +18,13 @@ from ldm.dream.pngwriter import PngWriter
 from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
 
 
-class CanceledException(Exception):
-    pass
+host = 'localhost'
+port = 9090
 
-
-canceled = Event()
 
 app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 
-# serve generated images
+
 app.config['OUTPUTS_FOLDER'] = "../outputs"
 
 
@@ -44,43 +42,16 @@ def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
 
 
-host = 'localhost'
-port = 9090
-
-dev_mode = True
+dev_mode = False
 
 logger = True if dev_mode else False
 engineio_logger = True if dev_mode else False
-cors_allowed_origins = "*" if dev_mode else None
 
 # default 1,000,000, needs to be higher for socketio to accept larger images
 max_http_buffer_size = 10000000
 
-socketio = SocketIO(app, cors_allowed_origins=cors_allowed_origins,
+socketio = SocketIO(app,
                     logger=logger, engineio_logger=logger, max_http_buffer_size=max_http_buffer_size)
-
-transformers.logging.set_verbosity_error()
-
-# initialize with defaults, we will populate all config
-model = Generate()
-
-# gets rid of annoying messages about random seed
-logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
-
-tic = time.time()
-model.load_model()
-print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
-
-print(f"\nServer online: http://{host}:{port}")
-
-
-def make_reponse(status, message=None, data=None):
-    response = {"status": status}
-    if message is not None:
-        response["message"] = message
-    if data is not None:
-        response["data"] = data
-    return response
 
 
 @socketio.on('cancel')
@@ -130,6 +101,36 @@ def handle_upload_initial_image(bytes, name):
     newFile = open(filePath, "wb")
     newFile.write(bytes)
     return make_reponse("OK", data=filePath)
+
+
+class CanceledException(Exception):
+    pass
+
+
+canceled = Event()
+
+transformers.logging.set_verbosity_error()
+
+# initialize with defaults, we will populate all config
+model = Generate()
+
+# gets rid of annoying messages about random seed
+logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
+
+tic = time.time()
+model.load_model()
+print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
+
+print(f"\nServer online: http://{host}:{port}")
+
+
+def make_reponse(status, message=None, data=None):
+    response = {"status": status}
+    if message is not None:
+        response["message"] = message
+    if data is not None:
+        response["data"] = data
+    return response
 
 
 def generate_image(data):
