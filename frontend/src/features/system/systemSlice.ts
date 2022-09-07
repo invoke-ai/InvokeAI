@@ -8,9 +8,11 @@ export interface SystemState {
   isProcessing: boolean;
   progress: number;
   log: Array<string>;
+  shouldShowLogViewer: boolean;
   isGFPGANAvailable: boolean;
   isESRGANAvailable: boolean;
   isConnected: boolean;
+  socketId: string;
 }
 
 const initialSystemState = {
@@ -18,10 +20,12 @@ const initialSystemState = {
   isProcessing: false,
   progress: 0,
   log: testLogs,
+  shouldShowLogViewer: false,
   shouldFitToWidthHeight: false,
   shouldDisplayInProgress: false,
   isGFPGANAvailable: false,
   isESRGANAvailable: false,
+  socketId: '',
 };
 
 const initialState: SystemState = initialSystemState;
@@ -46,8 +50,14 @@ export const systemSlice = createSlice({
     appendLog: (state, action: PayloadAction<string>) => {
       state.log.push(action.payload);
     },
+    setShouldShowLogViewer: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowLogViewer = action.payload;
+    },
     setIsConnected: (state, action: PayloadAction<boolean>) => {
       state.isConnected = action.payload;
+    },
+    setSocketId: (state, action: PayloadAction<string>) => {
+      state.socketId = action.payload;
     },
   },
 });
@@ -58,7 +68,9 @@ export const {
   setIsProcessing,
   setProgress,
   appendLog,
+  setShouldShowLogViewer,
   setIsConnected,
+  setSocketId,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

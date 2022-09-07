@@ -1,13 +1,13 @@
 import { Grid, GridItem } from '@chakra-ui/react';
-import SiteHeader from './components/SiteHeader';
+import { useSocketIOListeners } from './app/socket';
 import ImageRoll from './features/gallery/ImageRoll';
 import CurrentImage from './features/gallery/CurrentImage';
-import SDProgress from './components/SDProgress';
-import LogViewer from './components/LogViewer';
-import { useSocketIOListeners } from './context/socket';
-import SDSettings from './features/sd/SDSettings';
+import LogViewer from './features/system/LogViewer';
+import Settings from './features/sd/Settings';
 import PromptInput from './features/sd/PromptInput';
-import SDFileUpload from './components/SDFileUpload';
+import InitialImage from './features/sd/InitialImage';
+import ProgressBar from './features/header/ProgressBar';
+import SiteHeader from './features/header/SiteHeader';
 
 const App = () => {
     // Loads all socket listeners
@@ -27,14 +27,14 @@ const App = () => {
                 gap='2'
             >
                 <GridItem area={'progressBar'}>
-                    <SDProgress />
+                    <ProgressBar />
                 </GridItem>
                 <GridItem pl='2' pr='2' area={'header'}>
                     <SiteHeader />
                 </GridItem>
                 <GridItem pl='2' area={'menu'} overflowY='scroll'>
-                    <SDSettings height={475} />
-                    <SDFileUpload />
+                    <Settings height={475} />
+                    <InitialImage />
                 </GridItem>
 
                 <GridItem pr='2' area={'prompt'}>

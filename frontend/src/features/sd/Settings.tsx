@@ -7,7 +7,7 @@ import {
 } from '@chakra-ui/react';
 
 import { RootState } from '../../app/store';
-
+import { useSocketIOEmitters } from '../../app/socket';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 
 import { BsArrowCounterclockwise } from 'react-icons/bs';
@@ -38,9 +38,8 @@ import {
     UPSCALING_LEVELS,
     WIDTHS,
 } from '../../app/constants';
-import { useSocketIOEmitters } from '../../context/socket';
 
-const SDSettings = (props: ChakraProps) => {
+const Settings = (props: ChakraProps) => {
     const {
         imagesToGenerate,
         steps,
@@ -182,4 +181,4 @@ const SDSettings = (props: ChakraProps) => {
     );
 };
 
-export default SDSettings;
+export default Settings;

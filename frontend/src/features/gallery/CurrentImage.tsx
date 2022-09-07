@@ -6,18 +6,13 @@ import {
     Tooltip,
     VStack,
 } from '@chakra-ui/react';
-import {
-    FaCopy,
-    FaPaintBrush,
-    FaRecycle,
-    FaSeedling,
-} from 'react-icons/fa';
+import { FaCopy, FaPaintBrush, FaRecycle, FaSeedling } from 'react-icons/fa';
 import { RiBracesFill } from 'react-icons/ri';
 import { GiResize } from 'react-icons/gi';
 import { MdDeleteForever, MdFaceRetouchingNatural } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import { useSocketIOEmitters } from '../../context/socket';
+import { useSocketIOEmitters } from '../../app/socket';
 import { setInitialImagePath } from '../sd/sdSlice';
 
 const height = 'calc(100vh - 176px)';
@@ -42,16 +37,6 @@ const CurrentImage = () => {
                 <Flex gap={2}>
                     <Image maxHeight={height} src={imageToDisplay?.url} />
                     <VStack>
-                        <Tooltip label='Delete'>
-                            <IconButton
-                                aria-label='Delete'
-                                icon={<MdDeleteForever />}
-                                fontSize={24}
-                                onClick={() =>
-                                    emitDeleteImage(imageToDisplay?.uuid)
-                                }
-                            />
-                        </Tooltip>
                         <Tooltip label='Use as initial image'>
                             <IconButton
                                 fontSize={18}
@@ -106,6 +91,16 @@ const CurrentImage = () => {
                                 fontSize={20}
                                 aria-label='Fix faces (GFPGAN)'
                                 icon={<MdFaceRetouchingNatural />}
+                            />
+                        </Tooltip>
+                        <Tooltip label='Delete'>
+                            <IconButton
+                                aria-label='Delete'
+                                icon={<MdDeleteForever />}
+                                fontSize={24}
+                                onClick={() =>
+                                    emitDeleteImage(imageToDisplay?.uuid)
+                                }
                             />
                         </Tooltip>
                     </VStack>

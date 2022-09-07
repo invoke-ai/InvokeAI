@@ -6,19 +6,20 @@ import {
   IconButton,
   Image,
   Text,
+  Tooltip,
   useColorModeValue,
   useToast,
 } from '@chakra-ui/react';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { FaUpload } from 'react-icons/fa';
-import { RootState } from '../app/store';
-import { useSocketIOEmitters } from '../context/socket';
-import { resetInitialImagePath } from '../features/sd/sdSlice';
 import { RiCloseFill } from 'react-icons/ri';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { RootState } from '../../app/store';
+import { useSocketIOEmitters } from '../../app/socket';
+import { resetInitialImagePath } from '../../features/sd/sdSlice';
 
-const SDFileUpload = () => {
+const InitialImage = () => {
   const toast = useToast();
   const dispatch = useAppDispatch();
   const iconColor = useColorModeValue('gray.200', 'gray.600');
@@ -86,18 +87,22 @@ const SDFileUpload = () => {
                   right={2}
                   gap={2}
                 >
-                  <IconButton
-                    aria-label='Clear initial image'
-                    icon={<RiCloseFill />}
-                    fontSize={24}
-                    onClick={() => dispatch(resetInitialImagePath())}
-                  />
-                  <IconButton
-                    aria-label='Upload initial image'
-                    icon={<FaUpload />}
-                    fontSize={20}
-                    onClick={open}
-                  />
+                  <Tooltip label='Clear initial image'>
+                    <IconButton
+                      aria-label='Clear initial image'
+                      icon={<RiCloseFill />}
+                      fontSize={24}
+                      onClick={() => dispatch(resetInitialImagePath())}
+                    />
+                  </Tooltip>
+                  <Tooltip label='Upload initial image'>
+                    <IconButton
+                      aria-label='Upload initial image'
+                      icon={<FaUpload />}
+                      fontSize={20}
+                      onClick={open}
+                    />
+                  </Tooltip>
                 </Flex>
                 <Image
                   maxHeight={270}
@@ -119,4 +124,4 @@ const SDFileUpload = () => {
   );
 };
 
-export default SDFileUpload;
+export default InitialImage;

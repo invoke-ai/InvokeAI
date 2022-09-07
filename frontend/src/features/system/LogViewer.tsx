@@ -5,18 +5,19 @@ import {
     ListItem,
     Flex,
 } from '@chakra-ui/react';
-import { useAppSelector } from '../app/hooks';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { IoIosArrowDown, IoIosArrowUp } from 'react-icons/io';
-import { useState } from 'react';
-import { RootState } from '../app/store';
+import { RootState } from '../../app/store';
+import { setShouldShowLogViewer } from './systemSlice';
 
 const LogViewer = () => {
-    const [shouldShowLogViewer, setShouldShowLogViewer] =
-        useState<boolean>(false);
+    const dispatch = useAppDispatch();
     const bg = useColorModeValue('blue.50', 'blue.900');
     const borderColor = useColorModeValue('blue.500', 'blue.500');
 
-    const { log } = useAppSelector((state: RootState) => state.system);
+    const { log, shouldShowLogViewer } = useAppSelector(
+        (state: RootState) => state.system
+    );
 
     return (
         <>
@@ -54,7 +55,9 @@ const LogViewer = () => {
                 icon={
                     shouldShowLogViewer ? <IoIosArrowDown /> : <IoIosArrowUp />
                 }
-                onClick={() => setShouldShowLogViewer(!shouldShowLogViewer)}
+                onClick={() =>
+                    dispatch(setShouldShowLogViewer(!shouldShowLogViewer))
+                }
             />
         </>
     );

@@ -72,8 +72,6 @@ t2i.load_model()
 print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 
 print(f"\nServer online: http://{host}:{port}")
-print("\n")
-print("\n")
 
 
 def make_reponse(status, message=None, data=None):
@@ -124,17 +122,14 @@ def handle_upload_initial_image(bytes, name):
 
 
 def generate_image(data):
-    print(data)
     canceled.clear()
     prompt = data['prompt']
-    initimg = None
     strength = float(data['img2imgStrength'])
     iterations = int(data['imagesToGenerate'])
     steps = int(data['steps'])
     width = int(data['width'])
     height = int(data['height'])
     fit = False
-    initimg = None
     cfgscale = float(data['cfgScale'])
     sampler_name = data['sampler']
     gfpgan_strength = float(data['gfpganStrength']
@@ -145,7 +140,6 @@ def generate_image(data):
                ] if upscale_level != 0 else None
     progress_images = False
     seed = t2i.seed if int(data['seed']) == -1 else int(data['seed'])
-    seed = int(data['seed'])
     init_img = data['initialImagePath']
 
     pngwriter = PngWriter("./outputs/img-samples/")

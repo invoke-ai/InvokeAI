@@ -1,10 +1,5 @@
-/*
-Socket.io setup.
-Context used only for socket.io activities that do not touch redux.
-*/
-
 import { useToast } from '@chakra-ui/react';
-import { createContext, useEffect } from 'react';
+import { useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
@@ -12,6 +7,7 @@ import {
     setIsConnected,
     setIsProcessing,
     setProgress,
+    setSocketId,
 } from '../features/system/systemSlice';
 import { RootState } from '../app/store';
 import {
@@ -21,11 +17,7 @@ import {
 } from '../features/gallery/gallerySlice';
 import { setInitialImagePath } from '../features/sd/sdSlice';
 
-// Single instance of the client, shared across the app via two hooks and Context
 export const socket = io('http://localhost:9090');
-// In case a component needs to communicate without touching redux, it can useContext()
-// to to access the single client instance
-export const SocketContext = createContext(socket);
 
 interface SocketIOResponse {
     status: 'OK' | 'ERROR';
@@ -33,15 +25,20 @@ interface SocketIOResponse {
     data?: any;
 }
 
-// Hook sets up socketio listeners that touch redux and initializes gallery state, called only once in App.tsx
+/*
+Sets up socketio listeners which interact with state.
+Manages sync between server and UI, namely the image gallery.
+Called only once in App.tsx.
+*/
 export const useSocketIOListeners = () => {
     const dispatch = useAppDispatch();
+    // Makes a toast alert on change in connection status, not sure how to implement this elsewhere
     const toast = useToast();
 
     useEffect(() => {
         socket.on('connect', () => {
             dispatch(setIsConnected(true));
-            // maintain gallery sync
+            dispatch(setSocketId(socket.id));
             socket.emit('requestAllImages', (response: SocketIOResponse) => {
                 dispatch(setGalleryImages(response.data));
             });
@@ -54,6 +51,7 @@ export const useSocketIOListeners = () => {
 
         socket.on('disconnect', () => {
             dispatch(setIsConnected(false));
+            dispatch(setIsProcessing(false));
             toast({
                 title: 'Disconnected',
                 status: 'error',
@@ -61,9 +59,10 @@ export const useSocketIOListeners = () => {
             });
         });
 
-        socket.on('progress', (data: { step: number; steps: number }) =>
-            dispatch(setProgress(Math.round((data.step / data.steps) * 100)))
-        );
+        socket.on('progress', (data: { step: number; steps: number }) => {
+            dispatch(setIsProcessing(true));
+            dispatch(setProgress(Math.round((data.step / data.steps) * 100)));
+        });
 
         socket.on('result', (data: { url: string }) => {
             const uuid = uuidv4();
@@ -89,10 +88,9 @@ export const useSocketIOListeners = () => {
     }, []);
 };
 
-// Hook provides emitters that interact with redux. Ex:
-// const { generateImage } = useSocketIOEmitters()
-// const config = {...} // prompt, steps, etc
-// generateImage(config)
+/*
+Provides emitters which interact with state.
+*/
 export const useSocketIOEmitters = () => {
     const dispatch = useAppDispatch();
 
