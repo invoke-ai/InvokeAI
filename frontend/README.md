@@ -2,6 +2,18 @@
 
 Demo at https://peaceful-otter-7a427f.netlify.app/ (not connected to back end)
 
+much of this readme is just notes for myself during dev work
+
+## Test and Build
+
+from `frontend/`:
+
+-   `yarn dev` runs `tsc-watch`, which runs `vite build` on successful `tsc` transpilation
+
+from `.`:
+
+-   `python backend/server.py` serves both frontend and backend at http://localhost:9090
+
 ## API
 
 `backend/server.py` serves the UI and provides a [socket.io](https://github.com/socketio/socket.io) API via [flask-socketio](https://github.com/miguelgrinberg/flask-socketio).
@@ -64,16 +76,6 @@ The server listens for these socket.io events:
     metadata: image_metadata_object
 }
 ```
-
-## Test and Build
-
-from `frontend/`:
-
--   `yarn dev` > runs `tsc-watch`, which runs `vite build` on successful `tsc`,
-
-from `.`:
-
--   `python backend/server.py` serves both frontend and backend at http://localhost:9090
 
 ## TODO
 
