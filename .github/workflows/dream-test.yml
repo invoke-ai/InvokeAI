@@ -48,34 +48,42 @@ jobs:
       - name: Install dependencies
 #         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          conda env create -f environment-mac.yaml
-#       - name: Cache hugginface and torch models
-#         id: cache-hugginface-torch
-#         uses: actions/cache@v3
-#         env:
-#           cache-name: cache-hugginface-torch
-#         with:
-#           path: ~/.cache
-#           key: ${{ env.cache-name }}
-#           restore-keys: |
-#             ${{ env.cache-name }}
-
+          if [ $(uname) = "Darwin" ]; then
+              conda env create -f environment-mac.yaml
+          else
+              conda env create -f environment.yaml
+          fi
+      - name: Cache hugginface and torch models
+        id: cache-hugginface-torch
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-hugginface-torch
+        with:
+          path: ~/.cache
+          key: ${{ env.cache-name }}
+          restore-keys: |
+            ${{ env.cache-name }}
       - name: Download Huggingface and Torch models
-#         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         continue-on-error: true
         run: |
-          export PYTHON_BIN=/usr/local/miniconda/envs/ldm/bin/python
+          if [ -e /usr/local/miniconda/envs/ldm/bin/python ]; then
+              export PYTHON_BIN=/usr/local/miniconda/envs/ldm/bin/python
+          elif [ -e /usr/share/miniconda/envs/ldm/bin/python ]; then
+              export PYTHON_BIN=/usr/share/miniconda/envs/ldm/bin/python
+          fi
           $PYTHON_BIN scripts/preload_models.py
-
-      - name: Run tmate
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 30
-
       - name: Run the tests
         run: |
           # Note, can't "activate" via automation, and activation is just env vars and path
-          export PYTHON_BIN=/usr/local/miniconda/envs/ldm/bin/python
-          export PYTORCH_ENABLE_MPS_FALLBACK=1
+          if [ -e /usr/local/miniconda/envs/ldm/bin/python ]; then
+              export PYTHON_BIN=/usr/local/miniconda/envs/ldm/bin/python
+          elif [ -e /usr/share/miniconda/envs/ldm/bin/python ]; then
+              export PYTHON_BIN=/usr/share/miniconda/envs/ldm/bin/python
+          fi
+          if [ $(uname) = "Darwin" ]; then
+              export PYTORCH_ENABLE_MPS_FALLBACK=1
+          fi
           $PYTHON_BIN scripts/preload_models.py
           mkdir -p outputs/img-samples
           time $PYTHON_BIN scripts/dream.py --from_file tests/prompts.txt </dev/null 2> outputs/img-samples/err.log > outputs/img-samples/out.log
