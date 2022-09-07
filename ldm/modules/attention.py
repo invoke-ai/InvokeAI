@@ -191,7 +191,7 @@ class CrossAttention(nn.Module):
             del mask
 
         if device_type == 'mps':      #special case for M1 - disable neonsecret optimization
-            sim - sim.softmax(dim=-1)
+            sim = sim.softmax(dim=-1)
         else:
             sim[4:] = sim[4:].softmax(dim=-1)
             sim[:4] = sim[:4].softmax(dim=-1)
