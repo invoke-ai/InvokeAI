@@ -154,7 +154,7 @@ def generate_image(data):
     def image_progress(sample, step):
         if canceled.is_set():
             raise CanceledException
-        socketio.emit('progress', (step+1) / steps)
+        socketio.emit('progress', {"step": step, "steps": steps})
         eventlet.sleep(0)
 
     def image_done(image, seed, upscaled=False):

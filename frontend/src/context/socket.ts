@@ -61,8 +61,8 @@ export const useSocketIOListeners = () => {
             });
         });
 
-        socket.on('progress', (value: number) =>
-            dispatch(setProgress(Math.round(value * 100)))
+        socket.on('progress', (data: { step: number; steps: number }) =>
+            dispatch(setProgress(Math.round((data.step / data.steps) * 100)))
         );
 
         socket.on('result', (data: { url: string }) => {
