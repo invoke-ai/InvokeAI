@@ -534,6 +534,11 @@ class Generate:
 
     def _create_init_image(self,image):
         image = image.convert('RGB')
+        print(
+            f'>> DEBUG: writing the image to img.png'
+        )
+        image.save('img.png')
+
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
@@ -547,6 +552,10 @@ class Generate:
         # BUG: We need to use the model's downsample factor rather than hardcoding "8"
         from ldm.dream.generator.base import downsampling
         image = image.resize((image.width//downsampling, image.height//downsampling), resample=Image.Resampling.LANCZOS)
+        print(
+            f'>> DEBUG: writing the mask to mask.png'
+            )
+        image.save('mask.png')
         image = np.array(image)
         image = image.astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)

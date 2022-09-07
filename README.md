@@ -824,11 +824,13 @@ good, because Stable Diffusion needs that information in order to
 generate a good infill. You also must take care to export the PNG
 file in such a way that the color information is preserved.
 
-Here is the recipe I use for the Linux imaging editing program Gimp:
+## Recipe for GIMP
+
+GIMP is a popular Linux photoediting tool.
 
 1. Open image in GIMP.
 2. Layer->Transparency->Add Alpha Channel
-2. Use lasoo tool to select region
+2. Use lasoo tool to select region to mask
 3. Choose Select -> Float to create a floating selection
 4. Open the Layers toolbar (^L) and select "Floating Selection"
 5. Set opacity to 0%
