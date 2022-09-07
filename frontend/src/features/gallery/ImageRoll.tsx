@@ -13,7 +13,7 @@ const ImageRoll = () => {
                 const { url, uuid } = image;
                 return (
                     <Image
-                        borderRadius={'md'}
+                        rounded={'md'}
                         key={uuid}
                         onClick={() => dispatch(setCurrentImage(uuid))}
                         src={url}

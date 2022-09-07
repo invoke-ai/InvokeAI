@@ -20,8 +20,8 @@ const initialSystemState = {
   log: testLogs,
   shouldFitToWidthHeight: false,
   shouldDisplayInProgress: false,
-  isGFPGANAvailable: true,
-  isESRGANAvailable: true,
+  isGFPGANAvailable: false,
+  isESRGANAvailable: false,
 };
 
 const initialState: SystemState = initialSystemState;

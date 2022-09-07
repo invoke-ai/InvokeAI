@@ -4,13 +4,14 @@ import ImageRoll from './features/gallery/ImageRoll';
 import CurrentImage from './features/gallery/CurrentImage';
 import SDProgress from './components/SDProgress';
 import LogViewer from './components/LogViewer';
-import { useSocketIOInitialize } from './context/socket';
+import { useSocketIOListeners } from './context/socket';
 import SDSettings from './features/sd/SDSettings';
 import PromptInput from './features/sd/PromptInput';
+import SDFileUpload from './components/SDFileUpload';
 
 const App = () => {
-    // Loads all socket listeners & loads images to gallery
-    useSocketIOInitialize();
+    // Loads all socket listeners
+    useSocketIOListeners();
     return (
         <>
             <Grid
@@ -21,8 +22,8 @@ const App = () => {
                     "header header header"
                     "menu prompt prompt"
                     "menu currentImage imageRoll"`}
-                gridTemplateRows={'4px 40px 100px 1fr'}
-                gridTemplateColumns={'2fr 8fr 1fr'}
+                gridTemplateRows={'4px 40px 100px auto'}
+                gridTemplateColumns={'300px 4fr 150px'}
                 gap='2'
             >
                 <GridItem area={'progressBar'}>
@@ -32,8 +33,10 @@ const App = () => {
                     <SiteHeader />
                 </GridItem>
                 <GridItem pl='2' area={'menu'} overflowY='scroll'>
-                    <SDSettings />
+                    <SDSettings height={475} />
+                    <SDFileUpload />
                 </GridItem>
+
                 <GridItem pr='2' area={'prompt'}>
                     <PromptInput />
                 </GridItem>

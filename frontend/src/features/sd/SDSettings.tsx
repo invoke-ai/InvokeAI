@@ -1,4 +1,4 @@
-import { Flex, IconButton, HStack, Box, Spacer } from '@chakra-ui/react';
+import { Flex, IconButton, HStack, Box, Spacer, Image, ChakraProps } from '@chakra-ui/react';
 
 import { RootState } from '../../app/store';
 
@@ -35,7 +35,7 @@ import {
 } from '../../app/constants';
 import { useSocketIOEmitters } from '../../context/socket';
 
-const SDSettings = () => {
+const SDSettings = (props: ChakraProps) => {
     const {
         imagesToGenerate,
         steps,
@@ -48,6 +48,7 @@ const SDSettings = () => {
         gfpganStrength,
         upscalingLevel,
         upscalingStrength,
+        initialImagePath,
     } = useAppSelector((state: RootState) => state.sd);
 
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
@@ -57,138 +58,122 @@ const SDSettings = () => {
     const { emitGenerateImage, emitCancel } = useSocketIOEmitters();
 
     return (
-        <Box>
-            <Flex direction={'column'} gap={2}>
-                <Flex>
-                    <SDButton
-                        label='Generate'
-                        type='submit'
-                        colorScheme='green'
-                        isDisabled={!isConnected || isProcessing}
-                        onClick={() => emitGenerateImage()}
-                    />
-                    <Spacer />
-                    <SDButton
-                        label='Cancel'
-                        colorScheme='red'
-                        isDisabled={!isConnected || !isProcessing}
-                        onClick={() => emitCancel()}
-                    />
-                    <Spacer />
-                    <SDButton
-                        label='Reset'
-                        colorScheme='blue'
-                        onClick={() => dispatch(resetForm())}
-                    />
-                </Flex>
-
-                <SDNumberInput
-                    label='Image Count'
-                    step={1}
-                    min={1}
-                    precision={0}
-                    onChange={(v) => dispatch(setImagesToGenerate(Number(v)))}
-                    value={imagesToGenerate}
+        <Flex direction={'column'} gap={2} {...props}>
+            <Flex>
+                <SDButton
+                    label='Generate'
+                    type='submit'
+                    colorScheme='green'
+                    isDisabled={!isConnected || isProcessing}
+                    onClick={() => emitGenerateImage()}
                 />
-
-                <SDNumberInput
-                    label='Steps'
-                    min={1}
-                    step={1}
-                    precision={0}
-                    onChange={(v) => dispatch(setSteps(Number(v)))}
-                    value={steps}
+                <Spacer />
+                <SDButton
+                    label='Cancel'
+                    colorScheme='red'
+                    isDisabled={!isConnected || !isProcessing}
+                    onClick={() => emitCancel()}
                 />
-
-                <SDNumberInput
-                    label='CFG Scale'
-                    step={0.5}
-                    onChange={(v) => dispatch(setCfgScale(Number(v)))}
-                    value={cfgScale}
+                <Spacer />
+                <SDButton
+                    label='Reset'
+                    colorScheme='blue'
+                    onClick={() => dispatch(resetForm())}
                 />
-
-                <HStack>
-                    <SDNumberInput
-                        label='Seed'
-                        step={1}
-                        precision={0}
-                        onChange={(v) => dispatch(setSeed(Number(v)))}
-                        value={seed}
-                    />
-
-                    <IconButton
-                        aria-label='Reset seed to default'
-                        size={'sm'}
-                        icon={<BsArrowCounterclockwise />}
-                        onClick={() => dispatch(resetSeed())}
-                    />
-                </HStack>
-
-                <SDSelect
-                    label='Sampler'
-                    value={sampler}
-                    onChange={(e) => dispatch(setSampler(e.target.value))}
-                    validValues={SAMPLERS}
-                />
-
-                <SDSelect
-                    label='Width'
-                    value={width}
-                    onChange={(e) => dispatch(setWidth(Number(e.target.value)))}
-                    validValues={WIDTHS}
-                />
-
-                <SDSelect
-                    label='Height'
-                    value={height}
-                    onChange={(e) =>
-                        dispatch(setHeight(Number(e.target.value)))
-                    }
-                    validValues={HEIGHTS}
-                />
-
-                <SDNumberInput
-                    label='img2img Strength'
-                    step={0.01}
-                    min={0}
-                    max={1}
-                    onChange={(v) => dispatch(setImg2imgStrength(Number(v)))}
-                    value={img2imgStrength}
-                />
-
-                <SDNumberInput
-                    isDisabled={!isGFPGANAvailable}
-                    label='GFPGAN Strength'
-                    step={0.05}
-                    min={0}
-                    max={1}
-                    onChange={(v) => dispatch(setGfpganStrength(Number(v)))}
-                    value={gfpganStrength}
-                />
-
-                <SDSelect
-                    isDisabled={!isESRGANAvailable}
-                    label='Upscaling Level'
-                    value={upscalingLevel}
-                    onChange={(e) =>
-                        dispatch(setUpscalingLevel(Number(e.target.value)))
-                    }
-                    validValues={UPSCALING_LEVELS}
-                />
-
-                <SDNumberInput
-                    isDisabled={!isESRGANAvailable}
-                    label='Upscaling Strength'
-                    step={0.05}
-                    min={0}
-                    max={1}
-                    onChange={(v) => dispatch(setUpscalingStrength(Number(v)))}
-                    value={upscalingStrength}
-                />
-
-                <SDFileUpload />
             </Flex>
-        </Box>
+            <SDNumberInput
+                label='Image Count'
+                step={1}
+                min={1}
+                precision={0}
+                onChange={(v) => dispatch(setImagesToGenerate(Number(v)))}
+                value={imagesToGenerate}
+            />
+            <SDNumberInput
+                label='Steps'
+                min={1}
+                step={1}
+                precision={0}
+                onChange={(v) => dispatch(setSteps(Number(v)))}
+                value={steps}
+            />
+            <SDNumberInput
+                label='CFG Scale'
+                step={0.5}
+                onChange={(v) => dispatch(setCfgScale(Number(v)))}
+                value={cfgScale}
+            />
+            <HStack>
+                <SDNumberInput
+                    label='Seed'
+                    step={1}
+                    precision={0}
+                    onChange={(v) => dispatch(setSeed(Number(v)))}
+                    value={seed}
+                />
+
+                <IconButton
+                    aria-label='Reset seed to default'
+                    size={'sm'}
+                    icon={<BsArrowCounterclockwise />}
+                    onClick={() => dispatch(resetSeed())}
+                />
+            </HStack>
+            <SDSelect
+                label='Sampler'
+                value={sampler}
+                onChange={(e) => dispatch(setSampler(e.target.value))}
+                validValues={SAMPLERS}
+            />
+            <SDSelect
+                label='Width'
+                value={width}
+                onChange={(e) => dispatch(setWidth(Number(e.target.value)))}
+                validValues={WIDTHS}
+            />
+            <SDSelect
+                label='Height'
+                value={height}
+                onChange={(e) => dispatch(setHeight(Number(e.target.value)))}
+                validValues={HEIGHTS}
+            />
+            <SDNumberInput
+                isDisabled={!initialImagePath}
+                label='img2img Strength'
+                step={0.01}
+                min={0}
+                max={1}
+                onChange={(v) => dispatch(setImg2imgStrength(Number(v)))}
+                value={img2imgStrength}
+            />
+            <SDNumberInput
+                isDisabled={!isGFPGANAvailable}
+                label='GFPGAN Strength'
+                step={0.05}
+                min={0}
+                max={1}
+                onChange={(v) => dispatch(setGfpganStrength(Number(v)))}
+                value={gfpganStrength}
+            />
+            <SDSelect
+                isDisabled={!isESRGANAvailable}
+                label='Upscaling Level'
+                value={upscalingLevel}
+                onChange={(e) =>
+                    dispatch(setUpscalingLevel(Number(e.target.value)))
+                }
+                validValues={UPSCALING_LEVELS}
+            />
+            <SDNumberInput
+                isDisabled={!isESRGANAvailable}
+                label='Upscaling Strength'
+                step={0.05}
+                min={0}
+                max={1}
+                onChange={(v) => dispatch(setUpscalingStrength(Number(v)))}
+                value={upscalingStrength}
+            />
+        </Flex>
     );
 };
 

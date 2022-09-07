@@ -19,10 +19,10 @@ import {
     deleteImage,
     setGalleryImages,
 } from '../features/gallery/gallerySlice';
+import { setInitialImagePath } from '../features/sd/sdSlice';
 
 // Single instance of the client, shared across the app via two hooks and Context
 export const socket = io('http://localhost:9090');
-
 // In case a component needs to communicate without touching redux, it can useContext()
 // to to access the single client instance
 export const SocketContext = createContext(socket);
@@ -34,18 +34,17 @@ interface SocketIOResponse {
 }
 
 // Hook sets up socketio listeners that touch redux and initializes gallery state, called only once in App.tsx
-export const useSocketIOInitialize = () => {
+export const useSocketIOListeners = () => {
     const dispatch = useAppDispatch();
     const toast = useToast();
-
-    socket.emit('requestAllImages', (response: SocketIOResponse) => {
-        console.log(response);
-        dispatch(setGalleryImages(response.data));
-    });
 
     useEffect(() => {
         socket.on('connect', () => {
             dispatch(setIsConnected(true));
+            // maintain gallery sync
+            socket.emit('requestAllImages', (response: SocketIOResponse) => {
+                dispatch(setGalleryImages(response.data));
+            });
             toast({
                 title: 'Connected',
                 status: 'success',
@@ -110,6 +109,7 @@ export const useSocketIOEmitters = () => {
         gfpganStrength,
         upscalingLevel,
         upscalingStrength,
+        initialImagePath,
     } = useAppSelector((state: RootState) => state.sd);
 
     const { images } = useAppSelector((state: RootState) => state.gallery);
@@ -130,6 +130,7 @@ export const useSocketIOEmitters = () => {
                 gfpganStrength,
                 upscalingLevel,
                 upscalingStrength,
+                initialImagePath,
             });
         },
         emitDeleteImage: (uuid: string) => {
@@ -148,5 +149,20 @@ export const useSocketIOEmitters = () => {
                 response.status === 'OK' && dispatch(setIsProcessing(false));
             });
         },
+        emitUploadInitialImage: (file: File, name: string) => {
+            socket.emit(
+                'uploadInitialImage',
+                file,
+                name,
+                (response: SocketIOResponse) => {
+                    response.status === 'OK' &&
+                        dispatch(setInitialImagePath(response.data));
+                }
+            );
+        },
+        emitRequestAllImages: () =>
+            socket.emit('requestAllImages', (response: SocketIOResponse) => {
+                dispatch(setGalleryImages(response.data));
+            }),
     };
 };

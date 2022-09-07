@@ -13,7 +13,7 @@ from pathlib import Path
 from pytorch_lightning import logging
 from flask import Flask, send_from_directory, url_for, jsonify
 from flask_socketio import SocketIO
-from ldm.simplet2i import T2I
+from ldm.generate import Generate
 from ldm.dream.pngwriter import PngWriter
 from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
 
@@ -47,17 +47,22 @@ def serve(path):
 host = 'localhost'
 port = 9090
 
-# dev (allow all CORS):
-socketio = SocketIO(app, cors_allowed_origins="*",
-                    logger=True, engineio_logger=True)
+dev_mode = True
 
-# production:
-# socketio = SocketIO(app, logger=True, engineio_logger=True)
+logger = True if dev_mode else False
+engineio_logger = True if dev_mode else False
+cors_allowed_origins = "*" if dev_mode else None
+
+# default 1,000,000, needs to be higher for socketio to accept larger images
+max_http_buffer_size = 10000000
+
+socketio = SocketIO(app, cors_allowed_origins=cors_allowed_origins,
+                    logger=logger, engineio_logger=logger, max_http_buffer_size=max_http_buffer_size)
 
 transformers.logging.set_verbosity_error()
 
 # initialize with defaults, we will populate all config
-t2i = T2I()
+t2i = Generate()
 
 # gets rid of annoying messages about random seed
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
@@ -65,6 +70,10 @@ logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 tic = time.time()
 t2i.load_model()
 print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
+
+print(f"\nServer online: http://{host}:{port}")
+print("\n")
+print("\n")
 
 
 def make_reponse(status, message=None, data=None):
@@ -90,7 +99,7 @@ def handle_generate_image(data):
 
 @socketio.on('requestAllImages')
 def handle_request_all_images():
-    paths = Path("./outputs").rglob("*.png")
+    paths = sorted(Path("./outputs").rglob("*.png"), key=os.path.getmtime)
     relative_paths = []
     for p in paths:
         relative_paths.append(str(p.relative_to('.')))
@@ -102,6 +111,16 @@ def handle_request_all_images():
 def handle_delete_image(path):
     Path(path).unlink()
     return make_reponse("OK")
+
+
+# TODO: I think this needs a safety mechanism.
+@socketio.on('uploadInitialImage')
+def handle_upload_initial_image(bytes, name):
+    filePath = f'outputs/init-images/{name}'
+    os.makedirs(os.path.dirname(filePath), exist_ok=True)
+    newFile = open(filePath, "wb")
+    newFile.write(bytes)
+    return make_reponse("OK", data=filePath)
 
 
 def generate_image(data):
@@ -127,6 +146,7 @@ def generate_image(data):
     progress_images = False
     seed = t2i.seed if int(data['seed']) == -1 else int(data['seed'])
     seed = int(data['seed'])
+    init_img = data['initialImagePath']
 
     pngwriter = PngWriter("./outputs/img-samples/")
     prefix = pngwriter.unique_prefix()
@@ -146,6 +166,7 @@ def generate_image(data):
 
     t2i.prompt2image(prompt,
                      iterations=iterations,
+                     init_img=init_img,
                      cfg_scale=cfgscale,
                      width=width,
                      height=height,
@@ -156,9 +177,6 @@ def generate_image(data):
                      sampler_name=sampler_name,
                      step_callback=image_progress,
                      image_callback=image_done)
-
-    print(f"\nServer online: http://{host}:{port}" % (host, port)
-          )
 
 
 if __name__ == '__main__':

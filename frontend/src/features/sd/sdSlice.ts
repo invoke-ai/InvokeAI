@@ -1,6 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { testLogs } from '../../app/testingData';
 
 export interface SDState {
   prompt: string;
@@ -15,6 +14,7 @@ export interface SDState {
   gfpganStrength: number;
   upscalingLevel: number;
   upscalingStrength: number;
+  initialImagePath: string;
 }
 
 const initialDreamMenuState = {
@@ -30,6 +30,7 @@ const initialDreamMenuState = {
   gfpganStrength: 0.8,
   upscalingLevel: 0,
   upscalingStrength: 0.75,
+  initialImagePath: '',
 };
 
 const initialState: SDState = initialDreamMenuState;
@@ -74,6 +75,12 @@ export const sdSlice = createSlice({
     setUpscalingStrength: (state, action: PayloadAction<number>) => {
       state.upscalingStrength = action.payload;
     },
+    setInitialImagePath: (state, action: PayloadAction<string>) => {
+      state.initialImagePath = action.payload;
+    },
+    resetInitialImagePath: (state) => {
+      state.initialImagePath = '';
+    },
     resetSeed: (state) => {
       state.seed = -1;
     },
@@ -99,6 +106,8 @@ export const {
   setGfpganStrength,
   setUpscalingLevel,
   setUpscalingStrength,
+  setInitialImagePath,
+  resetInitialImagePath,
   resetSeed,
   resetForm,
 } = sdSlice.actions;

@@ -1,15 +1,31 @@
-import { useToast } from '@chakra-ui/react';
-import { base64ArrayBuffer } from '../util/base64ArrayBuffer';
+import {
+  Box,
+  Center,
+  Flex,
+  Icon,
+  IconButton,
+  Image,
+  Text,
+  useColorModeValue,
+  useToast,
+} from '@chakra-ui/react';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import {v4 as uuidv4} from 'uuid'
-import { useAppDispatch } from '../app/hooks';
-import { addImage } from '../features/gallery/gallerySlice';
-import SDButton from './SDButton';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { FaUpload } from 'react-icons/fa';
+import { RootState } from '../app/store';
+import { useSocketIOEmitters } from '../context/socket';
+import { MdDeleteForever } from 'react-icons/md';
+import { resetInitialImagePath } from '../features/sd/sdSlice';
 
 const SDFileUpload = () => {
   const toast = useToast();
   const dispatch = useAppDispatch();
+  const iconColor = useColorModeValue('gray.200', 'gray.600');
+  const textColor = useColorModeValue('gray.300', 'gray.500');
+  const bgColor = useColorModeValue('gray.100', 'gray.700');
+  const { initialImagePath } = useAppSelector((state: RootState) => state.sd);
+  const { emitUploadInitialImage } = useSocketIOEmitters();
 
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: any) => {
@@ -26,40 +42,15 @@ const SDFileUpload = () => {
           isClosable: true,
         });
       });
+
       acceptedFiles.forEach((file: File) => {
-        const reader = new FileReader();
-
-        reader.onabort = () =>
-          toast({
-            title: 'Upload aborted.',
-            status: 'error',
-            isClosable: true,
-          });
-
-        reader.onerror = () =>
-          toast({
-            title: `Upload failed.`,
-            status: 'error',
-            isClosable: true,
-          });
-
-        reader.onload = () => {
-          const binaryStr = reader.result;
-          const base64 = base64ArrayBuffer(binaryStr);
-          const newImage = {
-            uuid: uuidv4(),
-            url: 'data:image/image/png;base64,' + base64,
-            metadata: { prompt: 'test' }
-          }
-          dispatch(addImage(newImage));
-        };
-        reader.readAsArrayBuffer(file);
+        emitUploadInitialImage(file, file.name);
       });
     },
     []
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
       'image/jpeg': ['.jpg', '.jpeg', '.png'],
@@ -67,12 +58,63 @@ const SDFileUpload = () => {
   });
 
   return (
-    <div {...getRootProps()}>
+    <div
+      {...getRootProps({
+        onClick: initialImagePath ? (e) => e.stopPropagation() : undefined,
+      })}
+    >
       <input {...getInputProps()} />
-      <SDButton
-        label='Drag and Drop / Click to Upload'
-        colorScheme={isDragActive ? 'orange' : 'yellow'}
-      />
+      <Box
+        rounded={'md'}
+        border={initialImagePath ? undefined : '1px'}
+        borderColor={iconColor}
+        m={'10px'}
+        backgroundColor={isDragActive ? bgColor : undefined}
+      >
+        <Center height={280} width={280} pr={2}>
+          <Flex
+            direction={'column'}
+            alignItems={'center'}
+            position={'relative'}
+          >
+            {initialImagePath ? (
+              <>
+                <Flex
+                  direction={'column'}
+                  position={'absolute'}
+                  top={2}
+                  right={2}
+                  gap={2}
+                >
+                  <IconButton
+                    aria-label='Clear initial image'
+                    icon={<MdDeleteForever />}
+                    fontSize={24}
+                    onClick={() => dispatch(resetInitialImagePath())}
+                  />
+                  <IconButton
+                    aria-label='Upload initial image'
+                    icon={<FaUpload />}
+                    fontSize={20}
+                    onClick={open}
+                  />
+                </Flex>
+                <Image
+                  maxHeight={270}
+                  maxWidth={270}
+                  src={initialImagePath}
+                  rounded={'md'}
+                />
+              </>
+            ) : (
+              <>
+                <Text textColor={textColor}>Upload initial image</Text>
+                <Icon fontSize={136} color={iconColor} as={FaUpload} pt={5} />
+              </>
+            )}
+          </Flex>
+        </Center>
+      </Box>
     </div>
   );
 };
