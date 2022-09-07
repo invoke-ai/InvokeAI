@@ -17,7 +17,7 @@ export interface SDState {
   initialImagePath: string;
 }
 
-const initialDreamMenuState = {
+const initialSDState = {
   prompt: 'Cyborg pickle shooting lasers',
   imagesToGenerate: 1,
   steps: 5,
@@ -33,7 +33,7 @@ const initialDreamMenuState = {
   initialImagePath: '',
 };
 
-const initialState: SDState = initialDreamMenuState;
+const initialState: SDState = initialSDState;
 
 export const sdSlice = createSlice({
   name: 'sd',
@@ -84,10 +84,10 @@ export const sdSlice = createSlice({
     resetSeed: (state) => {
       state.seed = -1;
     },
-    resetForm: (state) => {
+    resetSDState: (state) => {
       return {
         ...state,
-        ...initialDreamMenuState,
+        ...initialSDState,
       };
     },
   },
@@ -109,7 +109,7 @@ export const {
   setInitialImagePath,
   resetInitialImagePath,
   resetSeed,
-  resetForm,
+  resetSDState,
 } = sdSlice.actions;
 
 export default sdSlice.reducer;

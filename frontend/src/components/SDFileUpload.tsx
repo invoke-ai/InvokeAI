@@ -17,6 +17,7 @@ import { RootState } from '../app/store';
 import { useSocketIOEmitters } from '../context/socket';
 import { MdDeleteForever } from 'react-icons/md';
 import { resetInitialImagePath } from '../features/sd/sdSlice';
+import { RiCloseFill } from 'react-icons/ri';
 
 const SDFileUpload = () => {
   const toast = useToast();
@@ -88,7 +89,7 @@ const SDFileUpload = () => {
                 >
                   <IconButton
                     aria-label='Clear initial image'
-                    icon={<MdDeleteForever />}
+                    icon={<RiCloseFill />}
                     fontSize={24}
                     onClick={() => dispatch(resetInitialImagePath())}
                   />

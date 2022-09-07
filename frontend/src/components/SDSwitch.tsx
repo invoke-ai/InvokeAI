@@ -1,5 +1,5 @@
 import { FormControl, FormLabel, HStack, Switch } from '@chakra-ui/react';
-import { ChangeEvent } from 'react';
+import React, { ChangeEvent } from 'react';
 
 type Props = {
   label: string;
@@ -12,7 +12,9 @@ const SDSwitch = ({ label, isChecked, onChange }: Props) => {
     <FormControl>
       <HStack>
         <Switch size='md' onChange={onChange} isChecked={isChecked} />
-        <FormLabel fontSize='md' whiteSpace='nowrap'>{label}</FormLabel>
+        <FormLabel fontSize='md' whiteSpace='nowrap'>
+          {label}
+        </FormLabel>
       </HStack>
     </FormControl>
   );

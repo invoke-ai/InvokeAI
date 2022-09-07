@@ -7,7 +7,7 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { BsArrowCounterclockwise } from 'react-icons/bs';
 
 import {
-    resetForm,
+    resetSDState,
     resetSeed,
     setCfgScale,
     setGfpganStrength,
@@ -78,7 +78,7 @@ const SDSettings = (props: ChakraProps) => {
                 <SDButton
                     label='Reset'
                     colorScheme='blue'
-                    onClick={() => dispatch(resetForm())}
+                    onClick={() => dispatch(resetSDState())}
                 />
             </Flex>
             <SDNumberInput
