@@ -4,9 +4,8 @@ import { testLogs } from '../../app/testingData';
 
 export interface SystemState {
   shouldDisplayInProgress: boolean;
-  shouldFitToWidthHeight: boolean;
   isProcessing: boolean;
-  progress: number;
+  currentStep: number;
   log: Array<string>;
   shouldShowLogViewer: boolean;
   isGFPGANAvailable: boolean;
@@ -18,10 +17,9 @@ export interface SystemState {
 const initialSystemState = {
   isConnected: false,
   isProcessing: false,
-  progress: 0,
+  currentStep: 0,
   log: testLogs,
   shouldShowLogViewer: false,
-  shouldFitToWidthHeight: false,
   shouldDisplayInProgress: false,
   isGFPGANAvailable: false,
   isESRGANAvailable: false,
@@ -37,15 +35,13 @@ export const systemSlice = createSlice({
     setShouldDisplayInProgress: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayInProgress = action.payload;
     },
-    setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
-      state.shouldFitToWidthHeight = action.payload;
-    },
+
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
-      state.progress = 0;
+      state.currentStep = 0;
     },
-    setProgress: (state, action: PayloadAction<number>) => {
-      state.progress = action.payload;
+    setCurrentStep: (state, action: PayloadAction<number>) => {
+      state.currentStep = action.payload;
     },
     appendLog: (state, action: PayloadAction<string>) => {
       state.log.push(action.payload);
@@ -64,9 +60,8 @@ export const systemSlice = createSlice({
 
 export const {
   setShouldDisplayInProgress,
-  setShouldFitToWidthHeight,
   setIsProcessing,
-  setProgress,
+  setCurrentStep,
   appendLog,
   setShouldShowLogViewer,
   setIsConnected,

@@ -1,10 +1,20 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import { SDMetadata } from '../gallery/gallerySlice';
+
+const calculateRealSteps = (
+  steps: number,
+  strength: number,
+  hasInitImage: boolean
+): number => {
+  return hasInitImage ? Math.floor(strength * steps) : steps;
+};
 
 export interface SDState {
   prompt: string;
   imagesToGenerate: number;
   steps: number;
+  realSteps: number;
   cfgScale: number;
   height: number;
   width: number;
@@ -15,12 +25,17 @@ export interface SDState {
   upscalingLevel: number;
   upscalingStrength: number;
   initialImagePath: string;
+  maskPath: string;
+  seamless: boolean;
+  shouldFitToWidthHeight: boolean;
+  shouldShowMask: boolean;
 }
 
 const initialSDState = {
   prompt: 'Cyborg pickle shooting lasers',
   imagesToGenerate: 1,
   steps: 5,
+  realSteps: 5,
   cfgScale: 7.5,
   height: 512,
   width: 512,
@@ -31,6 +46,10 @@ const initialSDState = {
   upscalingLevel: 0,
   upscalingStrength: 0.75,
   initialImagePath: '',
+  maskPath: '',
+  seamless: true,
+  shouldFitToWidthHeight: false,
+  shouldShowMask: false,
 };
 
 const initialState: SDState = initialSDState;
@@ -46,7 +65,13 @@ export const sdSlice = createSlice({
       state.imagesToGenerate = action.payload;
     },
     setSteps: (state, action: PayloadAction<number>) => {
+      const { img2imgStrength, initialImagePath } = state;
       state.steps = action.payload;
+      state.realSteps = calculateRealSteps(
+        action.payload,
+        img2imgStrength,
+        Boolean(initialImagePath)
+      );
     },
     setCfgScale: (state, action: PayloadAction<number>) => {
       state.cfgScale = action.payload;
@@ -65,6 +90,13 @@ export const sdSlice = createSlice({
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
+      const { steps, initialImagePath } = state;
+      state.steps = action.payload;
+      state.realSteps = calculateRealSteps(
+        steps,
+        action.payload,
+        Boolean(initialImagePath)
+      );
     },
     setGfpganStrength: (state, action: PayloadAction<number>) => {
       state.gfpganStrength = action.payload;
@@ -77,12 +109,48 @@ export const sdSlice = createSlice({
     },
     setInitialImagePath: (state, action: PayloadAction<string>) => {
       state.initialImagePath = action.payload;
+      const { steps, img2imgStrength } = state;
+      state.realSteps = calculateRealSteps(
+        steps,
+        img2imgStrength,
+        Boolean(action.payload)
+      );
+    },
+    setMaskPath: (state, action: PayloadAction<string>) => {
+      state.maskPath = action.payload;
+    },
+    setSeamless: (state, action: PayloadAction<boolean>) => {
+      state.seamless = action.payload;
+    },
+    setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
+      state.shouldFitToWidthHeight = action.payload;
     },
     resetInitialImagePath: (state) => {
       state.initialImagePath = '';
+      state.maskPath = '';
+    },
+    resetMaskPath: (state) => {
+      state.maskPath = '';
+    },
+    setShouldShowMask: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowMask = Boolean(state.maskPath) && action.payload;
     },
     resetSeed: (state) => {
       state.seed = -1;
+    },
+    randomizeSeed: (state) => {
+      state.seed = Math.round(Math.random() * 1000000);
+    },
+    setParameter: (
+      state,
+      action: PayloadAction<{ key: string; value: string | number | boolean }>
+    ) => {
+      const { key, value } = action.payload;
+      const temp = { ...state, [key]: value };
+      return temp;
+    },
+    setAllParameters: (state, action: PayloadAction<SDMetadata>) => {
+      return { ...state, ...action.payload };
     },
     resetSDState: (state) => {
       return {
@@ -102,14 +170,21 @@ export const {
   setWidth,
   setSampler,
   setSeed,
+  setSeamless,
   setImg2imgStrength,
   setGfpganStrength,
   setUpscalingLevel,
   setUpscalingStrength,
   setInitialImagePath,
+  setMaskPath,
   resetInitialImagePath,
   resetSeed,
+  randomizeSeed,
   resetSDState,
+  setShouldFitToWidthHeight,
+  setShouldShowMask,
+  setParameter,
+  setAllParameters,
 } = sdSlice.actions;
 
 export default sdSlice.reducer;

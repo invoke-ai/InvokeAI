@@ -7,6 +7,7 @@ type Props = {
     onClick?: MouseEventHandler<HTMLButtonElement>;
     colorScheme?: string;
     isDisabled?: boolean;
+    isLoading?: boolean;
 };
 
 const SDButton = ({
@@ -15,6 +16,7 @@ const SDButton = ({
     onClick,
     colorScheme,
     isDisabled = false,
+    isLoading = false,
 }: Props) => {
     return (
         <Button
@@ -23,6 +25,7 @@ const SDButton = ({
             onClick={onClick}
             type={type}
             isDisabled={isDisabled}
+            isLoading={isLoading}
         >
             {label}
         </Button>

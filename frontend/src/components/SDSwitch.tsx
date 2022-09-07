@@ -5,16 +5,27 @@ type Props = {
   label: string;
   isChecked: boolean;
   onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  isDisabled?: boolean;
 };
 
-const SDSwitch = ({ label, isChecked, onChange }: Props) => {
+const SDSwitch = ({
+  label,
+  isChecked,
+  onChange,
+  isDisabled = false,
+}: Props) => {
   return (
-    <FormControl>
+    <FormControl isDisabled={isDisabled}>
       <HStack>
-        <Switch size='md' onChange={onChange} isChecked={isChecked} />
-        <FormLabel fontSize='md' whiteSpace='nowrap'>
+        <FormLabel
+          marginInlineEnd={0}
+          marginBottom={1}
+          fontSize='sm'
+          whiteSpace='nowrap'
+        >
           {label}
         </FormLabel>
+        <Switch onChange={onChange} isChecked={isChecked} />
       </HStack>
     </FormControl>
   );

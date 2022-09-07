@@ -10,7 +10,7 @@ import {
   useColorModeValue,
   useToast,
 } from '@chakra-ui/react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FaUpload } from 'react-icons/fa';
 import { RiCloseFill } from 'react-icons/ri';
@@ -18,14 +18,18 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
 import { useSocketIOEmitters } from '../../app/socket';
 import { resetInitialImagePath } from '../../features/sd/sdSlice';
+import MaskUploader from './MaskUploader';
+import './InitImage.css';
 
-const InitialImage = () => {
+const InitImage = () => {
   const toast = useToast();
   const dispatch = useAppDispatch();
   const iconColor = useColorModeValue('gray.200', 'gray.600');
   const textColor = useColorModeValue('gray.300', 'gray.500');
   const bgColor = useColorModeValue('gray.100', 'gray.700');
-  const { initialImagePath } = useAppSelector((state: RootState) => state.sd);
+  const { initialImagePath, maskPath } = useAppSelector(
+    (state: RootState) => state.sd
+  );
   const { emitUploadInitialImage } = useSocketIOEmitters();
 
   const onDrop = useCallback(
@@ -37,7 +41,7 @@ const InitialImage = () => {
         );
 
         toast({
-          title: 'Upload failed.',
+          title: 'Upload failed',
           description: msg,
           status: 'error',
           isClosable: true,
@@ -58,21 +62,23 @@ const InitialImage = () => {
     },
   });
 
+  const [shouldShowMask, setShouldShowMask] = useState<boolean>(false);
+
   return (
     <div
       {...getRootProps({
         onClick: initialImagePath ? (e) => e.stopPropagation() : undefined,
       })}
     >
-      <input {...getInputProps()} />
+      <input {...getInputProps({ multiple: false })} />
       <Box
         rounded={'md'}
         border={initialImagePath ? undefined : '1px'}
         borderColor={iconColor}
-        m={'10px'}
+        mt={2}
         backgroundColor={isDragActive ? bgColor : undefined}
       >
-        <Center height={280} width={280} pr={2}>
+        <Center height={280} width={280}>
           <Flex
             direction={'column'}
             alignItems={'center'}
@@ -87,34 +93,36 @@ const InitialImage = () => {
                   right={2}
                   gap={2}
                 >
-                  <Tooltip label='Clear initial image'>
+                  <Tooltip label={'Reset initial image & mask'}>
                     <IconButton
-                      aria-label='Clear initial image'
+                      aria-label='Reset initial image & mask'
                       icon={<RiCloseFill />}
                       fontSize={24}
                       onClick={() => dispatch(resetInitialImagePath())}
                     />
                   </Tooltip>
-                  <Tooltip label='Upload initial image'>
+                  <Tooltip label='Upload new initial image'>
                     <IconButton
-                      aria-label='Upload initial image'
+                      aria-label='Upload new initial image'
                       icon={<FaUpload />}
                       fontSize={20}
                       onClick={open}
                     />
                   </Tooltip>
+                  <MaskUploader setShouldShowMask={setShouldShowMask} />
                 </Flex>
                 <Image
                   maxHeight={270}
                   maxWidth={270}
-                  src={initialImagePath}
+                  src={shouldShowMask ? maskPath : initialImagePath}
                   rounded={'md'}
+                  className='checkerboard'
                 />
               </>
             ) : (
               <>
                 <Text textColor={textColor}>Upload initial image</Text>
-                <Icon fontSize={136} color={iconColor} as={FaUpload} pt={5} />
+                <Icon fontSize={136} color={iconColor} as={FaUpload} pt={7} />
               </>
             )}
           </Flex>
@@ -124,4 +132,4 @@ const InitialImage = () => {
   );
 };
 
-export default InitialImage;
+export default InitImage;

@@ -6,16 +6,17 @@ import { useAppDispatch, useAppSelector } from '../app/hooks';
 import {
     setIsConnected,
     setIsProcessing,
-    setProgress,
+    setCurrentStep,
     setSocketId,
 } from '../features/system/systemSlice';
 import { RootState } from '../app/store';
 import {
     addImage,
     deleteImage,
+    SDMetadata,
     setGalleryImages,
 } from '../features/gallery/gallerySlice';
-import { setInitialImagePath } from '../features/sd/sdSlice';
+import { setInitialImagePath, setMaskPath } from '../features/sd/sdSlice';
 
 export const socket = io('http://localhost:9090');
 
@@ -29,6 +30,10 @@ interface SocketIOResponse {
 Sets up socketio listeners which interact with state.
 Manages sync between server and UI, namely the image gallery.
 Called only once in App.tsx.
+
+Socketio does no error handling on the client (here) so must catch all errors.
+See: https://socket.io/docs/v4/listening-to-events/#error-handling
+Very fun figuring that out.
 */
 export const useSocketIOListeners = () => {
     const dispatch = useAppDispatch();
@@ -37,45 +42,71 @@ export const useSocketIOListeners = () => {
 
     useEffect(() => {
         socket.on('connect', () => {
-            dispatch(setIsConnected(true));
-            dispatch(setSocketId(socket.id));
-            socket.emit('requestAllImages', (response: SocketIOResponse) => {
-                dispatch(setGalleryImages(response.data));
-            });
-            toast({
-                title: 'Connected',
-                status: 'success',
-                isClosable: true,
-            });
+            try {
+                dispatch(setIsConnected(true));
+                dispatch(setSocketId(socket.id));
+
+                // maintain sync with local images
+                socket.emit(
+                    'requestAllImages',
+                    (response: SocketIOResponse) => {
+                        try {
+                            response.status === 'OK' &&
+                                dispatch(setGalleryImages(response.data));
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                );
+
+                toast({
+                    title: 'Connected',
+                    status: 'success',
+                    isClosable: true,
+                });
+            } catch (e) {
+                console.error(e);
+            }
         });
 
         socket.on('disconnect', () => {
-            dispatch(setIsConnected(false));
-            dispatch(setIsProcessing(false));
-            toast({
-                title: 'Disconnected',
-                status: 'error',
-                isClosable: true,
-            });
+            try {
+                dispatch(setIsConnected(false));
+                dispatch(setIsProcessing(false));
+                toast({
+                    title: 'Disconnected',
+                    status: 'error',
+                    isClosable: true,
+                });
+            } catch (e) {
+                console.error(e);
+            }
         });
 
-        socket.on('progress', (data: { step: number; steps: number }) => {
-            dispatch(setIsProcessing(true));
-            dispatch(setProgress(Math.round((data.step / data.steps) * 100)));
+        socket.on('progress', (data: { step: number }) => {
+            try {
+                dispatch(setIsProcessing(true));
+                dispatch(setCurrentStep(data.step + 1));
+            } catch (e) {
+                console.error(e);
+            }
         });
 
-        socket.on('result', (data: { url: string }) => {
-            const uuid = uuidv4();
-            dispatch(
-                addImage({
-                    uuid,
-                    url: data.url,
-                    metadata: {
-                        prompt: 'test',
-                    },
-                })
-            );
-            dispatch(setIsProcessing(false));
+        socket.on('result', (data: { url: string; metadata: SDMetadata }) => {
+            try {
+                const uuid = uuidv4();
+                const { url, metadata } = data;
+                dispatch(
+                    addImage({
+                        uuid,
+                        url,
+                        metadata,
+                    })
+                );
+                dispatch(setIsProcessing(false));
+            } catch (e) {
+                console.error(e);
+            }
         });
 
         // clean up all listeners
@@ -108,6 +139,9 @@ export const useSocketIOEmitters = () => {
         upscalingLevel,
         upscalingStrength,
         initialImagePath,
+        maskPath,
+        seamless,
+        shouldFitToWidthHeight,
     } = useAppSelector((state: RootState) => state.sd);
 
     const { images } = useAppSelector((state: RootState) => state.gallery);
@@ -115,6 +149,7 @@ export const useSocketIOEmitters = () => {
     return {
         emitGenerateImage: () => {
             dispatch(setIsProcessing(true));
+            dispatch(setCurrentStep(-1));
             socket.emit('generateImage', {
                 prompt,
                 imagesToGenerate,
@@ -129,6 +164,9 @@ export const useSocketIOEmitters = () => {
                 upscalingLevel,
                 upscalingStrength,
                 initialImagePath,
+                maskPath,
+                shouldFitToWidthHeight,
+                seamless,
             });
         },
         emitDeleteImage: (uuid: string) => {
@@ -155,6 +193,17 @@ export const useSocketIOEmitters = () => {
                 (response: SocketIOResponse) => {
                     response.status === 'OK' &&
                         dispatch(setInitialImagePath(response.data));
+                }
+            );
+        },
+        emitUploadMask: (file: File, name: string) => {
+            socket.emit(
+                'uploadMask',
+                file,
+                name,
+                (response: SocketIOResponse) => {
+                    response.status === 'OK' &&
+                        dispatch(setMaskPath(response.data));
                 }
             );
         },

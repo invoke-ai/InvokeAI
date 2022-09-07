@@ -5,12 +5,11 @@ import CurrentImage from './features/gallery/CurrentImage';
 import LogViewer from './features/system/LogViewer';
 import Settings from './features/sd/Settings';
 import PromptInput from './features/sd/PromptInput';
-import InitialImage from './features/sd/InitialImage';
+import InitImage from './features/sd/InitImage';
 import ProgressBar from './features/header/ProgressBar';
 import SiteHeader from './features/header/SiteHeader';
 
 const App = () => {
-    // Loads all socket listeners
     useSocketIOListeners();
     return (
         <>
@@ -33,10 +32,9 @@ const App = () => {
                     <SiteHeader />
                 </GridItem>
                 <GridItem pl='2' area={'menu'} overflowY='scroll'>
-                    <Settings height={475} />
-                    <InitialImage />
+                    <Settings />
+                    <InitImage />
                 </GridItem>
-
                 <GridItem pr='2' area={'prompt'}>
                     <PromptInput />
                 </GridItem>

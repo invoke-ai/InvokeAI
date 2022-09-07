@@ -97,7 +97,8 @@ def handle_generate_image(data):
 
 @socketio.on('requestAllImages')
 def handle_request_all_images():
-    paths = sorted(Path("./outputs").rglob("*.png"), key=os.path.getmtime)
+    paths = sorted(Path("outputs/img-samples").glob("*.png"),
+                   key=os.path.getmtime)
     relative_paths = []
     for p in paths:
         relative_paths.append(str(p.relative_to('.')))
@@ -121,46 +122,72 @@ def handle_upload_initial_image(bytes, name):
     return make_reponse("OK", data=filePath)
 
 
-def generate_image(data):
+# TODO: I think this needs a safety mechanism.
+@socketio.on('uploadMask')
+def handle_upload_initial_image(bytes, name):
+    filePath = f'outputs/mask-images/{name}'
+    os.makedirs(os.path.dirname(filePath), exist_ok=True)
+    newFile = open(filePath, "wb")
+    newFile.write(bytes)
+    return make_reponse("OK", data=filePath)
+
+
+def generate_image(metadata):
     canceled.clear()
-    prompt = data['prompt']
-    strength = float(data['img2imgStrength'])
-    iterations = int(data['imagesToGenerate'])
-    steps = int(data['steps'])
-    width = int(data['width'])
-    height = int(data['height'])
+    prompt = metadata['prompt']
+    strength = float(metadata['img2imgStrength'])
+    iterations = int(metadata['imagesToGenerate'])
+    steps = int(metadata['steps'])
+    width = int(metadata['width'])
+    height = int(metadata['height'])
     fit = False
-    cfgscale = float(data['cfgScale'])
-    sampler_name = data['sampler']
-    gfpgan_strength = float(data['gfpganStrength']
+    cfgscale = float(metadata['cfgScale'])
+    sampler_name = metadata['sampler']
+    gfpgan_strength = float(metadata['gfpganStrength']
                             ) if gfpgan_model_exists else 0
-    upscale_level = data['upscalingLevel']
-    upscale_strength = data['upscalingStrength']
+    upscale_level = metadata['upscalingLevel']
+    upscale_strength = metadata['upscalingStrength']
     upscale = [int(upscale_level), float(upscale_strength)
                ] if upscale_level != 0 else None
     progress_images = False
-    seed = t2i.seed if int(data['seed']) == -1 else int(data['seed'])
-    init_img = data['initialImagePath']
+    seed = t2i.seed if int(metadata['seed']) == -1 else int(metadata['seed'])
+    init_img = metadata['initialImagePath']
+    fit = metadata['shouldFitToWidthHeight']
 
     pngwriter = PngWriter("./outputs/img-samples/")
     prefix = pngwriter.unique_prefix()
+    mask = metadata["maskPath"]
+    seamless = metadata["seamless"]
 
     def image_progress(sample, step):
         if canceled.is_set():
             raise CanceledException
-        socketio.emit('progress', {"step": step, "steps": steps})
+        socketio.emit('progress', {"step": step})
         eventlet.sleep(0)
 
     def image_done(image, seed, upscaled=False):
         name = f'{prefix}.{seed}.png'
         path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', name)
         if not upscaled:
-            socketio.emit('result', {'url': os.path.relpath(path)})
+            socketio.emit(
+                'result', {'url': os.path.relpath(path), 'metadata': metadata})
             eventlet.sleep(0)
+
+            # params yet to support
+            # ddim_eta       =    None,
+            # skip_normalize =    False,
+            # log_tokenization=  False,
+            # with_variations =   None,
+            # variation_amount =  0.0,
+            # # these are specific to img2img
+            # invert_mask    =    False,
+            # # these are specific to GFPGAN/ESRGAN
+            # save_original  =    False,
 
     t2i.prompt2image(prompt,
                      iterations=iterations,
                      init_img=init_img,
+                     mask=mask,
                      cfg_scale=cfgscale,
                      width=width,
                      height=height,
@@ -170,7 +197,10 @@ def generate_image(data):
                      upscale=upscale,
                      sampler_name=sampler_name,
                      step_callback=image_progress,
-                     image_callback=image_done)
+                     strength=strength,
+                     image_callback=image_done,
+                     fit=fit,
+                     seamless=seamless)
 
 
 if __name__ == '__main__':

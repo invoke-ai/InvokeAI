@@ -1,19 +1,32 @@
 import {
+    Box,
     Center,
     Flex,
     IconButton,
     Image,
+    List,
+    ListItem,
+    Text,
     Tooltip,
+    useColorModeValue,
     VStack,
 } from '@chakra-ui/react';
-import { FaCopy, FaPaintBrush, FaRecycle, FaSeedling } from 'react-icons/fa';
+import { FaCopy, FaPlus, FaRecycle } from 'react-icons/fa';
 import { RiBracesFill } from 'react-icons/ri';
 import { GiResize } from 'react-icons/gi';
 import { MdDeleteForever, MdFaceRetouchingNatural } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
 import { useSocketIOEmitters } from '../../app/socket';
-import { setInitialImagePath } from '../sd/sdSlice';
+import {
+    setAllParameters,
+    setInitialImagePath,
+    setParameter,
+} from '../sd/sdSlice';
+import { useState } from 'react';
+import { SDMetadata } from './gallerySlice';
+import { PARAMETERS } from '../../app/constants';
+import ImageParameters from './ImageParameters';
 
 const height = 'calc(100vh - 176px)';
 
@@ -27,15 +40,38 @@ const CurrentImage = () => {
     );
     const dispatch = useAppDispatch();
 
+    const [shouldShowImageDetails, setShouldShowImageDetails] =
+        useState<boolean>(false);
+
     const imageToDisplay = images.find(
         (image) => image.uuid === currentImageUuid
+    );
+
+    const bgColor = useColorModeValue(
+        'rgba(255, 255, 255, 0.85)',
+        'rgba(0, 0, 0, 0.8)'
     );
 
     return (
         <Center height={height}>
             {imageToDisplay && (
                 <Flex gap={2}>
-                    <Image maxHeight={height} src={imageToDisplay?.url} />
+                    <Box position={'relative'}>
+                        <Image maxHeight={height} src={imageToDisplay?.url} />
+                        {shouldShowImageDetails && (
+                            <Flex
+                                width={'100%'}
+                                height={'100%'}
+                                position={'absolute'}
+                                top={0}
+                                left={0}
+                                p={5}
+                                backgroundColor={bgColor}
+                            >
+                                <ImageParameters image={imageToDisplay} />
+                            </Flex>
+                        )}
+                    </Box>
                     <VStack>
                         <Tooltip label='Use as initial image'>
                             <IconButton
@@ -54,27 +90,28 @@ const CurrentImage = () => {
                                 fontSize={18}
                                 aria-label='Use all parameters'
                                 icon={<FaCopy />}
+                                onClick={() =>
+                                    dispatch(
+                                        setAllParameters(
+                                            imageToDisplay.metadata
+                                        )
+                                    )
+                                }
                             />
                         </Tooltip>
-                        <Tooltip label='Use individual parameters'>
+                        <Tooltip label='Image details'>
                             <IconButton
                                 fontSize={20}
-                                aria-label='Use individual parameters'
+                                colorScheme={
+                                    shouldShowImageDetails ? 'green' : undefined
+                                }
+                                aria-label='Image details'
                                 icon={<RiBracesFill />}
-                            />
-                        </Tooltip>
-                        <Tooltip label='Use seed'>
-                            <IconButton
-                                fontSize={18}
-                                aria-label='Use seed'
-                                icon={<FaSeedling />}
-                            />
-                        </Tooltip>
-                        <Tooltip label='Create inpainting mask'>
-                            <IconButton
-                                fontSize={18}
-                                aria-label='Create inpainting mask'
-                                icon={<FaPaintBrush />}
+                                onClick={() =>
+                                    setShouldShowImageDetails(
+                                        !shouldShowImageDetails
+                                    )
+                                }
                             />
                         </Tooltip>
                         <Tooltip label='Upscale (ESRGAN)' shouldWrapChildren>

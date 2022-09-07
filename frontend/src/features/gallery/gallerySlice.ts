@@ -1,11 +1,24 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { testImages } from '../../app/testingData';
 import { v4 as uuidv4 } from 'uuid';
 
-// TODO: Pending metadata RFC: https://github.com/lstein/stable-diffusion/issues/266
+// TODO: Revise pending metadata RFC: https://github.com/lstein/stable-diffusion/issues/266
 export interface SDMetadata {
-  prompt: string;
+  prompt?: string;
+  steps?: number;
+  cfgScale?: number;
+  height?: number;
+  width?: number;
+  sampler?: string;
+  seed?: number;
+  img2imgStrength?: number;
+  gfpganStrength?: number;
+  upscalingLevel?: number;
+  upscalingStrength?: number;
+  initialImagePath?: string;
+  maskPath?: string;
+  seamless?: boolean;
+  shouldFitToWidthHeight?: boolean;
 }
 
 export interface SDImage {
@@ -22,7 +35,7 @@ export interface GalleryState {
 
 const initialState: GalleryState = {
   currentImageUuid: '',
-  images: testImages,
+  images: [],
 };
 
 export const gallerySlice = createSlice({
@@ -60,19 +73,35 @@ export const gallerySlice = createSlice({
       state.images.push(action.payload);
       state.currentImageUuid = action.payload.uuid;
     },
-    setGalleryImages: (state, action: PayloadAction<Array<any>>) => {
-      const newGalleryImages = action.payload.map((url) => {
-        return {
-          uuid: uuidv4(),
-          url,
-          metadata: {
-            prompt: 'test',
-          },
-        };
-      });
-      state.images = newGalleryImages;
-      state.currentImageUuid =
-        newGalleryImages[newGalleryImages.length - 1].uuid;
+    setGalleryImages: (state, action: PayloadAction<Array<string>>) => {
+      // TODO: Revise pending metadata RFC: https://github.com/lstein/stable-diffusion/issues/266
+
+      const urls = action.payload;
+
+      if (urls.length === 0) {
+        // there are no images on disk, clear the gallery
+        state.images = [];
+        state.currentImageUuid = '';
+      } else {
+        // Filter image urls that are already in the rehydrated state
+        const filteredUrls = action.payload.filter(
+          (url) => !state.images.find((image) => image.url === url)
+        );
+
+        // filtered array is just paths, generate needed data
+        const preparedImages = filteredUrls.map((url) => {
+          return {
+            uuid: uuidv4(),
+            url,
+            metadata: {},
+          };
+        });
+
+        const newImages = [...state.images].concat(preparedImages);
+
+        state.currentImageUuid = newImages[newImages.length - 1].uuid;
+        state.images = newImages;
+      }
     },
   },
 });

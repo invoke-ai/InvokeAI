@@ -1,4 +1,11 @@
-import { FormControl, FormLabel, HStack, Select, Text } from '@chakra-ui/react';
+import {
+    ChakraProps,
+    FormControl,
+    FormLabel,
+    HStack,
+    Select,
+    Text,
+} from '@chakra-ui/react';
 import { ChangeEventHandler } from 'react';
 
 type Props = {
@@ -19,7 +26,7 @@ const SDSelect = ({
     return (
         <FormControl isDisabled={isDisabled}>
             <HStack>
-                <FormLabel>
+                <FormLabel marginInlineEnd={0} marginBottom={1}>
                     <Text fontSize={'sm'} whiteSpace='nowrap'>
                         {label}
                     </Text>

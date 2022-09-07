@@ -4,13 +4,15 @@ import {
     HStack,
     Spacer,
     ChakraProps,
+    Box,
 } from '@chakra-ui/react';
 
 import { RootState } from '../../app/store';
 import { useSocketIOEmitters } from '../../app/socket';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 
-import { BsArrowCounterclockwise } from 'react-icons/bs';
+import { TiArrowBack } from 'react-icons/ti';
+import { FaRandom } from 'react-icons/fa';
 
 import {
     resetSDState,
@@ -26,6 +28,9 @@ import {
     setUpscalingLevel,
     setUpscalingStrength,
     setWidth,
+    setShouldFitToWidthHeight,
+    randomizeSeed,
+    setSeamless,
 } from '../sd/sdSlice';
 
 import SDNumberInput from '../../components/SDNumberInput';
@@ -38,6 +43,7 @@ import {
     UPSCALING_LEVELS,
     WIDTHS,
 } from '../../app/constants';
+import SDSwitch from '../../components/SDSwitch';
 
 const Settings = (props: ChakraProps) => {
     const {
@@ -53,6 +59,8 @@ const Settings = (props: ChakraProps) => {
         upscalingLevel,
         upscalingStrength,
         initialImagePath,
+        shouldFitToWidthHeight,
+        seamless,
     } = useAppSelector((state: RootState) => state.sd);
 
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
@@ -63,7 +71,7 @@ const Settings = (props: ChakraProps) => {
 
     return (
         <Flex direction={'column'} gap={2} {...props}>
-            <Flex>
+            <HStack>
                 <SDButton
                     label='Generate'
                     type='submit'
@@ -84,29 +92,61 @@ const Settings = (props: ChakraProps) => {
                     colorScheme='blue'
                     onClick={() => dispatch(resetSDState())}
                 />
-            </Flex>
-            <SDNumberInput
-                label='Image Count'
-                step={1}
-                min={1}
-                precision={0}
-                onChange={(v) => dispatch(setImagesToGenerate(Number(v)))}
-                value={imagesToGenerate}
-            />
-            <SDNumberInput
-                label='Steps'
-                min={1}
-                step={1}
-                precision={0}
-                onChange={(v) => dispatch(setSteps(Number(v)))}
-                value={steps}
-            />
-            <SDNumberInput
-                label='CFG Scale'
-                step={0.5}
-                onChange={(v) => dispatch(setCfgScale(Number(v)))}
-                value={cfgScale}
-            />
+            </HStack>
+
+            <HStack>
+                <SDNumberInput
+                    label='Iterations'
+                    step={1}
+                    min={1}
+                    precision={0}
+                    onChange={(v) => dispatch(setImagesToGenerate(Number(v)))}
+                    value={imagesToGenerate}
+                />
+                <SDNumberInput
+                    label='Steps'
+                    min={1}
+                    step={1}
+                    precision={0}
+                    onChange={(v) => dispatch(setSteps(Number(v)))}
+                    value={steps}
+                />
+            </HStack>
+            <HStack>
+                <SDSelect
+                    label='Width'
+                    value={width}
+                    onChange={(e) => dispatch(setWidth(Number(e.target.value)))}
+                    validValues={WIDTHS}
+                />
+                <SDSelect
+                    label='Height'
+                    value={height}
+                    onChange={(e) =>
+                        dispatch(setHeight(Number(e.target.value)))
+                    }
+                    validValues={HEIGHTS}
+                />
+            </HStack>
+            <HStack>
+                <Box flexGrow={3}>
+                    <SDNumberInput
+                        label='CFG Scale'
+                        step={0.5}
+                        onChange={(v) => dispatch(setCfgScale(Number(v)))}
+                        value={cfgScale}
+                    />
+                </Box>
+                <Box>
+                    <SDSwitch
+                        label='Seamless'
+                        isChecked={seamless}
+                        onChange={(e) =>
+                            dispatch(setSeamless(e.target.checked))
+                        }
+                    />
+                </Box>
+            </HStack>
             <HStack>
                 <SDNumberInput
                     label='Seed'
@@ -119,8 +159,15 @@ const Settings = (props: ChakraProps) => {
                 <IconButton
                     aria-label='Reset seed to default'
                     size={'sm'}
-                    icon={<BsArrowCounterclockwise />}
+                    icon={<TiArrowBack />}
+                    fontSize={20}
                     onClick={() => dispatch(resetSeed())}
+                />
+                <IconButton
+                    aria-label='Randomize seed'
+                    size={'sm'}
+                    icon={<FaRandom />}
+                    onClick={() => dispatch(randomizeSeed())}
                 />
             </HStack>
             <SDSelect
@@ -129,27 +176,33 @@ const Settings = (props: ChakraProps) => {
                 onChange={(e) => dispatch(setSampler(e.target.value))}
                 validValues={SAMPLERS}
             />
-            <SDSelect
-                label='Width'
-                value={width}
-                onChange={(e) => dispatch(setWidth(Number(e.target.value)))}
-                validValues={WIDTHS}
-            />
-            <SDSelect
-                label='Height'
-                value={height}
-                onChange={(e) => dispatch(setHeight(Number(e.target.value)))}
-                validValues={HEIGHTS}
-            />
-            <SDNumberInput
-                isDisabled={!initialImagePath}
-                label='img2img Strength'
-                step={0.01}
-                min={0}
-                max={1}
-                onChange={(v) => dispatch(setImg2imgStrength(Number(v)))}
-                value={img2imgStrength}
-            />
+            <HStack>
+                <Box flexGrow={3}>
+                    <SDNumberInput
+                        isDisabled={!initialImagePath}
+                        label='i2i Strength'
+                        step={0.01}
+                        min={0}
+                        max={1}
+                        onChange={(v) =>
+                            dispatch(setImg2imgStrength(Number(v)))
+                        }
+                        value={img2imgStrength}
+                    />
+                </Box>
+                <Box>
+                    <SDSwitch
+                        isDisabled={!initialImagePath}
+                        label='Fit'
+                        isChecked={shouldFitToWidthHeight}
+                        onChange={(e) =>
+                            dispatch(
+                                setShouldFitToWidthHeight(e.target.checked)
+                            )
+                        }
+                    />
+                </Box>
+            </HStack>
             <SDNumberInput
                 isDisabled={!isGFPGANAvailable}
                 label='GFPGAN Strength'

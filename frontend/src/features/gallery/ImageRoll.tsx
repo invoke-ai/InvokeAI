@@ -4,7 +4,9 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { setCurrentImage } from './gallerySlice';
 
 const ImageRoll = () => {
-    const { images } = useAppSelector((state: RootState) => state.gallery);
+    const { images, currentImageUuid } = useAppSelector(
+        (state: RootState) => state.gallery
+    );
     const dispatch = useAppDispatch();
 
     return (
@@ -13,6 +15,8 @@ const ImageRoll = () => {
                 const { url, uuid } = image;
                 return (
                     <Image
+                        border={currentImageUuid === uuid ? '3px' : 0}
+                        borderColor='green'
                         rounded={'md'}
                         key={uuid}
                         onClick={() => dispatch(setCurrentImage(uuid))}

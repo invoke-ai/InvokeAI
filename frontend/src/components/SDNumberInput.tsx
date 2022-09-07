@@ -34,7 +34,7 @@ const SDNumberInput = ({
   return (
     <FormControl isDisabled={isDisabled}>
       <HStack>
-        <FormLabel>
+        <FormLabel marginInlineEnd={0} marginBottom={1}>
           <Text fontSize={'sm'} whiteSpace='nowrap'>
             {label}
           </Text>

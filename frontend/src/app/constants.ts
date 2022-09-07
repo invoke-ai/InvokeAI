@@ -26,3 +26,23 @@ export const HEIGHTS: Array<number> = [
 
 // Valid upscaling levels
 export const UPSCALING_LEVELS: Array<number> = [0, 2, 4];
+
+// Internal to human-readable parameters
+export const PARAMETERS: { [key: string]: string } = {
+    prompt: 'Prompt',
+    imagesToGenerate: 'Iterations',
+    steps: 'Steps',
+    cfgScale: 'CFG Scale',
+    height: 'Height',
+    width: 'Width',
+    sampler: 'Sampler',
+    seed: 'Seed',
+    img2imgStrength: 'img2img Strength',
+    gfpganStrength: 'GFPGAN Strength',
+    upscalingLevel: 'Upscaling Level',
+    upscalingStrength: 'Upscaling Strength',
+    initialImagePath: 'Initial Image',
+    maskPath: 'Initial Image Mask',
+    shouldFitToWidthHeight: 'Fit Initial Image',
+    seamless: 'Seamless Tiling',
+};
