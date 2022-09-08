@@ -237,9 +237,10 @@ face restore a particular generated image, pass it again with the same
 prompt and generated seed along with the `-U` and `-G` prompt
 arguments to perform those actions.
 
-## Google Colab
+## Google Colab <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/artmen1516/472402c8ae9265c01859544f3d100111/raw/colab-message.json" alt="Status Message"/>
 
-Stable Diffusion AI Notebook: <a href="https://colab.research.google.com/github/lstein/stable-diffusion/blob/main/Stable_Diffusion_AI_Notebook.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a> <br>
+Stable Diffusion AI Notebook: <br>
+<a href="https://colab.research.google.com/github/lstein/stable-diffusion/blob/main/Stable_Diffusion_AI_Notebook.ipynb"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/artmen1516/472402c8ae9265c01859544f3d100111/raw/colab-main.json" alt="Open In Colab"/></a> <a href="https://colab.research.google.com/github/lstein/stable-diffusion/blob/development/Stable_Diffusion_AI_Notebook.ipynb"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/artmen1516/472402c8ae9265c01859544f3d100111/raw/colab-develop.json" alt="Open In Colab"/></a><br>
 Open and follow instructions to use an isolated environment running Dream.<br>
 
 Output example:
