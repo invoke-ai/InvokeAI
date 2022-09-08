@@ -24,14 +24,14 @@ def main():
     """Initialize command-line parsers and the diffusion model"""
     arg_parser = create_argv_parser()
     opt = arg_parser.parse_args()
-    
+
     if opt.laion400m:
         print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
         sys.exit(-1)
     if opt.weights != 'model':
         print('--weights argument has been deprecated. Please configure ./configs/models.yaml, and call it using --model instead.')
         sys.exit(-1)
-        
+
     try:
         models  = OmegaConf.load(opt.config)
         width   = models[opt.model].width
@@ -106,7 +106,7 @@ def main():
 
     cmd_parser = create_cmd_parser()
     if opt.web:
-        dream_server_loop(t2i, opt.host, opt.port, opt.outdir)
+        dream_server_loop(t2i, opt.host, opt.port, opt.outdir, opt.cors)
     else:
         main_loop(t2i, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
 
@@ -319,8 +319,13 @@ def get_next_command(infile=None) -> str: #command string
         print(f'#{command}')
     return command
 
-def dream_server_loop(t2i, host, port, outdir):
+def dream_server_loop(t2i, host, port, outdir, cors):
     print('\n* --web was specified, starting web server...')
+    if cors:
+        print(f'* --cors was specified, enabling CORS support with "Access-Control-Allow-Origin: {cors}"...')
+    if cors == '*':
+        print(f'* UNSAFE CORS POLICY DETECTED! YOU ARE ALLOWING ANY ORIGIN TO CONNECT TO THIS SERVER!')
+        print(f'* PLEASE SPECIFY AN ORIGIN & SEE THIS STACKOVERFLOW POST FOR MORE INFORMATION: https://bit.ly/3RpIy6I! \n')
     # Change working directory to the stable-diffusion directory
     os.chdir(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -329,6 +334,7 @@ def dream_server_loop(t2i, host, port, outdir):
     # Start server
     DreamServer.model = t2i
     DreamServer.outdir = outdir
+    DreamServer.cors = cors
     dream_server = ThreadingDreamServer((host, port))
     print(">> Started Stable Diffusion dream server!")
     if host == '0.0.0.0':
@@ -371,7 +377,7 @@ SAMPLER_CHOICES=[
 def create_argv_parser():
     parser = argparse.ArgumentParser(
         description="""Generate images using Stable Diffusion.
-        Use --web to launch the web interface. 
+        Use --web to launch the web interface.
         Use --from_file to load prompts from a file path or standard input ("-").
         Otherwise you will be dropped into an interactive command prompt (type -h for help.)
         Other command-line arguments are defaults that can usually be overridden
@@ -488,6 +494,12 @@ def create_argv_parser():
         type=int,
         default='9090',
         help='Web server: Port to listen on'
+    )
+    parser.add_argument(
+        '--cors',
+        dest='cors',
+        type=str,
+        help='Web server: Access-Control-Allow-Origin value'
     )
     parser.add_argument(
         '--weights',

@@ -60,12 +60,22 @@ class CanceledException(Exception):
 class DreamServer(BaseHTTPRequestHandler):
     model = None
     outdir = None
+    cors = None
     canceled = Event()
+
+    # CORS support
+    def send_cors_headers(self):
+        if (self.cors):
+            self.send_header("Access-Control-Allow-Origin", self.cors)
+            request_headers = self.headers.get('Access-Control-Request-Headers');
+            if (request_headers):
+                self.send_header("Access-Control-Allow-Headers", request_headers)
 
     def do_GET(self):
         if self.path == "/":
             self.send_response(200)
             self.send_header("Content-type", "text/html")
+            self.send_cors_headers();
             self.end_headers()
             with open("./static/dream_web/index.html", "rb") as content:
                 self.wfile.write(content.read())
@@ -74,6 +84,7 @@ class DreamServer(BaseHTTPRequestHandler):
             from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
             self.send_response(200)
             self.send_header("Content-type", "application/javascript")
+            self.send_cors_headers();
             self.end_headers()
             config = {
                 'gfpgan_model_exists': gfpgan_model_exists
@@ -84,7 +95,7 @@ class DreamServer(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             output = []
-            
+
             log_file = os.path.join(self.outdir, "dream_web_log.txt")
             if os.path.exists(log_file):
                 with open(log_file, "r") as log:
@@ -100,6 +111,7 @@ class DreamServer(BaseHTTPRequestHandler):
             self.canceled.set()
             self.send_response(200)
             self.send_header("Content-type", "application/json")
+            self.send_cors_headers();
             self.end_headers()
             self.wfile.write(bytes('{}', 'utf8'))
         else:
@@ -113,6 +125,7 @@ class DreamServer(BaseHTTPRequestHandler):
             if mime_type is not None:
                 self.send_response(200)
                 self.send_header("Content-type", mime_type)
+                self.send_cors_headers();
                 self.end_headers()
                 with open("." + self.path, "rb") as content:
                     self.wfile.write(content.read())
@@ -122,6 +135,7 @@ class DreamServer(BaseHTTPRequestHandler):
     def do_POST(self):
         self.send_response(200)
         self.send_header("Content-type", "application/json")
+        self.send_cors_headers();
         self.end_headers()
 
         # unfortunately this import can't be at the top level, since that would cause a circular import
@@ -237,6 +251,13 @@ class DreamServer(BaseHTTPRequestHandler):
             print(f"Canceled.")
             return
 
+    # CORS support
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_cors_headers();
+        if (self.cors):
+            self.send_header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE")
+        self.end_headers()
 
 class ThreadingDreamServer(ThreadingHTTPServer):
     def __init__(self, server_address):
