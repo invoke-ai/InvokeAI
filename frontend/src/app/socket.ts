@@ -136,6 +136,12 @@ export const useSocketIOListeners = () => {
             }
         });
 
+        socket.on('error', (message) => {
+            dispatch(addLogEntry(`Server error: ${message}`));
+            dispatch(setIsProcessing(false));
+            dispatch(clearIntermediateImage());
+        });
+
         // clean up all listeners
         return () => {
             socket.off('connect');
@@ -143,6 +149,7 @@ export const useSocketIOListeners = () => {
             socket.off('progress');
             socket.off('intermediateResult');
             socket.off('result');
+            socket.off('error');
         };
     }, []);
 };

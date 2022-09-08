@@ -1,11 +1,18 @@
+from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
+from ldm.dream.pngwriter import PngWriter
+from ldm.generate import Generate
+from flask_socketio import SocketIO
+from flask import Flask, send_from_directory, url_for, jsonify
 import transformers
 import json
 import base64
 import mimetypes
 import os
 import sys
+import signal
 import time
 import eventlet
+import traceback
 from threading import Event
 from enum import Enum
 
@@ -16,12 +23,6 @@ from pytorch_lightning import logging
 import mimetypes
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
-
-from flask import Flask, send_from_directory, url_for, jsonify
-from flask_socketio import SocketIO
-from ldm.generate import Generate
-from ldm.dream.pngwriter import PngWriter
-from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
 
 
 host = 'localhost'
@@ -206,24 +207,34 @@ def generate_image(data):
             # # these are specific to GFPGAN/ESRGAN
             # save_original  =    False,
 
-    model.prompt2image(prompt,
-                       iterations=iterations,
-                       init_img=init_img,
-                       mask=mask,
-                       cfg_scale=cfgscale,
-                       width=width,
-                       height=height,
-                       seed=seed,
-                       steps=steps,
-                       gfpgan_strength=gfpgan_strength,
-                       upscale=upscale,
-                       sampler_name=sampler_name,
-                       step_callback=image_progress,
-                       strength=strength,
-                       image_callback=image_done,
-                       fit=fit,
-                       seamless=seamless,
-                       progress_images=progress_images)
+    try:
+
+        model.prompt2image(prompt,
+                           iterations=iterations,
+                           init_img=init_img,
+                           mask=mask,
+                           cfg_scale=cfgscale,
+                           width=width,
+                           height=height,
+                           seed=seed,
+                           steps=steps,
+                           gfpgan_strength=gfpgan_strength,
+                           upscale=upscale,
+                           sampler_name=sampler_name,
+                           step_callback=image_progress,
+                           strength=strength,
+                           image_callback=image_done,
+                           fit=fit,
+                           seamless=seamless,
+                           progress_images=progress_images)
+    except KeyboardInterrupt:
+
+        raise
+    except Exception as e:
+        socketio.emit('error', (str(e)))
+        print("\n")
+        traceback.print_exc()
+        print("\n")
 
 
 if __name__ == '__main__':
