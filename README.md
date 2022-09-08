@@ -1,7 +1,7 @@
 <h1 align='center'><b>Stable Diffusion Dream Script</b></h1>
 
 <p align='center'>
-<img src="static/logo_temp.png"/>
+<img src="static/logo.png"/>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@ text-to-image generator. This fork supports:
    generating images in your browser.
 
 3. Support for img2img in which you provide a seed image to guide the
-      image creation. (inpainting & masking coming soon)
+   image creation. (inpainting & masking coming soon)
 
 4. A notebook for running the code on Google Colab.
 
@@ -32,12 +32,12 @@ text-to-image generator. This fork supports:
 6. Weighted subprompts for prompt tuning.
 
 7. [Image variations](VARIATIONS.md) which allow you to systematically
-generate variations of an image you like and combine two or more
-images together to combine the best features of both.
+   generate variations of an image you like and combine two or more
+   images together to combine the best features of both.
 
 8. Textual inversion for customization of the prompt language and images.
 
-8. ...and more!
+9. ...and more!
 
 This fork is rapidly evolving, so use the Issues panel to report bugs
 and make feature requests, and check back periodically for
@@ -338,9 +338,8 @@ and introducing a new vocabulary to the fixed model.
 
 To train, prepare a folder that contains images sized at 512x512 and execute the following:
 
-
 WINDOWS: As the default backend is not available on Windows, if you're using that platform, set the environment variable `PL_TORCH_DISTRIBUTED_BACKEND=gloo`
-    
+
 ```
 (ldm) ~/stable-diffusion$ python3 ./main.py --base ./configs/stable-diffusion/v1-finetune.yaml \
                                             -t \
@@ -407,7 +406,7 @@ repository and associated paper for details and limitations.
   - WebUI supports GFPGAN/ESRGAN facial reconstruction and upscaling [Kevin Gibbons](https://github.com/bakkot)
   - WebUI supports incremental display of in-progress images during generation [Kevin Gibbons](https://github.com/bakkot)
   - A new configuration file scheme that allows new models (including upcoming stable-diffusion-v1.5)
-  to be added without altering the code. ([David Wager](https://github.com/maddavid12))
+    to be added without altering the code. ([David Wager](https://github.com/maddavid12))
   - Can specify --grid on dream.py command line as the default.
   - Miscellaneous internal bug and stability fixes.
   - Works on M1 Apple hardware.
@@ -431,8 +430,8 @@ There are separate installation walkthroughs for [Linux](#linux), [Windows](#win
 
 ```
 ~$  wget https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-x86_64.sh
-~$  chmod +x Anaconda3-2022.05-Linux-x86_64.sh 
-~$  ./Anaconda3-2022.05-Linux-x86_64.sh  
+~$  chmod +x Anaconda3-2022.05-Linux-x86_64.sh
+~$  ./Anaconda3-2022.05-Linux-x86_64.sh
 ```
 
 After installing anaconda, you should log out of your system and log back in. If the installation
@@ -621,9 +620,9 @@ python scripts\dream.py
 ```
 
 10. Subsequently, to relaunch the script, first activate the Anaconda
-command window (step 3), enter the stable-diffusion directory (step 5,
-"cd \path\to\stable-diffusion"), run "conda activate ldm" (step 6b),
-and then launch the dream script (step 9).
+    command window (step 3), enter the stable-diffusion directory (step 5,
+    "cd \path\to\stable-diffusion"), run "conda activate ldm" (step 6b),
+    and then launch the dream script (step 9).
 
 **Note:** Tildebyte has written an alternative ["Easy peasy Windows
 install"](https://github.com/lstein/stable-diffusion/wiki/Easy-peasy-Windows-install)
