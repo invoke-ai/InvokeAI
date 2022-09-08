@@ -64,10 +64,12 @@ REALESRGAN_GITHUB_URL="https://github.com/xinntao/Real-ESRGAN/releases/download/
 REALESRGAN_ARCHIVE="realesrgan.zip"
 REALESRGAN_PATH="realesrgan"
 
-curl $REALESRGAN_GITHUB_URL -o $REALESRGAN_ARCHIVE
+mkdir $REALESRGAN_PATH
+cd $REALESRGAN_PATH
+curl -L $REALESRGAN_GITHUB_URL -o $REALESRGAN_ARCHIVE
 unzip $REALESRGAN_ARCHIVE
 rm $REALESRGAN_ARCHIVE
-chmod u+x $REALESRGAN_PATH/realesrgan-ncnn-vulkan
+chmod u+x ./realesrgan-ncnn-vulkan
 
 # clone the repo
 git clone https://github.com/lstein/stable-diffusion.git
