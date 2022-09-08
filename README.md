@@ -22,22 +22,24 @@ text-to-image generator. This fork supports:
    generating images in your browser.
 
 3. Support for img2img in which you provide a seed image to guide the
-      image creation. (inpainting & masking coming soon)
+      image creation
 
-4. A notebook for running the code on Google Colab.
+4. Preliminary inpainting support.
 
-5. Upscaling and face fixing using the optional ESRGAN and GFPGAN
+5. A notebook for running the code on Google Colab.
+
+6. Upscaling and face fixing using the optional ESRGAN and GFPGAN
    packages.
 
-6. Weighted subprompts for prompt tuning.
+7. Weighted subprompts for prompt tuning.
 
-7. [Image variations](VARIATIONS.md) which allow you to systematically
+8. [Image variations](VARIATIONS.md) which allow you to systematically
 generate variations of an image you like and combine two or more
 images together to combine the best features of both.
 
-8. Textual inversion for customization of the prompt language and images.
+9. Textual inversion for customization of the prompt language and images.
 
-8. ...and more!
+10. ...and more!
 
 This fork is rapidly evolving, so use the Issues panel to report bugs
 and make feature requests, and check back periodically for
@@ -816,13 +818,32 @@ be fast because all the dependencies are already loaded.
 
 # Creating Transparent Regions for Inpainting
 
-Inpainting is really cool, but you have to prepare the initial image
-correctly. When you create a transparent area, many imaging editing
+Inpainting is really cool. To do it, you start with an initial image
+and use a photoeditor to make one or more regions transparent
+(i.e. they have a "hole" in them). You then provide the path to this
+image at the dream> command line using the -I switch. Stable Diffusion
+will only paint within the transparent region.
+
+There's a catch. In the current implementation, you have to prepare
+the initial image correctly so that the underlying colors are
+preserved under the transparent area. Many imaging editing
 applications will by default erase the color information under the
-transparent pixels and replace them with white or black. This is not
-good, because Stable Diffusion needs that information in order to
-generate a good infill. You also must take care to export the PNG
-file in such a way that the color information is preserved.
+transparent pixels and replace them with white or black, which will
+lead to suboptimal inpainting. You also must take care to export the
+PNG file in such a way that the color information is preserved.
+
+If your photoeditor is erasing the underlying color information,
+dream.py will give you a big fat warning. If you can't find a way to
+coax your photoeditor to retain color values under transparent areas,
+then you can combine the -I and -M switches to provide both the
+original unedited image and the masked (partially transparent) image:
+
+~~~~
+dream> man with cat on shoulder -I./images/man.png -M./images/man-transparent.png
+~~~~
+
+We are hoping to get rid of the need for this workaround in an
+upcoming release.
 
 ## Recipe for GIMP
 

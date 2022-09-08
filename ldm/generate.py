@@ -195,6 +195,7 @@ class Generate:
             variation_amount =  0.0,
             # these are specific to img2img and inpaint
             init_img       =    None,
+            init_mask      =    None,
             fit            =    False,
             strength       =    None,
             # these are specific to GFPGAN/ESRGAN
@@ -289,7 +290,7 @@ class Generate:
 
         results          = list()
         init_image       = None
-        init_mask        = None
+        mask_image       = None
 
         try:
             uc, c = get_uc_and_c(
@@ -298,20 +299,9 @@ class Generate:
                 log_tokens=self.log_tokenization
             )
 
-            # Check whether the image has transparent pixels. If it does
-            # we generate a mask as well
-            if init_img:
-                image        = self._load_img(init_img, width, height, fit=fit) # this returns an Image
-                if self._has_transparency(image):                               # if image has a transparent area, use it as a mask
-                    print('>> Initial image has transparent areas. Will inpaint in these regions.')
-                    if self._check_for_erasure(image):
-                        print(
-                            '>> WARNING: colors underneath the transparent region seem to have been erased; inpainting will be suboptimal. Please preserve the colors when making a transparency mask.'
-                        )
-                    init_mask = self._create_init_mask(image)                   # this returns a torch tensor
-                init_image   = self._create_init_image(image)                   # this returns a torch tensor
-
-            if (init_image is not None) and (init_mask is not None):
+            (init_image,mask_image) = self._make_images(init_img,init_mask, width, height, fit)
+            
+            if (init_image is not None) and (mask_image is not None):
                 generator = self._make_inpaint()
             elif init_image is not None:
                 generator = self._make_img2img()
@@ -333,7 +323,7 @@ class Generate:
                 width          = width,
                 height         = height,
                 init_image     = init_image,      # notice that init_image is different from init_img
-                init_mask      = init_mask,
+                mask_image     = mask_image,
                 strength       = strength,
             )
 
@@ -372,6 +362,31 @@ class Generate:
                 '%4.2fG' % (self.session_peakmem / 1e9),
             )
         return results
+
+    def _make_images(self, img_path, mask_path, width, height, fit=False):
+        init_image      = None
+        init_mask       = None
+        if not img_path:
+            return None,None
+
+        image        = self._load_img(img_path, width, height, fit=fit) # this returns an Image
+        init_image   = self._create_init_image(image)                   # this returns a torch tensor
+
+        if self._has_transparency(image) and not mask_path:      # if image has a transparent area and no mask was provided, then try to generate mask
+            print('>> Initial image has transparent areas. Will inpaint in these regions.')
+            if self._check_for_erasure(image):
+                print(
+                    '>> WARNING: Colors underneath the transparent region seem to have been erased.\n',
+                    '>>          Inpainting will be suboptimal. Please preserve the colors when making\n',
+                    '>>          a transparency mask, or provide mask explicitly using --init_mask (-M).'
+                )
+            init_mask = self._create_init_mask(image)                   # this returns a torch tensor
+
+        if mask_path:
+            mask_image  = self._load_img(mask_path, width, height, fit=fit) # this returns an Image
+            init_mask   = self._create_init_mask(mask_image)
+
+        return init_image,init_mask
 
     def _make_img2img(self):
         if not self.generators.get('img2img'):
@@ -534,11 +549,10 @@ class Generate:
 
     def _create_init_image(self,image):
         image = image.convert('RGB')
-        print(
-            f'>> DEBUG: writing the image to img.png'
-        )
-        image.save('img.png')
-
+        # print(
+        #     f'>> DEBUG: writing the image to img.png'
+        # )
+        # image.save('img.png')
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
@@ -552,10 +566,10 @@ class Generate:
         # BUG: We need to use the model's downsample factor rather than hardcoding "8"
         from ldm.dream.generator.base import downsampling
         image = image.resize((image.width//downsampling, image.height//downsampling), resample=Image.Resampling.LANCZOS)
-        print(
-            f'>> DEBUG: writing the mask to mask.png'
-            )
-        image.save('mask.png')
+        # print(
+        #     f'>> DEBUG: writing the mask to mask.png'
+        #     )
+        # image.save('mask.png')
         image = np.array(image)
         image = image.astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
