@@ -160,11 +160,15 @@ def real_esrgan_upscale(image, strength, upsampler_scale, seed, outdir=None):
             '-s', str(upsampler_scale)
         ]
 
-        if upsampler_scale > 2:
+        # Apply realesrgan-x4plus when x4 is selected.
+        # `realesrgan-x4plus` provides a slightly better rendering
+        # than the default model.
+        if upsampler_scale == 4:
             cmd.append('-n')
             cmd.append('realesrgan-x4plus')
 
         try:
+            # Run ../realesrgan/realesrgan-ncnn-vulkan -i <input> -o <ouput> -s [2..4]
             subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
