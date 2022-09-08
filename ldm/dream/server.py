@@ -31,6 +31,23 @@ class DreamServer(BaseHTTPRequestHandler):
                 'gfpgan_model_exists': gfpgan_model_exists
             }
             self.wfile.write(bytes("let config = " + json.dumps(config) + ";\n", "utf-8"))
+        elif self.path == "/run_log.json":
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            output = []
+            
+            log_file = os.path.join(self.outdir, "dream_web_log.txt")
+            if os.path.exists(log_file):
+                with open(log_file, "r") as log:
+                    for line in log:
+                        url, config = line.split(": {", maxsplit=1)
+                        config = json.loads("{" + config)
+                        config["url"] = url.lstrip(".")
+                        if os.path.exists(url):
+                            output.append(config)
+
+            self.wfile.write(bytes(json.dumps({"run_log": output}), "utf-8"))
         elif self.path == "/cancel":
             self.canceled.set()
             self.send_response(200)
@@ -75,12 +92,38 @@ class DreamServer(BaseHTTPRequestHandler):
         seamless = 'seamless' in post_data
         cfgscale = float(post_data['cfgscale'])
         sampler_name  = post_data['sampler']
+        variation_amount = float(post_data['variation_amount'])
+        with_variations = post_data['with_variations']
         gfpgan_strength = float(post_data['gfpgan_strength']) if gfpgan_model_exists else 0
         upscale_level    = post_data['upscale_level']
         upscale_strength = post_data['upscale_strength']
         upscale = [int(upscale_level),float(upscale_strength)] if upscale_level != '' else None
         progress_images = 'progress_images' in post_data
-        seed = self.model.seed if int(post_data['seed']) == -1 else int(post_data['seed'])
+        seed = None if int(post_data['seed']) == -1 else int(post_data['seed'])
+
+        if with_variations != '':
+            parts = []
+            broken = False
+            for part in with_variations.split(','):
+                seed_and_weight = part.split(':')
+                if len(seed_and_weight) != 2:
+                    print(f'could not parse with_variation part "{part}"')
+                    broken = True
+                    break
+                try:
+                    vseed = int(seed_and_weight[0])
+                    vweight = float(seed_and_weight[1])
+                except ValueError:
+                    print(f'could not parse with_variation part "{part}"')
+                    broken = True
+                    break
+                parts.append([vseed, vweight])
+            if broken:
+                raise CanceledException
+            if len(parts) > 0:
+                with_variations = parts
+            else:
+                with_variations = None
 
         self.canceled.clear()
         print(f">> Request to generate with prompt: {prompt}")
@@ -103,6 +146,7 @@ class DreamServer(BaseHTTPRequestHandler):
             name = f'{prefix}.{seed}.png'
             path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', name)
 
+            config['seed'] = seed
             # Append post_data to log, but only once!
             if not upscaled:
                 with open(os.path.join(self.outdir, "dream_web_log.txt"), "a") as log:
@@ -163,6 +207,8 @@ class DreamServer(BaseHTTPRequestHandler):
                                         height = height,
                                         seed = seed,
                                         steps = steps,
+                                        variation_amount = variation_amount,
+                                        with_variations = with_variations,
                                         gfpgan_strength = gfpgan_strength,
                                         upscale         = upscale,
                                         sampler_name    = sampler_name,
@@ -184,6 +230,8 @@ class DreamServer(BaseHTTPRequestHandler):
                                             cfg_scale  = cfgscale,
                                             seed       = seed,
                                             steps      = steps,
+                                            variation_amount = variation_amount,
+                                            with_variations = with_variations,
                                             sampler_name    = sampler_name,
                                             width      = width,
                                             height     = height,
