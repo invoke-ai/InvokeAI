@@ -91,11 +91,7 @@ def main():
         print(">> changed to seamless tiling mode")
 
     # preload the model
-    tic = time.time()
     t2i.load_model()
-    print(
-        f'>> model loaded in', '%4.2fs' % (time.time() - tic)
-    )
 
     if not infile:
         print(
@@ -568,14 +564,9 @@ def create_cmd_parser():
     )
     parser.add_argument(
         '-M',
-        '--mask',
+        '--init_mask',
         type=str,
-        help='Path to inpainting mask; transparent areas will be painted over',
-    )
-    parser.add_argument(
-        '--invert_mask',
-        action='store_true',
-        help='Invert the inpainting mask; opaque areas will be painted over',
+        help='Path to input mask for inpainting mode (supersedes width and height)',
     )
     parser.add_argument(
         '-T',
