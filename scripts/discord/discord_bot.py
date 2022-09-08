@@ -185,22 +185,20 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 fit = flags.img2img_fit
                 ))
 
+            for output in outputs:
+                output_file = discord.File(output[0], description = flags.prompt)
+                embed = discord.Embed()
+                embed.set_image(url=f'attachment://{output_file.filename}')
+                embed.add_field(name='Prompt', value=flags.prompt)
+                embed.add_field(name='Seconds taken', value=format(timer() - start, '.2f'))
+                embed.add_field(name='Seed used', value=output[1])
+                on_bot_thread(ctx.reply(content=f'{ctx.message.author.mention}', file=output_file,embed=embed))
+                
             # Only delete it if it wasn't a slash command
             if ctx.interaction is None:
                 on_bot_thread(message.delete())
             else:
                 on_bot_thread(message.edit(content='Finished dreaming for {}\'s `{}`'.format(ctx.message.author.mention,flags.prompt)))
-
-            for output in outputs:
-                output_file = discord.File(output[0], description = flags.prompt)
-                embed = discord.Embed(
-                    title=f'Finished dreaming',
-                    description=f'Dreamt for {ctx.message.author.mention}\'s `{flags.prompt}`',
-                )
-                embed.set_image(url=f'attachment://{output_file.filename}')
-                embed.add_field(name='Seconds taken', value=format(timer() - start, '.2f'))
-                embed.add_field(name='Seed used', value=output[1])
-                on_bot_thread(ctx.reply(file=output_file,embed=embed))
     except Exception as e:
         error_msg = 'Dreaming error: {}'.format(e)
         print(error_msg)
