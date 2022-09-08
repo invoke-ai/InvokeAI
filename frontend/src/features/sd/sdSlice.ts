@@ -89,7 +89,7 @@ export const sdSlice = createSlice({
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
       const { steps, initialImagePath } = state;
-      state.steps = action.payload;
+      state.img2imgStrength = action.payload;
       state.realSteps = calculateRealSteps(
         steps,
         action.payload,
