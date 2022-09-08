@@ -11,6 +11,12 @@ from enum import Enum
 
 from pathlib import Path
 from pytorch_lightning import logging
+
+# fix missing mimetypes on windows due to registry wonkiness
+import mimetypes
+mimetimes.add_type('application/javascript', '.js')
+mimetimes.add_type('text/css', '.css')
+
 from flask import Flask, send_from_directory, url_for, jsonify
 from flask_socketio import SocketIO
 from ldm.generate import Generate
