@@ -30,13 +30,12 @@ const ImageRoll = () => {
                 const { url, uuid } = image;
                 const isSelected = currentImageUuid === uuid;
                 return (
-                    <Box position={'relative'}>
+                    <Box position={'relative'} key={uuid}>
                         <Image
                             width={120}
                             height={120}
                             objectFit='cover'
                             rounded={'md'}
-                            key={uuid}
                             src={url}
                             loading={'lazy'}
                             backgroundColor={bgColor}
