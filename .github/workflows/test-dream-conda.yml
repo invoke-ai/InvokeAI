@@ -1,15 +1,23 @@
 name: Test Dream with Conda
 on:
-  workflow_dispatch
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - 'main'
 jobs:
-  build:
+  if_merged:
+    if: github.event.pull_request.merged == true
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-12 ]
     name: Test dream.py on ${{ matrix.os }} with conda
+    env:
+      test_script: tests/prompts.txt
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     steps:
+      - run: |
+          echo The PR was merged
       - name: Set platform variables
         id: vars
         run: |
@@ -35,7 +43,6 @@ jobs:
             ${{ env.cache-name }}
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
-        continue-on-error: true
         run: |
           if [ ! -e models/ldm/stable-diffusion-v1 ]; then
               mkdir -p models/ldm/stable-diffusion-v1
@@ -43,18 +50,18 @@ jobs:
           if [ ! -e models/ldm/stable-diffusion-v1/model.ckpt ]; then
             curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
           fi
-      - name: Use Cached Dependencies
-        id: cache-conda-env-ldm
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-conda-env-ldm
-        with:
-          path: ~/.conda/envs/ldm
-          key: ${{ env.cache-name }}
-          restore-keys: |
-            ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.ENV_FILE) }}
+#       - name: Use Cached Dependencies
+#         id: cache-conda-env-ldm
+#         uses: actions/cache@v3
+#         env:
+#           cache-name: cache-conda-env-ldm
+#         with:
+#           path: ~/.conda/envs/ldm
+#           key: ${{ env.cache-name }}
+#           restore-keys: |
+#             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.ENV_FILE) }}
       - name: Install Dependencies
-        if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
+#         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
       - name: Use Cached Huggingface and Torch models
@@ -69,7 +76,6 @@ jobs:
             ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
-        continue-on-error: true
         run: |
           ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
 #       - name: Run tmate
@@ -82,7 +88,7 @@ jobs:
               export PYTORCH_ENABLE_MPS_FALLBACK=1
           fi
           mkdir -p outputs/img-samples
-          time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/dream.py --from_file tests/prompts.txt --full_precision
+          time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/dream.py --from_file $test_script --full_precision
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
