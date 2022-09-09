@@ -13,28 +13,19 @@ from discord.ext import commands
 
 from discord_config import settings
 
-# regex for text parsing
-import re
-text_parser = re.compile("""
-^
-(?P<prompt>.+?)
-(?:
-    (?:\s+-+(?:width|w)[\s=](?P<width>\d{2,4})) |
-    (?:\s+-+(?:height|h)[\s=](?P<height>\d{2,4})) |
-    (?:\s+-+(?:steps)[\s=](?P<steps>\d{1,3})) |
-    (?:\s+-+(?:str|strength)[\s=](?P<strength>(?:\d+(?:\.\d+)?))) |
-    (?:\s+-+(?:number|n)[\s=](?P<number>\d{1})) |
-    (?:\s+-+(?:seed|s)[\s=](?P<seed>\d+))
-)*
-$
-""", re.IGNORECASE | re.VERBOSE)
-
-sys.path.append('.')
+#sys.path.append('.')
 
 from ldm.simplet2i import T2I
 model = T2I()
 model.load_model()
 
+# constants
+_MAX_IMAGE_DIMENSION: int = 2048
+_MAX_IMAGE_STEPS: int = 128
+_MAX_IMAGE_NUMBER: int = 20
+_MAX_DISCORD_EMBEDS: int = 10
+
+# setup
 dreaming_loop = asyncio.get_event_loop()
 dreaming_queue = asyncio.Queue()
 
@@ -43,6 +34,8 @@ intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix = settings['prefix'], intents=intents)
+
+# logic
 
 @bot.event
 async def on_ready():
@@ -93,11 +86,11 @@ async def sync(ctx: commands.Context, guilds: commands.Greedy[discord.Object] = 
 
 class DreamFlags(commands.FlagConverter, prefix = '--'):
     prompt: str = commands.Flag(description='The prompt to produce an image for')
-    width: int = commands.Flag(description='The width of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...2048)', default=512)
-    height: int = commands.Flag(description='The height of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...2048)', default=512)
-    steps: int = commands.Flag(description='The number of steps. Defaults to 50. Higher numbers take longer to run. (1...128)', default=50)
+    width: int = commands.Flag(description=f'The width of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...{_MAX_IMAGE_DIMENSION})', default=512)
+    height: int = commands.Flag(description=f'The height of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...{_MAX_IMAGE_DIMENSION})', default=512)
+    steps: int = commands.Flag(description=f'The number of steps. Defaults to 50. Higher numbers take longer to run. (1...{_MAX_IMAGE_STEPS})', default=50)
     strength: float = commands.Flag(description='The strength to follow the prompt using. Defaults to 7.5. (1.01...40.0)', default=7.5)
-    number: int = commands.Flag(description='The number of images to produce. More images take more time. Defaults to 1. (1...10)', default=1)
+    number: int = commands.Flag(description=f'The number of images to produce. More images take more time. Defaults to 1. (1...{_MAX_IMAGE_NUMBER})', default=1)
     seed: int = commands.Flag(description='The seed to use for your image. The same prompt + seed will produce the same image.', default=None)
 
     img2img: discord.Attachment = commands.Flag(description='If you want to use the img2img function, attach an image to base your new image on.', default=None)
@@ -132,16 +125,16 @@ async def dream(ctx: commands.Context, *, quote_text: str = None, flags: DreamFl
 
             if len(flags.prompt) < 1:
                 await ctx.reply(f'A prompt is required.')
-            elif flags.width < 64 or flags.width > 2048:
-                await ctx.reply(f'Width must be between 64 and 2048. Got `{flags.width}`.')
-            elif flags.height < 64 or flags.height > 2048:
-                await ctx.reply(f'Height must be between 64 and 2048. Got `{flags.height}`.')
-            elif flags.steps < 1 or flags.steps > 128:
-                await ctx.reply(f'Steps must be between 1 and 128. Got `{flags.steps}`.')
+            elif flags.width < 64 or flags.width > _MAX_IMAGE_DIMENSION:
+                await ctx.reply(f'Width must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.width}`.')
+            elif flags.height < 64 or flags.height > _MAX_IMAGE_DIMENSION:
+                await ctx.reply(f'Height must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.height}`.')
+            elif flags.steps < 1 or flags.steps > _MAX_IMAGE_STEPS:
+                await ctx.reply(f'Steps must be between 1 and {_MAX_IMAGE_STEPS}. Got `{flags.steps}`.')
             elif flags.strength <= 1.0 or flags.strength > 40.0:
                 await ctx.reply(f'Strength must be between 1.01 and 40.0. Got `{flags.strength}`.')
-            elif flags.number < 1 or flags.number > 10:
-                await ctx.reply(f'Number must be between 1 and 10. Got `{flags.number}`.')
+            elif flags.number < 1 or flags.number > _MAX_IMAGE_NUMBER:
+                await ctx.reply(f'Number must be between 1 and {_MAX_IMAGE_NUMBER}. Got `{flags.number}`.')
             elif flags.img2img_noise < 0.0 or flags.img2img_noise > 0.999:
                 await ctx.reply(f'img2img_noise must be between 0.0 and 0.999. Got `{flags.img2img_noise}`.')
             else:
@@ -185,14 +178,24 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 fit = flags.img2img_fit
                 ))
 
+            files = []
+            embeds = []
             for output in outputs:
-                output_file = discord.File(output[0], description = flags.prompt)
+                file = discord.File(output[0], description = flags.prompt)
                 embed = discord.Embed()
-                embed.set_image(url=f'attachment://{output_file.filename}')
+                embed.set_image(url=f'attachment://{file.filename}')
                 embed.add_field(name='Prompt', value=flags.prompt)
-                embed.add_field(name='Seconds taken', value=format(timer() - start, '.2f'))
-                embed.add_field(name='Seed used', value=output[1])
-                on_bot_thread(ctx.reply(content=f'{ctx.message.author.mention}', file=output_file,embed=embed))
+                embed.add_field(name='Time', value='{} seconds'.format(timer() - start, '.2f'))
+                embed.add_field(name='Seed', value=output[1])
+                
+                embeds.append(embed)
+                files.append(file)
+
+            # in groups in case we've got more than 10 which is the max embeds
+            for i in range(0, len(embeds), _MAX_DISCORD_EMBEDS):
+                embedsChunk = embeds[i:i + _MAX_DISCORD_EMBEDS]
+                filesChunk = files[i:i + _MAX_DISCORD_EMBEDS]
+                on_bot_thread(ctx.reply(content=f'{ctx.message.author.mention}', files=filesChunk,embeds=embedsChunk))
                 
             # Only delete it if it wasn't a slash command
             if ctx.interaction is None:
