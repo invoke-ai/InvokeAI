@@ -6,6 +6,7 @@ export default defineConfig(({ mode }) => {
   const common = {
     plugins: [react()],
     build: {
+      target: 'esnext',
       chunkSizeWarningLimit: 1500, // we don't really care about chunk size
     },
   };

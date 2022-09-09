@@ -21,7 +21,11 @@ import {
 } from '../features/gallery/gallerySlice';
 import { setInitialImagePath, setMaskPath } from '../features/sd/sdSlice';
 
-export const socket = io('http://localhost:9090');
+// Get the socket.io server host and port
+const response = await fetch('socketio_config');
+const data = await response.json();
+const { host, port } = data;
+export const socket = io(`http://${host}:${port}`);
 
 interface SocketIOResponse {
     status: 'OK' | 'ERROR';

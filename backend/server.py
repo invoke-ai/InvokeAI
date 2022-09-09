@@ -25,9 +25,26 @@ import mimetypes
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
 
-
+# Host and port to serve on
 host = 'localhost'
 port = 9090
+
+
+"""
+Additional CORS origins to this list.
+Useful if allowing other machines on your network to use the app.
+
+Example:
+additional_allowed_origins = ["192.168.1.8","192.168.1.24"]
+"""
+additional_allowed_origins = []
+
+
+def build_cors_allowed_origins(additional_allowed_origins):
+    cors_allowed_origins = [f"http://{host}:{port}"]
+    for origin in additional_allowed_origins:
+        cors_allowed_origins.append(origin)
+    return cors_allowed_origins
 
 
 app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
@@ -50,6 +67,12 @@ def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
 
 
+@app.route('/socketio_config')
+def socketio_config():
+    return json.dumps({'host': host, 'port': port})
+
+
+# True enables more logging from socket.io
 dev_mode = False
 
 logger = True if dev_mode else False
@@ -58,8 +81,13 @@ engineio_logger = True if dev_mode else False
 # default 1,000,000, needs to be higher for socketio to accept larger images
 max_http_buffer_size = 10000000
 
+cors_allowed_origins = build_cors_allowed_origins(additional_allowed_origins)
+
 socketio = SocketIO(app,
-                    logger=logger, engineio_logger=logger, max_http_buffer_size=max_http_buffer_size)
+                    logger=logger,
+                    engineio_logger=logger,
+                    max_http_buffer_size=max_http_buffer_size,
+                    cors_allowed_origins=cors_allowed_origins)
 
 
 @socketio.on('cancel')
