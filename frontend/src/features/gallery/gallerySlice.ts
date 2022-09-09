@@ -96,6 +96,7 @@ export const gallerySlice = createSlice({
         );
 
         // filtered array is just paths, generate needed data
+        // TODO: Read accept metadata from server when it is implemented
         const preparedImages = filteredUrls.map((url) => {
           return {
             uuid: uuidv4(),
@@ -106,7 +107,11 @@ export const gallerySlice = createSlice({
 
         const newImages = [...state.images].concat(preparedImages);
 
-        state.currentImageUuid = newImages[newImages.length - 1].uuid;
+        // if previous currentimage no longer exists, set a new one
+        if (!newImages.find((image) => image.uuid === state.currentImageUuid)) {
+          state.currentImageUuid = newImages[newImages.length - 1].uuid;
+        }
+
         state.images = newImages;
       }
     },

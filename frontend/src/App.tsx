@@ -8,6 +8,7 @@ import PromptInput from './features/sd/PromptInput';
 import InitImage from './features/sd/InitImage';
 import ProgressBar from './features/header/ProgressBar';
 import SiteHeader from './features/header/SiteHeader';
+import Variant from './features/sd/Variant';
 
 const App = () => {
     useSocketIOListeners();
@@ -19,10 +20,11 @@ const App = () => {
                 templateAreas={`
                     "progressBar progressBar progressBar"
                     "header header header"
-                    "menu prompt prompt"
+                    "menu prompt imageRoll"
+                    "menu variant imageRoll"
                     "menu currentImage imageRoll"`}
-                gridTemplateRows={'4px 40px 100px auto'}
-                gridTemplateColumns={'300px 4fr 150px'}
+                gridTemplateRows={'4px 40px 100px 32px auto'}
+                gridTemplateColumns={'300px auto 388px'}
                 gap='2'
             >
                 <GridItem area={'progressBar'}>
@@ -35,8 +37,11 @@ const App = () => {
                     <Settings />
                     <InitImage />
                 </GridItem>
-                <GridItem pr='2' area={'prompt'}>
+                <GridItem area={'prompt'}>
                     <PromptInput />
+                </GridItem>
+                <GridItem area={'variant'}>
+                    <Variant />
                 </GridItem>
                 <GridItem area={'currentImage'}>
                     <CurrentImage />

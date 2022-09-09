@@ -1,7 +1,4 @@
-import {
-  combineReducers,
-  configureStore,
-} from '@reduxjs/toolkit';
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
 
@@ -24,9 +21,11 @@ const persistedReducer = persistReducer(persistConfig, reducers);
 
 export const store = configureStore({
   reducer: persistedReducer,
-  // devTools: {
-  //   trace: true,
-  // },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      // redux-persist sometimes needs to have a function in redux, need to disable this check
+      serializableCheck: false,
+    }),
 });
 
 // Infer the `RootState` and `AppDispatch` types from the store itself

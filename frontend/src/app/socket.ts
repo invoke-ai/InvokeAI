@@ -162,7 +162,7 @@ export const useSocketIOEmitters = () => {
 
     const {
         prompt,
-        imagesToGenerate,
+        iterations,
         steps,
         cfgScale,
         height,
@@ -177,6 +177,9 @@ export const useSocketIOEmitters = () => {
         maskPath,
         seamless,
         shouldFitToWidthHeight,
+        shouldGenerateVariations,
+        variantAmount,
+        seedWeights,
     } = useAppSelector((state: RootState) => state.sd);
 
     const { shouldDisplayInProgress } = useAppSelector(
@@ -190,7 +193,7 @@ export const useSocketIOEmitters = () => {
     const generationParameters = {
         // from sd slice
         prompt,
-        imagesToGenerate,
+        iterations,
         steps,
         cfgScale,
         height,
@@ -207,12 +210,17 @@ export const useSocketIOEmitters = () => {
         seamless,
         // from system slid
         shouldDisplayInProgress,
+        // variants
+        shouldGenerateVariations,
+        variantAmount,
+        seedWeights: seedWeights,
     };
 
     return {
         emitGenerateImage: () => {
             dispatch(setIsProcessing(true));
             dispatch(setCurrentStep(-1));
+
             socket.emit('generateImage', generationParameters);
             dispatch(
                 addLogEntry(

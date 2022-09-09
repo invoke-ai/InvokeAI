@@ -1,32 +1,13 @@
-import { Button } from '@chakra-ui/react';
-import { MouseEventHandler } from 'react';
+import { Button, ButtonProps } from '@chakra-ui/react';
 
-type Props = {
+interface Props extends ButtonProps {
     label: string;
-    type?: 'button' | 'submit' | 'reset' | undefined;
-    onClick?: MouseEventHandler<HTMLButtonElement>;
-    colorScheme?: string;
-    isDisabled?: boolean;
-    isLoading?: boolean;
-};
+}
 
-const SDButton = ({
-    label,
-    type,
-    onClick,
-    colorScheme,
-    isDisabled = false,
-    isLoading = false,
-}: Props) => {
+const SDButton = (props: Props) => {
+    const { label, size = 'sm' } = props;
     return (
-        <Button
-            size={'sm'}
-            colorScheme={colorScheme}
-            onClick={onClick}
-            type={type}
-            isDisabled={isDisabled}
-            isLoading={isLoading}
-        >
+        <Button size={size} {...props}>
             {label}
         </Button>
     );

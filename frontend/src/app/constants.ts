@@ -30,7 +30,7 @@ export const UPSCALING_LEVELS: Array<number> = [0, 2, 4];
 // Internal to human-readable parameters
 export const PARAMETERS: { [key: string]: string } = {
     prompt: 'Prompt',
-    imagesToGenerate: 'Iterations',
+    iterations: 'Iterations',
     steps: 'Steps',
     cfgScale: 'CFG Scale',
     height: 'Height',

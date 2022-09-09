@@ -2,6 +2,7 @@ import {
     Flex,
     FormControl,
     FormLabel,
+    Heading,
     HStack,
     IconButton,
     Modal,
@@ -14,7 +15,6 @@ import {
     Switch,
     Text,
     useDisclosure,
-    useToast,
 } from '@chakra-ui/react';
 import { MdSettings } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
@@ -25,27 +25,30 @@ import {
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
 import { persistor } from '../../main';
-import { useState } from 'react';
 
 const SettingsModalButton = () => {
-    const { isOpen, onOpen, onClose } = useDisclosure();
+    const {
+        isOpen: isSettingsModalOpen,
+        onOpen: onSettingsModalOpen,
+        onClose: onSettingsModalClose,
+    } = useDisclosure();
+
+    const {
+        isOpen: isRefreshModalOpen,
+        onOpen: onRefreshModalOpen,
+        onClose: onRefreshModalClose,
+    } = useDisclosure();
+
     const { shouldDisplayInProgress, shouldConfirmOnDelete } = useAppSelector(
         (state: RootState) => state.system
     );
-    const [isResetting, setIsResetting] = useState<boolean>(false);
-    const toast = useToast();
 
     const dispatch = useAppDispatch();
 
     const handleClickResetWebUI = () => {
-        setIsResetting(true);
         persistor.purge().then(() => {
-            toast({
-                title: 'Web UI reset',
-                status: 'success',
-                isClosable: true,
-            });
-            setIsResetting(false);
+            onSettingsModalClose();
+            onRefreshModalOpen();
         });
     };
 
@@ -57,10 +60,10 @@ const SettingsModalButton = () => {
                 fontSize={24}
                 size={'sm'}
                 icon={<MdSettings />}
-                onClick={onOpen}
+                onClick={onSettingsModalOpen}
             />
 
-            <Modal isOpen={isOpen} onClose={onClose}>
+            <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
                 <ModalOverlay />
                 <ModalContent>
                     <ModalHeader>Settings</ModalHeader>
@@ -101,25 +104,52 @@ const SettingsModalButton = () => {
                                     />
                                 </HStack>
                             </FormControl>
-                            <SDButton
-                                label='Reset Web UI'
-                                colorScheme='orange'
-                                onClick={handleClickResetWebUI}
-                                isLoading={isResetting}
-                            />
+
+                            <Heading size={'md'}>Reset Web UI</Heading>
                             <Text>
                                 Resetting the web UI only resets the browser's
                                 local cache of your images and remembered
                                 settings. It does not delete any images from
-                                disk. After resetting, refresh your browser to
-                                re-load all images into the web UI.
+                                disk.
                             </Text>
+                            <Text>
+                                If images aren't showing up in the gallery or
+                                something else isn't working, please try
+                                resetting before submitting an issue on GitHub.
+                            </Text>
+                            <SDButton
+                                label='Reset Web UI'
+                                colorScheme='red'
+                                onClick={handleClickResetWebUI}
+                            />
                         </Flex>
                     </ModalBody>
 
                     <ModalFooter>
-                        <SDButton label='Close' onClick={onClose} />
+                        <SDButton
+                            label='Close'
+                            onClick={onSettingsModalClose}
+                        />
                     </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            <Modal
+                closeOnOverlayClick={false}
+                isOpen={isRefreshModalOpen}
+                onClose={onRefreshModalClose}
+                isCentered
+            >
+                <ModalOverlay bg='blackAlpha.300' backdropFilter='blur(40px)' />
+                <ModalContent>
+                    <ModalBody pb={6} pt={6}>
+                        <Flex justifyContent={'center'}>
+                            <Text fontSize={'lg'}>
+                                Web UI has been reset. Refresh the page to
+                                reload.
+                            </Text>
+                        </Flex>
+                    </ModalBody>
                 </ModalContent>
             </Modal>
         </>

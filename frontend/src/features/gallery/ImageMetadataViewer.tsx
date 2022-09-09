@@ -38,7 +38,7 @@ const ImageMetadataViewer = ({ image }: Props) => {
         <List>
             {metadata.map((parameter) => {
                 const { label, key, value } = parameter;
-                return (
+                return value ? (
                     <ListItem pb={1}>
                         <Flex gap={2}>
                             <IconButton
@@ -58,7 +58,7 @@ const ImageMetadataViewer = ({ image }: Props) => {
                             <Text>{value.toString()}</Text>
                         </Flex>
                     </ListItem>
-                );
+                ) : null;
             })}
         </List>
     ) : (

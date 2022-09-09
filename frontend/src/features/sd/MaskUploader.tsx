@@ -63,6 +63,7 @@ const MaskUploader = ({ setShouldShowMask }: Props) => {
                     aria-label='Upload mask'
                     icon={<FaMask />}
                     fontSize={20}
+                    colorScheme='blue'
                     onClick={open}
                 />
             </Tooltip>

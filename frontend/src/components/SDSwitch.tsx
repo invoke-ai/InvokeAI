@@ -1,31 +1,36 @@
-import { FormControl, FormLabel, HStack, Switch } from '@chakra-ui/react';
-import { ChangeEvent } from 'react';
+import {
+  FormControl,
+  FormLabel,
+  HStack,
+  Switch,
+  SwitchProps,
+} from '@chakra-ui/react';
 
-type Props = {
+interface Props extends SwitchProps {
   label: string;
-  isChecked: boolean;
-  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  isDisabled?: boolean;
-};
+  width?: string | number;
+}
 
-const SDSwitch = ({
-  label,
-  isChecked,
-  onChange,
-  isDisabled = false,
-}: Props) => {
+const SDSwitch = (props: Props) => {
+  const {
+    label,
+    isDisabled = false,
+    fontSize = 'sm',
+    size = 'md',
+    width,
+  } = props;
   return (
-    <FormControl isDisabled={isDisabled}>
+    <FormControl isDisabled={isDisabled} width={width}>
       <HStack>
         <FormLabel
           marginInlineEnd={0}
           marginBottom={1}
-          fontSize='sm'
+          fontSize={fontSize}
           whiteSpace='nowrap'
         >
           {label}
         </FormLabel>
-        <Switch onChange={onChange} isChecked={isChecked} />
+        <Switch size={size} {...props} />
       </HStack>
     </FormControl>
   );

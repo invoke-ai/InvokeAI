@@ -12,7 +12,7 @@ const calculateRealSteps = (
 
 export interface SDState {
   prompt: string;
-  imagesToGenerate: number;
+  iterations: number;
   steps: number;
   realSteps: number;
   cfgScale: number;
@@ -28,11 +28,14 @@ export interface SDState {
   maskPath: string;
   seamless: boolean;
   shouldFitToWidthHeight: boolean;
+  shouldGenerateVariations: boolean;
+  variantAmount: number;
+  seedWeights: string;
 }
 
 const initialSDState = {
-  prompt: 'Cyborg pickle shooting lasers',
-  imagesToGenerate: 1,
+  prompt: '',
+  iterations: 1,
   steps: 50,
   realSteps: 50,
   cfgScale: 7.5,
@@ -48,6 +51,9 @@ const initialSDState = {
   maskPath: '',
   seamless: false,
   shouldFitToWidthHeight: true,
+  shouldGenerateVariations: false,
+  variantAmount: 0.1,
+  seedWeights: '',
 };
 
 const initialState: SDState = initialSDState;
@@ -59,8 +65,8 @@ export const sdSlice = createSlice({
     setPrompt: (state, action: PayloadAction<string>) => {
       state.prompt = action.payload;
     },
-    setImagesToGenerate: (state, action: PayloadAction<number>) => {
-      state.imagesToGenerate = action.payload;
+    setIterations: (state, action: PayloadAction<number>) => {
+      state.iterations = action.payload;
     },
     setSteps: (state, action: PayloadAction<number>) => {
       const { img2imgStrength, initialImagePath } = state;
@@ -144,6 +150,15 @@ export const sdSlice = createSlice({
       const temp = { ...state, [key]: value };
       return temp;
     },
+    setShouldGenerateVariations: (state, action: PayloadAction<boolean>) => {
+      state.shouldGenerateVariations = action.payload;
+    },
+    setVariantAmount: (state, action: PayloadAction<number>) => {
+      state.variantAmount = action.payload;
+    },
+    setSeedWeights: (state, action: PayloadAction<string>) => {
+      state.seedWeights = action.payload;
+    },
     setAllParameters: (state, action: PayloadAction<SDMetadata>) => {
       return { ...state, ...action.payload };
     },
@@ -158,7 +173,7 @@ export const sdSlice = createSlice({
 
 export const {
   setPrompt,
-  setImagesToGenerate,
+  setIterations,
   setSteps,
   setCfgScale,
   setHeight,
@@ -178,6 +193,9 @@ export const {
   resetSDState,
   setShouldFitToWidthHeight,
   setParameter,
+  setShouldGenerateVariations,
+  setSeedWeights,
+  setVariantAmount,
   setAllParameters,
 } = sdSlice.actions;
 

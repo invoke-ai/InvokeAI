@@ -21,7 +21,7 @@ import { useState } from 'react';
 import ImageMetadataViewer from './ImageMetadataViewer';
 import DeleteImageModalButton from './DeleteImageModalButton';
 
-const height = 'calc(100vh - 176px)';
+const height = 'calc(100vh - 216px)';
 
 const CurrentImage = () => {
     const { currentImageUuid, images, intermediateImage } = useAppSelector(
@@ -51,11 +51,11 @@ const CurrentImage = () => {
                 <Flex gap={2}>
                     <Box position={'relative'}>
                         <Image
-                            maxHeight={height}
+                            height={height}
                             src={imageToDisplay.url}
                             fit='contain'
-                            minWidth={512}
-                            minHeight={512}
+                            // minWidth={512}
+                            // minHeight={512}
                         />
                         {shouldShowImageDetails && (
                             <Flex

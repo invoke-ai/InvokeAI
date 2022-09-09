@@ -2,8 +2,6 @@ import {
     Flex,
     IconButton,
     HStack,
-    Spacer,
-    ChakraProps,
     Box,
 } from '@chakra-ui/react';
 
@@ -20,7 +18,7 @@ import {
     setCfgScale,
     setGfpganStrength,
     setHeight,
-    setImagesToGenerate,
+    setIterations,
     setImg2imgStrength,
     setSampler,
     setSeed,
@@ -44,11 +42,11 @@ import {
     WIDTHS,
 } from '../../app/constants';
 import SDSwitch from '../../components/SDSwitch';
+import useCheckParameters from '../system/useCheckParameters';
 
-const Settings = (props: ChakraProps) => {
+const Settings = () => {
     const {
-        prompt,
-        imagesToGenerate,
+        iterations,
         steps,
         cfgScale,
         height,
@@ -62,34 +60,40 @@ const Settings = (props: ChakraProps) => {
         initialImagePath,
         shouldFitToWidthHeight,
         seamless,
+        shouldGenerateVariations,
     } = useAppSelector((state: RootState) => state.sd);
 
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
         useAppSelector((state: RootState) => state.system);
 
     const dispatch = useAppDispatch();
+
     const { emitGenerateImage, emitCancel } = useSocketIOEmitters();
 
+    const areParametersValid = useCheckParameters();
+
     return (
-        <Flex direction={'column'} gap={2} {...props}>
-            <HStack>
+        <Flex direction={'column'} gap={2}>
+            <HStack justifyContent={'stretch'}>
+                {isProcessing ? (
+                    <SDButton
+                        label='Cancel'
+                        colorScheme='red'
+                        isDisabled={!isConnected || !isProcessing}
+                        onClick={() => emitCancel()}
+                    />
+                ) : (
+                    <SDButton
+                        label='Generate'
+                        type='submit'
+                        colorScheme='green'
+                        isDisabled={!areParametersValid}
+                        onClick={() => emitGenerateImage()}
+                    />
+                )}
+                {/*<Spacer />*/}
                 <SDButton
-                    label='Generate'
-                    type='submit'
-                    colorScheme='green'
-                    isDisabled={!isConnected || isProcessing || !prompt}
-                    onClick={() => emitGenerateImage()}
-                />
-                <Spacer />
-                <SDButton
-                    label='Cancel'
-                    colorScheme='red'
-                    isDisabled={!isConnected || !isProcessing}
-                    onClick={() => emitCancel()}
-                />
-                <Spacer />
-                <SDButton
-                    label='Reset'
+                    label='Reset all image parameters'
                     colorScheme='blue'
                     onClick={() => dispatch(resetSDState())}
                 />
@@ -101,8 +105,8 @@ const Settings = (props: ChakraProps) => {
                     step={1}
                     min={1}
                     precision={0}
-                    onChange={(v) => dispatch(setImagesToGenerate(Number(v)))}
-                    value={imagesToGenerate}
+                    onChange={(v) => dispatch(setIterations(Number(v)))}
+                    value={iterations}
                 />
                 <SDNumberInput
                     label='Steps'
@@ -132,7 +136,7 @@ const Settings = (props: ChakraProps) => {
             <HStack>
                 <Box flexGrow={3}>
                     <SDNumberInput
-                        label='CFG Scale'
+                        label='CFG scale'
                         step={0.5}
                         onChange={(v) => dispatch(setCfgScale(Number(v)))}
                         value={cfgScale}
@@ -153,6 +157,7 @@ const Settings = (props: ChakraProps) => {
                     label='Seed'
                     step={1}
                     precision={0}
+                    isInvalid={seed < 0 && shouldGenerateVariations}
                     onChange={(v) => dispatch(setSeed(Number(v)))}
                     value={seed}
                 />

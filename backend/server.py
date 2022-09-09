@@ -18,6 +18,7 @@ from enum import Enum
 
 from pathlib import Path
 from pytorch_lightning import logging
+from parse_seed_weights import parse_seed_weights
 
 # fix missing mimetypes on windows due to registry wonkiness
 import mimetypes
@@ -144,7 +145,7 @@ def generate_image(data):
     canceled.clear()
     prompt = data['prompt']
     strength = float(data['img2imgStrength'])
-    iterations = int(data['imagesToGenerate'])
+    iterations = int(data['iterations'])
     steps = int(data['steps'])
     width = int(data['width'])
     height = int(data['height'])
@@ -171,6 +172,14 @@ def generate_image(data):
     step_writer = PngWriter("outputs/intermediates")
     step_index = 1
 
+    with_variations = None
+    variation_amount = data["variantAmount"]
+
+    seed_weights = parse_seed_weights(data["seedWeights"])
+
+    if data["shouldGenerateVariations"] and seed_weights is not False:
+        with_variations = seed_weights
+
     def image_progress(sample, step):
         if canceled.is_set():
             raise CanceledException
@@ -189,9 +198,11 @@ def generate_image(data):
         eventlet.sleep(0)
 
     def image_done(image, seed, upscaled=False):
-        name = f'{prefix}.{seed}.png'
-        path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', name)
+        filename = f'{prefix}.{seed}.png'
+        path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', filename)
         if not upscaled:
+            # We may have passed -1 as seed to server, need actual seed for UI
+            data["seed"] = seed
             socketio.emit(
                 'result', {'url': os.path.relpath(path), 'metadata': data})
             eventlet.sleep(0)
@@ -208,7 +219,7 @@ def generate_image(data):
             # save_original  =    False,
 
     try:
-
+        print(with_variations)
         model.prompt2image(prompt,
                            iterations=iterations,
                            init_img=init_img,
@@ -221,14 +232,18 @@ def generate_image(data):
                            gfpgan_strength=gfpgan_strength,
                            upscale=upscale,
                            sampler_name=sampler_name,
-                           step_callback=image_progress,
                            strength=strength,
-                           image_callback=image_done,
                            fit=fit,
                            seamless=seamless,
-                           progress_images=progress_images)
-    except KeyboardInterrupt:
+                           progress_images=progress_images,
+                           with_variations=with_variations,
+                           variation_amount=variation_amount,
+                           step_callback=image_progress,
+                           image_callback=image_done)
 
+    except KeyboardInterrupt:
+        raise
+    except CanceledException:
         raise
     except Exception as e:
         socketio.emit('error', (str(e)))

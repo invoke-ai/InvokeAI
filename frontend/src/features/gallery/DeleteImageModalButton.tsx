@@ -1,5 +1,6 @@
 import {
   IconButton,
+  IconButtonProps,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -11,6 +12,7 @@ import {
   Tooltip,
   useDisclosure,
 } from '@chakra-ui/react';
+import { MouseEventHandler } from 'react';
 import { MdDeleteForever } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { useSocketIOEmitters } from '../../app/socket';
@@ -18,17 +20,29 @@ import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
 import { setShouldConfirmOnDelete } from '../system/systemSlice';
 
-type Props = {
+interface Props extends IconButtonProps {
   uuid: string;
-};
+  'aria-label': string;
+}
 
-const DeleteImageModalButton = ({ uuid }: Props) => {
+/*
+TODO: The modal and button to open it should be two different components,
+but their state is closely related and I'm not sure how best to accomplish it.
+*/
+const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { emitDeleteImage } = useSocketIOEmitters();
   const dispatch = useAppDispatch();
   const { shouldConfirmOnDelete } = useAppSelector(
     (state: RootState) => state.system
   );
+
+  const handleClickDelete: MouseEventHandler<HTMLButtonElement> = (e) => {
+    e.stopPropagation();
+    shouldConfirmOnDelete ? onOpen() : handleDelete();
+  };
+
+  const { uuid, size, fontSize } = props;
 
   const handleDelete = () => {
     emitDeleteImage(uuid);
@@ -43,12 +57,14 @@ const DeleteImageModalButton = ({ uuid }: Props) => {
 
   return (
     <>
-      <Tooltip label='Delete'>
+      <Tooltip label='Delete image'>
         <IconButton
-          aria-label='Delete'
+          aria-label='Delete image'
           icon={<MdDeleteForever />}
-          fontSize={24}
-          onClick={shouldConfirmOnDelete ? onOpen : handleDelete}
+          onClickCapture={handleClickDelete}
+          size={size}
+          fontSize={fontSize}
+          {...props}
         />
       </Tooltip>
 

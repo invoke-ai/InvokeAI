@@ -98,6 +98,7 @@ const InitImage = () => {
                       aria-label='Reset initial image & mask'
                       icon={<RiCloseFill />}
                       fontSize={24}
+                      colorScheme='red'
                       onClick={() => dispatch(resetInitialImagePath())}
                     />
                   </Tooltip>
@@ -106,6 +107,7 @@ const InitImage = () => {
                       aria-label='Upload new initial image'
                       icon={<FaUpload />}
                       fontSize={20}
+                      colorScheme='blue'
                       onClick={open}
                     />
                   </Tooltip>

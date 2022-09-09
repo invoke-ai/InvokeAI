@@ -3,39 +3,38 @@ import {
     FormLabel,
     HStack,
     Select,
+    SelectProps,
     Text,
 } from '@chakra-ui/react';
-import { ChangeEventHandler } from 'react';
 
-type Props = {
+interface Props extends SelectProps {
     label: string;
-    value: string | number;
-    onChange: ChangeEventHandler<HTMLSelectElement>;
-    validValues: Array<string | number>;
-    isDisabled?: boolean;
-};
+    validValues: Array<number | string>;
+}
 
-const SDSelect = ({
-    label,
-    value,
-    onChange,
-    validValues,
-    isDisabled = false,
-}: Props) => {
+const SDSelect = (props: Props) => {
+    const {
+        label,
+        isDisabled,
+        validValues,
+        size = 'sm',
+        fontSize = 'sm',
+        marginInlineEnd = 0,
+        marginBottom = 1,
+        whiteSpace = 'nowrap',
+    } = props;
     return (
         <FormControl isDisabled={isDisabled}>
             <HStack>
-                <FormLabel marginInlineEnd={0} marginBottom={1}>
-                    <Text fontSize={'sm'} whiteSpace='nowrap'>
+                <FormLabel
+                    marginInlineEnd={marginInlineEnd}
+                    marginBottom={marginBottom}
+                >
+                    <Text fontSize={fontSize} whiteSpace={whiteSpace}>
                         {label}
                     </Text>
                 </FormLabel>
-                <Select
-                    fontSize={'sm'}
-                    size={'sm'}
-                    onChange={onChange}
-                    value={value}
-                >
+                <Select fontSize={fontSize} size={size} {...props}>
                     {validValues.map((val) => (
                         <option key={val} value={val}>
                             {val}

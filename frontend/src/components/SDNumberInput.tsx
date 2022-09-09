@@ -8,46 +8,32 @@ import {
   HStack,
   Text,
   FormLabel,
+  NumberInputProps,
 } from '@chakra-ui/react';
 
-type Props = {
+interface Props extends NumberInputProps {
   label: string;
-  value: number;
-  onChange: (valueAsString: string, valueAsNumber: number) => void;
-  step?: number;
-  min?: number;
-  max?: number;
-  precision?: number;
-  isDisabled?: boolean;
-};
+  width?: string | number;
+}
 
-const SDNumberInput = ({
-  label,
-  value,
-  onChange,
-  step,
-  min,
-  max,
-  precision,
-  isDisabled = false,
-}: Props) => {
+const SDNumberInput = (props: Props) => {
+  const {
+    label,
+    isDisabled = false,
+    fontSize = 'sm',
+    size = 'sm',
+    width,
+    isInvalid,
+  } = props;
   return (
-    <FormControl isDisabled={isDisabled}>
+    <FormControl isDisabled={isDisabled} width={width} isInvalid={isInvalid}>
       <HStack>
         <FormLabel marginInlineEnd={0} marginBottom={1}>
-          <Text fontSize={'sm'} whiteSpace='nowrap'>
+          <Text fontSize={fontSize} whiteSpace='nowrap'>
             {label}
           </Text>
         </FormLabel>
-        <NumberInput
-          size={'sm'}
-          step={step}
-          min={min}
-          max={max}
-          precision={precision}
-          onChange={onChange}
-          value={value}
-        >
+        <NumberInput size={size} {...props}>
           <NumberInputField />
           <NumberInputStepper>
             <NumberIncrementStepper />
