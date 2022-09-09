@@ -33,7 +33,6 @@ jobs:
             ${{ env.cache-name }}
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
-        continue-on-error: true
         run: |
           if [ ! -e models/ldm/stable-diffusion-v1 ]; then
               mkdir -p models/ldm/stable-diffusion-v1
@@ -56,17 +55,16 @@ jobs:
         run: |
           conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
       - name: Use Cached Huggingface and Torch models
-        id: cache-hugginface-torch
+        id: cache-huggingface-torch
         uses: actions/cache@v3
         env:
-          cache-name: cache-hugginface-torch
+          cache-name: cache-huggingface-torch
         with:
           path: ~/.cache
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
       - name: Download Huggingface and Torch models
-        if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
-        continue-on-error: true
+        if: ${{ steps.cache-huggingface-torch.outputs.cache-hit != 'true' }}
         run: |
           ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
