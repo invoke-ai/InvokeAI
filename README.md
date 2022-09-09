@@ -232,7 +232,7 @@ scaling factor and should be set to either `2` or `4` only. This will
 either scale the image 2x or 4x respectively using different models.
 
 You can set the scaling strength between `0` and `1.0` to control
-intensity of the of the scaling. This is handy because AI upscalers
+intensity of the scaling. This is handy because AI upscalers
 generally tend to smooth out texture details. If you wish to retain
 some of those for natural looking results, we recommend using values
 between `0.5 to 0.8`.
@@ -291,30 +291,29 @@ arguments to perform those actions.
 
 ## Embiggen 
 
-If Img2Img was cool, but you wanted to be able to do more (pixels) with
-it without running out of VRAM, this is for you.
-If you want to upscale and make new details that couldn't possibly be gotten
-without the context of a prompt, this is for you.
+If you wanted to be able to do more (pixels) without running out of VRAM,
+or you want to upscale with details that couldn't possibly appear
+without the context of a prompt, this is the feature to try out.
 
-Automates the process of taking an init image, upscaling it, cutting it
-into smaller tiles (of a size that can actually be run on your GPU
-with img2img) with some overlap between tiles, running all the tiles through
-img2img to refine details with respect to the prompt, and "stitching"
-the tiles back together into a cohesive image.
+Embiggen automates the process of taking an init image, upscaling it,
+cutting it into smaller tiles that slightly overlap, running all the
+tiles through img2img to refine details with respect to the prompt,
+and "stitching" the tiles back together into a cohesive image.
+
+It automatically computes how many tiles are needed, and so it can be fed
+*ANY* size init image and perform Img2Img on it (though it will be run only
+one tile at a time, which can cause problems, see the Note at the end).
 
 If you're familiar with "GoBig" (ala [progrock-stable](https://github.com/lowfuel/progrock-stable))
-it's sort of like that, except it can work up to an arbitrarily large size
-(instead of just 2x), with configurable overlaps between the tiles, and
+it's similar to that, except it can work up to an arbitrarily large size
+(instead of just 2x), with tile overlaps configurable as a ratio, and
 has extra logic to re-run any number of the tile sub-sections of the image
 if for example a small part of a huge run got messed up.
 
-Also, because it automatically figures out how many tiles it needs you can
-feed it ANY size init image and perform Img2Img on it (though, it will be 
-run only one tile at a time - which can cause problems - see the Note)
-
 **Usage**
 
-`-embiggen <scaling_factor> <esrgan_strength> <overlap_ratio OR overlap_pixels>`,
+`-embiggen <scaling_factor> <esrgan_strength> <overlap_ratio OR overlap_pixels>`
+
 Takes a scaling factor relative to the size of the `--init_img` (`-I`), followed by
 ESRGAN upscaling strength (0 - 1.0), followed by minimum amount of overlap
 between tiles as a decimal ratio (0 - 1.0) *OR* a number of pixels.
@@ -329,36 +328,37 @@ as many pixels, and will take (at least) 9 times as long (see overlap for why it
 longer). If the `--init_img` is already the right size `-embiggen 1`, and it can also be
 less than one if the init_img is too big.
 
-ESRGAN is only used to upscale the init prior to cutting it into tiles/pieces to run
-through img2img and then stitch back togeather. It can be run without ESRGAN, just set
+ESRGAN is only used to upscale the `--init_img` prior to cutting it into tiles/pieces to run
+through img2img and then stitch back together. It can be run without ESRGAN, just set
 the strength to zero (e.g. `-embiggen 1.75 0`). The output of Embiggen can also be upscaled
 after it's finished (`-U`).
 
-The overlap is minimum amount that tiles overlap with adjacent tiles, specified as either
-a ratio or a number of pixels. How much the tiles overlap contributes to how cohesive the
-image looks, and really small overlaps (e.g. a couple of pixels) may produce noticable
-grid-like fuzzy distortions in the final stiched image.
-It is a trade-off though, as the overlapping space doesn't contribute to making the image
-bigger, and the larger the overlap the more tiles (and the more time) it will take to finish.
+The overlap is the minimum that tiles will overlap with adjacent tiles, specified as
+either a ratio or a number of pixels. How much the tiles overlap determines the likelihood
+the tiling will be noticable, really small overlaps (e.g. a couple of pixels) may produce
+noticeable grid-like fuzzy distortions in the final stitched image. Though, as the
+overlapping space doesn't contribute to making the image bigger, and the larger the
+overlap the more tiles (and the more time) it will take to finish.
 
 Because the overlapping parts of tiles don't "contribute" to increasing size, every
 tile after the first in a row or column effectively only covers an extra `1 - overlap_ratio`
-on each axis. So, for an input/`--init_img` the same size as a tile, the ideal (for time)
+on each axis. If the input/`--init_img` is same size as a tile, the ideal (for time)
 scaling factors with the default overlap (0.25) are 1.75, 2.5, 3.25, 4.0 etc..
 
-`-embiggen_tiles <spaced list of tiles>` Is an advanced usage useful if you only want to alter
-parts of the image while running Embiggen. It takes a list of tiles by number
-(in order) to run and replace onto the initial image e.g. `0 2 4`.
-It's useful for either fixing problem spots from a previous Embiggen run, or
-selectively altering the prompt for sections of an image - for creative or
-coherency reasons.
-Tiles are numbered starting with zero, and left-to-right, top-to-bottom.
-So, if you are generating a 3x3 tiled image, the middle row would be `3 4 5`.
+`-embiggen_tiles <spaced list of tiles>`
+
+An advanced usage useful if you only want to alter parts of the image while running
+Embiggen. It takes a list of tiles by number to run and replace onto the initial
+image e.g. `1 3 5`. It's useful for either fixing problem spots from a previous
+Embiggen run, or selectively altering the prompt for sections of an image - for
+creative or coherency reasons.
+Tiles are numbered starting with one, and left-to-right, top-to-bottom.
+So, if you are generating a 3x3 tiled image, the middle row would be `4 5 6`.
 
 **Example Usage**
 
-Running embiggen with 512x512 tiles on an existing image, scaling up by a factor of 2.5x;
-and doing the same thing (default ESRGAN strength is 0.75, default overlap between tiles is 0.25)
+Running Embiggen with 512x512 tiles on an existing image, scaling up by a factor of 2.5x;
+and doing the same again (default ESRGAN strength is 0.75, default overlap between tiles is 0.25):
 ```
 dream > a photo of a forest at sunset -s 100 -W 512 -H 512 -I outputs/forest.png -f 0.4 -embiggen 2.5
 dream > a photo of a forest at sunset -s 100 -W 512 -H 512 -I outputs/forest.png -f 0.4 -embiggen 2.5 0.75 0.25
@@ -369,12 +369,21 @@ If there weren't enough clouds in the sky of that forest you just made (and that
 is about 1280 pixels (512*2.5) wide A.K.A. three 512x512 tiles with 0.25 overlaps wide)
 we can replace that top row of tiles:
 ```
-dream> a photo of puffy clouds over a forest at sunset -s 100 -W 512 -H 512 -I outputs/000002.seed.png -f 0.5 -embiggen_tiles 0 1 2
+dream> a photo of puffy clouds over a forest at sunset -s 100 -W 512 -H 512 -I outputs/000002.seed.png -f 0.5 -embiggen_tiles 1 2 3
 ```
 
 **Note**
 
-Because the same prompt is used on all the tiled images, and the model doesn't have the context of anything outside the tile being run - it can end up creating repeated patterns (also called 'motifs') across all the tiles based on that prompt. The best way to combat this is lowering the `--strength` (`-f`) to stay more true to the init image, and increasing the number of steps so there is more compute-time to create the detail. Anecdotally `--strength` 0.35-0.45 works pretty well on most things. It may also work great in some examples even with the `--strength` set high for patterns, landscapes, or subjects that are more abtract. Because this is (relatively) fast, you can also always create a few Embiggen'ed images and manually composite them to preserve the best parts from each.
+Because the same prompt is used on all the tiled images, and the model doesn't have the
+context of anything outside the tile being run - it can end up creating repeated pattern
+(also called 'motifs') across all the tiles based on that prompt. The best way to combat
+this is lowering the `--strength` (`-f`) to stay more true to the init image, and
+increasing the number of steps so there is more compute-time to create the detail.
+Anecdotally `--strength` 0.35-0.45 works pretty well on most things. It may also work
+great in some examples even with the `--strength` set high for patterns, landscapes, or
+subjects that are more abstract. Because this is (relatively) fast, you can also
+always create a few Embiggen'ed images and manually composite them to preserve the
+best parts from each.
 
 ## Google Colab
 
@@ -501,7 +510,7 @@ On a RTX3090, the process for SD will take ~1h @1.6 iterations/sec.
 Note: According to the associated paper, the optimal number of images
 is 3-5. Your model may not converge if you use more images than that.
 
-Training will run indefinately, but you may wish to stop it before the
+Training will run indefinitely, but you may wish to stop it before the
 heat death of the universe, when you find a low loss epoch or around
 ~5000 iterations.
 
@@ -540,7 +549,7 @@ repository and associated paper for details and limitations.
 
 - v1.14 (In progress)
 
-  - Add "seamless mode" for circular tiling of image. Generates beautiful effects. ([prixt](https://github.com/prixt))
+  - Add "seamless mode" for circular tiling of images. Generates beautiful effects. ([prixt](https://github.com/prixt))
 
 - v1.13 (3 September 2022
 
@@ -586,7 +595,7 @@ worked, your command prompt will be prefixed by the name of the current anaconda
 (base) ~$ git clone https://github.com/lstein/stable-diffusion.git
 ```
 
-This will create stable-diffusion folder where you will follow the rest of the steps.
+This will create a stable-diffusion folder where you will follow the rest of the steps.
 
 4. Enter the newly-created stable-diffusion folder. From this step forward make sure that you are working in the stable-diffusion directory!
 
@@ -624,7 +633,7 @@ machines that are not internet connected. See [Workaround for machines with limi
 
 7. Now you need to install the weights for the stable diffusion model.
 
-For running with the released weights, you will first need to set up an acount with Hugging Face (https://huggingface.co).
+For running with the released weights, you will first need to set up an account with Hugging Face (https://huggingface.co).
 Use your credentials to log in, and then point your browser at https://huggingface.co/CompVis/stable-diffusion-v-1-4-original.
 You may be asked to sign a license agreement at this point.
 
@@ -703,7 +712,7 @@ in the wiki
 git clone https://github.com/lstein/stable-diffusion.git
 ```
 
-This will create stable-diffusion folder where you will follow the rest of the steps.
+This will create a stable-diffusion folder where you will follow the rest of the steps.
 
 5. Enter the newly-created stable-diffusion folder. From this step forward make sure that you are working in the stable-diffusion directory!
 
@@ -734,7 +743,7 @@ downloaded just-in-time)
 8. Now you need to install the weights for the big stable diffusion model.
 
 For running with the released weights, you will first need to set up
-an acount with Hugging Face (https://huggingface.co). Use your
+an account with Hugging Face (https://huggingface.co). Use your
 credentials to log in, and then point your browser at
 https://huggingface.co/CompVis/stable-diffusion-v-1-4-original. You
 may be asked to sign a license agreement at this point.

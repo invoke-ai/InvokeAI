@@ -626,7 +626,7 @@ def create_cmd_parser():
         nargs='+',
         default=None,
         type=int,
-        help='If while doing Embiggen we are altering only parts of the image, takes a list of tiles by number in order to process and replace onto the image e.g. `0 2 4`, useful for redoing problematic spots from a prior Embiggen run',
+        help='If while doing Embiggen we are altering only parts of the image, takes a list of tiles by number to process and replace onto the image e.g. `1 3 5`, useful for redoing problematic spots from a prior Embiggen run',
     )
     # variants is going to be superseded by a generalized "prompt-morph" function
     #    parser.add_argument('-v','--variants',type=int,help="in img2img mode, the first generated image will get passed back to img2img to generate the requested number of variants")

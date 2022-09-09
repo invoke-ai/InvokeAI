@@ -55,6 +55,12 @@ class Embiggen(Generator):
             embiggen[2] = 0.25
             print('>> Overlap size for Embiggen must be a positive ratio between 0 and 1 OR a number of pixels, fell back to the default of 0.25 !')
 
+        # Convert tiles from their user-freindly count-from-one to count-from-zero, because we need to do modulo math
+        # and then sort them, because... people.
+        if embiggen_tiles:
+            embiggen_tiles = list(map(lambda n: n-1, embiggen_tiles))
+            embiggen_tiles.sort()
+
         # Prep img2img generator, since we wrap over it
         gen_img2img = Img2Img(self.model)
 
@@ -155,6 +161,18 @@ class Embiggen(Generator):
         alphaLayerLTC.paste(agradientC.resize((overlap_size_x, overlap_size_y)), (0, 0))
 
         if embiggen_tiles:
+            # TESTING individual sides only
+            alphaLayerR = Image.new("L", (width, height), 255)
+            alphaLayerR.paste(agradientL.rotate(180), (width - overlap_size_x, 0))
+            alphaLayerB = Image.new("L", (width, height), 255)
+            alphaLayerB.paste(agradientT.rotate(180), (0, height - overlap_size_y))
+            alphaLayerTB = Image.new("L", (width, height), 255)
+            alphaLayerTB.paste(agradientT, (0, 0))
+            alphaLayerTB.paste(agradientT.rotate(180), (0, height - overlap_size_y))
+            alphaLayerLR = Image.new("L", (width, height), 255)
+            alphaLayerLR.paste(agradientL, (0, 0))
+            alphaLayerLR.paste(agradientL.rotate(180), (width - overlap_size_x, 0))
+
             # Sides and corner Layers
             alphaLayerRBC = Image.new("L", (width, height), 255)
             alphaLayerRBC.paste(agradientL.rotate(180), (width - overlap_size_x, 0))
@@ -234,7 +252,7 @@ class Embiggen(Generator):
                 # newinitimage.save(newinitimagepath)
                 
                 if embiggen_tiles:
-                    print(f'Making tile #{tile} ({embiggen_tiles.index(tile) + 1} of {len(embiggen_tiles)} requested)')
+                    print(f'Making tile #{tile + 1} ({embiggen_tiles.index(tile) + 1} of {len(embiggen_tiles)} requested)')
                 else:
                     print(f'Starting {tile + 1} of {(emb_tiles_x * emb_tiles_y)} tiles')
 
@@ -301,29 +319,75 @@ class Embiggen(Generator):
                             top = round(emb_row_i * (height - overlap_size_y))
                         # Handle gradients for various conditions
                         # Handle emb_rerun case
-                        # TODO - smartly handle new Embiggen rerun logic for tile placements adjacent to other rerun tiles
                         if embiggen_tiles:
-                            if emb_row_i == 0: # top of image
+                            # top of image
+                            if emb_row_i == 0:
                                 if emb_column_i == 0:
-                                    intileimage.putalpha(alphaLayerRBC)
+                                    if (tile+1) in embiggen_tiles: # Look-ahead right
+                                        if (tile+emb_tiles_x) not in embiggen_tiles: # Look-ahead down
+                                            intileimage.putalpha(alphaLayerB)
+                                        # Otherwise do nothing on this tile
+                                    elif (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down only
+                                        intileimage.putalpha(alphaLayerR)
+                                    else:
+                                        intileimage.putalpha(alphaLayerRBC)
                                 elif emb_column_i == emb_tiles_x - 1:
-                                    intileimage.putalpha(alphaLayerLBC)
+                                    if (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down
+                                        intileimage.putalpha(alphaLayerL)
+                                    else:
+                                        intileimage.putalpha(alphaLayerLBC)
                                 else:
-                                    intileimage.putalpha(alphaLayerABT)
-                            elif emb_row_i == emb_tiles_y - 1: # bottom of image
+                                    if (tile+1) in embiggen_tiles: # Look-ahead right
+                                        if (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down
+                                            intileimage.putalpha(alphaLayerL)
+                                        else:
+                                            intileimage.putalpha(alphaLayerLBC)
+                                    elif (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down only
+                                        intileimage.putalpha(alphaLayerLR)
+                                    else:
+                                        intileimage.putalpha(alphaLayerABT)
+                            # bottom of image
+                            elif emb_row_i == emb_tiles_y - 1:
                                 if emb_column_i == 0:
-                                    intileimage.putalpha(alphaLayerRTC)
+                                    if (tile+1) in embiggen_tiles: # Look-ahead right
+                                        intileimage.putalpha(alphaLayerT)
+                                    else:
+                                        intileimage.putalpha(alphaLayerRTC)
                                 elif emb_column_i == emb_tiles_x - 1:
+                                    # No tiles to look ahead to
                                     intileimage.putalpha(alphaLayerLTC)
                                 else:
-                                    intileimage.putalpha(alphaLayerABB)
-                            else: # vertical middle
+                                    if (tile+1) in embiggen_tiles: # Look-ahead right
+                                        intileimage.putalpha(alphaLayerLTC)
+                                    else:
+                                        intileimage.putalpha(alphaLayerABB)
+                            # vertical middle of image
+                            else:
                                 if emb_column_i == 0:
-                                    intileimage.putalpha(alphaLayerABL)
+                                    if (tile+1) in embiggen_tiles: # Look-ahead right
+                                        if (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down
+                                            intileimage.putalpha(alphaLayerT)
+                                        else:
+                                            intileimage.putalpha(alphaLayerTB)
+                                    elif (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down only
+                                        intileimage.putalpha(alphaLayerRTC)
+                                    else:
+                                        intileimage.putalpha(alphaLayerABL)
                                 elif emb_column_i == emb_tiles_x - 1:
-                                    intileimage.putalpha(alphaLayerABR)
+                                    if (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down
+                                        intileimage.putalpha(alphaLayerLTC)
+                                    else:
+                                        intileimage.putalpha(alphaLayerABR)
                                 else:
-                                    intileimage.putalpha(alphaLayerAA)
+                                    if (tile+1) in embiggen_tiles: # Look-ahead right
+                                        if (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down
+                                            intileimage.putalpha(alphaLayerLTC)
+                                        else:
+                                            intileimage.putalpha(alphaLayerABR)
+                                    elif (tile+emb_tiles_x) in embiggen_tiles: # Look-ahead down only
+                                        intileimage.putalpha(alphaLayerABB)
+                                    else:
+                                        intileimage.putalpha(alphaLayerAA)
                         # Handle normal tiling case (much simpler - since we tile left to right, top to bottom)
                         else:
                             if emb_row_i == 0 and emb_column_i >= 1:
