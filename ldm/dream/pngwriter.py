@@ -13,31 +13,71 @@ from PIL import PngImagePlugin
 # -------------------image generation utils-----
 
 
+def get_last_prefix_from_log_file(log_file_path):
+    count = 0
+    if not os.path.exists(log_file_path):
+        return count
+    with open(log_file_path, 'r', encoding='utf-8') as file:
+        lines = file.read().splitlines()
+        last_index = len(lines) - 1
+        # find the first filename that matches our pattern
+        for i in range(last_index, 0, -1):
+            found = re.search('(\d+)\..*\.png:', lines[i])
+            if found:
+                count = int(found[1])
+                break
+    return count
+
+
+def get_last_prefix_from_dir(dir):
+    # sort reverse alphabetically until we find max+1
+    dirlist = sorted(os.listdir(dir), reverse=True)
+    # find the first filename that matches our pattern or return 000000.0.png
+    existing_name = next(
+        (f for f in dirlist if re.match('^(\d+)\..*\.png', f)),
+        f'0.0.png',
+    )
+    basecount = int(existing_name.split('.', 1)[0])
+    return basecount
+
+
 class PngWriter:
+    __outdir_last_prefix = {}
+
     def __init__(self, outdir):
         self.outdir = outdir
         os.makedirs(outdir, exist_ok=True)
+        if outdir not in PngWriter.__outdir_last_prefix:
+            PngWriter.__outdir_last_prefix[outdir] = self.get_last_prefix_from_outdir()
 
     # gives the next unique prefix in outdir
     def unique_prefix(self):
-        # sort reverse alphabetically until we find max+1
-        dirlist = sorted(os.listdir(self.outdir), reverse=True)
-        # find the first filename that matches our pattern or return 000000.0.png
-        existing_name = next(
-            (f for f in dirlist if re.match('^(\d+)\..*\.png', f)),
-            '0000000.0.png',
-        )
-        basecount = int(existing_name.split('.', 1)[0]) + 1
+        basecount = PngWriter.__outdir_last_prefix[self.outdir] + 1
         return f'{basecount:06}'
 
     # saves image named _image_ to outdir/name, writing metadata from prompt
     # returns full path of output
-    def save_image_and_prompt_to_png(self, image, prompt, name):
+    def save_image_and_prompt_to_png(self, image, prompt, name, allow_overwrite=False):
+        name_parts = name.split(".", 1)
+        prefix = int(name_parts[0])
         path = os.path.join(self.outdir, name)
         info = PngImagePlugin.PngInfo()
         info.add_text('Dream', prompt)
+        while not allow_overwrite and os.path.exists(path):
+            # if image of the same name already exists, increment prefix and try again
+            prefix = prefix + 1
+            path = os.path.join(self.outdir, f'{prefix:06}.{name_parts[1]}')
+
+        PngWriter.__outdir_last_prefix[self.outdir] = prefix
         image.save(path, 'PNG', pnginfo=info)
         return path
+
+    def get_last_prefix_from_outdir(self):
+        count_from_dream_log = get_last_prefix_from_log_file(os.path.join(self.outdir, 'dream_log.txt'))
+        count_from_dream_web_log = get_last_prefix_from_log_file(os.path.join(self.outdir, 'dream_web_log.txt'))
+        count_from_dir = get_last_prefix_from_dir(self.outdir)
+        last_count = max(count_from_dir, count_from_dream_log, count_from_dream_web_log)
+        return last_count
 
 
 class PromptFormatter:

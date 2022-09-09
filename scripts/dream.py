@@ -238,6 +238,7 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
             results = [] # list of filename, prompt pairs
             grid_images = dict() # seed -> Image, only used if `do_grid`
             def image_writer(image, seed, upscaled=False):
+                allow_overwrite = False
                 if do_grid:
                     grid_images[seed] = image
                 else:
@@ -245,6 +246,7 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
                         filename = f'{prefix}.{seed}.postprocessed.png'
                     else:
                         filename = f'{prefix}.{seed}.png'
+                        allow_overwrite = True
                     if opt.variation_amount > 0:
                         iter_opt = argparse.Namespace(**vars(opt)) # copy
                         this_variation = [[seed, opt.variation_amount]]
@@ -261,7 +263,7 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
                     else:
                         normalized_prompt = PromptFormatter(t2i, opt).normalize_prompt()
                         metadata_prompt = f'{normalized_prompt} -S{seed}'
-                    path = file_writer.save_image_and_prompt_to_png(image, metadata_prompt, filename)
+                    path = file_writer.save_image_and_prompt_to_png(image, metadata_prompt, filename, allow_overwrite)
                     if (not upscaled) or opt.save_original:
                         # only append to results if we didn't overwrite an earlier output
                         results.append([path, metadata_prompt])

@@ -161,7 +161,7 @@ class DreamServer(BaseHTTPRequestHandler):
             elif opt.with_variations is None:
                 iter_opt.seed = seed
             normalized_prompt = PromptFormatter(self.model, iter_opt).normalize_prompt()
-            path = pngwriter.save_image_and_prompt_to_png(image, f'{normalized_prompt} -S{iter_opt.seed}', name)
+            path = pngwriter.save_image_and_prompt_to_png(image, f'{normalized_prompt} -S{iter_opt.seed}', name, allow_overwrite=upscaled)
 
             if int(config['seed']) == -1:
                 config['seed'] = seed
@@ -209,7 +209,7 @@ class DreamServer(BaseHTTPRequestHandler):
                 image = self.model.sample_to_image(sample)
                 name = f'{prefix}.{opt.seed}.{step_index}.png'
                 metadata = f'{opt.prompt} -S{opt.seed} [intermediate]'
-                path = step_writer.save_image_and_prompt_to_png(image, metadata, name)
+                path = step_writer.save_image_and_prompt_to_png(image, metadata, name, allow_overwrite=True)
                 step_index += 1
             self.wfile.write(bytes(json.dumps(
                 {'event': 'step', 'step': step + 1, 'url': path}
