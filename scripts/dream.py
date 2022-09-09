@@ -68,7 +68,8 @@ def main():
         # this is solely for recreating the prompt
         seamless       = opt.seamless,
         embedding_path = opt.embedding_path,
-        device_type    = opt.device
+        device_type    = opt.device,
+        ignore_ctrl_c  = opt.infile is None,
     )
 
     # make sure the output directory exists
