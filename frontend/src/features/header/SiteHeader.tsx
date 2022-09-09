@@ -29,23 +29,9 @@ const SiteHeader = () => {
 
       <Spacer />
 
-      {isStatusIconHovered && (
-        <Text textColor={isConnected ? 'green.500' : 'red.500'}>
-          {isConnected ? `Session ID: ${socketId}` : 'No Connection'}
-        </Text>
-      )}
-      <IconButton
-        size={'sm'}
-        variant='link'
-        fontSize={20}
-        mt='1px'
-        aria-label='Connection Status'
-        icon={<FaServer />}
-        color={isConnected ? 'green.500' : 'red.500'}
-        onMouseOver={() => setIsStatusIconHovered(true)}
-        onMouseOut={() => setIsStatusIconHovered(false)}
-        cursor='unset'
-      />
+      <Text textColor={isConnected ? 'green.500' : 'red.500'}>
+        {isConnected ? `Connected to server` : 'No connection to server'}
+      </Text>
 
       <SettingsModalButton />
 
