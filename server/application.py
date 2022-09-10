@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 from flask import Flask
+from flask_cors import CORS
 from omegaconf import OmegaConf
 from dependency_injector.wiring import inject, Provide
 from server import views
@@ -21,6 +22,9 @@ def create_app(config) -> Flask:
 
   app = Flask(__name__, static_url_path='')
   app.container = container
+
+  # Set up CORS
+  CORS(app, resources={r'/api/*': {'origins': '*'}})
 
   # Web Routes
   app.add_url_rule('/', view_func=views.WebIndex.as_view('web_index', 'index.html'))
