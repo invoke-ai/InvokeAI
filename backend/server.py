@@ -153,9 +153,9 @@ model = Generate()
 # gets rid of annoying messages about random seed
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 
-tic = time.time()
+# tic = time.time()
 model.load_model()
-print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
+# print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 
 print(f"\nServer online: http://{host}:{port}")
 
@@ -193,7 +193,7 @@ def generate_image(data):
 
     pngwriter = PngWriter("./outputs/img-samples/")
     prefix = pngwriter.unique_prefix()
-    mask = data["maskPath"]
+    init_mask = data["maskPath"]
     seamless = data["seamless"]
     progress_images = data["shouldDisplayInProgress"]
 
@@ -235,39 +235,38 @@ def generate_image(data):
                 'result', {'url': os.path.relpath(path), 'metadata': data})
             eventlet.sleep(0)
 
-            # params yet to support
-            # ddim_eta       =    None,
-            # skip_normalize =    False,
-            # log_tokenization=  False,
-            # with_variations =   None,
-            # variation_amount =  0.0,
-            # # these are specific to img2img
-            # invert_mask    =    False,
-            # # these are specific to GFPGAN/ESRGAN
-            # save_original  =    False,
-
     try:
-        print(with_variations)
-        model.prompt2image(prompt,
-                           iterations=iterations,
-                           init_img=init_img,
-                           mask=mask,
-                           cfg_scale=cfgscale,
-                           width=width,
-                           height=height,
-                           seed=seed,
-                           steps=steps,
-                           gfpgan_strength=gfpgan_strength,
-                           upscale=upscale,
-                           sampler_name=sampler_name,
-                           strength=strength,
-                           fit=fit,
-                           seamless=seamless,
-                           progress_images=progress_images,
-                           with_variations=with_variations,
-                           variation_amount=variation_amount,
-                           step_callback=image_progress,
-                           image_callback=image_done)
+        model.prompt2image(
+            # Common generation parameters
+            prompt,
+            iterations=iterations,
+            steps=steps,
+            seed=seed,
+            cfg_scale=cfgscale,
+            # ddim_eta=None, # needs implementation
+            # skip_normalize=False, # needs implementation
+            width=width,
+            height=height,
+            sampler_name=sampler_name,
+            seamless=seamless,
+            with_variations=with_variations,
+            variation_amount=variation_amount,
+
+            # img2img & inpaint parameters
+            init_img=init_img,
+            init_mask=init_mask,
+            fit=fit,
+            strength=strength,
+
+            # GFPGAN/ESRGAN parameters
+            gfpgan_strength=gfpgan_strength,  # needs implementation
+            # save_original=False, # needs implementation
+            upscale=upscale,  # needs implementation
+
+            # System parameters
+            progress_images=progress_images,
+            step_callback=image_progress,
+            image_callback=image_done)
 
     except KeyboardInterrupt:
         raise
