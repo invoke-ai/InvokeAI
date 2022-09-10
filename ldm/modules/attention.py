@@ -186,13 +186,8 @@ class CrossAttention(nn.Module):
         self.mem_factor = (free_mem) / necessary_mem
         self.inner_step = math.floor(self.mem_factor)
         self.inner_step = min(self.inner_step, inner_limit)
-        if self.inner_step < inner_limit and self.inner_step > inner_limit // 2:
-            self.inner_step = inner_limit // 2
-       
         self.outer_step = math.floor(self.mem_factor/self.inner_step)
         self.outer_step = min(self.outer_step, outer_limit)
-        if self.outer_step < outer_limit and self.outer_step > outer_limit // 2:
-            self.outer_step = outer_limit // 2
         self.outer_step = max(self.outer_step, 1)
 
         if device.type == 'mps': # for apple GPUs
@@ -231,7 +226,6 @@ class CrossAttention(nn.Module):
         k_chunks.reverse()
         v_chunks.reverse()
         sim = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device)
-
         del k, q
         for i in range (0, outer_limit, outer_step):
             q_buffer = q_chunks.pop()
