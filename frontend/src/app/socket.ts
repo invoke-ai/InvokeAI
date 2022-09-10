@@ -21,10 +21,19 @@ import {
 } from '../features/gallery/gallerySlice';
 import { setInitialImagePath, setMaskPath } from '../features/sd/sdSlice';
 
+let host: string, port: number;
+
 // Get the socket.io server host and port
 const response = await fetch('socketio_config');
-const data = await response.json();
-const { host, port } = data;
+
+if (response.status === 200) {
+    const data = await response.json();
+    host = data.host;
+    port = data.port;
+} else {
+    throw { message: 'Unable to get server config', response };
+}
+
 export const socket = io(`http://${host}:${port}`);
 
 interface SocketIOResponse {
