@@ -1,7 +1,6 @@
 '''
 This module is provided for backward compatibility with the
 original (hasty) API.
-
 Please use ldm.generate instead.
 '''
 

@@ -159,72 +159,97 @@ class CrossAttention(nn.Module):
         self.scale = dim_head ** -0.5
         self.heads = heads
 
+        self.debug=True
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
-
+        self.mem_factor = None
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, query_dim),
             nn.Dropout(dropout)
         )
+        
+    def get_free_mem(self, device):
+        if device.type == 'mps':
+            mem_free = psutil.virtual_memory().available
+        else:
+            torch.cuda.empty_cache()
+            mem_free, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
+        return mem_free
+    
+    def compute_steps(self, device, outer_limit, inner_limit, dim_softmax):
+        sim_buffer_required_mem = dim_softmax * 2
+        softmax_required_mem = sim_buffer_required_mem * 4
+        necessary_mem = sim_buffer_required_mem + softmax_required_mem 
+    
+        free_mem = self.get_free_mem(device)
+        self.mem_factor = (free_mem) / necessary_mem
+        self.inner_step = math.floor(self.mem_factor)
+        self.inner_step = min(self.inner_step, inner_limit)
+        self.outer_step = math.floor(self.mem_factor/self.inner_step)
+        self.outer_step = min(self.outer_step, outer_limit)
+        self.outer_step = max(self.outer_step, 1)
 
+        if device.type == 'mps': # for apple GPUs
+            old_inner = self.inner_step
+            self.inner_step = min (self.inner_step, (2<<31) // (self.outer_step * dim_softmax))
+            self.outer_step = max (self.outer_step, (self.outer_step * old_inner) //self.inner_step)
+            self.outer_step = min (self.outer_step, outer_limit)
+    
     def forward(self, x, context=None, mask=None):
         h = self.heads
-
-        q_in = self.to_q(x)
+        q = self.to_q(x)
         context = default(context, x)
-        k_in = self.to_k(context)
-        v_in = self.to_v(context)
-        device_type = 'mps' if x.device.type == 'mps' else 'cuda'
+        k = self.to_k(context)
+        v = self.to_v(context)
+        x_shape = x.shape
         del context, x
 
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q_in, k_in, v_in))
-        del q_in, k_in, v_in
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
+       
+       
+        outer_limit = q.shape[0]
+        inner_limit = q.shape[1]
+        if self.mem_factor is None:
+            self.compute_steps(q.device, outer_limit, inner_limit, k.shape[1])
+                
+        inner_step = self.inner_step
+        outer_step = self.outer_step
+        
+        split_indices = [i for i in range (outer_step, outer_limit, outer_step)]
+        if outer_limit % outer_step > 0:
+            split_indices.append(outer_limit)
+        q_chunks = list(torch.tensor_split(q, split_indices, dim=0))
+        k_chunks = list(torch.tensor_split(k, split_indices, dim=0))
+        v_chunks = list(torch.tensor_split(v, split_indices, dim=0))
+        q_chunks.reverse()
+        k_chunks.reverse()
+        v_chunks.reverse()
+        sim = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device)
+        del k, q
+        for i in range (0, outer_limit, outer_step):
+            q_buffer = q_chunks.pop()
+            k_buffer = k_chunks.pop()
+            v_buffer = v_chunks.pop()
+            outer_end = min(i+outer_step, outer_limit)
+            for j in range (0, inner_limit, inner_step):
+                inner_end = min(j+inner_step, inner_limit)
 
-        r1 = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device)
-
-        if device_type == 'mps':
-            mem_free_total = psutil.virtual_memory().available
-        else:
-            stats = torch.cuda.memory_stats(q.device)
-            mem_active = stats['active_bytes.all.current']
-            mem_reserved = stats['reserved_bytes.all.current']
-            mem_free_cuda, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
-            mem_free_torch = mem_reserved - mem_active
-            mem_free_total = mem_free_cuda + mem_free_torch
-
-        gb = 1024 ** 3
-        tensor_size = q.shape[0] * q.shape[1] * k.shape[1] * 4
-        mem_required = tensor_size * 2.5
-        steps = 1
-
-        if mem_required > mem_free_total:
-            steps = 2**(math.ceil(math.log(mem_required / mem_free_total, 2)))
-            # print(f"Expected tensor size:{tensor_size/gb:0.1f}GB, cuda free:{mem_free_cuda/gb:0.1f}GB "
-            #       f"torch free:{mem_free_torch/gb:0.1f} total:{mem_free_total/gb:0.1f} steps:{steps}")
-
-        if steps > 64:
-            max_res = math.floor(math.sqrt(math.sqrt(mem_free_total / 2.5)) / 8) * 64
-            raise RuntimeError(f'Not enough memory, use lower resolution (max approx. {max_res}x{max_res}). '
-                               f'Need: {mem_required/64/gb:0.1f}GB free, Have:{mem_free_total/gb:0.1f}GB free')
-
-        slice_size = q.shape[1] // steps if (q.shape[1] % steps) == 0 else q.shape[1]
-        for i in range(0, q.shape[1], slice_size):
-            end = i + slice_size
-            s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * self.scale
-
-            s2 = s1.softmax(dim=-1)
-            del s1
-
-            r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
-            del s2
-
-        del q, k, v
-
-        r2 = rearrange(r1, '(b h) n d -> b n (h d)', h=h)
-        del r1
-
-        return self.to_out(r2)
+                sim_buffer = einsum('b i d, b j d -> b i j', q_buffer[:,j:inner_end,:], k_buffer[:,:,:])
+                
+                sim_buffer *= self.scale
+                
+                sim_buffer = sim_buffer.softmax(dim=-1)
+                
+                sim_buffer = einsum('b i j, b j d -> b i d', sim_buffer, v_buffer[:,:,:])
+                
+                sim[i:outer_end,j:inner_end,:] = sim_buffer
+                
+            del sim_buffer
+            del q_buffer, k_buffer, v_buffer
+            
+        sim = rearrange(sim, '(b h) n d -> b n (h d)', h=h)
+        return self.to_out(sim)
 
 
 class BasicTransformerBlock(nn.Module):
