@@ -1,10 +1,9 @@
-import math
 from inspect import isfunction
-
+import math
 import torch
 import torch.nn.functional as F
-from einops import rearrange, repeat
 from torch import nn, einsum
+from einops import rearrange, repeat
 
 from ldm.modules.diffusionmodules.util import checkpoint
 
@@ -14,7 +13,7 @@ def exists(val):
 
 
 def uniq(arr):
-    return {el: True for el in arr}.keys()
+    return{el: True for el in arr}.keys()
 
 
 def default(val, d):
@@ -83,14 +82,14 @@ class LinearAttention(nn.Module):
         super().__init__()
         self.heads = heads
         hidden_dim = dim_head * heads
-        self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
+        self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias = False)
         self.to_out = nn.Conv2d(hidden_dim, dim, 1)
 
     def forward(self, x):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
-        q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
-        k = k.softmax(dim=-1)
+        q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads = self.heads, qkv=3)
+        k = k.softmax(dim=-1)  
         context = torch.einsum('bhdn,bhen->bhde', k, v)
         out = torch.einsum('bhde,bhdn->bhen', context, q)
         out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
@@ -132,12 +131,12 @@ class SpatialSelfAttention(nn.Module):
         v = self.v(h_)
 
         # compute attention
-        b, c, h, w = q.shape
+        b,c,h,w = q.shape
         q = rearrange(q, 'b c h w -> b (h w) c')
         k = rearrange(k, 'b c h w -> b c (h w)')
         w_ = torch.einsum('bij,bjk->bik', q, k)
 
-        w_ = w_ * (int(c) ** (-0.5))
+        w_ = w_ * (int(c)**(-0.5))
         w_ = torch.nn.functional.softmax(w_, dim=2)
 
         # attend to values
@@ -147,7 +146,7 @@ class SpatialSelfAttention(nn.Module):
         h_ = rearrange(h_, 'b c (h w) -> b c h w', h=h)
         h_ = self.proj_out(h_)
 
-        return x + h_
+        return x+h_
 
 
 class CrossAttention(nn.Module):
@@ -159,44 +158,108 @@ class CrossAttention(nn.Module):
         self.scale = dim_head ** -0.5
         self.heads = heads
 
+        self.debug=True
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
-
+        self.mem_factor = None
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, query_dim),
             nn.Dropout(dropout)
         )
+        
+    def get_free_mem(self, device):
+        torch.cuda.empty_cache()
+        stats = torch.cuda.memory_stats(device)
+        mem_active = stats['active_bytes.all.current']
+        mem_reserved = stats['reserved_bytes.all.current']
+        mem_free_cuda, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
+        return mem_free_cuda
+    
+    def compute_steps(self, device, outer_limit, inner_limit, dim_softmax):
+        sim_buffer_required_mem = dim_softmax * 2
+        softmax_required_mem = sim_buffer_required_mem * 4
+        necessary_mem = sim_buffer_required_mem + softmax_required_mem 
+    
+        free_mem = self.get_free_mem(device)
+        self.mem_factor = (free_mem) / necessary_mem
+        self.inner_step = math.floor(self.mem_factor)
+        self.inner_step = min(self.inner_step, inner_limit)
+        if self.inner_step < inner_limit and self.inner_step > inner_limit // 2:
+            self.inner_step = inner_limit // 2
+       
+        self.outer_step = math.floor(self.mem_factor/self.inner_step)
+        self.outer_step = min(self.outer_step, outer_limit)
+        if self.outer_step < outer_limit and self.outer_step > outer_limit // 2:
+            self.outer_step = outer_limit // 2
+        self.outer_step = max(self.outer_step, 1)
 
+        if device.type == 'mps': # for apple GPUs
+            old_inner = self.inner_step
+            self.inner_step = min (self.inner_step, (2<<31) // (self.outer_step * dim_softmax[1]))
+            self.outer_step = max (self.outer_step, (self.outer_step * old_inner) //self.inner_step)
+            self.outer_step = min (self.outer_step, outer_limit)
+    
     def forward(self, x, context=None, mask=None):
         h = self.heads
-
         q = self.to_q(x)
         context = default(context, x)
         k = self.to_k(context)
         v = self.to_v(context)
-        device_type = x.device.type
+        x_shape = x.shape
         del context, x
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
+       
+       
+        outer_limit = q.shape[0]
+        inner_limit = q.shape[1]
+        if self.mem_factor is None:
+            self.compute_steps(q.device, outer_limit, inner_limit, k.shape[1])
+                
+        inner_step = self.inner_step
+        outer_step = self.outer_step
+        
+        split_indices = [i for i in range (outer_step, outer_limit, outer_step)]
+        if outer_limit % outer_step > 0:
+            split_indices.append(outer_limit)
+        q_chunks = list(torch.tensor_split(q, split_indices, dim=0))
+        k_chunks = list(torch.tensor_split(k, split_indices, dim=0))
+        v_chunks = list(torch.tensor_split(v, split_indices, dim=0))
+        q_chunks.reverse()
+        k_chunks.reverse()
+        v_chunks.reverse()
+        sim = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device)
 
-        sim = einsum('b i d, b j d -> b i j', q, k) * self.scale  # (8, 4096, 40)
-        del q, k
+        del k, q
+        for i in range (0, outer_limit, outer_step):
+            q_buffer = q_chunks.pop()
+            k_buffer = k_chunks.pop()
+            v_buffer = v_chunks.pop()
+            outer_end = min(i+outer_step, outer_limit)
+            for j in range (0, inner_limit, inner_step):
+                inner_end = min(j+inner_step, inner_limit)
 
-        if exists(mask):
-            mask = rearrange(mask, 'b ... -> b (...)')
-            max_neg_value = -torch.finfo(sim.dtype).max
-            mask = repeat(mask, 'b j -> (b h) () j', h=h)
-            sim.masked_fill_(~mask, max_neg_value)
-            del mask
+                sim_buffer = einsum('b i d, b j d -> b i j', q_buffer[:,j:inner_end,:], k_buffer[:,:,:])
+                
+                sim_buffer *= self.scale
+                
+                if exists(mask):
+                    mask_buffer = rearrange(mask[i:i+outer_step,:,:,:], 'b ... -> b (...)')
+                    max_neg_value = -torch.finfo(sim_buffer.dtype).max
+                    mask_buffer = repeat(mask_buffer, 'b j -> (b h) () j', h=h)
+                    sim_buffer.masked_fill_(~mask_buffer[:,j:inner_end,:], max_neg_value)
+                    del mask_buffer
 
-        if device_type == 'mps':      #special case for M1 - disable neonsecret optimization
-            sim = sim.softmax(dim=-1)
-        else:
-            sim[4:] = sim[4:].softmax(dim=-1)
-            sim[:4] = sim[:4].softmax(dim=-1)
-
-        sim = einsum('b i j, b j d -> b i d', sim, v)
+                sim_buffer = sim_buffer.softmax(dim=-1)
+                
+                sim_buffer = einsum('b i j, b j d -> b i d', sim_buffer, v_buffer[:,:,:])
+                
+                sim[i:outer_end,j:inner_end,:] = sim_buffer
+                
+            del sim_buffer
+            del q_buffer, k_buffer, v_buffer
+            
         sim = rearrange(sim, '(b h) n d -> b n (h d)', h=h)
         return self.to_out(sim)
 
@@ -204,8 +267,7 @@ class CrossAttention(nn.Module):
 class BasicTransformerBlock(nn.Module):
     def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True):
         super().__init__()
-        self.attn1 = CrossAttention(query_dim=dim, heads=n_heads, dim_head=d_head,
-                                    dropout=dropout)  # is a self-attention
+        self.attn1 = CrossAttention(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout)  # is a self-attention
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
         self.attn2 = CrossAttention(query_dim=dim, context_dim=context_dim,
                                     heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
@@ -218,7 +280,6 @@ class BasicTransformerBlock(nn.Module):
         return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
 
     def _forward(self, x, context=None):
-        x = x.contiguous() if x.device.type == 'mps' else x
         x = self.attn1(self.norm1(x)) + x
         x = self.attn2(self.norm2(x), context=context) + x
         x = self.ff(self.norm3(x)) + x
@@ -233,7 +294,6 @@ class SpatialTransformer(nn.Module):
     Then apply standard transformer action.
     Finally, reshape to image
     """
-
     def __init__(self, in_channels, n_heads, d_head,
                  depth=1, dropout=0., context_dim=None):
         super().__init__()
@@ -249,7 +309,7 @@ class SpatialTransformer(nn.Module):
 
         self.transformer_blocks = nn.ModuleList(
             [BasicTransformerBlock(inner_dim, n_heads, d_head, dropout=dropout, context_dim=context_dim)
-             for d in range(depth)]
+                for d in range(depth)]
         )
 
         self.proj_out = zero_module(nn.Conv2d(inner_dim,
