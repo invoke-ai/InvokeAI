@@ -14,18 +14,8 @@ info:
 servers:
   - url: http://localhost:9090/api
 tags:
-  - name: pet
-    description: Everything about your Pets
-    externalDocs:
-      description: Find out more
-      url: http://swagger.io
-  - name: store
-    description: Access to Petstore orders
-    externalDocs:
-      description: Find out more about our store
-      url: http://swagger.io
-  - name: user
-    description: Operations about user
+  - name: images
+    description: Retrieve and manage generated images
 paths:
   /images/{imageId}:
     get:
