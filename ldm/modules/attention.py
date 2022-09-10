@@ -169,12 +169,12 @@ class CrossAttention(nn.Module):
         )
         
     def get_free_mem(self, device):
-        torch.cuda.empty_cache()
-        stats = torch.cuda.memory_stats(device)
-        mem_active = stats['active_bytes.all.current']
-        mem_reserved = stats['reserved_bytes.all.current']
-        mem_free_cuda, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
-        return mem_free_cuda
+        if device.type == 'mps':
+            mem_free = psutil.virtual_memory().available
+        else:
+            torch.cuda.empty_cache()
+            mem_free, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
+        return mem_free
     
     def compute_steps(self, device, outer_limit, inner_limit, dim_softmax):
         sim_buffer_required_mem = dim_softmax * 2
@@ -244,13 +244,6 @@ class CrossAttention(nn.Module):
                 
                 sim_buffer *= self.scale
                 
-                if exists(mask):
-                    mask_buffer = rearrange(mask[i:i+outer_step,:,:,:], 'b ... -> b (...)')
-                    max_neg_value = -torch.finfo(sim_buffer.dtype).max
-                    mask_buffer = repeat(mask_buffer, 'b j -> (b h) () j', h=h)
-                    sim_buffer.masked_fill_(~mask_buffer[:,j:inner_end,:], max_neg_value)
-                    del mask_buffer
-
                 sim_buffer = sim_buffer.softmax(dim=-1)
                 
                 sim_buffer = einsum('b i j, b j d -> b i d', sim_buffer, v_buffer[:,:,:])
