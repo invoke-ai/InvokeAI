@@ -39,7 +39,7 @@ The one with seed 3357757885 looks nice:
 <img src="static/variation_walkthru/000001.3357757885.png"/>
 
 Let's try to generate some variations. Using the same seed, we pass
-the argument -v0.1 (or --variant_amount), which generates a series of
+the argument -v0.2 (or --variant_amount), which generates a series of
 variations each differing by a variation amount of 0.2. This number
 ranges from 0 to 1.0, with higher numbers being larger amounts of
 variation.
@@ -108,6 +108,6 @@ the chosen two images. Here's the one I like best:
 
 <img src="static/variation_walkthru/000004.3747154981.png">
 
-As you can see, this is a very powerful too, which when combined with
+As you can see, this is a very powerful tool, which when combined with
 subprompt weighting, gives you great control over the content and
 quality of your generated images.
