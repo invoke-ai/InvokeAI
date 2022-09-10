@@ -24,6 +24,7 @@ const SDNumberInput = (props: Props) => {
     size = 'sm',
     width,
     isInvalid,
+    ...rest
   } = props;
   return (
     <FormControl isDisabled={isDisabled} width={width} isInvalid={isInvalid}>
@@ -33,7 +34,7 @@ const SDNumberInput = (props: Props) => {
             {label}
           </Text>
         </FormLabel>
-        <NumberInput size={size} {...props}>
+        <NumberInput size={size} {...rest}>
           <NumberInputField />
           <NumberInputStepper>
             <NumberIncrementStepper />

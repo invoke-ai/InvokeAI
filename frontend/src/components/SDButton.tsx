@@ -5,9 +5,9 @@ interface Props extends ButtonProps {
 }
 
 const SDButton = (props: Props) => {
-    const { label, size = 'sm' } = props;
+    const { label, size = 'sm', ...rest } = props;
     return (
-        <Button size={size} {...props}>
+        <Button size={size} {...rest}>
             {label}
         </Button>
     );

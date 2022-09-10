@@ -22,6 +22,7 @@ const SDSelect = (props: Props) => {
         marginInlineEnd = 0,
         marginBottom = 1,
         whiteSpace = 'nowrap',
+        ...rest
     } = props;
     return (
         <FormControl isDisabled={isDisabled}>
@@ -34,7 +35,7 @@ const SDSelect = (props: Props) => {
                         {label}
                     </Text>
                 </FormLabel>
-                <Select fontSize={fontSize} size={size} {...props}>
+                <Select fontSize={fontSize} size={size} {...rest}>
                     {validValues.map((val) => (
                         <option key={val} value={val}>
                             {val}

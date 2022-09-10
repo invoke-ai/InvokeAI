@@ -18,6 +18,7 @@ const SDSwitch = (props: Props) => {
     fontSize = 'sm',
     size = 'md',
     width,
+    ...rest
   } = props;
   return (
     <FormControl isDisabled={isDisabled} width={width}>
@@ -30,7 +31,7 @@ const SDSwitch = (props: Props) => {
         >
           {label}
         </FormLabel>
-        <Switch size={size} {...props} />
+        <Switch size={size} {...rest} />
       </HStack>
     </FormControl>
   );
