@@ -6,10 +6,9 @@ and generates with ldm.dream.generator.img2img
 import torch
 import numpy as  np
 from PIL import Image
-from ldm.dream.devices             import choose_autocast_device
 from ldm.dream.generator.base      import Generator
 from ldm.models.diffusion.ddim     import DDIMSampler
-from ldm.dream.generator.img2img import Img2Img
+from ldm.dream.generator.img2img   import Img2Img
 
 class Embiggen(Generator):
     def __init__(self,model):
@@ -69,9 +68,6 @@ class Embiggen(Generator):
 
         with Image.open(init_img) as img:
             initsuperimage = img.convert('RGB')
-        print(
-            f'>> loaded input image of size {initsuperimage.width}x{initsuperimage.height} from {init_img}'
-        )
 
         # Size of the target super init image in pixels
         initsuperwidth, initsuperheight = initsuperimage.size
@@ -161,7 +157,7 @@ class Embiggen(Generator):
         alphaLayerLTC.paste(agradientC.resize((overlap_size_x, overlap_size_y)), (0, 0))
 
         if embiggen_tiles:
-            # TESTING individual sides only
+            # Individual unconnected sides
             alphaLayerR = Image.new("L", (width, height), 255)
             alphaLayerR.paste(agradientL.rotate(180), (width - overlap_size_x, 0))
             alphaLayerB = Image.new("L", (width, height), 255)
