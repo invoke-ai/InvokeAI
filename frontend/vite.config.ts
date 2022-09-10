@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
       ...common,
       build: {
         ...common.build,
-        sourcemap: true,
+        // sourcemap: true, // this can be enabled if needed, it adds ovwer 15MB to the commit
       },
     };
   } else {
