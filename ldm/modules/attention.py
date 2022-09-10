@@ -150,71 +150,116 @@ class SpatialSelfAttention(nn.Module):
 
 
 class CrossAttention(nn.Module):
-    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0., att_step=1):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = default(context_dim, query_dim)
 
         self.scale = dim_head ** -0.5
         self.heads = heads
-        self.att_step = att_step
 
+        self.debug=True
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
-
+        self.mem_factor = None
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, query_dim),
             nn.Dropout(dropout)
         )
+        
+    def get_free_mem(self, device):
+        torch.cuda.empty_cache()
+        stats = torch.cuda.memory_stats(device)
+        mem_active = stats['active_bytes.all.current']
+        mem_reserved = stats['reserved_bytes.all.current']
+        mem_free_cuda, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
+        return mem_free_cuda
+    
+    def compute_steps(self, device, outer_limit, inner_limit, dim_softmax):
+        sim_buffer_required_mem = dim_softmax * 2
+        softmax_required_mem = sim_buffer_required_mem * 4
+        necessary_mem = sim_buffer_required_mem + softmax_required_mem 
+    
+        free_mem = self.get_free_mem(device)
+        self.mem_factor = (free_mem) / necessary_mem
+        self.inner_step = math.floor(self.mem_factor)
+        self.inner_step = min(self.inner_step, inner_limit)
+        if self.inner_step < inner_limit and self.inner_step > inner_limit // 2:
+            self.inner_step = inner_limit // 2
+       
+        self.outer_step = math.floor(self.mem_factor/self.inner_step)
+        self.outer_step = min(self.outer_step, outer_limit)
+        if self.outer_step < outer_limit and self.outer_step > outer_limit // 2:
+            self.outer_step = outer_limit // 2
+        self.outer_step = max(self.outer_step, 1)
 
+        if device.type == 'mps': # for apple GPUs
+            old_inner = self.inner_step
+            self.inner_step = min (self.inner_step, (2<<31) // (self.outer_step * dim_softmax[1]))
+            self.outer_step = max (self.outer_step, (self.outer_step * old_inner) //self.inner_step)
+            self.outer_step = min (self.outer_step, outer_limit)
+    
     def forward(self, x, context=None, mask=None):
         h = self.heads
-
         q = self.to_q(x)
         context = default(context, x)
         k = self.to_k(context)
         v = self.to_v(context)
+        x_shape = x.shape
         del context, x
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
-
-
-        limit = k.shape[0]
-        att_step = self.att_step
-        q_chunks = list(torch.tensor_split(q, limit//att_step, dim=0))
-        k_chunks = list(torch.tensor_split(k, limit//att_step, dim=0))
-        v_chunks = list(torch.tensor_split(v, limit//att_step, dim=0))
-
+       
+       
+        outer_limit = q.shape[0]
+        inner_limit = q.shape[1]
+        if self.mem_factor is None:
+            self.compute_steps(q.device, outer_limit, inner_limit, k.shape[1])
+                
+        inner_step = self.inner_step
+        outer_step = self.outer_step
+        
+        split_indices = [i for i in range (outer_step, outer_limit, outer_step)]
+        if outer_limit % outer_step > 0:
+            split_indices.append(outer_limit)
+        q_chunks = list(torch.tensor_split(q, split_indices, dim=0))
+        k_chunks = list(torch.tensor_split(k, split_indices, dim=0))
+        v_chunks = list(torch.tensor_split(v, split_indices, dim=0))
         q_chunks.reverse()
         k_chunks.reverse()
         v_chunks.reverse()
         sim = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device)
-        del k, q, v
-        for i in range (0, limit, att_step):
 
+        del k, q
+        for i in range (0, outer_limit, outer_step):
             q_buffer = q_chunks.pop()
             k_buffer = k_chunks.pop()
             v_buffer = v_chunks.pop()
-            sim_buffer = einsum('b i d, b j d -> b i j', q_buffer, k_buffer) * self.scale
+            outer_end = min(i+outer_step, outer_limit)
+            for j in range (0, inner_limit, inner_step):
+                inner_end = min(j+inner_step, inner_limit)
 
-            del k_buffer, q_buffer
+                sim_buffer = einsum('b i d, b j d -> b i j', q_buffer[:,j:inner_end,:], k_buffer[:,:,:])
+                
+                sim_buffer *= self.scale
+                
+                if exists(mask):
+                    mask_buffer = rearrange(mask[i:i+outer_step,:,:,:], 'b ... -> b (...)')
+                    max_neg_value = -torch.finfo(sim_buffer.dtype).max
+                    mask_buffer = repeat(mask_buffer, 'b j -> (b h) () j', h=h)
+                    sim_buffer.masked_fill_(~mask_buffer[:,j:inner_end,:], max_neg_value)
+                    del mask_buffer
 
-            if exists(mask):
-                mask_buffer = rearrange(mask[i:i+att_step,:,:,:], 'b ... -> b (...)')
-                max_neg_value = -torch.finfo(sim_buffer.dtype).max
-                mask_buffer = repeat(mask_buffer, 'b j -> (b h) () j', h=h)
-                sim_buffer.masked_fill_(~mask_buffer, max_neg_value)
-
-        # attention, what we cannot get enough of, by chunks
-
-            sim_buffer = sim_buffer.softmax(dim=-1)
-
-            sim_buffer = einsum('b i j, b j d -> b i d', sim_buffer, v_buffer)
-            del v_buffer
-            sim[i:i+att_step,:,:] = sim_buffer
-
+                sim_buffer = sim_buffer.softmax(dim=-1)
+                
+                sim_buffer = einsum('b i j, b j d -> b i d', sim_buffer, v_buffer[:,:,:])
+                
+                sim[i:outer_end,j:inner_end,:] = sim_buffer
+                
             del sim_buffer
+            del q_buffer, k_buffer, v_buffer
+            
         sim = rearrange(sim, '(b h) n d -> b n (h d)', h=h)
         return self.to_out(sim)
 

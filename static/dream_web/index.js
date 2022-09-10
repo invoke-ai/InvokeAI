@@ -8,20 +8,42 @@ function toBase64(file) {
 }
 
 function appendOutput(src, seed, config) {
-    let outputNode = document.createElement("img");
-    outputNode.src = src;
-
+    let outputNode = document.createElement("figure");
     let altText = seed.toString() + " | " + config.prompt;
-    outputNode.alt = altText;
-    outputNode.title = altText;
+
+    const figureContents = `
+        <a href="${src}" target="_blank">
+            <img src="${src}" alt="${altText}" title="${altText}">
+        </a>
+        <figcaption>${seed}</figcaption>
+    `;
+
+    outputNode.innerHTML = figureContents;
+    let figcaption = outputNode.querySelector('figcaption')
 
     // Reload image config
-    outputNode.addEventListener('click', () => {
+    figcaption.addEventListener('click', () => {
         let form = document.querySelector("#generate-form");
         for (const [k, v] of new FormData(form)) {
+            if (k == 'initimg') { continue; }
             form.querySelector(`*[name=${k}]`).value = config[k];
         }
-        document.querySelector("#seed").value = seed;
+        if (config.variation_amount > 0 || config.with_variations != '') {
+            document.querySelector("#seed").value = config.seed;
+        } else {
+            document.querySelector("#seed").value = seed;
+        }
+
+        if (config.variation_amount > 0) {
+            let oldVarAmt = document.querySelector("#variation_amount").value
+            let oldVariations = document.querySelector("#with_variations").value
+            let varSep = ''
+            document.querySelector("#variation_amount").value = 0;
+            if (document.querySelector("#with_variations").value != '') {
+                varSep = ","
+            }
+            document.querySelector("#with_variations").value = oldVariations + varSep + seed + ':' + config.variation_amount
+        }
 
         saveFields(document.querySelector("#generate-form"));
     });
@@ -59,6 +81,7 @@ async function generateSubmit(form) {
 
     // Convert file data to base64
     let formData = Object.fromEntries(new FormData(form));
+    formData.initimg_name = formData.initimg.name
     formData.initimg = formData.initimg.name !== '' ? await toBase64(formData.initimg) : null;
 
     let strength = formData.strength;
@@ -131,6 +154,12 @@ async function generateSubmit(form) {
 }
 
 window.onload = () => {
+    document.querySelector("#prompt").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        const form = e.target.form;
+        generateSubmit(form);
+      }
+    });
     document.querySelector("#generate-form").addEventListener('submit', (e) => {
         e.preventDefault();
         const form = e.target;
@@ -147,11 +176,20 @@ window.onload = () => {
     document.querySelector("#reset-all").addEventListener('click', (e) => {
         clearFields(e.target.form);
     });
+    document.querySelector("#remove-image").addEventListener('click', (e) => {
+        initimg.value=null;
+    });
     loadFields(document.querySelector("#generate-form"));
 
     document.querySelector('#cancel-button').addEventListener('click', () => {
         fetch('/cancel').catch(e => {
             console.error(e);
+        });
+    });
+    document.documentElement.addEventListener('keydown', (e) => {
+      if (e.key === "Escape")
+        fetch('/cancel').catch(err => {
+          console.error(err);
         });
     });
 

@@ -1,27 +1,12 @@
-# Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
+'''
+This module is provided for backward compatibility with the
+original (hasty) API.
 
-# Derived from source code carrying the following copyrights
-# Copyright (c) 2022 Machine Vision and Learning Group, LMU Munich
-# Copyright (c) 2022 Robin Rombach and Patrick Esser and contributors
+Please use ldm.generate instead.
+'''
 
-import torch
-import numpy as np
-import random
-import os
-import traceback
-from omegaconf import OmegaConf
-from PIL import Image
-from tqdm import tqdm, trange
-from itertools import islice
-from einops import rearrange, repeat
-from torchvision.utils import make_grid
-from pytorch_lightning import seed_everything
-from torch import autocast
-from contextlib import contextmanager, nullcontext
-import transformers
-import time
-import re
-import sys
+from ldm.generate import Generate
+
 
 from ldm.util                      import instantiate_from_config
 from ldm.models.diffusion.ddim     import DDIMSampler

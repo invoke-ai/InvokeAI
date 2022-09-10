@@ -40,7 +40,7 @@ def main():
     print('* Initializing, be patient...\n')
     sys.path.append('.')
     from pytorch_lightning import logging
-    from ldm.simplet2i import T2I
+    from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
@@ -52,18 +52,18 @@ def main():
     # defaults passed on the command line.
     # additional parameters will be added (or overriden) during
     # the user input loop
-    t2i = T2I(
-        width=width,
-        height=height,
-        sampler_name=opt.sampler_name,
-        weights=weights,
-        full_precision=opt.full_precision,
-        config=config,
-        grid  = opt.grid,
+    t2i = Generate(
+        width          = width,
+        height         = height,
+        sampler_name   = opt.sampler_name,
+        weights        = weights,
+        full_precision = opt.full_precision,
+        config         = config,
+        grid           = opt.grid,
         # this is solely for recreating the prompt
-        latent_diffusion_weights=opt.laion400m,
-        embedding_path=opt.embedding_path,
-        device_type=opt.device
+        seamless       = opt.seamless,
+        embedding_path = opt.embedding_path,
+        device_type    = opt.device
     )
 
     # make sure the output directory exists
@@ -87,12 +87,11 @@ def main():
             print(f'{e}. Aborting.')
             sys.exit(-1)
 
+    if opt.seamless:
+        print(">> changed to seamless tiling mode")
+
     # preload the model
-    tic = time.time()
     t2i.load_model()
-    print(
-        f'>> model loaded in', '%4.2fs' % (time.time() - tic)
-    )
 
     if not infile:
         print(
@@ -101,7 +100,7 @@ def main():
 
     cmd_parser = create_cmd_parser()
     if opt.web:
-        dream_server_loop(t2i, opt.host, opt.port)
+        dream_server_loop(t2i, opt.host, opt.port, opt.outdir)
     else:
         main_loop(t2i, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
 
@@ -312,7 +311,7 @@ def get_next_command(infile=None) -> str: #command string
         print(f'#{command}')
     return command
 
-def dream_server_loop(t2i, host, port):
+def dream_server_loop(t2i, host, port, outdir):
     print('\n* --web was specified, starting web server...')
     # Change working directory to the stable-diffusion directory
     os.chdir(
@@ -321,6 +320,7 @@ def dream_server_loop(t2i, host, port):
 
     # Start server
     DreamServer.model = t2i
+    DreamServer.outdir = outdir
     dream_server = ThreadingDreamServer((host, port))
     print(">> Started Stable Diffusion dream server!")
     if host == '0.0.0.0':
@@ -419,6 +419,11 @@ def create_argv_parser():
         help='Directory to save generated images and a log of prompts and seeds. Default: outputs/img-samples',
     )
     parser.add_argument(
+        '--seamless',
+        action='store_true',
+        help='Change the model to seamless tiling (circular) mode',
+    )
+    parser.add_argument(
         '--embedding_path',
         type=str,
         help='Path to a pre-trained embedding manager checkpoint - can only be set on command line',
@@ -434,7 +439,7 @@ def create_argv_parser():
         '--gfpgan_bg_upsampler',
         type=str,
         default='realesrgan',
-        help='Background upsampler. Default: realesrgan. Options: realesrgan, none. Only used if --gfpgan is specified',
+        help='Background upsampler. Default: realesrgan. Options: realesrgan, none.',
 
     )
     parser.add_argument(
@@ -541,6 +546,11 @@ def create_cmd_parser():
         help='Directory to save generated images and a log of prompts and seeds',
     )
     parser.add_argument(
+        '--seamless',
+        action='store_true',
+        help='Change the model to seamless tiling (circular) mode',
+    )
+    parser.add_argument(
         '-i',
         '--individual',
         action='store_true',
@@ -551,6 +561,17 @@ def create_cmd_parser():
         '--init_img',
         type=str,
         help='Path to input image for img2img mode (supersedes width and height)',
+    )
+    parser.add_argument(
+        '-M',
+        '--mask',
+        type=str,
+        help='Path to inpainting mask; transparent areas will be painted over',
+    )
+    parser.add_argument(
+        '--invert_mask',
+        action='store_true',
+        help='Invert the inpainting mask; opaque areas will be painted over',
     )
     parser.add_argument(
         '-T',
