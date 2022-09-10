@@ -7,6 +7,7 @@ from einops import rearrange, repeat
 
 from ldm.modules.diffusionmodules.util import checkpoint
 
+import psutil
 
 def exists(val):
     return val is not None
