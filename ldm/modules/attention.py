@@ -197,7 +197,7 @@ class CrossAttention(nn.Module):
 
         if device.type == 'mps': # for apple GPUs
             old_inner = self.inner_step
-            self.inner_step = min (self.inner_step, (2<<31) // (self.outer_step * dim_softmax[1]))
+            self.inner_step = min (self.inner_step, (2<<31) // (self.outer_step * dim_softmax))
             self.outer_step = max (self.outer_step, (self.outer_step * old_inner) //self.inner_step)
             self.outer_step = min (self.outer_step, outer_limit)
     
