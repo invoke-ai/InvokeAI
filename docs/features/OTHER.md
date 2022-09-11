@@ -1,7 +1,11 @@
 ## **Google Colab**
 
-Stable Diffusion AI Notebook: <a href="https://colab.research.google.com/github/lstein/stable-diffusion/blob/main/Stable_Diffusion_AI_Notebook.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a> <br>
-Open and follow instructions to use an isolated environment running Dream.<br>
+Stable Diffusion AI Notebook: <a
+href="https://colab.research.google.com/github/lstein/stable-diffusion/blob/main/notebooks/Stable_Diffusion_AI_Notebook.ipynb"
+target="_parent"><img
+src="https://colab.research.google.com/assets/colab-badge.svg"
+alt="Open In Colab"/></a> <br> Open and follow instructions to use an
+isolated environment running Dream.<br>
 
 Output Example:
 ![Colab Notebook](../assets/colab_notebook.png)
@@ -10,8 +14,10 @@ Output Example:
 
 ## **Seamless Tiling**
 
-The seamless tiling mode causes generated images to seamlessly tile with itself. To use it, add the `--seamless` option when starting the
-script which will result in all generated images to tile, or for each `dream>` prompt as shown here:
+The seamless tiling mode causes generated images to seamlessly tile
+with itself. To use it, add the `--seamless` option when starting the
+script which will result in all generated images to tile, or for each
+`dream>` prompt as shown here:
 
 ```
 dream> "pond garden with lotus by claude monet" --seamless -s100 -n4
@@ -21,7 +27,10 @@ dream> "pond garden with lotus by claude monet" --seamless -s100 -n4
 
 ## **Reading Prompts from a File**
 
-You can automate `dream.py` by providing a text file with the prompts you want to run, one line per prompt. The text file must be composed with a text editor (e.g. Notepad) and not a word processor. Each line should look like what you would type at the dream> prompt:
+You can automate `dream.py` by providing a text file with the prompts
+you want to run, one line per prompt. The text file must be composed
+with a text editor (e.g. Notepad) and not a word processor. Each line
+should look like what you would type at the dream> prompt:
 
 ```
 a beautiful sunny day in the park, children playing -n4 -C10
@@ -74,8 +83,11 @@ For example consider this prompt:
     tabby cat:0.25 white duck:0.75 hybrid
 ```
 
-This will tell the sampler to invest 25% of its effort on the tabby cat aspect of the image and 75% on the white duck aspect (surprisingly, this example actually works). The prompt weights can
-use any combination of integers and floating point numbers, and they do not need to add up to 1.
+This will tell the sampler to invest 25% of its effort on the tabby
+cat aspect of the image and 75% on the white duck aspect
+(surprisingly, this example actually works). The prompt weights can
+use any combination of integers and floating point numbers, and they
+do not need to add up to 1.
 
 ---
 
@@ -84,22 +96,27 @@ use any combination of integers and floating point numbers, and they do not need
 For programmers who wish to incorporate stable-diffusion into other products, this repository includes a simplified API for text to image generation, which lets you create images from a prompt in just three lines of code:
 
 ```
-from ldm.simplet2i import T2I
-model   = T2I()
-outputs = model.txt2img("a unicorn in manhattan")
+from ldm.generate import Generate
+g       = Generate()
+outputs = g.txt2img("a unicorn in manhattan")
 ```
 
 Outputs is a list of lists in the format [filename1,seed1],[filename2,seed2]...].
 
-Please see ldm/simplet2i.py for more information. A set of example scripts is coming RSN.
+Please see ldm/generate.py for more information. A set of example scripts is coming RSN.
 
 ---
 
 ## **Preload Models**
 
-In situations where you have limited internet connectivity or are blocked behind a firewall, you can use the preload script to preload the required files for Stable Diffusion to run.
+In situations where you have limited internet connectivity or are
+blocked behind a firewall, you can use the preload script to preload
+the required files for Stable Diffusion to run.
 
-The preload script `scripts/preload_models.py` needs to be run once at least while connected to the internet. In the following runs, it will load up the cached versions of the required files from the `.cache` directory of the system.
+The preload script `scripts/preload_models.py` needs to be run once at
+least while connected to the internet. In the following runs, it will
+load up the cached versions of the required files from the `.cache`
+directory of the system.
 
 ```
 (ldm) ~/stable-diffusion$ python3 ./scripts/preload_models.py
