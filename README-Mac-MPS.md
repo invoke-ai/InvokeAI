@@ -5,10 +5,6 @@ Requirements
 - macOS 12.3 Monterey or later
 - Python
 - Patience
-- Apple Silicon*
-
-*I haven't tested any of this on Intel Macs but I have read that one person got
-it to work, so Apple Silicon might not be requried.
 
 Things have moved really fast and so these instructions change often and are
 often out-of-date. One of the problems is that there are so many different ways to
@@ -57,6 +53,8 @@ brew install cmake protobuf rust
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -o Miniconda3-latest-MacOSX-arm64.sh
 /bin/bash Miniconda3-latest-MacOSX-arm64.sh
 
+# OR install miniconda on an x86 Intel Mac:
+https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.pkg
 
 # EITHER WAY,
 # continue from here
@@ -76,7 +74,8 @@ PATH_TO_CKPT="$HOME/Downloads"  # or wherever you saved sd-v1-4.ckpt
 
 ln -s "$PATH_TO_CKPT/sd-v1-4.ckpt" models/ldm/stable-diffusion-v1/model.ckpt
 
-# install packages
+# Install packages.
+# For Intel Macs, exclude `CONDA_SUBDIR=osx-arm64` from the command below.
 PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac.yaml
 conda activate ldm
 
