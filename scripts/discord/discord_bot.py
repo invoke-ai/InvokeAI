@@ -11,9 +11,29 @@ from typing import Literal, Optional
 import discord
 from discord.ext import commands
 
-from discord_config import settings
+#from discord_config import settings
+import json
 
 #sys.path.append('.')
+
+intents = discord.Intents.default()
+intents.members = True
+intents.message_content = True
+
+discord_config_path: str = None
+if not discord_config_path or discord_config_path is None or not os.path.exists(discord_config_path):
+    discord_config_path = os.path.dirname(os.path.abspath(__file__)) + '/discord_config.json'
+
+if (not os.path.exists(discord_config_path)):
+    input(f'NO CONFIG FOUND FILE: {discord_config_path}')
+    sys.exit(191)
+
+with open(discord_config_path, 'r') as config_file:
+    settings = json.load(config_file)
+
+if (not settings or settings is None):
+    input(f'INVALID CONFIG FOUND FILE: {discord_config_path}')
+    sys.exit(192)
 
 from ldm.simplet2i import T2I
 model = T2I()
@@ -29,13 +49,8 @@ _MAX_DISCORD_EMBEDS: int = 10
 dreaming_loop = asyncio.get_event_loop()
 dreaming_queue = asyncio.Queue()
 
-intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
-
-bot = commands.Bot(command_prefix = settings['prefix'], intents=intents)
-
 # logic
+bot = commands.Bot(command_prefix = settings['prefix'], intents=intents)
 
 @bot.event
 async def on_ready():

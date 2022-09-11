@@ -1,1 +1,4 @@
-discord_config.py
+discord_config.py*
+!discord_config.py.template
+discord_config.json*
+!discord_config.json.template

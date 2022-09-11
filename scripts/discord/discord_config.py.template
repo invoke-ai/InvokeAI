@@ -1,6 +1,0 @@
-settings = {
-    'token': 'ThisIsAJWT.Generated.ByDiscordForYourBot',
-    'bot': 'BotName',
-    'id': 1, # discord client_id
-    'prefix': '/'
-}
