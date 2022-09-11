@@ -117,6 +117,7 @@ class Generate:
             seamless              = False,
             embedding_path        = None,
             device_type           = 'cuda',
+            ignore_ctrl_c         = False,
     ):
         self.iterations               = iterations
         self.width                    = width
@@ -134,6 +135,7 @@ class Generate:
         self.seamless                 = seamless
         self.embedding_path           = embedding_path
         self.device_type              = device_type
+        self.ignore_ctrl_c            = ignore_ctrl_c    # note, this logic probably doesn't belong here...
         self.model                    = None     # empty for now
         self.sampler                  = None
         self.device                   = None
@@ -210,7 +212,7 @@ class Generate:
             **args,
     ):   # eat up additional cruft
         """
-        ldm.prompt2image() is the common entry point for txt2img() and img2img()
+        ldm.generate.prompt2image() is the common entry point for txt2img() and img2img()
         It takes the following arguments:
            prompt                          // prompt string (no default)
            iterations                      // iterations (1); image count=iterations
@@ -341,6 +343,8 @@ class Generate:
 
         except KeyboardInterrupt:
             print('*interrupted*')
+            if not self.ignore_ctrl_c:
+                raise KeyboardInterrupt
             print(
                 '>> Partial results will be returned; if --grid was requested, nothing will be returned.'
             )
@@ -353,12 +357,14 @@ class Generate:
         print(
             f'>>   {len(results)} image(s) generated in', '%4.2fs' % (toc - tic)
         )
-        print(
-            f'>>   Max VRAM used for this generation:',
-            '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
-        )
+        if torch.cuda.is_available() and self.device.type == 'cuda':
+            print(
+                f'>>   Max VRAM used for this generation:',
+                '%4.2fG.' % (torch.cuda.max_memory_allocated() / 1e9),
+                'Current VRAM utilization:'
+                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
+            )
 
-        if self.session_peakmem:
             self.session_peakmem = max(
                 self.session_peakmem, torch.cuda.max_memory_allocated()
             )
@@ -532,9 +538,6 @@ class Generate:
         sd = pl_sd['state_dict']
         model = instantiate_from_config(config.model)
         m, u = model.load_state_dict(sd, strict=False)
-        model.to(self.device)
-        model.eval()
-
         
         if self.full_precision:
             print(
@@ -545,6 +548,8 @@ class Generate:
                 '>> Using half precision math. Call with --full_precision to use more accurate but VRAM-intensive full precision.'
             )
             model.half()
+        model.to(self.device)
+        model.eval()
 
         # usage statistics
         toc = time.time()
