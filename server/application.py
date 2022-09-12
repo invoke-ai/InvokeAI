@@ -1,3 +1,5 @@
+# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
+
 """Application module."""
 import argparse
 import json
@@ -20,18 +22,6 @@ def initialize_app(
 ) -> SocketIO:
   socketio.init_app(app)
   
-  # def on_join(data):
-  #   room = data['room']
-  #   join_room(room)
-  #   socketio_service.emit("test", "something", room=room)
-    
-  # def on_leave(data):
-  #   room = data['room']
-  #   leave_room(room)
-
-  # socketio_service.on_event('join_room', on_join)
-  # socketio_service.on_event('leave_room', on_leave)
-
   return socketio
 
 # The signal and generator services are injected to warm up the processing queues

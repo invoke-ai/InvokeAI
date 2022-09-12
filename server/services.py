@@ -1,14 +1,17 @@
+# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
+
 import base64
 import os
 from queue import Empty, Queue
 from threading import Thread
 import time
+from flask import app, url_for
 from flask_socketio import SocketIO, join_room, leave_room
 
 from ldm.dream.pngwriter import PngWriter
 from ldm.dream.server import CanceledException
 from ldm.generate import Generate
-from server.models import DreamRequest, Signal
+from server.models import DreamRequest, ProgressType, Signal
 
 class JobQueueService:
   __queue: Queue = Queue()
@@ -73,6 +76,7 @@ class SignalService:
 
 
 # TODO: Name this better?
+# TODO: Logging and signals should probably be event based (multiple listeners for an event)
 class LogService:
   __location: str
   __logFile: str
@@ -158,19 +162,35 @@ class GeneratorService:
         print('Generation queue processor stopped')
 
 
+  def __start(self, dreamRequest: DreamRequest):
+    if dreamRequest.start_callback:
+      dreamRequest.start_callback()
+    self.__signal_service.emit(Signal.job_started(dreamRequest.id()))
+
+
   def __done(self, dreamRequest: DreamRequest, image, seed, upscaled=False):
     self.__imageStorage.save(image, dreamRequest, seed, upscaled)
     
-    # TODO: get api path from Flask
-    imgpath = f"/api/images/{dreamRequest.id(seed, upscaled)}"
 
     # TODO: handle upscaling logic better (this is appending data to log, but only on first generation)
     if not upscaled:
       self.__log.log(dreamRequest, seed, upscaled)
+
+    self.__signal_service.emit(Signal.image_result(dreamRequest.id(), dreamRequest.id(seed, upscaled), dreamRequest.clone_without_image(seed)))
+
+    upscaling_requested = dreamRequest.upscale or dreamRequest.gfpgan_strength>0
     
-    if dreamRequest.image_callback:
-      dreamRequest.image_callback(imgpath, dreamRequest, seed, upscaled)
-    self.__signal_service.emit(Signal.image_result(dreamRequest.id(), dreamRequest.id(seed), dreamRequest.clone_without_image(seed)))
+    if upscaled:
+      dreamRequest.images_upscaled += 1
+    else:
+      dreamRequest.images_generated +=1
+    if upscaling_requested:
+    #     action = None
+      if dreamRequest.images_generated >= dreamRequest.iterations:
+        progressType = ProgressType.UPSCALING_DONE
+        if dreamRequest.images_upscaled < dreamRequest.iterations:
+          progressType = ProgressType.UPSCALING_STARTED
+        self.__signal_service.emit(Signal.image_progress(dreamRequest.id(), dreamRequest.id(seed), dreamRequest.images_upscaled+1, dreamRequest.iterations, progressType))
 
 
   def __progress(self, dreamRequest, sample, step):
@@ -183,15 +203,8 @@ class GeneratorService:
       image = self.__model._sample_to_image(sample)
       self.__intermediateStorage.save(image, dreamRequest, self.__model.seed, postfix=f'.{step}', metadataPostfix=f' [intermediate]')
       hasProgressImage = True
-#      imgpath = f"/api/intermediates/{dreamRequest.id(self.__model.seed)}/{step}"
-    
-    self.__signal_service.emit(Signal.image_progress(dreamRequest.id(), dreamRequest.id(self.__model.seed), step, dreamRequest.steps, hasProgressImage))
 
-
-  def __start(self, dreamRequest: DreamRequest):
-    if dreamRequest.start_callback:
-      dreamRequest.start_callback()
-    self.__signal_service.emit(Signal.job_started(dreamRequest.id()))
+    self.__signal_service.emit(Signal.image_progress(dreamRequest.id(), dreamRequest.id(self.__model.seed), step, dreamRequest.steps, ProgressType.GENERATION, hasProgressImage))
 
 
   def __generate(self, dreamRequest: DreamRequest):
