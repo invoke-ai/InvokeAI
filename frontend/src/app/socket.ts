@@ -257,15 +257,6 @@ export const useSocketIOEmitters = () => {
                 )
             );
         },
-        emitTestGenerateImage: () => {
-            socket.emit('generateImage', generationParameters);
-        },
-        emitTestRunESRGAN: () => {
-            socket.emit('runESRGAN', generationParameters);
-        },
-        emitTestRunGFPGAN: () => {
-            socket.emit('runGFPGAN', generationParameters);
-        },
         emitRunESRGAN: () => {
             dispatch(setIsProcessing(true));
             dispatch(setCurrentStep(-1));

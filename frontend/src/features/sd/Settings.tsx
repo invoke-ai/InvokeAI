@@ -72,10 +72,7 @@ const Settings = () => {
 
     const {
         emitGenerateImage,
-        emitTestGenerateImage,
         emitCancel,
-        emitTestRunESRGAN,
-        emitTestRunGFPGAN,
         emitRunESRGAN,
         emitRunGFPGAN,
     } = useSocketIOEmitters();
