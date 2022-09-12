@@ -77,9 +77,6 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 
-# WebUI temp files:
-img2img-tmp.png
-
 # Scrapy stuff:
 .scrapy
 
@@ -187,9 +184,10 @@ checkpoints
 # If it's a Mac
 .DS_Store
 
-
-# GFPGAN downloads stuff here on first run
-gfpgan/
-
-# Let the frontend manage its own .gitignore
+# Let the frontend manage its own gitignore
 !frontend/*
+
+# Scratch folder
+.scratch/
+.vscode/
+gfpgan/
