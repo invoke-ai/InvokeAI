@@ -195,7 +195,7 @@ class CrossAttention(nn.Module):
             for i in range(0, q.shape[1], slice_size):
                 end = i + slice_size
                 s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * self.scale
-                s2 = s1.softmax(dim=-1)
+                s2 = s1.softmax(dim=-1, dtype=r1.dtype)
                 del s1  
                 r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
                 del s2
@@ -207,7 +207,7 @@ class CrossAttention(nn.Module):
         for i in range(0, q.shape[1], slice_size): # conservative/less mem: operation in steps
             end = i + slice_size
             s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * self.scale
-            s2 = s1.softmax(dim=-1)
+            s2 = s1.softmax(dim=-1, dtype=r1.dtype)
             del s1  
             r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
             del s2
@@ -220,7 +220,7 @@ class CrossAttention(nn.Module):
             end = min(q.shape[0], i + slice_size)
             s1 = einsum('b i d, b j d -> b i j', q[i:end], k[i:end]) # adapted einsum for mem
             s1 *= self.scale
-            s2 = s1.softmax(dim=-1)
+            s2 = s1.softmax(dim=-1, dtype=r1.dtype)
             del s1
             r1[i:end] = einsum('b i j, b j d -> b i d', s2, v[i:end]) # adapted einsum for mem
             del s2
@@ -252,7 +252,7 @@ class CrossAttention(nn.Module):
         for i in range(0, q.shape[1], slice_size):
             end = min(q.shape[1], i + slice_size)
             s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * self.scale
-            s2 = s1.softmax(dim=-1)
+            s2 = s1.softmax(dim=-1, dtype=r1.dtype)
             del s1
             r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
             del s2 
