@@ -8,7 +8,7 @@ import numpy as np
 from einops import rearrange
 
 from ldm.util import instantiate_from_config
-from ldm.modules.attention import LinearAttention
+from ldm.modules.attention import LinearAttention, SpatialSelfAttention
 
 import psutil
 
@@ -138,116 +138,15 @@ class ResnetBlock(nn.Module):
         return x + h
 
 class LinAttnBlock(LinearAttention):
-    """to match AttnBlock usage"""
+    """to match SpatialSelfAttention usage"""
     def __init__(self, in_channels):
         super().__init__(dim=in_channels, heads=1, dim_head=in_channels)
-
-
-class AttnBlock(nn.Module):
-    def __init__(self, in_channels):
-        super().__init__()
-        self.in_channels = in_channels
-
-        self.norm = Normalize(in_channels)
-        self.q = torch.nn.Conv2d(in_channels,
-                                 in_channels,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
-        self.k = torch.nn.Conv2d(in_channels,
-                                 in_channels,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
-        self.v = torch.nn.Conv2d(in_channels,
-                                 in_channels,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
-        self.proj_out = torch.nn.Conv2d(in_channels,
-                                        in_channels,
-                                        kernel_size=1,
-                                        stride=1,
-                                        padding=0)
-
-
-    def forward(self, x):
-        h_ = x
-        h_ = self.norm(h_)
-        q1 = self.q(h_)
-        k1 = self.k(h_)
-        v = self.v(h_)
-
-        # compute attention
-        b, c, h, w = q1.shape
-
-        q2 = q1.reshape(b, c, h*w)
-        del q1
-
-        q = q2.permute(0, 2, 1)   # b,hw,c
-        del q2
-
-        k = k1.reshape(b, c, h*w) # b,c,hw
-        del k1
-
-        h_ = torch.zeros_like(k, device=q.device)
-
-        if q.device.type == 'cuda':
-            stats = torch.cuda.memory_stats(q.device)
-            mem_active = stats['active_bytes.all.current']
-            mem_reserved = stats['reserved_bytes.all.current']
-            mem_free_cuda, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
-            mem_free_torch = mem_reserved - mem_active
-            mem_free_total = mem_free_cuda + mem_free_torch
-
-            tensor_size = q.shape[0] * q.shape[1] * k.shape[2] * 4
-            mem_required = tensor_size * 2.5
-            steps = 1
-
-            if mem_required > mem_free_total:
-                steps = 2**(math.ceil(math.log(mem_required / mem_free_total, 2)))
-            
-            slice_size = q.shape[1] // steps if (q.shape[1] % steps) == 0 else q.shape[1]
-
-        else:
-            if psutil.virtual_memory().available / (1024**3) < 12:
-                slice_size = 1
-            else:
-                slice_size = min(q.shape[1], math.floor(2**30 / (q.shape[0] * q.shape[1])))
-        
-        for i in range(0, q.shape[1], slice_size):
-            end = i + slice_size
-
-            w1 = torch.bmm(q[:, i:end], k)     # b,hw,hw    w[b,i,j]=sum_c q[b,i,c]k[b,c,j]
-            w2 = w1 * (int(c)**(-0.5))
-            del w1
-            w3 = torch.nn.functional.softmax(w2, dim=2)
-            del w2
-
-            # attend to values
-            v1 = v.reshape(b, c, h*w)
-            w4 = w3.permute(0, 2, 1)   # b,hw,hw (first hw of k, second of q)
-            del w3
-
-            h_[:, :, i:end] = torch.bmm(v1, w4)     # b, c,hw (hw of q) h_[b,c,j] = sum_i v[b,c,i] w_[b,i,j]
-            del v1, w4
-
-        h2 = h_.reshape(b, c, h, w)
-        del h_
-
-        h3 = self.proj_out(h2)
-        del h2
-
-        h3 += x
-
-        return h3
-
 
 def make_attn(in_channels, attn_type="vanilla"):
     assert attn_type in ["vanilla", "linear", "none"], f'attn_type {attn_type} unknown'
     print(f"making attention of type '{attn_type}' with {in_channels} in_channels")
     if attn_type == "vanilla":
-        return AttnBlock(in_channels)
+        return SpatialSelfAttention(in_channels)
     elif attn_type == "none":
         return nn.Identity(in_channels)
     else:
@@ -712,7 +611,7 @@ class LatentRescaler(nn.Module):
                                                      out_channels=mid_channels,
                                                      temb_channels=0,
                                                      dropout=0.0) for _ in range(depth)])
-        self.attn = AttnBlock(mid_channels)
+        self.attn = SpatialSelfAttention(mid_channels)
         self.res_block2 = nn.ModuleList([ResnetBlock(in_channels=mid_channels,
                                                      out_channels=mid_channels,
                                                      temb_channels=0,

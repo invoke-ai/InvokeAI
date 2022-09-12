@@ -138,7 +138,7 @@ class SpatialSelfAttention(nn.Module):
         w_ = torch.einsum('bij,bjk->bik', q, k)
 
         w_ = w_ * (int(c)**(-0.5))
-        w_ = torch.nn.functional.softmax(w_, dim=2)
+        w_ = w_.softmax(dim=2, dtype=w_.dtype)
 
         # attend to values
         v = rearrange(v, 'b c h w -> b c (h w)')
