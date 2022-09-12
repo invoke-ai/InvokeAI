@@ -183,3 +183,10 @@ testtube
 checkpoints
 # If it's a Mac
 .DS_Store
+
+
+# GFPGAN downloads stuff here on first run
+gfpgan/
+
+# Let the frontend manage its own .gitignore
+!frontend/*
