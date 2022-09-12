@@ -1,28 +1,58 @@
 """Application module."""
 import argparse
+import json
 import os
 import sys
 from flask import Flask
 from flask_cors import CORS
+from flask_socketio import SocketIO, join_room, leave_room
 from omegaconf import OmegaConf
 from dependency_injector.wiring import inject, Provide
 from server import views
 from server.containers import Container
-from server.services import GeneratorService
+from server.services import GeneratorService, SignalService
 
-# Initialize the generator so it warms up the model and starts processing from the queue
+# The socketio_service is injected here (rather than created in run_app) to initialize it
 @inject
-def initialize_app(generator_service: GeneratorService = Provide[Container.generator_service]) -> None:
+def initialize_app(
+  app: Flask,
+  socketio: SocketIO = Provide[Container.socketio]
+) -> SocketIO:
+  socketio.init_app(app)
+  
+  # def on_join(data):
+  #   room = data['room']
+  #   join_room(room)
+  #   socketio_service.emit("test", "something", room=room)
+    
+  # def on_leave(data):
+  #   room = data['room']
+  #   leave_room(room)
+
+  # socketio_service.on_event('join_room', on_join)
+  # socketio_service.on_event('leave_room', on_leave)
+
+  return socketio
+
+# The signal and generator services are injected to warm up the processing queues
+# TODO: Initialize these a better way?
+@inject
+def initialize_generator(
+  signal_service: SignalService = Provide[Container.signal_service],
+  generator_service: GeneratorService = Provide[Container.generator_service]
+):
   pass
 
-def create_app(config) -> Flask:
+
+def run_app(config, host, port) -> Flask:
+  app = Flask(__name__, static_url_path='')
+
+  # Set up dependency injection container
   container = Container()
   container.config.from_dict(config)
   container.wire(modules=[__name__])
-
-  app = Flask(__name__, static_url_path='')
   app.container = container
-
+  
   # Set up CORS
   CORS(app, resources={r'/api/*': {'origins': '*'}})
 
@@ -33,6 +63,7 @@ def create_app(config) -> Flask:
   app.add_url_rule('/config.js', view_func=views.WebConfig.as_view('web_config'))
 
   # API Routes
+  app.add_url_rule('/api/jobs', view_func=views.ApiJobs.as_view('api_jobs'))
   app.add_url_rule('/api/cancel', view_func=views.ApiCancel.as_view('api_cancel'))
 
   # TODO: Get storage root from config
@@ -42,9 +73,19 @@ def create_app(config) -> Flask:
   app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../static/dream_web/')) 
 
   # Initialize
-  initialize_app()
+  socketio = initialize_app(app)
+  initialize_generator()
 
-  return app
+  print(">> Started Stable Diffusion api server!")
+  if  host == '0.0.0.0':
+    print(f"Point your browser at http://localhost:{port} or use the host's DNS name or IP address.")
+  else:
+    print(">> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address.")
+    print(f">> Point your browser at http://{host}:{port}.")
+
+  # Run the app
+  socketio.run(app, host, port)
+
 
 def main():
   """Initialize command-line parsers and the diffusion model"""
@@ -108,17 +149,8 @@ def main():
   )
 
   # Start server
-  flask = create_app(appConfig)
-
-  print(">> Started Stable Diffusion api server!")
-  if opt.host == '0.0.0.0':
-    print(f"Point your browser at http://localhost:{opt.port} or use the host's DNS name or IP address.")
-  else:
-    print(">> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address.")
-    print(f">> Point your browser at http://{opt.host}:{opt.port}.")
-
   try:
-    flask.run(opt.host, opt.port)
+    run_app(appConfig, opt.host, opt.port)
   except KeyboardInterrupt:
     pass
 

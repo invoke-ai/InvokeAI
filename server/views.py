@@ -10,6 +10,29 @@ from server.models import DreamRequest
 from server.services import GeneratorService, ImageStorageService, JobQueueService
 from server.containers import Container
 
+class ApiJobs(MethodView):
+
+  @inject
+  def post(self, job_queue_service: JobQueueService = Provide[Container.generation_queue_service]):
+    dreamRequest = DreamRequest.from_json(request.json, newTime = True)
+
+    #self.canceled.clear()
+    print(f">> Request to generate with prompt: {dreamRequest.prompt}")
+
+    q = Queue()
+
+    dreamRequest.start_callback = None
+    dreamRequest.image_callback = None
+    dreamRequest.progress_callback = None
+    dreamRequest.cancelled_callback = None
+    dreamRequest.done_callback = None
+
+    # Push the request
+    job_queue_service.push(dreamRequest)
+
+    return { 'dreamId': dreamRequest.id() }
+  
+
 class WebIndex(MethodView):
   init_every_request = False
   __file: str = None
@@ -21,7 +44,7 @@ class WebIndex(MethodView):
     return current_app.send_static_file(self.__file)
 
   @inject
-  def post(self, job_queue_service: JobQueueService = Provide[Container.queue_service]):
+  def post(self, job_queue_service: JobQueueService = Provide[Container.generation_queue_service]):
     dreamRequest = DreamRequest.from_json(request.json, newTime = True)
 
     #self.canceled.clear()
@@ -84,18 +107,32 @@ class WebIndex(MethodView):
     def done():
       q.put({ 'type': 'done' })
 
+    def start():
+      q.put({ 'type': 'started' })
+
+
+    dreamRequest.start_callback = start
     dreamRequest.image_callback = image_done
     dreamRequest.progress_callback = image_progress
     dreamRequest.cancelled_callback = image_canceled
     dreamRequest.done_callback = done
 
     # Push the request
+    print('pushing job')
     job_queue_service.push(dreamRequest)
+    print('job pushed')
 
     # Write responses
     def generateResponse():
+      print('generating response')
+      yield f"SEND"
+      print('sent dummy event') 
       while True:
         event = q.get()
+
+        if event['type'] == 'started':
+          yield f"{json.dumps({'event': 'started', 'dreamId': dreamRequest.id() })}\n"
+
         if event['type'] == 'progress':
           yield f"{json.dumps(event['data'])}\n"
 
@@ -160,6 +197,6 @@ class ApiIntermediates(MethodView):
     self.__storage = storage
 
   def get(self, dreamId, step):
-    name = self.__storage.path(dreamId, f'.{step}')
+    name = self.__storage.path(dreamId, postfix=f'.{step}')
     fullpath=os.path.join(self.__pathRoot, name)
     return send_from_directory(os.path.dirname(fullpath), os.path.basename(fullpath))

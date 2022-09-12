@@ -1,6 +1,7 @@
 """Containers module."""
 
 from dependency_injector import containers, providers
+from flask_socketio import SocketIO
 from ldm.generate import Generate
 from server import services
 
@@ -9,7 +10,12 @@ class Container(containers.DeclarativeContainer):
 
   config = providers.Configuration()
 
-  model_singleton = providers.Singleton(
+  socketio = providers.ThreadSafeSingleton(
+    SocketIO,
+    app = None
+  )
+
+  model_singleton = providers.ThreadSafeSingleton(
     Generate,
     width = config.model.width,
     height = config.model.height,
@@ -24,33 +30,44 @@ class Container(containers.DeclarativeContainer):
   )
 
   # TODO: get location from config
-  image_storage_service = providers.Singleton(
+  image_storage_service = providers.ThreadSafeSingleton(
     services.ImageStorageService,
     './outputs/img-samples/'
   )
 
   # TODO: get location from config
-  image_intermediates_storage_service = providers.Singleton(
+  image_intermediates_storage_service = providers.ThreadSafeSingleton(
     services.ImageStorageService,
     './outputs/intermediates/'
   )
 
-  queue_service = providers.Singleton(
+  signal_queue_service = providers.ThreadSafeSingleton(
+    services.SignalQueueService
+  )
+
+  signal_service = providers.ThreadSafeSingleton(
+    services.SignalService,
+    socketio = socketio,
+    queue = signal_queue_service
+  )
+
+  generation_queue_service = providers.ThreadSafeSingleton(
     services.JobQueueService
   )
 
   # TODO: get locations from config
-  log_service = providers.Singleton(
+  log_service = providers.ThreadSafeSingleton(
     services.LogService,
     './outputs/img-samples/',
     'dream_web_log.txt'
   )
 
-  generator_service = providers.Singleton(
+  generator_service = providers.ThreadSafeSingleton(
     services.GeneratorService,
     model = model_singleton,
-    queue = queue_service,
+    queue = generation_queue_service,
     imageStorage = image_storage_service,
     intermediateStorage = image_intermediates_storage_service,
-    log = log_service
+    log = log_service,
+    signal_service = signal_service
   )

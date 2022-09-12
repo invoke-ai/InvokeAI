@@ -1,6 +1,6 @@
 import json
 import string
-from copy import copy
+from copy import deepcopy
 from datetime import datetime, timezone
 
 class DreamRequest():
@@ -23,6 +23,7 @@ class DreamRequest():
   time: int
 
   # TODO: use signals/events for progress instead
+  start_callback = None
   progress_callback = None
   image_callback = None
   cancelled_callback = None
@@ -31,21 +32,25 @@ class DreamRequest():
   def id(self, seed = None, upscaled = False) -> str:
     return f"{self.time}.{seed or self.seed}{'.u' if upscaled else ''}"
 
-  # TODO: handle this more cleanly
-  def data_without_image(self, seed = None):
-    data = copy(self.__dict__)
-    data['initimg'] = None
-    data['progress_callback'] = None
-    data['image_callback'] = None
-    data['cancelled_callback'] = None
-    data['done_callback'] = None
+  # TODO: handle this more cleanly (probably by splitting this into a Job and Result class)
+  # TODO: Set iterations to 1 or remove it from the dream result? And just keep it on the job?
+  def clone_without_image(self, seed = None):
+    data = deepcopy(self)
+    #data = copy(self.__dict__)
+    data.initimg = None
+    data.start_callback = None
+    data.progress_callback = None
+    data.image_callback = None
+    data.cancelled_callback = None
+    data.done_callback = None
     if seed:
-      data['seed'] = seed
+      data.seed = seed
 
     return data
 
   def to_json(self, seed: int = None):
-    return json.dumps(self.data_without_image(seed))
+    copy = self.clone_without_image(seed)
+    return json.dumps(copy.__dict__)
 
   @staticmethod
   def from_json(j, newTime: bool = False):
@@ -71,3 +76,47 @@ class DreamRequest():
     d.seed = int(j.get('seed'))
     d.time = int(datetime.now(timezone.utc).timestamp()) if newTime else int(j.get('time'))
     return d
+
+
+class Signal():
+  event: str
+  data = None
+  room: str = None
+  broadcast: bool = False
+
+  def __init__(self, event: str, data, room: str = None, broadcast: bool = False):
+    self.event = event
+    self.data = data
+    self.room = room
+    self.broadcast = broadcast
+
+  @staticmethod
+  def image_progress(jobId: str, dreamId: str, step: int, totalSteps: int, hasProgressImage: bool = False):
+    return Signal('dream_progress', {
+      'jobId': jobId,
+      'dreamId': dreamId,
+      'step': step,
+      'totalSteps': totalSteps,
+      'hasProgressImage': hasProgressImage
+    }, room=jobId, broadcast=True)
+
+  # TODO: use a result id or something? Like a sub-job
+  @staticmethod
+  def image_result(jobId: str, dreamId: str, dreamRequest: DreamRequest):
+    return Signal('dream_result', {
+      'jobId': jobId,
+      'dreamId': dreamId,
+      'dreamRequest': dreamRequest.__dict__
+    }, room=jobId, broadcast=True)
+
+  @staticmethod
+  def job_started(jobId: str):
+    return Signal('job_started', { 'jobId': jobId }, room=jobId, broadcast=True)
+    
+  @staticmethod
+  def job_done(jobId: str):
+    return Signal('job_done', { 'jobId': jobId }, room=jobId, broadcast=True)
+
+  @staticmethod
+  def job_canceled(jobId: str):
+    return Signal('job_canceled', { 'jobId': jobId }, room=jobId, broadcast=True)

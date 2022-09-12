@@ -7,6 +7,7 @@
 
     <link rel="stylesheet" href="index.css">
     <script src="config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
     <script src="index.js"></script>
   </head>
   <body>
@@ -18,8 +19,8 @@
     </header>
 
     <main>
-      <form id="generate-form" method="post" action="#">
-	<fieldset id="txt2img">
+      <form id="generate-form" method="post" action="api/jobs">
+	    <fieldset id="txt2img">
           <div id="search-box">
             <textarea rows="3" id="prompt" name="prompt"></textarea>
             <input type="submit" id="submit" value="Generate">
@@ -68,8 +69,8 @@
             <option value="832">832</option> <option value="896">896</option>
             <option value="960">960</option> <option value="1024">1024</option>
           </select>
-          <label title="Set to -1 for random seed" for="seed">Seed:</label>
-          <input value="-1" type="number" id="seed" name="seed">
+          <label title="Set to 0 for random seed" for="seed">Seed:</label>
+          <input value="0" type="number" id="seed" name="seed">
           <button type="button" id="reset-seed">&olarr;</button>
           <input type="checkbox" name="progress_images" id="progress_images">
 	  <label for="progress_images">Display in-progress images (slower)</label>
@@ -115,6 +116,10 @@
             <i><span>Postprocessing...</span><span id="processing_cnt">1/3</span></i>
           </div>
         </div>
+      </section>
+
+      <section id="log-section">
+        <div id="log-container"></div>
       </section>
 
       <div id="results">
