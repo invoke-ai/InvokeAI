@@ -267,7 +267,6 @@ class Generate:
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 m.padding_mode = 'circular' if seamless else m._orig_padding_mode
         
-        assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert (
             0.0 < strength < 1.0
         ), 'img2img and inpaint strength can only work with 0.0 < strength < 1.0'
