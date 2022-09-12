@@ -1,38 +1,29 @@
-from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
-from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
-from ldm.dream.pngwriter import PngWriter
-from ldm.generate import Generate
-from flask_socketio import SocketIO
-from flask import Flask, send_from_directory, url_for, jsonify
-from PIL import Image
+import mimetypes
 import transformers
 import json
-import base64
-import mimetypes
+import re
 import os
-import sys
-import signal
-import time
-import eventlet
 import traceback
-from threading import Event
-from enum import Enum
+import glob
+import eventlet
 
+from flask_socketio import SocketIO
+from flask import Flask, send_from_directory, url_for, jsonify
 from pathlib import Path
+from PIL import Image
 from pytorch_lightning import logging
-from modules.parse_seed_weights import parse_seed_weights
+from threading import Event
 
-# fix missing mimetypes on windows due to registry wonkiness
-import mimetypes
-mimetypes.add_type('application/javascript', '.js')
-mimetypes.add_type('text/css', '.css')
+from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
+from ldm.gfpgan.gfpgan_tools import run_gfpgan
+from ldm.generate import Generate
 
-# Host and port to serve on
-host = 'localhost'
-port = 9090
+from modules.parameters import make_generation_parameters, make_esrgan_parameters, make_gfpgan_parameters
 
-# Output directory for images
-output_dir = "web-outputs/"
+
+output_dir = "outputs/"  # Base output directory for images
+host = 'localhost'  # Web & socket.io host
+port = 9090  # Web & socket.io port
 
 """
 Additional CORS origins to this list.
@@ -44,12 +35,9 @@ additional_allowed_origins = ["192.168.1.8","192.168.1.24"]
 additional_allowed_origins = []
 
 
-def build_cors_allowed_origins(additional_allowed_origins):
-    cors_allowed_origins = [f"http://{host}:{port}"]
-    for origin in additional_allowed_origins:
-        cors_allowed_origins.append(origin)
-    return cors_allowed_origins
-
+# fix missing mimetypes on windows due to registry wonkiness
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
 
 app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 
@@ -65,7 +53,6 @@ def outputs(filename):
     )
 
 
-# serve the vite build
 @app.route("/", defaults={'path': ''})
 def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
@@ -85,68 +72,115 @@ engineio_logger = True if dev_mode else False
 # default 1,000,000, needs to be higher for socketio to accept larger images
 max_http_buffer_size = 10000000
 
-cors_allowed_origins = build_cors_allowed_origins(additional_allowed_origins)
+
+cors_allowed_origins = [f"http://{host}:{port}"] + additional_allowed_origins
 
 socketio = SocketIO(app,
                     logger=logger,
                     engineio_logger=logger,
                     max_http_buffer_size=max_http_buffer_size,
-                    cors_allowed_origins=cors_allowed_origins)
+                    cors_allowed_origins=cors_allowed_origins
+                    )
 
 
-@socketio.on('cancel')
-def handleCancel():
-    canceled.set()
-    return make_reponse("OK")
+class CanceledException(Exception):
+    pass
 
 
-@socketio.on('generateImage')
-def handle_generate_image(data):
-    generate_image(data)
-    return make_reponse("OK")
+canceled = Event()
+
+# reduce logging outputs to error
+transformers.logging.set_verbosity_error()
+logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
+
+# Initialize and load model
+model = Generate()
+model.load_model()
 
 
-@socketio.on('runESRGAN')
-def handle_run_esrgan(data):
-    image = Image.open(data["url"])
-    strength = data["upscalingStrength"]
-    upsampler_scale = data["upscalingLevel"]
-    seed = 1
-    outdir = "outputs/"
-    image = real_esrgan_upscale(
-        image=image,
-        strength=strength,
-        upsampler_scale=upsampler_scale,
-        seed=seed,
-        outdir=outdir)
-    image.save("outputs/test/test.png")
-    return make_reponse("OK")
+# location for "finished" images
+result_path = os.path.join(output_dir, 'img-samples/')
 
+# temporary path for intermediates
+intermediate_path = os.path.join(output_dir, 'intermediates/')
 
-@socketio.on('runGFPGAN')
-def handle_run_gfpgan(data):
-    image = Image.open(data["url"])
-    strength = Image.open(data["gfpganStrength"])
-    seed = Image.open(data["seed"])
-    image = run_gfpgan(image, strength, seed, 1)
-    image.save("")
+# path for user-uploaded init images and masks
+init_path = os.path.join(output_dir, 'init/')
+mask_path = os.path.join(output_dir, 'mask/')
+
+# make all output paths
+[os.makedirs(path, exist_ok=True)
+ for path in [result_path, intermediate_path, init_path, mask_path]]
 
 
 @socketio.on('requestAllImages')
 def handle_request_all_images():
-    paths = sorted(Path("outputs/img-samples").glob("*.png"),
-                   key=os.path.getmtime)
-    relative_paths = []
-    for p in paths:
-        relative_paths.append(str(p.relative_to('.')))
-    return make_reponse("OK", data=relative_paths)
+    paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
+    paths.sort(key=lambda x: os.path.getmtime(x))
+    return make_response("OK", data=paths)
+
+
+@socketio.on('generateImage')
+def handle_generate_image_event(data):
+    generate_images(
+        data
+    )
+
+    return make_response("OK")
+
+
+@socketio.on('runESRGAN')
+def handle_run_esrgan_event(data):
+    parameters = make_esrgan_parameters(data)
+    image = Image.open(data["imagePath"])
+
+    image = real_esrgan_upscale(
+        image=image,
+        **parameters,
+    )
+
+    path = save_image(
+        image=image,
+        seed=parameters["seed"],
+        output_dir=result_path,
+        postprocessing="esrgan"
+    )
+
+    data["seed"] = parameters["seed"]
+    socketio.emit(
+        'result', {'url': os.path.relpath(path), 'metadata': data})
+    eventlet.sleep(0)
+
+
+@socketio.on('runGFPGAN')
+def handle_run_gfpgan_event(data):
+    parameters = make_gfpgan_parameters(data)
+    image = Image.open(data["imagePath"])
+
+    image = run_gfpgan(
+        image=image,
+        ** parameters,
+        upsampler_scale=1
+    )
+
+    path = save_image(
+        image=image,
+        seed=parameters["seed"],
+        output_dir=result_path,
+        postprocessing="gfpgan"
+    )
+
+    data["seed"] = parameters["seed"]
+    socketio.emit(
+        'result', {'url': os.path.relpath(path), 'metadata': data})
+    eventlet.sleep(0)
 
 
 # TODO: I think this needs a safety mechanism.
 @socketio.on('deleteImage')
 def handle_delete_image(path):
     Path(path).unlink()
-    return make_reponse("OK")
+    return make_response("OK")
 
 
 # TODO: I think this needs a safety mechanism.
@@ -156,7 +190,7 @@ def handle_upload_initial_image(bytes, name):
     os.makedirs(os.path.dirname(filePath), exist_ok=True)
     newFile = open(filePath, "wb")
     newFile.write(bytes)
-    return make_reponse("OK", data=filePath)
+    return make_response("OK", data=filePath)
 
 
 # TODO: I think this needs a safety mechanism.
@@ -166,71 +200,10 @@ def handle_upload_initial_image(bytes, name):
     os.makedirs(os.path.dirname(filePath), exist_ok=True)
     newFile = open(filePath, "wb")
     newFile.write(bytes)
-    return make_reponse("OK", data=filePath)
+    return make_response("OK", data=filePath)
 
 
-class CanceledException(Exception):
-    pass
-
-
-canceled = Event()
-
-transformers.logging.set_verbosity_error()
-
-# initialize with defaults, we will populate all config
-model = Generate()
-
-# gets rid of annoying messages about random seed
-logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
-
-model.load_model()
-
-print(f"\nServer online: http://{host}:{port}")
-
-
-# Logic from ldm.dream.pngwriter.unique_prefix
-def get_unique_prefix(dir):
-    # sort reverse alphabetically until we find max+1
-    dirlist = sorted(os.listdir(dir), reverse=True)
-    # find the first filename that matches our pattern or return 000000.0.png
-    existing_name = next(
-        (f for f in dirlist if re.match(r'^(\d+)\..*\.png', f)),
-        '0000000.0.png',
-    )
-    basecount = int(existing_name.split('.', 1)[0]) + 1
-    return f'{basecount: 06}'
-
-
-# prefix = pngwriter.unique_prefix()
-
-# def make_filename(upscaled, with_variations,):
-#     if upscaled and opt.save_original:
-#                         filename = f'{prefix}.{seed}.postprocessed.png'
-#                     else:
-#                         filename = f'{prefix}.{seed}.png'
-#                     if opt.variation_amount > 0:
-#                         iter_opt = argparse.Namespace(**vars(opt)) # copy
-#                         this_variation = [[seed, opt.variation_amount]]
-#                         if opt.with_variations is None:
-#                             iter_opt.with_variations = this_variation
-#                         else:
-#                             iter_opt.with_variations = opt.with_variations + this_variation
-#                         iter_opt.variation_amount = 0
-#                         normalized_prompt = PromptFormatter(t2i, iter_opt).normalize_prompt()
-#                         metadata_prompt = f'{normalized_prompt} -S{iter_opt.seed}'
-#                     elif opt.with_variations is not None:
-#                         normalized_prompt = PromptFormatter(t2i, opt).normalize_prompt()
-#                         metadata_prompt = f'{normalized_prompt} -S{opt.seed}' # use the original seed - the per-iteration value is the last variation-seed
-#                     else:
-#                         normalized_prompt = PromptFormatter(t2i, opt).normalize_prompt()
-#                         metadata_prompt = f'{normalized_prompt} -S{seed}'
-#                     path = file_writer.save_image_and_prompt_to_png(image, metadata_prompt, filename)
-#                     if (not upscaled) or opt.save_original:
-#                         # only append to results if we didn't overwrite an earlier output
-#                         results.append([path, metadata_prompt])
-
-
-def make_reponse(status, message=None, data=None):
+def make_response(status, message=None, data=None):
     response = {'status': status}
     if message is not None:
         response['message'] = message
@@ -239,74 +212,56 @@ def make_reponse(status, message=None, data=None):
     return response
 
 
-# set up writers for various image types
-image_writer = PngWriter(os.path.join(output_dir, 'final_images'))
-init_image_writer = PngWriter(os.path.join(output_dir, 'init_images'))
-mask_image_writer = PngWriter(os.path.join(output_dir, 'mask_images'))
-intermediate_writer = PngWriter(
-    os.path.join(output_dir, 'intermediate_images'))
+def save_image(image, seed, output_dir, step_index=None, postprocessing=None):
+    # Prefix logic from `ldm.dream.pngwriter.unique_prefix`
+    # sort reverse alphabetically until we find max+1
+    dirlist = sorted(os.listdir(output_dir), reverse=True)
+    # find the first filename that matches our pattern or return 000000.0.png
+    existing_name = next(
+        (f for f in dirlist if re.match('^(\d+)\..*\.png', f)),
+        '0000000.0.png',
+    )
+    basecount = int(existing_name.split('.', 1)[0]) + 1
+    prefix = f'{basecount:06}'
 
-"""
-Jobs:
-- Generate image
-    - At least from prompt
-    - May use init
-    - May use mask
-    - May run ESRGAN
-    - May run GFPGAN
-"""
+    filename = f'{prefix}.{seed}'
 
-def generate_image(data):
+    if step_index:
+        filename += f'.{step_index}'
+    if postprocessing:
+        filename += f'.{postprocessing}'
+
+    filename += '.png'
+
+    filepath = os.path.join(output_dir, filename)
+    image.save(filepath, 'PNG')
+
+    return filepath
+
+
+def generate_images(data):
     canceled.clear()
-
-    prompt = data['prompt']
-    strength = float(data['img2imgStrength'])
-    iterations = int(data['iterations'])
-    steps = int(data['steps'])
-    width = int(data['width'])
-    height = int(data['height'])
-    fit = bool(data['shouldFitToWidthHeight'])
-    cfgscale = float(data['cfgScale'])
-    sampler_name = data['sampler']
-    gfpgan_strength = float(data['gfpganStrength']
-                            ) if gfpgan_model_exists else 0
-    upscale_level = int(data['upscalingLevel'])
-    upscale_strength = float(data['upscalingStrength'])
-    upscale = [int(upscale_level), float(upscale_strength)
-               ] if upscale_level != 0 else None
-
-    # generate seed if set to random in UI
-    seed = model.seed if int(data['seed']) == -1 else int(data['seed'])
-    data['seed'] = seed
-
-    init_img = data['initialImagePath']
-    fit = data['shouldFitToWidthHeight']
-
-    init_mask = data['maskPath']
-    seamless = data['seamless']
-    progress_images = data['shouldDisplayInProgress']
 
     step_index = 1
 
-    with_variations = None
-    variation_amount = data['variantAmount']
+    parameters = make_generation_parameters(data)
 
-    seed_weights = parse_seed_weights(data['seedWeights'])
+    should_run_esrgan = data["shouldRunESRGAN"]
+    if should_run_esrgan:
+        esrgan_parameters = make_esrgan_parameters(data)
 
-    if data['shouldGenerateVariations'] and seed_weights is not False:
-        with_variations = seed_weights
+    should_run_gfpgan = data["shouldRunGFPGAN"]
+    if should_run_gfpgan:
+        gfpgan_parameters = make_gfpgan_parameters(data)
 
     def image_progress(sample, step):
         if canceled.is_set():
             raise CanceledException
-
         nonlocal step_index
-        if progress_images and step % 5 == 0 and step < steps - 1:
+        if parameters["progress_images"] and step % 5 == 0 and step < steps - 1:
             image = model.sample_to_image(sample)
-            name = f'{prefix}.{seed}.{step_index}.png'
-            metadata = f'{prompt} -S{seed} [intermediate]'
-            path = step_writer.save_image_and_prompt_to_png(
-                image, metadata, name)
+            path = save_image(image, data["seed"],
+                              intermediate_path, step_index)
             step_index += 1
             socketio.emit('intermediateResult', {
                           'url': os.path.relpath(path), 'metadata': data})
@@ -314,55 +269,39 @@ def generate_image(data):
         eventlet.sleep(0)
 
     def image_done(image, seed, upscaled=False):
-        prefix = get_unique_prefix()
-        filename = f'{prefix}.{seed}.png'
-        path = os.path.join(outdir, filename)
-        image.save(path, 'PNG')
-        if not upscaled:
-            # We may have passed -1 as seed to server, need actual seed for UI
-            socketio.emit(
-                'result', {'url': os.path.relpath(path), 'metadata': data})
-            eventlet.sleep(0)
+        if should_run_esrgan:
+            esrgan_parameters['seed'] = seed
+            image = real_esrgan_upscale(
+                image=image,
+                **esrgan_parameters,
+            )
+        if should_run_gfpgan:
+            gfpgan_parameters['seed'] = seed
+            image = run_gfpgan(
+                image=image,
+                **gfpgan_parameters,
+                upsampler_scale=1,
+            )
+        path = save_image(image, seed, output_dir=result_path)
+        data["seed"] = seed
+        socketio.emit(
+            'result', {'url': os.path.relpath(path), 'metadata': data})
+        eventlet.sleep(0)
 
     try:
         model.prompt2image(
-            # Common generation parameters
-            prompt,
-            iterations=iterations,
-            steps=steps,
-            seed=seed,
-            cfg_scale=cfgscale,
-            # ddim_eta=None, # needs implementation
-            # skip_normalize=False, # needs implementation
-            width=width,
-            height=height,
-            sampler_name=sampler_name,
-            seamless=seamless,
-            with_variations=with_variations,
-            variation_amount=variation_amount,
-
-            # img2img & inpaint parameters
-            init_img=init_img,
-            init_mask=init_mask,
-            fit=fit,
-            strength=strength,
-
-            # GFPGAN/ESRGAN parameters
-            gfpgan_strength=gfpgan_strength,  # needs implementation
-            # save_original=False, # needs implementation
-            upscale=upscale,  # needs implementation
-
-            # System parameters
-            progress_images=progress_images,
+            **parameters,
+            # In Web UI, we process GFPGAN and ESRGAN wholly separately, skip them here:
             step_callback=image_progress,
-            image_callback=image_done)
+            image_callback=image_done
+        )
 
     except KeyboardInterrupt:
         raise
     except CanceledException:
         raise
     except Exception as e:
-        socketio.emit('error', (str(e)))
+        # socketio.emit('error', (str(e)))
         print("\n")
         traceback.print_exc()
         print("\n")
