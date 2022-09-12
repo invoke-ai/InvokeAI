@@ -10,11 +10,15 @@ class CFGDenoiser(nn.Module):
         self.inner_model = model
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
-        x_in = torch.cat([x] * 2)
-        sigma_in = torch.cat([sigma] * 2)
-        cond_in = torch.cat([uncond, cond])
-        uncond, cond = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
-        return uncond + (cond - uncond) * cond_scale
+        if (cond_scale == 1.0):
+            return self.inner_model(x, sigma, cond=cond)
+        else:
+            x_in = torch.cat([x] * 2)
+            sigma_in = torch.cat([sigma] * 2)
+            cond_in = torch.cat([uncond, cond])
+            uncond, cond = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
+            return uncond + (cond - uncond) * cond_scale
+
 
 
 class KSampler(object):
@@ -25,13 +29,16 @@ class KSampler(object):
         self.device   = device or choose_torch_device()
 
         def forward(self, x, sigma, uncond, cond, cond_scale):
-            x_in = torch.cat([x] * 2)
-            sigma_in = torch.cat([sigma] * 2)
-            cond_in = torch.cat([uncond, cond])
-            uncond, cond = self.inner_model(
-                x_in, sigma_in, cond=cond_in
-            ).chunk(2)
-            return uncond + (cond - uncond) * cond_scale
+            if (cond_scale == 1.0):
+                return self.inner_model(x, sigma, cond=cond)
+            else:
+                x_in = torch.cat([x] * 2)
+                sigma_in = torch.cat([sigma] * 2)
+                cond_in = torch.cat([uncond, cond])
+                uncond, cond = self.inner_model(
+                    x_in, sigma_in, cond=cond_in
+                ).chunk(2)
+                return uncond + (cond - uncond) * cond_scale
 
     # most of these arguments are ignored and are only present for compatibility with
     # other samples
