@@ -103,7 +103,7 @@ class Generate:
             self,
             iterations            = 1,
             steps                 = 50,
-            cfg_scale             = 7.5,
+            cfg_scale             = [ 7.5 ],
             weights               = 'models/ldm/stable-diffusion-v1/model.ckpt',
             config                = 'configs/stable-diffusion/v1-inference.yaml',
             grid                  = False,

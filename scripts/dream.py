@@ -206,6 +206,12 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
 
         do_grid = opt.grid or t2i.grid
 
+        if opt.cfg_scale is not None:
+            opt.cfg_scale = [float(i) for i in opt.cfg_scale.split(',')]
+            steps = opt.steps or 50
+            while len(opt.cfg_scale) < steps: opt.cfg_scale.append(opt.cfg_scale[-1])
+            print(f'opt.cfg_scale {opt.cfg_scale}')
+
         if opt.with_variations is not None:
             # shotgun parsing, woo
             parts = []
@@ -567,8 +573,8 @@ def create_cmd_parser():
     parser.add_argument(
         '-C',
         '--cfg_scale',
-        default=7.5,
-        type=float,
+        default='7.5',
+        type=str,
         help='Classifier free guidance (CFG) scale - higher numbers cause generator to "try" harder.',
     )
     parser.add_argument(

@@ -127,7 +127,7 @@ class DDIMSampler(object):
         verbose=True,
         x_T=None,
         log_every_t=100,
-        unconditional_guidance_scale=1.0,
+        unconditional_guidance_scale=None,
         unconditional_conditioning=None,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs,
@@ -190,7 +190,7 @@ class DDIMSampler(object):
         noise_dropout=0.0,
         score_corrector=None,
         corrector_kwargs=None,
-        unconditional_guidance_scale=1.0,
+        unconditional_guidance_scale=None,
         unconditional_conditioning=None,
     ):
         device = self.model.betas.device
@@ -256,7 +256,7 @@ class DDIMSampler(object):
                 noise_dropout=noise_dropout,
                 score_corrector=score_corrector,
                 corrector_kwargs=corrector_kwargs,
-                unconditional_guidance_scale=unconditional_guidance_scale,
+                unconditional_guidance_scale=unconditional_guidance_scale[i%len(unconditional_guidance_scale)],
                 unconditional_conditioning=unconditional_conditioning,
             )
             img, pred_x0 = outs
@@ -286,7 +286,7 @@ class DDIMSampler(object):
         noise_dropout=0.0,
         score_corrector=None,
         corrector_kwargs=None,
-        unconditional_guidance_scale=1.0,
+        unconditional_guidance_scale=None,
         unconditional_conditioning=None,
     ):
         b, *_, device = *x.shape, x.device
@@ -379,7 +379,7 @@ class DDIMSampler(object):
             cond,
             t_start,
             img_callback=None,
-            unconditional_guidance_scale=1.0,
+            unconditional_guidance_scale=None,
             unconditional_conditioning=None,
             use_original_steps=False,
             init_latent       = None,
@@ -423,7 +423,7 @@ class DDIMSampler(object):
                 ts,
                 index=index,
                 use_original_steps=use_original_steps,
-                unconditional_guidance_scale=unconditional_guidance_scale,
+                unconditional_guidance_scale=unconditional_guidance_scale[i%len(unconditional_guidance_scale)],
                 unconditional_conditioning=unconditional_conditioning,
             )
 

@@ -20,7 +20,7 @@ def build_opt(post_data, seed, gfpgan_model_exists):
     setattr(opt, 'fit', 'fit' in post_data)
     setattr(opt, 'mask', 'mask' in post_data)
     setattr(opt, 'invert_mask', 'invert_mask' in post_data)
-    setattr(opt, 'cfg_scale', float(post_data['cfg_scale']))
+    setattr(opt, 'cfg_scale', [float(i) for i in post_data['cfg_scale'].split(',')])
     setattr(opt, 'sampler_name', post_data['sampler_name'])
     setattr(opt, 'gfpgan_strength', float(post_data['gfpgan_strength']) if gfpgan_model_exists else 0)
     setattr(opt, 'upscale', [int(post_data['upscale_level']), float(post_data['upscale_strength'])] if post_data['upscale_level'] != '' else None)

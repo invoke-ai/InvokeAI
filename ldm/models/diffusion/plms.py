@@ -128,7 +128,7 @@ class PLMSSampler(object):
         verbose=True,
         x_T=None,
         log_every_t=100,
-        unconditional_guidance_scale=1.0,
+        unconditional_guidance_scale=None,
         unconditional_conditioning=None,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs,
@@ -190,7 +190,7 @@ class PLMSSampler(object):
         noise_dropout=0.0,
         score_corrector=None,
         corrector_kwargs=None,
-        unconditional_guidance_scale=1.0,
+        unconditional_guidance_scale=None,
         unconditional_conditioning=None,
     ):
         device = self.model.betas.device
@@ -263,7 +263,7 @@ class PLMSSampler(object):
                 noise_dropout=noise_dropout,
                 score_corrector=score_corrector,
                 corrector_kwargs=corrector_kwargs,
-                unconditional_guidance_scale=unconditional_guidance_scale,
+                unconditional_guidance_scale=unconditional_guidance_scale[i%len(unconditional_guidance_scale)],
                 unconditional_conditioning=unconditional_conditioning,
                 old_eps=old_eps,
                 t_next=ts_next,
@@ -297,7 +297,7 @@ class PLMSSampler(object):
         noise_dropout=0.0,
         score_corrector=None,
         corrector_kwargs=None,
-        unconditional_guidance_scale=1.0,
+        unconditional_guidance_scale=None,
         unconditional_conditioning=None,
         old_eps=None,
         t_next=None,
