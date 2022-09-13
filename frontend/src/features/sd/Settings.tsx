@@ -25,6 +25,7 @@ import {
     setShouldRandomizeSeed,
     setShouldRunGFPGAN,
     setShouldRunESRGAN,
+    SDState,
 } from '../sd/sdSlice';
 
 import SDNumberInput from '../../components/SDNumberInput';
@@ -39,6 +40,39 @@ import {
 } from '../../app/constants';
 import SDSwitch from '../../components/SDSwitch';
 import ProcessButtons from './ProcessButtons';
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
+
+const sdSelector = createSelector(
+    (state: RootState) => state.sd,
+    (sd: SDState) => {
+        return {
+            iterations: sd.iterations,
+            steps: sd.steps,
+            cfgScale: sd.cfgScale,
+            height: sd.height,
+            width: sd.width,
+            sampler: sd.sampler,
+            seed: sd.seed,
+            img2imgStrength: sd.img2imgStrength,
+            gfpganStrength: sd.gfpganStrength,
+            upscalingLevel: sd.upscalingLevel,
+            upscalingStrength: sd.upscalingStrength,
+            initialImagePath: sd.initialImagePath,
+            shouldFitToWidthHeight: sd.shouldFitToWidthHeight,
+            seamless: sd.seamless,
+            shouldGenerateVariations: sd.shouldGenerateVariations,
+            shouldRandomizeSeed: sd.shouldRandomizeSeed,
+            shouldRunESRGAN: sd.shouldRunESRGAN,
+            shouldRunGFPGAN: sd.shouldRunGFPGAN,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
 
 const Settings = () => {
     const {
@@ -60,7 +94,7 @@ const Settings = () => {
         shouldRandomizeSeed,
         shouldRunESRGAN,
         shouldRunGFPGAN,
-    } = useAppSelector((state: RootState) => state.sd);
+    } = useAppSelector(sdSelector);
 
     const { isGFPGANAvailable, isESRGANAvailable } = useAppSelector(
         (state: RootState) => state.system

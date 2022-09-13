@@ -6,20 +6,39 @@ import {
     Input,
     Text,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
 import SDNumberInput from '../../components/SDNumberInput';
 import SDSwitch from '../../components/SDSwitch';
 import {
+    SDState,
     setSeedWeights,
     setShouldGenerateVariations,
     setVariantAmount,
 } from './sdSlice';
 import { validateSeedWeights } from './util/seedWeightPairs';
 
+const sdSelector = createSelector(
+    (state: RootState) => state.sd,
+    (sd: SDState) => {
+        return {
+            variantAmount: sd.variantAmount,
+            seedWeights: sd.seedWeights,
+            shouldGenerateVariations: sd.shouldGenerateVariations,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
+
 const Variant = () => {
     const { shouldGenerateVariations, variantAmount, seedWeights } =
-        useAppSelector((state: RootState) => state.sd);
+        useAppSelector(sdSelector);
     const dispatch = useAppDispatch();
 
     return (
@@ -43,7 +62,10 @@ const Variant = () => {
                 onChange={(v) => dispatch(setVariantAmount(Number(v)))}
             />
             <FormControl
-                isInvalid={shouldGenerateVariations && !validateSeedWeights(seedWeights)}
+                isInvalid={
+                    shouldGenerateVariations &&
+                    !validateSeedWeights(seedWeights)
+                }
                 flexGrow={1}
                 isDisabled={!shouldGenerateVariations}
             >
