@@ -200,6 +200,9 @@ class Generate:
             init_mask        = None,
             fit              = False,
             strength         = None,
+            # these are specific to embiggen (which also relies on img2img args)
+            embiggen       =    None,
+            embiggen_tiles =    None,
             # these are specific to GFPGAN/ESRGAN
             gfpgan_strength  = 0,
             save_original    = False,
