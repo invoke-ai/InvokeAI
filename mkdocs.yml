@@ -1,4 +1,7 @@
+# General
 site_name: Dream Script Docs
+site_url: https://mauwii.github.io/stable-diffusion/
+
 # Repository
 repo_name: mauwii/stable-diffusion
 repo_url: https://github.com/mauwii/stable-diffusion

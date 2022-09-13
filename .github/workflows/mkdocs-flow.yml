@@ -14,9 +14,8 @@ jobs:
         uses: Tiryoh/actions-mkdocs@v0
         with:
           mkdocs_version: 'latest' # option
-          #mkdocs_version: '1.1' # option
-          requirements: 'docs/requirements.txt' # option
-          configfile: 'mkdocs.yml' # option
+          requirements: '/docs/requirements.txt' # option
+          configfile: '/mkdocs.yml' # option
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
