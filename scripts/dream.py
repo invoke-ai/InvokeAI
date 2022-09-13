@@ -349,7 +349,7 @@ def dream_server_loop(t2i, host, port, outdir):
     )
 
     # Start server
-    DreamServer.model = t2i
+    DreamServer.model  = t2i
     DreamServer.outdir = outdir
     dream_server = ThreadingDreamServer((host, port))
     print(">> Started Stable Diffusion dream server!")
