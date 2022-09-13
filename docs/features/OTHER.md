@@ -1,3 +1,7 @@
+---
+title: other
+---
+
 ## **Google Colab**
 
 Stable Diffusion AI Notebook: <a
@@ -19,7 +23,7 @@ with itself. To use it, add the `--seamless` option when starting the
 script which will result in all generated images to tile, or for each
 `dream>` prompt as shown here:
 
-```
+```python
 dream> "pond garden with lotus by claude monet" --seamless -s100 -n4
 ```
 
@@ -40,13 +44,13 @@ innovative packaging for a squid's dinner           -S137038382
 
 Then pass this file's name to `dream.py` when you invoke it:
 
-```
+```bash
 (ldm) ~/stable-diffusion$ python3 scripts/dream.py --from_file "path/to/prompts.txt"
 ```
 
 You may read a series of prompts from standard input by providing a filename of `-`:
 
-```
+```bash
 (ldm) ~/stable-diffusion$ echo "a beautiful day" | python3 scripts/dream.py --from_file -
 ```
 

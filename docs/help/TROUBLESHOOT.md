@@ -1,4 +1,8 @@
-# **Frequently Asked Questions**
+---
+title: F.A.Q. 
+---
+
+## **Frequently Asked Questions**
 
 Here are a few common installation problems and their solutions. Often these are caused by incomplete installations or crashes during the
 install process.

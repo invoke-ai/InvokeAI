@@ -1,5 +1,6 @@
-# **Image-to-Image**
-
+---
+title: **Image-to-Image**
+---
 This script also provides an img2img feature that lets you seed your
 creations with an initial drawing or photo. This is a really cool
 feature that tells stable diffusion to build the prompt on top of the

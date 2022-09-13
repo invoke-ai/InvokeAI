@@ -1,0 +1,61 @@
+site_name: Dream Script Docs
+# Repository
+repo_name: mauwii/stable-diffusion
+repo_url: https://github.com/mauwii/stable-diffusion
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2022 Lincoln D. Stein <lincoln.stein@gmail.com>
+
+# Configuration
+theme:
+  name: material
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - meta
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: 'Mauwii'
+      repo: 'stable-diffusion'
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - tables
+
+# Plugins
+# plugins:
+#   - search
+#   - git-revision-date
+#   - mike

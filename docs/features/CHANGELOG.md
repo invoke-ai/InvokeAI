@@ -1,4 +1,6 @@
-# **Changelog**
+---
+title: **Changelog**
+---
 
 ## v1.13 (in process)
 
@@ -9,8 +11,6 @@
 - The grid was displaying duplicated images when not enough images to fill the final row [Muhammad Usama](https://github.com/SMUsamaShah)
 - Can specify --grid on dream.py command line as the default.
 - Miscellaneous internal bug and stability fixes.
-
----
 
 ## v1.12 (28 August 2022)
 
@@ -24,8 +24,6 @@
   [Oceanswave](https://github.com/oceanswave) for their work on this.
 - You can now swap samplers on the dream> command line. [Blessedcoolant](https://github.com/blessedcoolant)
 
----
-
 ## v1.11 (26 August 2022)
 
 - NEW FEATURE: Support upscaling and face enhancement using the GFPGAN module. (kudos to [Oceanswave](https://github.com/Oceanswave)
@@ -36,8 +34,6 @@
   iteratively modifying the prompt and its parameters. Please see[ Pull Request #86](https://github.com/lstein/stable-diffusion/pull/86)
   for a synopsis of how this works. Note that when this feature is eventually added to the main branch, it will may be modified
   significantly.
-
----
 
 ## v1.10 (25 August 2022)
 
@@ -97,22 +93,16 @@
 - You can use the "cd" and "pwd" commands at the dream> prompt to set and retrieve
   the path of the output directory.
 
----
-
 ## v1.04 (22 August 2022 - after the drop)
 
 - Updated README to reflect installation of the released weights.
 - Suppressed very noisy and inconsequential warning when loading the frozen CLIP
   tokenizer.
 
----
-
 ## v1.03 (22 August 2022)
 
 - The original txt2img and img2img scripts from the CompViz repository have been moved into
   a subfolder named "orig_scripts", to reduce confusion.
-
----
 
 ## v1.02 (21 August 2022)
 
@@ -121,17 +111,9 @@
   or an image editor that allows you to explore the full metadata.
   **Please run "conda env update -f environment.yaml" to load the k_lms dependencies!!**
 
----
-
 ## v1.01 (21 August 2022)
 
 - added k_lms sampling.
   **Please run "conda env update -f environment.yaml" to load the k_lms dependencies!!**
 - use half precision arithmetic by default, resulting in faster execution and lower memory requirements
   Pass argument --full_precision to dream.py to get slower but more accurate image generation
-
----
-
-## Links
-
-- **[Read Me](../readme.md)**

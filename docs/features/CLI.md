@@ -1,4 +1,8 @@
-# **Interactive Command-Line Interface**
+---
+title: "CLI"
+---
+
+**Interactive Command Line Interface**
 
 The `dream.py` script, located in `scripts/dream.py`, provides an interactive interface to image generation similar to the "dream mothership" bot that Stable AI provided on its Discord server.
 
@@ -13,7 +17,7 @@ The script is confirmed to work on Linux, Windows and Mac systems.
 
 _Note:_ This script runs from the command-line or can be used as a Web application. The Web GUI is currently rudimentary, but a much better replacement is on its way.
 
-```
+```bash
 (ldm) ~/stable-diffusion$ python3 ./scripts/dream.py
 * Initializing, be patient...
 Loading model from models/ldm/text2img-large/model.ckpt
@@ -54,7 +58,7 @@ The script itself also recognizes a series of command-line switches
 that will change important global defaults, such as the directory for
 image outputs and the location of the model weight files.
 
-## List of arguments recognized at the command line:
+## List of arguments recognized at the command line
 
 These command-line arguments can be passed to dream.py when you first
 run it from the Windows, Mac or Linux command line. Some set defaults
@@ -103,7 +107,7 @@ from text (txt2img), to embellish an existing image or sketch
 (img2img), or to selectively alter chosen regions of the image
 (inpainting).
 
-### This is an example of txt2img:
+### This is an example of txt2img
 
 ~~~~
 dream> waterfall and rainbow -W640 -H480
@@ -140,8 +144,7 @@ Note that the width and height of the image must be multiples of
 64. You can provide different values, but they will be rounded down to
 the nearest multiple of 64.
 
-
-### This is an example of img2img:	
+### This is an example of img2img 
 
 ~~~~
 dream> waterfall and rainbow -I./vacation-photo.png -W640 -H480 --fit
@@ -162,7 +165,7 @@ accepts additional options:
 | --fit              | -F         | False               | Scale the image to fit into the specified -H and -W dimensions |
 | --strength <float> | -s<float>  | 0.75                | How hard to try to match the prompt to the initial image. Ranges from 0.0-0.99, with higher values replacing the initial image completely.|
 
-### This is an example of inpainting:
+### This is an example of inpainting
 
 ~~~~
 dream> waterfall and rainbow -I./vacation-photo.png -M./vacation-mask.png -W640 -H480 --fit
@@ -181,7 +184,6 @@ well as the --mask (-M) argument:
 | Argument           |  Shortcut  |  Default            |  Description |
 |--------------------|------------|---------------------|--------------|
 | --init_mask <path> | -M<path>   | None                |Path to an image the same size as the initial_image, with areas for inpainting made transparent.|
-
 
 # Command-line editing and completion
 
@@ -225,4 +227,3 @@ dream> zebra with a mustache -I./test-pictures<TAB>
 You can then type "z", hit tab again, and it will autofill to "zebra.jpg".
 
 More text completion features (such as autocompleting seeds) are on their way.
-

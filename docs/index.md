@@ -1,8 +1,10 @@
+---
+title: Home
+---
+
 <h1 align='center'><b>Stable Diffusion Dream Script</b></h1>
 
-<p align='center'>
-    <img src="assets/logo.png"/>
-</p>
+![logo](./assets/logo.png){align='center'}
 
 <p align="center">
     <img src="https://img.shields.io/github/last-commit/lstein/stable-diffusion?logo=Python&logoColor=green&style=for-the-badge" alt="last-commit"/>
@@ -12,7 +14,7 @@
     <img src="https://img.shields.io/github/issues-pr/lstein/stable-diffusion?logo=GitHub&style=for-the-badge" alt="pull-requests"/>
 </p>
 
-# **Stable Diffusion Dream Script**
+---
 
 This is a fork of
 [CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion),
@@ -26,43 +28,51 @@ _Note: This fork is rapidly evolving. Please use the
 report bugs and make feature requests. Be sure to use the provided
 templates. They will help aid diagnose issues faster._
 
-# **Table of Contents**
+## **Table of Contents**
 
-1. [Installation](#installation)
-2. [Major Features](#features)
-3. [Changelog](#latest-changes)
-4. [Troubleshooting](#troubleshooting)
-5. [Contributing](#contributing)
-6. [Support](#support)
+- [**Table of Contents**](#table-of-contents)
+- [Installation](#installation)
+- [**Hardware Requirements**](#hardware-requirements)
+  - [**System**](#system)
+  - [**Memory**](#memory)
+  - [**Disk**](#disk)
+  - [**Note**](#note)
+- [Features](#features)
+  - [**Major Features**](#major-features)
+  - [**Other Features**](#other-features)
+- [Latest Changes](#latest-changes)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+  - [**Contributors**](#contributors)
+- [Support](#support)
+- [Further Reading](#further-reading)
 
-# Installation
+## Installation
 
 This fork is supported across multiple platforms. You can find individual installation instructions below.
 
-- ## [Linux](installation\INSTALL_LINUX.md)
-
-- ## [Windows](installation\INSTALL_WINDOWS.md)
-
-- ## [Macintosh](installation\INSTALL_MAC.md)
+- [Linux](./installation/INSTALL_LINUX.md)
+- [Windows](./installation/INSTALL_WINDOWS.md)
+- [Macintosh](./installation/INSTALL_MAC.md)
 
 ## **Hardware Requirements**
 
-**System**
+### **System**
 
 You wil need one of the following:
 
 - An NVIDIA-based graphics card with 4 GB or more VRAM memory.
 - An Apple computer with an M1 chip.
 
-**Memory**
+### **Memory**
 
 - At least 12 GB Main Memory RAM.
 
-**Disk**
+### **Disk**
 
 - At least 6 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
-**Note**
+### **Note**
 
 If you are have a Nvidia 10xx series card (e.g. the 1080ti), please
 run the dream script in full-precision mode as shown below.
@@ -72,50 +82,37 @@ Similarly, specify full-precision mode on Apple M1 hardware.
 To run in full-precision mode, start `dream.py` with the
 `--full_precision` flag:
 
-```
+```bash
 (ldm) ~/stable-diffusion$ python scripts/dream.py --full_precision
 ```
 
-# Features
+## Features
 
-## **Major Features**
+### **Major Features**
 
-- ## [Interactive Command Line Interface](docs/features/CLI.md)
+- [Interactive Command Line Interface](./features/CLI.md)
+- [Image To Image](./features/IMG2IMG.md)
+- [Inpainting Support](./features/INPAINTING.md)
+- [GFPGAN and Real-ESRGAN Support](./features/UPSCALE.md)
+- [Seamless Tiling](./features/OTHER.md#seamless-tiling)
+- [Google Colab](./features/OTHER.md#google-colab)
+- [Web Server](./features/WEB.md)
+- [Reading Prompts From File](./features/OTHER.md#reading-prompts-from-a-file)
+- [Shortcut: Reusing Seeds](./features/OTHER.md#shortcuts-reusing-seeds)
+- [Weighted Prompts](./features/OTHER.md#weighted-prompts)
+- [Variations](./features/VARIATIONS.md)
+- [Personalizing Text-to-Image Generation](./features/TEXTUAL_INVERSION.md)
+- [Simplified API for text to image generation](./features/OTHER.md#simplified-api)
 
-- ## [Image To Image](docs/features/IMG2IMG.md)
+### **Other Features**
 
-- ## [Inpainting Support](docs/features/INPAINTING.md)
+- [Creating Transparent Regions for Inpainting](./features/INPAINTING.md#creating-transparent-regions-for-inpainting)
 
-- ## [GFPGAN and Real-ESRGAN Support](docs/features/UPSCALE.md)
+-[Preload Models](./features/OTHER.md#preload-models)
 
-- ## [Seamless Tiling](docs/features/OTHER.md#seamless-tiling)
-
-- ## [Google Colab](docs/features/OTHER.md#google-colab)
-
-- ## [Web Server](docs/features/WEB.md)
-
-- ## [Reading Prompts From File](docs/features/OTHER.md#reading-prompts-from-a-file)
-
-- ## [Shortcut: Reusing Seeds](docs/features/OTHER.md#shortcuts-reusing-seeds)
-
-- ## [Weighted Prompts](docs/features/OTHER.md#weighted-prompts)
-
-- ## [Variations](docs/features/VARIATIONS.md)
-
-- ## [Personalizing Text-to-Image Generation](docs/features/TEXTUAL_INVERSION.md)
-
-- ## [Simplified API for text to image generation](docs/features/OTHER.md#simplified-api)
-
-## **Other Features**
-
-- ### [Creating Transparent Regions for Inpainting](docs/features/INPAINTING.md#creating-transparent-regions-for-inpainting)
-
-- ### [Preload Models](docs/features/OTHER.md#preload-models)
-
-# Latest Changes
+## Latest Changes
 
 - v1.14 (11 September 2022)
-
   - Memory optimizations for small-RAM cards. 512x512 now possible on 4 GB GPUs.
   - Full support for Apple hardware with M1 or M2 chips.
   - Add "seamless mode" for circular tiling of image. Generates beautiful effects. ([prixt](https://github.com/prixt)).
@@ -124,8 +121,7 @@ To run in full-precision mode, start `dream.py` with the
   - Lots of code and documentation cleanups.
 
 - v1.13 (3 September 2022
-
-  - Support image variations (see [VARIATIONS](docs/features/VARIATIONS.md) ([Kevin Gibbons](https://github.com/bakkot) and many contributors and reviewers)
+  - Support image variations (see [VARIATIONS](./features/VARIATIONS.md) ([Kevin Gibbons](https://github.com/bakkot) and many contributors and reviewers)
   - Supports a Google Colab notebook for a standalone server running on Google hardware [Arturo Mendivil](https://github.com/artmen1516)
   - WebUI supports GFPGAN/ESRGAN facial reconstruction and upscaling [Kevin Gibbons](https://github.com/bakkot)
   - WebUI supports incremental display of in-progress images during generation [Kevin Gibbons](https://github.com/bakkot)
@@ -136,32 +132,32 @@ To run in full-precision mode, start `dream.py` with the
   - Works on M1 Apple hardware.
   - Multiple bug fixes.
 
-For older changelogs, please visit **[CHANGELOGS](docs/CHANGELOG.md)**.
+For older changelogs, please visit **[CHANGELOGS](./CHANGELOG.md)**.
 
-# Troubleshooting
+## Troubleshooting
 
-Please check out our **[Q&A](docs/help/TROUBLESHOOT.md)** to get solutions for common installation problems and other issues.
+Please check out our **[Q&A](./help/TROUBLESHOOT.md)** to get solutions for common installation problems and other issues.
 
-# Contributing
+## Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code cleanup, testing, or code reviews, is very much encouraged to do so. If you are unfamiliar with
 how to contribute to GitHub projects, here is a [Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github).
 
 A full set of contribution guidelines, along with templates, are in progress, but for now the most important thing is to **make your pull request against the "development" branch**, and not against "main". This will help keep public breakage to a minimum and will allow you to propose more radical changes.
 
-## **Contributors**
+### **Contributors**
 
-This fork is a combined effort of various people from across the world. [Check out the list of all these amazing people](docs/CONTRIBUTORS.md). We thank them for their time, hard work and effort.
+This fork is a combined effort of various people from across the world. [Check out the list of all these amazing people](./CONTRIBUTORS.md). We thank them for their time, hard work and effort.
 
-# Support
+## Support
 
 For support,
 please use this repository's GitHub Issues tracking service. Feel free
 to send me an email if you use and like the script.
 
-Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (<https://github.com/lstein>)
+Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https://github.com/lstein)
 
-# Further Reading
+## Further Reading
 
 Please see the original README for more information on this software
-and underlying algorithm, located in the file [README-CompViz.md](docs/README-CompViz.md).
+and underlying algorithm, located in the file [README-CompViz.md](./README-CompViz.md).

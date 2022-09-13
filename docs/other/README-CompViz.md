@@ -1,4 +1,8 @@
-# Original README from CompViz/stable-diffusion
+---
+title: CompViz-Readme
+---
+
+# *README from [CompViz/stable-diffusion](https://github.com/CompVis/stable-diffusion)*
 
 _Stable Diffusion was made possible thanks to a collaboration with [Stability AI](https://stability.ai/) and [Runway](https://runwayml.com/) and builds upon our previous work:_
 
@@ -9,7 +13,7 @@ _Stable Diffusion was made possible thanks to a collaboration with [Stability AI
 [Patrick Esser](https://github.com/pesser),
 [Björn Ommer](https://hci.iwr.uni-heidelberg.de/Staff/bommer)<br/>
 
-**CVPR '22 Oral**
+## **CVPR '22 Oral**
 
 which is available on [GitHub](https://github.com/CompVis/latent-diffusion). PDF at [arXiv](https://arxiv.org/abs/2112.10752). Please also visit our [Project page](https://ommer-lab.com/research/latent-diffusion-models/).
 
@@ -27,14 +31,14 @@ See [this section](#stable-diffusion-v1) below and the [model card](https://hugg
 A suitable [conda](https://conda.io/) environment named `ldm` can be created
 and activated with:
 
-```
+```bash
 conda env create -f environment.yaml
 conda activate ldm
 ```
 
 You can also update an existing [latent diffusion](https://github.com/CompVis/latent-diffusion) environment by running
 
-```
+```bash
 conda install pytorch torchvision -c pytorch
 pip install transformers==4.19.2
 pip install -e .
