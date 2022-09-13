@@ -2,7 +2,7 @@
 import k_diffusion as K
 import torch
 import torch.nn as nn
-
+from ldm.dream.devices import choose_torch_device
 
 class CFGDenoiser(nn.Module):
     def __init__(self, model):
@@ -18,11 +18,11 @@ class CFGDenoiser(nn.Module):
 
 
 class KSampler(object):
-    def __init__(self, model, schedule='lms', device='cuda', **kwargs):
+    def __init__(self, model, schedule='lms', device=None, **kwargs):
         super().__init__()
         self.model = K.external.CompVisDenoiser(model)
         self.schedule = schedule
-        self.device = device
+        self.device   = device or choose_torch_device()
 
         def forward(self, x, sigma, uncond, cond, cond_scale):
             x_in = torch.cat([x] * 2)
@@ -61,10 +61,13 @@ class KSampler(object):
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs,
     ):
+        def route_callback(k_callback_values):
+            if img_callback is not None:
+                img_callback(k_callback_values['x'], k_callback_values['i'])
 
         sigmas = self.model.get_sigmas(S)
-        if x_T:
-            x = x_T
+        if x_T is not None:
+            x = x_T * sigmas[0]
         else:
             x = (
                 torch.randn([batch_size, *shape], device=self.device)
@@ -78,7 +81,8 @@ class KSampler(object):
         }
         return (
             K.sampling.__dict__[f'sample_{self.schedule}'](
-                model_wrap_cfg, x, sigmas, extra_args=extra_args
+                model_wrap_cfg, x, sigmas, extra_args=extra_args,
+                callback=route_callback
             ),
             None,
         )

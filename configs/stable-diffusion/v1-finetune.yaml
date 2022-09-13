@@ -73,8 +73,8 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 2
-    num_workers: 16
+    batch_size: 1
+    num_workers: 2
     wrap: false
     train:
       target: ldm.data.personalized.PersonalizedBase
@@ -92,6 +92,9 @@ data:
         repeats: 10
 
 lightning:
+  modelcheckpoint:
+    params:
+      every_n_train_steps: 500
   callbacks:
     image_logger:
       target: main.ImageLogger
@@ -102,4 +105,6 @@ lightning:
 
   trainer:
     benchmark: True
-    max_steps: 6100
+    max_steps: 4000000
+#    max_steps: 4000
+    

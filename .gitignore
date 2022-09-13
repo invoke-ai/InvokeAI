@@ -77,6 +77,9 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 
+# WebUI temp files:
+img2img-tmp.png
+
 # Scrapy stuff:
 .scrapy
 
@@ -173,6 +176,13 @@ cython_debug/
 #.idea/
 
 src
-logs/
 **/__pycache__/
 outputs
+
+# Logs and associated folders 
+# created from generated embeddings.
+logs
+testtube
+checkpoints
+# If it's a Mac
+.DS_Store

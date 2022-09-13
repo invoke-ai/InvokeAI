@@ -22,8 +22,8 @@ class Completer:
     def complete(self, text, state):
         buffer = readline.get_line_buffer()
 
-        if text.startswith(('-I', '--init_img')):
-            return self._path_completions(text, state, ('.png'))
+        if text.startswith(('-I', '--init_img','-M','--init_mask')):
+            return self._path_completions(text, state, ('.png','.jpg','.jpeg'))
 
         if buffer.strip().endswith('cd') or text.startswith(('.', '/')):
             return self._path_completions(text, state, ())
@@ -48,10 +48,15 @@ class Completer:
 
     def _path_completions(self, text, state, extensions):
         # get the path so far
+        # TODO: replace this mess with a regular expression match
         if text.startswith('-I'):
             path = text.replace('-I', '', 1).lstrip()
         elif text.startswith('--init_img='):
             path = text.replace('--init_img=', '', 1).lstrip()
+        elif text.startswith('--init_mask='):
+            path = text.replace('--init_mask=', '', 1).lstrip()
+        elif text.startswith('-M'):
+            path = text.replace('-M', '', 1).lstrip()
         else:
             path = text
 
@@ -86,32 +91,27 @@ if readline_available:
     readline.set_completer(
         Completer(
             [
-                'cd',
-                'pwd',
-                '--steps',
-                '-s',
-                '--seed',
-                '-S',
-                '--iterations',
-                '-n',
-                '--batch_size',
-                '-b',
-                '--width',
-                '-W',
-                '--height',
-                '-H',
-                '--cfg_scale',
-                '-C',
-                '--grid',
-                '-g',
-                '--individual',
-                '-i',
-                '--init_img',
-                '-I',
-                '--strength',
-                '-f',
-                '-v',
-                '--variants',
+                '--steps','-s',
+                '--seed','-S',
+                '--iterations','-n',
+                '--width','-W','--height','-H',
+                '--cfg_scale','-C',
+                '--grid','-g',
+                '--individual','-i',
+                '--init_img','-I',
+                '--init_mask','-M',
+                '--strength','-f',
+                '--variants','-v',
+                '--outdir','-o',
+                '--sampler','-A','-m',
+                '--embedding_path',
+                '--device',
+                '--grid','-g',
+                '--gfpgan_strength','-G',
+                '--upscale','-U',
+                '-save_orig','--save_original',
+                '--skip_normalize','-x',
+                '--log_tokenization','t',
             ]
         ).complete
     )

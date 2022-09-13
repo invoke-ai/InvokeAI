@@ -15,10 +15,10 @@ from contextlib import contextmanager, nullcontext
 import k_diffusion as K
 import torch.nn as nn
 
-from ldm.util import instantiate_from_config
+from ldm.util                  import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
-
+from ldm.dream.devices         import choose_torch_device
 
 def chunk(it, size):
     it = iter(it)
@@ -40,7 +40,7 @@ def load_model_from_config(config, ckpt, verbose=False):
         print("unexpected keys:")
         print(u)
 
-    model.cuda()
+    model.to(choose_torch_device())
     model.eval()
     return model
 
@@ -190,13 +190,14 @@ def main():
         opt.ckpt = "models/ldm/text2img-large/model.ckpt"
         opt.outdir = "outputs/txt2img-samples-laion400m"
 
-    seed_everything(opt.seed)
 
     config = OmegaConf.load(f"{opt.config}")
     model = load_model_from_config(config, f"{opt.ckpt}")
 
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model = model.to(device)
+    seed_everything(opt.seed)
+
+    device = torch.device(choose_torch_device())
+    model  = model.to(device)
 
     #for klms
     model_wrap = K.external.CompVisDenoiser(model)
@@ -231,7 +232,12 @@ def main():
         print(f"reading prompts from {opt.from_file}")
         with open(opt.from_file, "r") as f:
             data = f.read().splitlines()
-            data = list(chunk(data, batch_size))
+            if (len(data) >= batch_size):
+                data = list(chunk(data, batch_size))
+            else:
+                while (len(data) < batch_size):
+                    data.append(data[-1])
+                data = [data]
 
     sample_path = os.path.join(outpath, "samples")
     os.makedirs(sample_path, exist_ok=True)
@@ -240,11 +246,17 @@ def main():
 
     start_code = None
     if opt.fixed_code:
-        start_code = torch.randn([opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f], device=device)
+        shape = [opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f]
+        if device.type == 'mps':
+            start_code = torch.randn(shape, device='cpu').to(device)
+        else:
+            torch.randn(shape, device=device)
 
     precision_scope = autocast if opt.precision=="autocast" else nullcontext
+    if device.type in ['mps', 'cpu']:
+        precision_scope = nullcontext # have to use f32 on mps
     with torch.no_grad():
-        with precision_scope("cuda"):
+        with precision_scope(device.type):
             with model.ema_scope():
                 tic = time.time()
                 all_samples = list()
@@ -257,7 +269,7 @@ def main():
                             prompts = list(prompts)
                         c = model.get_learned_conditioning(prompts)
                         shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
-                        
+
                         if not opt.klms:
                             samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
                                                             conditioning=c,
@@ -277,7 +289,7 @@ def main():
                             model_wrap_cfg = CFGDenoiser(model_wrap)
                             extra_args = {'cond': c, 'uncond': uc, 'cond_scale': opt.scale}
                             samples_ddim = K.sampling.sample_lms(model_wrap_cfg, x, sigmas, extra_args=extra_args)
-                        
+
                         x_samples_ddim = model.decode_first_stage(samples_ddim)
                         x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
 

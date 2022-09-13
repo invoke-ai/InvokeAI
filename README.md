@@ -1,211 +1,111 @@
-# Stable Diffusion Dream Script
+<h1 align='center'><b>Stable Diffusion Dream Script</b></h1>
 
-This is a fork of CompVis/stable-diffusion, the wonderful open source
-text-to-image generator. The original has been improved in several ways:
+<p align='center'>
+<img src="docs/assets/logo.png"/>
+</p>
 
-## Interactive command-line interface similar to the Discord bot
+<p align="center">
+    <img src="https://img.shields.io/github/last-commit/lstein/stable-diffusion?logo=Python&logoColor=green&style=for-the-badge" alt="last-commit"/>
+    <img src="https://img.shields.io/github/stars/lstein/stable-diffusion?logo=GitHub&style=for-the-badge" alt="stars"/>
+    <br>
+    <img src="https://img.shields.io/github/issues/lstein/stable-diffusion?logo=GitHub&style=for-the-badge" alt="issues"/>
+    <img src="https://img.shields.io/github/issues-pr/lstein/stable-diffusion?logo=GitHub&style=for-the-badge" alt="pull-requests"/>
+</p>
 
-The *dream.py* script, located in scripts/dream.py, 
-provides an interactive interface to image generation similar to
-the "dream mothership" bot that Stable AI provided on its Discord
-server. Unlike the txt2img.py and img2img.py scripts provided in the
-original CompViz/stable-diffusion source code repository, the
-time-consuming initialization of the AI model
-initialization only happens once. After that image generation 
-from the command-line interface is very fast.
+# **Stable Diffusion Dream Script**
 
-The script uses the readline library to allow for in-line editing,
-command history (up and down arrows), autocompletion, and more. To help
-keep track of which prompts generated which images, the script writes a
-log file of image names and prompts to the selected output directory.
-In addition, as of version 1.02, it also writes the prompt into the PNG
-file's metadata where it can be retrieved using scripts/images2prompt.py
+This is a fork of
+[CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion),
+the open source text-to-image generator. It provides a streamlined
+process with various new features and options to aid the image
+generation process. It runs on Windows, Mac and Linux machines,
+and runs on GPU cards with as little as 4 GB or RAM.
 
-The script is confirmed to work on Linux and Windows systems. It should
-work on MacOSX as well, but this is not confirmed. Note that this script
-runs from the command-line (CMD or Terminal window), and does not have a GUI.
+_Note: This fork is rapidly evolving. Please use the
+[Issues](https://github.com/lstein/stable-diffusion/issues) tab to
+report bugs and make feature requests. Be sure to use the provided
+templates. They will help aid diagnose issues faster._
 
-~~~~
-(ldm) ~/stable-diffusion$ python3 ./scripts/dream.py
-* Initializing, be patient...
-Loading model from models/ldm/text2img-large/model.ckpt
-(...more initialization messages...)
+# **Table of Contents**
+1. [Installation](#installation)
+2. [Major Features](#features)
+3. [Changelog](#latest-changes)
+4. [Troubleshooting](#troubleshooting)
+5. [Contributing](#contributing)
+6. [Support](#support)
 
-* Initialization done! Awaiting your command...
-dream> ashley judd riding a camel -n2 -s150
-Outputs:
-   outputs/img-samples/00009.png: "ashley judd riding a camel" -n2 -s150 -S 416354203
-   outputs/img-samples/00010.png: "ashley judd riding a camel" -n2 -s150 -S 1362479620
+# Installation
 
-dream> "there's a fly in my soup" -n6 -g
-    outputs/img-samples/00011.png: "there's a fly in my soup" -n6 -g -S 2685670268
-    seeds for individual rows: [2685670268, 1216708065, 2335773498, 822223658, 714542046, 3395302430]
-dream> q
+This fork is supported across multiple platforms. You can find individual installation instructions below.
 
-# this shows how to retrieve the prompt stored in the saved image's metadata
-(ldm) ~/stable-diffusion$ python3 ./scripts/images2prompt.py outputs/img_samples/*.png
-00009.png: "ashley judd riding a camel" -s150 -S 416354203
-00010.png: "ashley judd riding a camel" -s150 -S 1362479620
-00011.png: "there's a fly in my soup" -n6 -g -S 2685670268
-~~~~
+- ## [Linux](docs/installation/INSTALL_LINUX.md)
+- ## [Windows](docs/installation/INSTALL_WINDOWS.md)
+- ## [Macintosh](docs/installation/INSTALL_MAC.md)
 
-The dream> prompt's arguments are pretty much identical to those used
-in the Discord bot, except you don't need to type "!dream" (it doesn't
-hurt if you do). A significant change is that creation of individual
-images is now the default unless --grid (-g) is given. For backward
-compatibility, the -i switch is recognized.  For command-line help
-type -h (or --help) at the dream> prompt.
+## **Hardware Requirements**
 
-The script itself also recognizes a series of command-line switches
-that will change important global defaults, such as the directory for
-image outputs and the location of the model weight files.
+**System**
 
-## Image-to-Image
+You wil need one of the following:
 
-This script also provides an img2img feature that lets you seed your
-creations with a drawing or photo. This is a really cool feature that tells
-stable diffusion to build the prompt on top of the image you provide, preserving
-the original's basic shape and layout. To use it, provide the --init_img 
-option as shown here:
+- An NVIDIA-based graphics card with 4 GB or more VRAM memory.
+- An Apple computer with an M1 chip.
 
-~~~~
-dream> "waterfall and rainbow" --init_img=./init-images/crude_drawing.png --strength=0.5 -s100 -n4
-~~~~
+**Memory**
 
-The --init_img (-I) option gives the path to the seed picture. --strength (-f) controls how much
-the original will be modified, ranging from 0.0 (keep the original intact), to 1.0 (ignore the original
-completely). The default is 0.75, and ranges from 0.25-0.75 give interesting results.
+- At least 12 GB Main Memory RAM.
 
-You may also pass a -v<count> option to generate count variants on the original image. This is done by
-passing the first generated image back into img2img the requested number of times. It generates interesting
-variants.
+**Disk**
 
-## GFPGAN Support
+- At least 6 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
-This script also provides the ability to invoke GFPGAN after image
-generation. Doing so will enhance faces and optionally upscale the
-image to a higher resolution.
+**Note**
 
-To use the ability, clone the [GFPGAN
-repository](https://github.com/TencentARC/GFPGAN) and follow their
-installation instructions. By default, we expect GFPGAN to be
-installed in a 'GFPGAN' sibling directory. Be sure that the "ldm"
-conda environment is active as you install GFPGAN.
+If you are have a Nvidia 10xx series card (e.g. the 1080ti), please
+run the dream script in full-precision mode as shown below.
 
-You may also want to install Real-ESRGAN, if you want to enhance
-non-face regions in the image, by installing the pip Real-ESRGAN
-package.
+Similarly, specify full-precision mode on Apple M1 hardware.
+
+To run in full-precision mode, start `dream.py` with the
+`--full_precision` flag:
 
 ```
-pip install realesrgan
-
+(ldm) ~/stable-diffusion$ python scripts/dream.py --full_precision
 ```
 
-Users whose GPU machines are isolated from the Internet (e.g. on a
-University cluster) should be aware that the first time you run
-dream.py with GFPGAN turned on, it will try to download model files
-from the Internet. To rectify this, you may run `python3
-scripts/preload_models.pl` after you have installed GFPGAN and all its
-dependencies.
+# Features
 
-Now, you can run this script by adding the **--gfpgan** option. Any
-issues with GFPGAN will be reported on initialization.
+## **Major Features**
 
-~~~~
-(ldm) ~/stable-diffusion$ python3 ./scripts/dream.py --gfpgan
-* Initializing, be patient...
-(...more initialization messages...)
-* --gfpgan was specified, loading gfpgan...
-(...even more initialization messages...)
-* Initialization done! Awaiting your command...
-~~~~
+- ## [Interactive Command Line Interface](docs/features/CLI.md)
 
-When generating prompts, add a -G or --gfpgan_strenth option to
-control the strength of the GFPGAN enhancement. 0.0 is no
-enhancement, 1.0 is maximum enhancement.
+- ## [Image To Image](docs/features/IMG2IMG.md)
 
-So for instance, to apply the maximum strength:
-~~~~
-dream> a man wearing a pineapple hat -G 1
-~~~~
+- ## [Inpainting Support](docs/features/INPAINTING.md)
 
-This also works with img2img:
-~~~
-dream> a man wearing a pineapple hat -I path/to/your/file.png -G 1
-~~~
+- ## [GFPGAN and Real-ESRGAN Support](docs/features/UPSCALE.md)
 
-That's it!
+- ## [Embiggen upscaling](docs/features/EMBIGGEN.md)
 
-There's also a bunch of options to control GFPGAN settings when
-starting the script for different configs that you can read about in
-the help text. This will let you control where GFPGAN is installed, if
-upsampling is enabled, the upsampler to use and the model path.
+- ## [Seamless Tiling](docs/features/OTHER.md#seamless-tiling)
 
-By default, images will be upscaled by 2-fold, meaning that the old
-Stable Diffusion default size of 512x512 will now be a glorious
-detailed 1024x1024. The extent of upscaling is set when you run the
-script, and can't be changed while it's running. However, at any time
-you may specify **-G0** to turn off upscaling and facial enhancement
-for that image or set of images.
+- ## [Google Colab](docs/features/OTHER.md#google-colab)
 
-Note that loading GFPGAN consumes additional GPU memory, and will add
-a few seconds to image generation. However, if can afford a 3090s with
-24Gi, the results are well worth it.
+- ## [Web Server](docs/features/WEB.md)
 
-## Barebones Web Server
+- ## [Reading Prompts From File](docs/features/OTHER.md#reading-prompts-from-a-file)
 
-As of version 1.10, this distribution comes with a bare bones web
-server (see screenshot). To use it, run the command:
+- ## [Shortcut: Reusing Seeds](docs/features/OTHER.md#shortcuts-reusing-seeds)
 
-~~~~
-(ldm) ~/stable-diffusion$ python3 scripts/dream_web.py
-~~~~
+- ## [Weighted Prompts](docs/features/OTHER.md#weighted-prompts)
 
-You can then connect to the server by pointing your web browser at
-http://localhost:9090, or to the network name or IP address of the server.
+- ## [Variations](docs/features/VARIATIONS.md)
 
-Kudos to [Tesseract Cat](https://github.com/TesseractCat) for
-contributing this code.
+- ## [Personalizing Text-to-Image Generation](docs/features/TEXTUAL_INVERSION.md)
 
-![Dream Web Server](static/dream_web_server.png)
+- ## [Simplified API for text to image generation](docs/features/OTHER.md#simplified-api)
 
-## Reading Prompts from a File
-
-You can automate dream.py by providing a text file with the prompts
-you want to run, one line per prompt. The text file must be composed
-with a text editor (e.g. Notepad) and not a word processor. Each line
-should look like what you would type at the dream> prompt:
-
-~~~~
-a beautiful sunny day in the park, children playing -n4 -C10
-stormy weather on a mountain top, goats grazing     -s100
-innovative packaging for a squid's dinner           -S137038382
-~~~~
-
-Then pass this file's name to dream.py when you invoke it:
-
-~~~~
-(ldm) ~/stable-diffusion$ python3 scripts/dream.py --from_file="path/to/prompts.txt"
-~~~~
-
-## Shortcut for reusing seeds from the previous command
-
-Since it is so common to reuse seeds while refining a prompt, there is
-now a shortcut as of version 1.11. Provide a **-S** (or **--seed**)
-switch of -1 to use the seed of the most recent image generated. If
-you produced multiple images with the **-n** switch, then you can go
-back further using -2, -3, etc. up to the first image generated by the
-previous command. Sorry, but you can't go back further than one
-command.
-
-Here's an example of using this to do a quick refinement. It also
-illustrates using the new **-G** switch to turn on upscaling and
-face enhancement (see previous section):
-
-~~~~
-dream> a cute child playing hopscotch -G0.5
-[...]
-outputs/img-samples/000039.3498014304.png: "a cute child playing hopscotch" -s50 -b1 -W512 -H512 -C7.5 -mk_lms -S3498014304
+## **Other Features**
 
 # I wonder what it will look like if I bump up the steps and set facial enhancement to full strength?
 dream> a cute child playing hopscotch -G1.0 -s100 -S -1
@@ -611,19 +511,9 @@ For support,
 please use this repository's GitHub Issues tracking service. Feel free
 to send me an email if you use and like the script.
 
-*Original Author:* Lincoln D. Stein <lincoln.stein@gmail.com>
-
-*Contributions by:* 
-[Peter Kowalczyk](https://github.com/slix), [Henry Harrison](https://github.com/hwharrison),
-[xraxra](https://github.com/xraxra), [bmaltais](https://github.com/bmaltais), [Sean McLellan](https://github.com/Oceanswave),
-[nicolai256](https://github.com/nicolai256), [Benjamin Warner](https://github.com/warner-benjamin),
-[tildebyte](https://github.com/tildebyte),
-and [Tesseract Cat](https://github.com/TesseractCat)
-
-
 Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https://github.com/lstein)
 
-#Further Reading
+# Further Reading
 
 Please see the original README for more information on this software
-and underlying algorithm, located in the file README-CompViz.md.
+and underlying algorithm, located in the file [README-CompViz.md](docs/README-CompViz.md).
