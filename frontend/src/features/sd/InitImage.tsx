@@ -16,10 +16,10 @@ import { FaUpload } from 'react-icons/fa';
 import { RiCloseFill } from 'react-icons/ri';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import { useSocketIOEmitters } from '../../app/socket';
 import { resetInitialImagePath } from '../../features/sd/sdSlice';
 import MaskUploader from './MaskUploader';
 import './InitImage.css';
+import { uploadInitialImage } from '../../app/socketio';
 
 const InitImage = () => {
   const toast = useToast();
@@ -30,7 +30,6 @@ const InitImage = () => {
   const { initialImagePath, maskPath } = useAppSelector(
     (state: RootState) => state.sd
   );
-  const { emitUploadInitialImage } = useSocketIOEmitters();
 
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: any) => {
@@ -49,7 +48,7 @@ const InitImage = () => {
       });
 
       acceptedFiles.forEach((file: File) => {
-        emitUploadInitialImage(file, file.name);
+        dispatch(uploadInitialImage(file));
       });
     },
     []

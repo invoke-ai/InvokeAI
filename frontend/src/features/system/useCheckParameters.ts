@@ -1,6 +1,28 @@
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
 import { useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
+import { SDState } from '../sd/sdSlice';
 import { validateSeedWeights } from '../sd/util/seedWeightPairs';
+
+const selector = createSelector(
+    (state: RootState) => state.sd,
+    (sd: SDState) => {
+        return {
+            prompt: sd.prompt,
+            shouldGenerateVariations: sd.shouldGenerateVariations,
+            seedWeights: sd.seedWeights,
+            maskPath: sd.maskPath,
+            initialImagePath: sd.initialImagePath,
+            seed: sd.seed,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
 
 /*
 Returns a function check relevant pieces of state and verify generation will not deterministically fail.
@@ -17,7 +39,7 @@ const useCheckParameters = () => {
         maskPath,
         initialImagePath,
         seed,
-    } = useAppSelector((state: RootState) => state.sd);
+    } = useAppSelector(selector);
 
     const { isProcessing, isConnected } = useAppSelector(
         (state: RootState) => state.system

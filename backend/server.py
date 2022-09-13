@@ -115,6 +115,7 @@ mask_path = os.path.join(output_dir, 'mask/')
 
 @socketio.on('requestAllImages')
 def handle_request_all_images():
+    print('> All images requested')
     paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
     paths.sort(key=lambda x: os.path.getmtime(x))
     return make_response("OK", data=paths)
@@ -122,6 +123,7 @@ def handle_request_all_images():
 
 @socketio.on('generateImage')
 def handle_generate_image_event(data):
+    print('> Generate image requested')
     generate_images(
         data
     )
@@ -131,6 +133,7 @@ def handle_generate_image_event(data):
 
 @socketio.on('runESRGAN')
 def handle_run_esrgan_event(data):
+    print('> Upscale image requested')
     parameters = make_esrgan_parameters(data)
     image = Image.open(data["imagePath"])
 
@@ -154,6 +157,7 @@ def handle_run_esrgan_event(data):
 
 @socketio.on('runGFPGAN')
 def handle_run_gfpgan_event(data):
+    print('> Fix faces requested')
     parameters = make_gfpgan_parameters(data)
     image = Image.open(data["imagePath"])
 
@@ -176,9 +180,17 @@ def handle_run_gfpgan_event(data):
     eventlet.sleep(0)
 
 
+@socketio.on('cancel')
+def handle_cancel():
+    print('> Cancel requested')
+    canceled.set()
+    return make_response("OK")
+
+
 # TODO: I think this needs a safety mechanism.
 @socketio.on('deleteImage')
 def handle_delete_image(path):
+    print('> Delete image requested')
     Path(path).unlink()
     return make_response("OK")
 
@@ -186,6 +198,7 @@ def handle_delete_image(path):
 # TODO: I think this needs a safety mechanism.
 @socketio.on('uploadInitialImage')
 def handle_upload_initial_image(bytes, name):
+    print('> Upload initial image requested')
     filePath = f'outputs/init-images/{name}'
     os.makedirs(os.path.dirname(filePath), exist_ok=True)
     newFile = open(filePath, "wb")
@@ -194,8 +207,9 @@ def handle_upload_initial_image(bytes, name):
 
 
 # TODO: I think this needs a safety mechanism.
-@socketio.on('uploadMask')
+@socketio.on('uploadMaskImage')
 def handle_upload_initial_image(bytes, name):
+    print('> Upload mask image requested')
     filePath = f'outputs/mask-images/{name}'
     os.makedirs(os.path.dirname(filePath), exist_ok=True)
     newFile = open(filePath, "wb")
@@ -299,13 +313,14 @@ def generate_images(data):
     except KeyboardInterrupt:
         raise
     except CanceledException:
-        raise
+        pass
     except Exception as e:
-        # socketio.emit('error', (str(e)))
+        socketio.emit('error', (str(e)))
         print("\n")
         traceback.print_exc()
         print("\n")
 
 
 if __name__ == '__main__':
+    print(f'Starting server at http://{host}:{port}')
     socketio.run(app, host=host, port=port)

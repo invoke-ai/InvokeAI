@@ -2,8 +2,8 @@ import { IconButton, Tooltip, useToast } from '@chakra-ui/react';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FaMask } from 'react-icons/fa';
-import { useAppSelector } from '../../app/hooks';
-import { useSocketIOEmitters } from '../../app/socket';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { uploadMaskImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
 
 type Props = {
@@ -11,8 +11,8 @@ type Props = {
 };
 
 const MaskUploader = ({ setShouldShowMask }: Props) => {
+    const dispatch = useAppDispatch();
     const toast = useToast();
-    const { emitUploadMask } = useSocketIOEmitters();
     const { maskPath } = useAppSelector((state: RootState) => state.sd);
 
     const onDrop = useCallback(
@@ -33,7 +33,7 @@ const MaskUploader = ({ setShouldShowMask }: Props) => {
             });
 
             acceptedFiles.forEach((file: File) => {
-                emitUploadMask(file, file.name);
+                dispatch(uploadMaskImage(file));
             });
         },
         []

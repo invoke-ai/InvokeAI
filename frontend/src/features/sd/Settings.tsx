@@ -1,15 +1,12 @@
 import { Flex, IconButton, HStack, Box } from '@chakra-ui/react';
 
 import { RootState } from '../../app/store';
-import { useSocketIOEmitters } from '../../app/socket';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 
-import { TiArrowBack } from 'react-icons/ti';
-import { FaRandom, FaRecycle } from 'react-icons/fa';
+import { FaRandom } from 'react-icons/fa';
 
 import {
     resetSDState,
-    resetSeed,
     setCfgScale,
     setGfpganStrength,
     setHeight,
@@ -41,7 +38,7 @@ import {
     WIDTHS,
 } from '../../app/constants';
 import SDSwitch from '../../components/SDSwitch';
-import useCheckParameters from '../system/useCheckParameters';
+import ProcessButtons from './ProcessButtons';
 
 const Settings = () => {
     const {
@@ -65,58 +62,18 @@ const Settings = () => {
         shouldRunGFPGAN,
     } = useAppSelector((state: RootState) => state.sd);
 
-    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
-        useAppSelector((state: RootState) => state.system);
+    const { isGFPGANAvailable, isESRGANAvailable } = useAppSelector(
+        (state: RootState) => state.system
+    );
 
     const dispatch = useAppDispatch();
-
-    const {
-        emitGenerateImage,
-        emitCancel,
-        emitRunESRGAN,
-        emitRunGFPGAN,
-    } = useSocketIOEmitters();
-
-    const areParametersValid = useCheckParameters();
 
     return (
         <Flex direction={'column'} gap={2}>
             <HStack justifyContent={'stretch'}>
-                {isProcessing ? (
-                    <SDButton
-                        label='Cancel'
-                        colorScheme='red'
-                        isDisabled={!isConnected || !isProcessing}
-                        onClick={() => emitCancel()}
-                    />
-                ) : (
-                    <>
-                        <SDButton
-                            label='g'
-                            type='submit'
-                            colorScheme='green'
-                            isDisabled={!areParametersValid}
-                            onClick={() => emitGenerateImage()}
-                        />
-                        <SDButton
-                            label='e'
-                            type='submit'
-                            colorScheme='green'
-                            // isDisabled={!areParametersValid}
-                            onClick={() => emitRunESRGAN()}
-                        />
-                        <SDButton
-                            label='f'
-                            type='submit'
-                            colorScheme='green'
-                            // isDisabled={!areParametersValid}
-                            onClick={() => emitRunGFPGAN()}
-                        />
-                    </>
-                )}
-                {/*<Spacer />*/}
+                <ProcessButtons />
                 <SDButton
-                    label='Reset all image parameters'
+                    label='Reset'
                     colorScheme='blue'
                     onClick={() => dispatch(resetSDState())}
                 />

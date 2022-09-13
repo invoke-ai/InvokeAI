@@ -1,5 +1,4 @@
 import { Grid, GridItem } from '@chakra-ui/react';
-import { useSocketIOListeners } from './app/socket';
 import ImageRoll from './features/gallery/ImageRoll';
 import CurrentImage from './features/gallery/CurrentImage';
 import LogViewer from './features/system/LogViewer';
@@ -9,9 +8,15 @@ import InitImage from './features/sd/InitImage';
 import ProgressBar from './features/header/ProgressBar';
 import SiteHeader from './features/header/SiteHeader';
 import Variant from './features/sd/Variant';
+import { useEffect } from 'react';
+import { useAppDispatch } from './app/hooks';
+import { requestAllImages } from './app/socketio';
 
 const App = () => {
-    useSocketIOListeners();
+    const dispatch = useAppDispatch();
+    useEffect(() => {
+        dispatch(requestAllImages());
+    }, []);
     return (
         <>
             <Grid

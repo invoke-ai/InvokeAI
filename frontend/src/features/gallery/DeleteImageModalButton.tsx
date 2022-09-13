@@ -15,13 +15,14 @@ import {
 import { MouseEventHandler } from 'react';
 import { MdDeleteForever } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { useSocketIOEmitters } from '../../app/socket';
+import { deleteImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
 import { setShouldConfirmOnDelete } from '../system/systemSlice';
+import { SDImage } from './gallerySlice';
 
 interface Props extends IconButtonProps {
-  uuid: string;
+  image: SDImage;
   'aria-label': string;
 }
 
@@ -31,7 +32,6 @@ but their state is closely related and I'm not sure how best to accomplish it.
 */
 const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { emitDeleteImage } = useSocketIOEmitters();
   const dispatch = useAppDispatch();
   const { shouldConfirmOnDelete } = useAppSelector(
     (state: RootState) => state.system
@@ -42,15 +42,15 @@ const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
     shouldConfirmOnDelete ? onOpen() : handleDelete();
   };
 
-  const { uuid, size, fontSize } = props;
+  const { image, size, fontSize } = props;
 
   const handleDelete = () => {
-    emitDeleteImage(uuid);
+    dispatch(deleteImage(image));
     onClose();
   };
 
   const handleDeleteAndDontAsk = () => {
-    emitDeleteImage(uuid);
+    dispatch(deleteImage(image));
     dispatch(setShouldConfirmOnDelete(false));
     onClose();
   };

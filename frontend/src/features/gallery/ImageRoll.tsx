@@ -53,7 +53,7 @@ const ImageRoll = () => {
                             backgroundColor={
                                 isSelected ? overlayColor : undefined
                             }
-                            onClick={() => dispatch(setCurrentImage(uuid))}
+                            onClick={() => dispatch(setCurrentImage(image))}
                         >
                             {isSelected && (
                                 <Icon
@@ -67,7 +67,7 @@ const ImageRoll = () => {
                                 position={'absolute'}
                                 top={1}
                                 right={1}
-                                uuid={uuid}
+                                image={image}
                                 size='xs'
                                 fontSize={18}
                                 colorScheme='red'

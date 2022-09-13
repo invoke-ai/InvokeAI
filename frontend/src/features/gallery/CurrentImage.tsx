@@ -20,12 +20,11 @@ import { setAllParameters, setInitialImagePath } from '../sd/sdSlice';
 import { useState } from 'react';
 import ImageMetadataViewer from './ImageMetadataViewer';
 import DeleteImageModalButton from './DeleteImageModalButton';
-import { useSocketIOEmitters } from '../../app/socket';
 
 const height = 'calc(100vh - 216px)';
 
 const CurrentImage = () => {
-    const { currentImageUuid, images, intermediateImage } = useAppSelector(
+    const { currentImage, intermediateImage } = useAppSelector(
         (state: RootState) => state.gallery
     );
 
@@ -39,14 +38,11 @@ const CurrentImage = () => {
         'rgba(0, 0, 0, 0.8)'
     );
 
-    // const { emitUpscaleImage } = useSocketIOEmitters();
 
     const [shouldShowImageDetails, setShouldShowImageDetails] =
         useState<boolean>(false);
 
-    const imageToDisplay =
-        intermediateImage ||
-        images.find((image) => image.uuid === currentImageUuid);
+    const imageToDisplay = intermediateImage || currentImage;
 
     return (
         <Center height={height}>
@@ -129,16 +125,15 @@ const CurrentImage = () => {
                         </Tooltip>
                         <Tooltip label='Upscale (ESRGAN)' shouldWrapChildren>
                             <IconButton
-                                // isDisabled={isESRGANAvailable ? false : true}
+                                isDisabled={!isESRGANAvailable}
                                 fontSize={20}
                                 aria-label='Upscale (ESRGAN)'
                                 icon={<GiResize />}
-                                // onClick={() => emitUpscaleImage()}
                             />
                         </Tooltip>
                         <Tooltip label='Fix faces (GFPGAN)' shouldWrapChildren>
                             <IconButton
-                                isDisabled={isGFPGANAvailable ? false : true}
+                                isDisabled={!isGFPGANAvailable}
                                 fontSize={20}
                                 aria-label='Fix faces (GFPGAN)'
                                 icon={<MdFaceRetouchingNatural />}
@@ -146,7 +141,9 @@ const CurrentImage = () => {
                         </Tooltip>
                         {!intermediateImage && (
                             <DeleteImageModalButton
-                                uuid={imageToDisplay.uuid}
+                                image={imageToDisplay}
+                                // uuid={imageToDisplay.uuid}
+                                // url={imageToDisplay.url}
                             />
                         )}
                     </VStack>
