@@ -54,6 +54,26 @@ def main():
 
     transformers.logging.set_verbosity_error()
 
+    # Loading GFPGAN and ESRGAN
+    try:
+        gfpgan, esrgan = None, None
+        if opt.gfpgan:
+            from ldm.restoration.gfpgan import GFPGAN
+            gfpgan = GFPGAN(opt.gfpgan_dir, opt.gfpgan_model_path)
+            print('>> GFPGAN Initialized')
+        else:
+            print('>> GFPGAN Disabled')
+        if opt.esrgan:
+            from ldm.restoration.realesrgan import ESRGAN
+            esrgan = ESRGAN(opt.esrgan_bg_tile)
+            print('>> ESRGAN Initialized')
+        else:
+            print('>> ESRGAN Disabled')
+    except (ModuleNotFoundError, ImportError):
+        import traceback
+        print(traceback.format_exc(), file=sys.stderr)
+        print('>> You may need to install the ESRGAN and/or GFPGAN modules')
+
     # creating a simple text2image object with a handful of
     # defaults passed on the command line.
     # additional parameters will be added (or overriden) during
@@ -71,6 +91,8 @@ def main():
         embedding_path=opt.embedding_path,
         device_type=opt.device,
         ignore_ctrl_c=opt.infile is None,
+        gfpgan=gfpgan,
+        esrgan=esrgan
     )
 
     # make sure the output directory exists
@@ -107,7 +129,7 @@ def main():
 
     cmd_parser = create_cmd_parser()
     if opt.web:
-        dream_server_loop(t2i, opt.host, opt.port, opt.outdir)
+        dream_server_loop(t2i, opt.host, opt.port, opt.outdir, gfpgan)
     else:
         main_loop(t2i, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
 
@@ -299,7 +321,7 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
             t2i.prompt2image(image_callback=image_writer, **vars(opt))
 
             if do_grid and len(grid_images) > 0:
-                grid_img   = make_grid(list(grid_images.values()))
+                grid_img = make_grid(list(grid_images.values()))
                 grid_seeds = list(grid_images.keys())
                 first_seed = last_results[0][1]
                 filename = f'{prefix}.{first_seed}.png'
@@ -341,7 +363,7 @@ def get_next_command(infile=None) -> str:  # command string
     return command
 
 
-def dream_server_loop(t2i, host, port, outdir):
+def dream_server_loop(t2i, host, port, outdir, gfpgan=None):
     print('\n* --web was specified, starting web server...')
     # Change working directory to the stable-diffusion directory
     os.chdir(
@@ -351,6 +373,10 @@ def dream_server_loop(t2i, host, port, outdir):
     # Start server
     DreamServer.model = t2i
     DreamServer.outdir = outdir
+    DreamServer.gfpgan_model_exists = False
+    if gfpgan is not None:
+        DreamServer.gfpgan_model_exists = gfpgan.model_exists()
+
     dream_server = ThreadingDreamServer((host, port))
     print(">> Started Stable Diffusion dream server!")
     if host == '0.0.0.0':
@@ -374,8 +400,7 @@ def write_log_message(results, log_path):
     log_lines = [f'{path}: {prompt}\n' for path, prompt in results]
     for l in log_lines:
         output_cntr += 1
-        print(f'[{output_cntr}] {l}',end='')
-
+        print(f'[{output_cntr}] {l}', end='')
 
     with open(log_path, 'a', encoding='utf-8') as file:
         file.writelines(log_lines)
@@ -472,18 +497,16 @@ def create_argv_parser():
     )
     # GFPGAN related args
     parser.add_argument(
-        '--gfpgan_bg_upsampler',
-        type=str,
-        default='realesrgan',
-        help='Background upsampler. Default: realesrgan. Options: realesrgan, none.',
-
-    )
+        '--gfpgan',
+        action='store_true',
+        help='Enable GFPGAN',
+    ),
     parser.add_argument(
-        '--gfpgan_bg_tile',
-        type=int,
-        default=400,
-        help='Tile size for background sampler, 0 for no tile during testing. Default: 400.',
-    )
+        '--gfpgan_dir',
+        type=str,
+        default='./src/gfpgan',
+        help='Indicates the directory containing the GFPGAN code.',
+    ),
     parser.add_argument(
         '--gfpgan_model_path',
         type=str,
@@ -491,10 +514,15 @@ def create_argv_parser():
         help='Indicates the path to the GFPGAN model, relative to --gfpgan_dir.',
     )
     parser.add_argument(
-        '--gfpgan_dir',
-        type=str,
-        default='./src/gfpgan',
-        help='Indicates the directory containing the GFPGAN code.',
+        '--esrgan',
+        action='store_true',
+        help='Enable ESRGAN',
+    ),
+    parser.add_argument(
+        '--esrgan_bg_tile',
+        type=int,
+        default=400,
+        help='Tile size for background sampler, 0 for no tile during testing. Default: 400.',
     )
     parser.add_argument(
         '--web',

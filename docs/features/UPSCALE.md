@@ -4,19 +4,20 @@ The script also provides the ability to do face restoration and
 upscaling with the help of GFPGAN and Real-ESRGAN respectively.
 
 As of version 1.14, environment.yaml will install the Real-ESRGAN package into the
-standard install location for python packages, and will put GFPGAN into a subdirectory of "src" 
+standard install location for python packages, and will put GFPGAN into a subdirectory of "src"
 in the stable-diffusion directory.
 (The reason for this is that the standard GFPGAN distribution has a minor bug that adversely affects image
 color.) Upscaling with Real-ESRGAN should "just work" without further intervention. Simply pass the --upscale (-U)
 option on the dream> command line, or indicate the desired scale on the popup in the Web GUI.
 
-For **GFPGAN** to work, there is one additional step needed. You will need to download and 
-copy the GFPGAN [models file](https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth) 
+For **GFPGAN** to work, there is one additional step needed. You will need to download and
+copy the GFPGAN [models file](https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth)
 into **src/gfpgan/experiments/pretrained_models**. On Mac and Linux systems, here's how you'd do it using
 **wget**:
-~~~~
+
+```
 > wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth src/gfpgan/experiments/pretrained_models/
-~~~~
+```
 
 Make sure that you're in the stable-diffusion directory when you do this.
 

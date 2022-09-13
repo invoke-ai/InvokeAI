@@ -19,14 +19,14 @@ from PIL import Image, ImageOps
 from torch import nn
 from pytorch_lightning import seed_everything
 
-from ldm.util                      import instantiate_from_config
-from ldm.models.diffusion.ddim     import DDIMSampler
-from ldm.models.diffusion.plms     import PLMSSampler
+from ldm.util import instantiate_from_config
+from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
-from ldm.dream.pngwriter           import PngWriter
-from ldm.dream.image_util          import InitImageResizer
-from ldm.dream.devices             import choose_torch_device
-from ldm.dream.conditioning        import get_uc_and_c
+from ldm.dream.pngwriter import PngWriter
+from ldm.dream.image_util import InitImageResizer
+from ldm.dream.devices import choose_torch_device
+from ldm.dream.conditioning import get_uc_and_c
 
 """Simplified text to image API for stable diffusion/latent diffusion
 
@@ -101,45 +101,50 @@ class Generate:
 
     def __init__(
             self,
-            iterations            = 1,
-            steps                 = 50,
-            cfg_scale             = 7.5,
-            weights               = 'models/ldm/stable-diffusion-v1/model.ckpt',
-            config                = 'configs/stable-diffusion/v1-inference.yaml',
-            grid                  = False,
-            width                 = 512,
-            height                = 512,
-            sampler_name          = 'k_lms',
-            ddim_eta              = 0.0,  # deterministic
-            full_precision        = False,
-            strength              = 0.75,  # default in scripts/img2img.py
-            seamless              = False,
-            embedding_path        = None,
-            device_type           = 'cuda',
-            ignore_ctrl_c         = False,
+            iterations=1,
+            steps=50,
+            cfg_scale=7.5,
+            weights='models/ldm/stable-diffusion-v1/model.ckpt',
+            config='configs/stable-diffusion/v1-inference.yaml',
+            grid=False,
+            width=512,
+            height=512,
+            sampler_name='k_lms',
+            ddim_eta=0.0,  # deterministic
+            full_precision=False,
+            strength=0.75,  # default in scripts/img2img.py
+            seamless=False,
+            embedding_path=None,
+            device_type='cuda',
+            ignore_ctrl_c=False,
+            gfpgan=None,
+            esrgan=None
     ):
-        self.iterations               = iterations
-        self.width                    = width
-        self.height                   = height
-        self.steps                    = steps
-        self.cfg_scale                = cfg_scale
-        self.weights                  = weights
-        self.config                   = config
-        self.sampler_name             = sampler_name
-        self.grid                     = grid
-        self.ddim_eta                 = ddim_eta
-        self.full_precision           = True if choose_torch_device() == 'mps' else full_precision
-        self.strength                 = strength
-        self.seamless                 = seamless
-        self.embedding_path           = embedding_path
-        self.device_type              = device_type
-        self.ignore_ctrl_c            = ignore_ctrl_c    # note, this logic probably doesn't belong here...
-        self.model                    = None     # empty for now
-        self.sampler                  = None
-        self.device                   = None
-        self.generators               = {}
-        self.base_generator           = None
-        self.seed                     = None
+        self.iterations = iterations
+        self.width = width
+        self.height = height
+        self.steps = steps
+        self.cfg_scale = cfg_scale
+        self.weights = weights
+        self.config = config
+        self.sampler_name = sampler_name
+        self.grid = grid
+        self.ddim_eta = ddim_eta
+        self.full_precision = True if choose_torch_device() == 'mps' else full_precision
+        self.strength = strength
+        self.seamless = seamless
+        self.embedding_path = embedding_path
+        self.device_type = device_type
+        # note, this logic probably doesn't belong here...
+        self.ignore_ctrl_c = ignore_ctrl_c
+        self.model = None     # empty for now
+        self.sampler = None
+        self.device = None
+        self.generators = {}
+        self.base_generator = None
+        self.seed = None
+        self.gfpgan = gfpgan
+        self.esrgan = esrgan
 
         if device_type == 'cuda' and not torch.cuda.is_available():
             device_type = choose_torch_device()
@@ -147,8 +152,9 @@ class Generate:
         self.device = torch.device(device_type)
 
         # for VRAM usage statistics
-        device_type          = choose_torch_device()
-        self.session_peakmem = torch.cuda.max_memory_allocated() if device_type == 'cuda' else None
+        device_type = choose_torch_device()
+        self.session_peakmem = torch.cuda.max_memory_allocated(
+        ) if device_type == 'cuda' else None
         transformers.logging.set_verbosity_error()
 
     def prompt2png(self, prompt, outdir, **kwargs):
@@ -183,33 +189,33 @@ class Generate:
             self,
             # these are common
             prompt,
-            iterations     =    None,
-            steps          =    None,
-            seed           =    None,
-            cfg_scale      =    None,
-            ddim_eta       =    None,
-            skip_normalize =    False,
-            image_callback =    None,
-            step_callback  =    None,
-            width          =    None,
-            height         =    None,
-            sampler_name   =    None,
-            seamless       =    False,
-            log_tokenization=  False,
-            with_variations =   None,
-            variation_amount =  0.0,
+            iterations=None,
+            steps=None,
+            seed=None,
+            cfg_scale=None,
+            ddim_eta=None,
+            skip_normalize=False,
+            image_callback=None,
+            step_callback=None,
+            width=None,
+            height=None,
+            sampler_name=None,
+            seamless=False,
+            log_tokenization=False,
+            with_variations=None,
+            variation_amount=0.0,
             # these are specific to img2img and inpaint
-            init_img       =    None,
-            init_mask      =    None,
-            fit            =    False,
-            strength       =    None,
+            init_img=None,
+            init_mask=None,
+            fit=False,
+            strength=None,
             # these are specific to embiggen (which also relies on img2img args)
-            embiggen       =    None,
-            embiggen_tiles =    None,
+            embiggen=None,
+            embiggen_tiles=None,
             # these are specific to GFPGAN/ESRGAN
-            gfpgan_strength=    0,
-            save_original  =    False,
-            upscale        =    None,
+            gfpgan_strength=0,
+            save_original=False,
+            upscale=None,
             **args,
     ):   # eat up additional cruft
         """
@@ -250,15 +256,15 @@ class Generate:
         write the prompt into the PNG metadata.
         """
         # TODO: convert this into a getattr() loop
-        steps                 = steps      or self.steps
-        width                 = width      or self.width
-        height                = height     or self.height
-        seamless              = seamless   or self.seamless
-        cfg_scale             = cfg_scale  or self.cfg_scale
-        ddim_eta              = ddim_eta   or self.ddim_eta
-        iterations            = iterations or self.iterations
-        strength              = strength   or self.strength
-        self.seed             = seed
+        steps = steps or self.steps
+        width = width or self.width
+        height = height or self.height
+        seamless = seamless or self.seamless
+        cfg_scale = cfg_scale or self.cfg_scale
+        ddim_eta = ddim_eta or self.ddim_eta
+        iterations = iterations or self.iterations
+        strength = strength or self.strength
+        self.seed = seed
         self.log_tokenization = log_tokenization
         with_variations = [] if with_variations is None else with_variations
 
@@ -269,16 +275,17 @@ class Generate:
         for m in model.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 m.padding_mode = 'circular' if seamless else m._orig_padding_mode
-        
+
         assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert (
             0.0 < strength < 1.0
         ), 'img2img and inpaint strength can only work with 0.0 < strength < 1.0'
         assert (
-                0.0 <= variation_amount <= 1.0
+            0.0 <= variation_amount <= 1.0
         ), '-v --variation_amount must be in [0.0, 1.0]'
         assert (
-            (embiggen == None and embiggen_tiles == None) or ((embiggen != None or embiggen_tiles != None) and init_img != None)
+            (embiggen == None and embiggen_tiles == None) or (
+                (embiggen != None or embiggen_tiles != None) and init_img != None)
         ), 'Embiggen requires an init/input image to be specified'
 
         # check this logic - doesn't look right
@@ -301,9 +308,9 @@ class Generate:
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
 
-        results          = list()
-        init_image       = None
-        mask_image       = None
+        results = list()
+        init_image = None
+        mask_image = None
 
         try:
             uc, c = get_uc_and_c(
@@ -312,8 +319,9 @@ class Generate:
                 log_tokens=self.log_tokenization
             )
 
-            (init_image,mask_image) = self._make_images(init_img,init_mask, width, height, fit)
-            
+            (init_image, mask_image) = self._make_images(
+                init_img, init_mask, width, height, fit)
+
             if (init_image is not None) and (mask_image is not None):
                 generator = self._make_inpaint()
             elif (embiggen != None or embiggen_tiles != None):
@@ -323,34 +331,35 @@ class Generate:
             else:
                 generator = self._make_txt2img()
 
-            generator.set_variation(self.seed, variation_amount, with_variations)
+            generator.set_variation(
+                self.seed, variation_amount, with_variations)
             results = generator.generate(
                 prompt,
-                iterations     = iterations,
-                seed           = self.seed,
-                sampler        = self.sampler,
-                steps          = steps,
-                cfg_scale      = cfg_scale,
-                conditioning   = (uc,c),
-                ddim_eta       = ddim_eta,
-                image_callback = image_callback,  # called after the final image is generated
-                step_callback  = step_callback,   # called after each intermediate image is generated
-                width          = width,
-                height         = height,
-                init_img       = init_img,        # embiggen needs to manipulate from the unmodified init_img
-                init_image     = init_image,      # notice that init_image is different from init_img
-                mask_image     = mask_image,
-                strength       = strength,
-                embiggen       = embiggen,
-                embiggen_tiles = embiggen_tiles,
+                iterations=iterations,
+                seed=self.seed,
+                sampler=self.sampler,
+                steps=steps,
+                cfg_scale=cfg_scale,
+                conditioning=(uc, c),
+                ddim_eta=ddim_eta,
+                image_callback=image_callback,  # called after the final image is generated
+                step_callback=step_callback,   # called after each intermediate image is generated
+                width=width,
+                height=height,
+                init_img=init_img,        # embiggen needs to manipulate from the unmodified init_img
+                init_image=init_image,      # notice that init_image is different from init_img
+                mask_image=mask_image,
+                strength=strength,
+                embiggen=embiggen,
+                embiggen_tiles=embiggen_tiles,
             )
 
             if upscale is not None or gfpgan_strength > 0:
                 self.upscale_and_reconstruct(results,
-                                             upscale        = upscale,
-                                             strength       = gfpgan_strength,
-                                             save_original  = save_original,
-                                             image_callback = image_callback)
+                                             upscale=upscale,
+                                             strength=gfpgan_strength,
+                                             save_original=save_original,
+                                             image_callback=image_callback)
 
         except KeyboardInterrupt:
             print('*interrupted*')
@@ -366,7 +375,8 @@ class Generate:
         toc = time.time()
         print('>> Usage stats:')
         print(
-            f'>>   {len(results)} image(s) generated in', '%4.2fs' % (toc - tic)
+            f'>>   {len(results)} image(s) generated in', '%4.2fs' % (
+                toc - tic)
         )
         if torch.cuda.is_available() and self.device.type == 'cuda':
             print(
@@ -386,36 +396,42 @@ class Generate:
         return results
 
     def _make_images(self, img_path, mask_path, width, height, fit=False):
-        init_image      = None
-        init_mask       = None
+        init_image = None
+        init_mask = None
         if not img_path:
-            return None,None
+            return None, None
 
-        image        = self._load_img(img_path, width, height, fit=fit) # this returns an Image
-        init_image   = self._create_init_image(image)                   # this returns a torch tensor
+        image = self._load_img(img_path, width, height,
+                               fit=fit)  # this returns an Image
+        # this returns a torch tensor
+        init_image = self._create_init_image(image)
 
-        if self._has_transparency(image) and not mask_path:      # if image has a transparent area and no mask was provided, then try to generate mask
-            print('>> Initial image has transparent areas. Will inpaint in these regions.')
+        # if image has a transparent area and no mask was provided, then try to generate mask
+        if self._has_transparency(image) and not mask_path:
+            print(
+                '>> Initial image has transparent areas. Will inpaint in these regions.')
             if self._check_for_erasure(image):
                 print(
                     '>> WARNING: Colors underneath the transparent region seem to have been erased.\n',
                     '>>          Inpainting will be suboptimal. Please preserve the colors when making\n',
                     '>>          a transparency mask, or provide mask explicitly using --init_mask (-M).'
                 )
-            init_mask = self._create_init_mask(image)                   # this returns a torch tensor
+            # this returns a torch tensor
+            init_mask = self._create_init_mask(image)
 
         if mask_path:
-            mask_image  = self._load_img(mask_path, width, height, fit=fit) # this returns an Image
-            init_mask   = self._create_init_mask(mask_image)
+            mask_image = self._load_img(
+                mask_path, width, height, fit=fit)  # this returns an Image
+            init_mask = self._create_init_mask(mask_image)
 
-        return init_image,init_mask
+        return init_image, init_mask
 
     def _make_img2img(self):
         if not self.generators.get('img2img'):
             from ldm.dream.generator.img2img import Img2Img
             self.generators['img2img'] = Img2Img(self.model)
         return self.generators['img2img']
-    
+
     def _make_embiggen(self):
         if not self.generators.get('embiggen'):
             from ldm.dream.generator.embiggen import Embiggen
@@ -463,36 +479,27 @@ class Generate:
 
     def upscale_and_reconstruct(self,
                                 image_list,
-                                upscale       = None,
-                                strength      =  0.0,
-                                save_original = False,
-                                image_callback = None):
-        try:
-            if upscale is not None:
-                from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
-            if strength > 0:
-                from ldm.gfpgan.gfpgan_tools import run_gfpgan
-        except (ModuleNotFoundError, ImportError):
-            print(traceback.format_exc(), file=sys.stderr)
-            print('>> You may need to install the ESRGAN and/or GFPGAN modules')
-            return
-            
+                                upscale=None,
+                                strength=0.0,
+                                save_original=False,
+                                image_callback=None):
+
         for r in image_list:
             image, seed = r
             try:
                 if upscale is not None:
-                    if len(upscale) < 2:
-                        upscale.append(0.75)
-                    image = real_esrgan_upscale(
-                        image,
-                        upscale[1],
-                        int(upscale[0]),
-                        seed,
-                    )
+                    if self.esrgan is not None:
+                        if len(upscale) < 2:
+                            upscale.append(0.75)
+                        image = self.esrgan.process(
+                            image, upscale[1], seed, int(upscale[0]))
+                    else:
+                        print(">> ESRGAN is disabled. Image not upscaled.")
                 if strength > 0:
-                    image = run_gfpgan(
-                        image, strength, seed, 1
-                    )
+                    if self.gfpgan is not None:
+                        image = self.gfpgan.process(image, strength, seed)
+                    else:
+                        print(">> GFPGAN is disabled. No faces restored.")
             except Exception as e:
                 print(
                     f'>> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}'
@@ -504,10 +511,10 @@ class Generate:
                 r[0] = image
 
     # to help WebGUI - front end to generator util function
-    def sample_to_image(self,samples):
+    def sample_to_image(self, samples):
         return self._sample_to_image(samples)
 
-    def _sample_to_image(self,samples):
+    def _sample_to_image(self, samples):
         if not self.base_generator:
             from ldm.dream.generator import Generator
             self.base_generator = Generator(self.model)
@@ -547,7 +554,7 @@ class Generate:
         # for usage statistics
         device_type = choose_torch_device()
         if device_type == 'cuda':
-            torch.cuda.reset_peak_memory_stats() 
+            torch.cuda.reset_peak_memory_stats()
         tic = time.time()
 
         # this does the work
@@ -555,7 +562,7 @@ class Generate:
         sd = pl_sd['state_dict']
         model = instantiate_from_config(config.model)
         m, u = model.load_state_dict(sd, strict=False)
-        
+
         if self.full_precision:
             print(
                 '>> Using slower but more accurate full-precision math (--full_precision)'
@@ -593,12 +600,12 @@ class Generate:
             f'>> loaded input image of size {image.width}x{image.height} from {path}'
         )
         if fit:
-            image = self._fit_image(image,(width,height))
+            image = self._fit_image(image, (width, height))
         else:
             image = self._squeeze_image(image)
         return image
 
-    def _create_init_image(self,image):
+    def _create_init_image(self, image):
         image = image.convert('RGB')
         # print(
         #     f'>> DEBUG: writing the image to img.png'
@@ -607,7 +614,7 @@ class Generate:
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
-        image = 2.0 * image - 1.0 
+        image = 2.0 * image - 1.0
         return image.to(self.device)
 
     def _create_init_mask(self, image):
@@ -616,7 +623,8 @@ class Generate:
         image = image.convert('RGB')
         # BUG: We need to use the model's downsample factor rather than hardcoding "8"
         from ldm.dream.generator.base import downsampling
-        image = image.resize((image.width//downsampling, image.height//downsampling), resample=Image.Resampling.LANCZOS)
+        image = image.resize((image.width//downsampling, image.height //
+                             downsampling), resample=Image.Resampling.LANCZOS)
         # print(
         #     f'>> DEBUG: writing the mask to mask.png'
         #     )
@@ -638,7 +646,7 @@ class Generate:
             mask = ImageOps.invert(mask)
         return mask
 
-    def _has_transparency(self,image):
+    def _has_transparency(self, image):
         if image.info.get("transparency", None) is not None:
             return True
         if image.mode == "P":
@@ -652,11 +660,10 @@ class Generate:
                 return True
         return False
 
-    
-    def _check_for_erasure(self,image):
+    def _check_for_erasure(self, image):
         width, height = image.size
-        pixdata       = image.load()
-        colored       = 0
+        pixdata = image.load()
+        colored = 0
         for y in range(height):
             for x in range(width):
                 if pixdata[x, y][3] == 0:
@@ -666,28 +673,28 @@ class Generate:
                         colored += 1
         return colored == 0
 
-    def _squeeze_image(self,image):
-        x,y,resize_needed = self._resolution_check(image.width,image.height)
+    def _squeeze_image(self, image):
+        x, y, resize_needed = self._resolution_check(image.width, image.height)
         if resize_needed:
-            return InitImageResizer(image).resize(x,y)
+            return InitImageResizer(image).resize(x, y)
         return image
 
-
-    def _fit_image(self,image,max_dimensions):
-        w,h = max_dimensions
+    def _fit_image(self, image, max_dimensions):
+        w, h = max_dimensions
         print(
             f'>> image will be resized to fit inside a box {w}x{h} in size.'
         )
         if image.width > image.height:
-            h   = None   # by setting h to none, we tell InitImageResizer to fit into the width and calculate height
+            h = None   # by setting h to none, we tell InitImageResizer to fit into the width and calculate height
         elif image.height > image.width:
-            w   = None   # ditto for w
+            w = None   # ditto for w
         else:
             pass
-        image = InitImageResizer(image).resize(w,h)   # note that InitImageResizer does the multiple of 64 truncation internally
+        # note that InitImageResizer does the multiple of 64 truncation internally
+        image = InitImageResizer(image).resize(w, h)
         print(
             f'>> after adjusting image dimensions to be multiples of 64, init image is {image.width}x{image.height}'
-            )
+        )
         return image
 
     def _resolution_check(self, width, height, log=False):
@@ -701,12 +708,10 @@ class Generate:
                     f'>> Provided width and height must be multiples of 64. Auto-resizing to {w}x{h}'
                 )
             height = h
-            width  = w
+            width = w
             resize_needed = True
 
         if (width * height) > (self.width * self.height):
             print(">> This input is larger than your defaults. If you run out of memory, please use a smaller image.")
 
         return width, height, resize_needed
-
-
