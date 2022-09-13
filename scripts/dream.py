@@ -42,7 +42,27 @@ def main():
     import transformers
     transformers.logging.set_verbosity_error()
 
-    # creating a simple Generate object with a handful of
+    # Loading GFPGAN and ESRGAN
+    try:
+        gfpgan, esrgan = None, None
+        if opt.gfpgan:
+            from ldm.restoration.gfpgan import GFPGAN
+            gfpgan = GFPGAN(opt.gfpgan_dir, opt.gfpgan_model_path)
+            print('>> GFPGAN Initialized')
+        else:
+            print('>> GFPGAN Disabled')
+        if opt.esrgan:
+            from ldm.restoration.realesrgan import ESRGAN
+            esrgan = ESRGAN(opt.esrgan_bg_tile)
+            print('>> ESRGAN Initialized')
+        else:
+            print('>> ESRGAN Disabled')
+    except (ModuleNotFoundError, ImportError):
+        import traceback
+        print(traceback.format_exc(), file=sys.stderr)
+        print('>> You may need to install the ESRGAN and/or GFPGAN modules')
+
+    # creating a simple text2image object with a handful of
     # defaults passed on the command line.
     # additional parameters will be added (or overriden) during
     # the user input loop
@@ -53,6 +73,8 @@ def main():
             sampler_name   = opt.sampler_name,
             embedding_path = opt.embedding_path,
             full_precision = opt.full_precision,
+            gfpgan=gfpgan,
+            esrgan=esrgan
         )
     except (FileNotFoundError, IOError, KeyError) as e:
         print(f'{e}. Aborting.')
@@ -322,6 +344,10 @@ def dream_server_loop(gen, host, port, outdir):
     # Start server
     DreamServer.model  = gen # misnomer in DreamServer - this is not the model you are looking for
     DreamServer.outdir = outdir
+    DreamServer.gfpgan_model_exists = False
+    if gfpgan is not None:
+        DreamServer.gfpgan_model_exists = gfpgan.model_exists()
+
     dream_server = ThreadingDreamServer((host, port))
     print(">> Started Stable Diffusion dream server!")
     if host == '0.0.0.0':
@@ -345,8 +371,7 @@ def write_log_message(results, log_path):
     log_lines = [f'{path}: {prompt}\n' for path, prompt in results]
     for l in log_lines:
         output_cntr += 1
-        print(f'[{output_cntr}] {l}',end='')
-
+        print(f'[{output_cntr}] {l}', end='')
 
     with open(log_path, 'a', encoding='utf-8') as file:
         file.writelines(log_lines)
