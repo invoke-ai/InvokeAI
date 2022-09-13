@@ -665,26 +665,27 @@ class LatentDiffusion(DDPM):
             self.init_from_ckpt(ckpt_path, ignore_keys)
             self.restarted_from_ckpt = True
 
-        self.cond_stage_model.train = disabled_train
-        for param in self.cond_stage_model.parameters():
-            param.requires_grad = False
+        # self.cond_stage_model.train = disabled_train
+        # for param in self.cond_stage_model.parameters():
+        #     param.requires_grad = False
 
-        self.model.eval()
-        self.model.train = disabled_train
-        for param in self.model.parameters():
-            param.requires_grad = False
+        # self.model.eval()
+        # self.model.train = disabled_train
+        # for param in self.model.parameters():
+        #     param.requires_grad = False
 
-        self.embedding_manager = self.instantiate_embedding_manager(
-            personalization_config, self.cond_stage_model
-        )
+        self.embedding_manager = None
+        # self.embedding_manager = self.instantiate_embedding_manager(
+        #     personalization_config, self.cond_stage_model
+        # )
 
         self.emb_ckpt_counter = 0
 
         # if self.embedding_manager.is_clip:
         #     self.cond_stage_model.update_embedding_func(self.embedding_manager)
 
-        for param in self.embedding_manager.embedding_parameters():
-            param.requires_grad = True
+        # for param in self.embedding_manager.embedding_parameters():
+        #     param.requires_grad = True
 
     def make_cond_schedule(
         self,
@@ -1974,17 +1975,17 @@ class LatentDiffusion(DDPM):
                 denoise_grid = self._get_denoise_row_from_list(z_denoise_row)
                 log['denoise_row'] = denoise_grid
 
-            uc = self.get_learned_conditioning(len(c) * [''])
-            sample_scaled, _ = self.sample_log(
-                cond=c,
-                batch_size=N,
-                ddim=use_ddim,
-                ddim_steps=ddim_steps,
-                eta=ddim_eta,
-                unconditional_guidance_scale=5.0,
-                unconditional_conditioning=uc,
-            )
-            log['samples_scaled'] = self.decode_first_stage(sample_scaled)
+            # uc = self.get_learned_conditioning(len(c) * [''])
+            # sample_scaled, _ = self.sample_log(
+            #     cond=c,
+            #     batch_size=N,
+            #     ddim=use_ddim,
+            #     ddim_steps=ddim_steps,
+            #     eta=ddim_eta,
+            #     unconditional_guidance_scale=5.0,
+            #     unconditional_conditioning=uc,
+            # )
+            # log['samples_scaled'] = self.decode_first_stage(sample_scaled)
 
             if (
                 quantize_denoised
@@ -2011,7 +2012,7 @@ class LatentDiffusion(DDPM):
                 b, h, w = z.shape[0], z.shape[2], z.shape[3]
                 mask = torch.ones(N, h, w).to(self.device)
                 # zeros will be filled in
-                mask[:, h // 4 : 3 * h // 4, w // 4 : 3 * w // 4] = 0.0
+                mask[:, h // 4: 3 * h // 4, w // 4: 3 * w // 4] = 0.0
                 mask = mask[:, None, ...]
                 with self.ema_scope('Plotting Inpaint'):
 
@@ -2102,26 +2103,26 @@ class LatentDiffusion(DDPM):
         x = 2.0 * (x - x.min()) / (x.max() - x.min()) - 1.0
         return x
 
-    @rank_zero_only
-    def on_save_checkpoint(self, checkpoint):
-        checkpoint.clear()
+    # @rank_zero_only
+    # def on_save_checkpoint(self, checkpoint):
+    #     checkpoint.clear()
 
-        if os.path.isdir(self.trainer.checkpoint_callback.dirpath):
-            self.embedding_manager.save(
-                os.path.join(
-                    self.trainer.checkpoint_callback.dirpath, 'embeddings.pt'
-                )
-            )
+    #     if os.path.isdir(self.trainer.checkpoint_callback.dirpath):
+    #         self.embedding_manager.save(
+    #             os.path.join(
+    #                 self.trainer.checkpoint_callback.dirpath, 'embeddings.pt'
+    #             )
+    #         )
 
-            if (self.global_step - self.emb_ckpt_counter) > 500:
-                self.embedding_manager.save(
-                    os.path.join(
-                        self.trainer.checkpoint_callback.dirpath,
-                        f'embeddings_gs-{self.global_step}.pt',
-                    )
-                )
+    #         if (self.global_step - self.emb_ckpt_counter) > 500:
+    #             self.embedding_manager.save(
+    #                 os.path.join(
+    #                     self.trainer.checkpoint_callback.dirpath,
+    #                     f'embeddings_gs-{self.global_step}.pt',
+    #                 )
+    #             )
 
-                self.emb_ckpt_counter += 500
+    #             self.emb_ckpt_counter += 500
 
 
 class DiffusionWrapper(pl.LightningModule):
@@ -2175,7 +2176,8 @@ class Layout2ImgDiffusion(LatentDiffusion):
         mapper = dset.conditional_builders[self.cond_stage_key]
 
         bbox_imgs = []
-        map_fn = lambda catno: dset.get_textual_label(
+
+        def map_fn(catno): return dset.get_textual_label(
             dset.get_category_id(catno)
         )
         for tknzd_bbox in batch[self.cond_stage_key][:N]:

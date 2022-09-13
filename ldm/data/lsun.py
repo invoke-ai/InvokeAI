@@ -72,8 +72,8 @@ class LSUNBase(Dataset):
 class LSUNChurchesTrain(LSUNBase):
     def __init__(self, **kwargs):
         super().__init__(
-            txt_file='data/lsun/church_outdoor_train.txt',
-            data_root='data/lsun/churches',
+            txt_file='ldm/data/lsun/church_outdoor_train.txt',
+            data_root='ldm/data/lsun/churches',
             **kwargs
         )
 
@@ -81,8 +81,8 @@ class LSUNChurchesTrain(LSUNBase):
 class LSUNChurchesValidation(LSUNBase):
     def __init__(self, flip_p=0.0, **kwargs):
         super().__init__(
-            txt_file='data/lsun/church_outdoor_val.txt',
-            data_root='data/lsun/churches',
+            txt_file='ldm/data/lsun/church_outdoor_val.txt',
+            data_root='ldm/data/lsun/churches',
             flip_p=flip_p,
             **kwargs
         )

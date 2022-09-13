@@ -1,3 +1,10 @@
+# ignore downloaded data
+ldm/data/lsun/
+
+# ignore all zip and ckpt files
+*.zip
+*.ckpt
+
 # ignore default image save location and model symbolic link
 outputs/
 models/ldm/stable-diffusion-v1/model.ckpt

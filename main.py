@@ -1,4 +1,10 @@
-import argparse, os, sys, datetime, glob, importlib, csv
+import argparse
+import os
+import sys
+import datetime
+import glob
+import importlib
+import csv
 import numpy as np
 import time
 import torch
@@ -160,7 +166,7 @@ def get_parser(**parser_kwargs):
     parser.add_argument(
         '--data_root',
         type=str,
-        required=True,
+        required=False,
         help='Path to directory with training images',
     )
 
@@ -213,7 +219,7 @@ def worker_init_fn(_):
         split_size = dataset.num_records // worker_info.num_workers
         # reset num_records to the true number to retain reliable length information
         dataset.sample_ids = dataset.valid_ids[
-            worker_id * split_size : (worker_id + 1) * split_size
+            worker_id * split_size: (worker_id + 1) * split_size
         ]
         current_id = np.random.choice(len(np.random.get_state()[1]), 1)
         return np.random.seed(np.random.get_state()[1][current_id] + worker_id)
@@ -473,7 +479,7 @@ class ImageLogger(Callback):
             self.check_frequency(check_idx)
             and hasattr(  # batch_idx % self.batch_freq == 0
                 pl_module, 'log_images'
-            ) 
+            )
             and callable(pl_module.log_images)
             and self.max_images > 0
         ):
@@ -553,7 +559,7 @@ class CUDACallback(Callback):
         torch.cuda.synchronize(trainer.root_gpu)
         self.start_time = time.time()
 
-    def on_train_epoch_end(self, trainer, pl_module, outputs):
+    def on_train_epoch_end(self, trainer, pl_module):#, outputs):
         torch.cuda.synchronize(trainer.root_gpu)
         max_memory = (
             torch.cuda.max_memory_allocated(trainer.root_gpu) / 2**20
@@ -568,6 +574,7 @@ class CUDACallback(Callback):
             rank_zero_info(f'Average Peak memory {max_memory:.2f}MiB')
         except AttributeError:
             pass
+
 
 class ModeSwapCallback(Callback):
 
@@ -584,6 +591,7 @@ class ModeSwapCallback(Callback):
         if trainer.global_step > self.swap_step and self.is_frozen:
             self.is_frozen = False
             trainer.optimizers = [pl_module.configure_opt_model()]
+
 
 if __name__ == '__main__':
     # custom parser to specify config files, train, test and debug mode,
@@ -675,9 +683,8 @@ if __name__ == '__main__':
         else:
             name = ''
 
-        if opt.datadir_in_name:
-            now = os.path.basename(os.path.normpath(opt.data_root)) + now
-
+        # if opt.datadir_in_name:
+        #     now = os.path.basename(os.path.normpath(opt.data_root)) + now
 
         nowname = now + name + opt.postfix
         logdir = os.path.join(opt.logdir, nowname)
@@ -862,14 +869,16 @@ if __name__ == '__main__':
         trainer_kwargs['callbacks'] = [
             instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg
         ]
+
+        trainer_opt.max_steps = 100000
         trainer_kwargs['max_steps'] = trainer_opt.max_steps
 
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
-        trainer.logdir = logdir  ###
+        trainer.logdir = logdir
 
         # data
-        config.data.params.train.params.data_root = opt.data_root
-        config.data.params.validation.params.data_root = opt.data_root
+        # config.data.params.train.params.data_root = opt.data_root
+        # config.data.params.validation.params.data_root = opt.data_root
         data = instantiate_from_config(config.data)
 
         data = instantiate_from_config(config.data)
