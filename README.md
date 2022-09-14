@@ -39,6 +39,7 @@ templates. They will help aid diagnose issues faster._
 
 This fork is supported across multiple platforms. You can find individual installation instructions below.
 
+- ## [Docker](docs/installation/INSTALL_DOCKER.md) (Multi-Platform)
 - ## [Linux](docs/installation/INSTALL_LINUX.md)
 - ## [Windows](docs/installation/INSTALL_WINDOWS.md)
 - ## [Macintosh](docs/installation/INSTALL_MAC.md)
