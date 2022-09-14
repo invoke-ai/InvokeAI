@@ -68,7 +68,7 @@ def serve(path):
 
 @app.route('/socketio_config')
 def socketio_config():
-    return json.dumps({'host': host, 'port': port})
+    return jsonify({'host': host, 'port': port})
 
 
 logger = True if verbose else False
