@@ -51,7 +51,6 @@ class PromptFormatter:
         """Normalize the prompt and switches"""
         t2i = self.t2i
         opt = self.opt
-
         switches = list()
         switches.append(f'"{opt.prompt}"')
         switches.append(f'-s{opt.steps        or t2i.steps}')

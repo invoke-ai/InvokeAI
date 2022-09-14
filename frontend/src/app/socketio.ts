@@ -19,6 +19,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { setInitialImagePath } from '../features/sd/sdSlice';
 import randomInt from '../features/sd/util/randomInt';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from './constants';
+import {
+    backendToFrontendParameters,
+    frontendToBackendParameters,
+} from './parameterTranslation';
 
 export interface SocketioMiddlewareConfig {
     host: string;
@@ -60,20 +64,61 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                 }
             });
 
-            // RESULT IMAGE
+            // PROCESSING RESULT
             socketio.on(
                 'result',
-                (data: { url: string; metadata: SDMetadata }) => {
+                (data: {
+                    url: string;
+                    type: 'generation' | 'esrgan' | 'gfpgan';
+                    uuid?: string;
+                    metadata: { [key: string]: any };
+                }) => {
                     try {
-                        const uuid = uuidv4();
-                        const { url, metadata } = data;
-                        dispatch(
-                            addImage({
-                                uuid,
-                                url,
-                                metadata,
-                            })
-                        );
+                        const newUuid = uuidv4();
+                        const { type, url, uuid, metadata } = data;
+                        if (type === 'generation') {
+                            const translatedMetadata =
+                                backendToFrontendParameters(metadata);
+                            dispatch(
+                                addImage({
+                                    uuid: newUuid,
+                                    url,
+                                    metadata: translatedMetadata,
+                                })
+                            );
+                        } else if (type === 'esrgan') {
+                            const originalImage =
+                                getState().gallery.images.find(
+                                    (i: SDImage) => i.uuid === uuid
+                                );
+                            const newMetadata = { ...originalImage.metadata };
+                            newMetadata.shouldRunESRGAN = true;
+                            newMetadata.upscalingLevel = metadata.upscale[0];
+                            newMetadata.upscalingStrength = metadata.upscale[1];
+                            dispatch(
+                                addImage({
+                                    uuid: newUuid,
+                                    url,
+                                    metadata: newMetadata,
+                                })
+                            );
+                        } else if (type === 'gfpgan') {
+                            const originalImage =
+                                getState().gallery.images.find(
+                                    (i: SDImage) => i.uuid === uuid
+                                );
+                            const newMetadata = { ...originalImage.metadata };
+                            newMetadata.shouldRunGFPGAN = true;
+                            newMetadata.gfpganStrength =
+                                metadata.gfpgan_strength;
+                            dispatch(
+                                addImage({
+                                    uuid: newUuid,
+                                    url,
+                                    metadata: newMetadata,
+                                })
+                            );
+                        }
                         dispatch(setIsProcessing(false));
                         dispatch(addLogEntry(`Image generated: ${url}`));
                     } catch (e) {
@@ -136,20 +181,23 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
             case 'socketio/generateImage': {
                 dispatch(setIsProcessing(true));
                 dispatch(setCurrentStep(-1));
-                const generationParameters = {
-                    ...getState().sd,
-                    shouldDisplayInProgress:
-                        getState().system.shouldDisplayInProgress,
-                };
 
-                if (generationParameters.shouldRandomizeSeed) {
-                    generationParameters.seed = randomInt(
-                        NUMPY_RAND_MIN,
-                        NUMPY_RAND_MAX
-                    );
-                }
+                const {
+                    generationParameters,
+                    esrganParameters,
+                    gfpganParameters,
+                } = frontendToBackendParameters(
+                    getState().sd,
+                    getState().system
+                );
 
-                socketio.emit('generateImage', generationParameters);
+                socketio.emit(
+                    'generateImage',
+                    generationParameters,
+                    esrganParameters,
+                    gfpganParameters
+                );
+
                 dispatch(
                     addLogEntry(
                         `Image generation requested: ${JSON.stringify(
@@ -167,11 +215,9 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                 dispatch(setCurrentStep(-1));
                 const { upscalingLevel, upscalingStrength } = getState().sd;
                 const esrganParameters = {
-                    imagePath: imageToProcess.url,
-                    upscalingLevel,
-                    upscalingStrength,
+                    upscale: [upscalingLevel, upscalingStrength],
                 };
-                socketio.emit('runESRGAN', esrganParameters, imageToProcess.metadata);
+                socketio.emit('runESRGAN', imageToProcess, esrganParameters);
                 dispatch(
                     addLogEntry(
                         `ESRGAN image upscale requested: ${JSON.stringify(
@@ -184,18 +230,15 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
 
             // RUN GFPGAN (FIX FACES)
             case 'socketio/runGFPGAN': {
-                const uuid = action.payload;
+                const imageToProcess = action.payload;
                 dispatch(setIsProcessing(true));
                 dispatch(setCurrentStep(-1));
                 const { gfpganStrength } = getState().sd;
-                const imageToProcess = getState().gallery.images.find(
-                    (i: SDImage) => i.uuid === uuid
-                );
+
                 const gfpganParameters = {
-                    imagePath: imageToProcess.url,
-                    gfpganStrength,
+                    gfpgan_strength: gfpganStrength,
                 };
-                socketio.emit('runGFPGAN', gfpganParameters, imageToProcess.metadata);
+                socketio.emit('runGFPGAN', imageToProcess, gfpganParameters);
                 dispatch(
                     addLogEntry(
                         `GFPGAN fix faces requested: ${JSON.stringify(

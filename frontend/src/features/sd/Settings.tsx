@@ -105,7 +105,24 @@ const Settings = () => {
     return (
         <Flex direction={'column'} gap={2}>
             <ProcessButtons />
-
+            <Flex>
+                <SDSwitch
+                    isDisabled={!isESRGANAvailable}
+                    label='Run ESRGAN'
+                    isChecked={shouldRunESRGAN}
+                    onChange={(e) =>
+                        dispatch(setShouldRunESRGAN(e.target.checked))
+                    }
+                />
+                <SDSwitch
+                    isDisabled={!isGFPGANAvailable}
+                    label='Run GFPGAN'
+                    isChecked={shouldRunGFPGAN}
+                    onChange={(e) =>
+                        dispatch(setShouldRunGFPGAN(e.target.checked))
+                    }
+                />
+            </Flex>
             <HStack>
                 <SDNumberInput
                     label='Iterations'
@@ -221,14 +238,8 @@ const Settings = () => {
                     />
                 </Box>
             </HStack>
-            <SDSwitch
-                isDisabled={!isGFPGANAvailable}
-                label='Fix faces (GFPGAN)'
-                isChecked={shouldRunGFPGAN}
-                onChange={(e) => dispatch(setShouldRunGFPGAN(e.target.checked))}
-            />
             <SDNumberInput
-                isDisabled={!isGFPGANAvailable || !shouldRunGFPGAN}
+                isDisabled={!isGFPGANAvailable}
                 label='GFPGAN Strength'
                 step={0.05}
                 min={0}
@@ -236,14 +247,8 @@ const Settings = () => {
                 onChange={(v) => dispatch(setGfpganStrength(Number(v)))}
                 value={gfpganStrength}
             />
-            <SDSwitch
-                isDisabled={!isESRGANAvailable}
-                label='Upscale (ESRGAN)'
-                isChecked={shouldRunESRGAN}
-                onChange={(e) => dispatch(setShouldRunESRGAN(e.target.checked))}
-            />
             <SDSelect
-                isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
+                isDisabled={!isESRGANAvailable}
                 label='Upscaling Level'
                 value={upscalingLevel}
                 onChange={(e) =>
@@ -256,7 +261,7 @@ const Settings = () => {
                 validValues={UPSCALING_LEVELS}
             />
             <SDNumberInput
-                isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
+                isDisabled={!isESRGANAvailable}
                 label='Upscaling Strength'
                 step={0.05}
                 min={0}

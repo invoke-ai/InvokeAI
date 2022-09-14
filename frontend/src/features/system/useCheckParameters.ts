@@ -69,7 +69,7 @@ const useCheckParameters = () => {
     // Cannot generate variations without valid seed weights
     if (
         shouldGenerateVariations &&
-        (!validateSeedWeights(seedWeights) || seed === -1)
+        (!(validateSeedWeights(seedWeights) || seedWeights === '') || seed === -1)
     ) {
         return false;
     }

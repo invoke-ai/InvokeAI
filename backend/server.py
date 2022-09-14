@@ -6,6 +6,7 @@ import os
 import traceback
 import glob
 import eventlet
+import argparse
 
 from flask_socketio import SocketIO
 from flask import Flask, send_from_directory, url_for, jsonify
@@ -18,9 +19,9 @@ from uuid import uuid4
 from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
 from ldm.gfpgan.gfpgan_tools import run_gfpgan
 from ldm.generate import Generate
+from ldm.dream.pngwriter import PngWriter, PromptFormatter
 
-from modules.parameters import make_generation_parameters, make_esrgan_parameters, make_gfpgan_parameters
-
+from modules.parameters import make_generation_parameters, make_esrgan_parameters, make_gfpgan_parameters, parameters_to_command
 
 output_dir = "outputs/"  # Base output directory for images
 host = 'localhost'  # Web & socket.io host
@@ -45,6 +46,8 @@ app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 
 app.config['OUTPUTS_FOLDER'] = "../outputs"
 
+thread = None
+thread_lock = Lock()
 
 @app.route('/outputs/<path:filename>')
 def outputs(filename):
@@ -123,61 +126,54 @@ def handle_request_all_images():
 
 
 @socketio.on('generateImage')
-def handle_generate_image_event(data):
+def handle_generate_image_event(generation_parameters, esrgan_parameters, gfpgan_parameters):
     print('> Generate image requested')
     generate_images(
-        data
+        generation_parameters,
+        esrgan_parameters,
+        gfpgan_parameters
     )
 
     return make_response("OK")
 
 
 @socketio.on('runESRGAN')
-def handle_run_esrgan_event(data):
-    print('> Upscale image requested')
-    parameters = make_esrgan_parameters(data)
-    image = Image.open(data["imagePath"])
+def handle_run_esrgan_event(original_image, esrgan_parameters):
+    image = Image.open(original_image["url"])
+
+    seed = original_image['metadata']['seed'] if original_image['metadata']['seed'] else 'unknown_seed'
 
     image = real_esrgan_upscale(
         image=image,
-        **parameters,
+        upsampler_scale=esrgan_parameters['upscale'][0],
+        strength=esrgan_parameters['upscale'][1],
+        seed=seed
     )
 
-    path = save_image(
-        image=image,
-        seed=parameters["seed"],
-        output_dir=result_path,
-        postprocessing="esrgan"
-    )
+    path = save_image(image, esrgan_parameters, result_path, postprocessing='esrgan')
 
-    data["seed"] = parameters["seed"]
     socketio.emit(
-        'result', {'url': os.path.relpath(path), 'metadata': data})
+            'result', {'url': os.path.relpath(path), 'type': 'esrgan', 'uuid': original_image['uuid'],'metadata': esrgan_parameters})
     eventlet.sleep(0)
 
 
 @socketio.on('runGFPGAN')
-def handle_run_gfpgan_event(data):
-    print('> Fix faces requested')
-    parameters = make_gfpgan_parameters(data)
-    image = Image.open(data["imagePath"])
+def handle_run_gfpgan_event(original_image, gfpgan_parameters):
+    image = Image.open(original_image["url"])
+
+    seed = original_image['metadata']['seed'] if original_image['metadata']['seed'] else 'unknown_seed'
 
     image = run_gfpgan(
         image=image,
-        ** parameters,
+        strength=gfpgan_parameters['gfpgan_strength'],
+        seed=seed,
         upsampler_scale=1
     )
 
-    path = save_image(
-        image=image,
-        seed=parameters["seed"],
-        output_dir=result_path,
-        postprocessing="gfpgan"
-    )
+    path = save_image(image, gfpgan_parameters, result_path, postprocessing='gfpgan')
 
-    data["seed"] = parameters["seed"]
     socketio.emit(
-        'result', {'url': os.path.relpath(path), 'metadata': data})
+            'result', {'url': os.path.relpath(path), 'type': 'gfpgan', 'uuid': original_image['uuid'],'metadata': gfpgan_parameters})
     eventlet.sleep(0)
 
 
@@ -232,18 +228,11 @@ def make_response(status, message=None, data=None):
         response['data'] = data
     return response
 
+def save_image(image, parameters, output_dir, step_index=None, postprocessing=None):
+    seed = parameters['seed'] if 'seed' in parameters else 'unknown_seed'
 
-def save_image(image, seed, output_dir, step_index=None, postprocessing=None):
-    # Prefix logic from `ldm.dream.pngwriter.unique_prefix`
-    # sort reverse alphabetically until we find max+1
-    dirlist = sorted(os.listdir(output_dir), reverse=True)
-    # find the first filename that matches our pattern or return 000000.0.png
-    existing_name = next(
-        (f for f in dirlist if re.match('^(\d+)\..*\.png', f)),
-        '0000000.0.png',
-    )
-    basecount = int(existing_name.split('.', 1)[0]) + 1
-    prefix = f'{basecount:06}'
+    pngwriter = PngWriter(output_dir)
+    prefix = pngwriter.unique_prefix()
 
     filename = f'{prefix}.{seed}'
 
@@ -254,65 +243,68 @@ def save_image(image, seed, output_dir, step_index=None, postprocessing=None):
 
     filename += '.png'
 
-    filepath = os.path.join(output_dir, filename)
-    image.save(filepath, 'PNG')
+    command = parameters_to_command(parameters)
 
-    return filepath
+    path = pngwriter.save_image_and_prompt_to_png(image, command, filename)
 
+    return path
 
-def generate_images(data):
+def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters):
     canceled.clear()
 
     step_index = 1
-
-    parameters = make_generation_parameters(data)
-
-    should_run_esrgan = data["shouldRunESRGAN"]
-    if should_run_esrgan:
-        esrgan_parameters = make_esrgan_parameters(data)
-
-    should_run_gfpgan = data["shouldRunGFPGAN"]
-    if should_run_gfpgan:
-        gfpgan_parameters = make_gfpgan_parameters(data)
 
     def image_progress(sample, step):
         if canceled.is_set():
             raise CanceledException
         nonlocal step_index
-        if parameters["progress_images"] and step % 5 == 0 and step < steps - 1:
+        nonlocal generation_parameters
+        if generation_parameters["progress_images"] and step % 5 == 0 and step < generation_parameters['steps'] - 1:
             image = model.sample_to_image(sample)
-            path = save_image(image, data["seed"],
-                              intermediate_path, step_index)
+            path = save_image(image, generation_parameters, intermediate_path, step_index)
+
             step_index += 1
             socketio.emit('intermediateResult', {
-                          'url': os.path.relpath(path), 'metadata': data})
+                          'url': os.path.relpath(path), 'metadata': generation_parameters})
         socketio.emit('progress', {'step': step + 1})
         eventlet.sleep(0)
 
-    def image_done(image, seed, upscaled=False):
-        if should_run_esrgan:
-            esrgan_parameters['seed'] = seed
+    def image_done(image, seed):
+        nonlocal generation_parameters
+        nonlocal esrgan_parameters
+        nonlocal gfpgan_parameters
+
+        all_parameters = generation_parameters
+
+        if esrgan_parameters:
             image = real_esrgan_upscale(
                 image=image,
-                **esrgan_parameters,
+                strength=esrgan_parameters['strength'],
+                upsampler_scale=esrgan_parameters['level'],
+                seed=seed
             )
-        if should_run_gfpgan:
-            gfpgan_parameters['seed'] = seed
+            all_parameters["upscale"] = [esrgan_parameters['level'], esrgan_parameters['strength']]
+
+        if gfpgan_parameters:
             image = run_gfpgan(
                 image=image,
-                **gfpgan_parameters,
+                strength=gfpgan_parameters['strength'],
+                seed=seed,
                 upsampler_scale=1,
             )
-        path = save_image(image, seed, output_dir=result_path)
-        data["seed"] = seed
+            all_parameters["gfpgan_strength"] = gfpgan_parameters['strength']
+
+        all_parameters['seed'] = seed
+
+        path = save_image(image, all_parameters, result_path)
+
         socketio.emit(
-            'result', {'url': os.path.relpath(path), 'metadata': data})
+            'result', {'url': os.path.relpath(path), 'type': 'generation', 'metadata': all_parameters})
         eventlet.sleep(0)
 
     try:
         model.prompt2image(
-            **parameters,
-            # In Web UI, we process GFPGAN and ESRGAN wholly separately, skip them here:
+            **generation_parameters,
             step_callback=image_progress,
             image_callback=image_done
         )

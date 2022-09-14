@@ -55,7 +55,7 @@ const ImageMetadataViewer = ({ image }: Props) => {
                 <List>
                     {metadata.map((parameter) => {
                         const { label, key, value } = parameter;
-                        return value ? (
+                        return (
                             <ListItem pb={1}>
                                 <Flex gap={2}>
                                     <IconButton
@@ -74,12 +74,28 @@ const ImageMetadataViewer = ({ image }: Props) => {
                                     <Text fontWeight={'semibold'}>
                                         {label}:
                                     </Text>
-                                    <Text maxHeight={100} overflowY={'scroll'}>
-                                        {value.toString()}
-                                    </Text>
+
+                                    {value === undefined ||
+                                    value === null ||
+                                    value === '' ||
+                                    value === 0 ? (
+                                        <Text
+                                            maxHeight={100}
+                                            fontStyle={'italic'}
+                                        >
+                                            None
+                                        </Text>
+                                    ) : (
+                                        <Text
+                                            maxHeight={100}
+                                            overflowY={'scroll'}
+                                        >
+                                            {value.toString()}
+                                        </Text>
+                                    )}
                                 </Flex>
                             </ListItem>
-                        ) : null;
+                        );
                     })}
                 </List>
             ) : (

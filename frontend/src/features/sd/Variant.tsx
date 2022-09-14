@@ -64,7 +64,7 @@ const Variant = () => {
             <FormControl
                 isInvalid={
                     shouldGenerateVariations &&
-                    !validateSeedWeights(seedWeights)
+                    !(validateSeedWeights(seedWeights) || seedWeights === '')
                 }
                 flexGrow={1}
                 isDisabled={!shouldGenerateVariations}

@@ -15,9 +15,8 @@ const CurrentImage = () => {
         (state: RootState) => state.gallery
     );
 
-    const { isGFPGANAvailable, isESRGANAvailable } = useAppSelector(
-        (state: RootState) => state.system
-    );
+    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
+        useAppSelector((state: RootState) => state.system);
     const dispatch = useAppDispatch();
 
     const bgColor = useColorModeValue(
@@ -47,6 +46,7 @@ const CurrentImage = () => {
                         label='Details'
                         colorScheme={'gray'}
                         variant={shouldShowImageDetails ? 'solid' : 'outline'}
+                        borderWidth={1}
                         flexGrow={1}
                         onClick={() =>
                             setShouldShowImageDetails(!shouldShowImageDetails)
@@ -58,7 +58,9 @@ const CurrentImage = () => {
                         flexGrow={1}
                         variant={'outline'}
                         isDisabled={
-                            !isESRGANAvailable || Boolean(intermediateImage)
+                            !isESRGANAvailable ||
+                            Boolean(intermediateImage) ||
+                            !(isConnected && !isProcessing)
                         }
                         onClick={() => dispatch(runESRGAN(imageToDisplay))}
                     />
@@ -68,7 +70,9 @@ const CurrentImage = () => {
                         flexGrow={1}
                         variant={'outline'}
                         isDisabled={
-                            !isGFPGANAvailable || Boolean(intermediateImage)
+                            !isGFPGANAvailable ||
+                            Boolean(intermediateImage) ||
+                            !(isConnected && !isProcessing)
                         }
                         onClick={() => dispatch(runGFPGAN(imageToDisplay))}
                     />
