@@ -39,6 +39,7 @@ const sdSelector = createSelector(
 const Variant = () => {
     const { shouldGenerateVariations, variantAmount, seedWeights } =
         useAppSelector(sdSelector);
+
     const dispatch = useAppDispatch();
 
     return (
@@ -57,7 +58,7 @@ const Variant = () => {
                 step={0.01}
                 min={0}
                 max={1}
-                width={150}
+                width={240}
                 isDisabled={!shouldGenerateVariations}
                 onChange={(v) => dispatch(setVariantAmount(Number(v)))}
             />

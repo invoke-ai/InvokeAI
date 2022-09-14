@@ -7,16 +7,36 @@ import ImageMetadataViewer from './ImageMetadataViewer';
 import DeleteImageModalButton from './DeleteImageModalButton';
 import SDButton from '../../components/SDButton';
 import { runESRGAN, runGFPGAN } from '../../app/socketio';
+import { createSelector } from '@reduxjs/toolkit';
+import { SystemState } from '../system/systemSlice';
+import { isEqual } from 'lodash';
 
 const height = 'calc(100vh - 270px)';
+
+const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => {
+        return {
+            isProcessing: system.isProcessing,
+            isConnected: system.isConnected,
+            isGFPGANAvailable: system.isGFPGANAvailable,
+            isESRGANAvailable: system.isESRGANAvailable,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
 
 const CurrentImage = () => {
     const { currentImage, intermediateImage } = useAppSelector(
         (state: RootState) => state.gallery
     );
-
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
-        useAppSelector((state: RootState) => state.system);
+        useAppSelector(systemSelector);
+
     const dispatch = useAppDispatch();
 
     const bgColor = useColorModeValue(

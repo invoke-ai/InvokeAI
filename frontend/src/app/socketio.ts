@@ -16,9 +16,7 @@ import {
     setIsProcessing,
 } from '../features/system/systemSlice';
 import { v4 as uuidv4 } from 'uuid';
-import { setInitialImagePath } from '../features/sd/sdSlice';
-import randomInt from '../features/sd/util/randomInt';
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from './constants';
+import { setInitialImagePath, setMaskPath } from '../features/sd/sdSlice';
 import {
     backendToFrontendParameters,
     frontendToBackendParameters,
@@ -76,51 +74,75 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                     try {
                         const newUuid = uuidv4();
                         const { type, url, uuid, metadata } = data;
-                        if (type === 'generation') {
-                            const translatedMetadata =
-                                backendToFrontendParameters(metadata);
-                            dispatch(
-                                addImage({
-                                    uuid: newUuid,
-                                    url,
-                                    metadata: translatedMetadata,
-                                })
-                            );
-                        } else if (type === 'esrgan') {
-                            const originalImage =
-                                getState().gallery.images.find(
-                                    (i: SDImage) => i.uuid === uuid
+                        switch (type) {
+                            case 'generation': {
+                                const translatedMetadata =
+                                    backendToFrontendParameters(metadata);
+                                dispatch(
+                                    addImage({
+                                        uuid: newUuid,
+                                        url,
+                                        metadata: translatedMetadata,
+                                    })
                                 );
-                            const newMetadata = { ...originalImage.metadata };
-                            newMetadata.shouldRunESRGAN = true;
-                            newMetadata.upscalingLevel = metadata.upscale[0];
-                            newMetadata.upscalingStrength = metadata.upscale[1];
-                            dispatch(
-                                addImage({
-                                    uuid: newUuid,
-                                    url,
-                                    metadata: newMetadata,
-                                })
-                            );
-                        } else if (type === 'gfpgan') {
-                            const originalImage =
-                                getState().gallery.images.find(
-                                    (i: SDImage) => i.uuid === uuid
+                                dispatch(
+                                    addLogEntry(`Image generated: ${url}`)
                                 );
-                            const newMetadata = { ...originalImage.metadata };
-                            newMetadata.shouldRunGFPGAN = true;
-                            newMetadata.gfpganStrength =
-                                metadata.gfpgan_strength;
-                            dispatch(
-                                addImage({
-                                    uuid: newUuid,
-                                    url,
-                                    metadata: newMetadata,
-                                })
-                            );
+
+                                break;
+                            }
+                            case 'esrgan': {
+                                const originalImage =
+                                    getState().gallery.images.find(
+                                        (i: SDImage) => i.uuid === uuid
+                                    );
+                                const newMetadata = {
+                                    ...originalImage.metadata,
+                                };
+                                newMetadata.shouldRunESRGAN = true;
+                                newMetadata.upscalingLevel =
+                                    metadata.upscale[0];
+                                newMetadata.upscalingStrength =
+                                    metadata.upscale[1];
+                                dispatch(
+                                    addImage({
+                                        uuid: newUuid,
+                                        url,
+                                        metadata: newMetadata,
+                                    })
+                                );
+                                dispatch(
+                                    addLogEntry(`ESRGAN upscaled: ${url}`)
+                                );
+
+                                break;
+                            }
+                            case 'gfpgan': {
+                                const originalImage =
+                                    getState().gallery.images.find(
+                                        (i: SDImage) => i.uuid === uuid
+                                    );
+                                const newMetadata = {
+                                    ...originalImage.metadata,
+                                };
+                                newMetadata.shouldRunGFPGAN = true;
+                                newMetadata.gfpganStrength =
+                                    metadata.gfpgan_strength;
+                                dispatch(
+                                    addImage({
+                                        uuid: newUuid,
+                                        url,
+                                        metadata: newMetadata,
+                                    })
+                                );
+                                dispatch(
+                                    addLogEntry(`GFPGAN fixed faces: ${url}`)
+                                );
+
+                                break;
+                            }
                         }
                         dispatch(setIsProcessing(false));
-                        dispatch(addLogEntry(`Image generated: ${url}`));
                     } catch (e) {
                         console.error(e);
                     }
@@ -200,9 +222,11 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
 
                 dispatch(
                     addLogEntry(
-                        `Image generation requested: ${JSON.stringify(
-                            generationParameters
-                        )}`
+                        `Image generation requested: ${JSON.stringify({
+                            ...generationParameters,
+                            ...esrganParameters,
+                            ...gfpganParameters,
+                        })}`
                     )
                 );
                 break;
@@ -220,9 +244,10 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                 socketio.emit('runESRGAN', imageToProcess, esrganParameters);
                 dispatch(
                     addLogEntry(
-                        `ESRGAN image upscale requested: ${JSON.stringify(
-                            esrganParameters
-                        )}`
+                        `ESRGAN upscale requested: ${JSON.stringify({
+                            file: imageToProcess.url,
+                            ...esrganParameters,
+                        })}`
                     )
                 );
                 break;
@@ -241,9 +266,10 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                 socketio.emit('runGFPGAN', imageToProcess, gfpganParameters);
                 dispatch(
                     addLogEntry(
-                        `GFPGAN fix faces requested: ${JSON.stringify(
-                            gfpganParameters
-                        )}`
+                        `GFPGAN fix faces requested: ${JSON.stringify({
+                            file: imageToProcess.url,
+                            ...gfpganParameters,
+                        })}`
                     )
                 );
                 break;
@@ -271,7 +297,6 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                 socketio.emit(
                     'requestAllImages',
                     (response: SocketIOResponse) => {
-                        dispatch(addLogEntry(`Loading gallery...`));
                         dispatch(setGalleryImages(response.data));
                         dispatch(
                             addLogEntry(`Loaded ${response.data.length} images`)
@@ -297,7 +322,7 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
 
                             dispatch(clearIntermediateImage());
                         }
-                        dispatch(addLogEntry(`Image generation canceled`));
+                        dispatch(addLogEntry(`Processing canceled`));
                     }
                 });
                 break;
@@ -335,7 +360,7 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                     file.name,
                     (response: SocketIOResponse) => {
                         if (response.status === 'OK') {
-                            dispatch(setInitialImagePath(response.data));
+                            dispatch(setMaskPath(response.data));
                             dispatch(
                                 addLogEntry(
                                     `Mask image uploaded: ${response.data}`

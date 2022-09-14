@@ -42,6 +42,7 @@ import SDSwitch from '../../components/SDSwitch';
 import ProcessButtons from './ProcessButtons';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
+import { SystemState } from '../system/systemSlice';
 
 const sdSelector = createSelector(
     (state: RootState) => state.sd,
@@ -74,6 +75,21 @@ const sdSelector = createSelector(
     }
 );
 
+const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => {
+        return {
+            isGFPGANAvailable: system.isGFPGANAvailable,
+            isESRGANAvailable: system.isESRGANAvailable,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
+
 const Settings = () => {
     const {
         iterations,
@@ -96,9 +112,8 @@ const Settings = () => {
         shouldRunGFPGAN,
     } = useAppSelector(sdSelector);
 
-    const { isGFPGANAvailable, isESRGANAvailable } = useAppSelector(
-        (state: RootState) => state.system
-    );
+    const { isGFPGANAvailable, isESRGANAvailable } =
+        useAppSelector(systemSelector);
 
     const dispatch = useAppDispatch();
 
@@ -177,33 +192,35 @@ const Settings = () => {
                 </Box>
             </HStack>
             <HStack>
-                <SDSwitch
-                    label='Random seed'
-                    isChecked={shouldRandomizeSeed}
-                    onChange={(e) =>
-                        dispatch(setShouldRandomizeSeed(e.target.checked))
-                    }
+                <Box>
+                    <SDSwitch
+                        label='Random'
+                        isChecked={shouldRandomizeSeed}
+                        onChange={(e) =>
+                            dispatch(setShouldRandomizeSeed(e.target.checked))
+                        }
+                    />
+                </Box>
+                <Box flexGrow={3}>
+                    <SDNumberInput
+                        label='Seed'
+                        step={1}
+                        precision={0}
+                        min={NUMPY_RAND_MIN}
+                        max={NUMPY_RAND_MAX}
+                        isDisabled={shouldRandomizeSeed}
+                        isInvalid={seed < 0 && shouldGenerateVariations}
+                        onChange={(v) => dispatch(setSeed(Number(v)))}
+                        value={seed}
+                    />
+                </Box>
+                <IconButton
+                    aria-label='Randomize '
+                    size={'sm'}
+                    icon={<FaRandom />}
+                    isDisabled={shouldRandomizeSeed}
+                    onClick={() => dispatch(randomizeSeed())}
                 />
-                {!shouldRandomizeSeed && (
-                    <>
-                        <SDNumberInput
-                            label='Seed'
-                            step={1}
-                            precision={0}
-                            min={NUMPY_RAND_MIN}
-                            max={NUMPY_RAND_MAX}
-                            isInvalid={seed < 0 && shouldGenerateVariations}
-                            onChange={(v) => dispatch(setSeed(Number(v)))}
-                            value={seed}
-                        />
-                        <IconButton
-                            aria-label='Randomize '
-                            size={'sm'}
-                            icon={<FaRandom />}
-                            onClick={() => dispatch(randomizeSeed())}
-                        />
-                    </>
-                )}
             </HStack>
             <SDSelect
                 label='Sampler'
@@ -211,33 +228,7 @@ const Settings = () => {
                 onChange={(e) => dispatch(setSampler(e.target.value))}
                 validValues={SAMPLERS}
             />
-            <HStack>
-                <Box flexGrow={3}>
-                    <SDNumberInput
-                        isDisabled={!initialImagePath}
-                        label='i2i Strength'
-                        step={0.01}
-                        min={0}
-                        max={1}
-                        onChange={(v) =>
-                            dispatch(setImg2imgStrength(Number(v)))
-                        }
-                        value={img2imgStrength}
-                    />
-                </Box>
-                <Box>
-                    <SDSwitch
-                        isDisabled={!initialImagePath}
-                        label='Fit'
-                        isChecked={shouldFitToWidthHeight}
-                        onChange={(e) =>
-                            dispatch(
-                                setShouldFitToWidthHeight(e.target.checked)
-                            )
-                        }
-                    />
-                </Box>
-            </HStack>
+
             <SDNumberInput
                 isDisabled={!isGFPGANAvailable}
                 label='GFPGAN Strength'
@@ -269,6 +260,33 @@ const Settings = () => {
                 onChange={(v) => dispatch(setUpscalingStrength(Number(v)))}
                 value={upscalingStrength}
             />
+            <HStack>
+                <Box flexGrow={3}>
+                    <SDNumberInput
+                        isDisabled={!initialImagePath}
+                        label='i2i Strength'
+                        step={0.01}
+                        min={0}
+                        max={1}
+                        onChange={(v) =>
+                            dispatch(setImg2imgStrength(Number(v)))
+                        }
+                        value={img2imgStrength}
+                    />
+                </Box>
+                <Box>
+                    <SDSwitch
+                        isDisabled={!initialImagePath}
+                        label='Fit'
+                        isChecked={shouldFitToWidthHeight}
+                        onChange={(e) =>
+                            dispatch(
+                                setShouldFitToWidthHeight(e.target.checked)
+                            )
+                        }
+                    />
+                </Box>
+            </HStack>
         </Flex>
     );
 };

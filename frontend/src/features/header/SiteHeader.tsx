@@ -7,16 +7,29 @@ import {
   Text,
   useColorMode,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
 
 import { FaSun, FaMoon, FaGithub } from 'react-icons/fa';
 import { MdHelp } from 'react-icons/md';
 import { useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
 import SettingsModalButton from '../system/SettingsModalButton';
+import { SystemState } from '../system/systemSlice';
+
+const systemSelector = createSelector(
+  (state: RootState) => state.system,
+  (system: SystemState) => {
+    return { isConnected: system.isConnected };
+  },
+  {
+    memoizeOptions: { resultEqualityCheck: isEqual },
+  }
+);
 
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
-  const { isConnected } = useAppSelector((state: RootState) => state.system);
+  const { isConnected } = useAppSelector(systemSelector);
 
   return (
     <Flex minWidth='max-content' alignItems='center' gap='1'>

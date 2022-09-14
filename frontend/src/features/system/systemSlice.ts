@@ -49,7 +49,9 @@ export const systemSlice = createSlice({
 
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
-      state.currentStep = 0;
+      if (action.payload === false) {
+        state.currentStep = 0;
+      }
     },
     setCurrentStep: (state, action: PayloadAction<number>) => {
       state.currentStep = action.payload;

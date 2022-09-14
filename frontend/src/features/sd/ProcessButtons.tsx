@@ -1,18 +1,35 @@
 import { Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { cancelProcessing, generateImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
+import { SystemState } from '../system/systemSlice';
 import useCheckParameters from '../system/useCheckParameters';
 import { resetSDState } from './sdSlice';
 
-const ProcessButtons = () => {
-    const areParametersValid = useCheckParameters();
+const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => {
+        return {
+            isProcessing: system.isProcessing,
+            isConnected: system.isConnected,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
 
-    const { isProcessing, isConnected } = useAppSelector(
-        (state: RootState) => state.system
-    );
+const ProcessButtons = () => {
+    const { isProcessing, isConnected } = useAppSelector(systemSelector);
+
     const dispatch = useAppDispatch();
+
+    const isReady = useCheckParameters();
 
     return (
         <Flex gap={2}>
@@ -21,7 +38,7 @@ const ProcessButtons = () => {
                 type='submit'
                 colorScheme='green'
                 flexGrow={1}
-                isDisabled={!areParametersValid}
+                isDisabled={!isReady}
                 onClick={() => dispatch(generateImage())}
             />
             <SDButton

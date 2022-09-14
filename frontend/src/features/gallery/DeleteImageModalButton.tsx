@@ -10,12 +10,13 @@ import {
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { cloneElement, MouseEventHandler, ReactElement } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { deleteImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
-import { setShouldConfirmOnDelete } from '../system/systemSlice';
+import { setShouldConfirmOnDelete, SystemState } from '../system/systemSlice';
 import { SDImage } from './gallerySlice';
 
 interface Props extends IconButtonProps {
@@ -24,6 +25,11 @@ interface Props extends IconButtonProps {
   children: ReactElement;
 }
 
+const systemSelector = createSelector(
+  (state: RootState) => state.system,
+  (system: SystemState) => system.shouldConfirmOnDelete
+);
+
 /*
 TODO: The modal and button to open it should be two different components,
 but their state is closely related and I'm not sure how best to accomplish it.
@@ -31,9 +37,7 @@ but their state is closely related and I'm not sure how best to accomplish it.
 const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
-  const { shouldConfirmOnDelete } = useAppSelector(
-    (state: RootState) => state.system
-  );
+  const shouldConfirmOnDelete = useAppSelector(systemSelector);
 
   const handleClickDelete: MouseEventHandler<HTMLButtonElement> = (e) => {
     e.stopPropagation();

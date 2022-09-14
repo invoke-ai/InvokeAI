@@ -34,7 +34,12 @@ const SDNumberInput = (props: Props) => {
             {label}
           </Text>
         </FormLabel>
-        <NumberInput size={size} {...rest}>
+        <NumberInput
+          size={size}
+          {...rest}
+          keepWithinRange={false}
+          clampValueOnBlur={true}
+        >
           <NumberInputField />
           <NumberInputStepper>
             <NumberIncrementStepper />

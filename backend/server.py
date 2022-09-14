@@ -1,12 +1,10 @@
 import mimetypes
 import transformers
 import json
-import re
 import os
 import traceback
-import glob
 import eventlet
-import argparse
+import glob
 
 from flask_socketio import SocketIO
 from flask import Flask, send_from_directory, url_for, jsonify
@@ -23,18 +21,26 @@ from ldm.dream.pngwriter import PngWriter, PromptFormatter
 
 from modules.parameters import make_generation_parameters, make_esrgan_parameters, make_gfpgan_parameters, parameters_to_command
 
+
+"""
+USER CONFIG
+"""
+
 output_dir = "outputs/"  # Base output directory for images
 host = 'localhost'  # Web & socket.io host
 port = 9090  # Web & socket.io port
+verbose = False # enables copious socket.io logging
+additional_allowed_origins = [] # additional CORS allowed origins
+
 
 """
-Additional CORS origins to this list.
-Useful if allowing other machines on your network to use the app.
-
-Example:
-additional_allowed_origins = ["192.168.1.8","192.168.1.24"]
+END USER CONFIG
 """
-additional_allowed_origins = []
+
+
+"""
+SERVER SETUP
+"""
 
 
 # fix missing mimetypes on windows due to registry wonkiness
@@ -46,8 +52,6 @@ app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 
 app.config['OUTPUTS_FOLDER'] = "../outputs"
 
-thread = None
-thread_lock = Lock()
 
 @app.route('/outputs/<path:filename>')
 def outputs(filename):
@@ -67,24 +71,31 @@ def socketio_config():
     return json.dumps({'host': host, 'port': port})
 
 
-# True enables more logging from socket.io
-dev_mode = False
-
-logger = True if dev_mode else False
-engineio_logger = True if dev_mode else False
+logger = True if verbose else False
+engineio_logger = True if verbose else False
 
 # default 1,000,000, needs to be higher for socketio to accept larger images
 max_http_buffer_size = 10000000
 
-
 cors_allowed_origins = [f"http://{host}:{port}"] + additional_allowed_origins
 
-socketio = SocketIO(app,
-                    logger=logger,
-                    engineio_logger=logger,
-                    max_http_buffer_size=max_http_buffer_size,
-                    cors_allowed_origins=cors_allowed_origins
+socketio = SocketIO(
+                        app,
+                        logger=logger,
+                        engineio_logger=engineio_logger,
+                        max_http_buffer_size=max_http_buffer_size,
+                        cors_allowed_origins=cors_allowed_origins,
                     )
+
+
+"""
+END SERVER SETUP
+"""
+
+
+"""
+APP SETUP
+"""
 
 
 class CanceledException(Exception):
@@ -117,6 +128,16 @@ mask_path = os.path.join(result_path, 'mask-images/')
  for path in [result_path, intermediate_path, init_path, mask_path]]
 
 
+"""
+END APP SETUP
+"""
+
+
+"""
+SOCKET.IO LISTENERS
+"""
+
+
 @socketio.on('requestAllImages')
 def handle_request_all_images():
     print('> All images requested')
@@ -133,7 +154,6 @@ def handle_generate_image_event(generation_parameters, esrgan_parameters, gfpgan
         esrgan_parameters,
         gfpgan_parameters
     )
-
     return make_response("OK")
 
 
@@ -141,7 +161,7 @@ def handle_generate_image_event(generation_parameters, esrgan_parameters, gfpgan
 def handle_run_esrgan_event(original_image, esrgan_parameters):
     image = Image.open(original_image["url"])
 
-    seed = original_image['metadata']['seed'] if original_image['metadata']['seed'] else 'unknown_seed'
+    seed = original_image['metadata']['seed'] if 'seed' in original_image['metadata'] else 'unknown_seed'
 
     image = real_esrgan_upscale(
         image=image,
@@ -154,7 +174,7 @@ def handle_run_esrgan_event(original_image, esrgan_parameters):
 
     socketio.emit(
             'result', {'url': os.path.relpath(path), 'type': 'esrgan', 'uuid': original_image['uuid'],'metadata': esrgan_parameters})
-    eventlet.sleep(0)
+
 
 
 @socketio.on('runGFPGAN')
@@ -174,7 +194,6 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
 
     socketio.emit(
             'result', {'url': os.path.relpath(path), 'type': 'gfpgan', 'uuid': original_image['uuid'],'metadata': gfpgan_parameters})
-    eventlet.sleep(0)
 
 
 @socketio.on('cancel')
@@ -218,6 +237,18 @@ def handle_upload_initial_image(bytes, name):
     newFile = open(file_path, "wb")
     newFile.write(bytes)
     return make_response("OK", data=file_path)
+
+
+
+"""
+END SOCKET.IO LISTENERS
+"""
+
+
+
+"""
+ADDITIONAL FUNCTIONS
+"""
 
 
 def make_response(status, message=None, data=None):
@@ -318,6 +349,11 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
         print("\n")
         traceback.print_exc()
         print("\n")
+
+
+"""
+END ADDITIONAL FUNCTIONS
+"""
 
 
 if __name__ == '__main__':
