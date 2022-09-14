@@ -27,7 +27,6 @@ report bugs and make feature requests. Be sure to use the provided
 templates. They will help aid diagnose issues faster._
 
 # **Table of Contents**
-
 1. [Installation](#installation)
 2. [Major Features](#features)
 3. [Changelog](#latest-changes)
@@ -86,6 +85,8 @@ To run in full-precision mode, start `dream.py` with the
 
 - ## [GFPGAN and Real-ESRGAN Support](docs/features/UPSCALE.md)
 
+- ## [Embiggen upscaling](docs/features/EMBIGGEN.md)
+
 - ## [Seamless Tiling](docs/features/OTHER.md#seamless-tiling)
 
 - ## [Google Colab](docs/features/OTHER.md#google-colab)
@@ -103,6 +104,8 @@ To run in full-precision mode, start `dream.py` with the
 - ## [Personalizing Text-to-Image Generation](docs/features/TEXTUAL_INVERSION.md)
 
 - ## [Simplified API for text to image generation](docs/features/OTHER.md#simplified-api)
+
+- ## [Image to Zoom Video](docs/features/DREAMVIDEO.md)
 
 ## **Other Features**
 
@@ -134,7 +137,7 @@ To run in full-precision mode, start `dream.py` with the
   - Works on M1 Apple hardware.
   - Multiple bug fixes.
 
-For older changelogs, please visit **[CHANGELOGS](docs/CHANGELOG.md)**.
+For older changelogs, please visit **[CHANGELOGS](docs/CHANGELOG.md)**. 
 
 # Troubleshooting
 
@@ -149,7 +152,10 @@ A full set of contribution guidelines, along with templates, are in progress, bu
 
 ## **Contributors**
 
-This fork is a combined effort of various people from across the world. [Check out the list of all these amazing people](docs/CONTRIBUTORS.md). We thank them for their time, hard work and effort.
+This fork is a combined effort of various people from across the
+world. [Check out the list of all these amazing
+people](docs/CONTRIBUTORS.md). We thank them for their time, hard work
+and effort.
 
 # Support
 
