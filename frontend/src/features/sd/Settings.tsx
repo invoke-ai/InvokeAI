@@ -6,7 +6,6 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { FaRandom } from 'react-icons/fa';
 
 import {
-    resetSDState,
     setCfgScale,
     setGfpganStrength,
     setHeight,
@@ -30,10 +29,11 @@ import {
 
 import SDNumberInput from '../../components/SDNumberInput';
 import SDSelect from '../../components/SDSelect';
-import SDButton from '../../components/SDButton';
 
 import {
     HEIGHTS,
+    NUMPY_RAND_MAX,
+    NUMPY_RAND_MIN,
     SAMPLERS,
     UPSCALING_LEVELS,
     WIDTHS,
@@ -104,14 +104,7 @@ const Settings = () => {
 
     return (
         <Flex direction={'column'} gap={2}>
-            <HStack justifyContent={'stretch'}>
-                <ProcessButtons />
-                <SDButton
-                    label='Reset'
-                    colorScheme='blue'
-                    onClick={() => dispatch(resetSDState())}
-                />
-            </HStack>
+            <ProcessButtons />
 
             <HStack>
                 <SDNumberInput
@@ -180,6 +173,8 @@ const Settings = () => {
                             label='Seed'
                             step={1}
                             precision={0}
+                            min={NUMPY_RAND_MIN}
+                            max={NUMPY_RAND_MAX}
                             isInvalid={seed < 0 && shouldGenerateVariations}
                             onChange={(v) => dispatch(setSeed(Number(v)))}
                             value={seed}

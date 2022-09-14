@@ -13,6 +13,7 @@ from pathlib import Path
 from PIL import Image
 from pytorch_lightning import logging
 from threading import Event
+from uuid import uuid4
 
 from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
 from ldm.gfpgan.gfpgan_tools import run_gfpgan
@@ -102,11 +103,11 @@ model.load_model()
 result_path = os.path.join(output_dir, 'img-samples/')
 
 # temporary path for intermediates
-intermediate_path = os.path.join(output_dir, 'intermediates/')
+intermediate_path = os.path.join(result_path, 'intermediates/')
 
 # path for user-uploaded init images and masks
-init_path = os.path.join(output_dir, 'init/')
-mask_path = os.path.join(output_dir, 'mask/')
+init_path = os.path.join(result_path, 'init-images/')
+mask_path = os.path.join(result_path, 'mask-images/')
 
 # make all output paths
 [os.makedirs(path, exist_ok=True)
@@ -199,22 +200,28 @@ def handle_delete_image(path):
 @socketio.on('uploadInitialImage')
 def handle_upload_initial_image(bytes, name):
     print('> Upload initial image requested')
-    filePath = f'outputs/init-images/{name}'
-    os.makedirs(os.path.dirname(filePath), exist_ok=True)
-    newFile = open(filePath, "wb")
+    uuid = uuid4().hex
+    split = os.path.splitext(name)
+    name = f'{split[0]}.{uuid}{split[1]}'
+    file_path = os.path.join(init_path, name)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    newFile = open(file_path, "wb")
     newFile.write(bytes)
-    return make_response("OK", data=filePath)
+    return make_response("OK", data=file_path)
 
 
 # TODO: I think this needs a safety mechanism.
 @socketio.on('uploadMaskImage')
 def handle_upload_initial_image(bytes, name):
     print('> Upload mask image requested')
-    filePath = f'outputs/mask-images/{name}'
-    os.makedirs(os.path.dirname(filePath), exist_ok=True)
-    newFile = open(filePath, "wb")
+    uuid = uuid4().hex
+    split = os.path.splitext(name)
+    name = f'{split[0]}.{uuid}{split[1]}'
+    file_path = os.path.join(mask_path, name)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    newFile = open(file_path, "wb")
     newFile.write(bytes)
-    return make_response("OK", data=filePath)
+    return make_response("OK", data=file_path)
 
 
 def make_response(status, message=None, data=None):

@@ -1,5 +1,4 @@
 import {
-  IconButton,
   IconButtonProps,
   Modal,
   ModalBody,
@@ -9,11 +8,9 @@ import {
   ModalHeader,
   ModalOverlay,
   Text,
-  Tooltip,
   useDisclosure,
 } from '@chakra-ui/react';
-import { MouseEventHandler } from 'react';
-import { MdDeleteForever } from 'react-icons/md';
+import { cloneElement, MouseEventHandler, ReactElement } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { deleteImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
@@ -24,6 +21,7 @@ import { SDImage } from './gallerySlice';
 interface Props extends IconButtonProps {
   image: SDImage;
   'aria-label': string;
+  children: ReactElement;
 }
 
 /*
@@ -42,7 +40,7 @@ const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
     shouldConfirmOnDelete ? onOpen() : handleDelete();
   };
 
-  const { image, size, fontSize } = props;
+  const { image, children } = props;
 
   const handleDelete = () => {
     dispatch(deleteImage(image));
@@ -57,16 +55,9 @@ const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
 
   return (
     <>
-      <Tooltip label='Delete image'>
-        <IconButton
-          aria-label='Delete image'
-          icon={<MdDeleteForever />}
-          onClickCapture={handleClickDelete}
-          size={size}
-          fontSize={fontSize}
-          {...props}
-        />
-      </Tooltip>
+      {cloneElement(children, {
+        onClickCapture: handleClickDelete,
+      })}
 
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />

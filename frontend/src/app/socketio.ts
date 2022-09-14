@@ -171,7 +171,7 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                     upscalingLevel,
                     upscalingStrength,
                 };
-                socketio.emit('runESRGAN', esrganParameters);
+                socketio.emit('runESRGAN', esrganParameters, imageToProcess.metadata);
                 dispatch(
                     addLogEntry(
                         `ESRGAN image upscale requested: ${JSON.stringify(
@@ -195,7 +195,7 @@ export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
                     imagePath: imageToProcess.url,
                     gfpganStrength,
                 };
-                socketio.emit('runGFPGAN', gfpganParameters);
+                socketio.emit('runGFPGAN', gfpganParameters, imageToProcess.metadata);
                 dispatch(
                     addLogEntry(
                         `GFPGAN fix faces requested: ${JSON.stringify(

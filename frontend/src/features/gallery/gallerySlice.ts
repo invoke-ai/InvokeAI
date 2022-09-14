@@ -94,6 +94,7 @@ export const gallerySlice = createSlice({
         // there are no images on disk, clear the gallery
         state.images = [];
         state.currentImageUuid = '';
+        state.currentImage = undefined;
       } else {
         // Filter image urls that are already in the rehydrated state
         const filteredUrls = action.payload.filter(
@@ -114,7 +115,9 @@ export const gallerySlice = createSlice({
 
         // if previous currentimage no longer exists, set a new one
         if (!newImages.find((image) => image.uuid === state.currentImageUuid)) {
-          state.currentImageUuid = newImages[newImages.length - 1].uuid;
+          const newCurrentImage = newImages[newImages.length - 1];
+          state.currentImage = newCurrentImage;
+          state.currentImageUuid = newCurrentImage.uuid;
         }
 
         state.images = newImages;

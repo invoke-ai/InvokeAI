@@ -49,7 +49,7 @@ const initialSDState: SDState = {
   height: 512,
   width: 512,
   sampler: 'k_lms',
-  seed: -1,
+  seed: 0,
   seamless: false,
   img2imgStrength: 0.75,
   initialImagePath: '',

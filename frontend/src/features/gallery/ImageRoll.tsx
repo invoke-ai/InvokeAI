@@ -2,6 +2,7 @@ import {
     Box,
     Flex,
     Icon,
+    IconButton,
     Image,
     useColorModeValue,
 } from '@chakra-ui/react';
@@ -10,6 +11,7 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { setCurrentImage } from './gallerySlice';
 import { FaCheck } from 'react-icons/fa';
 import DeleteImageModalButton from './DeleteImageModalButton';
+import { MdDeleteForever } from 'react-icons/md';
 
 const ImageRoll = () => {
     const { images, currentImageUuid } = useAppSelector(
@@ -63,15 +65,18 @@ const ImageRoll = () => {
                                     as={FaCheck}
                                 />
                             )}
-                            <DeleteImageModalButton
-                                position={'absolute'}
-                                top={1}
-                                right={1}
-                                image={image}
-                                size='xs'
-                                fontSize={18}
-                                colorScheme='red'
-                            />
+                            <DeleteImageModalButton image={image}>
+                                <IconButton
+                                    colorScheme='red'
+                                    position={'absolute'}
+                                    top={1}
+                                    right={1}
+                                    aria-label='Delete image'
+                                    icon={<MdDeleteForever />}
+                                    size='xs'
+                                    fontSize={18}
+                                />
+                            </DeleteImageModalButton>
                         </Flex>
                     </Box>
                 );

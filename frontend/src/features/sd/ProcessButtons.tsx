@@ -1,59 +1,43 @@
+import { Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import {
-    cancelProcessing,
-    generateImage,
-    runESRGAN,
-    runGFPGAN,
-} from '../../app/socketio';
+import { cancelProcessing, generateImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
 import useCheckParameters from '../system/useCheckParameters';
+import { resetSDState } from './sdSlice';
 
 const ProcessButtons = () => {
     const areParametersValid = useCheckParameters();
 
-    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
-        useAppSelector((state: RootState) => state.system);
-    const { currentImage } = useAppSelector(
-        (state: RootState) => state.gallery
+    const { isProcessing, isConnected } = useAppSelector(
+        (state: RootState) => state.system
     );
     const dispatch = useAppDispatch();
 
-    return isProcessing ? (
-        <SDButton
-            label='Cancel'
-            colorScheme='red'
-            isDisabled={!isConnected || !isProcessing}
-            onClick={() => dispatch(cancelProcessing())}
-        />
-    ) : (
-        <>
+    return (
+        <Flex gap={2}>
             <SDButton
-                label='Gen'
+                label='Generate Image'
                 type='submit'
                 colorScheme='green'
+                flexGrow={1}
                 isDisabled={!areParametersValid}
                 onClick={() => dispatch(generateImage())}
             />
             <SDButton
-                label='Upscale'
-                type='submit'
-                colorScheme='green'
-                isDisabled={currentImage === undefined}
-                onClick={() =>
-                    currentImage && dispatch(runESRGAN(currentImage))
-                }
+                label='Cancel'
+                colorScheme='red'
+                flexGrow={1}
+                isDisabled={!isConnected || !isProcessing}
+                onClick={() => dispatch(cancelProcessing())}
             />
             <SDButton
-                label='Face'
-                type='submit'
-                colorScheme='green'
-                isDisabled={currentImage === undefined}
-                onClick={() =>
-                    currentImage && dispatch(runGFPGAN(currentImage))
-                }
+                label='Reset'
+                colorScheme='blue'
+                flexGrow={1}
+                onClick={() => dispatch(resetSDState())}
             />
-        </>
+        </Flex>
     );
 };
 
