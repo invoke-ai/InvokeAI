@@ -7,9 +7,33 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import { setShouldShowLogViewer } from './systemSlice';
+import { setShouldShowLogViewer, SystemState } from './systemSlice';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { FaAngleDoubleDown, FaMinus, FaPlus } from 'react-icons/fa';
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
+
+const logSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => system.log,
+    {
+        memoizeOptions: {
+            resultEqualityCheck: (a, b) => a.length === b.length,
+        },
+    }
+);
+
+const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => {
+        return { shouldShowLogViewer: system.shouldShowLogViewer };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
 
 const LogViewer = () => {
     const dispatch = useAppDispatch();
@@ -17,9 +41,8 @@ const LogViewer = () => {
     const borderColor = useColorModeValue('gray.500', 'gray.500');
     const [shouldAutoscroll, setShouldAutoscroll] = useState<boolean>(true);
 
-    const { log, shouldShowLogViewer } = useAppSelector(
-        (state: RootState) => state.system
-    );
+    const log = useAppSelector(logSelector);
+    const { shouldShowLogViewer } = useAppSelector(systemSelector);
 
     const viewerRef = useRef<HTMLDivElement>(null);
 

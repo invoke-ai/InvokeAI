@@ -1,51 +1,51 @@
-from ldm.gfpgan.gfpgan_tools import gfpgan_model_exists
-from ldm.dream.pngwriter import PngWriter
-from ldm.generate import Generate
-from flask_socketio import SocketIO
-from flask import Flask, send_from_directory, url_for, jsonify
+import mimetypes
 import transformers
 import json
-import base64
-import mimetypes
 import os
-import sys
-import signal
-import time
-import eventlet
 import traceback
-from threading import Event
-from enum import Enum
+import eventlet
+import glob
 
+from flask_socketio import SocketIO
+from flask import Flask, send_from_directory, url_for, jsonify
 from pathlib import Path
+from PIL import Image
 from pytorch_lightning import logging
-from parse_seed_weights import parse_seed_weights
+from threading import Event
+from uuid import uuid4
+
+from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
+from ldm.gfpgan.gfpgan_tools import run_gfpgan
+from ldm.generate import Generate
+from ldm.dream.pngwriter import PngWriter, PromptFormatter
+
+from modules.parameters import make_generation_parameters, make_esrgan_parameters, make_gfpgan_parameters, parameters_to_command
+
+
+"""
+USER CONFIG
+"""
+
+output_dir = "outputs/"  # Base output directory for images
+host = 'localhost'  # Web & socket.io host
+port = 9090  # Web & socket.io port
+verbose = False # enables copious socket.io logging
+additional_allowed_origins = [] # additional CORS allowed origins
+
+
+"""
+END USER CONFIG
+"""
+
+
+"""
+SERVER SETUP
+"""
+
 
 # fix missing mimetypes on windows due to registry wonkiness
-import mimetypes
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
-
-# Host and port to serve on
-host = 'localhost'
-port = 9090
-
-
-"""
-Additional CORS origins to this list.
-Useful if allowing other machines on your network to use the app.
-
-Example:
-additional_allowed_origins = ["192.168.1.8","192.168.1.24"]
-"""
-additional_allowed_origins = []
-
-
-def build_cors_allowed_origins(additional_allowed_origins):
-    cors_allowed_origins = [f"http://{host}:{port}"]
-    for origin in additional_allowed_origins:
-        cors_allowed_origins.append(origin)
-    return cors_allowed_origins
-
 
 app = Flask(__name__, static_url_path='', static_folder='../frontend/dist/')
 
@@ -61,7 +61,6 @@ def outputs(filename):
     )
 
 
-# serve the vite build
 @app.route("/", defaults={'path': ''})
 def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
@@ -72,71 +71,31 @@ def socketio_config():
     return json.dumps({'host': host, 'port': port})
 
 
-# True enables more logging from socket.io
-dev_mode = False
-
-logger = True if dev_mode else False
-engineio_logger = True if dev_mode else False
+logger = True if verbose else False
+engineio_logger = True if verbose else False
 
 # default 1,000,000, needs to be higher for socketio to accept larger images
 max_http_buffer_size = 10000000
 
-cors_allowed_origins = build_cors_allowed_origins(additional_allowed_origins)
+cors_allowed_origins = [f"http://{host}:{port}"] + additional_allowed_origins
 
-socketio = SocketIO(app,
-                    logger=logger,
-                    engineio_logger=logger,
-                    max_http_buffer_size=max_http_buffer_size,
-                    cors_allowed_origins=cors_allowed_origins)
-
-
-@socketio.on('cancel')
-def handleCancel():
-    canceled.set()
-    return make_reponse("OK")
+socketio = SocketIO(
+                        app,
+                        logger=logger,
+                        engineio_logger=engineio_logger,
+                        max_http_buffer_size=max_http_buffer_size,
+                        cors_allowed_origins=cors_allowed_origins,
+                    )
 
 
-@socketio.on('generateImage')
-def handle_generate_image(data):
-    generate_image(data)
-    return make_reponse("OK")
+"""
+END SERVER SETUP
+"""
 
 
-@socketio.on('requestAllImages')
-def handle_request_all_images():
-    paths = sorted(Path("outputs/img-samples").glob("*.png"),
-                   key=os.path.getmtime)
-    relative_paths = []
-    for p in paths:
-        relative_paths.append(str(p.relative_to('.')))
-    return make_reponse("OK", data=relative_paths)
-
-
-# TODO: I think this needs a safety mechanism.
-@socketio.on('deleteImage')
-def handle_delete_image(path):
-    Path(path).unlink()
-    return make_reponse("OK")
-
-
-# TODO: I think this needs a safety mechanism.
-@socketio.on('uploadInitialImage')
-def handle_upload_initial_image(bytes, name):
-    filePath = f'outputs/init-images/{name}'
-    os.makedirs(os.path.dirname(filePath), exist_ok=True)
-    newFile = open(filePath, "wb")
-    newFile.write(bytes)
-    return make_reponse("OK", data=filePath)
-
-
-# TODO: I think this needs a safety mechanism.
-@socketio.on('uploadMask')
-def handle_upload_initial_image(bytes, name):
-    filePath = f'outputs/mask-images/{name}'
-    os.makedirs(os.path.dirname(filePath), exist_ok=True)
-    newFile = open(filePath, "wb")
-    newFile.write(bytes)
-    return make_reponse("OK", data=filePath)
+"""
+APP SETUP
+"""
 
 
 class CanceledException(Exception):
@@ -145,133 +104,246 @@ class CanceledException(Exception):
 
 canceled = Event()
 
+# reduce logging outputs to error
 transformers.logging.set_verbosity_error()
-
-# initialize with defaults, we will populate all config
-model = Generate()
-
-# gets rid of annoying messages about random seed
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 
-# tic = time.time()
+# Initialize and load model
+model = Generate()
 model.load_model()
-# print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
-
-print(f"\nServer online: http://{host}:{port}")
 
 
-def make_reponse(status, message=None, data=None):
-    response = {"status": status}
+# location for "finished" images
+result_path = os.path.join(output_dir, 'img-samples/')
+
+# temporary path for intermediates
+intermediate_path = os.path.join(result_path, 'intermediates/')
+
+# path for user-uploaded init images and masks
+init_path = os.path.join(result_path, 'init-images/')
+mask_path = os.path.join(result_path, 'mask-images/')
+
+# make all output paths
+[os.makedirs(path, exist_ok=True)
+ for path in [result_path, intermediate_path, init_path, mask_path]]
+
+
+"""
+END APP SETUP
+"""
+
+
+"""
+SOCKET.IO LISTENERS
+"""
+
+
+@socketio.on('requestAllImages')
+def handle_request_all_images():
+    print('> All images requested')
+    paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
+    paths.sort(key=lambda x: os.path.getmtime(x))
+    return make_response("OK", data=paths)
+
+
+@socketio.on('generateImage')
+def handle_generate_image_event(generation_parameters, esrgan_parameters, gfpgan_parameters):
+    print('> Generate image requested')
+    generate_images(
+        generation_parameters,
+        esrgan_parameters,
+        gfpgan_parameters
+    )
+    return make_response("OK")
+
+
+@socketio.on('runESRGAN')
+def handle_run_esrgan_event(original_image, esrgan_parameters):
+    image = Image.open(original_image["url"])
+
+    seed = original_image['metadata']['seed'] if 'seed' in original_image['metadata'] else 'unknown_seed'
+
+    image = real_esrgan_upscale(
+        image=image,
+        upsampler_scale=esrgan_parameters['upscale'][0],
+        strength=esrgan_parameters['upscale'][1],
+        seed=seed
+    )
+
+    path = save_image(image, esrgan_parameters, result_path, postprocessing='esrgan')
+
+    socketio.emit(
+            'result', {'url': os.path.relpath(path), 'type': 'esrgan', 'uuid': original_image['uuid'],'metadata': esrgan_parameters})
+
+
+
+@socketio.on('runGFPGAN')
+def handle_run_gfpgan_event(original_image, gfpgan_parameters):
+    image = Image.open(original_image["url"])
+
+    seed = original_image['metadata']['seed'] if original_image['metadata']['seed'] else 'unknown_seed'
+
+    image = run_gfpgan(
+        image=image,
+        strength=gfpgan_parameters['gfpgan_strength'],
+        seed=seed,
+        upsampler_scale=1
+    )
+
+    path = save_image(image, gfpgan_parameters, result_path, postprocessing='gfpgan')
+
+    socketio.emit(
+            'result', {'url': os.path.relpath(path), 'type': 'gfpgan', 'uuid': original_image['uuid'],'metadata': gfpgan_parameters})
+
+
+@socketio.on('cancel')
+def handle_cancel():
+    print('> Cancel requested')
+    canceled.set()
+    return make_response("OK")
+
+
+# TODO: I think this needs a safety mechanism.
+@socketio.on('deleteImage')
+def handle_delete_image(path):
+    print('> Delete image requested')
+    Path(path).unlink()
+    return make_response("OK")
+
+
+# TODO: I think this needs a safety mechanism.
+@socketio.on('uploadInitialImage')
+def handle_upload_initial_image(bytes, name):
+    print('> Upload initial image requested')
+    uuid = uuid4().hex
+    split = os.path.splitext(name)
+    name = f'{split[0]}.{uuid}{split[1]}'
+    file_path = os.path.join(init_path, name)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    newFile = open(file_path, "wb")
+    newFile.write(bytes)
+    return make_response("OK", data=file_path)
+
+
+# TODO: I think this needs a safety mechanism.
+@socketio.on('uploadMaskImage')
+def handle_upload_initial_image(bytes, name):
+    print('> Upload mask image requested')
+    uuid = uuid4().hex
+    split = os.path.splitext(name)
+    name = f'{split[0]}.{uuid}{split[1]}'
+    file_path = os.path.join(mask_path, name)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    newFile = open(file_path, "wb")
+    newFile.write(bytes)
+    return make_response("OK", data=file_path)
+
+
+
+"""
+END SOCKET.IO LISTENERS
+"""
+
+
+
+"""
+ADDITIONAL FUNCTIONS
+"""
+
+
+def make_response(status, message=None, data=None):
+    response = {'status': status}
     if message is not None:
-        response["message"] = message
+        response['message'] = message
     if data is not None:
-        response["data"] = data
+        response['data'] = data
     return response
 
+def save_image(image, parameters, output_dir, step_index=None, postprocessing=None):
+    seed = parameters['seed'] if 'seed' in parameters else 'unknown_seed'
 
-def generate_image(data):
-    canceled.clear()
-    prompt = data['prompt']
-    strength = float(data['img2imgStrength'])
-    iterations = int(data['iterations'])
-    steps = int(data['steps'])
-    width = int(data['width'])
-    height = int(data['height'])
-    fit = False
-    cfgscale = float(data['cfgScale'])
-    sampler_name = data['sampler']
-    gfpgan_strength = float(data['gfpganStrength']
-                            ) if gfpgan_model_exists else 0
-    upscale_level = data['upscalingLevel']
-    upscale_strength = data['upscalingStrength']
-    upscale = [int(upscale_level), float(upscale_strength)
-               ] if upscale_level != 0 else None
-    progress_images = False
-    seed = model.seed if int(data['seed']) == -1 else int(data['seed'])
-    init_img = data['initialImagePath']
-    fit = data['shouldFitToWidthHeight']
-
-    pngwriter = PngWriter("./outputs/img-samples/")
+    pngwriter = PngWriter(output_dir)
     prefix = pngwriter.unique_prefix()
-    init_mask = data["maskPath"]
-    seamless = data["seamless"]
-    progress_images = data["shouldDisplayInProgress"]
 
-    step_writer = PngWriter("outputs/intermediates")
+    filename = f'{prefix}.{seed}'
+
+    if step_index:
+        filename += f'.{step_index}'
+    if postprocessing:
+        filename += f'.{postprocessing}'
+
+    filename += '.png'
+
+    command = parameters_to_command(parameters)
+
+    path = pngwriter.save_image_and_prompt_to_png(image, command, filename)
+
+    return path
+
+def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters):
+    canceled.clear()
+
     step_index = 1
-
-    with_variations = None
-    variation_amount = data["variantAmount"]
-
-    seed_weights = parse_seed_weights(data["seedWeights"])
-
-    if data["shouldGenerateVariations"] and seed_weights is not False:
-        with_variations = seed_weights
 
     def image_progress(sample, step):
         if canceled.is_set():
             raise CanceledException
-
         nonlocal step_index
-        if progress_images and step % 5 == 0 and step < steps - 1:
+        nonlocal generation_parameters
+        if generation_parameters["progress_images"] and step % 5 == 0 and step < generation_parameters['steps'] - 1:
             image = model.sample_to_image(sample)
-            name = f'{prefix}.{seed}.{step_index}.png'
-            metadata = f'{prompt} -S{seed} [intermediate]'
-            path = step_writer.save_image_and_prompt_to_png(
-                image, metadata, name)
+            path = save_image(image, generation_parameters, intermediate_path, step_index)
+
             step_index += 1
             socketio.emit('intermediateResult', {
-                          'url': os.path.relpath(path), 'metadata': data})
-        socketio.emit('progress', {"step": step + 1})
+                          'url': os.path.relpath(path), 'metadata': generation_parameters})
+        socketio.emit('progress', {'step': step + 1})
         eventlet.sleep(0)
 
-    def image_done(image, seed, upscaled=False):
-        filename = f'{prefix}.{seed}.png'
-        path = pngwriter.save_image_and_prompt_to_png(image, f'{prompt} -S{seed}', filename)
-        if not upscaled:
-            # We may have passed -1 as seed to server, need actual seed for UI
-            data["seed"] = seed
-            socketio.emit(
-                'result', {'url': os.path.relpath(path), 'metadata': data})
-            eventlet.sleep(0)
+    def image_done(image, seed):
+        nonlocal generation_parameters
+        nonlocal esrgan_parameters
+        nonlocal gfpgan_parameters
+
+        all_parameters = generation_parameters
+
+        if esrgan_parameters:
+            image = real_esrgan_upscale(
+                image=image,
+                strength=esrgan_parameters['strength'],
+                upsampler_scale=esrgan_parameters['level'],
+                seed=seed
+            )
+            all_parameters["upscale"] = [esrgan_parameters['level'], esrgan_parameters['strength']]
+
+        if gfpgan_parameters:
+            image = run_gfpgan(
+                image=image,
+                strength=gfpgan_parameters['strength'],
+                seed=seed,
+                upsampler_scale=1,
+            )
+            all_parameters["gfpgan_strength"] = gfpgan_parameters['strength']
+
+        all_parameters['seed'] = seed
+
+        path = save_image(image, all_parameters, result_path)
+
+        socketio.emit(
+            'result', {'url': os.path.relpath(path), 'type': 'generation', 'metadata': all_parameters})
+        eventlet.sleep(0)
 
     try:
         model.prompt2image(
-            # Common generation parameters
-            prompt,
-            iterations=iterations,
-            steps=steps,
-            seed=seed,
-            cfg_scale=cfgscale,
-            # ddim_eta=None, # needs implementation
-            # skip_normalize=False, # needs implementation
-            width=width,
-            height=height,
-            sampler_name=sampler_name,
-            seamless=seamless,
-            with_variations=with_variations,
-            variation_amount=variation_amount,
-
-            # img2img & inpaint parameters
-            init_img=init_img,
-            init_mask=init_mask,
-            fit=fit,
-            strength=strength,
-
-            # GFPGAN/ESRGAN parameters
-            gfpgan_strength=gfpgan_strength,  # needs implementation
-            # save_original=False, # needs implementation
-            upscale=upscale,  # needs implementation
-
-            # System parameters
-            progress_images=progress_images,
+            **generation_parameters,
             step_callback=image_progress,
-            image_callback=image_done)
+            image_callback=image_done
+        )
 
     except KeyboardInterrupt:
         raise
     except CanceledException:
-        raise
+        pass
     except Exception as e:
         socketio.emit('error', (str(e)))
         print("\n")
@@ -279,5 +351,11 @@ def generate_image(data):
         print("\n")
 
 
+"""
+END ADDITIONAL FUNCTIONS
+"""
+
+
 if __name__ == '__main__':
+    print(f'Starting server at http://{host}:{port}')
     socketio.run(app, host=host, port=port)

@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import eslint from 'vite-plugin-eslint';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const common = {
-    plugins: [react()],
+    plugins: [react(), eslint()],
     build: {
       target: 'esnext',
       chunkSizeWarningLimit: 1500, // we don't really care about chunk size

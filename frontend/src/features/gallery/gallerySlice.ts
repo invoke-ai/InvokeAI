@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
+import { UpscalingLevel } from '../sd/sdSlice';
 
 // TODO: Revise pending metadata RFC: https://github.com/lstein/stable-diffusion/issues/266
 export interface SDMetadata {
@@ -13,7 +14,7 @@ export interface SDMetadata {
   seed?: number;
   img2imgStrength?: number;
   gfpganStrength?: number;
-  upscalingLevel?: number;
+  upscalingLevel?: UpscalingLevel;
   upscalingStrength?: number;
   initialImagePath?: string;
   maskPath?: string;
@@ -32,6 +33,7 @@ export interface GalleryState {
   currentImageUuid: string;
   images: Array<SDImage>;
   intermediateImage?: SDImage;
+  currentImage?: SDImage;
 }
 
 const initialState: GalleryState = {
@@ -43,29 +45,31 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState,
   reducers: {
-    setCurrentImage: (state, action: PayloadAction<string>) => {
-      const newCurrentImage = state.images.find(
-        (image) => image.uuid === action.payload
+    setCurrentImage: (state, action: PayloadAction<SDImage>) => {
+      state.currentImage = action.payload;
+      state.currentImageUuid = action.payload.uuid;
+    },
+    removeImage: (state, action: PayloadAction<SDImage>) => {
+      const { uuid } = action.payload;
+
+      const newImages = state.images.filter((image) => image.uuid !== uuid);
+
+      const imageToDeleteIndex = state.images.findIndex(
+        (image) => image.uuid === uuid
       );
 
-      if (newCurrentImage) {
-        const { uuid } = newCurrentImage;
-        state.currentImageUuid = uuid;
-      }
-    },
-    deleteImage: (state, action: PayloadAction<string>) => {
-      const newImages = state.images.filter(
-        (image) => image.uuid !== action.payload
-      );
-      const imageToDeleteIndex = state.images.findIndex(
-        (image) => image.uuid === action.payload
-      );
       const newCurrentImageIndex = Math.min(
         Math.max(imageToDeleteIndex, 0),
         newImages.length - 1
       );
+
       state.images = newImages;
-      state.currentImageUuid = newImages[0]
+
+      state.currentImage = newImages.length
+        ? newImages[newCurrentImageIndex]
+        : undefined;
+
+      state.currentImageUuid = newImages.length
         ? newImages[newCurrentImageIndex].uuid
         : '';
     },
@@ -73,6 +77,7 @@ export const gallerySlice = createSlice({
       state.images.push(action.payload);
       state.currentImageUuid = action.payload.uuid;
       state.intermediateImage = undefined;
+      state.currentImage = action.payload;
     },
     setIntermediateImage: (state, action: PayloadAction<SDImage>) => {
       state.intermediateImage = action.payload;
@@ -89,6 +94,7 @@ export const gallerySlice = createSlice({
         // there are no images on disk, clear the gallery
         state.images = [];
         state.currentImageUuid = '';
+        state.currentImage = undefined;
       } else {
         // Filter image urls that are already in the rehydrated state
         const filteredUrls = action.payload.filter(
@@ -109,7 +115,9 @@ export const gallerySlice = createSlice({
 
         // if previous currentimage no longer exists, set a new one
         if (!newImages.find((image) => image.uuid === state.currentImageUuid)) {
-          state.currentImageUuid = newImages[newImages.length - 1].uuid;
+          const newCurrentImage = newImages[newImages.length - 1];
+          state.currentImage = newCurrentImage;
+          state.currentImageUuid = newCurrentImage.uuid;
         }
 
         state.images = newImages;
@@ -120,7 +128,7 @@ export const gallerySlice = createSlice({
 
 export const {
   setCurrentImage,
-  deleteImage,
+  removeImage,
   addImage,
   setGalleryImages,
   setIntermediateImage,

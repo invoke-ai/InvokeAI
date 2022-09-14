@@ -1,6 +1,8 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { SDMetadata } from '../gallery/gallerySlice';
+import randomInt from './util/randomInt';
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
 
 const calculateRealSteps = (
   steps: number,
@@ -9,6 +11,8 @@ const calculateRealSteps = (
 ): number => {
   return hasInitImage ? Math.floor(strength * steps) : steps;
 };
+
+export type UpscalingLevel = 0 | 2 | 3 | 4;
 
 export interface SDState {
   prompt: string;
@@ -22,7 +26,7 @@ export interface SDState {
   seed: number;
   img2imgStrength: number;
   gfpganStrength: number;
-  upscalingLevel: number;
+  upscalingLevel: UpscalingLevel;
   upscalingStrength: number;
   initialImagePath: string;
   maskPath: string;
@@ -31,9 +35,12 @@ export interface SDState {
   shouldGenerateVariations: boolean;
   variantAmount: number;
   seedWeights: string;
+  shouldRunESRGAN: boolean;
+  shouldRunGFPGAN: boolean;
+  shouldRandomizeSeed: boolean;
 }
 
-const initialSDState = {
+const initialSDState: SDState = {
   prompt: '',
   iterations: 1,
   steps: 50,
@@ -42,18 +49,21 @@ const initialSDState = {
   height: 512,
   width: 512,
   sampler: 'k_lms',
-  seed: -1,
+  seed: 0,
+  seamless: false,
   img2imgStrength: 0.75,
-  gfpganStrength: 0.8,
-  upscalingLevel: 0,
-  upscalingStrength: 0.75,
   initialImagePath: '',
   maskPath: '',
-  seamless: false,
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
   variantAmount: 0.1,
   seedWeights: '',
+  shouldRunESRGAN: true,
+  upscalingLevel: 4,
+  upscalingStrength: 0.75,
+  shouldRunGFPGAN: true,
+  gfpganStrength: 0.8,
+  shouldRandomizeSeed: true,
 };
 
 const initialState: SDState = initialSDState;
@@ -105,7 +115,7 @@ export const sdSlice = createSlice({
     setGfpganStrength: (state, action: PayloadAction<number>) => {
       state.gfpganStrength = action.payload;
     },
-    setUpscalingLevel: (state, action: PayloadAction<number>) => {
+    setUpscalingLevel: (state, action: PayloadAction<UpscalingLevel>) => {
       state.upscalingLevel = action.payload;
     },
     setUpscalingStrength: (state, action: PayloadAction<number>) => {
@@ -140,7 +150,7 @@ export const sdSlice = createSlice({
       state.seed = -1;
     },
     randomizeSeed: (state) => {
-      state.seed = Math.round(Math.random() * 1000000);
+      state.seed = randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX);
     },
     setParameter: (
       state,
@@ -168,8 +178,19 @@ export const sdSlice = createSlice({
         ...initialSDState,
       };
     },
+    setShouldRunGFPGAN: (state, action: PayloadAction<boolean>) => {
+      state.shouldRunGFPGAN = action.payload;
+    },
+    setShouldRunESRGAN: (state, action: PayloadAction<boolean>) => {
+      state.shouldRunESRGAN = action.payload;
+    },
+    setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
+      state.shouldRandomizeSeed = action.payload;
+    },
   },
 });
+
+
 
 export const {
   setPrompt,
@@ -197,6 +218,9 @@ export const {
   setSeedWeights,
   setVariantAmount,
   setAllParameters,
+  setShouldRunGFPGAN,
+  setShouldRunESRGAN,
+  setShouldRandomizeSeed,
 } = sdSlice.actions;
 
 export default sdSlice.reducer;

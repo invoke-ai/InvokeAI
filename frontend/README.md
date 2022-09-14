@@ -4,6 +4,8 @@ Demo at https://peaceful-otter-7a427f.netlify.app/ (not connected to back end)
 
 much of this readme is just notes for myself during dev work
 
+numpy rand: 0 to 4294967295
+
 ## Test and Build
 
 from `frontend/`:

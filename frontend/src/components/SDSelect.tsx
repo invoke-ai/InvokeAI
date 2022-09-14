@@ -9,7 +9,9 @@ import {
 
 interface Props extends SelectProps {
     label: string;
-    validValues: Array<number | string>;
+    validValues:
+        | Array<number | string>
+        | Array<{ key: string; value: string | number }>;
 }
 
 const SDSelect = (props: Props) => {
@@ -36,11 +38,18 @@ const SDSelect = (props: Props) => {
                     </Text>
                 </FormLabel>
                 <Select fontSize={fontSize} size={size} {...rest}>
-                    {validValues.map((val) => (
-                        <option key={val} value={val}>
-                            {val}
-                        </option>
-                    ))}
+                    {validValues.map((opt) => {
+                        return typeof opt === 'string' ||
+                            typeof opt === 'number' ? (
+                            <option key={opt} value={opt}>
+                                {opt}
+                            </option>
+                        ) : (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.key}
+                            </option>
+                        );
+                    })}
                 </Select>
             </HStack>
         </FormControl>

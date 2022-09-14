@@ -1,5 +1,4 @@
 import {
-  IconButton,
   IconButtonProps,
   Modal,
   ModalBody,
@@ -9,21 +8,27 @@ import {
   ModalHeader,
   ModalOverlay,
   Text,
-  Tooltip,
   useDisclosure,
 } from '@chakra-ui/react';
-import { MouseEventHandler } from 'react';
-import { MdDeleteForever } from 'react-icons/md';
+import { createSelector } from '@reduxjs/toolkit';
+import { cloneElement, MouseEventHandler, ReactElement } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { useSocketIOEmitters } from '../../app/socket';
+import { deleteImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
-import { setShouldConfirmOnDelete } from '../system/systemSlice';
+import { setShouldConfirmOnDelete, SystemState } from '../system/systemSlice';
+import { SDImage } from './gallerySlice';
 
 interface Props extends IconButtonProps {
-  uuid: string;
+  image: SDImage;
   'aria-label': string;
+  children: ReactElement;
 }
+
+const systemSelector = createSelector(
+  (state: RootState) => state.system,
+  (system: SystemState) => system.shouldConfirmOnDelete
+);
 
 /*
 TODO: The modal and button to open it should be two different components,
@@ -31,42 +36,32 @@ but their state is closely related and I'm not sure how best to accomplish it.
 */
 const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { emitDeleteImage } = useSocketIOEmitters();
   const dispatch = useAppDispatch();
-  const { shouldConfirmOnDelete } = useAppSelector(
-    (state: RootState) => state.system
-  );
+  const shouldConfirmOnDelete = useAppSelector(systemSelector);
 
   const handleClickDelete: MouseEventHandler<HTMLButtonElement> = (e) => {
     e.stopPropagation();
     shouldConfirmOnDelete ? onOpen() : handleDelete();
   };
 
-  const { uuid, size, fontSize } = props;
+  const { image, children } = props;
 
   const handleDelete = () => {
-    emitDeleteImage(uuid);
+    dispatch(deleteImage(image));
     onClose();
   };
 
   const handleDeleteAndDontAsk = () => {
-    emitDeleteImage(uuid);
+    dispatch(deleteImage(image));
     dispatch(setShouldConfirmOnDelete(false));
     onClose();
   };
 
   return (
     <>
-      <Tooltip label='Delete image'>
-        <IconButton
-          aria-label='Delete image'
-          icon={<MdDeleteForever />}
-          onClickCapture={handleClickDelete}
-          size={size}
-          fontSize={fontSize}
-          {...props}
-        />
-      </Tooltip>
+      {cloneElement(children, {
+        onClickCapture: handleClickDelete,
+      })}
 
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />

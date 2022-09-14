@@ -1,154 +1,138 @@
-import {
-    Box,
-    Center,
-    Flex,
-    IconButton,
-    Image,
-    Link,
-    Tooltip,
-    useColorModeValue,
-    VStack,
-} from '@chakra-ui/react';
-import { FaCopy, FaRecycle } from 'react-icons/fa';
-import { RiBracesFill } from 'react-icons/ri';
-import { GiResize } from 'react-icons/gi';
-import { IoOpen } from 'react-icons/io5';
-import { MdFaceRetouchingNatural } from 'react-icons/md';
+import { Center, Flex, Image, useColorModeValue } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import { setAllParameters, setInitialImagePath } from '../sd/sdSlice';
+import { setInitialImagePath } from '../sd/sdSlice';
 import { useState } from 'react';
 import ImageMetadataViewer from './ImageMetadataViewer';
 import DeleteImageModalButton from './DeleteImageModalButton';
+import SDButton from '../../components/SDButton';
+import { runESRGAN, runGFPGAN } from '../../app/socketio';
+import { createSelector } from '@reduxjs/toolkit';
+import { SystemState } from '../system/systemSlice';
+import { isEqual } from 'lodash';
 
-const height = 'calc(100vh - 216px)';
+const height = 'calc(100vh - 270px)';
+
+const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => {
+        return {
+            isProcessing: system.isProcessing,
+            isConnected: system.isConnected,
+            isGFPGANAvailable: system.isGFPGANAvailable,
+            isESRGANAvailable: system.isESRGANAvailable,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
 
 const CurrentImage = () => {
-    const { currentImageUuid, images, intermediateImage } = useAppSelector(
+    const { currentImage, intermediateImage } = useAppSelector(
         (state: RootState) => state.gallery
     );
+    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
+        useAppSelector(systemSelector);
 
-    const { isGFPGANAvailable, isESRGANAvailable } = useAppSelector(
-        (state: RootState) => state.system
-    );
     const dispatch = useAppDispatch();
-
-    const [shouldShowImageDetails, setShouldShowImageDetails] =
-        useState<boolean>(false);
-
-    const imageToDisplay =
-        intermediateImage ||
-        images.find((image) => image.uuid === currentImageUuid);
 
     const bgColor = useColorModeValue(
         'rgba(255, 255, 255, 0.85)',
         'rgba(0, 0, 0, 0.8)'
     );
 
+    const [shouldShowImageDetails, setShouldShowImageDetails] =
+        useState<boolean>(false);
+
+    const imageToDisplay = intermediateImage || currentImage;
+
     return (
-        <Center height={height}>
+        <Flex direction={'column'} rounded={'md'} borderWidth={1} p={2} gap={2}>
             {imageToDisplay && (
                 <Flex gap={2}>
-                    <Box position={'relative'}>
-                        <Image
-                            height={height}
-                            src={imageToDisplay.url}
-                            fit='contain'
-                            // minWidth={512}
-                            // minHeight={512}
+                    <SDButton
+                        label='Use as initial image'
+                        colorScheme={'gray'}
+                        flexGrow={1}
+                        variant={'outline'}
+                        onClick={() =>
+                            dispatch(setInitialImagePath(imageToDisplay.url))
+                        }
+                    />
+                    <SDButton
+                        label='Details'
+                        colorScheme={'gray'}
+                        variant={shouldShowImageDetails ? 'solid' : 'outline'}
+                        borderWidth={1}
+                        flexGrow={1}
+                        onClick={() =>
+                            setShouldShowImageDetails(!shouldShowImageDetails)
+                        }
+                    />
+                    <SDButton
+                        label='Upscale'
+                        colorScheme={'gray'}
+                        flexGrow={1}
+                        variant={'outline'}
+                        isDisabled={
+                            !isESRGANAvailable ||
+                            Boolean(intermediateImage) ||
+                            !(isConnected && !isProcessing)
+                        }
+                        onClick={() => dispatch(runESRGAN(imageToDisplay))}
+                    />
+                    <SDButton
+                        label='Fix faces'
+                        colorScheme={'gray'}
+                        flexGrow={1}
+                        variant={'outline'}
+                        isDisabled={
+                            !isGFPGANAvailable ||
+                            Boolean(intermediateImage) ||
+                            !(isConnected && !isProcessing)
+                        }
+                        onClick={() => dispatch(runGFPGAN(imageToDisplay))}
+                    />
+                    <DeleteImageModalButton image={imageToDisplay}>
+                        <SDButton
+                            label='Delete'
+                            colorScheme={'red'}
+                            flexGrow={1}
+                            variant={'outline'}
+                            isDisabled={Boolean(intermediateImage)}
                         />
-                        {shouldShowImageDetails && (
-                            <Flex
-                                width={'100%'}
-                                height={'100%'}
-                                position={'absolute'}
-                                top={0}
-                                left={0}
-                                p={3}
-                                boxSizing='border-box'
-                                backgroundColor={bgColor}
-                                overflow='scroll'
-                            >
-                                <ImageMetadataViewer image={imageToDisplay} />
-                            </Flex>
-                        )}
-                    </Box>
-                    <VStack>
-                        <Tooltip label='Use as initial image'>
-                            <IconButton
-                                fontSize={18}
-                                onClick={() =>
-                                    dispatch(
-                                        setInitialImagePath(imageToDisplay.url)
-                                    )
-                                }
-                                aria-label='Use as initial image'
-                                icon={<FaRecycle />}
-                            />
-                        </Tooltip>
-                        <Tooltip label='Use all parameters'>
-                            <IconButton
-                                fontSize={18}
-                                aria-label='Use all parameters'
-                                icon={<FaCopy />}
-                                onClick={() =>
-                                    dispatch(
-                                        setAllParameters(
-                                            imageToDisplay.metadata
-                                        )
-                                    )
-                                }
-                            />
-                        </Tooltip>
-                        <Tooltip label='Image details'>
-                            <IconButton
-                                fontSize={20}
-                                colorScheme={
-                                    shouldShowImageDetails ? 'green' : undefined
-                                }
-                                aria-label='Image details'
-                                icon={<RiBracesFill />}
-                                onClick={() =>
-                                    setShouldShowImageDetails(
-                                        !shouldShowImageDetails
-                                    )
-                                }
-                            />
-                        </Tooltip>
-                        <Tooltip label='Open in new tab' shouldWrapChildren>
-                            <Link isExternal href={imageToDisplay.url}>
-                                <IconButton
-                                    fontSize={20}
-                                    aria-label='Open in new tab'
-                                    icon={<IoOpen />}
-                                />
-                            </Link>
-                        </Tooltip>
-                        <Tooltip label='Upscale (ESRGAN)' shouldWrapChildren>
-                            <IconButton
-                                isDisabled={isESRGANAvailable ? false : true}
-                                fontSize={20}
-                                aria-label='Upscale (ESRGAN)'
-                                icon={<GiResize />}
-                            />
-                        </Tooltip>
-                        <Tooltip label='Fix faces (GFPGAN)' shouldWrapChildren>
-                            <IconButton
-                                isDisabled={isGFPGANAvailable ? false : true}
-                                fontSize={20}
-                                aria-label='Fix faces (GFPGAN)'
-                                icon={<MdFaceRetouchingNatural />}
-                            />
-                        </Tooltip>
-                        {!intermediateImage && (
-                            <DeleteImageModalButton
-                                uuid={imageToDisplay.uuid}
-                            />
-                        )}
-                    </VStack>
+                    </DeleteImageModalButton>
                 </Flex>
             )}
-        </Center>
+            <Center height={height} position={'relative'}>
+                {imageToDisplay && (
+                    <Image
+                        src={imageToDisplay.url}
+                        fit='contain'
+                        maxWidth={'100%'}
+                        maxHeight={'100%'}
+                    />
+                )}
+                {imageToDisplay && shouldShowImageDetails && (
+                    <Flex
+                        width={'100%'}
+                        height={'100%'}
+                        position={'absolute'}
+                        top={0}
+                        left={0}
+                        p={3}
+                        boxSizing='border-box'
+                        backgroundColor={bgColor}
+                        overflow='scroll'
+                    >
+                        <ImageMetadataViewer image={imageToDisplay} />
+                    </Flex>
+                )}
+            </Center>
+        </Flex>
     );
 };
 

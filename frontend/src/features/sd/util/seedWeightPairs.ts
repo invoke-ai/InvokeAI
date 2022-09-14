@@ -27,7 +27,6 @@ export const validateSeedWeights = (
         : Boolean(
               seedWeights.length &&
                   !seedWeights.some((pair) => {
-                      console.log(pair);
                       const [seed, weight] = pair;
                       const isSeedValid = !isNaN(parseInt(seed.toString(), 10));
                       const isWeightValid =

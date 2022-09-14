@@ -21,10 +21,24 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import {
     setShouldConfirmOnDelete,
     setShouldDisplayInProgress,
+    SystemState,
 } from './systemSlice';
 import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
 import { persistor } from '../../main';
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
+
+const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => {
+        const { shouldDisplayInProgress, shouldConfirmOnDelete } = system;
+        return { shouldDisplayInProgress, shouldConfirmOnDelete };
+    },
+    {
+        memoizeOptions: { resultEqualityCheck: isEqual },
+    }
+);
 
 const SettingsModalButton = () => {
     const {
@@ -39,9 +53,8 @@ const SettingsModalButton = () => {
         onClose: onRefreshModalClose,
     } = useDisclosure();
 
-    const { shouldDisplayInProgress, shouldConfirmOnDelete } = useAppSelector(
-        (state: RootState) => state.system
-    );
+    const { shouldDisplayInProgress, shouldConfirmOnDelete } =
+        useAppSelector(systemSelector);
 
     const dispatch = useAppDispatch();
 

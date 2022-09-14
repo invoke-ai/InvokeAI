@@ -357,12 +357,14 @@ class Generate:
         print(
             f'>>   {len(results)} image(s) generated in', '%4.2fs' % (toc - tic)
         )
-        print(
-            f'>>   Max VRAM used for this generation:',
-            '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
-        )
+        if torch.cuda.is_available() and self.device.type == 'cuda':
+            print(
+                f'>>   Max VRAM used for this generation:',
+                '%4.2fG.' % (torch.cuda.max_memory_allocated() / 1e9),
+                'Current VRAM utilization:'
+                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
+            )
 
-        if self.session_peakmem:
             self.session_peakmem = max(
                 self.session_peakmem, torch.cuda.max_memory_allocated()
             )
@@ -536,9 +538,6 @@ class Generate:
         sd = pl_sd['state_dict']
         model = instantiate_from_config(config.model)
         m, u = model.load_state_dict(sd, strict=False)
-        model.to(self.device)
-        model.eval()
-
         
         if self.full_precision:
             print(
@@ -549,6 +548,8 @@ class Generate:
                 '>> Using half precision math. Call with --full_precision to use more accurate but VRAM-intensive full precision.'
             )
             model.half()
+        model.to(self.device)
+        model.eval()
 
         # usage statistics
         toc = time.time()

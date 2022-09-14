@@ -12,14 +12,14 @@ import {
 } from '@chakra-ui/react';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { FaUpload } from 'react-icons/fa';
+import { FaMask, FaUpload } from 'react-icons/fa';
 import { RiCloseFill } from 'react-icons/ri';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import { useSocketIOEmitters } from '../../app/socket';
 import { resetInitialImagePath } from '../../features/sd/sdSlice';
 import MaskUploader from './MaskUploader';
 import './InitImage.css';
+import { uploadInitialImage } from '../../app/socketio';
 
 const InitImage = () => {
   const toast = useToast();
@@ -30,7 +30,6 @@ const InitImage = () => {
   const { initialImagePath, maskPath } = useAppSelector(
     (state: RootState) => state.sd
   );
-  const { emitUploadInitialImage } = useSocketIOEmitters();
 
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: any) => {
@@ -49,7 +48,7 @@ const InitImage = () => {
       });
 
       acceptedFiles.forEach((file: File) => {
-        emitUploadInitialImage(file, file.name);
+        dispatch(uploadInitialImage(file));
       });
     },
     []
@@ -63,6 +62,9 @@ const InitImage = () => {
   });
 
   const [shouldShowMask, setShouldShowMask] = useState<boolean>(false);
+
+  const handleMouseOver = () => setShouldShowMask(true);
+  const handleMouseOut = () => setShouldShowMask(false);
 
   return (
     <div
@@ -92,6 +94,7 @@ const InitImage = () => {
                   top={2}
                   right={2}
                   gap={2}
+                  zIndex={2}
                 >
                   <Tooltip label={'Reset initial image & mask'}>
                     <IconButton
@@ -111,15 +114,42 @@ const InitImage = () => {
                       onClick={open}
                     />
                   </Tooltip>
-                  <MaskUploader setShouldShowMask={setShouldShowMask} />
+                  <MaskUploader>
+                    <Tooltip
+                      label={
+                        maskPath ? 'Upload new mask image' : 'Upload mask image'
+                      }
+                    >
+                      <IconButton
+                        onMouseOver={handleMouseOver}
+                        onMouseOut={handleMouseOut}
+                        aria-label='Upload mask'
+                        icon={<FaMask />}
+                        fontSize={20}
+                        colorScheme='blue'
+                        onClick={open}
+                      />
+                    </Tooltip>
+                  </MaskUploader>
                 </Flex>
                 <Image
                   maxHeight={270}
                   maxWidth={270}
-                  src={shouldShowMask ? maskPath : initialImagePath}
+                  src={initialImagePath}
                   rounded={'md'}
-                  className='checkerboard'
                 />
+                {!shouldShowMask && maskPath && (
+                  <Image
+                    position={'absolute'}
+                    top={0}
+                    left={0}
+                    maxHeight={270}
+                    maxWidth={270}
+                    src={maskPath}
+                    rounded={'md'}
+                    zIndex={1}
+                  />
+                )}
               </>
             ) : (
               <>

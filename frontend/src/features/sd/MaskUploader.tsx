@@ -1,19 +1,16 @@
-import { IconButton, Tooltip, useToast } from '@chakra-ui/react';
-import { useCallback } from 'react';
+import { useToast } from '@chakra-ui/react';
+import { ReactElement, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { FaMask } from 'react-icons/fa';
-import { useAppSelector } from '../../app/hooks';
-import { useSocketIOEmitters } from '../../app/socket';
-import { RootState } from '../../app/store';
+import { useAppDispatch } from '../../app/hooks';
+import { uploadMaskImage } from '../../app/socketio';
 
 type Props = {
-    setShouldShowMask: Function;
+    children: ReactElement;
 };
 
-const MaskUploader = ({ setShouldShowMask }: Props) => {
+const MaskUploader = ({ children }: Props) => {
+    const dispatch = useAppDispatch();
     const toast = useToast();
-    const { emitUploadMask } = useSocketIOEmitters();
-    const { maskPath } = useAppSelector((state: RootState) => state.sd);
 
     const onDrop = useCallback(
         (acceptedFiles: Array<File>, fileRejections: any) => {
@@ -33,40 +30,23 @@ const MaskUploader = ({ setShouldShowMask }: Props) => {
             });
 
             acceptedFiles.forEach((file: File) => {
-                emitUploadMask(file, file.name);
+                dispatch(uploadMaskImage(file));
             });
         },
         []
     );
 
-    const { getRootProps, getInputProps, open } = useDropzone({
+    const { getRootProps, getInputProps } = useDropzone({
         onDrop,
         accept: {
             'image/jpeg': ['.jpg', '.jpeg', '.png'],
         },
     });
 
-    const handleMouseOver = () => setShouldShowMask(true);
-    const handleMouseOut = () => setShouldShowMask(false);
-
     return (
         <div {...getRootProps()}>
             <input {...getInputProps({ multiple: false })} />
-            <Tooltip
-                label={maskPath ? 'Upload new mask image' : 'Upload mask image'}
-            >
-                <IconButton
-                    onMouseOver={
-                        Boolean(maskPath) ? handleMouseOver : undefined
-                    }
-                    onMouseOut={Boolean(maskPath) ? handleMouseOut : undefined}
-                    aria-label='Upload mask'
-                    icon={<FaMask />}
-                    fontSize={20}
-                    colorScheme='blue'
-                    onClick={open}
-                />
-            </Tooltip>
+            {children}
         </div>
     );
 };

@@ -1,20 +1,11 @@
-import {
-    Flex,
-    IconButton,
-    HStack,
-    Box,
-} from '@chakra-ui/react';
+import { Flex, IconButton, HStack, Box } from '@chakra-ui/react';
 
 import { RootState } from '../../app/store';
-import { useSocketIOEmitters } from '../../app/socket';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 
-import { TiArrowBack } from 'react-icons/ti';
 import { FaRandom } from 'react-icons/fa';
 
 import {
-    resetSDState,
-    resetSeed,
     setCfgScale,
     setGfpganStrength,
     setHeight,
@@ -29,20 +20,75 @@ import {
     setShouldFitToWidthHeight,
     randomizeSeed,
     setSeamless,
+    UpscalingLevel,
+    setShouldRandomizeSeed,
+    setShouldRunGFPGAN,
+    setShouldRunESRGAN,
+    SDState,
 } from '../sd/sdSlice';
 
 import SDNumberInput from '../../components/SDNumberInput';
 import SDSelect from '../../components/SDSelect';
-import SDButton from '../../components/SDButton';
 
 import {
     HEIGHTS,
+    NUMPY_RAND_MAX,
+    NUMPY_RAND_MIN,
     SAMPLERS,
     UPSCALING_LEVELS,
     WIDTHS,
 } from '../../app/constants';
 import SDSwitch from '../../components/SDSwitch';
-import useCheckParameters from '../system/useCheckParameters';
+import ProcessButtons from './ProcessButtons';
+import { createSelector } from '@reduxjs/toolkit';
+import { isEqual } from 'lodash';
+import { SystemState } from '../system/systemSlice';
+
+const sdSelector = createSelector(
+    (state: RootState) => state.sd,
+    (sd: SDState) => {
+        return {
+            iterations: sd.iterations,
+            steps: sd.steps,
+            cfgScale: sd.cfgScale,
+            height: sd.height,
+            width: sd.width,
+            sampler: sd.sampler,
+            seed: sd.seed,
+            img2imgStrength: sd.img2imgStrength,
+            gfpganStrength: sd.gfpganStrength,
+            upscalingLevel: sd.upscalingLevel,
+            upscalingStrength: sd.upscalingStrength,
+            initialImagePath: sd.initialImagePath,
+            shouldFitToWidthHeight: sd.shouldFitToWidthHeight,
+            seamless: sd.seamless,
+            shouldGenerateVariations: sd.shouldGenerateVariations,
+            shouldRandomizeSeed: sd.shouldRandomizeSeed,
+            shouldRunESRGAN: sd.shouldRunESRGAN,
+            shouldRunGFPGAN: sd.shouldRunGFPGAN,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
+
+const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => {
+        return {
+            isGFPGANAvailable: system.isGFPGANAvailable,
+            isESRGANAvailable: system.isESRGANAvailable,
+        };
+    },
+    {
+        memoizeOptions: {
+            resultEqualityCheck: isEqual,
+        },
+    }
+);
 
 const Settings = () => {
     const {
@@ -61,44 +107,37 @@ const Settings = () => {
         shouldFitToWidthHeight,
         seamless,
         shouldGenerateVariations,
-    } = useAppSelector((state: RootState) => state.sd);
+        shouldRandomizeSeed,
+        shouldRunESRGAN,
+        shouldRunGFPGAN,
+    } = useAppSelector(sdSelector);
 
-    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
-        useAppSelector((state: RootState) => state.system);
+    const { isGFPGANAvailable, isESRGANAvailable } =
+        useAppSelector(systemSelector);
 
     const dispatch = useAppDispatch();
 
-    const { emitGenerateImage, emitCancel } = useSocketIOEmitters();
-
-    const areParametersValid = useCheckParameters();
-
     return (
         <Flex direction={'column'} gap={2}>
-            <HStack justifyContent={'stretch'}>
-                {isProcessing ? (
-                    <SDButton
-                        label='Cancel'
-                        colorScheme='red'
-                        isDisabled={!isConnected || !isProcessing}
-                        onClick={() => emitCancel()}
-                    />
-                ) : (
-                    <SDButton
-                        label='Generate'
-                        type='submit'
-                        colorScheme='green'
-                        isDisabled={!areParametersValid}
-                        onClick={() => emitGenerateImage()}
-                    />
-                )}
-                {/*<Spacer />*/}
-                <SDButton
-                    label='Reset all image parameters'
-                    colorScheme='blue'
-                    onClick={() => dispatch(resetSDState())}
+            <ProcessButtons />
+            <Flex>
+                <SDSwitch
+                    isDisabled={!isESRGANAvailable}
+                    label='Run ESRGAN'
+                    isChecked={shouldRunESRGAN}
+                    onChange={(e) =>
+                        dispatch(setShouldRunESRGAN(e.target.checked))
+                    }
                 />
-            </HStack>
-
+                <SDSwitch
+                    isDisabled={!isGFPGANAvailable}
+                    label='Run GFPGAN'
+                    isChecked={shouldRunGFPGAN}
+                    onChange={(e) =>
+                        dispatch(setShouldRunGFPGAN(e.target.checked))
+                    }
+                />
+            </Flex>
             <HStack>
                 <SDNumberInput
                     label='Iterations'
@@ -153,26 +192,33 @@ const Settings = () => {
                 </Box>
             </HStack>
             <HStack>
-                <SDNumberInput
-                    label='Seed'
-                    step={1}
-                    precision={0}
-                    isInvalid={seed < 0 && shouldGenerateVariations}
-                    onChange={(v) => dispatch(setSeed(Number(v)))}
-                    value={seed}
-                />
-
+                <Box>
+                    <SDSwitch
+                        label='Random'
+                        isChecked={shouldRandomizeSeed}
+                        onChange={(e) =>
+                            dispatch(setShouldRandomizeSeed(e.target.checked))
+                        }
+                    />
+                </Box>
+                <Box flexGrow={3}>
+                    <SDNumberInput
+                        label='Seed'
+                        step={1}
+                        precision={0}
+                        min={NUMPY_RAND_MIN}
+                        max={NUMPY_RAND_MAX}
+                        isDisabled={shouldRandomizeSeed}
+                        isInvalid={seed < 0 && shouldGenerateVariations}
+                        onChange={(v) => dispatch(setSeed(Number(v)))}
+                        value={seed}
+                    />
+                </Box>
                 <IconButton
-                    aria-label='Reset seed to default'
-                    size={'sm'}
-                    icon={<TiArrowBack />}
-                    fontSize={20}
-                    onClick={() => dispatch(resetSeed())}
-                />
-                <IconButton
-                    aria-label='Randomize seed'
+                    aria-label='Randomize '
                     size={'sm'}
                     icon={<FaRandom />}
+                    isDisabled={shouldRandomizeSeed}
                     onClick={() => dispatch(randomizeSeed())}
                 />
             </HStack>
@@ -181,6 +227,38 @@ const Settings = () => {
                 value={sampler}
                 onChange={(e) => dispatch(setSampler(e.target.value))}
                 validValues={SAMPLERS}
+            />
+
+            <SDNumberInput
+                isDisabled={!isGFPGANAvailable}
+                label='GFPGAN Strength'
+                step={0.05}
+                min={0}
+                max={1}
+                onChange={(v) => dispatch(setGfpganStrength(Number(v)))}
+                value={gfpganStrength}
+            />
+            <SDSelect
+                isDisabled={!isESRGANAvailable}
+                label='Upscaling Level'
+                value={upscalingLevel}
+                onChange={(e) =>
+                    dispatch(
+                        setUpscalingLevel(
+                            Number(e.target.value) as UpscalingLevel
+                        )
+                    )
+                }
+                validValues={UPSCALING_LEVELS}
+            />
+            <SDNumberInput
+                isDisabled={!isESRGANAvailable}
+                label='Upscaling Strength'
+                step={0.05}
+                min={0}
+                max={1}
+                onChange={(v) => dispatch(setUpscalingStrength(Number(v)))}
+                value={upscalingStrength}
             />
             <HStack>
                 <Box flexGrow={3}>
@@ -209,33 +287,6 @@ const Settings = () => {
                     />
                 </Box>
             </HStack>
-            <SDNumberInput
-                isDisabled={!isGFPGANAvailable}
-                label='GFPGAN Strength'
-                step={0.05}
-                min={0}
-                max={1}
-                onChange={(v) => dispatch(setGfpganStrength(Number(v)))}
-                value={gfpganStrength}
-            />
-            <SDSelect
-                isDisabled={!isESRGANAvailable}
-                label='Upscaling Level'
-                value={upscalingLevel}
-                onChange={(e) =>
-                    dispatch(setUpscalingLevel(Number(e.target.value)))
-                }
-                validValues={UPSCALING_LEVELS}
-            />
-            <SDNumberInput
-                isDisabled={!isESRGANAvailable}
-                label='Upscaling Strength'
-                step={0.05}
-                min={0}
-                max={1}
-                onChange={(v) => dispatch(setUpscalingStrength(Number(v)))}
-                value={upscalingStrength}
-            />
         </Flex>
     );
 };

@@ -51,7 +51,6 @@ class PromptFormatter:
         """Normalize the prompt and switches"""
         t2i = self.t2i
         opt = self.opt
-
         switches = list()
         switches.append(f'"{opt.prompt}"')
         switches.append(f'-s{opt.steps        or t2i.steps}')
@@ -78,6 +77,4 @@ class PromptFormatter:
         if opt.with_variations:
             formatted_variations = ','.join(f'{seed}:{weight}' for seed, weight in opt.with_variations)
             switches.append(f'-V{formatted_variations}')
-        if t2i.full_precision:
-            switches.append('-F')
         return ' '.join(switches)
