@@ -1,10 +1,10 @@
 # General
 site_name: Dream Script Docs
-site_url: https://mauwii.github.io/stable-diffusion/
+site_url: https://lstein.github.io/stable-diffusion/
 
 # Repository
-repo_name: mauwii/stable-diffusion
-repo_url: https://github.com/mauwii/stable-diffusion
+repo_name: lstein/stable-diffusion
+repo_url: https://github.com/lstein/stable-diffusion
 edit_uri: edit/main/docs/
 
 # Copyright
