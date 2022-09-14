@@ -137,6 +137,7 @@ const InitImage = () => {
                   maxWidth={270}
                   src={initialImagePath}
                   rounded={'md'}
+                  className={'checkerboard'}
                 />
                 {!shouldShowMask && maskPath && (
                   <Image
