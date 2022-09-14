@@ -12,7 +12,7 @@ copyright: Copyright &copy; 2022 Lincoln D. Stein <lincoln.stein@gmail.com>
 
 # Configuration
 theme:
-  name: material
+  name: main
   features:
     - toc.integrate
   palette:
