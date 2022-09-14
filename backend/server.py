@@ -181,7 +181,7 @@ def handle_run_esrgan_event(original_image, esrgan_parameters):
 def handle_run_gfpgan_event(original_image, gfpgan_parameters):
     image = Image.open(original_image["url"])
 
-    seed = original_image['metadata']['seed'] if original_image['metadata']['seed'] else 'unknown_seed'
+    seed = original_image['metadata']['seed'] if 'seed' in original_image['metadata'] else 'unknown_seed'
 
     image = run_gfpgan(
         image=image,
