@@ -22,20 +22,16 @@ import {
     frontendToBackendParameters,
 } from './parameterTranslation';
 
-export interface SocketioMiddlewareConfig {
-    host: string;
-    port: number;
-}
-
 export interface SocketIOResponse {
     status: 'OK' | 'ERROR';
     message?: string;
     data?: any;
 }
 
-export const socketioMiddleware = (config: SocketioMiddlewareConfig) => {
-    const { host, port } = config;
-    const socketio = io(`http://${host}:${port}`);
+export const socketioMiddleware = () => {
+    const { hostname, port } = new URL(window.location.href);
+
+    const socketio = io(`http://${hostname}:${parseInt(port)}`);
 
     let areListenersSet = false;
 

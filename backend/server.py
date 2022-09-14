@@ -66,11 +66,6 @@ def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
 
 
-@app.route('/socketio_config')
-def socketio_config():
-    return jsonify({'host': host, 'port': port})
-
-
 logger = True if verbose else False
 engineio_logger = True if verbose else False
 

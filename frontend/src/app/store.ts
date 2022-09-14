@@ -36,29 +36,6 @@ const persistedReducer = persistReducer(persistConfig, reducers);
   as any to make this fetch request.
 */
 
-interface SocketIOConfig {
-  host: string;
-  port: number;
-}
-
-const fetchSocketioConfig = async (): Promise<SocketIOConfig> => {
-  const uri = 'socketio_config';
-  const response = await fetch(uri);
-
-  if (response.status === 200) {
-    const config = await response.json();
-    return config;
-  }
-
-  console.error(
-    `Unable to get server config - will use default host (localhost) and port (9090)`,
-    response
-  );
-
-  return { host: 'localhost', port: 9090 };
-};
-
-const socketioConfig = await fetchSocketioConfig();
 
 // Continue with store setup
 export const store = configureStore({
@@ -67,7 +44,7 @@ export const store = configureStore({
     getDefaultMiddleware({
       // redux-persist sometimes needs to have a function in redux, need to disable this check
       serializableCheck: false,
-    }).concat(socketioMiddleware(socketioConfig)),
+    }).concat(socketioMiddleware()),
 });
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
