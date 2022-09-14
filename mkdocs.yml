@@ -13,6 +13,20 @@ copyright: Copyright &copy; 2022 Lincoln D. Stein <lincoln.stein@gmail.com>
 # Configuration
 theme:
   name: material
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      primary: blue
+      scheme: default
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+    - media: '(prefers-color-scheme: dark)'
+      primary: dark-blue
+      accent: white
+      scheme: slate
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
 
 # Extensions
 markdown_extensions:
