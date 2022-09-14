@@ -1,7 +1,7 @@
 <h1 align='center'><b>Stable Diffusion Dream Script</b></h1>
 
 <p align='center'>
-<img src="docs/assets/logo.png"/>
+    <img src="assets/logo.png"/>
 </p>
 
 <p align="center">
@@ -39,9 +39,11 @@ templates. They will help aid diagnose issues faster._
 
 This fork is supported across multiple platforms. You can find individual installation instructions below.
 
-- ## [Linux](docs/installation/INSTALL_LINUX.md)
-- ## [Windows](docs/installation/INSTALL_WINDOWS.md)
-- ## [Macintosh](docs/installation/INSTALL_MAC.md)
+- ## [Linux](installation\INSTALL_LINUX.md)
+
+- ## [Windows](installation\INSTALL_WINDOWS.md)
+
+- ## [Macintosh](installation\INSTALL_MAC.md)
 
 ## **Hardware Requirements**
 
@@ -157,7 +159,7 @@ For support,
 please use this repository's GitHub Issues tracking service. Feel free
 to send me an email if you use and like the script.
 
-Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (https://github.com/lstein)
+Original portions of the software are Copyright (c) 2020 Lincoln D. Stein (<https://github.com/lstein>)
 
 # Further Reading
 
