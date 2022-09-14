@@ -13,6 +13,8 @@ copyright: Copyright &copy; 2022 Lincoln D. Stein <lincoln.stein@gmail.com>
 # Configuration
 theme:
   name: material
+  features:
+    - toc.integrate
   palette:
     - media: '(prefers-color-scheme: light)'
       primary: blue
@@ -38,7 +40,7 @@ markdown_extensions:
   - meta
   - md_in_html
   - toc:
-      permalink: true
+      permalink: '#'
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.betterem:
@@ -71,8 +73,6 @@ markdown_extensions:
   - pymdownx.tilde
   - tables
 
-# Plugins
-# plugins:
-#   - search
-#   - git-revision-date
-#   - mike
+plugins:
+  - search
+  - git-revision-date
