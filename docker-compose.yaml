@@ -2,22 +2,12 @@ version: "3"
 services:
   stable-diffusor:
     # TODO: exchange this image with an image of CompVis
-<<<<<<< HEAD
     image: guestros/stable-diffusion-lstein:latest
-=======
-    image: guestros/stable-diffusion:latest
->>>>>>> 12169c54a12c30110b189edfee28c51a6d8b0b75
     build: .
     platform: linux/amd64
     volumes:
       - ./weights/:/app/weights/
       - ./outputs/:/app/outputs/
-<<<<<<< HEAD
-=======
-    environment:
-      - PROMPT="a drawing of a giraffe riding a bicycle in space"
-    # to make sure all gpus are passed
->>>>>>> 12169c54a12c30110b189edfee28c51a6d8b0b75
     deploy:
       resources:
         reservations:
