@@ -470,7 +470,7 @@ class Args(object):
 # very partial implementation of https://github.com/lstein/stable-diffusion/issues/266
 # it does not write all the required top-level metadata, writes too much image
 # data, and doesn't support grids yet. But you gotta start somewhere, no?
-def format_metadata(opt):
+def format_metadata(opt,seed=None):
     '''
     Given an Args object, returns a partial implementation of
     the stable diffusion metadata standard
@@ -480,6 +480,6 @@ def format_metadata(opt):
         'model_id'    : opt.model,
         'app_id'      : APP_ID,
         'app_version' : APP_VERSION,
-        'image'       : opt.to_dict()
+        'image'       : opt.to_dict(seed=seed,iterations=1)
     }
 

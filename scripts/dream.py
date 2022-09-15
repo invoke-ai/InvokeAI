@@ -242,7 +242,7 @@ def main_loop(gen, opt, infile):
                     path = file_writer.save_image_and_prompt_to_png(
                         image     = image,
                         prompt    = formatted_prompt,
-                        metadata  = format_metadata(opt),
+                        metadata  = format_metadata(opt,seed),
                         name      = filename,
                     )
                     if (not upscaled) or opt.save_original:
