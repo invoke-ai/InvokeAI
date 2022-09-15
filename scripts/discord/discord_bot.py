@@ -35,8 +35,8 @@ if (not settings or settings is None):
     input(f'INVALID CONFIG FOUND FILE: {discord_config_path}')
     sys.exit(192)
 
-from ldm.simplet2i import T2I
-model = T2I()
+from ldm.generate import Generate
+model = Generate()
 model.load_model()
 
 # constants
@@ -107,6 +107,7 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
     strength: float = commands.Flag(description='The strength to follow the prompt using. Defaults to 7.5. (1.01...40.0)', default=7.5)
     number: int = commands.Flag(description=f'The number of images to produce. More images take more time. Defaults to 1. (1...{_MAX_IMAGE_NUMBER})', default=1)
     seed: int = commands.Flag(description='The seed to use for your image. The same prompt + seed will produce the same image.', default=None)
+    seamless: bool = commands.Flag(description='Should the image generated tile without any seams?', default=False)
 
     img2img: discord.Attachment = commands.Flag(description='If you want to use the img2img function, attach an image to base your new image on.', default=None)
     img2img_noise: float = commands.Flag(description='The noise/unnoising to apply to the image if based on an image. 0.0 returns the same image, 1.0 returns a new image. Defaults to 0.999.', default=0.5)
@@ -120,6 +121,7 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
         self.strength = 7.5
         self.number = 1
         self.seed = None
+        self.seamless = False
         self.img2img = None
         self.img2img_noise = 0.75
         self.img2img_fit = True
@@ -190,7 +192,8 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 width = flags.width,
                 strength = flags.img2img_noise,
                 init_img = img2img_filepath,
-                fit = flags.img2img_fit
+                fit = flags.img2img_fit,
+                seamless = flags.seamless
                 ))
 
             files = []
