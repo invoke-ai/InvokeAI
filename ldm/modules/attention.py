@@ -167,6 +167,80 @@ class CrossAttention(nn.Module):
             nn.Linear(inner_dim, query_dim),
             nn.Dropout(dropout)
         )
+        
+        if torch.cuda.is_available():
+            self.einsum_op = self.einsum_op_cuda
+        else:
+            self.mem_total = psutil.virtual_memory().total / (1024**3)
+            self.einsum_op = self.einsum_op_mps_v1 if self.mem_total >= 32 else self.einsum_op_mps_v2
+
+    def einsum_op_compvis(self, q, k, v, r1):
+        s1 = einsum('b i d, b j d -> b i j', q, k) * self.scale # faster
+        s2 = s1.softmax(dim=-1, dtype=q.dtype)
+        del s1
+        r1 = einsum('b i j, b j d -> b i d', s2, v)
+        del s2
+        return r1
+
+    def einsum_op_mps_v1(self, q, k, v, r1):
+        if q.shape[1] <= 4096: # (512x512) max q.shape[1]: 4096
+            r1 = self.einsum_op_compvis(q, k, v, r1)
+        else:
+            slice_size = math.floor(2**30 / (q.shape[0] * q.shape[1]))
+            for i in range(0, q.shape[1], slice_size):
+                end = i + slice_size
+                s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * self.scale
+                s2 = s1.softmax(dim=-1, dtype=r1.dtype)
+                del s1  
+                r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
+                del s2
+        return r1
+
+    def einsum_op_mps_v2(self, q, k, v, r1):
+        if self.mem_total >= 8 and q.shape[1] <= 4096:
+                r1 = self.einsum_op_compvis(q, k, v, r1)
+        else:
+            slice_size = 1
+            for i in range(0, q.shape[0], slice_size):
+                end = min(q.shape[0], i + slice_size)
+                s1 = einsum('b i d, b j d -> b i j', q[i:end], k[i:end])
+                s1 *= self.scale
+                s2 = s1.softmax(dim=-1, dtype=r1.dtype)
+                del s1
+                r1[i:end] = einsum('b i j, b j d -> b i d', s2, v[i:end])
+                del s2
+        return r1
+    
+    def einsum_op_cuda(self, q, k, v, r1):
+        stats = torch.cuda.memory_stats(q.device)
+        mem_active = stats['active_bytes.all.current']
+        mem_reserved = stats['reserved_bytes.all.current']
+        mem_free_cuda, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
+        mem_free_torch = mem_reserved - mem_active
+        mem_free_total = mem_free_cuda + mem_free_torch
+
+        gb = 1024 ** 3
+        tensor_size = q.shape[0] * q.shape[1] * k.shape[1] * 4
+        mem_required = tensor_size * 2.5
+        steps = 1
+
+        if mem_required > mem_free_total:
+            steps = 2**(math.ceil(math.log(mem_required / mem_free_total, 2)))
+
+        if steps > 64:
+            max_res = math.floor(math.sqrt(math.sqrt(mem_free_total / 2.5)) / 8) * 64
+            raise RuntimeError(f'Not enough memory, use lower resolution (max approx. {max_res}x{max_res}). '
+                            f'Need: {mem_required/64/gb:0.1f}GB free, Have:{mem_free_total/gb:0.1f}GB free')
+        
+        slice_size = q.shape[1] // steps if (q.shape[1] % steps) == 0 else q.shape[1]  
+        for i in range(0, q.shape[1], slice_size):
+            end = min(q.shape[1], i + slice_size)
+            s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * self.scale
+            s2 = s1.softmax(dim=-1, dtype=r1.dtype)
+            del s1
+            r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
+            del s2 
+        return r1
 
     def forward(self, x, context=None, mask=None):
         h = self.heads
@@ -180,45 +254,8 @@ class CrossAttention(nn.Module):
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q_in, k_in, v_in))
         del q_in, k_in, v_in
-
-        r1 = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device)
-
-        if device_type == 'mps':
-            mem_free_total = psutil.virtual_memory().available
-        else:
-            stats = torch.cuda.memory_stats(q.device)
-            mem_active = stats['active_bytes.all.current']
-            mem_reserved = stats['reserved_bytes.all.current']
-            mem_free_cuda, _ = torch.cuda.mem_get_info(torch.cuda.current_device())
-            mem_free_torch = mem_reserved - mem_active
-            mem_free_total = mem_free_cuda + mem_free_torch
-
-        gb = 1024 ** 3
-        tensor_size = q.shape[0] * q.shape[1] * k.shape[1] * 4
-        mem_required = tensor_size * 2.5
-        steps = 1
-
-        if mem_required > mem_free_total:
-            steps = 2**(math.ceil(math.log(mem_required / mem_free_total, 2)))
-            # print(f"Expected tensor size:{tensor_size/gb:0.1f}GB, cuda free:{mem_free_cuda/gb:0.1f}GB "
-            #       f"torch free:{mem_free_torch/gb:0.1f} total:{mem_free_total/gb:0.1f} steps:{steps}")
-
-        if steps > 64:
-            max_res = math.floor(math.sqrt(math.sqrt(mem_free_total / 2.5)) / 8) * 64
-            raise RuntimeError(f'Not enough memory, use lower resolution (max approx. {max_res}x{max_res}). '
-                               f'Need: {mem_required/64/gb:0.1f}GB free, Have:{mem_free_total/gb:0.1f}GB free')
-
-        slice_size = q.shape[1] // steps if (q.shape[1] % steps) == 0 else q.shape[1]
-        for i in range(0, q.shape[1], slice_size):
-            end = i + slice_size
-            s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * self.scale
-
-            s2 = s1.softmax(dim=-1)
-            del s1
-
-            r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
-            del s2
-
+        r1 = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
+        r1 = self.einsum_op(q, k, v, r1)
         del q, k, v
 
         r2 = rearrange(r1, '(b h) n d -> b n (h d)', h=h)
@@ -244,9 +281,9 @@ class BasicTransformerBlock(nn.Module):
 
     def _forward(self, x, context=None):
         x = x.contiguous() if x.device.type == 'mps' else x
-        x = self.attn1(self.norm1(x)) + x
-        x = self.attn2(self.norm2(x), context=context) + x
-        x = self.ff(self.norm3(x)) + x
+        x += self.attn1(self.norm1(x.clone()))
+        x += self.attn2(self.norm2(x.clone()), context=context)
+        x += self.ff(self.norm3(x.clone()))
         return x
 
 
