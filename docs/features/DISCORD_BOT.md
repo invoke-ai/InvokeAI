@@ -4,7 +4,7 @@ A Discord bot is provided in `/scripts/discord/discord_bot.py`.
 
 ![Discord Prompt Example](../assets/discord/Discord_Prompt_Example.png)
 
-To get this bot configured, you need to do the following:
+To get this bot configured, you need to follow each part of this page.
 
 - [**Discord Bot**](#discord-bot)
 - [Setup Discord Bot](#setup-discord-bot)
