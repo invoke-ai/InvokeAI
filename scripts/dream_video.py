@@ -44,7 +44,8 @@ def prompt2vid(
         next_frame, _seed = _gen.prompt2image(prompt, steps=50, cfg_scale=cfg_scale)[0]
     
     w, h = next_frame.size
-    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 0, fps, (w, h))
+    video_tag = cv2.VideoWriter_fourcc(*"MPEG")
+    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), video_tag, fps, (w, h))
 
     # write first frame
     next_frame_filename = os.path.join(frames_path, "0.png")
