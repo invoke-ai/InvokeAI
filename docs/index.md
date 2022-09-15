@@ -16,8 +16,6 @@ title: Home
     <img src="https://img.shields.io/github/issues-pr/lstein/stable-diffusion?logo=GitHub&style=for-the-badge" alt="pull-requests"/>
 </p>
 
----
-
 This is a fork of [CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion), the open
 source text-to-image generator. It provides a streamlined process with various new features and
 options to aid the image generation process. It runs on Windows, Mac and Linux machines, and runs on
@@ -27,52 +25,47 @@ _Note: This fork is rapidly evolving. Please use the
 [Issues](https://github.com/lstein/stable-diffusion/issues) tab to report bugs and make feature
 requests. Be sure to use the provided templates. They will help aid diagnose issues faster._
 
-## **Table of Contents**
+**Table of Contents**
 
-- [**Table of Contents**](#table-of-contents)
-- [Installation](#installation)
-- [**Hardware Requirements**](#hardware-requirements)
-  - [**System**](#system)
-  - [**Memory**](#memory)
-  - [**Disk**](#disk)
-  - [**Note**](#note)
-- [Features](#features)
-  - [**Major Features**](#major-features)
-  - [**Other Features**](#other-features)
-- [Latest Changes](#latest-changes)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-  - [**Contributors**](#contributors)
-- [Support](#support)
-- [Further Reading](#further-reading)
+1. [Installation](#installation)
+2. [Hardware Requirements](#hardware-requirements)
+3. [Features](#features)
+4. [Latest Changes](#latest-changes)
+5. [Troubleshooting](#troubleshooting)
+6. [Contributing](#contributing)
+7. [Contributors](#contributors)
+8. [Support](#support)
+9. [Further Reading](#further-reading)
 
 ## Installation
 
 This fork is supported across multiple platforms. You can find individual installation instructions
 below.
 
-- [Linux](./installation/INSTALL_LINUX.md)
-- [Windows](./installation/INSTALL_WINDOWS.md)
-- [Macintosh](./installation/INSTALL_MAC.md)
+- ### [Linux](installation/INSTALL_LINUX.md)
 
-## **Hardware Requirements**
+- ### [Windows](installation/INSTALL_WINDOWS.md)
 
-### **System**
+- ### [Macintosh](installation/INSTALL_MAC.md)
+
+## Hardware Requirements
+
+**System**
 
 You wil need one of the following:
 
 - An NVIDIA-based graphics card with 4 GB or more VRAM memory.
 - An Apple computer with an M1 chip.
 
-### **Memory**
+**Memory**
 
 - At least 12 GB Main Memory RAM.
 
-### **Disk**
+**Disk**
 
 - At least 6 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
-### **Note**
+**Note**
 
 If you are have a Nvidia 10xx series card (e.g. the 1080ti), please run the dream script in
 full-precision mode as shown below.
@@ -87,27 +80,39 @@ To run in full-precision mode, start `dream.py` with the `--full_precision` flag
 
 ## Features
 
-### **Major Features**
+### Major Features
 
-- [Interactive Command Line Interface](./features/CLI.md)
-- [Image To Image](./features/IMG2IMG.md)
-- [Inpainting Support](./features/INPAINTING.md)
-- [GFPGAN and Real-ESRGAN Support](./features/UPSCALE.md)
-- [Seamless Tiling](./features/OTHER.md#seamless-tiling)
-- [Google Colab](./features/OTHER.md#google-colab)
-- [Web Server](./features/WEB.md)
-- [Reading Prompts From File](./features/OTHER.md#reading-prompts-from-a-file)
-- [Shortcut: Reusing Seeds](./features/OTHER.md#shortcuts-reusing-seeds)
-- [Weighted Prompts](./features/OTHER.md#weighted-prompts)
-- [Variations](./features/VARIATIONS.md)
-- [Personalizing Text-to-Image Generation](./features/TEXTUAL_INVERSION.md)
-- [Simplified API for text to image generation](./features/OTHER.md#simplified-api)
+- #### [Interactive Command Line Interface](features/CLI.md)
 
-### **Other Features**
+- #### [Image To Image](features/IMG2IMG.md)
 
-- [Creating Transparent Regions for Inpainting](./features/INPAINTING.md#creating-transparent-regions-for-inpainting)
+- #### [Inpainting Support](features/INPAINTING.md)
 
--[Preload Models](./features/OTHER.md#preload-models)
+- #### [GFPGAN and Real-ESRGAN Support](features/UPSCALE.md)
+
+- #### [Seamless Tiling](features/OTHER.md#seamless-tiling)
+
+- #### [Google Colab](features/OTHER.md#google-colab)
+
+- #### [Web Server](features/WEB.md)
+
+- #### [Reading Prompts From File](features/OTHER.md#reading-prompts-from-a-file)
+
+- #### [Shortcut: Reusing Seeds](features/OTHER.md#shortcuts-reusing-seeds)
+
+- #### [Weighted Prompts](features/OTHER.md#weighted-prompts)
+
+- #### [Variations](features/VARIATIONS.md)
+
+- #### [Personalizing Text-to-Image Generation](features/TEXTUAL_INVERSION.md)
+
+- #### [Simplified API for text to image generation](features/OTHER.md#simplified-api)
+
+### Other Features
+
+- #### [Creating Transparent Regions for Inpainting](features/INPAINTING.md#creating-transparent-regions-for-inpainting)
+
+- #### [Preload Models](features/OTHER.md#preload-models)
 
 ## Latest Changes
 
@@ -122,7 +127,8 @@ To run in full-precision mode, start `dream.py` with the `--full_precision` flag
   - Lots of code and documentation cleanups.
 
 - v1.13 (3 September 2022
-  - Support image variations (see [VARIATIONS](./features/VARIATIONS.md)
+
+  - Support image variations (see [VARIATIONS](features/VARIATIONS.md)
     ([Kevin Gibbons](https://github.com/bakkot) and many contributors and reviewers)
   - Supports a Google Colab notebook for a standalone server running on Google hardware
     [Arturo Mendivil](https://github.com/artmen1516)
@@ -138,11 +144,11 @@ To run in full-precision mode, start `dream.py` with the `--full_precision` flag
   - Works on M1 Apple hardware.
   - Multiple bug fixes.
 
-For older changelogs, please visit **[CHANGELOGS](./CHANGELOG.md)**.
+For older changelogs, please visit the **[CHANGELOG](features/CHANGELOG.md)**.
 
 ## Troubleshooting
 
-Please check out our **[Q&A](./help/TROUBLESHOOT.md)** to get solutions for common installation
+Please check out our **[Q&A](help/TROUBLESHOOT.md)** to get solutions for common installation
 problems and other issues.
 
 ## Contributing
@@ -157,11 +163,11 @@ important thing is to **make your pull request against the "development" branch*
 "main". This will help keep public breakage to a minimum and will allow you to propose more radical
 changes.
 
-### **Contributors**
+## Contributors
 
 This fork is a combined effort of various people from across the world.
-[Check out the list of all these amazing people](./CONTRIBUTORS.md). We thank them for their time,
-hard work and effort.
+[Check out the list of all these amazing people](other/CONTRIBUTORS.md). We thank them for their
+time, hard work and effort.
 
 ## Support
 
@@ -174,4 +180,4 @@ Original portions of the software are Copyright (c) 2020
 ## Further Reading
 
 Please see the original README for more information on this software and underlying algorithm,
-located in the file [README-CompViz.md](./README-CompViz.md).
+located in the file [README-CompViz.md](other/README-CompViz.md).
