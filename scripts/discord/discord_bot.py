@@ -110,6 +110,7 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
     seamless: bool = commands.Flag(description='Should the image generated tile without any seams?', default=False)
 
     img2img: discord.Attachment = commands.Flag(description='If you want to use the img2img function, attach an image to base your new image on.', default=None)
+    img2img_mask: discord.Attachment = commands.Flag(description='If you want to use the img2img inpainting (masking) function, attach an image with a transparent area.', default=None)
     img2img_noise: float = commands.Flag(description='The noise/unnoising to apply to the image if based on an image. 0.0 returns the same image, 1.0 returns a new image. Defaults to 0.999.', default=0.5)
     img2img_fit: bool = commands.Flag(description='Fit the image to the width/height provided. If false, the width/height of the image will be used', default=True)
 
@@ -123,6 +124,7 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
         self.seed = None
         self.seamless = False
         self.img2img = None
+        self.img2img_mask = None
         self.img2img_noise = 0.75
         self.img2img_fit = True
 
@@ -138,9 +140,10 @@ async def dream(ctx: commands.Context, *, quote_text: str = None, flags: DreamFl
             if (quote_text is not None):
                 flags.prompt = quote_text
 
-            flags.prompt = flags.prompt.strip()
+            if (flags.prompt is not None):
+                flags.prompt = flags.prompt.strip()
 
-            if len(flags.prompt) < 1:
+            if flags.prompt is None or len(flags.prompt) < 1:
                 await ctx.reply(f'A prompt is required.')
             elif flags.width < 64 or flags.width > _MAX_IMAGE_DIMENSION:
                 await ctx.reply(f'Width must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.width}`.')
@@ -167,13 +170,18 @@ async def dream(ctx: commands.Context, *, quote_text: str = None, flags: DreamFl
                     img2img_filepath = make_temp_name()
                     await flags.img2img.save(img2img_filepath)
 
-                dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, flags, message, img2img_filepath))
+                img2img_mask_filepath: str = None
+                if (flags.img2img_mask is not None):
+                    img2img_mask_filepath = make_temp_name()
+                    await flags.img2img_mask.save(img2img_mask_filepath)
+
+                dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, flags, message, img2img_filepath, img2img_mask_filepath))
         except Exception as e:
             error_msg = 'Dream error: {}'.format(e)
             print(error_msg)
             await ctx.reply(error_msg)
 
-async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Message, img2img_filepath: str = None):
+async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Message, img2img_filepath: str = None, img2img_mask_filepath: str = None):
     try:
         if ctx.author != bot.user:
             start = timer()
@@ -192,6 +200,7 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 width = flags.width,
                 strength = flags.img2img_noise,
                 init_img = img2img_filepath,
+                init_mask = img2img_mask_filepath,
                 fit = flags.img2img_fit,
                 seamless = flags.seamless
                 ))
@@ -203,7 +212,7 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 embed = discord.Embed()
                 embed.set_image(url=f'attachment://{file.filename}')
                 embed.add_field(name='Prompt', value=flags.prompt)
-                embed.add_field(name='Time', value='{} seconds'.format(timer() - start, '.2f'))
+                embed.add_field(name='Time', value='{} seconds'.format(format(timer() - start,'.2f')))
                 embed.add_field(name='Seed', value=output[1])
                 
                 embeds.append(embed)
@@ -230,6 +239,12 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
                 os.remove(img2img_filepath)
         except Exception as e:
             print(f'Failed to delete image at {img2img_filepath}: {e}')
+
+        try:
+            if img2img_mask_filepath is not None and os.path.exists(img2img_mask_filepath):
+                os.remove(img2img_mask_filepath)
+        except Exception as e:
+            print(f'Failed to delete image at {img2img_mask_filepath}: {e}')
 
 async def async_handler():
     while True:
