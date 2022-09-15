@@ -10,6 +10,7 @@ from typing import Literal, Optional
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 #from discord_config import settings
 import json
@@ -100,50 +101,48 @@ async def sync(ctx: commands.Context, guilds: commands.Greedy[discord.Object] = 
     await ctx.reply(f"Synced the tree to {ret}/{len(guilds)}.")
 
 class DreamFlags(commands.FlagConverter, prefix = '--'):
-    prompt: str = commands.Flag(description='The prompt to produce an image for')
     width: int = commands.Flag(description=f'The width of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...{_MAX_IMAGE_DIMENSION})', default=512)
     height: int = commands.Flag(description=f'The height of the image to produce, a multiple of 64. Defaults to 512. Higher numbers can fail to run. (64...{_MAX_IMAGE_DIMENSION})', default=512)
     steps: int = commands.Flag(description=f'The number of steps. Defaults to 50. Higher numbers take longer to run. (1...{_MAX_IMAGE_STEPS})', default=50)
-    strength: float = commands.Flag(description='The strength to follow the prompt using. Defaults to 7.5. (1.01...40.0)', default=7.5)
-    number: int = commands.Flag(description=f'The number of images to produce. More images take more time. Defaults to 1. (1...{_MAX_IMAGE_NUMBER})', default=1)
+    cfg_scale: float = commands.Flag(description='The strength to follow the prompt using. Defaults to 7.5. (1.01...40.0)', default=7.5)
+    iterations: int = commands.Flag(description=f'The number of images to produce. More images take more time. Defaults to 1. (1...{_MAX_IMAGE_NUMBER})', default=1, aliases=['number'])
     seed: int = commands.Flag(description='The seed to use for your image. The same prompt + seed will produce the same image.', default=None)
     seamless: bool = commands.Flag(description='Should the image generated tile without any seams?', default=False)
 
     img2img: discord.Attachment = commands.Flag(description='If you want to use the img2img function, attach an image to base your new image on.', default=None)
     img2img_mask: discord.Attachment = commands.Flag(description='If you want to use the img2img inpainting (masking) function, attach an image with a transparent area.', default=None)
-    img2img_noise: float = commands.Flag(description='The noise/unnoising to apply to the image if based on an image. 0.0 returns the same image, 1.0 returns a new image. Defaults to 0.999.', default=0.5)
+    img2img_strength: float = commands.Flag(description='The noise/unnoising to apply to the image if based on an image. 0.0 returns the same image, 1.0 returns a new image. Defaults to 0.999.', default=0.5)
     img2img_fit: bool = commands.Flag(description='Fit the image to the width/height provided. If false, the width/height of the image will be used', default=True)
 
     def __init__(self):
-        self.prompt = None
         self.width = 512
         self.height = 512
         self.steps = 50
-        self.strength = 7.5
-        self.number = 1
+        self.cfg_scale = 7.5
+        self.iterations = 1
         self.seed = None
         self.seamless = False
         self.img2img = None
         self.img2img_mask = None
-        self.img2img_noise = 0.75
+        self.img2img_strength = 0.75
         self.img2img_fit = True
 
 @bot.hybrid_command(
     description="Generate an image based on the given prompt"
 )
-async def dream(ctx: commands.Context, *, quote_text: str = None, flags: DreamFlags = None):
+@app_commands.describe(
+    prompt='The prompt to produce an image for'
+)
+async def dream(ctx: commands.Context, *, prompt: str, flags: DreamFlags = None):
     if flags is None:
         flags = DreamFlags()
 
     if ctx.author != bot.user:
         try:
-            if (quote_text is not None):
-                flags.prompt = quote_text
+            if (prompt is not None):
+                prompt = prompt.strip()
 
-            if (flags.prompt is not None):
-                flags.prompt = flags.prompt.strip()
-
-            if flags.prompt is None or len(flags.prompt) < 1:
+            if prompt is None or len(prompt) < 1:
                 await ctx.reply(f'A prompt is required.')
             elif flags.width < 64 or flags.width > _MAX_IMAGE_DIMENSION:
                 await ctx.reply(f'Width must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.width}`.')
@@ -151,12 +150,12 @@ async def dream(ctx: commands.Context, *, quote_text: str = None, flags: DreamFl
                 await ctx.reply(f'Height must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.height}`.')
             elif flags.steps < 1 or flags.steps > _MAX_IMAGE_STEPS:
                 await ctx.reply(f'Steps must be between 1 and {_MAX_IMAGE_STEPS}. Got `{flags.steps}`.')
-            elif flags.strength <= 1.0 or flags.strength > 40.0:
-                await ctx.reply(f'Strength must be between 1.01 and 40.0. Got `{flags.strength}`.')
-            elif flags.number < 1 or flags.number > _MAX_IMAGE_NUMBER:
-                await ctx.reply(f'Number must be between 1 and {_MAX_IMAGE_NUMBER}. Got `{flags.number}`.')
-            elif flags.img2img_noise < 0.0 or flags.img2img_noise > 0.999:
-                await ctx.reply(f'img2img_noise must be between 0.0 and 0.999. Got `{flags.img2img_noise}`.')
+            elif flags.cfg_scale <= 1.0 or flags.cfg_scale > 40.0:
+                await ctx.reply(f'cfg_scale must be between 1.01 and 40.0. Got `{flags.cfg_scale}`.')
+            elif flags.iterations < 1 or flags.iterations > _MAX_IMAGE_NUMBER:
+                await ctx.reply(f'Number must be between 1 and {_MAX_IMAGE_NUMBER}. Got `{flags.iterations}`.')
+            elif flags.img2img_strength < 0.0 or flags.img2img_strength > 0.999:
+                await ctx.reply(f'img2img_noise must be between 0.0 and 0.999. Got `{flags.img2img_strength}`.')
             else:
                 if dreaming_queue.qsize() <= 0:
                     message = await ctx.reply('Your dream is queued.')
@@ -175,30 +174,30 @@ async def dream(ctx: commands.Context, *, quote_text: str = None, flags: DreamFl
                     img2img_mask_filepath = make_temp_name()
                     await flags.img2img_mask.save(img2img_mask_filepath)
 
-                dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, flags, message, img2img_filepath, img2img_mask_filepath))
+                dreaming_loop.call_soon_threadsafe(dreaming_queue.put_nowait, dreaming(ctx, prompt, flags, message, img2img_filepath, img2img_mask_filepath))
         except Exception as e:
             error_msg = 'Dream error: {}'.format(e)
             print(error_msg)
             await ctx.reply(error_msg)
 
-async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Message, img2img_filepath: str = None, img2img_mask_filepath: str = None):
+async def dreaming(ctx: commands.Context, prompt: str, flags: DreamFlags, message: discord.Message, img2img_filepath: str = None, img2img_mask_filepath: str = None):
     try:
         if ctx.author != bot.user:
             start = timer()
             
-            on_bot_thread(message.edit(content='Dreaming for {}\'s `{}`'.format(ctx.message.author.mention,flags.prompt)))
+            on_bot_thread(message.edit(content='Dreaming for {}\'s `{}`'.format(ctx.message.author.mention,prompt)))
 
             outputs = await dreaming_loop.run_in_executor(None, functools.partial(
                 model.prompt2png,
-                flags.prompt, 
+                prompt, 
                 'outputs/img-samples', 
                 seed = flags.seed,
-                iterations = flags.number,
-                cfg_scale = flags.strength,
+                iterations = flags.iterations,
+                cfg_scale = flags.cfg_scale,
                 steps = flags.steps,
                 height = flags.height,
                 width = flags.width,
-                strength = flags.img2img_noise,
+                strength = flags.img2img_strength,
                 init_img = img2img_filepath,
                 init_mask = img2img_mask_filepath,
                 fit = flags.img2img_fit,
@@ -208,10 +207,10 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
             files = []
             embeds = []
             for output in outputs:
-                file = discord.File(output[0], description = flags.prompt)
+                file = discord.File(output[0], description = prompt)
                 embed = discord.Embed()
                 embed.set_image(url=f'attachment://{file.filename}')
-                embed.add_field(name='Prompt', value=flags.prompt)
+                embed.add_field(name='Prompt', value=prompt)
                 embed.add_field(name='Time', value='{} seconds'.format(format(timer() - start,'.2f')))
                 embed.add_field(name='Seed', value=output[1])
                 
@@ -228,7 +227,7 @@ async def dreaming(ctx: commands.Context, flags: DreamFlags, message: discord.Me
             if ctx.interaction is None:
                 on_bot_thread(message.delete())
             else:
-                on_bot_thread(message.edit(content='Finished dreaming for {}\'s `{}`'.format(ctx.message.author.mention,flags.prompt)))
+                on_bot_thread(message.edit(content='Finished dreaming for {}\'s `{}`'.format(ctx.message.author.mention,prompt)))
     except Exception as e:
         error_msg = 'Dreaming error: {}'.format(e)
         print(error_msg)
