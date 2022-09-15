@@ -170,7 +170,12 @@ export const sdSlice = createSlice({
       state.seedWeights = action.payload;
     },
     setAllParameters: (state, action: PayloadAction<SDMetadata>) => {
-      return { ...state, ...action.payload };
+      const newState = { ...state, ...action.payload };
+      // If the image whose parameters we are using has a seed, disable randomizing the seed
+      if (action.payload.seed) {
+        newState.shouldRandomizeSeed = false;
+      }
+      return newState;
     },
     resetSDState: (state) => {
       return {
@@ -189,8 +194,6 @@ export const sdSlice = createSlice({
     },
   },
 });
-
-
 
 export const {
   setPrompt,

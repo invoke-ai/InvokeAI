@@ -5,6 +5,8 @@ import os
 import traceback
 import eventlet
 import glob
+import shlex
+import argparse
 
 from flask_socketio import SocketIO
 from flask import Flask, send_from_directory, url_for, jsonify
@@ -18,6 +20,7 @@ from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
 from ldm.gfpgan.gfpgan_tools import run_gfpgan
 from ldm.generate import Generate
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
+from scripts.dream import create_cmd_parser
 
 from modules.parameters import make_generation_parameters, make_esrgan_parameters, make_gfpgan_parameters, parameters_to_command
 
@@ -136,9 +139,23 @@ SOCKET.IO LISTENERS
 @socketio.on('requestAllImages')
 def handle_request_all_images():
     print('> All images requested')
+    parser = create_cmd_parser()
     paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
     paths.sort(key=lambda x: os.path.getmtime(x))
-    return make_response("OK", data=paths)
+    image_array = []
+    metadata_failed = 0
+    for path in paths:
+        image = Image.open(path)
+        metadata = {}
+        if 'Dream' in image.info:
+            try:
+                metadata = vars(parser.parse_args(shlex.split(image.info['Dream'])))
+            except SystemExit:
+                # TODO: Unable to parse metadata, ignore it for now...
+                metadata_failed++
+                pass
+        image_array.append({'path': path, 'metadata': metadata})
+    return make_response("OK", data=image_array)
 
 
 @socketio.on('generateImage')

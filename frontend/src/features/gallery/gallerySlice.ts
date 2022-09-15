@@ -2,6 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 import { UpscalingLevel } from '../sd/sdSlice';
+import { backendToFrontendParameters } from '../../app/parameterTranslation';
 
 // TODO: Revise pending metadata RFC: https://github.com/lstein/stable-diffusion/issues/266
 export interface SDMetadata {
@@ -85,29 +86,34 @@ export const gallerySlice = createSlice({
     clearIntermediateImage: (state) => {
       state.intermediateImage = undefined;
     },
-    setGalleryImages: (state, action: PayloadAction<Array<string>>) => {
+    setGalleryImages: (
+      state,
+      action: PayloadAction<
+        Array<{
+          path: string;
+          metadata: { [key: string]: string | number | boolean };
+        }>
+      >
+    ) => {
       // TODO: Revise pending metadata RFC: https://github.com/lstein/stable-diffusion/issues/266
+      const images = action.payload;
 
-      const urls = action.payload;
-
-      if (urls.length === 0) {
+      if (images.length === 0) {
         // there are no images on disk, clear the gallery
         state.images = [];
         state.currentImageUuid = '';
         state.currentImage = undefined;
       } else {
         // Filter image urls that are already in the rehydrated state
-        const filteredUrls = action.payload.filter(
-          (url) => !state.images.find((image) => image.url === url)
+        const filteredImages = action.payload.filter(
+          (image) => !state.images.find((i) => i.url === image.path)
         );
 
-        // filtered array is just paths, generate needed data
-        // TODO: Read accept metadata from server when it is implemented
-        const preparedImages = filteredUrls.map((url) => {
+        const preparedImages = filteredImages.map((image): SDImage => {
           return {
             uuid: uuidv4(),
-            url,
-            metadata: {},
+            url: image.path,
+            metadata: backendToFrontendParameters(image.metadata),
           };
         });
 
