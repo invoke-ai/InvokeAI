@@ -6,6 +6,15 @@ import eslint from 'vite-plugin-eslint';
 export default defineConfig(({ mode }) => {
   const common = {
     plugins: [react(), eslint()],
+    server: {
+      proxy: {
+        '/outputs': {
+          target: 'http://localhost:9090/outputs',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/outputs/, ''),
+        },
+      },
+    },
     build: {
       target: 'esnext',
       chunkSizeWarningLimit: 1500, // we don't really care about chunk size

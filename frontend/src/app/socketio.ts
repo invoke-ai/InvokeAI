@@ -31,7 +31,7 @@ export interface SocketIOResponse {
 export const socketioMiddleware = () => {
     const { hostname, port } = new URL(window.location.href);
 
-    const socketio = io(`http://${hostname}:${parseInt(port)}`);
+    const socketio = io(`http://${hostname}:9090`);
 
     let areListenersSet = false;
 

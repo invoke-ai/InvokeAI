@@ -33,7 +33,7 @@ output_dir = "outputs/"  # Base output directory for images
 host = 'localhost'  # Web & socket.io host
 port = 9090  # Web & socket.io port
 verbose = False # enables copious socket.io logging
-additional_allowed_origins = [] # additional CORS allowed origins
+additional_allowed_origins = ['http://localhost:5173'] # additional CORS allowed origins
 
 
 """
