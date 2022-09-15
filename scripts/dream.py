@@ -20,7 +20,6 @@ from omegaconf import OmegaConf
 # Just want to get the formatting look right for now.
 output_cntr = 0
 
-
 def main():
     """Initialize command-line parsers and the diffusion model"""
     arg_parser = create_argv_parser()
@@ -620,6 +619,7 @@ def create_cmd_parser():
     )
     parser.add_argument(
         '-embiggen',
+        '--embiggen',
         nargs='+',
         default=None,
         type=float,
@@ -627,6 +627,7 @@ def create_cmd_parser():
     )
     parser.add_argument(
         '-embiggen_tiles',
+        '--embiggen_tiles',
         nargs='+',
         default=None,
         type=int,
