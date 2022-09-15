@@ -31,7 +31,8 @@ def prompt2vid(
         fps = 30.0,
         cfg_scale = 7.5,
         strength = 0.8,
-        zoom_speed = 2.0
+        zoom_speed = 2.0,
+        seed = None
     ):
 
     vid_path = get_vid_path(prompt)
@@ -41,7 +42,7 @@ def prompt2vid(
     if init_img:
         next_frame = PIL.Image.open(init_img)
     else:
-        next_frame, _seed = _gen.prompt2image(prompt, steps=50, cfg_scale=cfg_scale)[0]
+        next_frame, _seed = _gen.prompt2image(prompt, steps=50, cfg_scale=cfg_scale, seed=seed)[0]
     
     w, h = next_frame.size
     video_tag = cv2.VideoWriter_fourcc(*"MPEG")
@@ -53,7 +54,7 @@ def prompt2vid(
     video_writer.write(cv2.imread(next_frame_filename))
     
     for i in tqdm(range(1, n_frames), desc="Creating Video"):
-        images = _gen.prompt2image(prompt, init_img=next_frame_filename, strength=strength, cfg_scale=cfg_scale, seed=42)
+        images = _gen.prompt2image(prompt, init_img=next_frame_filename, strength=strength, cfg_scale=cfg_scale, seed=seed)
         
         next_frame, _seed = choice(images)
         
@@ -116,6 +117,13 @@ def create_parser():
         type=float,
         default=2.0,
         help="Factor to zoom in by each second"
+    )
+    parser.add_argument(
+        "-S",
+        "--seed",
+        type=int,
+        default=None,
+        help="Seed to use. If not given, use a different seed for each frame."
     )
     return parser
 
