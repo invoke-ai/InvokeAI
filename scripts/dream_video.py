@@ -4,12 +4,12 @@ import string
 import cv2
 from datetime import datetime
 from tqdm import tqdm
-from ldm.simplet2i import T2I
+from ldm.generate import Generate
 from random import choice
 import PIL
 from PIL.Image import Resampling
 
-_t2i = T2I()
+_gen = Generate()
 
 def get_folder_name(prompt = ""):
     now = datetime.now()
@@ -24,34 +24,35 @@ def get_folder_name(prompt = ""):
 def get_vid_path(prompt = ""):
     return os.path.join(".", "outputs", "vid-samples", get_folder_name(prompt))
 
-def prompt2vid(**config):
-    prompt = config["prompt"]
-    n_frames = config["n_frames"]
-    initial_image = config["init_img"]
-    fps = config["fps"] if "fps" in config else 30.0
-    cfg_scale = config["cfg_scale"] if "cfg_scale" in config else 7.5
-    strength = config["strength"] if "strength" in config else 0.8
-    zoom_speed = config["zoom_speed"] if "zoom_speed" in config else 2.0
+def prompt2vid(
+        prompt,
+        n_frames,
+        init_img = None,
+        fps = 30.0,
+        cfg_scale = 7.5,
+        strength = 0.8,
+        zoom_speed = 2.0
+    ):
 
     vid_path = get_vid_path(prompt)
     frames_path = os.path.join(vid_path, "frames")
     os.makedirs(frames_path, exist_ok=True)
     
-    if initial_image:
-        next_frame = PIL.Image.open(initial_image)
+    if init_img:
+        next_frame = PIL.Image.open(init_img)
     else:
-        next_frame, _seed = _t2i.prompt2image(prompt, steps=50, cfg_scale=cfg_scale)[0]
+        next_frame, _seed = _gen.prompt2image(prompt, steps=50, cfg_scale=cfg_scale)[0]
     
     w, h = next_frame.size
-    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 1, fps, (w, h))
+    video_writer = cv2.VideoWriter(os.path.join(vid_path, "video.mp4"), 0, fps, (w, h))
 
     # write first frame
     next_frame_filename = os.path.join(frames_path, "0.png")
     next_frame.save(next_frame_filename)
     video_writer.write(cv2.imread(next_frame_filename))
     
-    for i in tqdm(range(n_frames), desc="Creating Video"):
-        images = _t2i.prompt2image(prompt, init_img=next_frame_filename, strength=strength, cfg_scale=cfg_scale)
+    for i in tqdm(range(1, n_frames), desc="Creating Video"):
+        images = _gen.prompt2image(prompt, init_img=next_frame_filename, strength=strength, cfg_scale=cfg_scale, seed=42)
         
         next_frame, _seed = choice(images)
         
@@ -120,8 +121,5 @@ def create_parser():
 if __name__ == "__main__":
     parser = create_parser()
     opt = vars(parser.parse_args())
-
-    print("Initializing Model, please wait...")
-    _t2i.load_model()
 
     prompt2vid(**opt)
