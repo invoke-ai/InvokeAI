@@ -143,7 +143,6 @@ def handle_request_all_images():
     paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
     paths.sort(key=lambda x: os.path.getmtime(x))
     image_array = []
-    metadata_failed = 0
     for path in paths:
         image = Image.open(path)
         metadata = {}
@@ -152,7 +151,6 @@ def handle_request_all_images():
                 metadata = vars(parser.parse_args(shlex.split(image.info['Dream'])))
             except SystemExit:
                 # TODO: Unable to parse metadata, ignore it for now...
-                metadata_failed++
                 pass
         image_array.append({'path': path, 'metadata': metadata})
     return make_response("OK", data=image_array)
