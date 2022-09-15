@@ -52,6 +52,9 @@ We also export the function build_metadata
 import argparse
 import shlex
 import json
+import hashlib
+import os
+from ldm.dream.conditioning import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
     'ddim',
@@ -69,10 +72,15 @@ APP_ID      = 'lstein/stable-diffusion'
 APP_VERSION = 'v1.15'
 
 class Args(object):
-    def __init__(self):
-        '''Initialize new Args class. Takes no arguments'''
-        self._arg_parser   = self._create_arg_parser()
-        self._cmd_parser   = self._create_cmd_parser()
+    def __init__(self,arg_parser=None,cmd_parser=None):
+        '''
+        Initialize new Args class. It takes two optional arguments, an argparse
+        parser for switches given on the shell command line, and an argparse
+        parser for switches given on the dream> CLI line. If one or both are
+        missing, it creates appropriate parsers internally.
+        '''
+        self._arg_parser   = arg_parser or self._create_arg_parser()
+        self._cmd_parser   = cmd_parser or self._create_cmd_parser()
         self._arg_switches = self.parse_args()   # so there's something there
         self._cmd_switches = self.parse_cmd('')  # so there's something there
 
@@ -92,13 +100,13 @@ class Args(object):
         switches = ['']
         switches_started = False
 
-        for el in elements:
-            if el[0] == '-' and not switches_started:
+        for element in elements:
+            if element[0] == '-' and not switches_started:
                 switches_started = True
             if switches_started:
-                switches.append(el)
+                switches.append(element)
             else:
-                switches[0] += el
+                switches[0] += element
                 switches[0] += ' '
         switches[0] = switches[0][: len(switches[0]) - 1]
         self._cmd_switches = self._cmd_parser.parse_args(switches)
@@ -130,7 +138,7 @@ class Args(object):
         if a['seamless']:
             switches.append(f'--seamless')
         if len(a['init_img'])>0:
-            switches.append(f'-I {a.init_img}')
+            switches.append(f'-I {a["init_img"]}')
         if a['fit']:
             switches.append(f'--fit')
         if a['strength'] and len(a['init_img'])>0:
@@ -470,16 +478,71 @@ class Args(object):
 # very partial implementation of https://github.com/lstein/stable-diffusion/issues/266
 # it does not write all the required top-level metadata, writes too much image
 # data, and doesn't support grids yet. But you gotta start somewhere, no?
-def format_metadata(opt,seed=None):
+def format_metadata(opt,
+                    seed=None,
+                    weights=None,
+                    model_hash=None,
+                    postprocessing=None):
     '''
     Given an Args object, returns a partial implementation of
     the stable diffusion metadata standard
     '''
+    # add some RFC266 fields that are generated internally, and not as
+    # user args
+    image_dict = opt.to_dict(
+        seed=seed,
+        postprocessing=postprocessing
+    )
+
+    # remove any image keys not mentioned in RFC #266
+    rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
+                         'cfg_scale','step_number','width','height','extra','strength']
+
+    rfc_dict ={}
+    for item in image_dict.items():
+        key,value = item
+        if key in rfc266_img_fields:
+            rfc_dict[key] = value
+
+    # semantic drift
+    rfc_dict['sampler']  = image_dict.get('sampler_name',None)
+        
+    # display weighted subprompts (liable to change)
+    if opt.prompt:
+        subprompts = split_weighted_subprompts(opt.prompt)
+        subprompts = [{'prompt':x[0],'weight':x[1]} for x in subprompts]
+        rfc_dict['prompt'] = subprompts
+
+    # variations
+    if opt.with_variations:
+        split_vars = opt.variations.split(',')
+        variations = [{'seed':x[0],'weight':x[1]} for x in [ v.split(':') for v in split_vars]]
+        rfc_dict['variations'] = variations
+
+    if opt.init_img:
+        rfc_dict['type']           = 'img2img'
+        rfc_dict['strength_steps'] = rfc_dict.pop('strength')
+        rfc_dict['orig_hash']      = sha256(image_dict['init_img'])
+        rfc_dict['sampler']        = 'ddim'  # FIX ME WHEN IMG2IMG SUPPORTS ALL SAMPLERS
+    else:
+        rfc_dict['type']  = 'txt2img'
+
     return {
         'model'       : 'stable diffusion',
         'model_id'    : opt.model,
+        'model_hash'  : model_hash,
         'app_id'      : APP_ID,
         'app_version' : APP_VERSION,
-        'image'       : opt.to_dict(seed=seed,iterations=1)
+        'images'      : [rfc_dict],
     }
+
+def sha256(path):
+    sha = hashlib.sha256()
+    with open(path,'rb') as f:
+        while True:
+            data = f.read(65536)
+            if not data:
+                break
+            sha.update(data)
+    return sha.hexdigest()
 
