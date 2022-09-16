@@ -104,7 +104,7 @@ To run in full-precision mode, start `dream.py` with the
 
 - ## [Simplified API for text to image generation](docs/features/OTHER.md#simplified-api)
 
-- ## [Discord Bot](docs/features/DISCORD_BOT.md)
+- ## [Self-hosted Discord Bot](docs/features/DISCORD_BOT.md)
 
 ## **Other Features**
 

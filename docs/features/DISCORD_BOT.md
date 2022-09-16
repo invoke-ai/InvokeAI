@@ -1,6 +1,6 @@
 # **Discord Bot**
 
-A Discord bot is provided in `/scripts/discord/discord_bot.py`.
+A self-hosted Discord bot is provided in `/scripts/discord/discord_bot.py`.
 
 ![Discord Prompt Example](../assets/discord/Discord_Prompt_Example.png)
 
