@@ -260,6 +260,20 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
             results = []  # list of filename, prompt pairs
             grid_images = dict()  # seed -> Image, only used if `do_grid`
 
+            step_writer = PngWriter(os.path.join(current_outdir, "intermediates"))
+            step_index = 1
+            def image_progress(sample, step):
+                # since rendering images is moderately expensive, only render every 5th image
+                # and don't bother with the last one, since it'll render anyway
+                nonlocal step_index
+                if opt.progress_images and step % 5 == 0 and step < opt.steps - 1:
+                    image = t2i.sample_to_image(sample)
+                    step_index_padded = str(step_index).rjust(len(str(opt.steps)), '0')
+                    name = f'{prefix}.{opt.seed}.{step_index_padded}.png'
+                    metadata = f'{opt.prompt} -S{opt.seed} [intermediate]'
+                    step_writer.save_image_and_prompt_to_png(image, metadata, name)
+                    step_index += 1
+
             def image_writer(image, seed, upscaled=False):
                 path = None
                 if do_grid:
@@ -296,7 +310,7 @@ def main_loop(t2i, outdir, prompt_as_dir, parser, infile):
                         results.append([path, metadata_prompt])
                 last_results.append([path, seed])
 
-            t2i.prompt2image(image_callback=image_writer, **vars(opt))
+            t2i.prompt2image(step_callback=image_progress, image_callback=image_writer, **vars(opt))
 
             if do_grid and len(grid_images) > 0:
                 grid_img   = make_grid(list(grid_images.values()))
@@ -544,7 +558,7 @@ def create_cmd_parser():
         description='Example: dream> a fantastic alien landscape -W1024 -H960 -s100 -n12'
     )
     parser.add_argument('prompt')
-    parser.add_argument('-s', '--steps', type=int, help='Number of steps')
+    parser.add_argument('-s', '--steps', type=int, default=50, help='Number of steps')
     parser.add_argument(
         '-S',
         '--seed',
@@ -677,6 +691,11 @@ def create_cmd_parser():
         default=None,
         type=str,
         help='list of variations to apply, in the format `seed:weight,seed:weight,...'
+    )
+    parser.add_argument(
+        '--progress-images',
+        action='store_true',
+        help='Store in-progress images as the image is being rendered.',
     )
     return parser
 
