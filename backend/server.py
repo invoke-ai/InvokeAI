@@ -121,6 +121,9 @@ intermediate_path = os.path.join(result_path, 'intermediates/')
 init_path = os.path.join(result_path, 'init-images/')
 mask_path = os.path.join(result_path, 'mask-images/')
 
+# txt log
+log_path = os.path.join(result_path, 'dream_log.txt')
+
 # make all output paths
 [os.makedirs(path, exist_ok=True)
  for path in [result_path, intermediate_path, init_path, mask_path]]
@@ -138,7 +141,6 @@ SOCKET.IO LISTENERS
 
 @socketio.on('requestAllImages')
 def handle_request_all_images():
-    print('> All images requested')
     parser = create_cmd_parser()
     paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
     paths.sort(key=lambda x: os.path.getmtime(x))
@@ -158,7 +160,6 @@ def handle_request_all_images():
 
 @socketio.on('generateImage')
 def handle_generate_image_event(generation_parameters, esrgan_parameters, gfpgan_parameters):
-    print('> Generate image requested')
     generate_images(
         generation_parameters,
         esrgan_parameters,
@@ -182,6 +183,9 @@ def handle_run_esrgan_event(original_image, esrgan_parameters):
 
     esrgan_parameters['seed'] = seed
     path = save_image(image, esrgan_parameters, result_path, postprocessing='esrgan')
+    command = parameters_to_command(esrgan_parameters)
+
+    write_log_message(f'[Upscaled] "{original_image["url"]}" > "{path}": {command}')
 
     socketio.emit(
             'result', {'url': os.path.relpath(path), 'type': 'esrgan', 'uuid': original_image['uuid'],'metadata': esrgan_parameters})
@@ -203,6 +207,9 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
 
     gfpgan_parameters['seed'] = seed
     path = save_image(image, gfpgan_parameters, result_path, postprocessing='gfpgan')
+    command = parameters_to_command(gfpgan_parameters)
+
+    write_log_message(f'[Fixed faces] "{original_image["url"]}" > "{path}": {command}')
 
     socketio.emit(
             'result', {'url': os.path.relpath(path), 'type': 'gfpgan', 'uuid': original_image['uuid'],'metadata': gfpgan_parameters})
@@ -210,7 +217,6 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
 
 @socketio.on('cancel')
 def handle_cancel():
-    print('> Cancel requested')
     canceled.set()
     return make_response("OK")
 
@@ -218,7 +224,6 @@ def handle_cancel():
 # TODO: I think this needs a safety mechanism.
 @socketio.on('deleteImage')
 def handle_delete_image(path):
-    print('> Delete image requested')
     Path(path).unlink()
     return make_response("OK")
 
@@ -226,7 +231,6 @@ def handle_delete_image(path):
 # TODO: I think this needs a safety mechanism.
 @socketio.on('uploadInitialImage')
 def handle_upload_initial_image(bytes, name):
-    print('> Upload initial image requested')
     uuid = uuid4().hex
     split = os.path.splitext(name)
     name = f'{split[0]}.{uuid}{split[1]}'
@@ -240,7 +244,6 @@ def handle_upload_initial_image(bytes, name):
 # TODO: I think this needs a safety mechanism.
 @socketio.on('uploadMaskImage')
 def handle_upload_initial_image(bytes, name):
-    print('> Upload mask image requested')
     uuid = uuid4().hex
     split = os.path.splitext(name)
     name = f'{split[0]}.{uuid}{split[1]}'
@@ -263,6 +266,13 @@ ADDITIONAL FUNCTIONS
 """
 
 
+def write_log_message(message, log_path=log_path):
+    """Logs the filename and parameters used to generate or process that image to log file"""
+    message = f'{message}\n'
+    with open(log_path, 'a', encoding='utf-8') as file:
+        file.writelines(message)
+
+
 def make_response(status, message=None, data=None):
     response = {'status': status}
     if message is not None:
@@ -271,7 +281,8 @@ def make_response(status, message=None, data=None):
         response['data'] = data
     return response
 
-def save_image(image, parameters, output_dir, step_index=None, postprocessing=None):
+
+def save_image(image, parameters, output_dir, step_index=None, postprocessing=False):
     seed = parameters['seed'] if 'seed' in parameters else 'unknown_seed'
 
     pngwriter = PngWriter(output_dir)
@@ -282,7 +293,7 @@ def save_image(image, parameters, output_dir, step_index=None, postprocessing=No
     if step_index:
         filename += f'.{step_index}'
     if postprocessing:
-        filename += f'.{postprocessing}'
+        filename += f'.postprocessed'
 
     filename += '.png'
 
@@ -318,6 +329,7 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
         nonlocal gfpgan_parameters
 
         all_parameters = generation_parameters
+        postprocessing = False
 
         if esrgan_parameters:
             image = real_esrgan_upscale(
@@ -326,6 +338,7 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
                 upsampler_scale=esrgan_parameters['level'],
                 seed=seed
             )
+            postprocessing = True
             all_parameters["upscale"] = [esrgan_parameters['level'], esrgan_parameters['strength']]
 
         if gfpgan_parameters:
@@ -335,11 +348,15 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
                 seed=seed,
                 upsampler_scale=1,
             )
+            postprocessing = True
             all_parameters["gfpgan_strength"] = gfpgan_parameters['strength']
 
         all_parameters['seed'] = seed
 
-        path = save_image(image, all_parameters, result_path)
+        path = save_image(image, all_parameters, result_path, postprocessing=postprocessing)
+        command = parameters_to_command(all_parameters)
+
+        write_log_message(f'[Generated] "{path}": {command}')
 
         socketio.emit(
             'result', {'url': os.path.relpath(path), 'type': 'generation', 'metadata': all_parameters})
