@@ -464,6 +464,11 @@ class Args(object):
             help='Path to input mask for inpainting mode (supersedes width and height)',
         )
         img2img_group.add_argument(
+            '--init_color',
+            type=str,
+            help='Path to reference image for color correction (used for repeated img2img and inpainting)'
+        )
+        img2img_group.add_argument(
             '-T',
             '-fit',
             '--fit',
