@@ -19,7 +19,6 @@ from omegaconf import OmegaConf
 # Just want to get the formatting look right for now.
 output_cntr = 0
 
-
 def main():
     """Initialize command-line parsers and the diffusion model"""
     opt  = Args()

@@ -24,6 +24,12 @@ def build_opt(post_data, seed, gfpgan_model_exists):
     setattr(opt, 'invert_mask', 'invert_mask' in post_data)
     setattr(opt, 'cfg_scale', float(post_data['cfg_scale']))
     setattr(opt, 'sampler_name', post_data['sampler_name'])
+
+    # embiggen not practical at this point because we have no way of feeding images back into img2img
+    # however, this code is here against that eventuality
+    setattr(opt, 'embiggen', None)
+    setattr(opt, 'embiggen_tiles', None)
+
     setattr(opt, 'gfpgan_strength', float(post_data['gfpgan_strength']) if gfpgan_model_exists else 0)
     setattr(opt, 'upscale', [int(post_data['upscale_level']), float(post_data['upscale_strength'])] if post_data['upscale_level'] != '' else None)
     setattr(opt, 'progress_images', 'progress_images' in post_data)
@@ -109,7 +115,7 @@ class DreamServer(BaseHTTPRequestHandler):
             out_dir  = os.path.realpath(self.outdir.rstrip('/'))
             if self.path.startswith('/static/dream_web/'):
                 path = '.' + self.path
-            elif out_dir.endswith(path_dir):
+            elif out_dir.replace('\\', '/').endswith(path_dir):
                 file = os.path.basename(self.path)
                 path = os.path.join(self.outdir,file)
             else:
@@ -157,7 +163,7 @@ class DreamServer(BaseHTTPRequestHandler):
         # LS: This repeats code in dream.py
         def image_done(image, seed, upscaled=False):
             name = f'{prefix}.{seed}.png'
-            iter_opt       = copy.copy(opt)
+            iter_opt = argparse.Namespace(**vars(opt)) # copy
             if opt.variation_amount > 0:
                 this_variation = [[seed, opt.variation_amount]]
                 if opt.with_variations is None:
@@ -250,6 +256,15 @@ class DreamServer(BaseHTTPRequestHandler):
         except CanceledException:
             print(f"Canceled.")
             return
+        except Exception as e:
+            print("Error happened")
+            print(e)
+            self.wfile.write(bytes(json.dumps(
+                {'event': 'error',
+                 'message': str(e),
+                 'type': e.__class__.__name__}
+            ) + '\n',"utf-8"))
+            raise e
 
 
 class ThreadingDreamServer(ThreadingHTTPServer):
