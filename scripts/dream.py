@@ -23,6 +23,8 @@ def main():
     """Initialize command-line parsers and the diffusion model"""
     opt  = Args()
     args = opt.parse_args()
+    if not args:
+        sys.exit(-1)
 
     if args.laion400m:
         print('--laion400m flag has been deprecated. Please use --model laion400m instead.')

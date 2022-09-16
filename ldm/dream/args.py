@@ -5,31 +5,37 @@ command string passed at the dream> prompt. It serves as the definitive reposito
 of all the arguments used by Generate and their default values.
 
 To use:
-  a = Args()
+  opt = Args()
 
-  # read in the command line options:
-  args = a.parse_args()
+  # Read in the command line options:
+  # this returns a namespace object like the underlying argparse library)
+  # You do not have to use the return value, but you can check it against None
+  # to detect illegal arguments on the command line.
+  args = opt.parse_args()
+  if not args:
+     print('oops')
+     sys.exit(-1)
 
   # read in a command passed to the dream> prompt:
-  opts = a.parse_cmd('do androids dream of electric sheep? -H256 -W1024 -n4')
+  opts = opt.parse_cmd('do androids dream of electric sheep? -H256 -W1024 -n4')
 
-  # The args object acts like a namespace object
-  print(a.model)
+  # The Args object acts like a namespace object
+  print(opt.model)
 
 You can set attributes in the usual way, use vars(), etc.:
 
-  a.model = 'something-else'
+  opt.model = 'something-else'
   do_something(**vars(a))
 
 It is helpful in saving metadata:
 
   # To get a json representation of all the values, allowing
   # you to override any values dynamically
-  j = a.json(seed=42)
+  j = opt.json(seed=42)
 
   # To get the prompt string with the switches, allowing you
   # to override any values dynamically
-  j = a.dream_prompt_str(seed=42)
+  j = opt.dream_prompt_str(seed=42)
 
 If you want to access the namespace objects from the shell args or the
 parsed command directly, you may use the values returned from the
@@ -43,8 +49,8 @@ you wish to apply logic as to which one to use. For example:
   opts    = a.parse_cmd(string)
   do_grid = args.grid or opts.grid
 
-To add new attributes, edit the _create_command_arg_parser() and
-_create_cmd_parser() methods.
+To add new attributes, edit the _create_arg_parser() and
+_create_dream_cmd_parser() methods.
 
 We also export the function build_metadata
 """
@@ -81,14 +87,17 @@ class Args(object):
         missing, it creates appropriate parsers internally.
         '''
         self._arg_parser   = arg_parser or self._create_arg_parser()
-        self._cmd_parser   = cmd_parser or self._create_cmd_parser()
-        self._arg_switches = self.parse_args()   # so there's something there
-        self._cmd_switches = self.parse_cmd('')  # so there's something there
+        self._cmd_parser   = cmd_parser or self._create_dream_cmd_parser()
+        self._arg_switches = self.parse_cmd('')   # fill in defaults
+        self._cmd_switches = self.parse_cmd('')   # fill in defaults
 
     def parse_args(self):
         '''Parse the shell switches and store.'''
-        self._arg_switches = self._arg_parser.parse_args()
-        return self._arg_switches
+        try:
+            self._arg_switches = self._arg_parser.parse_args()
+            return self._arg_switches
+        except:
+            return None
 
     def parse_cmd(self,cmd_string):
         '''Parse a dream>-style command string '''
@@ -110,8 +119,11 @@ class Args(object):
                 switches[0] += element
                 switches[0] += ' '
         switches[0] = switches[0][: len(switches[0]) - 1]
-        self._cmd_switches = self._cmd_parser.parse_args(switches)
-        return self._cmd_switches
+        try:
+            self._cmd_switches = self._cmd_parser.parse_args(switches)
+            return self._cmd_switches
+        except:
+            return None
 
     def json(self,**kwargs):
         return json.dumps(self.to_dict(**kwargs))
@@ -175,19 +187,42 @@ class Args(object):
             arg_switches = object.__getattribute__(self,'_arg_switches')
         except AttributeError:
             pass
+
         if cmd_switches and arg_switches and name=='__dict__':
             a = arg_switches.__dict__
             a.update(cmd_switches.__dict__)
             return a
+
         try:
             return object.__getattribute__(self,name)
         except AttributeError:
             pass
+
+        if not hasattr(cmd_switches,name) and not hasattr(arg_switches,name):
+            raise AttributeError
+        
+        value_arg,value_cmd = (None,None)
         try:
-            return getattr(cmd_switches,name)
+            value_cmd = getattr(cmd_switches,name)
         except AttributeError:
             pass
-        return getattr(arg_switches,name)
+        try:
+            value_arg = getattr(arg_switches,name)
+        except AttributeError:
+            pass
+
+        # here is where we can pick and choose which to use
+        # default behavior is to choose the dream_command value over
+        # the arg value. For example, the --grid and --individual options are a little
+        # funny because of their push/pull relationship. This is how to handle it.
+        if name=='grid':
+            return value_arg or value_cmd  # arg supersedes cmd
+        if name=='individual':
+            return value_cmd or value_arg  # cmd supersedes arg
+        if value_cmd is not None:
+            return value_cmd
+        else:
+            return value_arg
 
     def __setattr__(self,name,value):
         if name.startswith('_'):
@@ -209,11 +244,18 @@ class Args(object):
             Otherwise you will be dropped into an interactive command prompt (type -h for help.)
             Other command-line arguments are defaults that can usually be overridden
             prompt the command prompt.
-            """
+            """,
         )
-        parser.add_argument('--laion400m') # deprecated
-        parser.add_argument('--weights') # deprecated
-        parser.add_argument(
+        model_group      = parser.add_argument_group('Model selection')
+        file_group       = parser.add_argument_group('Input/output')
+        web_server_group = parser.add_argument_group('Web server')
+        render_group     = parser.add_argument_group('Rendering')
+        postprocessing_group     = parser.add_argument_group('Postprocessing')
+        deprecated_group = parser.add_argument_group('Deprecated options')
+
+        deprecated_group.add_argument('--laion400m')
+        deprecated_group.add_argument('--weights') # deprecated
+        model_group.add_argument(
             '--conf',
             '-c',
             '-conf',
@@ -221,92 +263,92 @@ class Args(object):
             default='./configs/models.yaml',
             help='Path to configuration file for alternate models.',
         )
-        parser.add_argument(
+        model_group.add_argument(
             '--model',
             default='stable-diffusion-1.4',
             help='Indicates which diffusion model to load. (currently "stable-diffusion-1.4" (default) or "laion400m")',
         )
-        parser.add_argument(
-            '--from_file',
-            dest='infile',
-            type=str,
-            help='If specified, load prompts from this file',
-        )
-        parser.add_argument(
+        model_group.add_argument(
             '-F',
             '--full_precision',
             dest='full_precision',
             action='store_true',
             help='Use more memory-intensive full precision math for calculations',
         )
-        parser.add_argument(
+        file_group.add_argument(
+            '--from_file',
+            dest='infile',
+            type=str,
+            help='If specified, load prompts from this file',
+        )
+        file_group.add_argument(
             '--outdir',
             '-o',
             type=str,
             help='Directory to save generated images and a log of prompts and seeds. Default: outputs/img-samples',
             default='outputs/img-samples',
         )
-        parser.add_argument(
-            '--seamless',
-            action='store_true',
-            help='Change the model to seamless tiling (circular) mode',
-        )
-        parser.add_argument(
-            '--grid',
-            '-g',
-            action='store_true',
-            help='generate a grid'
-        )
-        parser.add_argument(
-            '--embedding_path',
-            type=str,
-            help='Path to a pre-trained embedding manager checkpoint - can only be set on command line',
-        )
-        parser.add_argument(
+        file_group.add_argument(
             '--prompt_as_dir',
             '-p',
             action='store_true',
             help='Place images in subdirectories named after the prompt.',
         )
+        render_group.add_argument(
+            '--seamless',
+            action='store_true',
+            help='Change the model to seamless tiling (circular) mode',
+        )
+        render_group.add_argument(
+            '--grid',
+            '-g',
+            action='store_true',
+            help='generate a grid'
+        )
+        render_group.add_argument(
+            '--embedding_path',
+            type=str,
+            help='Path to a pre-trained embedding manager checkpoint - can only be set on command line',
+        )
         # GFPGAN related args
-        parser.add_argument(
+        postprocessing_group.add_argument(
             '--gfpgan_bg_upsampler',
             type=str,
             default='realesrgan',
             help='Background upsampler. Default: realesrgan. Options: realesrgan, none.',
 
         )
-        parser.add_argument(
+        postprocessing_group.add_argument(
             '--gfpgan_bg_tile',
             type=int,
             default=400,
             help='Tile size for background sampler, 0 for no tile during testing. Default: 400.',
         )
-        parser.add_argument(
+        postprocessing_group.add_argument(
             '--gfpgan_model_path',
             type=str,
             default='experiments/pretrained_models/GFPGANv1.3.pth',
             help='Indicates the path to the GFPGAN model, relative to --gfpgan_dir.',
         )
-        parser.add_argument(
+        postprocessing_group.add_argument(
             '--gfpgan_dir',
             type=str,
             default='./src/gfpgan',
             help='Indicates the directory containing the GFPGAN code.',
         )
-        parser.add_argument(
+        web_server_group.add_argument(
             '--web',
             dest='web',
             action='store_true',
             help='Start in web server mode.',
         )
-        parser.add_argument(
+        web_server_group.add_argument(
             '--host',
             type=str,
             default='127.0.0.1',
             help='Web server: Host or IP to listen on. Set to 0.0.0.0 to accept traffic from other devices on your network.'
         )
-        parser.add_argument(
+        web_server_group.add_argument(
             '--port',
             type=int,
             default='9090',
@@ -314,149 +356,78 @@ class Args(object):
         )
         return parser
 
-    def _create_cmd_parser(self):
+    # This creates the parser that processes commands on the dream> command line
+    def _create_dream_cmd_parser(self):
         parser = argparse.ArgumentParser(
             description='Example: dream> a fantastic alien landscape -W1024 -H960 -s100 -n12'
         )
-        parser.add_argument('prompt')
-        parser.add_argument(
+        render_group     = parser.add_argument_group('General rendering')
+        img2img_group    = parser.add_argument_group('Image-to-image and inpainting')
+        variation_group  = parser.add_argument_group('Creating and combining variations')
+        postprocessing_group   = parser.add_argument_group('Post-processing')
+        special_effects_group  = parser.add_argument_group('Special effects')
+        render_group.add_argument('prompt')
+        render_group.add_argument(
             '-s',
             '--steps',
             type=int,
             default=50,
             help='Number of steps'
         )
-        parser.add_argument(
+        render_group.add_argument(
             '-S',
             '--seed',
             type=int,
             default=None,
             help='Image seed; a +ve integer, or use -1 for the previous seed, -2 for the one before that, etc',
         )
-        parser.add_argument(
+        render_group.add_argument(
             '-n',
             '--iterations',
             type=int,
             default=1,
             help='Number of samplings to perform (slower, but will provide seeds for individual images)',
         )
-        parser.add_argument(
+        render_group.add_argument(
             '-W',
             '--width',
             type=int,
             help='Image width, multiple of 64',
             default=512
         )
-        parser.add_argument(
+        render_group.add_argument(
             '-H',
             '--height',
             type=int,
             help='Image height, multiple of 64',
             default=512,
         )
-        parser.add_argument(
+        render_group.add_argument(
             '-C',
             '--cfg_scale',
             default=7.5,
             type=float,
             help='Classifier free guidance (CFG) scale - higher numbers cause generator to "try" harder.',
         )
-        parser.add_argument(
+        render_group.add_argument(
             '--grid',
             '-g',
             action='store_true',
             help='generate a grid'
         )
-        parser.add_argument(
-            '--outdir',
-            '-o',
-            type=str,
-            default='outputs/img-samples',
-            help='Directory to save generated images and a log of prompts and seeds',
-        )
-        parser.add_argument(
-            '--seamless',
-            action='store_true',
-            help='Change the model to seamless tiling (circular) mode',
-        )
-        parser.add_argument(
-            '-i',
+        render_group.add_argument(
             '--individual',
+            '-i',
             action='store_true',
-            help='Generate individual files (default)',
+            help='override command-line --grid setting and generate individual images'
         )
-        parser.add_argument(
-            '-I',
-            '--init_img',
-            type=str,
-            help='Path to input image for img2img mode (supersedes width and height)',
-            default='',
-        )
-        parser.add_argument(
-            '-M',
-            '--init_mask',
-            type=str,
-            help='Path to input mask for inpainting mode (supersedes width and height)',
-            default='',
-        )
-        parser.add_argument(
-            '-T',
-            '-fit',
-            '--fit',
-            action='store_true',
-            help='If specified, will resize the input image to fit within the dimensions of width x height (512x512 default)',
-        )
-        parser.add_argument(
-            '-f',
-            '--strength',
-            type=float,
-            help='Strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely',
-            default=0.75,
-        )
-        parser.add_argument(
-            '-G',
-            '--gfpgan_strength',
-            type=float,
-            help='The strength at which to apply the GFPGAN model to the result, in order to improve faces.',
-            default=0,
-        )
-        parser.add_argument(
-            '-U',
-            '--upscale',
-            nargs='+',
-            type=float,
-            help='Scale factor (2, 4) for upscaling final output followed by upscaling strength (0-1.0). If strength not specified, defaults to 0.75',
-            default=None,
-        )
-        parser.add_argument(
-            '--save_original',
-            '-save_orig',
-            action='store_true',
-            help='Save original. Use it when upscaling to save both versions.',
-        )
-        parser.add_argument(
-            '--embiggen',
-            '-embiggen',
-            nargs='+',
-            type=float,
-            help='Embiggen tiled img2img for higher resolution and detail without extra VRAM usage. Takes scale factor relative to the size of the --init_img (-I), followed by ESRGAN upscaling strength (0-1.0), followed by minimum amount of overlap between tiles as a decimal ratio (0 - 1.0) or number of pixels. ESRGAN strength defaults to 0.75, and overlap defaults to 0.25 . ESRGAN is used to upscale the init prior to cutting it into tiles/pieces to run through img2img and then stitch back togeather.',
-            default=None,
-        )
-        parser.add_argument(
-            '--embiggen_tiles',
-            '-embiggen_tiles',
-            nargs='+',
-            type=int,
-            help='If while doing Embiggen we are altering only parts of the image, takes a list of tiles by number to process and replace onto the image e.g. `1 3 5`, useful for redoing problematic spots from a prior Embiggen run',
-            default=None,
-        )
-        parser.add_argument(
+        render_group.add_argument(
             '-x',
             '--skip_normalize',
             action='store_true',
             help='Skip subprompt weight normalization',
         )
-        parser.add_argument(
+        render_group.add_argument(
             '-A',
             '-m',
             '--sampler',
@@ -467,20 +438,95 @@ class Args(object):
             help=f'Switch to a different sampler. Supported samplers: {", ".join(SAMPLER_CHOICES)}',
             default='k_lms',
         )
-        parser.add_argument(
+        render_group.add_argument(
             '-t',
             '--log_tokenization',
             action='store_true',
             help='shows how the prompt is split into tokens'
         )
-        parser.add_argument(
+        render_group.add_argument(
+            '--outdir',
+            '-o',
+            type=str,
+            default='outputs/img-samples',
+            help='Directory to save generated images and a log of prompts and seeds',
+        )
+        img2img_group.add_argument(
+            '-I',
+            '--init_img',
+            type=str,
+            help='Path to input image for img2img mode (supersedes width and height)',
+        )
+        img2img_group.add_argument(
+            '-M',
+            '--init_mask',
+            type=str,
+            help='Path to input mask for inpainting mode (supersedes width and height)',
+        )
+        img2img_group.add_argument(
+            '-T',
+            '-fit',
+            '--fit',
+            action='store_true',
+            help='If specified, will resize the input image to fit within the dimensions of width x height (512x512 default)',
+        )
+        img2img_group.add_argument(
+            '-f',
+            '--strength',
+            type=float,
+            help='Strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely',
+            default=0.75,
+        )
+        postprocessing_group.add_argument(
+            '-G',
+            '--gfpgan_strength',
+            type=float,
+            help='The strength at which to apply the GFPGAN model to the result, in order to improve faces.',
+            default=0,
+        )
+        postprocessing_group.add_argument(
+            '-U',
+            '--upscale',
+            nargs='+',
+            type=float,
+            help='Scale factor (2, 4) for upscaling final output followed by upscaling strength (0-1.0). If strength not specified, defaults to 0.75',
+            default=None,
+        )
+        postprocessing_group.add_argument(
+            '--save_original',
+            '-save_orig',
+            action='store_true',
+            help='Save original. Use it when upscaling to save both versions.',
+        )
+        postprocessing_group.add_argument(
+            '--embiggen',
+            '-embiggen',
+            nargs='+',
+            type=float,
+            help='Embiggen tiled img2img for higher resolution and detail without extra VRAM usage. Takes scale factor relative to the size of the --init_img (-I), followed by ESRGAN upscaling strength (0-1.0), followed by minimum amount of overlap between tiles as a decimal ratio (0 - 1.0) or number of pixels. ESRGAN strength defaults to 0.75, and overlap defaults to 0.25 . ESRGAN is used to upscale the init prior to cutting it into tiles/pieces to run through img2img and then stitch back togeather.',
+            default=None,
+        )
+        postprocessing_group.add_argument(
+            '--embiggen_tiles',
+            '-embiggen_tiles',
+            nargs='+',
+            type=int,
+            help='If while doing Embiggen we are altering only parts of the image, takes a list of tiles by number to process and replace onto the image e.g. `1 3 5`, useful for redoing problematic spots from a prior Embiggen run',
+            default=None,
+        )
+        special_effects_group.add_argument(
+            '--seamless',
+            action='store_true',
+            help='Change the model to seamless tiling (circular) mode',
+        )
+        variation_group.add_argument(
             '-v',
             '--variation_amount',
             default=0.0,
             type=float,
             help='If > 0, generates variations on the initial seed instead of random seeds per iteration. Must be between 0 and 1. Higher values will be more different.'
         )
-        parser.add_argument(
+        variation_group.add_argument(
             '-V',
             '--with_variations',
             default=None,
@@ -509,10 +555,10 @@ def format_metadata(opt,
 
     # TODO: This is just a hack until postprocessing pipeline work completed
     image_dict['postprocessing'] = []
-    if image_dict['gfpgan_strength'] > 0:
-        image_dict['postprocessing'].append('GFPGAN')
-    if image_dict['upscale'][0] > 0:
-        image_dict['postprocessing'].append('ESRGAN')
+    if image_dict['gfpgan_strength'] and image_dict['gfpgan_strength'] > 0:
+        image_dict['postprocessing'].append('GFPGAN (not RFC compliant)')
+    if image_dict['upscale'] and image_dict['upscale'][0] > 0:
+        image_dict['postprocessing'].append('ESRGAN  (not RFC compliant)')
 
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
@@ -560,6 +606,7 @@ def format_metadata(opt,
         'images'      : images,
     }
 
+# Bah. This should be moved somewhere else...
 def sha256(path):
     sha = hashlib.sha256()
     with open(path,'rb') as f:

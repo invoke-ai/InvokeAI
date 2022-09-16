@@ -11,6 +11,7 @@ from threading import Event
 
 def build_opt(post_data, seed, gfpgan_model_exists):
     opt = Args()
+    opt.parse_args()  # initialize defaults
     setattr(opt, 'prompt', post_data['prompt'])
     setattr(opt, 'init_img', post_data['initimg'])
     setattr(opt, 'strength', float(post_data['strength']))
@@ -42,7 +43,7 @@ def build_opt(post_data, seed, gfpgan_model_exists):
         for part in post_data['with_variations'].split(','):
             seed_and_weight = part.split(':')
             if len(seed_and_weight) != 2:
-                print(f'could not parse with_variation part "{part}"')
+                print(f'could not parse WITH_variation part "{part}"')
                 broken = True
                 break
             try:
@@ -163,7 +164,7 @@ class DreamServer(BaseHTTPRequestHandler):
         # LS: This repeats code in dream.py
         def image_done(image, seed, upscaled=False):
             name = f'{prefix}.{seed}.png'
-            iter_opt = argparse.Namespace(**vars(opt)) # copy
+            iter_opt  = copy.copy(opt)
             if opt.variation_amount > 0:
                 this_variation = [[seed, opt.variation_amount]]
                 if opt.with_variations is None:
@@ -171,7 +172,7 @@ class DreamServer(BaseHTTPRequestHandler):
                 else:
                     iter_opt.with_variations = opt.with_variations + this_variation
                 iter_opt.variation_amount = 0
-            formatted_prompt  = iter_opt.dream_prompt_str(seed=seed)
+            formatted_prompt  = opt.dream_prompt_str(seed=seed)
             path = pngwriter.save_image_and_prompt_to_png(
                 image,
                 dream_prompt   = formatted_prompt,

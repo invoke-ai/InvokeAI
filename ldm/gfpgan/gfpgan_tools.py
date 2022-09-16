@@ -9,6 +9,7 @@ from PIL import Image
 from ldm.dream.args import Args
 
 opt                 = Args()
+opt.parse_args()
 model_path          = os.path.join(opt.gfpgan_dir, opt.gfpgan_model_path)
 gfpgan_model_exists = os.path.isfile(model_path)
 
