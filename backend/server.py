@@ -180,6 +180,7 @@ def handle_run_esrgan_event(original_image, esrgan_parameters):
         seed=seed
     )
 
+    esrgan_parameters['seed'] = seed
     path = save_image(image, esrgan_parameters, result_path, postprocessing='esrgan')
 
     socketio.emit(
@@ -200,6 +201,7 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
         upsampler_scale=1
     )
 
+    gfpgan_parameters['seed'] = seed
     path = save_image(image, gfpgan_parameters, result_path, postprocessing='gfpgan')
 
     socketio.emit(
