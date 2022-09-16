@@ -156,7 +156,7 @@ of memory if it is large.
 
 Repeated chaining of img2img on an image can result in significant color shifts
 in the output, especially if run with lower strength. Color correction can be
-run against a reference image to fix this issue. Use the input image to the
+run against a reference image to fix this issue. Use the original input image to the
 chain as the the reference image for each step in the chain.
 
 In addition to the command-line options recognized by txt2img, img2img accepts additional options:
