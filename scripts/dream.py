@@ -160,6 +160,7 @@ def main_loop(gen, opt, infile):
                 opt.seed = None
                 continue
 
+        # TODO - move this into a module
         if opt.with_variations is not None:
             # shotgun parsing, woo
             parts = []
@@ -224,7 +225,7 @@ def main_loop(gen, opt, infile):
                     else:
                         filename = f'{prefix}.{seed}.png'
                     # the handling of variations is probably broken
-                    # Also, given the ability to add stuff to the prompt_str, it isn't
+                    # Also, given the ability to add stuff to the dream_prompt_str, it isn't
                     # necessary to make a copy of the opt option just to change its attributes
                     if opt.variation_amount > 0:
                         iter_opt       = copy.copy(opt)
@@ -234,17 +235,17 @@ def main_loop(gen, opt, infile):
                         else:
                             iter_opt.with_variations = opt.with_variations + this_variation
                         iter_opt.variation_amount = 0
-                        formatted_prompt = iter_opt.prompt_str(seed=seed)
+                        formatted_dream_prompt = iter_opt.dream_prompt_str(seed=seed)
                     elif opt.with_variations is not None:
-                        formatted_prompt = opt.prompt_str(seed=seed)
+                        formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
                     else:
-                        formatted_prompt = opt.prompt_str(seed=seed)
+                        formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
                     path = file_writer.save_image_and_prompt_to_png(
-                        image     = image,
-                        prompt    = formatted_prompt,
-                        metadata  = format_metadata(
+                        image           = image,
+                        dream_prompt    = formatted_dream_prompt,
+                        metadata        = format_metadata(
                             opt,
-                            seed       = seed,
+                            seeds      = [seed],
                             weights    = gen.weights,
                             model_hash = gen.model_hash,
                         ),
@@ -252,7 +253,7 @@ def main_loop(gen, opt, infile):
                     )
                     if (not upscaled) or opt.save_original:
                         # only append to results if we didn't overwrite an earlier output
-                        results.append([path, formatted_prompt])
+                        results.append([path, formatted_dream_prompt])
                 last_results.append([path, seed])
 
             catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
@@ -266,15 +267,22 @@ def main_loop(gen, opt, infile):
                 grid_img   = make_grid(list(grid_images.values()))
                 grid_seeds = list(grid_images.keys())
                 first_seed = last_results[0][1]
-                filename = f'{prefix}.{first_seed}.png'
-                # TODO better metadata for grid images
-                normalized_prompt = PromptFormatter(
-                    gen, opt).normalize_prompt()
-                metadata_prompt = f'{normalized_prompt} -S{first_seed} --grid -n{len(grid_images)} # {grid_seeds}'
+                filename   = f'{prefix}.{first_seed}.png'
+                formatted_dream_prompt  = opt.dream_prompt_str(seed=first_seed,grid=True,iterations=len(grid_images))
+                formatted_dream_prompt += f' # {grid_seeds}'
+                metadata = format_metadata(
+                    opt,
+                    seeds      = grid_seeds,
+                    weights    = gen.weights,
+                    model_hash = gen.model_hash
+                    )
                 path = file_writer.save_image_and_prompt_to_png(
-                    grid_img, metadata_prompt, filename
+                    image        = grid_img,
+                    dream_prompt = formatted_dream_prompt,
+                    metadata     = metadata,
+                    name         = filename
                 )
-                results = [[path, metadata_prompt]]
+                results = [[path, formatted_dream_prompt]]
 
         except AssertionError as e:
             print(e)

@@ -29,7 +29,7 @@ It is helpful in saving metadata:
 
   # To get the prompt string with the switches, allowing you
   # to override any values dynamically
-  j = a.prompt_str(seed=42)
+  j = a.dream_prompt_str(seed=42)
 
 If you want to access the namespace objects from the shell args or the
 parsed command directly, you may use the values returned from the
@@ -54,6 +54,7 @@ import shlex
 import json
 import hashlib
 import os
+import copy
 from ldm.dream.conditioning import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
@@ -123,8 +124,8 @@ class Args(object):
     # Isn't there a more automated way of doing this?
     # Ideally we get the switch strings out of the argparse objects,
     # but I don't see a documented API for this.
-    def prompt_str(self,**kwargs):
-        """Normalized prompt."""
+    def dream_prompt_str(self,**kwargs):
+        """Normalized dream_prompt."""
         a = vars(self)
         a.update(kwargs)
         switches = list()
@@ -135,13 +136,17 @@ class Args(object):
         switches.append(f'-C {a["cfg_scale"]}')
         switches.append(f'-A {a["sampler_name"]}')
         switches.append(f'-S {a["seed"]}')
+        if a['grid']:
+            switches.append('--grid')
+        if a['iterations'] and a['iterations']>0:
+            switches.append(f'-n {a["iterations"]}')
         if a['seamless']:
-            switches.append(f'--seamless')
-        if len(a['init_img'])>0:
+            switches.append('--seamless')
+        if a['init_img'] and len(a['init_img'])>0:
             switches.append(f'-I {a["init_img"]}')
         if a['fit']:
             switches.append(f'--fit')
-        if a['strength'] and len(a['init_img'])>0:
+        if a['strength'] and a['strength']>0:
             switches.append(f'-f {a["strength"]}')
         if a['gfpgan_strength']:
             switches.append(f'-G {a["gfpgan_strength"]}')
@@ -158,22 +163,31 @@ class Args(object):
             switches.append(f'-V {formatted_variations}')
         return ' '.join(switches)
 
-
     def __getattribute__(self,name):
-        if name=='__dict__':
-            a = self._arg_switches.__dict__
-            a.update(self._cmd_switches.__dict__)
+        '''
+        Returns union of command-line arguments and dream_prompt arguments,
+        with the latter superseding the former.
+        '''
+        cmd_switches = None
+        arg_switches = None
+        try:
+            cmd_switches = object.__getattribute__(self,'_cmd_switches')
+            arg_switches = object.__getattribute__(self,'_arg_switches')
+        except AttributeError:
+            pass
+        if cmd_switches and arg_switches and name=='__dict__':
+            a = arg_switches.__dict__
+            a.update(cmd_switches.__dict__)
             return a
         try:
             return object.__getattribute__(self,name)
         except AttributeError:
             pass
-        if self._cmd_switches and hasattr(self._cmd_switches,name):
-            return getattr(self._cmd_switches,name)
-        elif self._arg_switches and hasattr(self._arg_switches,name):
-            return getattr(self._arg_switches,name)
-        else:
-            raise AttributeError
+        try:
+            return getattr(cmd_switches,name)
+        except AttributeError:
+            pass
+        return getattr(arg_switches,name)
 
     def __setattr__(self,name,value):
         if name.startswith('_'):
@@ -479,7 +493,7 @@ class Args(object):
 # it does not write all the required top-level metadata, writes too much image
 # data, and doesn't support grids yet. But you gotta start somewhere, no?
 def format_metadata(opt,
-                    seed=None,
+                    seeds=[],
                     weights=None,
                     model_hash=None,
                     postprocessing=None):
@@ -490,9 +504,15 @@ def format_metadata(opt,
     # add some RFC266 fields that are generated internally, and not as
     # user args
     image_dict = opt.to_dict(
-        seed=seed,
         postprocessing=postprocessing
     )
+
+    # TODO: This is just a hack until postprocessing pipeline work completed
+    image_dict['postprocessing'] = []
+    if image_dict['gfpgan_strength'] > 0:
+        image_dict['postprocessing'].append('GFPGAN')
+    if image_dict['upscale'][0] > 0:
+        image_dict['postprocessing'].append('ESRGAN')
 
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
@@ -515,8 +535,7 @@ def format_metadata(opt,
 
     # variations
     if opt.with_variations:
-        split_vars = opt.variations.split(',')
-        variations = [{'seed':x[0],'weight':x[1]} for x in [ v.split(':') for v in split_vars]]
+        variations = [{'seed':x[0],'weight':x[1]} for x in opt.with_variations]
         rfc_dict['variations'] = variations
 
     if opt.init_img:
@@ -527,13 +546,18 @@ def format_metadata(opt,
     else:
         rfc_dict['type']  = 'txt2img'
 
+    images = []
+    for seed in seeds:
+        rfc_dict['seed'] = seed
+        images.append(copy.copy(rfc_dict))
+
     return {
         'model'       : 'stable diffusion',
         'model_id'    : opt.model,
         'model_hash'  : model_hash,
         'app_id'      : APP_ID,
         'app_version' : APP_VERSION,
-        'images'      : [rfc_dict],
+        'images'      : images,
     }
 
 def sha256(path):

@@ -165,13 +165,17 @@ class DreamServer(BaseHTTPRequestHandler):
                 else:
                     iter_opt.with_variations = opt.with_variations + this_variation
                 iter_opt.variation_amount = 0
-            formatted_prompt   = iter_opt.prompt_str(seed=seed)
+            formatted_prompt  = iter_opt.dream_prompt_str(seed=seed)
             path = pngwriter.save_image_and_prompt_to_png(
                 image,
-                prompt   = formatted_prompt,
-                metadata = format_metadata(iter_opt),
+                dream_prompt   = formatted_prompt,
+                metadata = format_metadata(iter_opt,
+                                           seeds      = [seed],
+                                           weights    = self.model.weights,
+                                           model_hash = self.model.model_hash
+                ),
                 name     = name,
-                )
+            )
 
             if int(config['seed']) == -1:
                 config['seed'] = seed

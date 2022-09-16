@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import json
 from ldm.dream.pngwriter import retrieve_metadata
 
 if len(sys.argv) < 2:
@@ -12,7 +13,7 @@ filenames = sys.argv[1:]
 for f in filenames:
     try:
         metadata = retrieve_metadata(f)
-        print(f'{f}:',metadata)
+        print(f'{f}:\n',json.dumps(metadata, indent=4))
     except FileNotFoundError:
         sys.stderr.write(f'{f} not found\n')
         continue
