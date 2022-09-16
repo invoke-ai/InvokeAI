@@ -7,7 +7,7 @@ import os
 import sys
 from flask import Flask
 from flask_cors import CORS
-from flask_socketio import SocketIO, join_room, leave_room
+from flask_socketio import SocketIO
 from omegaconf import OmegaConf
 from dependency_injector.wiring import inject, Provide
 from server import views
@@ -58,6 +58,8 @@ def run_app(config, host, port) -> Flask:
 
   # TODO: Get storage root from config
   app.add_url_rule('/api/images/<string:dreamId>', view_func=views.ApiImages.as_view('api_images', '../'))
+  app.add_url_rule('/api/images/<string:dreamId>/metadata', view_func=views.ApiImagesMetadata.as_view('api_images_metadata', '../'))
+  app.add_url_rule('/api/images', view_func=views.ApiImagesList.as_view('api_images_list'))
   app.add_url_rule('/api/intermediates/<string:dreamId>/<string:step>', view_func=views.ApiIntermediates.as_view('api_intermediates', '../'))
 
   app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../static/dream_web/')) 
@@ -90,19 +92,18 @@ def main():
     print('--weights argument has been deprecated. Please configure ./configs/models.yaml, and call it using --model instead.')
     sys.exit(-1)
       
-  try:
-    models  = OmegaConf.load(opt.config)
-    width   = models[opt.model].width
-    height  = models[opt.model].height
-    config  = models[opt.model].config
-    weights = models[opt.model].weights
-  except (FileNotFoundError, IOError, KeyError) as e:
-    print(f'{e}. Aborting.')
-    sys.exit(-1)
+  # try:
+  #   models  = OmegaConf.load(opt.config)
+  #   width   = models[opt.model].width
+  #   height  = models[opt.model].height
+  #   config  = models[opt.model].config
+  #   weights = models[opt.model].weights
+  # except (FileNotFoundError, IOError, KeyError) as e:
+  #   print(f'{e}. Aborting.')
+  #   sys.exit(-1)
 
-  print('* Initializing, be patient...\n')
+  #print('* Initializing, be patient...\n')
   sys.path.append('.')
-  from pytorch_lightning import logging
 
   # these two lines prevent a horrible warning message from appearing
   # when the frozen CLIP tokenizer is imported
@@ -110,26 +111,28 @@ def main():
 
   transformers.logging.set_verbosity_error()
 
-  appConfig = {
-    "model": {
-      "width": width,
-      "height": height,
-      "sampler_name": opt.sampler_name,
-      "weights": weights,
-      "full_precision": opt.full_precision,
-      "config": config,
-      "grid": opt.grid,
-      "latent_diffusion_weights": opt.laion400m,
-      "embedding_path": opt.embedding_path,
-      "device_type": opt.device
-    }
-  }
+  appConfig = opt.__dict__
+
+  # appConfig = {
+  #   "model": {
+  #     "width": width,
+  #     "height": height,
+  #     "sampler_name": opt.sampler_name,
+  #     "weights": weights,
+  #     "full_precision": opt.full_precision,
+  #     "config": config,
+  #     "grid": opt.grid,
+  #     "latent_diffusion_weights": opt.laion400m,
+  #     "embedding_path": opt.embedding_path
+  #   }
+  # }
 
   # make sure the output directory exists
   if not os.path.exists(opt.outdir):
     os.makedirs(opt.outdir)
 
   # gets rid of annoying messages about random seed
+  from pytorch_lightning import logging
   logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 
   print('\n* starting api server...')
