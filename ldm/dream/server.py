@@ -22,6 +22,12 @@ def build_opt(post_data, seed, gfpgan_model_exists):
     setattr(opt, 'invert_mask', 'invert_mask' in post_data)
     setattr(opt, 'cfg_scale', float(post_data['cfg_scale']))
     setattr(opt, 'sampler_name', post_data['sampler_name'])
+
+    # embiggen not practical at this point because we have no way of feeding images back into img2img
+    # however, this code is here against that eventuality
+    setattr(opt, 'embiggen', None)
+    setattr(opt, 'embiggen_tiles', None)
+
     setattr(opt, 'gfpgan_strength', float(post_data['gfpgan_strength']) if gfpgan_model_exists else 0)
     setattr(opt, 'upscale', [int(post_data['upscale_level']), float(post_data['upscale_strength'])] if post_data['upscale_level'] != '' else None)
     setattr(opt, 'progress_images', 'progress_images' in post_data)
@@ -103,10 +109,14 @@ class DreamServer(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(bytes('{}', 'utf8'))
         else:
-            path = "." + self.path
-            cwd = os.path.realpath(os.getcwd())
-            is_in_cwd = os.path.commonprefix((os.path.realpath(path), cwd)) == cwd
-            if not (is_in_cwd and os.path.exists(path)):
+            path_dir = os.path.dirname(self.path)
+            out_dir  = os.path.realpath(self.outdir.rstrip('/'))
+            if self.path.startswith('/static/dream_web/'):
+                path = '.' + self.path
+            elif out_dir.replace('\\', '/').endswith(path_dir):
+                file = os.path.basename(self.path)
+                path = os.path.join(self.outdir,file)
+            else:
                 self.send_response(404)
                 return
             mime_type = mimetypes.guess_type(path)[0]
@@ -114,7 +124,7 @@ class DreamServer(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-type", mime_type)
                 self.end_headers()
-                with open("." + self.path, "rb") as content:
+                with open(path, "rb") as content:
                     self.wfile.write(content.read())
             else:
                 self.send_response(404)
@@ -151,6 +161,7 @@ class DreamServer(BaseHTTPRequestHandler):
         def image_done(image, seed, upscaled=False):
             name = f'{prefix}.{seed}.png'
             iter_opt = argparse.Namespace(**vars(opt)) # copy
+            print(f'iter_opt = {iter_opt}')
             if opt.variation_amount > 0:
                 this_variation = [[seed, opt.variation_amount]]
                 if opt.with_variations is None:
