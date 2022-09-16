@@ -140,6 +140,7 @@ SOCKET.IO LISTENERS
 
 @socketio.on('requestAllImages')
 def handle_request_all_images():
+    print(f'>> All images requested')
     parser = create_cmd_parser()
     paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
     paths.sort(key=lambda x: os.path.getmtime(x))
@@ -160,6 +161,7 @@ def handle_request_all_images():
 
 @socketio.on('generateImage')
 def handle_generate_image_event(generation_parameters, esrgan_parameters, gfpgan_parameters):
+    print(f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}')
     generate_images(
         generation_parameters,
         esrgan_parameters,
@@ -170,6 +172,7 @@ def handle_generate_image_event(generation_parameters, esrgan_parameters, gfpgan
 
 @socketio.on('runESRGAN')
 def handle_run_esrgan_event(original_image, esrgan_parameters):
+    print(f'>> ESRGAN upscale requested for "{original_image["url"]}": {esrgan_parameters}')
     image = Image.open(original_image["url"])
 
     seed = original_image['metadata']['seed'] if 'seed' in original_image['metadata'] else 'unknown_seed'
@@ -194,6 +197,7 @@ def handle_run_esrgan_event(original_image, esrgan_parameters):
 
 @socketio.on('runGFPGAN')
 def handle_run_gfpgan_event(original_image, gfpgan_parameters):
+    print(f'>> GFPGAN face fix requested for "{original_image["url"]}": {gfpgan_parameters}')
     image = Image.open(original_image["url"])
 
     seed = original_image['metadata']['seed'] if 'seed' in original_image['metadata'] else 'unknown_seed'
@@ -217,6 +221,7 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
 
 @socketio.on('cancel')
 def handle_cancel():
+    print(f'>> Cancel processing requested')
     canceled.set()
     return make_response("OK")
 
@@ -224,6 +229,7 @@ def handle_cancel():
 # TODO: I think this needs a safety mechanism.
 @socketio.on('deleteImage')
 def handle_delete_image(path):
+    print(f'>> Delete requested "{path}"')
     Path(path).unlink()
     return make_response("OK")
 
@@ -231,6 +237,7 @@ def handle_delete_image(path):
 # TODO: I think this needs a safety mechanism.
 @socketio.on('uploadInitialImage')
 def handle_upload_initial_image(bytes, name):
+    print(f'>> Init image upload requested "{name}"')
     uuid = uuid4().hex
     split = os.path.splitext(name)
     name = f'{split[0]}.{uuid}{split[1]}'
@@ -243,7 +250,8 @@ def handle_upload_initial_image(bytes, name):
 
 # TODO: I think this needs a safety mechanism.
 @socketio.on('uploadMaskImage')
-def handle_upload_initial_image(bytes, name):
+def handle_upload_mask_image(bytes, name):
+    print(f'>> Mask image upload requested "{name}"')
     uuid = uuid4().hex
     split = os.path.splitext(name)
     name = f'{split[0]}.{uuid}{split[1]}'
@@ -356,6 +364,7 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
         path = save_image(image, all_parameters, result_path, postprocessing=postprocessing)
         command = parameters_to_command(all_parameters)
 
+        print(f'Image generated: "{path}"')
         write_log_message(f'[Generated] "{path}": {command}')
 
         socketio.emit(

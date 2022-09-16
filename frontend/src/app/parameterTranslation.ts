@@ -26,6 +26,7 @@ export const frontendToBackendParameters = (
         sampler,
         seed,
         seamless,
+        shouldUseInitImage,
         img2imgStrength,
         initialImagePath,
         maskPath,
@@ -60,7 +61,7 @@ export const frontendToBackendParameters = (
         ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
         : seed;
 
-    if (initialImagePath) {
+    if (shouldUseInitImage) {
         generationParameters.init_img = initialImagePath;
         generationParameters.strength = img2imgStrength;
         generationParameters.fit = shouldFitToWidthHeight;
@@ -126,15 +127,6 @@ export const backendToFrontendParameters = (parameters: {
     } = parameters;
 
     const sd: { [key: string]: any } = {
-        prompt,
-        iterations,
-        steps,
-        cfgScale: cfg_scale,
-        height,
-        width,
-        sampler: sampler_name,
-        seed,
-        seamless,
         shouldDisplayInProgress: progress_images,
         // init
         shouldGenerateVariations: false,
@@ -164,11 +156,26 @@ export const backendToFrontendParameters = (parameters: {
     }
 
     if (init_img) {
+        sd.shouldUseInitImage = true
         sd.initialImagePath = init_img;
         sd.strength = strength;
         if (init_mask) {
             sd.maskPath = init_mask;
         }
+    }
+
+    // if we had a prompt, add all the metadata, but if we don't have a prompt,
+    // we must have only done ESRGAN or GFPGAN so do not add that metadata
+    if (prompt) {
+        sd.prompt = prompt;
+        sd.iterations = iterations;
+        sd.steps = steps;
+        sd.cfgScale = cfg_scale;
+        sd.height = height;
+        sd.width = width;
+        sd.sampler = sampler_name;
+        sd.seed = seed;
+        sd.seamless = seamless;
     }
 
     return sd;

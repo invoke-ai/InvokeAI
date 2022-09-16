@@ -4,7 +4,6 @@ import {
     FormLabel,
     Heading,
     HStack,
-    IconButton,
     Modal,
     ModalBody,
     ModalCloseButton,
@@ -16,7 +15,6 @@ import {
     Text,
     useDisclosure,
 } from '@chakra-ui/react';
-import { MdSettings } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import {
     setShouldConfirmOnDelete,
@@ -28,6 +26,7 @@ import SDButton from '../../components/SDButton';
 import { persistor } from '../../main';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
+import { cloneElement, ReactElement } from 'react';
 
 const systemSelector = createSelector(
     (state: RootState) => state.system,
@@ -40,7 +39,11 @@ const systemSelector = createSelector(
     }
 );
 
-const SettingsModalButton = () => {
+type Props = {
+    children: ReactElement;
+};
+
+const SettingsModal = ({ children }: Props) => {
     const {
         isOpen: isSettingsModalOpen,
         onOpen: onSettingsModalOpen,
@@ -67,14 +70,9 @@ const SettingsModalButton = () => {
 
     return (
         <>
-            <IconButton
-                aria-label='Settings'
-                variant='link'
-                fontSize={24}
-                size={'sm'}
-                icon={<MdSettings />}
-                onClick={onSettingsModalOpen}
-            />
+            {cloneElement(children, {
+                onClick: onSettingsModalOpen,
+            })}
 
             <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
                 <ModalOverlay />
@@ -169,4 +167,4 @@ const SettingsModalButton = () => {
     );
 };
 
-export default SettingsModalButton;
+export default SettingsModal;

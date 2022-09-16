@@ -1,7 +1,7 @@
 import { Center, Flex, Image, useColorModeValue } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import { setInitialImagePath } from '../sd/sdSlice';
+import { setAllParameters, setInitialImagePath, setSeed } from '../sd/sdSlice';
 import { useState } from 'react';
 import ImageMetadataViewer from './ImageMetadataViewer';
 import DeleteImageModalButton from './DeleteImageModalButton';
@@ -11,7 +11,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { SystemState } from '../system/systemSlice';
 import { isEqual } from 'lodash';
 
-const height = 'calc(100vh - 270px)';
+const height = 'calc(100vh - 238px)';
 
 const systemSelector = createSelector(
     (state: RootState) => state.system,
@@ -62,16 +62,28 @@ const CurrentImage = () => {
                             dispatch(setInitialImagePath(imageToDisplay.url))
                         }
                     />
+
                     <SDButton
-                        label='Details'
+                        label='Use all'
                         colorScheme={'gray'}
-                        variant={shouldShowImageDetails ? 'solid' : 'outline'}
-                        borderWidth={1}
                         flexGrow={1}
+                        variant={'outline'}
                         onClick={() =>
-                            setShouldShowImageDetails(!shouldShowImageDetails)
+                            dispatch(setAllParameters(imageToDisplay.metadata))
                         }
                     />
+
+                    <SDButton
+                        label='Use seed'
+                        colorScheme={'gray'}
+                        flexGrow={1}
+                        variant={'outline'}
+                        isDisabled={!imageToDisplay.metadata.seed}
+                        onClick={() =>
+                            dispatch(setSeed(imageToDisplay.metadata.seed!))
+                        }
+                    />
+
                     <SDButton
                         label='Upscale'
                         colorScheme={'gray'}
@@ -95,6 +107,16 @@ const CurrentImage = () => {
                             !(isConnected && !isProcessing)
                         }
                         onClick={() => dispatch(runGFPGAN(imageToDisplay))}
+                    />
+                    <SDButton
+                        label='Details'
+                        colorScheme={'gray'}
+                        variant={shouldShowImageDetails ? 'solid' : 'outline'}
+                        borderWidth={1}
+                        flexGrow={1}
+                        onClick={() =>
+                            setShouldShowImageDetails(!shouldShowImageDetails)
+                        }
                     />
                     <DeleteImageModalButton image={imageToDisplay}>
                         <SDButton

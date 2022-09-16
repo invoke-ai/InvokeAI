@@ -11,7 +11,11 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { cloneElement, MouseEventHandler, ReactElement } from 'react';
+import {
+  cloneElement,
+  ReactElement,
+  SyntheticEvent,
+} from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { deleteImage } from '../../app/socketio';
 import { RootState } from '../../app/store';
@@ -39,7 +43,7 @@ const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
   const dispatch = useAppDispatch();
   const shouldConfirmOnDelete = useAppSelector(systemSelector);
 
-  const handleClickDelete: MouseEventHandler<HTMLButtonElement> = (e) => {
+  const handleClickDelete = (e: SyntheticEvent) => {
     e.stopPropagation();
     shouldConfirmOnDelete ? onOpen() : handleDelete();
   };
@@ -60,7 +64,7 @@ const DeleteImageModalButton = (props: Omit<Props, 'aria-label'>) => {
   return (
     <>
       {cloneElement(children, {
-        onClickCapture: handleClickDelete,
+        onClick: handleClickDelete,
       })}
 
       <Modal isOpen={isOpen} onClose={onClose}>

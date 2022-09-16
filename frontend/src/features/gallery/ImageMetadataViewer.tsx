@@ -52,52 +52,64 @@ const ImageMetadataViewer = ({ image }: Props) => {
                 </Link>
             </Flex>
             {metadata.length ? (
-                <List>
-                    {metadata.map((parameter) => {
-                        const { label, key, value } = parameter;
-                        return (
-                            <ListItem pb={1}>
-                                <Flex gap={2}>
-                                    <IconButton
-                                        aria-label='Use this parameter'
-                                        icon={<FaPlus />}
-                                        size={'xs'}
-                                        onClick={() =>
-                                            dispatch(
-                                                setParameter({
-                                                    key,
-                                                    value,
-                                                })
-                                            )
-                                        }
-                                    />
-                                    <Text fontWeight={'semibold'}>
-                                        {label}:
-                                    </Text>
+                <>
+                    <List>
+                        {metadata.map((parameter, i) => {
+                            const { label, key, value } = parameter;
+                            return (
+                                <ListItem key={i} pb={1}>
+                                    <Flex gap={2}>
+                                        <IconButton
+                                            aria-label='Use this parameter'
+                                            icon={<FaPlus />}
+                                            size={'xs'}
+                                            onClick={() =>
+                                                dispatch(
+                                                    setParameter({
+                                                        key,
+                                                        value,
+                                                    })
+                                                )
+                                            }
+                                        />
+                                        <Text fontWeight={'semibold'}>
+                                            {label}:
+                                        </Text>
 
-                                    {value === undefined ||
-                                    value === null ||
-                                    value === '' ||
-                                    value === 0 ? (
-                                        <Text
-                                            maxHeight={100}
-                                            fontStyle={'italic'}
-                                        >
-                                            None
-                                        </Text>
-                                    ) : (
-                                        <Text
-                                            maxHeight={100}
-                                            overflowY={'scroll'}
-                                        >
-                                            {value.toString()}
-                                        </Text>
-                                    )}
-                                </Flex>
-                            </ListItem>
-                        );
-                    })}
-                </List>
+                                        {value === undefined ||
+                                        value === null ||
+                                        value === '' ||
+                                        value === 0 ? (
+                                            <Text
+                                                maxHeight={100}
+                                                fontStyle={'italic'}
+                                            >
+                                                None
+                                            </Text>
+                                        ) : (
+                                            <Text
+                                                maxHeight={100}
+                                                overflowY={'scroll'}
+                                            >
+                                                {value.toString()}
+                                            </Text>
+                                        )}
+                                    </Flex>
+                                </ListItem>
+                            );
+                        })}
+                    </List>
+                    <Flex gap={2}>
+                        <Text fontWeight={'semibold'}>Raw:</Text>
+                        <Text
+                            maxHeight={100}
+                            overflowY={'scroll'}
+                            wordBreak={'break-all'}
+                        >
+                            {JSON.stringify(image.metadata)}
+                        </Text>
+                    </Flex>
+                </>
             ) : (
                 <Center width={'100%'} pt={10}>
                     <Text fontSize={'lg'} fontWeight='semibold'>

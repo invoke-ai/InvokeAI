@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import dateFormat from 'dateformat';
+import { ExpandedIndex } from '@chakra-ui/react';
 
 export interface LogEntry {
   timestamp: string;
@@ -22,6 +23,7 @@ export interface SystemState {
   isConnected: boolean;
   socketId: string;
   shouldConfirmOnDelete: boolean;
+  openAccordions: ExpandedIndex;
 }
 
 const initialSystemState = {
@@ -35,6 +37,7 @@ const initialSystemState = {
   isESRGANAvailable: true,
   socketId: '',
   shouldConfirmOnDelete: true,
+  openAccordions: [0],
 };
 
 const initialState: SystemState = initialSystemState;
@@ -46,7 +49,6 @@ export const systemSlice = createSlice({
     setShouldDisplayInProgress: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayInProgress = action.payload;
     },
-
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
       if (action.payload === false) {
@@ -75,6 +77,9 @@ export const systemSlice = createSlice({
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
     },
+    setOpenAccordions: (state, action: PayloadAction<ExpandedIndex>) => {
+      state.openAccordions = action.payload;
+    },
   },
 });
 
@@ -87,6 +92,7 @@ export const {
   setIsConnected,
   setSocketId,
   setShouldConfirmOnDelete,
+  setOpenAccordions,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

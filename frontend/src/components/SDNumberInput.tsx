@@ -5,14 +5,14 @@ import {
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
-  HStack,
   Text,
   FormLabel,
   NumberInputProps,
+  Flex,
 } from '@chakra-ui/react';
 
 interface Props extends NumberInputProps {
-  label: string;
+  label?: string;
   width?: string | number;
 }
 
@@ -20,7 +20,7 @@ const SDNumberInput = (props: Props) => {
   const {
     label,
     isDisabled = false,
-    fontSize = 'sm',
+    fontSize = 'md',
     size = 'sm',
     width,
     isInvalid,
@@ -28,25 +28,27 @@ const SDNumberInput = (props: Props) => {
   } = props;
   return (
     <FormControl isDisabled={isDisabled} width={width} isInvalid={isInvalid}>
-      <HStack>
-        <FormLabel marginInlineEnd={0} marginBottom={1}>
-          <Text fontSize={fontSize} whiteSpace='nowrap'>
-            {label}
-          </Text>
-        </FormLabel>
+      <Flex gap={2} justifyContent={'space-between'} alignItems={'center'}>
+        {label && (
+          <FormLabel marginBottom={1}>
+            <Text fontSize={fontSize} whiteSpace='nowrap'>
+              {label}
+            </Text>
+          </FormLabel>
+        )}
         <NumberInput
           size={size}
           {...rest}
           keepWithinRange={false}
           clampValueOnBlur={true}
         >
-          <NumberInputField />
+          <NumberInputField fontSize={'md'}/>
           <NumberInputStepper>
             <NumberIncrementStepper />
             <NumberDecrementStepper />
           </NumberInputStepper>
         </NumberInput>
-      </HStack>
+      </Flex>
     </FormControl>
   );
 };

@@ -28,6 +28,7 @@ export interface SDState {
   gfpganStrength: number;
   upscalingLevel: UpscalingLevel;
   upscalingStrength: number;
+  shouldUseInitImage: boolean;
   initialImagePath: string;
   maskPath: string;
   seamless: boolean;
@@ -51,6 +52,7 @@ const initialSDState: SDState = {
   sampler: 'k_lms',
   seed: 0,
   seamless: false,
+  shouldUseInitImage: false,
   img2imgStrength: 0.75,
   initialImagePath: '',
   maskPath: '',
@@ -58,10 +60,10 @@ const initialSDState: SDState = {
   shouldGenerateVariations: false,
   variantAmount: 0.1,
   seedWeights: '',
-  shouldRunESRGAN: true,
+  shouldRunESRGAN: false,
   upscalingLevel: 4,
   upscalingStrength: 0.75,
-  shouldRunGFPGAN: true,
+  shouldRunGFPGAN: false,
   gfpganStrength: 0.8,
   shouldRandomizeSeed: true,
 };
@@ -80,9 +82,10 @@ export const sdSlice = createSlice({
     },
     setSteps: (state, action: PayloadAction<number>) => {
       const { img2imgStrength, initialImagePath } = state;
-      state.steps = action.payload;
+      const steps = action.payload;
+      state.steps = steps;
       state.realSteps = calculateRealSteps(
-        action.payload,
+        steps,
         img2imgStrength,
         Boolean(initialImagePath)
       );
@@ -101,14 +104,15 @@ export const sdSlice = createSlice({
     },
     setSeed: (state, action: PayloadAction<number>) => {
       state.seed = action.payload;
+      state.shouldRandomizeSeed = false;
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
-      state.img2imgStrength = action.payload;
+      const img2imgStrength = action.payload;
       const { steps, initialImagePath } = state;
-      state.img2imgStrength = action.payload;
+      state.img2imgStrength = img2imgStrength;
       state.realSteps = calculateRealSteps(
         steps,
-        action.payload,
+        img2imgStrength,
         Boolean(initialImagePath)
       );
     },
@@ -121,13 +125,18 @@ export const sdSlice = createSlice({
     setUpscalingStrength: (state, action: PayloadAction<number>) => {
       state.upscalingStrength = action.payload;
     },
+    setShouldUseInitImage: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseInitImage = action.payload;
+    },
     setInitialImagePath: (state, action: PayloadAction<string>) => {
-      state.initialImagePath = action.payload;
+      const initialImagePath = action.payload;
       const { steps, img2imgStrength } = state;
+      state.shouldUseInitImage = initialImagePath ? true : false;
+      state.initialImagePath = initialImagePath;
       state.realSteps = calculateRealSteps(
         steps,
         img2imgStrength,
-        Boolean(action.payload)
+        Boolean(initialImagePath)
       );
     },
     setMaskPath: (state, action: PayloadAction<string>) => {
@@ -138,13 +147,6 @@ export const sdSlice = createSlice({
     },
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
-    },
-    resetInitialImagePath: (state) => {
-      state.initialImagePath = '';
-      state.maskPath = '';
-    },
-    resetMaskPath: (state) => {
-      state.maskPath = '';
     },
     resetSeed: (state) => {
       state.seed = -1;
@@ -158,6 +160,12 @@ export const sdSlice = createSlice({
     ) => {
       const { key, value } = action.payload;
       const temp = { ...state, [key]: value };
+      if (key === 'seed') {
+        temp.shouldRandomizeSeed = false;
+      }
+      if (key === 'initialImagePath' && value === '') {
+        temp.shouldUseInitImage = false;
+      }
       return temp;
     },
     setShouldGenerateVariations: (state, action: PayloadAction<boolean>) => {
@@ -170,12 +178,58 @@ export const sdSlice = createSlice({
       state.seedWeights = action.payload;
     },
     setAllParameters: (state, action: PayloadAction<SDMetadata>) => {
-      const newState = { ...state, ...action.payload };
+      const {
+        prompt,
+        steps,
+        cfgScale,
+        height,
+        width,
+        sampler,
+        seed,
+        img2imgStrength,
+        gfpganStrength,
+        upscalingLevel,
+        upscalingStrength,
+        initialImagePath,
+        maskPath,
+        seamless,
+        shouldFitToWidthHeight,
+      } = action.payload;
+
+      // ?? = falsy values ('', 0, etc) are used
+      // || = falsy values not used
+      state.prompt = prompt ?? state.prompt;
+      state.steps = steps || state.steps;
+      state.cfgScale = cfgScale || state.cfgScale;
+      state.width = width || state.width;
+      state.height = height || state.height;
+      state.sampler = sampler || state.sampler;
+      state.seed = seed ?? state.seed;
+      state.seamless = seamless ?? state.seamless;
+      state.shouldFitToWidthHeight =
+        shouldFitToWidthHeight ?? state.shouldFitToWidthHeight;
+      state.img2imgStrength = img2imgStrength ?? state.img2imgStrength;
+      state.gfpganStrength = gfpganStrength ?? state.gfpganStrength;
+      state.upscalingLevel = upscalingLevel ?? state.upscalingLevel;
+      state.upscalingStrength = upscalingStrength ?? state.upscalingStrength;
+      state.initialImagePath = initialImagePath ?? state.initialImagePath;
+      state.maskPath = maskPath ?? state.maskPath;
+
       // If the image whose parameters we are using has a seed, disable randomizing the seed
-      if (action.payload.seed) {
-        newState.shouldRandomizeSeed = false;
+      if (seed) {
+        state.shouldRandomizeSeed = false;
       }
-      return newState;
+
+      // if we have a gfpgan strength, enable it
+      state.shouldRunGFPGAN = gfpganStrength ? true : false;
+
+      // if we have a esrgan strength, enable it
+      state.shouldRunESRGAN = upscalingLevel ? true : false;
+
+      // if we want to recreate an image exactly, we disable variations
+      state.shouldGenerateVariations = false;
+
+      state.shouldUseInitImage = initialImagePath ? true : false;
     },
     resetSDState: (state) => {
       return {
@@ -209,9 +263,9 @@ export const {
   setGfpganStrength,
   setUpscalingLevel,
   setUpscalingStrength,
+  setShouldUseInitImage,
   setInitialImagePath,
   setMaskPath,
-  resetInitialImagePath,
   resetSeed,
   randomizeSeed,
   resetSDState,

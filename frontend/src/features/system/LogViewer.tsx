@@ -9,7 +9,7 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
 import { setShouldShowLogViewer, SystemState } from './systemSlice';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { FaAngleDoubleDown, FaMinus, FaPlus } from 'react-icons/fa';
+import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
@@ -112,7 +112,7 @@ const LogViewer = () => {
                     bottom={2}
                     variant={'solid'}
                     aria-label='Toggle Log Viewer'
-                    icon={shouldShowLogViewer ? <FaMinus /> : <FaPlus />}
+                    icon={shouldShowLogViewer ? <FaMinus /> : <FaCode />}
                     onClick={() =>
                         dispatch(setShouldShowLogViewer(!shouldShowLogViewer))
                     }

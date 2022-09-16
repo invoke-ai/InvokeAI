@@ -11,10 +11,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
 import { FaSun, FaMoon, FaGithub } from 'react-icons/fa';
-import { MdHelp } from 'react-icons/md';
+import { MdHelp, MdSettings } from 'react-icons/md';
 import { useAppSelector } from '../../app/hooks';
 import { RootState } from '../../app/store';
-import SettingsModalButton from '../system/SettingsModalButton';
+import SettingsModal from '../system/SettingsModal';
 import { SystemState } from '../system/systemSlice';
 
 const systemSelector = createSelector(
@@ -32,7 +32,7 @@ const SiteHeader = () => {
   const { isConnected } = useAppSelector(systemSelector);
 
   return (
-    <Flex minWidth='max-content' alignItems='center' gap='1'>
+    <Flex minWidth='max-content' alignItems='center' gap='1' pl={2} pr={1}>
       <Heading size={'lg'}>Stable Diffusion Dream Server</Heading>
 
       <Spacer />
@@ -41,7 +41,15 @@ const SiteHeader = () => {
         {isConnected ? `Connected to server` : 'No connection to server'}
       </Text>
 
-      <SettingsModalButton />
+      <SettingsModal>
+        <IconButton
+          aria-label='Settings'
+          variant='link'
+          fontSize={24}
+          size={'sm'}
+          icon={<MdSettings />}
+        />
+      </SettingsModal>
 
       <IconButton
         aria-label='Link to Github Issues'

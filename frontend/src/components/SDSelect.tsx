@@ -1,7 +1,7 @@
 import {
+    Flex,
     FormControl,
     FormLabel,
-    HStack,
     Select,
     SelectProps,
     Text,
@@ -20,17 +20,15 @@ const SDSelect = (props: Props) => {
         isDisabled,
         validValues,
         size = 'sm',
-        fontSize = 'sm',
-        marginInlineEnd = 0,
+        fontSize = 'md',
         marginBottom = 1,
         whiteSpace = 'nowrap',
         ...rest
     } = props;
     return (
         <FormControl isDisabled={isDisabled}>
-            <HStack>
+            <Flex justifyContent={'space-between'} alignItems={'center'}>
                 <FormLabel
-                    marginInlineEnd={marginInlineEnd}
                     marginBottom={marginBottom}
                 >
                     <Text fontSize={fontSize} whiteSpace={whiteSpace}>
@@ -51,7 +49,7 @@ const SDSelect = (props: Props) => {
                         );
                     })}
                 </Select>
-            </HStack>
+            </Flex>
         </FormControl>
     );
 };

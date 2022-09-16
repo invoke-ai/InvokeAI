@@ -1,12 +1,11 @@
-'''
-Accepts seed weights as string in "12345:0.1,23456:0.2,3456:0.3" format
-Validates them
-If valid: returns as [[12345, 0.1], [23456, 0.2], [3456, 0.3]]
-If invalid: returns False
-'''
-
-
 def parse_seed_weights(seed_weights):
+    """
+    Accepts seed weights as string in "12345:0.1,23456:0.2,3456:0.3" format
+    Validates them
+    If valid: returns as [[12345, 0.1], [23456, 0.2], [3456, 0.3]]
+    If invalid: returns False
+    """
+
     # Must be a string
     if not isinstance(seed_weights, str):
         return False

@@ -26,7 +26,6 @@ export const HEIGHTS: Array<number> = [
 
 // Valid upscaling levels
 export const UPSCALING_LEVELS: Array<{ key: string; value: number }> = [
-    { key: 'None', value: 0 },
     { key: '2x', value: 2 },
     { key: '4x', value: 4 },
 ];

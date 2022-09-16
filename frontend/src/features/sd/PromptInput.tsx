@@ -13,7 +13,7 @@ const PromptInput = () => {
       name='prompt'
       resize='none'
       size={'lg'}
-      height={100}
+      height={'100%'}
       isInvalid={!prompt.length}
       onChange={(e) => dispatch(setPrompt(e.target.value))}
       value={prompt}

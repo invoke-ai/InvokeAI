@@ -1,13 +1,13 @@
 import {
+  Flex,
   FormControl,
   FormLabel,
-  HStack,
   Switch,
   SwitchProps,
 } from '@chakra-ui/react';
 
 interface Props extends SwitchProps {
-  label: string;
+  label?: string;
   width?: string | number;
 }
 
@@ -15,24 +15,26 @@ const SDSwitch = (props: Props) => {
   const {
     label,
     isDisabled = false,
-    fontSize = 'sm',
+    fontSize = 'md',
     size = 'md',
     width,
     ...rest
   } = props;
   return (
     <FormControl isDisabled={isDisabled} width={width}>
-      <HStack>
-        <FormLabel
-          marginInlineEnd={0}
-          marginBottom={1}
-          fontSize={fontSize}
-          whiteSpace='nowrap'
-        >
-          {label}
-        </FormLabel>
+      <Flex justifyContent={'space-between'} alignItems={'center'}>
+        {label && (
+          <FormLabel
+            fontSize={fontSize}
+            marginBottom={1}
+            flexGrow={2}
+            whiteSpace='nowrap'
+          >
+            {label}
+          </FormLabel>
+        )}
         <Switch size={size} {...rest} />
-      </HStack>
+      </Flex>
     </FormControl>
   );
 };

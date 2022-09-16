@@ -1,52 +1,49 @@
 import { Grid, GridItem } from '@chakra-ui/react';
-import ImageRoll from './features/gallery/ImageRoll';
 import CurrentImage from './features/gallery/CurrentImage';
 import LogViewer from './features/system/LogViewer';
-import Settings from './features/sd/Settings';
 import PromptInput from './features/sd/PromptInput';
-import InitImage from './features/sd/InitImage';
 import ProgressBar from './features/header/ProgressBar';
-import SiteHeader from './features/header/SiteHeader';
-import Variant from './features/sd/Variant';
 import { useEffect } from 'react';
 import { useAppDispatch } from './app/hooks';
 import { requestAllImages } from './app/socketio';
+import ProcessButtons from './features/sd/ProcessButtons';
+import ImageRoll from './features/gallery/ImageRoll';
+import SiteHeader from './features/header/SiteHeader';
+import OptionsAccordion from './features/sd/OptionsAccordion';
 
 const App = () => {
     const dispatch = useAppDispatch();
     useEffect(() => {
         dispatch(requestAllImages());
-    }, []);
+    }, [dispatch]);
     return (
         <>
             <Grid
                 width='100vw'
                 height='100vh'
                 templateAreas={`
-                    "progressBar progressBar progressBar"
-                    "header header header"
-                    "menu prompt imageRoll"
-                    "menu variant imageRoll"
-                    "menu currentImage imageRoll"`}
-                gridTemplateRows={'4px 40px 100px 32px auto'}
-                gridTemplateColumns={'300px auto 388px'}
-                gap='2'
+                    "header header header header"
+                    "progressBar progressBar progressBar progressBar"
+                    "menu prompt processButtons imageRoll"
+                    "menu currentImage currentImage imageRoll"`}
+                gridTemplateRows={'36px 10px 100px auto'}
+                gridTemplateColumns={'350px auto 100px 388px'}
+                gap={2}
             >
+                <GridItem area={'header'} pt={1}>
+                    <SiteHeader />
+                </GridItem>
                 <GridItem area={'progressBar'}>
                     <ProgressBar />
                 </GridItem>
-                <GridItem pl='2' pr='2' area={'header'}>
-                    <SiteHeader />
-                </GridItem>
                 <GridItem pl='2' area={'menu'} overflowY='scroll'>
-                    <Settings />
-                    <InitImage />
+                    <OptionsAccordion />
                 </GridItem>
                 <GridItem area={'prompt'}>
                     <PromptInput />
                 </GridItem>
-                <GridItem area={'variant'}>
-                    <Variant />
+                <GridItem area={'processButtons'}>
+                    <ProcessButtons />
                 </GridItem>
                 <GridItem area={'currentImage'}>
                     <CurrentImage />

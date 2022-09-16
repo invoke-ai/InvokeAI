@@ -7,7 +7,6 @@ import { RootState } from '../../app/store';
 import SDButton from '../../components/SDButton';
 import { SystemState } from '../system/systemSlice';
 import useCheckParameters from '../system/useCheckParameters';
-import { resetSDState } from './sdSlice';
 
 const systemSelector = createSelector(
     (state: RootState) => state.system,
@@ -32,27 +31,25 @@ const ProcessButtons = () => {
     const isReady = useCheckParameters();
 
     return (
-        <Flex gap={2}>
+        <Flex gap={2} direction={'column'} alignItems={'space-between'} height={'100%'}>
             <SDButton
-                label='Generate Image'
+                label='Generate'
                 type='submit'
                 colorScheme='green'
                 flexGrow={1}
                 isDisabled={!isReady}
+                fontSize={'md'}
+                size={'md'}
                 onClick={() => dispatch(generateImage())}
             />
             <SDButton
                 label='Cancel'
                 colorScheme='red'
                 flexGrow={1}
+                fontSize={'md'}
+                size={'md'}
                 isDisabled={!isConnected || !isProcessing}
                 onClick={() => dispatch(cancelProcessing())}
-            />
-            <SDButton
-                label='Reset'
-                colorScheme='blue'
-                flexGrow={1}
-                onClick={() => dispatch(resetSDState())}
             />
         </Flex>
     );

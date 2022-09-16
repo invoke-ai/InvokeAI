@@ -12,5 +12,26 @@ export const theme = extendTheme({
         textColor: props.colorMode === 'dark' ? 'gray.800' : 'gray.100',
       }),
     },
+    Accordion: {
+      baseStyle: (props: StyleFunctionProps) => ({
+        button: {
+          fontWeight: 'bold',
+          _hover: {
+            bgColor:
+              props.colorMode === 'dark'
+                ? 'rgba(255,255,255,0.05)'
+                : 'rgba(0,0,0,0.05)',
+          },
+        },
+        panel: {
+          paddingBottom: 2,
+        },
+      }),
+    },
+    FormLabel: {
+      baseStyle: {
+        fontWeight: 'light',
+      },
+    },
   },
 });
