@@ -20,9 +20,8 @@ from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
 from ldm.gfpgan.gfpgan_tools import run_gfpgan
 from ldm.generate import Generate
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
-from scripts.dream import create_cmd_parser
 
-from modules.parameters import make_generation_parameters, make_esrgan_parameters, make_gfpgan_parameters, parameters_to_command
+from modules.parameters import parameters_to_command, create_cmd_parser
 
 
 """
@@ -152,7 +151,8 @@ def handle_request_all_images():
             try:
                 metadata = vars(parser.parse_args(shlex.split(image.info['Dream'])))
             except SystemExit:
-                # TODO: Unable to parse metadata, ignore it for now...
+                # TODO: Unable to parse metadata, ignore it for now,
+                # this can happen when metadata is missing a prompt
                 pass
         image_array.append({'path': path, 'metadata': metadata})
     return make_response("OK", data=image_array)
