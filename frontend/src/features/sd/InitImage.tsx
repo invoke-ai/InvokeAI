@@ -10,8 +10,8 @@ import {
   useColorModeValue,
   useToast,
 } from '@chakra-ui/react';
-import { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { SyntheticEvent, useCallback, useState } from 'react';
+import { FileRejection, useDropzone } from 'react-dropzone';
 import { FaMask, FaUpload } from 'react-icons/fa';
 import { RiCloseFill } from 'react-icons/ri';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
@@ -32,8 +32,8 @@ const InitImage = () => {
   );
 
   const onDrop = useCallback(
-    (acceptedFiles: Array<File>, fileRejections: any) => {
-      fileRejections.forEach((rejection: any) => {
+    (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
+      fileRejections.forEach((rejection: FileRejection) => {
         const msg = rejection.errors.reduce(
           (acc: string, cur: { message: string }) => acc + '\n' + cur.message,
           ''
@@ -51,7 +51,7 @@ const InitImage = () => {
         dispatch(uploadInitialImage(file));
       });
     },
-    []
+    [dispatch, toast]
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -62,6 +62,14 @@ const InitImage = () => {
   });
 
   const [shouldShowMask, setShouldShowMask] = useState<boolean>(false);
+  const handleClickUploadIcon = (e: SyntheticEvent) => {
+    e.stopPropagation();
+    open();
+  };
+  const handleClickResetInitialImageAndMask = (e: SyntheticEvent) => {
+    e.stopPropagation();
+    dispatch(resetInitialImagePath());
+  };
 
   const handleMouseOver = () => setShouldShowMask(true);
   const handleMouseOut = () => setShouldShowMask(false);
@@ -102,7 +110,7 @@ const InitImage = () => {
                       icon={<RiCloseFill />}
                       fontSize={24}
                       colorScheme='red'
-                      onClick={() => dispatch(resetInitialImagePath())}
+                      onClick={handleClickResetInitialImageAndMask}
                     />
                   </Tooltip>
                   <Tooltip label='Upload new initial image'>
@@ -111,7 +119,7 @@ const InitImage = () => {
                       icon={<FaUpload />}
                       fontSize={20}
                       colorScheme='blue'
-                      onClick={open}
+                      onClick={handleClickUploadIcon}
                     />
                   </Tooltip>
                   <MaskUploader>
@@ -127,7 +135,6 @@ const InitImage = () => {
                         icon={<FaMask />}
                         fontSize={20}
                         colorScheme='blue'
-                        onClick={open}
                       />
                     </Tooltip>
                   </MaskUploader>
