@@ -12,13 +12,13 @@ import shlex
 from threading import Thread
 import time
 from flask_socketio import SocketIO, join_room, leave_room
+from ldm.dream.args import Args
 from ldm.dream.generator import embiggen
 from PIL import Image
 
 from ldm.dream.pngwriter import PngWriter
 from ldm.dream.server import CanceledException
 from ldm.generate import Generate
-from scripts.dream import create_cmd_parser
 from server.models import DreamResult, JobRequest, PaginatedItems, ProgressType, Signal
 
 class JobQueueService:
@@ -106,7 +106,7 @@ class ImageStorageService:
   def __init__(self, location):
     self.__location = location
     self.__pngWriter = PngWriter(self.__location)
-    self.__legacyParser = create_cmd_parser() # TODO: remove this in the future
+    self.__legacyParser = Args() # TODO: inject this?
 
   def __getName(self, dreamId: str, postfix: str = '') -> str:
     return f'{dreamId}{postfix}.png'
@@ -114,7 +114,7 @@ class ImageStorageService:
   def save(self, image, dreamResult: DreamResult, postfix: str = '') -> str:
     name = self.__getName(dreamResult.id, postfix)
     meta = dreamResult.to_json() # TODO: make all methods consistent with writing metadata. Standardize metadata.
-    path = self.__pngWriter.save_image_and_prompt_to_png(image, meta, name)
+    path = self.__pngWriter.save_image_and_prompt_to_png(image, dream_prompt=meta, metadata=None, name=name)
     return path
 
   def path(self, dreamId: str, postfix: str = '') -> str:
@@ -186,7 +186,7 @@ class ImageStorageService:
     switches[0] = switches[0][: len(switches[0]) - 1]
 
     try:
-        opt = self.__legacyParser.parse_args(switches)
+        opt = self.__legacyParser.parse_cmd(switches)
         return opt
     except SystemExit:
         return None

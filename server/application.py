@@ -10,6 +10,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from omegaconf import OmegaConf
 from dependency_injector.wiring import inject, Provide
+from ldm.dream.args import Args
 from server import views
 from server.containers import Container
 from server.services import GeneratorService, SignalService
@@ -81,16 +82,15 @@ def run_app(config, host, port) -> Flask:
 
 def main():
   """Initialize command-line parsers and the diffusion model"""
-  from scripts.dream import create_argv_parser
-  arg_parser = create_argv_parser()
+  arg_parser = Args()
   opt = arg_parser.parse_args()
 
   if opt.laion400m:
-    print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
-    sys.exit(-1)
-  if opt.weights != 'model':
-    print('--weights argument has been deprecated. Please configure ./configs/models.yaml, and call it using --model instead.')
-    sys.exit(-1)
+      print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
+      sys.exit(-1)
+  if opt.weights:
+      print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
+      sys.exit(-1)
       
   # try:
   #   models  = OmegaConf.load(opt.config)

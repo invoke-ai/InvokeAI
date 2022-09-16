@@ -17,9 +17,9 @@ class Container(containers.DeclarativeContainer):
     app = None
   )
 
+  # TODO: Add a model provider service that provides model(s) dynamically
   model_singleton = providers.ThreadSafeSingleton(
     Generate,
-    conf           = config.config,
     model          = config.model,
     sampler_name   = config.sampler_name,
     embedding_path = config.embedding_path,
