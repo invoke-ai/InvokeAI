@@ -186,3 +186,8 @@ testtube
 checkpoints
 # If it's a Mac
 .DS_Store
+
+# Scratch folder
+.scratch/
+.vscode/
+gfpgan/
