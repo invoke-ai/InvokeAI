@@ -6,21 +6,15 @@ import uuid, tempfile
 
 import functools
 import asyncio
-from typing import Literal, Optional
+from typing import Literal
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 
-#from discord_config import settings
 import json
 
-#sys.path.append('.')
-
-intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
-
+# config settings load
 discord_config_path: str = None
 if not discord_config_path or discord_config_path is None or not os.path.exists(discord_config_path):
     discord_config_path = os.path.dirname(os.path.abspath(__file__)) + '/discord_config.json'
@@ -36,26 +30,36 @@ if (not settings or settings is None):
     input(f'INVALID CONFIG FOUND FILE: {discord_config_path}')
     sys.exit(192)
 
+# sd loader
 from ldm.generate import Generate
 model = Generate()
 model.load_model()
 
 # constants
 _MAX_IMAGE_DIMENSION: int = 2048
-_MAX_IMAGE_STEPS: int = 128
+_MAX_IMAGE_STEPS: int = 256
 _MAX_IMAGE_NUMBER: int = 20
 _MAX_DISCORD_EMBEDS: int = 10
 
-# setup
+# loop & queue setup
 dreaming_loop = asyncio.get_event_loop()
 dreaming_queue = asyncio.Queue()
 
-# logic
+# discord setup
+intents = discord.Intents.default()
+intents.members = True
+intents.message_content = True
+
 bot = commands.Bot(command_prefix = settings['prefix'], intents=intents)
 
 @bot.event
 async def on_ready():
-    print('Bot is ready, oauth url: {}'.format(discord.utils.oauth_url(bot.user.id, permissions=discord.Permissions(2147609600))))
+    # permissions = Read Messages | Send Messages | Embed Links | Attach Files | Use Slash Commands
+    print('Bot is ready, oauth url: {}'.format(discord.utils.oauth_url(bot.user.id, permissions=discord.Permissions(2147535872))))
+
+def on_bot_thread(coroutine):
+    bot.loop.create_task(coroutine) # add the coroutine to the bot.loop
+    bot.loop.call_soon_threadsafe(noop) # Force the bot.loop to clear itself with a noop, so that the message gets handled asap
 
 def make_temp_name(dir = tempfile.gettempdir()):
     return os.path.join(dir, str(uuid.uuid1()))
@@ -63,12 +67,8 @@ def make_temp_name(dir = tempfile.gettempdir()):
 def noop():
     pass
 
-def on_bot_thread(coroutine):
-    bot.loop.create_task(coroutine) # add the coroutine as a task to the bot loop
-    bot.loop.call_soon_threadsafe(noop) # Force the bot.loop to clear itself
-
 @bot.hybrid_command(
-    description='Syncs the Discord bot\'s commands'
+    description='Syncs the Discord bot\'s slash commands'
 )
 @commands.guild_only()
 @commands.is_owner()
@@ -134,6 +134,8 @@ class DreamFlags(commands.FlagConverter, prefix = '--'):
     prompt='The prompt to produce an image for'
 )
 async def dream(ctx: commands.Context, *, prompt: str, flags: DreamFlags = None):
+    # prompt is required, but not in flags so we can still use !dream
+
     if flags is None:
         flags = DreamFlags()
 
@@ -145,17 +147,17 @@ async def dream(ctx: commands.Context, *, prompt: str, flags: DreamFlags = None)
             if prompt is None or len(prompt) < 1:
                 await ctx.reply(f'A prompt is required.')
             elif flags.width < 64 or flags.width > _MAX_IMAGE_DIMENSION:
-                await ctx.reply(f'Width must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.width}`.')
+                await ctx.reply(f'width must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.width}`.')
             elif flags.height < 64 or flags.height > _MAX_IMAGE_DIMENSION:
-                await ctx.reply(f'Height must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.height}`.')
+                await ctx.reply(f'height must be between 64 and {_MAX_IMAGE_DIMENSION}. Got `{flags.height}`.')
             elif flags.steps < 1 or flags.steps > _MAX_IMAGE_STEPS:
-                await ctx.reply(f'Steps must be between 1 and {_MAX_IMAGE_STEPS}. Got `{flags.steps}`.')
+                await ctx.reply(f'steps must be between 1 and {_MAX_IMAGE_STEPS}. Got `{flags.steps}`.')
             elif flags.cfg_scale <= 1.0 or flags.cfg_scale > 40.0:
                 await ctx.reply(f'cfg_scale must be between 1.01 and 40.0. Got `{flags.cfg_scale}`.')
             elif flags.iterations < 1 or flags.iterations > _MAX_IMAGE_NUMBER:
-                await ctx.reply(f'Number must be between 1 and {_MAX_IMAGE_NUMBER}. Got `{flags.iterations}`.')
+                await ctx.reply(f'iterations must be between 1 and {_MAX_IMAGE_NUMBER}. Got `{flags.iterations}`.')
             elif flags.img2img_strength < 0.0 or flags.img2img_strength > 0.999:
-                await ctx.reply(f'img2img_noise must be between 0.0 and 0.999. Got `{flags.img2img_strength}`.')
+                await ctx.reply(f'img2img_strength must be between 0.0 and 0.999. Got `{flags.img2img_strength}`.')
             else:
                 if dreaming_queue.qsize() <= 0:
                     message = await ctx.reply('Your dream is queued.')

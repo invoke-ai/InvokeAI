@@ -1,6 +1,4 @@
 {
     "token": "ThisIsAJWT.Generated.ByDiscordForYourBot",
-    "bot": "BotName",
-    "id": 1,
     "prefix": "!"
 }
