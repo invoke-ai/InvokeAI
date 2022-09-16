@@ -13,6 +13,7 @@ import ldm.dream.readline
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
 from ldm.dream.image_util import make_grid
+from ldm.dream.log import write_log
 from omegaconf import OmegaConf
 
 # Placeholder to be replaced with proper class that tracks the
@@ -306,7 +307,8 @@ def main_loop(gen, outdir, prompt_as_dir, parser, infile):
 
         print('Outputs:')
         log_path = os.path.join(current_outdir, 'dream_log')
-        write_log_message(results, log_path ,('txt', 'md'))
+        global output_cntr
+        output_cntr = write_log(results, log_path ,('txt', 'md'), output_cntr)
         print()
 
     print('goodbye!')
@@ -351,30 +353,6 @@ def dream_server_loop(gen, host, port, outdir):
         pass
 
     dream_server.server_close()
-
-
-def write_log_message(results, log_path, file_types):
-    """logs the name of the output image, prompt, and prompt args to the terminal and log file"""
-    global output_cntr
-    log_lines = [f'{path}: {prompt}\n' for path, prompt in results]
-    for l in log_lines:
-        output_cntr += 1
-        print(f'[{output_cntr}] {l}',end='')
-    for file_type in file_types:
-        if file_type == 'txt':
-            with open(log_path + '.txt', 'a', encoding='utf-8') as file:
-                file.writelines(log_lines)
-        elif file_type == 'md' or file_type == 'markdown':
-            md_lines = []
-            for path,prompt in results:
-                file_name = os.path.basename(path)
-                md_lines.append(f'## {file_name}\n![]({file_name})\n{prompt}\n')
-            with open(log_path + '.md', 'a', encoding='utf-8') as file:
-                file.writelines(md_lines)
-        else:
-            print(f"'{file_type}' format is not supported, so write in plain text")
-            with open(log_path + '.' + file_type, 'a', encoding='utf-8') as file:
-                file.writelines(log_lines)
 
 
 
