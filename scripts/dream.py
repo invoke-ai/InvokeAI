@@ -380,7 +380,10 @@ def write_log_message(results, log_path,file_types):
             with open(log_path+'.txt', 'a', encoding='utf-8') as file:
                 file.writelines(log_lines)
         elif file_type == 'md' or file_type == 'markdown':
-            md_lines = [f'![]({os.path.basename(path)})\n{prompt}\n' for path,prompt in results]
+            md_lines = []
+            for path,prompt in results:
+                file_name = os.path.basename(path)
+                md_lines.append(f'## {file_name}\n![]({file_name})\n{prompt}\n')
             with open(log_path+'.md', 'a', encoding='utf-8') as file:
                 file.writelines(md_lines)
         else:
