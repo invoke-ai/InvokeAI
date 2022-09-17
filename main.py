@@ -122,7 +122,7 @@ def get_parser(**parser_kwargs):
         '-s',
         '--seed',
         type=int,
-        default=23,
+        default=None,
         help='seed for seed_everything',
     )
     parser.add_argument(
@@ -291,7 +291,8 @@ class DataModuleFromConfig(pl.LightningDataModule):
             self.datasets['train'],
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False if is_iterable_dataset else True,
+            # shuffle=False if is_iterable_dataset else True,
+            shuffle=True,
             worker_init_fn=init_fn,
         )
 
