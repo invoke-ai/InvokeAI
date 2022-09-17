@@ -12,9 +12,11 @@ log_tokenization()              print out colour-coded tokens and warn if trunca
 import re
 import torch
 
-def get_uc_and_c(prompt, model, log_tokens=False, skip_normalize=False):
-    uc = model.get_learned_conditioning([''])
-
+def get_uc_and_c(prompt, unconditional, model, log_tokens=False, skip_normalize=False):
+    if unconditional == None:
+        uc = model.get_learned_conditioning([''])
+    else:
+        uc = model.get_learned_conditioning([unconditional])
     # get weighted sub-prompts
     weighted_subprompts = split_weighted_subprompts(
         prompt, skip_normalize
@@ -31,9 +33,14 @@ def get_uc_and_c(prompt, model, log_tokens=False, skip_normalize=False):
                 model.get_learned_conditioning([subprompt]),
                 alpha=weight,
             )
+    elif unconditional != None:
+        log_tokenization(prompt, model, log_tokens)
+        c = model.get_learned_conditioning([prompt])
+        uc = model.get_learned_conditioning([unconditional])        
     else:   # just standard 1 prompt
         log_tokenization(prompt, model, log_tokens)
         c = model.get_learned_conditioning([prompt])
+        uc = model.get_learned_conditioning([''])
     return (uc, c)
 
 def split_weighted_subprompts(text, skip_normalize=False)->list:
