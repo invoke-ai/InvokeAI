@@ -683,8 +683,8 @@ if __name__ == '__main__':
         else:
             name = ''
 
-        # if opt.datadir_in_name:
-        #     now = os.path.basename(os.path.normpath(opt.data_root)) + now
+        if opt.datadir_in_name:
+            now = os.path.basename(os.path.normpath(opt.data_root)) + now
 
         nowname = now + name + opt.postfix
         logdir = os.path.join(opt.logdir, nowname)
@@ -878,9 +878,8 @@ if __name__ == '__main__':
         trainer.logdir = logdir
 
         # data
-        # config.data.params.train.params.data_root = opt.data_root
-        # config.data.params.validation.params.data_root = opt.data_root
-        data = instantiate_from_config(config.data)
+        config.data.params.train.params.data_root = opt.data_root
+        config.data.params.validation.params.data_root = opt.data_root
 
         data = instantiate_from_config(config.data)
         # NOTE according to https://pytorch-lightning.readthedocs.io/en/latest/datamodules.html
