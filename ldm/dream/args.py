@@ -87,6 +87,7 @@ import hashlib
 import os
 import copy
 import base64
+import sys
 from ldm.dream.conditioning import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
@@ -121,6 +122,14 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             self._arg_switches = self._arg_parser.parse_args()
+
+            if self._arg_switches.laion400m:
+                print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
+                sys.exit(-1)
+            if self._arg_switches.weights:
+                print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
+                sys.exit(-1)
+
             return self._arg_switches
         except:
             return None
@@ -627,7 +636,7 @@ def metadata_dumps(opt,
 
     images = []
     if len(seeds)==0 and opt.seed:
-        seeds=[seed]
+        seeds=[opt.seed]
         
     for seed in seeds:
         rfc_dict['seed'] = seed
