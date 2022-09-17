@@ -94,7 +94,6 @@ To run in full-precision mode, start `dream.py` with the `--full_precision` flag
 
 #### Major Features
 
-
 - [Interactive Command Line Interface](docs/features/CLI.md)
 - [Image To Image](docs/features/IMG2IMG.md)
 - [Inpainting Support](docs/features/INPAINTING.md)
@@ -109,7 +108,6 @@ To run in full-precision mode, start `dream.py` with the `--full_precision` flag
 - [Personalizing Text-to-Image Generation](docs/features/TEXTUAL_INVERSION.md)
 - [Simplified API for text to image generation](docs/features/OTHER.md#simplified-api)
 - [Self-hosted Discord Bot](docs/features/DISCORD_BOT.md)
-
 
 #### Other Features
 
@@ -181,7 +179,5 @@ Original portions of the software are Copyright (c) 2020
 
 ### Further Reading
 
-
 Please see the original README for more information on this software and underlying algorithm,
 located in the file [README-CompViz.md](docs/other/README-CompViz.md).
-
