@@ -544,6 +544,12 @@ def create_cmd_parser():
         description='Example: dream> a fantastic alien landscape -W1024 -H960 -s100 -n12'
     )
     parser.add_argument('prompt')
+    parser.add_argument('-u', 
+        type=str, 
+        dest=('unconditional'),
+        default=None,
+        help='Unconditional conditioning string'
+    )
     parser.add_argument('-s', '--steps', type=int, help='Number of steps')
     parser.add_argument(
         '-S',
