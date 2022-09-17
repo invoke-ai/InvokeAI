@@ -64,21 +64,24 @@ class DreamBase():
       self.id = j.get('id')
 
     # Initial Image
-    self.enable_init_image = 'enable_init_image' in j and bool(j.get('enable_init_image'))
+    self.enable_init_image = bool(j.get('enable_init_image') or False)
     if self.enable_init_image:
       self.initimg = j.get('initimg')
 
       # Img2Img
-      self.enable_img2img = 'enable_img2img' in j and bool(j.get('enable_img2img'))
+      self.enable_img2img = bool(j.get('enable_img2img') or False)
       if self.enable_img2img:
         self.strength = float(j.get('strength'))
         self.fit    = 'fit' in j
+    
+    else:
+      self.enable_img2img = False
 
     # Generation
-    self.enable_generate = 'enable_generate' in j and bool(j.get('enable_generate'))
+    self.enable_generate = bool(j.get('enable_generate') or False)
     if self.enable_generate:
       self.prompt = j.get('prompt')
-      self.seed = int(j.get('seed'))
+      self.seed = int(j.get('seed') or 0)
       self.steps = int(j.get('steps'))
       self.width = int(j.get('width'))
       self.height = int(j.get('height'))
@@ -90,19 +93,19 @@ class DreamBase():
       self.progress_images = 'progress_images' in j
 
     # GFPGAN
-    self.enable_gfpgan = 'enable_gfpgan' in j and bool(j.get('enable_gfpgan'))
+    self.enable_gfpgan = bool(j.get('enable_gfpgan') or False)
     if self.enable_gfpgan:
       self.gfpgan_strength = float(j.get('gfpgan_strength'))
 
     # Upscale
-    self.enable_upscale = 'enable_upscale' in j and bool(j.get('enable_upscale'))
+    self.enable_upscale = bool(j.get('enable_upscale') or False)
     if self.enable_upscale:
       self.upscale_level    = j.get('upscale_level')
       self.upscale_strength = j.get('upscale_strength')
       self.upscale = None if self.upscale_level in {None,''} else [int(self.upscale_level),float(self.upscale_strength)]
 
     # Embiggen
-    self.enable_embiggen = 'enable_embiggen' in j and bool(j.get('enable_embiggen'))
+    self.enable_embiggen = bool(j.get('enable_embiggen') or False)
     if self.enable_embiggen:
       self.embiggen       = j.get('embiggen')
       self.embiggen_tiles = j.get('embiggen_tiles')
@@ -185,13 +188,13 @@ class ProgressType(Enum):
 class Signal():
   event: str
   data = None
-  room: str = None
+  job: str = None
   broadcast: bool = False
 
-  def __init__(self, event: str, data, room: str = None, broadcast: bool = False):
+  def __init__(self, event: str, data, job: str = None, broadcast: bool = False):
     self.event = event
     self.data = data
-    self.room = room
+    self.job = job
     self.broadcast = broadcast
 
   @staticmethod
@@ -203,7 +206,7 @@ class Signal():
       'totalSteps': totalSteps,
       'hasProgressImage': hasProgressImage,
       'progressType': progressType.name
-    }, room=jobId, broadcast=True)
+    }, job=jobId, broadcast=True)
 
   # TODO: use a result id or something? Like a sub-job
   @staticmethod
@@ -211,26 +214,26 @@ class Signal():
     return Signal('dream_result', {
       'jobId': jobId,
       'dreamId': dreamId,
-      'dreamRequest': dreamResult.clone_without_img().__dict__
-    }, room=jobId, broadcast=True)
+      'dreamResult': dreamResult.clone_without_img().__dict__
+    }, job=jobId, broadcast=True)
 
   @staticmethod
   def job_started(jobId: str):
     return Signal('job_started', {
       'jobId': jobId
-    }, room=jobId, broadcast=True)
+    }, job=jobId, broadcast=True)
     
   @staticmethod
   def job_done(jobId: str):
     return Signal('job_done', {
       'jobId': jobId
-    }, room=jobId, broadcast=True)
+    }, job=jobId, broadcast=True)
 
   @staticmethod
   def job_canceled(jobId: str):
     return Signal('job_canceled', {
       'jobId': jobId
-    }, room=jobId, broadcast=True)
+    }, job=jobId, broadcast=True)
 
 
 class PaginatedItems():

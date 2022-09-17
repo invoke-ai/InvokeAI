@@ -34,19 +34,7 @@ def initialize_generator(
 ):
   pass
 
-
-def run_app(config, host, port) -> Flask:
-  app = Flask(__name__, static_url_path='')
-
-  # Set up dependency injection container
-  container = Container()
-  container.config.from_dict(config)
-  container.wire(modules=[__name__])
-  app.container = container
-  
-  # Set up CORS
-  CORS(app, resources={r'/api/*': {'origins': '*'}})
-
+def add_routes(app: Flask):
   # Web Routes
   app.add_url_rule('/', view_func=views.WebIndex.as_view('web_index', 'index.html'))
   app.add_url_rule('/index.css', view_func=views.WebIndex.as_view('web_index_css', 'index.css'))
@@ -65,9 +53,48 @@ def run_app(config, host, port) -> Flask:
 
   app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../static/dream_web/')) 
 
+def configure_logging():
+  # these two lines prevent a horrible warning message from appearing
+  # when the frozen CLIP tokenizer is imported
+  import transformers
+  transformers.logging.set_verbosity_error()
+
+  # gets rid of annoying messages about random seed
+  from pytorch_lightning import logging
+  logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
+
+
+def run_web_app(config) -> Flask:
+  configure_logging()
+
+  sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+  
+  # Change working directory to the stable-diffusion directory
+  os.chdir(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+  )
+
+  # Create the flask app
+  app = Flask(__name__, static_url_path='')
+
+  # Set up dependency injection container
+  container = Container()
+  container.config.from_dict(config)
+  container.wire(modules=[__name__])
+  app.container = container
+  
+  # Set up CORS
+  CORS(app, resources={r'/api/*': {'origins': '*'}})
+
+  # Add routes
+  add_routes(app)
+
   # Initialize
   socketio = initialize_app(app)
   initialize_generator()
+
+  host = config['host']
+  port = config['port']
 
   print(">> Started Stable Diffusion api server!")
   if  host == '0.0.0.0':
@@ -80,73 +107,14 @@ def run_app(config, host, port) -> Flask:
   socketio.run(app, host, port)
 
 
-def main():
-  """Initialize command-line parsers and the diffusion model"""
+if __name__ == '__main__':
+  """Load configuration and run application"""
   arg_parser = Args()
   opt = arg_parser.parse_args()
-
-  if opt.laion400m:
-      print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
-      sys.exit(-1)
-  if opt.weights:
-      print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
-      sys.exit(-1)
-      
-  # try:
-  #   models  = OmegaConf.load(opt.config)
-  #   width   = models[opt.model].width
-  #   height  = models[opt.model].height
-  #   config  = models[opt.model].config
-  #   weights = models[opt.model].weights
-  # except (FileNotFoundError, IOError, KeyError) as e:
-  #   print(f'{e}. Aborting.')
-  #   sys.exit(-1)
-
-  #print('* Initializing, be patient...\n')
-  sys.path.append('.')
-
-  # these two lines prevent a horrible warning message from appearing
-  # when the frozen CLIP tokenizer is imported
-  import transformers
-
-  transformers.logging.set_verbosity_error()
-
   appConfig = opt.__dict__
-
-  # appConfig = {
-  #   "model": {
-  #     "width": width,
-  #     "height": height,
-  #     "sampler_name": opt.sampler_name,
-  #     "weights": weights,
-  #     "full_precision": opt.full_precision,
-  #     "config": config,
-  #     "grid": opt.grid,
-  #     "latent_diffusion_weights": opt.laion400m,
-  #     "embedding_path": opt.embedding_path
-  #   }
-  # }
-
-  # make sure the output directory exists
-  if not os.path.exists(opt.outdir):
-    os.makedirs(opt.outdir)
-
-  # gets rid of annoying messages about random seed
-  from pytorch_lightning import logging
-  logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
-
-  print('\n* starting api server...')
-  # Change working directory to the stable-diffusion directory
-  os.chdir(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-  )
 
   # Start server
   try:
-    run_app(appConfig, opt.host, opt.port)
+    run_web_app(appConfig)
   except KeyboardInterrupt:
     pass
-
-
-if __name__ == '__main__':
-  main()
