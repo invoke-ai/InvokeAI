@@ -107,6 +107,7 @@ class Generate:
             weights               = 'models/ldm/stable-diffusion-v1/model.ckpt',
             config                = 'configs/stable-diffusion/v1-inference.yaml',
             grid                  = False,
+            unconditional         = None,
             width                 = 512,
             height                = 512,
             sampler_name          = 'k_lms',
@@ -119,6 +120,7 @@ class Generate:
             device_type           = 'cuda',
             ignore_ctrl_c         = False,
     ):
+        self.unconditional            = unconditional
         self.iterations               = iterations
         self.width                    = width
         self.height                   = height
@@ -185,6 +187,7 @@ class Generate:
             self,
             # these are common
             prompt,
+            unconditional  =    None,
             iterations     =    None,
             steps          =    None,
             seed           =    None,
@@ -247,6 +250,7 @@ class Generate:
         write the prompt into the PNG metadata.
         """
         # TODO: convert this into a getattr() loop
+        unconditional         = unconditional or self.unconditional
         steps                 = steps      or self.steps
         width                 = width      or self.width
         height                = height     or self.height
@@ -301,7 +305,7 @@ class Generate:
 
         try:
             uc, c = get_uc_and_c(
-                prompt, model=self.model,
+                prompt, unconditional, model=self.model,
                 skip_normalize=skip_normalize,
                 log_tokens=self.log_tokenization
             )
@@ -318,6 +322,7 @@ class Generate:
             generator.set_variation(self.seed, variation_amount, with_variations)
             results = generator.generate(
                 prompt,
+                unconditional  = self.unconditional,
                 iterations     = iterations,
                 seed           = self.seed,
                 sampler        = self.sampler,
