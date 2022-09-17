@@ -501,6 +501,7 @@ class DDPM(pl.LightningModule):
             loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True
         )
 
+
         self.log(
             'global_step',
             self.global_step,
