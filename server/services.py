@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from queue import Empty, Queue
 import shlex
-from threading import Thread
+from threading import Event, Thread
 import time
 from flask_socketio import SocketIO, join_room, leave_room
 from ldm.dream.args import Args
@@ -17,17 +17,19 @@ from ldm.dream.generator import embiggen
 from PIL import Image
 
 from ldm.dream.pngwriter import PngWriter
-from ldm.dream.server import CanceledException
 from ldm.generate import Generate
 from server.models import DreamResult, JobRequest, PaginatedItems, ProgressType, Signal
+
+class CanceledException(Exception):
+    pass
 
 class JobQueueService:
   __queue: Queue = Queue()
 
-  def push(self, dreamRequest: DreamResult):
-    self.__queue.put(dreamRequest)
+  def push(self, jobRequest: JobRequest):
+    self.__queue.put(jobRequest)
 
-  def get(self, timeout: float = None) -> DreamResult:
+  def get(self, timeout: float = None) -> JobRequest:
     return self.__queue.get(timeout= timeout)
 
 class SignalQueueService:
@@ -36,8 +38,8 @@ class SignalQueueService:
   def push(self, signal: Signal):
     self.__queue.put(signal)
 
-  def get(self) -> Signal:
-    return self.__queue.get(block=False)
+  def get(self, block=False) -> Signal:
+    return self.__queue.get(block=block)
 
 
 class SignalService:
@@ -69,7 +71,7 @@ class SignalService:
       while True:
         try:
           signal = self.__queue.get()
-          self.__socketio.emit(signal.event, signal.data, room=signal.room, broadcast=signal.broadcast)
+          self.__socketio.emit(signal.event, signal.data, room=signal.job, broadcast=signal.broadcast)
         except Empty:
           pass
         finally:
@@ -107,6 +109,9 @@ class ImageStorageService:
     self.__location = location
     self.__pngWriter = PngWriter(self.__location)
     self.__legacyParser = Args() # TODO: inject this?
+
+    # Create the storage directory if it doesn't exist
+    Path(location).mkdir(parents=True, exist_ok=True)
 
   def __getName(self, dreamId: str, postfix: str = '') -> str:
     return f'{dreamId}{postfix}.png'
@@ -214,6 +219,7 @@ class GeneratorService:
   __thread: Thread
   __cancellationRequested: bool = False
   __signal_service: SignalService
+  __ready_event: Event
 
   def __init__(self, model: Generate, queue: JobQueueService, imageStorage: ImageStorageService, intermediateStorage: ImageStorageService, log: LogService, signal_service: SignalService):
     self.__model = model
@@ -224,6 +230,7 @@ class GeneratorService:
     self.__signal_service = signal_service
 
     # Create the background thread
+    self.__event = Event()
     self.__thread = Thread(target=self.__process, name = "GeneratorService")
     self.__thread.daemon = True
     self.__thread.start()
@@ -232,6 +239,10 @@ class GeneratorService:
   # Request cancellation of the current job
   def cancel(self):
     self.__cancellationRequested = True
+
+  
+  def wait_for_ready(self, timeout: float = None):
+    self.__event.wait(timeout=timeout)
 
 
   # TODO: Consider moving this to its own service if there's benefit in separating the generator
@@ -242,6 +253,8 @@ class GeneratorService:
     tic = time.time()
     self.__model.load_model()
     print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
+
+    self.__event.set()
 
     print('Started generation queue processor')
     try:
@@ -377,6 +390,7 @@ class GeneratorService:
           embiggen_tiles   = jobRequest.embiggen_tiles,
           step_callback    = lambda sample, step: self.__on_progress(jobRequest, sample, step),
           image_callback   = lambda image, seed, upscaled=False: self.__on_image_result(jobRequest, image, seed, upscaled))
+          # TODO: add catch_interrupts as an option for console app (injected through options)
 
     except CanceledException:
       self.__signal_service.emit(Signal.job_canceled(jobRequest.id))
