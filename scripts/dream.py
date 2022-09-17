@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 
-import argparse
-import shlex
 import os
 import re
 import sys
@@ -10,7 +8,8 @@ import copy
 import warnings
 import time
 import ldm.dream.readline
-from ldm.dream.pngwriter import PngWriter, PromptFormatter
+from ldm.dream.args import Args, format_metadata
+from ldm.dream.pngwriter import PngWriter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
 from ldm.dream.image_util import make_grid
 from ldm.dream.log import write_log
@@ -23,14 +22,16 @@ output_cntr = 0
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
-    arg_parser = create_argv_parser()
-    opt = arg_parser.parse_args()
+    opt  = Args()
+    args = opt.parse_args()
+    if not args:
+        sys.exit(-1)
 
-    if opt.laion400m:
+    if args.laion400m:
         print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
         sys.exit(-1)
-    if opt.weights != 'model':
-        print('--weights argument has been deprecated. Please configure ./configs/models.yaml, and call it using --model instead.')
+    if args.weights:
+        print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
         sys.exit(-1)
 
     print('* Initializing, be patient...\n')
@@ -48,7 +49,7 @@ def main():
     # the user input loop
     try:
         gen = Generate(
-            conf           = opt.config,
+            conf           = opt.conf,
             model          = opt.model,
             sampler_name   = opt.sampler_name,
             embedding_path = opt.embedding_path,
@@ -92,20 +93,20 @@ def main():
         dream_server_loop(gen, opt.host, opt.port, opt.outdir)
         sys.exit(0)
 
-    cmd_parser = create_cmd_parser()
-    main_loop(gen, opt.outdir, opt.prompt_as_dir, cmd_parser, infile)
+    main_loop(gen, opt, infile)
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
-def main_loop(gen, outdir, prompt_as_dir, parser, infile):
+def main_loop(gen, opt, infile):
     """prompt/read/execute loop"""
     done = False
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
+    model_config = OmegaConf.load(opt.conf)[opt.model]
 
     # os.pathconf is not available on Windows
     if hasattr(os, 'pathconf'):
-        path_max = os.pathconf(outdir, 'PC_PATH_MAX')
-        name_max = os.pathconf(outdir, 'PC_NAME_MAX')
+        path_max = os.pathconf(opt.outdir, 'PC_PATH_MAX')
+        name_max = os.pathconf(opt.outdir, 'PC_NAME_MAX')
     else:
         path_max = 260
         name_max = 255
@@ -124,48 +125,27 @@ def main_loop(gen, outdir, prompt_as_dir, parser, infile):
         if command.startswith(('#', '//')):
             continue
 
-        # before splitting, escape single quotes so as not to mess
-        # up the parser
-        command = command.replace("'", "\\'")
-
-        try:
-            elements = shlex.split(command)
-        except ValueError as e:
-            print(str(e))
-            continue
-
-        if elements[0] == 'q':
+        if len(command.strip()) == 1 and command.startswith('q'):
             done = True
             break
 
-        if elements[0].startswith(
+        if command.startswith(
             '!dream'
         ):   # in case a stored prompt still contains the !dream command
-            elements.pop(0)
+            command.replace('!dream','',1)
 
-        # rearrange the arguments to mimic how it works in the Dream bot.
-        switches = ['']
-        switches_started = False
-
-        for el in elements:
-            if el[0] == '-' and not switches_started:
-                switches_started = True
-            if switches_started:
-                switches.append(el)
-            else:
-                switches[0] += el
-                switches[0] += ' '
-        switches[0] = switches[0][: len(switches[0]) - 1]
-
-        try:
-            opt = parser.parse_args(switches)
-        except SystemExit:
-            parser.print_help()
+        if opt.parse_cmd(command) is None:
             continue
         if len(opt.prompt) == 0:
-            print('Try again with a prompt!')
+            print('\nTry again with a prompt!')
             continue
 
+        # width and height are set by model if not specified
+        if not opt.width:
+            opt.width = model_config.width
+        if not opt.height:
+            opt.height = model_config.height
+        
         # retrieve previous value!
         if opt.init_img is not None and re.match('^-\\d+$', opt.init_img):
             try:
@@ -186,6 +166,7 @@ def main_loop(gen, outdir, prompt_as_dir, parser, infile):
                 opt.seed = None
                 continue
 
+        # TODO - move this into a module
         if opt.with_variations is not None:
             # shotgun parsing, woo
             parts = []
@@ -215,14 +196,14 @@ def main_loop(gen, outdir, prompt_as_dir, parser, infile):
             if not os.path.exists(opt.outdir):
                 os.makedirs(opt.outdir)
             current_outdir = opt.outdir
-        elif prompt_as_dir:
+        elif opt.prompt_as_dir:
             # sanitize the prompt to a valid folder name
             subdir = path_filter.sub('_', opt.prompt)[:name_max].rstrip(' .')
 
             # truncate path to maximum allowed length
             # 27 is the length of '######.##########.##.png', plus two separators and a NUL
-            subdir = subdir[:(path_max - 27 - len(os.path.abspath(outdir)))]
-            current_outdir = os.path.join(outdir, subdir)
+            subdir = subdir[:(path_max - 27 - len(os.path.abspath(opt.outdir)))]
+            current_outdir = os.path.join(opt.outdir, subdir)
 
             print('Writing files to directory: "' + current_outdir + '"')
 
@@ -230,7 +211,7 @@ def main_loop(gen, outdir, prompt_as_dir, parser, infile):
             if not os.path.exists(current_outdir):
                 os.makedirs(current_outdir)
         else:
-            current_outdir = outdir
+            current_outdir = opt.outdir
 
         # Here is where the images are actually generated!
         last_results = []
@@ -249,31 +230,36 @@ def main_loop(gen, outdir, prompt_as_dir, parser, infile):
                         filename = f'{prefix}.{seed}.postprocessed.png'
                     else:
                         filename = f'{prefix}.{seed}.png'
+                    # the handling of variations is probably broken
+                    # Also, given the ability to add stuff to the dream_prompt_str, it isn't
+                    # necessary to make a copy of the opt option just to change its attributes
                     if opt.variation_amount > 0:
-                        iter_opt = argparse.Namespace(**vars(opt))  # copy
+                        iter_opt       = copy.copy(opt)
                         this_variation = [[seed, opt.variation_amount]]
                         if opt.with_variations is None:
                             iter_opt.with_variations = this_variation
                         else:
                             iter_opt.with_variations = opt.with_variations + this_variation
                         iter_opt.variation_amount = 0
-                        normalized_prompt = PromptFormatter(
-                            gen, iter_opt).normalize_prompt()
-                        metadata_prompt = f'{normalized_prompt} -S{iter_opt.seed}'
+                        formatted_dream_prompt = iter_opt.dream_prompt_str(seed=seed)
                     elif opt.with_variations is not None:
-                        normalized_prompt = PromptFormatter(
-                            gen, opt).normalize_prompt()
-                        # use the original seed - the per-iteration value is the last variation-seed
-                        metadata_prompt = f'{normalized_prompt} -S{opt.seed}'
+                        formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
                     else:
-                        normalized_prompt = PromptFormatter(
-                            gen, opt).normalize_prompt()
-                        metadata_prompt = f'{normalized_prompt} -S{seed}'
+                        formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
                     path = file_writer.save_image_and_prompt_to_png(
-                        image, metadata_prompt, filename)
+                        image           = image,
+                        dream_prompt    = formatted_dream_prompt,
+                        metadata        = format_metadata(
+                            opt,
+                            seeds      = [seed],
+                            weights    = gen.weights,
+                            model_hash = gen.model_hash,
+                        ),
+                        name      = filename,
+                    )
                     if (not upscaled) or opt.save_original:
                         # only append to results if we didn't overwrite an earlier output
-                        results.append([path, metadata_prompt])
+                        results.append([path, formatted_dream_prompt])
                 last_results.append([path, seed])
 
             catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
@@ -287,15 +273,22 @@ def main_loop(gen, outdir, prompt_as_dir, parser, infile):
                 grid_img   = make_grid(list(grid_images.values()))
                 grid_seeds = list(grid_images.keys())
                 first_seed = last_results[0][1]
-                filename = f'{prefix}.{first_seed}.png'
-                # TODO better metadata for grid images
-                normalized_prompt = PromptFormatter(
-                    gen, opt).normalize_prompt()
-                metadata_prompt = f'{normalized_prompt} -S{first_seed} --grid -n{len(grid_images)} # {grid_seeds}'
+                filename   = f'{prefix}.{first_seed}.png'
+                formatted_dream_prompt  = opt.dream_prompt_str(seed=first_seed,grid=True,iterations=len(grid_images))
+                formatted_dream_prompt += f' # {grid_seeds}'
+                metadata = format_metadata(
+                    opt,
+                    seeds      = grid_seeds,
+                    weights    = gen.weights,
+                    model_hash = gen.model_hash
+                    )
                 path = file_writer.save_image_and_prompt_to_png(
-                    grid_img, metadata_prompt, filename
+                    image        = grid_img,
+                    dream_prompt = formatted_dream_prompt,
+                    metadata     = metadata,
+                    name         = filename
                 )
-                results = [[path, metadata_prompt]]
+                results = [[path, formatted_dream_prompt]]
 
         except AssertionError as e:
             print(e)
@@ -326,7 +319,6 @@ def get_next_command(infile=None) -> str:  # command string
         if len(command)>0:
             print(f'#{command}')
     return command
-
 
 def dream_server_loop(gen, host, port, outdir):
     print('\n* --web was specified, starting web server...')
