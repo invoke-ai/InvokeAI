@@ -13,7 +13,7 @@
 [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link]
 
 [CI checks on dev badge]: https://flat.badgen.net/github/checks/lstein/stable-diffusion/development?label=CI%20status%20on%20dev&cache=900&icon=github
-[CI checks on dev link]: https://github.com/lstein/stable-diffusion/actions/workflows/test-dream-conda.yml
+[CI checks on dev link]: https://github.com/lstein/stable-diffusion/actions?query=branch%3Adevelopment
 [CI checks on main badge]: https://flat.badgen.net/github/checks/lstein/stable-diffusion/main?label=CI%20status%20on%20main&cache=900&icon=github
 [CI checks on main link]: https://github.com/lstein/stable-diffusion/actions/workflows/test-dream-conda.yml
 [discord badge]: https://flat.badgen.net/discord/members/htRgbc7e?icon=discord
