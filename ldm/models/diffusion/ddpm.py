@@ -615,7 +615,7 @@ class LatentDiffusion(DDPM):
         self,
         first_stage_config,
         cond_stage_config,
-        personalization_config,
+        personalization_config=None,
         num_timesteps_cond=None,
         cond_stage_key='image',
         cond_stage_trainable=False,
@@ -674,18 +674,20 @@ class LatentDiffusion(DDPM):
         # for param in self.model.parameters():
         #     param.requires_grad = False
 
+        self.personalization_config = personalization_config
         self.embedding_manager = None
-        # self.embedding_manager = self.instantiate_embedding_manager(
-        #     personalization_config, self.cond_stage_model
-        # )
+        if self.personalization_config:
+            self.embedding_manager = self.instantiate_embedding_manager(
+                personalization_config, self.cond_stage_model
+            )
 
-        self.emb_ckpt_counter = 0
+            self.emb_ckpt_counter = 0
 
-        # if self.embedding_manager.is_clip:
-        #     self.cond_stage_model.update_embedding_func(self.embedding_manager)
+            if self.embedding_manager.is_clip:
+                self.cond_stage_model.update_embedding_func(self.embedding_manager)
 
-        # for param in self.embedding_manager.embedding_parameters():
-        #     param.requires_grad = True
+            for param in self.embedding_manager.embedding_parameters():
+                param.requires_grad = True
 
     def make_cond_schedule(
         self,
@@ -1975,17 +1977,18 @@ class LatentDiffusion(DDPM):
                 denoise_grid = self._get_denoise_row_from_list(z_denoise_row)
                 log['denoise_row'] = denoise_grid
 
-            # uc = self.get_learned_conditioning(len(c) * [''])
-            # sample_scaled, _ = self.sample_log(
-            #     cond=c,
-            #     batch_size=N,
-            #     ddim=use_ddim,
-            #     ddim_steps=ddim_steps,
-            #     eta=ddim_eta,
-            #     unconditional_guidance_scale=5.0,
-            #     unconditional_conditioning=uc,
-            # )
-            # log['samples_scaled'] = self.decode_first_stage(sample_scaled)
+            if self.personalization_config:
+                uc = self.get_learned_conditioning(len(c) * [''])
+                sample_scaled, _ = self.sample_log(
+                    cond=c,
+                    batch_size=N,
+                    ddim=use_ddim,
+                    ddim_steps=ddim_steps,
+                    eta=ddim_eta,
+                    unconditional_guidance_scale=5.0,
+                    unconditional_conditioning=uc,
+                )
+                log['samples_scaled'] = self.decode_first_stage(sample_scaled)
 
             if (
                 quantize_denoised
@@ -2103,26 +2106,27 @@ class LatentDiffusion(DDPM):
         x = 2.0 * (x - x.min()) / (x.max() - x.min()) - 1.0
         return x
 
-    # @rank_zero_only
-    # def on_save_checkpoint(self, checkpoint):
-    #     checkpoint.clear()
+    @rank_zero_only
+    def on_save_checkpoint(self, checkpoint):
+        if self.personalization_config:
+            checkpoint.clear()
 
-    #     if os.path.isdir(self.trainer.checkpoint_callback.dirpath):
-    #         self.embedding_manager.save(
-    #             os.path.join(
-    #                 self.trainer.checkpoint_callback.dirpath, 'embeddings.pt'
-    #             )
-    #         )
+            if os.path.isdir(self.trainer.checkpoint_callback.dirpath):
+                self.embedding_manager.save(
+                    os.path.join(
+                        self.trainer.checkpoint_callback.dirpath, 'embeddings.pt'
+                    )
+                )
 
-    #         if (self.global_step - self.emb_ckpt_counter) > 500:
-    #             self.embedding_manager.save(
-    #                 os.path.join(
-    #                     self.trainer.checkpoint_callback.dirpath,
-    #                     f'embeddings_gs-{self.global_step}.pt',
-    #                 )
-    #             )
+                if (self.global_step - self.emb_ckpt_counter) > 500:
+                    self.embedding_manager.save(
+                        os.path.join(
+                            self.trainer.checkpoint_callback.dirpath,
+                            f'embeddings_gs-{self.global_step}.pt',
+                        )
+                    )
 
-    #             self.emb_ckpt_counter += 500
+                    self.emb_ckpt_counter += 500
 
 
 class DiffusionWrapper(pl.LightningModule):

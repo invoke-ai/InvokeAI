@@ -291,8 +291,7 @@ class DataModuleFromConfig(pl.LightningDataModule):
             self.datasets['train'],
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            # shuffle=False if is_iterable_dataset else True,
-            shuffle=True,
+            shuffle=False if is_iterable_dataset else True,
             worker_init_fn=init_fn,
         )
 
@@ -718,18 +717,19 @@ if __name__ == '__main__':
 
         # model
 
-        # config.model.params.personalization_config.params.init_word = opt.init_word
-        config.model.params.personalization_config.params.embedding_manager_ckpt = (
-            opt.embedding_manager_ckpt
-        )
-        config.model.params.personalization_config.params.placeholder_tokens = (
-            opt.placeholder_tokens
-        )
+        if "personalization_config" in config.model.params:
+            # config.model.params.personalization_config.params.init_word = opt.init_word
+            config.model.params.personalization_config.params.embedding_manager_ckpt = (
+                opt.embedding_manager_ckpt
+            )
+            config.model.params.personalization_config.params.placeholder_tokens = (
+                opt.placeholder_tokens
+            )
 
-        if opt.init_word:
-            config.model.params.personalization_config.params.initializer_words[
-                0
-            ] = opt.init_word
+            if opt.init_word:
+                config.model.params.personalization_config.params.initializer_words[
+                    0
+                ] = opt.init_word
 
         if opt.actual_resume:
             model = load_model_from_config(config, opt.actual_resume)

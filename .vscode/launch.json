@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "env": {
-                "CUDA_VISIBLE_DEVICES": "0"
+                "CUDA_VISIBLE_DEVICES": "2"
             },
             "program": "/data/nv419/machine_drive/vton/stable-diffusion/main.py",
             "console": "integratedTerminal",

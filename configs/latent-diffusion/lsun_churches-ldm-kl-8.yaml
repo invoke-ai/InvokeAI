@@ -17,15 +17,6 @@ model:
     scale_by_std: True
     monitor: 'val/loss_simple_ema'
 
-    personalization_config:
-      target: ldm.modules.embedding_manager.EmbeddingManager
-      params:
-        placeholder_strings: ["*"]
-        initializer_words: ["sculpture"]
-        per_image_tokens: false
-        num_vectors_per_token: 1
-        progressive_words: False
-
     scheduler_config: # 10000 warmup steps
       target: ldm.lr_scheduler.LambdaLinearScheduler
       params:
