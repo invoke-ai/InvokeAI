@@ -12,6 +12,10 @@
     <img src="https://img.shields.io/github/issues-pr/lstein/stable-diffusion?logo=GitHub&style=for-the-badge" alt="pull-requests"/>
 </p>
 
+<p align='center'>
+  <a href="https://discord.gg/ZmtBAhwWhy"><img src="docs/assets/join-us-on-discord-image.png"/></a>
+</p>
+
 # **Stable Diffusion Dream Script**
 
 This is a fork of
