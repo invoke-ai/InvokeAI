@@ -25,6 +25,7 @@ __pycache__/
 .#*
 
 # Distribution / packaging
+.vscode
 .Python
 build/
 develop-eggs/
