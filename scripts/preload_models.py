@@ -95,3 +95,15 @@ if gfpgan:
         import traceback
         print('Error loading GFPGAN:')
         print(traceback.format_exc())
+
+print('preloading CodeFormer Model...')
+try:
+        import urllib.request
+        model_path = 'https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
+        model_dest = 'ldm/restoration/codeformer/weights/GFPGANv1.3.pth'
+        print('downloading CodeFormer model file...')
+        urllib.request.urlretrieve(model_path,model_dest)
+except Exception:
+    import traceback
+    print('Error loading CodeFormer:')
+    print(traceback.format_exc())
