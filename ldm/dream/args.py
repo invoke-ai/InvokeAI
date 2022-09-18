@@ -181,6 +181,10 @@ class Args(object):
             switches.append('--seamless')
         if a['init_img'] and len(a['init_img'])>0:
             switches.append(f'-I {a["init_img"]}')
+        if a['init_mask'] and len(a['init_mask'])>0:
+            switches.append(f'-M {a["init_mask"]}')
+        if a['init_color'] and len(a['init_color'])>0:
+            switches.append(f'--init_color {a["init_color"]}')
         if a['fit']:
             switches.append(f'--fit')
         if a['init_img'] and a['strength'] and a['strength']>0:
