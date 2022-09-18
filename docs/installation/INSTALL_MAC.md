@@ -32,11 +32,6 @@ While that is downloading, open Terminal and run the following commands one at a
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 #
-# later on, we will need the Rust compiler. If you do not have Rust installed yet, do so now
-#
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-#
 # Now there are two different routes to get the Python (miniconda) environment up and running:
 # 1. Alongside pyenv
 # 2. No pyenv
@@ -46,7 +41,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 # NOW EITHER DO
 # 1. Installing alongside pyenv
 
-brew install pyenv-virtualenv # you might have this from before, no problem
+brew install rust pyenv-virtualenv # you might have this from before, no problem
 pyenv install anaconda3-2022.05
 pyenv virtualenv anaconda3-2022.05
 eval "$(pyenv init -)"
@@ -55,7 +50,7 @@ pyenv activate anaconda3-2022.05
 # OR,
 # 2. Installing standalone
 # install python 3, git, cmake, protobuf:
-brew install cmake protobuf rust
+brew install cmake rust
 
 # install miniconda (M1 arm64 version):
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -o Miniconda3-latest-MacOSX-arm64.sh
