@@ -501,7 +501,6 @@ class DDPM(pl.LightningModule):
             loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True
         )
 
-
         self.log(
             'global_step',
             self.global_step,
@@ -752,6 +751,7 @@ class LatentDiffusion(DDPM):
 
     def instantiate_first_stage(self, config):
         model = instantiate_from_config(config)
+        self.first_stage_model = model
         # self.first_stage_model = model.eval()
         # self.first_stage_model.train = disabled_train
         # for param in self.first_stage_model.parameters():
@@ -770,6 +770,7 @@ class LatentDiffusion(DDPM):
                 # self.be_unconditional = True
             else:
                 model = instantiate_from_config(config)
+                self.cond_stage_model = model
                 # self.cond_stage_model = model.eval()
                 # self.cond_stage_model.train = disabled_train
                 # for param in self.cond_stage_model.parameters():
