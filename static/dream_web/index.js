@@ -258,11 +258,11 @@ socket.on('job_started', (data) => {})
 socket.on('dream_result', (data) => {
   var jobId = data.jobId;
   var dreamId = data.dreamId;
-  var dreamRequest = data.dreamRequest;
+  var dreamResult = data.dreamResult;
   var src = 'api/images/' + dreamId;
 
   priorResultsLoadState.offset += 1;
-  appendOutput(src, dreamRequest.seed, dreamRequest);
+  appendOutput(src, dreamResult.seed, dreamResult);
 
   resetProgress(false);
 })
