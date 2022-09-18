@@ -5,6 +5,7 @@ import copy
 from PIL import Image
 from dependency_injector import providers
 from dependency_injector.wiring import inject, Provide
+from omegaconf import OmegaConf
 from ldm.dream.args import Args, metadata_dumps
 from ldm.dream.pngwriter import PngWriter
 from ldm.dream.image_util import make_grid
@@ -87,6 +88,7 @@ def main_loop(opt, infile,
     done = False
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
+    model_config = OmegaConf.load(opt.conf)[opt.model]
 
     # Wait for generator to be warmed
     generator_service.wait_for_ready()
@@ -113,7 +115,7 @@ def main_loop(opt, infile,
         if command.startswith(('#', '//')):
             continue
 
-        if command.startswith('q '):
+        if len(command.strip()) == 1 and command.startswith('q'):
             done = True
             break
 
@@ -123,11 +125,17 @@ def main_loop(opt, infile,
             command.replace('!dream','',1)
 
         if opt.parse_cmd(command) is None:
-          continue;
+            continue
         if len(opt.prompt) == 0:
-            print('Try again with a prompt!')
+            print('\nTry again with a prompt!')
             continue
 
+        # width and height are set by model if not specified
+        if not opt.width:
+            opt.width = model_config.width
+        if not opt.height:
+            opt.height = model_config.height
+        
         # retrieve previous value!
         if opt.init_img is not None and re.match('^-\\d+$', opt.init_img):
             try:
@@ -245,7 +253,7 @@ def main_loop(opt, infile,
                     )
                 path = file_writer.save_image_and_prompt_to_png(
                     image        = grid_img,
-                    #dream_prompt = formatted_dream_prompt, # NOTE: metadata already has all this information
+                    dream_prompt = formatted_dream_prompt, # NOTE: metadata already has all this information
                     metadata     = metadata,
                     name         = filename
                 )

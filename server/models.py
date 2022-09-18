@@ -153,10 +153,11 @@ class JobRequest(DreamBase):
   with_variations = None
 
   # Results
-  results: List[DreamResult] = []
+  results: List[DreamResult] = None
 
   def __init__(self):
     super().__init__()
+    self.results = []
 
   def newDreamResult(self) -> DreamResult:
     result = DreamResult()

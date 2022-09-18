@@ -111,7 +111,6 @@ class ImageStorageService:
     self.__legacyParser = Args() # TODO: inject this?
 
     # Create the storage directory if it doesn't exist
-    print('creation ' + location)
     Path(location).mkdir(parents=True, exist_ok=True)
 
   def __getName(self, dreamId: str, postfix: str = '') -> str:

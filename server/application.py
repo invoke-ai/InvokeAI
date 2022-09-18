@@ -84,7 +84,10 @@ def run_web_app(config) -> Flask:
   app.container = container
   
   # Set up CORS
-  CORS(app, resources={r'/api/*': {'origins': '*'}})
+  cors = config.get('cors')
+  if cors:
+    print(f"Enabling CORS on origin {cors}")
+    CORS(app, resources={r'/api/*': {'origins': cors}})
 
   # Add routes
   add_routes(app)

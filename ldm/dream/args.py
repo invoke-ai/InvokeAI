@@ -250,7 +250,7 @@ class Args(object):
         # the arg value. For example, the --grid and --individual options are a little
         # funny because of their push/pull relationship. This is how to handle it.
         if name=='grid':
-            return not cmd_switches.individual and value_arg  # arg supersedes cmd
+            return not cmd_switches.individual and (value_arg or value_cmd)  # arg supersedes cmd
         return value_cmd if value_cmd is not None else value_arg
 
     def __setattr__(self,name,value):
@@ -396,6 +396,11 @@ class Args(object):
             type=int,
             default='9090',
             help='Web server: Port to listen on'
+        )
+        web_server_group.add_argument(
+            '--cors',
+            type=str,
+            help='Web server: CORS origin for API'
         )
         return parser
 

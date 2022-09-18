@@ -21,7 +21,6 @@ def main():
     if args.web:
       # Start server
       try:
-        print('The --web flag is being deprecated. Please run server/application.py instead')
         run_web_app(args.__dict__)
         sys.exit(0)
       except KeyboardInterrupt:
