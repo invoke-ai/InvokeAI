@@ -212,3 +212,22 @@ def parallel_data_prefetch(
         return out
     else:
         return gather_res
+
+def make_video(images, video_location):
+    import cv2
+    width, height = images[0].size
+
+    video = cv2.VideoWriter(video_location, cv2.VideoWriter_fourcc(*'mp4v'), 20.0, (width, height))
+
+    #draw stuff that goes on every frame here
+    for image in images:
+        image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
+        video.write(image)
+    
+    video.release()
+
+def show_progress(image):
+    import cv2
+    image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
+    cv2.imshow('Preview', image)
+    cv2.waitKey(1)

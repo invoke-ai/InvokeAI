@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 
+import cv2
 import os
 import re
 import sys
@@ -12,6 +13,7 @@ from ldm.dream.args import Args, metadata_dumps
 from ldm.dream.pngwriter import PngWriter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
 from ldm.dream.image_util import make_grid
+from ldm.util import make_video, show_progress
 from omegaconf import OmegaConf
 
 # Placeholder to be replaced with proper class that tracks the
@@ -220,10 +222,70 @@ def main_loop(gen, opt, infile):
             prior_variations = opt.with_variations or []
             first_seed       = opt.seed
 
+            if opt.save_progress is not None or opt.show_progress is not None:
+                step_index = 1
+                step_count = 1
+
+            if opt.show_progress is not None:
+                if len(opt.show_progress) < 2:
+                    if len(opt.show_progress) == 0:
+                        opt.show_progress.extend([5, 2])
+                    elif len(opt.show_progress) == 1:
+                        opt.show_progress.append(2)
+                step_count = int(opt.show_progress[0])
+            
+            if opt.save_progress is not None:                                
+                if len(opt.save_progress) < 2:
+                    if len(opt.save_progress) == 0:
+                        opt.save_progress.extend([5, None])
+                    elif len(opt.save_progress) == 1:
+                        opt.save_progress.append(None)
+
+                step_count, progress_video_type = opt.save_progress
+            
+                if progress_video_type is not None:
+                    frames_for_video = []
+
+                if progress_video_type != 'vo':
+                    step_writer = PngWriter(os.path.join(current_outdir, 'intermediates'))
+                                
+            def image_progress(sample, step):
+                nonlocal step_index
+                nonlocal step_count
+
+                if step_count == 0:
+                    step_count = 5                 
+                
+                if step % int(step_count) == 0 and step < opt.steps - 1:
+                    image = gen.sample_to_image(sample)                    
+                    
+                    if opt.save_progress is not None:
+                        nonlocal progress_video_type
+                        step_index_padded = str(step_index).rjust(len(str(opt.steps)), '0')
+
+                        if progress_video_type != 'vo':
+                            interim_seed = '.'
+                            if opt.seed is not None:
+                                interim_seed = f'.{opt.seed}.'
+                            name = f'{prefix}{interim_seed}{step_index_padded}.png'
+                            metadata = f'{opt.prompt} -S{interim_seed} [intermediate]'
+                            step_writer.save_image_and_prompt_to_png(image, metadata, name)
+                        
+                        if progress_video_type == 'v' or progress_video_type == 'vo':
+                            frames_for_video.append(image)
+
+                    if opt.show_progress is not None:
+                        if step == 0 and int(step_count) == opt.steps:
+                            return
+                        show_progress(image)
+                    
+                step_index += 1
+                    
             def image_writer(image, seed, upscaled=False):
                 path = None
                 nonlocal first_seed
-                nonlocal prior_variations
+                nonlocal prior_variations                
+
                 if opt.grid:
                     grid_images[seed] = image
                 else:
@@ -255,8 +317,25 @@ def main_loop(gen, opt, infile):
                         results.append([path, formatted_dream_prompt])
                 last_results.append([path, seed])
 
+                if opt.save_progress is not None:
+                    nonlocal progress_video_type
+                    if progress_video_type == 'v' or progress_video_type == 'vo':
+                            frames_for_video.append(image)
+                            make_video(frames_for_video, os.path.join(current_outdir, f'{prefix}.{seed}.mp4'))
+                            frames_for_video.clear()
+
+                if opt.show_progress is not None:
+                    show_progress(image)
+                    cv2.waitKey(1000)
+
             catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
+
+            step_callback = None
+            if opt.save_progress is not None or opt.show_progress is not None:
+                step_callback = image_progress
+
             gen.prompt2image(
+                step_callback=step_callback,
                 image_callback=image_writer,
                 catch_interrupts=catch_ctrl_c,
                 **vars(opt)
@@ -294,6 +373,12 @@ def main_loop(gen, opt, infile):
         print('Outputs:')
         log_path = os.path.join(current_outdir, 'dream_log.txt')
         write_log_message(results, log_path)
+        if opt.show_progress is not None:
+            if (int(opt.show_progress[1]) == 0):
+                print("Press any key on the preview window to continue ...")
+            cv2.waitKey(int(opt.show_progress[1]) * 1000)
+            cv2.destroyAllWindows()
+            cv2.waitKey(1) # possible fix for window not closing on Macs
         print()
 
     print('goodbye!')

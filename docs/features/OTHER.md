@@ -6,8 +6,7 @@ title: Others
 
 Stable Diffusion AI Notebook: <a
 href="https://colab.research.google.com/github/lstein/stable-diffusion/blob/main/notebooks/Stable_Diffusion_AI_Notebook.ipynb"
-target="_parent">
-<img
+target="_parent"> <img
 src="https://colab.research.google.com/assets/colab-badge.svg"
 alt="Open In Colab"/></a> <br> Open and follow instructions to use an isolated environment running
 Dream.<br>
@@ -25,6 +24,57 @@ for each `dream>` prompt as shown here:
 ```python
 dream> "pond garden with lotus by claude monet" --seamless -s100 -n4
 ```
+
+---
+
+## **Show Progress**
+
+Provides a visual preview of the image generation process.
+
+`-show_progress <step_count: int> <duration: float>`
+
+- `step_count`: The number of steps between each progress update. Default: `5`.
+
+- `duration`: The duration (in seconds) for how long you want the final image to be displayed before
+  the preview closes automatically. Default: `2`.
+
+- Set step_count to the same value as your steps to get a preview only when the image is fully
+  generated.
+
+- Enter duration: `0` to keep it open forever until user presses a key. Note that this will block
+  the code from running further until user input.
+
+If you have post processing options, the preview will close after image generation and reopen again
+with the updated changes.
+
+---
+
+## **Save Progress & Make Video**
+
+Allows you to save the intermediate steps during the image generation process and make a video out
+of it.
+
+`-save_progress <step_count: int default=5> <video_options: v | vo default: None>`
+
+- `step_count`: The number of steps between each intermediate image saved. When no value is given,
+  it defaults to `5`.
+- `video_options`: Allows you to generate a video from the intermediate images. Takes two options:
+  `v` (Video) or `vo` (Video Only)
+
+### **Usage**
+
+`-save_progress`: Saves intermediate frames every 5 steps. No video generation.
+
+`-save_progress 3`: Saves intermediate frames every 3 steps. No video generation.
+
+`-save_progress 3 v`: Saves intermediate frames every 3 steps. Also generates a video from the
+frames at the end.
+
+`-save_progress 3 vo`: Does not save intermediate frames but generates a video of the process every
+3 steps.
+
+`-show_progress 3 -save_progress 3 vo`: Shows a preview of the generation process updating every 3
+seconds while also saving a video of the same.
 
 ---
 

@@ -485,6 +485,19 @@ class Args(object):
             type=str,
             help='Directory to save generated images and a log of prompts and seeds',
         )
+        render_group.add_argument(
+            '-save_progress',
+            '--save_progress',
+            nargs='*',
+            help='Store in-progress images as the image is being rendered. Takes two values <step_count> : int <progress_video_type>: v (video) or vo (video only)'
+        )
+        render_group.add_argument(
+            '-show_progress',
+            '--show_progress',
+            nargs='*',
+            type=float,
+            help='Show image generation progress. Takes two values. <step_count: int> and <final_display_time: float>'
+        )
         img2img_group.add_argument(
             '-I',
             '--init_img',
