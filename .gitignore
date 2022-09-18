@@ -1,3 +1,6 @@
+# ignore folder for hacky testing stuff
+testing_stuff/
+
 # ignore downloaded data
 ldm/data/lsun/
 
