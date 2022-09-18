@@ -32,6 +32,11 @@ While that is downloading, open Terminal and run the following commands one at a
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 #
+# later on, we will need the Rust compiler. If you do not have Rust installed yet, do so now
+#
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+#
 # Now there are two different routes to get the Python (miniconda) environment up and running:
 # 1. Alongside pyenv
 # 2. No pyenv
@@ -139,6 +144,7 @@ The cause of this error is long so it's below.
 Third, if it says you're missing taming you need to rebuild your virtual
 environment.
 
+    conda deactivate
     conda env remove -n ldm
     conda env create -f environment-mac.yaml
 
