@@ -74,8 +74,8 @@ class ImageStorageService:
     path = self.path(dreamId, postfix)
     image = Image.open(path)
     text = image.text
-    if text.__contains__('Dream'):
-      dreamMeta = text.get('Dream')
+    if text.__contains__('sd-metadata') or text.get('Dream'): # TODO: get this from PngWriter
+      dreamMeta = text.get('sd-metadata') or text.get('Dream')
       try:
         j = json.loads(dreamMeta)
         return DreamResult.from_json(j)
