@@ -3,26 +3,25 @@
 """Containers module."""
 
 from dependency_injector import containers, providers
-from server.storage.services import ImageStorageService, JobQueueService, SignalQueueService
+from server.storage.services import (
+    ImageStorageService,
+    JobQueueService,
+    SignalQueueService,
+)
+
 
 class StorageContainer(containers.DeclarativeContainer):
-  # TODO: get location from config
-  image_storage_service = providers.ThreadSafeSingleton(
-    ImageStorageService,
-    './outputs/img-samples/'
-  )
+    # TODO: get location from config
+    image_storage_service = providers.ThreadSafeSingleton(
+        ImageStorageService, "./outputs/img-samples/"
+    )
 
-  # TODO: get location from config
-  image_intermediates_storage_service = providers.ThreadSafeSingleton(
-    ImageStorageService,
-    './outputs/intermediates/'
-  )
+    # TODO: get location from config
+    image_intermediates_storage_service = providers.ThreadSafeSingleton(
+        ImageStorageService, "./outputs/intermediates/"
+    )
 
-  # TODO: Move queues to their own container?
-  signal_queue_service = providers.ThreadSafeSingleton(
-    SignalQueueService
-  )
+    # TODO: Move queues to their own container?
+    signal_queue_service = providers.ThreadSafeSingleton(SignalQueueService)
 
-  generation_queue_service = providers.ThreadSafeSingleton(
-    JobQueueService
-  )
+    generation_queue_service = providers.ThreadSafeSingleton(JobQueueService)
