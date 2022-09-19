@@ -1,20 +1,18 @@
 import os
 import re
 import sys
-import copy
+from ldm.dream.containers import Container, SignalServiceOverride
 import ldm.dream.readline
 from PIL import Image
-from dependency_injector import providers
 from dependency_injector.wiring import inject, Provide
 from omegaconf import OmegaConf
 from ldm.dream.args import Args, metadata_dumps
 from ldm.dream.pngwriter import PngWriter
 from ldm.dream.image_util import make_grid
 from ldm.generate import Generate
-from server import containers
-from server import services
-from server.models import DreamResult, JobRequest, Signal
-from server.services import GeneratorService, ImageStorageService, JobQueueService, SignalQueueService
+from server.generation.services import GeneratorService
+from server.models import DreamResult, JobRequest
+from server.storage.services import ImageStorageService, JobQueueService
 
 def run_console_app(opt, parser: Args):
     # Change working directory to the stable-diffusion directory
@@ -49,41 +47,22 @@ def run_console_app(opt, parser: Args):
         print(">> changed to seamless tiling mode")
 
     # Set up dependency injection container
-    container = containers.Container()
-    container.config.from_dict(copy.deepcopy(opt).__dict__)
+    container = Container()
+    container.config.from_dict(opt.__dict__)
+    container.generator_package.config.from_dict(opt.__dict__)
     container.wire(modules=[__name__])
-
-    # Replace the signaling service with a dummy signaling service
-    with container.signal_service.override(
-      providers.ThreadSafeSingleton(
-        SignalServiceOverride,
-        container.signal_queue_service)):
-      main_loop(parser, infile)
-
-
-# An override signal service that does nothing but queue signals
-class SignalServiceOverride():
-  __queue: SignalQueueService
-
-  def __init__(self, queue: SignalQueueService):
-    self.__queue = queue
-    pass
-
-  def get_signal(self) -> Signal:
-    return self.__queue.get(block=True)
-
-  def emit(self, signal: Signal):
-    self.__queue.push(signal)
+    
+    main_loop(parser, infile)
 
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 @inject
 def main_loop(opt, infile,
-  job_queue_service: JobQueueService = Provide[containers.Container.generation_queue_service],
-  image_storage_service: ImageStorageService = Provide[containers.Container.image_storage_service],
-  generator_service: GeneratorService = Provide[containers.Container.generator_service],
-  signal_service: SignalServiceOverride = Provide[containers.Container.signal_service], # Override
-  generator: Generate = Provide[containers.Container.model_singleton] # TODO: remove the need for this
+  job_queue_service: JobQueueService = Provide[Container.generator_package.generation_queue_service],
+  image_storage_service: ImageStorageService = Provide[Container.storage_package.image_storage_service],
+  generator_service: GeneratorService = Provide[Container.generator_package.generator_service],
+  signal_service: SignalServiceOverride = Provide[Container.signal_service], # TODO: use eventing
+  generator: Generate = Provide[Container.generator_package.model_singleton] # TODO: remove the need for this
 ):
     """prompt/read/execute loop"""
     done = False

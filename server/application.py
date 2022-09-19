@@ -11,15 +11,16 @@ from flask_socketio import SocketIO
 from omegaconf import OmegaConf
 from dependency_injector.wiring import inject, Provide
 from ldm.dream.args import Args
-from server import views
 from server.containers import Container
-from server.services import GeneratorService, SignalService
+from server.generation.services import GeneratorService
+from server.signaling.services import SignalService
+from server.views import ApiCancel, ApiImages, ApiImagesList, ApiImagesMetadata, ApiIntermediates, ApiJobs, WebConfig, WebIndex
 
 # The socketio_service is injected here (rather than created in run_app) to initialize it
 @inject
 def initialize_app(
   app: Flask,
-  socketio: SocketIO = Provide[Container.socketio]
+  socketio: SocketIO = Provide[Container.signaling_package.socketio]
 ) -> SocketIO:
   socketio.init_app(app)
   
@@ -29,27 +30,27 @@ def initialize_app(
 # TODO: Initialize these a better way?
 @inject
 def initialize_generator(
-  signal_service: SignalService = Provide[Container.signal_service],
-  generator_service: GeneratorService = Provide[Container.generator_service]
+  signal_service: SignalService = Provide[Container.signaling_package.signal_service],
+  generator_service: GeneratorService = Provide[Container.generator_package.generator_service]
 ):
   pass
 
 def add_routes(app: Flask):
   # Web Routes
-  app.add_url_rule('/', view_func=views.WebIndex.as_view('web_index', 'index.html'))
-  app.add_url_rule('/index.css', view_func=views.WebIndex.as_view('web_index_css', 'index.css'))
-  app.add_url_rule('/index.js', view_func=views.WebIndex.as_view('web_index_js', 'index.js'))
-  app.add_url_rule('/config.js', view_func=views.WebConfig.as_view('web_config'))
+  app.add_url_rule('/', view_func=WebIndex.as_view('web_index', 'index.html'))
+  app.add_url_rule('/index.css', view_func=WebIndex.as_view('web_index_css', 'index.css'))
+  app.add_url_rule('/index.js', view_func=WebIndex.as_view('web_index_js', 'index.js'))
+  app.add_url_rule('/config.js', view_func=WebConfig.as_view('web_config'))
 
   # API Routes
-  app.add_url_rule('/api/jobs', view_func=views.ApiJobs.as_view('api_jobs'))
-  app.add_url_rule('/api/cancel', view_func=views.ApiCancel.as_view('api_cancel'))
+  app.add_url_rule('/api/jobs', view_func=ApiJobs.as_view('api_jobs'))
+  app.add_url_rule('/api/cancel', view_func=ApiCancel.as_view('api_cancel'))
 
   # TODO: Get storage root from config
-  app.add_url_rule('/api/images/<string:dreamId>', view_func=views.ApiImages.as_view('api_images', '../'))
-  app.add_url_rule('/api/images/<string:dreamId>/metadata', view_func=views.ApiImagesMetadata.as_view('api_images_metadata', '../'))
-  app.add_url_rule('/api/images', view_func=views.ApiImagesList.as_view('api_images_list'))
-  app.add_url_rule('/api/intermediates/<string:dreamId>/<string:step>', view_func=views.ApiIntermediates.as_view('api_intermediates', '../'))
+  app.add_url_rule('/api/images/<string:dreamId>', view_func=ApiImages.as_view('api_images', '../'))
+  app.add_url_rule('/api/images/<string:dreamId>/metadata', view_func=ApiImagesMetadata.as_view('api_images_metadata', '../'))
+  app.add_url_rule('/api/images', view_func=ApiImagesList.as_view('api_images_list'))
+  app.add_url_rule('/api/intermediates/<string:dreamId>/<string:step>', view_func=ApiIntermediates.as_view('api_intermediates', '../'))
 
   app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../static/dream_web/')) 
 
@@ -80,6 +81,7 @@ def run_web_app(config) -> Flask:
   # Set up dependency injection container
   container = Container()
   container.config.from_dict(config)
+  container.generator_package.config.from_dict(config)
   container.wire(modules=[__name__])
   app.container = container
   

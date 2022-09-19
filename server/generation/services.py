@@ -1,214 +1,18 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from argparse import ArgumentParser
 import base64
-from datetime import datetime, timezone
-import glob
-import json
 import os
-from pathlib import Path
-from queue import Empty, Queue
-import shlex
 from threading import Event, Thread
 import time
-from flask_socketio import SocketIO, join_room, leave_room
-from ldm.dream.args import Args
-from ldm.dream.generator import embiggen
 from PIL import Image
-
-from ldm.dream.pngwriter import PngWriter
 from ldm.generate import Generate
-from server.models import DreamResult, JobRequest, PaginatedItems, ProgressType, Signal
+from server.models import DreamResult, JobRequest, ProgressType, Signal
+from server.logging.services import LogService
+from server.signaling.services import SignalService
+from server.storage.services import ImageStorageService, JobQueueService
 
 class CanceledException(Exception):
     pass
-
-class JobQueueService:
-  __queue: Queue = Queue()
-
-  def push(self, jobRequest: JobRequest):
-    self.__queue.put(jobRequest)
-
-  def get(self, timeout: float = None) -> JobRequest:
-    return self.__queue.get(timeout= timeout)
-
-class SignalQueueService:
-  __queue: Queue = Queue()
-
-  def push(self, signal: Signal):
-    self.__queue.put(signal)
-
-  def get(self, block=False) -> Signal:
-    return self.__queue.get(block=block)
-
-
-class SignalService:
-  __socketio: SocketIO
-  __queue: SignalQueueService
-
-  def __init__(self, socketio: SocketIO, queue: SignalQueueService):
-    self.__socketio = socketio
-    self.__queue = queue
-
-    def on_join(data):
-      room = data['room']
-      join_room(room)
-      self.__socketio.emit("test", "something", room=room)
-      
-    def on_leave(data):
-      room = data['room']
-      leave_room(room)
-
-    self.__socketio.on_event('join_room', on_join)
-    self.__socketio.on_event('leave_room', on_leave)
-
-    self.__socketio.start_background_task(self.__process)
-
-  def __process(self):
-    # preload the model
-    print('Started signal queue processor')
-    try:
-      while True:
-        try:
-          signal = self.__queue.get()
-          self.__socketio.emit(signal.event, signal.data, room=signal.job, broadcast=signal.broadcast)
-        except Empty:
-          pass
-        finally:
-          self.__socketio.sleep(0.001)
-
-    except KeyboardInterrupt:
-        print('Signal queue processor stopped')
-
-
-  def emit(self, signal: Signal):
-    self.__queue.push(signal)
-
-
-# TODO: Name this better?
-# TODO: Logging and signals should probably be event based (multiple listeners for an event)
-class LogService:
-  __location: str
-  __logFile: str
-
-  def __init__(self, location:str, file:str):
-    self.__location = location
-    self.__logFile = file
-
-  def log(self, dreamResult: DreamResult, seed = None, upscaled = False):
-    with open(os.path.join(self.__location, self.__logFile), "a") as log:
-      log.write(f"{dreamResult.id}: {dreamResult.to_json()}\n")
-
-
-class ImageStorageService:
-  __location: str
-  __pngWriter: PngWriter
-  __legacyParser: ArgumentParser
-
-  def __init__(self, location):
-    self.__location = location
-    self.__pngWriter = PngWriter(self.__location)
-    self.__legacyParser = Args() # TODO: inject this?
-
-    # Create the storage directory if it doesn't exist
-    Path(location).mkdir(parents=True, exist_ok=True)
-
-  def __getName(self, dreamId: str, postfix: str = '') -> str:
-    return f'{dreamId}{postfix}.png'
-
-  def save(self, image, dreamResult: DreamResult, postfix: str = '') -> str:
-    name = self.__getName(dreamResult.id, postfix)
-    meta = dreamResult.to_json() # TODO: make all methods consistent with writing metadata. Standardize metadata.
-    path = self.__pngWriter.save_image_and_prompt_to_png(image, dream_prompt=meta, metadata=None, name=name)
-    return path
-
-  def path(self, dreamId: str, postfix: str = '') -> str:
-    name = self.__getName(dreamId, postfix)
-    path = os.path.join(self.__location, name)
-    return path
-  
-  # Returns true if found, false if not found or error
-  def delete(self, dreamId: str, postfix: str = '') -> bool:
-    path = self.path(dreamId, postfix)
-    if (os.path.exists(path)):
-      os.remove(path)
-      return True
-    else:
-      return False
-  
-  def getMetadata(self, dreamId: str, postfix: str = '') -> DreamResult:
-    path = self.path(dreamId, postfix)
-    image = Image.open(path)
-    text = image.text
-    if text.__contains__('Dream'):
-      dreamMeta = text.get('Dream')
-      try:
-        j = json.loads(dreamMeta)
-        return DreamResult.from_json(j)
-      except ValueError:
-        # Try to parse command-line format (legacy metadata format)
-        try:
-          opt = self.__parseLegacyMetadata(dreamMeta)
-          optd = opt.__dict__
-          if (not 'width' in optd) or (optd.get('width') is None):
-            optd['width'] = image.width
-          if (not 'height' in optd) or (optd.get('height') is None):
-            optd['height'] = image.height
-          if (not 'steps' in optd) or (optd.get('steps') is None):
-            optd['steps'] = 10 # No way around this unfortunately - seems like it wasn't storing this previously
-
-          optd['time'] = os.path.getmtime(path) # Set timestamp manually (won't be exactly correct though)
-
-          return DreamResult.from_json(optd)
-
-        except:
-          return None
-    else:
-      return None
-
-  def __parseLegacyMetadata(self, command: str) -> DreamResult:
-    # before splitting, escape single quotes so as not to mess
-    # up the parser
-    command = command.replace("'", "\\'")
-
-    try:
-        elements = shlex.split(command)
-    except ValueError as e:
-        return None
-
-    # rearrange the arguments to mimic how it works in the Dream bot.
-    switches = ['']
-    switches_started = False
-
-    for el in elements:
-        if el[0] == '-' and not switches_started:
-            switches_started = True
-        if switches_started:
-            switches.append(el)
-        else:
-            switches[0] += el
-            switches[0] += ' '
-    switches[0] = switches[0][: len(switches[0]) - 1]
-
-    try:
-        opt = self.__legacyParser.parse_cmd(switches)
-        return opt
-    except SystemExit:
-        return None
-
-  def list_files(self, page: int, perPage: int) -> PaginatedItems:
-    files = sorted(glob.glob(os.path.join(self.__location,'*.png')), key=os.path.getmtime, reverse=True)
-    count = len(files)
-
-    startId = page * perPage
-    pageCount = int(count / perPage) + 1
-    endId = min(startId + perPage, count)
-    items = [] if startId >= count else files[startId:endId]
-
-    items = list(map(lambda f: Path(f).stem, items))
-
-    return PaginatedItems(items, page, pageCount, perPage, count)
-
 
 class GeneratorService:
   __model: Generate
@@ -249,21 +53,21 @@ class GeneratorService:
   def __process(self):
     # preload the model
     # TODO: support multiple models
-    print('Preloading model')
+    print('>> Preloading model')
     tic = time.time()
     self.__model.load_model()
     print(f'>> model loaded in', '%4.2fs' % (time.time() - tic))
 
     self.__event.set()
 
-    print('Started generation queue processor')
+    print('>> Started generation queue processor')
     try:
       while True:
         dreamRequest = self.__queue.get()
         self.__generate(dreamRequest)
 
     except KeyboardInterrupt:
-        print('Generation queue processor stopped')
+        print('>> Generation queue processor stopped')
 
 
   def __on_start(self, jobRequest: JobRequest):

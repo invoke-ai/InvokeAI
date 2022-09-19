@@ -3,19 +3,19 @@
 """Views module."""
 import json
 import os
-from queue import Queue
-from flask import current_app, jsonify, request, Response, send_from_directory, stream_with_context, url_for
+from flask import current_app, request, Response, send_from_directory
 from flask.views import MethodView
 from dependency_injector.wiring import inject, Provide
+from server.generation.services import GeneratorService
 
-from server.models import DreamResult, JobRequest
-from server.services import GeneratorService, ImageStorageService, JobQueueService
+from server.models import JobRequest
 from server.containers import Container
+from server.storage.services import ImageStorageService, JobQueueService
 
 class ApiJobs(MethodView):
 
   @inject
-  def post(self, job_queue_service: JobQueueService = Provide[Container.generation_queue_service]):
+  def post(self, job_queue_service: JobQueueService = Provide[Container.generator_package.generation_queue_service]):
     jobRequest = JobRequest.from_json(request.json)
 
     print(f">> Request to generate with prompt: {jobRequest.prompt}")
@@ -54,7 +54,7 @@ class ApiCancel(MethodView):
   init_every_request = False
   
   @inject
-  def get(self, generator_service: GeneratorService = Provide[Container.generator_service]):
+  def get(self, generator_service: GeneratorService = Provide[Container.generator_package.generator_service]):
     generator_service.cancel()
     return Response(status=204)
 
@@ -66,7 +66,7 @@ class ApiImages(MethodView):
   __storage: ImageStorageService
 
   @inject
-  def __init__(self, pathBase, storage: ImageStorageService = Provide[Container.image_storage_service]):
+  def __init__(self, pathBase, storage: ImageStorageService = Provide[Container.storage_package.image_storage_service]):
     self.__pathRoot = os.path.abspath(os.path.join(os.path.dirname(__file__), pathBase))
     self.__storage = storage
 
@@ -86,7 +86,7 @@ class ApiImagesMetadata(MethodView):
   __storage: ImageStorageService
 
   @inject
-  def __init__(self, pathBase, storage: ImageStorageService = Provide[Container.image_storage_service]):
+  def __init__(self, pathBase, storage: ImageStorageService = Provide[Container.storage_package.image_storage_service]):
     self.__pathRoot = os.path.abspath(os.path.join(os.path.dirname(__file__), pathBase))
     self.__storage = storage
 
@@ -99,10 +99,10 @@ class ApiImagesMetadata(MethodView):
 class ApiIntermediates(MethodView):
   init_every_request = False
   __pathRoot = None
-  __storage: ImageStorageService = Provide[Container.image_intermediates_storage_service]
+  __storage: ImageStorageService = Provide[Container.storage_package.image_intermediates_storage_service]
 
   @inject
-  def __init__(self, pathBase, storage: ImageStorageService = Provide[Container.image_intermediates_storage_service]):
+  def __init__(self, pathBase, storage: ImageStorageService = Provide[Container.storage_package.image_intermediates_storage_service]):
     self.__pathRoot = os.path.abspath(os.path.join(os.path.dirname(__file__), pathBase))
     self.__storage = storage
 
@@ -121,7 +121,7 @@ class ApiImagesList(MethodView):
   __storage: ImageStorageService
 
   @inject
-  def __init__(self, storage: ImageStorageService = Provide[Container.image_storage_service]):
+  def __init__(self, storage: ImageStorageService = Provide[Container.storage_package.image_storage_service]):
     self.__storage = storage
 
   def get(self):
