@@ -53,7 +53,7 @@ class ImageStorageService:
   def save(self, image, dreamResult: DreamResult, postfix: str = '') -> str:
     name = self.__getName(dreamResult.id, postfix)
     meta = dreamResult.to_json() # TODO: make all methods consistent with writing metadata. Standardize metadata.
-    path = self.__pngWriter.save_image_and_prompt_to_png(image, dream_prompt=meta, metadata=None, name=name)
+    path = self.__pngWriter.save_image_and_prompt_to_png(image, dream_prompt=None, metadata=meta, name=name)
     return path
 
   def path(self, dreamId: str, postfix: str = '') -> str:

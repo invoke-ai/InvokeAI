@@ -36,9 +36,9 @@ class PngWriter:
     def save_image_and_prompt_to_png(self, image, dream_prompt, name, metadata=None):
         path = os.path.join(self.outdir, name)
         info = PngImagePlugin.PngInfo()
-        info.add_text('Dream', dream_prompt)
+        info.add_text('Dream', dream_prompt or '')
         if metadata: # TODO: merge command line app's method of writing metadata and always just write metadata
-          info.add_text('sd-metadata', json.dumps(metadata))
+          info.add_text('sd-metadata', metadata)
         image.save(path, 'PNG', pnginfo=info)
         return path
 

@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import sys
@@ -234,7 +235,7 @@ def main_loop(opt, infile,
                 path = file_writer.save_image_and_prompt_to_png(
                     image        = grid_img,
                     dream_prompt = formatted_dream_prompt, # NOTE: metadata already has all this information
-                    metadata     = metadata,
+                    metadata     = json.dumps(metadata),
                     name         = filename
                 )
 
