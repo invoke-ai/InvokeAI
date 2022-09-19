@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import copy
+import ldm.dream.readline
 from PIL import Image
 from dependency_injector import providers
 from dependency_injector.wiring import inject, Provide
