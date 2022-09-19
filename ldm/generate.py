@@ -152,6 +152,7 @@ class Generate:
             weights               = None,
             config                = None,
             gfpgan=None,
+            codeformer=None,
             esrgan=None
     ):
         models              = OmegaConf.load(conf)
@@ -177,6 +178,7 @@ class Generate:
         self.base_generator = None
         self.seed           = None
         self.gfpgan = gfpgan
+        self.codeformer = codeformer
         self.esrgan = esrgan
 
         # Note that in previous versions, there was an option to pass the
@@ -549,18 +551,6 @@ class Generate:
                                 codeformer_fidelity = 0.75,
                                 save_original = False,
                                 image_callback = None):
-        try:
-            if upscale is not None:
-                from ldm.gfpgan.gfpgan_tools import real_esrgan_upscale
-            if strength > 0:
-                if facetool == 'codeformer':
-                    from ldm.restoration.codeformer.codeformer import CodeFormerRestoration
-                else:
-                    from ldm.gfpgan.gfpgan_tools import run_gfpgan
-        except (ModuleNotFoundError, ImportError):
-            print(traceback.format_exc(), file=sys.stderr)
-            print('>> You may need to install the ESRGAN and/or GFPGAN modules')
-            return
             
         for r in image_list:
             image, seed = r
@@ -574,12 +564,13 @@ class Generate:
                     else:
                         print(">> ESRGAN is disabled. Image not upscaled.")
                 if strength > 0:
-                    if facetool == 'codeformer':
-                        image = CodeFormerRestoration().process(image=image, strength=strength, device=self.device, seed=seed, fidelity=codeformer_fidelity)
+                    if self.gfpgan is not None and self.codeformer is not None:
+                        if facetool == 'codeformer':
+                            image = self.codeformer.process(image=image, strength=strength, device=self.device, seed=seed, fidelity=codeformer_fidelity)
+                        else:
+                            image = self.gfpgan.process(image, strength, seed)
                     else:
-                        image = run_gfpgan(
-                            image, strength, seed, 1
-                        )
+                        print(">> Face Restoration is disabled.")
             except Exception as e:
                 print(
                     f'>> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}'
