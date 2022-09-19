@@ -72,7 +72,7 @@ class DreamBase():
       self.enable_img2img = bool(j.get('enable_img2img') or False)
       if self.enable_img2img:
         self.strength = float(j.get('strength'))
-        self.fit    = 'fit' in j
+        self.fit    = 'fit' in j and bool(j.get('fit'))
     
     else:
       self.enable_img2img = False
@@ -89,8 +89,8 @@ class DreamBase():
       self.sampler_name  = j.get('sampler') or j.get('sampler_name')
       # model: str = None # The model to use (currently unused)
       # embeddings = None # The embeddings to use (currently unused)
-      self.seamless = 'seamless' in j
-      self.progress_images = 'progress_images' in j
+      self.seamless = 'seamless' in j and bool(j.get('seamless'))
+      self.progress_images = 'progress_images' in j and bool(j.get('progress_images'))
 
     # GFPGAN
     self.enable_gfpgan = bool(j.get('enable_gfpgan') or False)
