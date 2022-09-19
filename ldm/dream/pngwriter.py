@@ -38,7 +38,7 @@ class PngWriter:
         info = PngImagePlugin.PngInfo()
         info.add_text('Dream', dream_prompt or '')
         if metadata: # TODO: merge command line app's method of writing metadata and always just write metadata
-          info.add_text('sd-metadata', metadata)
+            info.add_text('sd-metadata', metadata)
         image.save(path, 'PNG', pnginfo=info)
         return path
 
