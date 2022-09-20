@@ -7,26 +7,41 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from ldm.dream.pngwriter import PngWriter, PromptFormatter
 from threading import Event
 
+default_opts = {
+    'initimg': None,
+    'strength': 0.75,
+    'iterations': 1,
+    'steps': 50,
+    'width': 512,
+    'height': 512,
+    'cfg_scale': 7.5,
+    'sampler_name': 'k_lms',
+    'gfpgan_strength': 0,
+    'upscale_level': None,
+    'seed': None,
+    'variation_amount': 0
+}
+
 def build_opt(post_data, seed, gfpgan_model_exists):
     opt = argparse.Namespace()
     setattr(opt, 'prompt', post_data['prompt'])
-    setattr(opt, 'init_img', post_data['initimg'])
-    setattr(opt, 'strength', float(post_data['strength']))
-    setattr(opt, 'iterations', int(post_data['iterations']))
-    setattr(opt, 'steps', int(post_data['steps']))
-    setattr(opt, 'width', int(post_data['width']))
-    setattr(opt, 'height', int(post_data['height']))
+    setattr(opt, 'init_img', post_data['initimg'] if 'initimg' in post_data else default_opts['initimg'])
+    setattr(opt, 'strength', float(post_data['strength']) if 'strength' in post_data else default_opts['strength'])
+    setattr(opt, 'iterations', int(post_data['iterations']) if 'iterations' in post_data else default_opts['iterations'])
+    setattr(opt, 'steps', int(post_data['steps']) if 'steps' in post_data else default_opts['steps'])
+    setattr(opt, 'width', int(post_data['width']) if 'width' in post_data else default_opts['width'])
+    setattr(opt, 'height', int(post_data['height']) if 'height' in post_data else default_opts['height'])
     setattr(opt, 'seamless', 'seamless' in post_data)
     setattr(opt, 'fit', 'fit' in post_data)
     setattr(opt, 'mask', 'mask' in post_data)
     setattr(opt, 'invert_mask', 'invert_mask' in post_data)
-    setattr(opt, 'cfg_scale', float(post_data['cfg_scale']))
-    setattr(opt, 'sampler_name', post_data['sampler_name'])
-    setattr(opt, 'gfpgan_strength', float(post_data['gfpgan_strength']) if gfpgan_model_exists else 0)
-    setattr(opt, 'upscale', [int(post_data['upscale_level']), float(post_data['upscale_strength'])] if post_data['upscale_level'] != '' else None)
+    setattr(opt, 'cfg_scale', float(post_data['cfg_scale']) if 'cfg_scale' in post_data else default_opts['cfg_scale'])
+    setattr(opt, 'sampler_name', post_data['sampler_name'] if 'sampler_name' in post_data else default_opts['sampler_name'])
+    setattr(opt, 'gfpgan_strength', float(post_data['gfpgan_strength']) if gfpgan_model_exists else default_opts['gfpgan_strength'])
+    setattr(opt, 'upscale', [int(post_data['upscale_level']), float(post_data['upscale_strength'])] if ('upscale_level' in post_data and post_data['upscale_level'] != '') else default_opts['upscale_level'])
     setattr(opt, 'progress_images', 'progress_images' in post_data)
-    setattr(opt, 'seed', None if int(post_data['seed']) == -1 else int(post_data['seed']))
-    setattr(opt, 'variation_amount', float(post_data['variation_amount']) if int(post_data['seed']) != -1 else 0)
+    setattr(opt, 'seed', default_opts['seed'] if (('seed' not in post_data) or int(post_data['seed']) == -1) else int(post_data['seed']))
+    setattr(opt, 'variation_amount', float(post_data['variation_amount']) if ('seed' in post_data and int(post_data['seed']) != -1) else default_opts['variation_amount'])
     setattr(opt, 'with_variations', [])
 
     broken = False
