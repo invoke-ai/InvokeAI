@@ -3,11 +3,11 @@
 """Containers module."""
 
 from dependency_injector import containers, providers
-from server.models import Signal
-from server.logging.services import LogService
-from server.storage.containers import StorageContainer
-from server.storage.services import SignalQueueService
-from server.generation.containers import GeneratorContainer
+from ldm.dream.app.services.models import Signal
+from ldm.dream.app.services.logging.services import LogService
+from ldm.dream.app.services.storage.containers import StorageContainer
+from ldm.dream.app.services.storage.services import SignalQueueService
+from ldm.dream.app.services.generation.containers import GeneratorContainer
 
 # An override signal service that does nothing but queue signals
 # TODO: convert signaling to use events and just don't inject any socketio stuff by default
@@ -26,7 +26,10 @@ class SignalServiceOverride:
 
 
 class Container(containers.DeclarativeContainer):
-    wiring_config = containers.WiringConfiguration(packages=["server"])
+    wiring_config = containers.WiringConfiguration(packages=[
+        "ldm.dream.app.services",
+        "ldm.dream.app.console"
+        ])
 
     config = providers.Configuration()
 

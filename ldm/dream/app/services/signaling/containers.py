@@ -4,7 +4,7 @@
 
 from flask_socketio import SocketIO
 from dependency_injector import containers, providers
-from server.signaling.services import SignalService
+from ldm.dream.app.services.signaling.services import SignalService
 
 
 class SignalingContainer(containers.DeclarativeContainer):

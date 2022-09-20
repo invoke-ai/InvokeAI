@@ -11,10 +11,10 @@ from flask_socketio import SocketIO
 from omegaconf import OmegaConf
 from dependency_injector.wiring import inject, Provide
 from ldm.dream.args import Args
-from server.containers import Container
-from server.generation.services import GeneratorService
-from server.signaling.services import SignalService
-from server.views import (
+from ldm.dream.app.services.generation.services import GeneratorService
+from ldm.dream.app.services.signaling.services import SignalService
+from ldm.dream.app.api.containers import Container
+from ldm.dream.app.api.views import (
     ApiCancel,
     ApiImages,
     ApiImagesList,
@@ -64,20 +64,20 @@ def add_routes(app: Flask):
 
     # TODO: Get storage root from config
     app.add_url_rule(
-        "/api/images/<string:dreamId>", view_func=ApiImages.as_view("api_images", "../")
+        "/api/images/<string:dreamId>", view_func=ApiImages.as_view("api_images", "../../../../")
     )
     app.add_url_rule(
         "/api/images/<string:dreamId>/metadata",
-        view_func=ApiImagesMetadata.as_view("api_images_metadata", "../"),
+        view_func=ApiImagesMetadata.as_view("api_images_metadata", "../../../../"),
     )
     app.add_url_rule("/api/images", view_func=ApiImagesList.as_view("api_images_list"))
     app.add_url_rule(
         "/api/intermediates/<string:dreamId>/<string:step>",
-        view_func=ApiIntermediates.as_view("api_intermediates", "../"),
+        view_func=ApiIntermediates.as_view("api_intermediates", "../../../../"),
     )
 
     app.static_folder = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../static/dream_web/")
+        os.path.join(os.path.dirname(__file__), "../../../../static/dream_web/")
     )
 
 
@@ -97,10 +97,10 @@ def configure_logging():
 def run_web_app(config) -> Flask:
     configure_logging()
 
-    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+    sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
 
     # Change working directory to the stable-diffusion directory
-    os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
 
     # Create the flask app
     app = Flask(__name__, static_url_path="")

@@ -2,7 +2,6 @@ import json
 import os
 import re
 import sys
-from ldm.dream.containers import Container, SignalServiceOverride
 import ldm.dream.readline
 from PIL import Image
 from dependency_injector.wiring import inject, Provide
@@ -11,14 +10,15 @@ from ldm.dream.args import Args, metadata_dumps
 from ldm.dream.pngwriter import PngWriter
 from ldm.dream.image_util import make_grid
 from ldm.generate import Generate
-from server.generation.services import GeneratorService
-from server.models import DreamResult, JobRequest
-from server.storage.services import ImageStorageService, JobQueueService
+from ldm.dream.app.services.generation.services import GeneratorService
+from ldm.dream.app.services.models import DreamResult, JobRequest
+from ldm.dream.app.services.storage.services import ImageStorageService, JobQueueService
+from ldm.dream.app.console.containers import Container, SignalServiceOverride
 
 
 def run_console_app(opt, parser: Args):
     # Change working directory to the stable-diffusion directory
-    os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+    os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
 
     print("* Initializing, be patient...\n")
     sys.path.append(".")

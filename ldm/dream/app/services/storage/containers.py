@@ -3,7 +3,7 @@
 """Containers module."""
 
 from dependency_injector import containers, providers
-from server.storage.services import (
+from ldm.dream.app.services.storage.services import (
     ImageStorageService,
     JobQueueService,
     SignalQueueService,

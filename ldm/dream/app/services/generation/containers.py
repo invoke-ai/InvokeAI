@@ -4,7 +4,7 @@
 
 from dependency_injector import containers, providers
 from ldm.generate import Generate
-from server.generation.services import GeneratorService
+from ldm.dream.app.services.generation.services import GeneratorService
 
 
 class GeneratorContainer(containers.DeclarativeContainer):

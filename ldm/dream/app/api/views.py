@@ -6,11 +6,11 @@ import os
 from flask import current_app, request, Response, send_from_directory
 from flask.views import MethodView
 from dependency_injector.wiring import inject, Provide
-from server.generation.services import GeneratorService
+from ldm.dream.app.services.generation.services import GeneratorService
 
-from server.models import JobRequest
-from server.containers import Container
-from server.storage.services import ImageStorageService, JobQueueService
+from ldm.dream.app.services.models import JobRequest
+from ldm.dream.app.services.storage.services import ImageStorageService, JobQueueService
+from ldm.dream.app.api.containers import Container
 
 
 class ApiJobs(MethodView):

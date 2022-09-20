@@ -2,8 +2,8 @@
 
 from queue import Empty
 from flask_socketio import SocketIO, join_room, leave_room
-from server.models import Signal
-from server.storage.services import SignalQueueService
+from ldm.dream.app.services.models import Signal
+from ldm.dream.app.services.storage.services import SignalQueueService
 
 
 class SignalService:

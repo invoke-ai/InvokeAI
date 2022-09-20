@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
-from server.models import DreamResult
+from ldm.dream.app.services.models import DreamResult
 
 # TODO: Name this better?
 # TODO: Logging and signals should probably be event based (multiple listeners for an event)

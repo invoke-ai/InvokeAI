@@ -3,14 +3,17 @@
 """Containers module."""
 
 from dependency_injector import containers, providers
-from server.generation.containers import GeneratorContainer
-from server.signaling.containers import SignalingContainer
-from server.storage.containers import StorageContainer
-from server.logging.services import LogService
+from ldm.dream.app.services.generation.containers import GeneratorContainer
+from ldm.dream.app.services.signaling.containers import SignalingContainer
+from ldm.dream.app.services.storage.containers import StorageContainer
+from ldm.dream.app.services.logging.services import LogService
 
 
 class Container(containers.DeclarativeContainer):
-    wiring_config = containers.WiringConfiguration(packages=["server"])
+    wiring_config = containers.WiringConfiguration(packages=[
+        "ldm.dream.app.services",
+        "ldm.dream.app.api"
+        ])
 
     config = providers.Configuration()
 

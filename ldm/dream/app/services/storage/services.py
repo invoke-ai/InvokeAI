@@ -11,7 +11,7 @@ from ldm.dream.args import Args
 from PIL import Image
 
 from ldm.dream.pngwriter import PngWriter
-from server.models import DreamResult, JobRequest, PaginatedItems, Signal
+from ldm.dream.app.services.models import DreamResult, JobRequest, PaginatedItems, Signal
 
 
 class JobQueueService:

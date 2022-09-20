@@ -6,10 +6,10 @@ from threading import Event, Thread
 import time
 from PIL import Image
 from ldm.generate import Generate
-from server.models import DreamResult, JobRequest, ProgressType, Signal
-from server.logging.services import LogService
-from server.signaling.services import SignalService
-from server.storage.services import ImageStorageService, JobQueueService
+from ldm.dream.app.services.models import DreamResult, JobRequest, ProgressType, Signal
+from ldm.dream.app.services.logging.services import LogService
+from ldm.dream.app.services.signaling.services import SignalService
+from ldm.dream.app.services.storage.services import ImageStorageService, JobQueueService
 
 
 class CanceledException(Exception):
