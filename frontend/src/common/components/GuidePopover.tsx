@@ -26,6 +26,9 @@ type GuideProps = {
     feature: keyof typeof Guides;
   };
   
+
+  const shouldShowGuide = true
+  const shouldShowGuideVisuals = true
 const Guide = ({ children, feature }: GuideProps) => {
     const { text, href, guideImage } = Guides[feature];
     if (shouldShowGuide) {    
@@ -34,28 +37,28 @@ const Guide = ({ children, feature }: GuideProps) => {
                 <PopoverTrigger>{children}</PopoverTrigger>
                 <PopoverContent width={"auto"}>
                     <PopoverArrow />
+                    if (shouldShowGuideVisuals) {   
                         <PopoverHeader>
                             <Flex alignItems={"center"} gap={2}>
-                            <Image src={guideImage} alt={text} />
+                                <Image src={guideImage} alt={text} />
                             </Flex>
-                        </PopoverHeader>
+                        </PopoverHeader>}
                 
                     
                         <Flex alignItems={"center"} gap={2} p={4}>
                             {text} 
-                            
                         </Flex>
                         <Flex alignItems={"right"} gap={2} p={4}>
-                        <Spacer />
-                        <Spacer />
-                        <Spacer />
-                        <Spacer />
-                        <Spacer />
-                        <Spacer />   
+                            <Spacer />
+                            <Spacer />
+                            <Spacer />
+                            <Spacer />
+                            <Spacer />
+                            <Spacer />   
                             <Link href={href} isExternal>
-                            <Button leftIcon={<ExternalLinkIcon />} colorScheme='teal' variant='solid'>
-                            Learn More
-                            </Button>
+                                <Button leftIcon={<ExternalLinkIcon />} colorScheme='teal' variant='solid'>
+                                Learn More
+                                </Button>
                             </Link>
                         </Flex>           
                 </PopoverContent>
