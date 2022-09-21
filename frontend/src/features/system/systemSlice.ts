@@ -60,7 +60,7 @@ const initialSystemState = {
   totalIterations: 0,
   currentStatus: '',
   currentStatusHasSteps: false,
-  setShouldDisplayGuides: true,
+  ShouldDisplayGuides: true,
 };
 
 const initialState: SystemState = initialSystemState;
