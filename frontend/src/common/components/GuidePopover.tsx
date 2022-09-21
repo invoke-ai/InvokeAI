@@ -3,6 +3,7 @@ import {
     PopoverArrow,
     PopoverContent,
     PopoverTrigger,
+    PopoverHeader,
     Flex
   } from "@chakra-ui/react";
 import {
@@ -24,7 +25,6 @@ type GuideProps = {
     (state: RootState) => state.system,
     (system: SystemState) => system.shouldDisplayGuides
   );
- {/* const shouldShowGuideVisuals = false*/} 
 
 const GuidePopover = ({ children, feature }: GuideProps) => {
     const shouldDisplayGuides = useAppSelector(systemSelector);
@@ -33,40 +33,26 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
         return (
             <Popover trigger={"hover"} placement='right'>
                 <PopoverTrigger>{children}</PopoverTrigger>
-                <PopoverContent width={"auto"}>
-                    <PopoverArrow />
-                    {/*  if (shouldShowGuideVisuals) {   
-                        <PopoverHeader>
-                            <Flex alignItems={"center"} gap={2}>
-                                <Image src={guideImage} alt={text} />
-                            </Flex>
-                        </PopoverHeader>}*/}
-                
-                    
-                        <Flex alignItems={"center"} gap={2} p={4}>
-                            {text} 
-                        </Flex>
-                        {/* Commenting out learn more button and link, until documentation links are ready.*/} 
-                        {/* 
-                        <Flex alignItems={"right"} gap={2} p={4}>
-                            <Spacer />
-                            <Spacer />
-                            <Spacer />
-                            <Spacer />
-                            <Spacer />
-                            <Spacer />   
-                            <Link href={href} isExternal>
-                                <Button leftIcon={<ExternalLinkIcon />} colorScheme='teal' variant='solid'>
-                                Learn More
-                                </Button>
-                            </Link> 
-                        </Flex>     
-                        */}      
-                </PopoverContent>
+                    <PopoverHeader>
+                        <PopoverContent width={"auto"}>
+                            <PopoverArrow />
+                                <Flex alignItems={"center"} gap={2} p={4}>
+                                    {text} 
+                                </Flex>
+                        </PopoverContent>
+                    </PopoverHeader>
             </Popover>
             );
         }
-        return
+        return (
+        /**
+ * This is how I was able to get the Guides option to not hide UI elements (ensuring that the 'child' is displayed)
+ * However, it seems odd to have a non-functional "popover" wrapping all of the UI elements when that's off, so this probably needs a #todo to fix
+ */
+
+            <Popover>
+                 <PopoverTrigger>{children}</PopoverTrigger>
+            </Popover>)
     }
     
 export default GuidePopover;
