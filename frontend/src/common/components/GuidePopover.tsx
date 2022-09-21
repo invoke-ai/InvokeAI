@@ -31,28 +31,18 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
     const { text } = Guides[feature];
     if (shouldDisplayGuides) {   
         return (
-            <Popover trigger={"hover"} placement='right'>
+            <Popover trigger={"hover"} placement='bottom-end'>
                 <PopoverTrigger>{children}</PopoverTrigger>
-                    <PopoverHeader>
-                        <PopoverContent width={"auto"}>
+                    <PopoverContent maxWidth='400px'>
                             <PopoverArrow />
-                                <Flex alignItems={"center"} gap={2} p={4}>
-                                    {text} 
-                                </Flex>
-                        </PopoverContent>
-                    </PopoverHeader>
+                            <Flex alignItems={"center"} gap={2} p={4}>
+                                {text} 
+                            </Flex>
+                    </PopoverContent>
             </Popover>
             );
         }
-        return (
-        /**
- * This is how I was able to get the Guides option to not hide UI elements (ensuring that the 'child' is displayed)
- * However, it seems odd to have a non-functional "popover" wrapping all of the UI elements when that's off, so this probably needs a #todo to fix
- */
-
-            <Popover>
-                 <PopoverTrigger>{children}</PopoverTrigger>
-            </Popover>)
+        return 
     }
     
 export default GuidePopover;
