@@ -3,51 +3,51 @@ import {
     PopoverArrow,
     PopoverContent,
     PopoverTrigger,
-    Link,
-    PopoverHeader,
-    Flex,
-    Spacer,
-    Image,
-    Button
+    Flex
   } from "@chakra-ui/react";
+import {
+    SystemState
+} from "../../features/system/systemSlice";
+import { useAppSelector } from '../../app/store';
+import { RootState } from '../../app/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { ReactElement } from "react";
-import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { Guides } from "../../app/guides";
-  /**
-   * The GuidePopover needs a child 'children' to be
-   * the trigger component you hover on. That child
-   * will be of type ReactElement.
-   *
-   * It also needs a feature name 'feature', which it
-   * uses to look up the 'text' and 'href' from 'help.ts'
-   */
+
 type GuideProps = {
     children: ReactElement;
     feature: keyof typeof Guides;
   };
-  
 
-  const shouldShowGuide = true
-  const shouldShowGuideVisuals = true
-const Guide = ({ children, feature }: GuideProps) => {
-    const { text, href, guideImage } = Guides[feature];
-    if (shouldShowGuide) {    
+
+  const systemSelector = createSelector(
+    (state: RootState) => state.system,
+    (system: SystemState) => system.shouldDisplayGuides
+  );
+ {/* const shouldShowGuideVisuals = false*/} 
+
+const GuidePopover = ({ children, feature }: GuideProps) => {
+    const shouldDisplayGuides = useAppSelector(systemSelector);
+    const { text } = Guides[feature];
+    if (shouldDisplayGuides) {   
         return (
-            <Popover trigger={"hover"}>
+            <Popover trigger={"hover"} placement='right'>
                 <PopoverTrigger>{children}</PopoverTrigger>
                 <PopoverContent width={"auto"}>
                     <PopoverArrow />
-                    if (shouldShowGuideVisuals) {   
+                    {/*  if (shouldShowGuideVisuals) {   
                         <PopoverHeader>
                             <Flex alignItems={"center"} gap={2}>
                                 <Image src={guideImage} alt={text} />
                             </Flex>
-                        </PopoverHeader>}
+                        </PopoverHeader>}*/}
                 
                     
                         <Flex alignItems={"center"} gap={2} p={4}>
                             {text} 
                         </Flex>
+                        {/* Commenting out learn more button and link, until documentation links are ready.*/} 
+                        {/* 
                         <Flex alignItems={"right"} gap={2} p={4}>
                             <Spacer />
                             <Spacer />
@@ -59,14 +59,14 @@ const Guide = ({ children, feature }: GuideProps) => {
                                 <Button leftIcon={<ExternalLinkIcon />} colorScheme='teal' variant='solid'>
                                 Learn More
                                 </Button>
-                            </Link>
-                        </Flex>           
+                            </Link> 
+                        </Flex>     
+                        */}      
                 </PopoverContent>
             </Popover>
             );
-        };
-return ;
-};
-
+        }
+        return
+    }
     
 export default GuidePopover;

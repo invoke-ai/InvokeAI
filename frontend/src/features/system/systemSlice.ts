@@ -40,6 +40,7 @@ export interface SystemState extends SystemStatus {
   totalIterations: number;
   currentStatus: string;
   currentStatusHasSteps: boolean;
+  shouldDisplayGuides: boolean;
 }
 
 const initialSystemState = {
@@ -59,6 +60,7 @@ const initialSystemState = {
   totalIterations: 0,
   currentStatus: '',
   currentStatusHasSteps: false,
+  setShouldDisplayGuides: true,
 };
 
 const initialState: SystemState = initialSystemState;
@@ -118,6 +120,9 @@ export const systemSlice = createSlice({
     setOpenAccordions: (state, action: PayloadAction<ExpandedIndex>) => {
       state.openAccordions = action.payload;
     },
+    setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
+      state.shouldDisplayGuides = action.payload;
+    },
   },
 });
 
@@ -132,6 +137,7 @@ export const {
   setOpenAccordions,
   setSystemStatus,
   setCurrentStatus,
+  setShouldDisplayGuides
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

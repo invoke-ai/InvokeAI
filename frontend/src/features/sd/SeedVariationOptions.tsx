@@ -26,6 +26,7 @@ import {
   setShouldRandomizeSeed,
   setVariationAmount,
 } from './sdSlice';
+import GuidePopover from '../../common/components/GuidePopover';
 
 const sdSelector = createSelector(
   (state: RootState) => state.sd,
@@ -98,18 +99,20 @@ const SeedVariationOptions = () => {
         onChange={handleChangeShouldRandomizeSeed}
       />
       <Flex gap={2}>
-        <SDNumberInput
-          label="Seed"
-          step={1}
-          precision={0}
-          flexGrow={1}
-          min={NUMPY_RAND_MIN}
-          max={NUMPY_RAND_MAX}
-          isDisabled={shouldRandomizeSeed}
-          isInvalid={seed < 0 && shouldGenerateVariations}
-          onChange={handleChangeSeed}
-          value={seed}
-        />
+      <GuidePopover feature={"Seed"}>
+          <SDNumberInput
+            label="Seed"
+            step={1}
+            precision={0}
+            flexGrow={1}
+            min={NUMPY_RAND_MIN}
+            max={NUMPY_RAND_MAX}
+            isDisabled={shouldRandomizeSeed}
+            isInvalid={seed < 0 && shouldGenerateVariations}
+            onChange={handleChangeSeed}
+            value={seed}
+          />
+        </GuidePopover>
         <Button
           size={'sm'}
           isDisabled={shouldRandomizeSeed}
@@ -120,12 +123,14 @@ const SeedVariationOptions = () => {
           </Text>
         </Button>
       </Flex>
-      <SDSwitch
-        label="Generate variations"
-        isChecked={shouldGenerateVariations}
-        width={'auto'}
-        onChange={handleChangeShouldGenerateVariations}
-      />
+      <GuidePopover feature={"Variations"}>
+        <SDSwitch
+          label="Generate variations"
+          isChecked={shouldGenerateVariations}
+          width={'auto'}
+          onChange={handleChangeShouldGenerateVariations}
+        />
+      </GuidePopover>
       <SDNumberInput
         label="Variation amount"
         value={variationAmount}
