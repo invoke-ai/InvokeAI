@@ -12,11 +12,11 @@ import { useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import { ReactElement } from 'react';
-import { Guides } from '../../app/guides';
+import {  Feature, FEATURES } from '../../app/features';
 
 type GuideProps = {
   children: ReactElement;
-  feature: keyof typeof Guides;
+  feature: Feature;
 };
 
 const systemSelector = createSelector(
@@ -26,7 +26,7 @@ const systemSelector = createSelector(
 
 const GuidePopover = ({ children, feature }: GuideProps) => {
   const shouldDisplayGuides = useAppSelector(systemSelector);
-  const { text } = Guides[feature];
+  const { text } = FEATURES[feature];
   return shouldDisplayGuides ? (
     <Popover trigger={'hover'}>
       <PopoverTrigger>
