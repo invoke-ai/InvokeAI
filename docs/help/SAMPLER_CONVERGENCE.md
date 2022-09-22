@@ -16,15 +16,23 @@ In this document, we will talk about sampler convergence.
 |---|---|
 |  1 | Results tend to converge as steps (`-s`) are increased.  |
 |  2 | Producing a batch of candidate images at low step counts can save you a ton of time.  |
-|  3 | K_HEUN and K_DPM_2 tend to converge faster towards the final result.  |
+|  3 | K_HEUN and K_DPM_2 tend to converge in less steps.  |
 |  4 | K_DPM_2_A and K_EULER_A incorporate a lot of creativity/variability.  |
 
-| Topic   | K_HEUN/K_DPM_2 steps  |
+Adjusting convergence for it/s ->
+
+
+| Topic   | K_HEUN/K_DPM_2 steps to conv.  |
 |---|---|
 |  Nature |   |
 |  Anime/People |   |
 |  Food |   |
 |  Animals |   |
+
+| Sampler   | it/s  |
+|---|---|
+|  K_HEUN |   |
+|  K_DPM_2 |   |
 ---
 
 ### **Sampler results**
