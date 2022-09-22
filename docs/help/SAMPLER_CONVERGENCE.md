@@ -25,7 +25,7 @@ Let's start by choosing a prompt, `"an anime girl" -W512 -H512 -C7.5 -S303191297
 Immediately, you can notice results tend to converge -that is, results with low `-s` (step) values are often indicative of results with high `-s` values.
 
 You can also notice how DDIM and PLMS produce very similar results which eventually tend to converge to K-sampler results as steps are increased.
-Among K-samplers, K_HEUN seems to be the quickest to converge. And finally, K_DPM_2_A and K_EULER_A seem to do a bit of their own thing and while they converge, they don't keep much similarity with the rest of samplers.
+Among K-samplers, K_HEUN seems to be the quickest to converge. And finally, K_DPM_2_A and K_EULER_A seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
 
 ### **Batch generation speedup**
 
@@ -36,3 +36,11 @@ The latter technique is 3x to 10x faster.
 ### **Topic convergance**
 
 Now, these results seem interesting, but do they hold for other topics? How about nature? Food? People? Animals? Let's try!
+
+Nature.
+
+![samplers-nature-2](https://user-images.githubusercontent.com/50542132/191632502-218cdd83-9808-47c5-8e71-c2bf113642fc.png)
+
+Food.
+
+
