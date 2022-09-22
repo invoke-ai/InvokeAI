@@ -12,39 +12,42 @@ The purpose of this series of documents is to help you better understand these t
 
 In this document, we will talk about sampler convergence.
 
+Looking for a short version? Here'a TL;DR in 4 tables.
+
 | Remember  |
 |:---|
 | Results tend to converge as steps (`-s`) are increased.  |
 | Producing a batch of candidate images at low step counts can save a lot of time.  |
-| `K_HEUN` and `K_DPM_2`  converge in less steps (but are currently slower)  |
-| `K_DPM_2_A` and `K_EULER_A` incorporate a lot of creativity/variability (`K_EULER_A` is 2x as quick)  |
-
+| `K_HEUN` and `K_DPM_2`  converge in less steps (but are slower).  |
+| `K_DPM_2_A` and `K_EULER_A` incorporate a lot of creativity/variability. |
 
 | Sampler   | (3 sample avg) it/s (M1 Max 64GB, 512x512)  |
 |---|---|
-|  DDIM | 1.89  |
-|  PLMS | 1.86  |
-|  K_EULER | 1.86  |
-|  K_LMS | 1.91  |
-|  K_HEUN | 0.95  |
-|  K_DPM_2 | 0.95  |
-|  K_DPM_2_A | 0.95  |
-|  K_EULER_A | 1.86  |
+|  `DDIM` | 1.89  |
+|  `PLMS` | 1.86  |
+|  `K_EULER` | 1.86  |
+|  `K_LMS` | 1.91  |
+|  `K_HEUN` | 0.95 (slow)  |
+|  `K_DPM_2` | 0.95 (slow)  |
+|  `K_DPM_2_A` | 0.95 (slow)  |
+|  `K_EULER_A` | 1.86  |
 
-Suggestion: If you want variability, `K_EULER_A`.
-
-Suggestion: If you want fast generations and convergence, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2`.
+| Suggestions  |
+|:---|
+| If you want variability, use `K_EULER_A` (2x as quick as `K_DPM_2_A`).  |
+| If you want a batch of candidates, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2` (2x slower, converge 2x faster).  |
+| If you want people, use `K_HEUN` or `K_DPM_2` (2x slower, converge 4x faster)  |
 
 | Topic   | K_HEUN/K_DPM_2 steps to conv.  |
 |:---|:---|
 |  Nature |   |
-|  Faces/bodies | (more steps increase coherence)  |
+|  Faces/bodies | Not guaranteed (but more steps increase coherence)  |
 |  Food |   |
 ---
 
 ### **Sampler results**
 
-Let's start by choosing a prompt and using it with each of our 8 samplers, running it for 10, 20, 30, 40, 50 and 100 steps.
+Here's the long version. Let's start by choosing a prompt and using it with each of our 8 samplers, running it for 10, 20, 30, 40, 50 and 100 steps.
 
 Anime. `"an anime girl" -W512 -H512 -C7.5 -S3031912972`
 <img width="1082" alt="image" src="https://user-images.githubusercontent.com/50542132/191636411-083c8282-6ed1-4f78-9273-ee87c0a0f1b6.png">
@@ -96,7 +99,17 @@ Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
 However, you can see how in general it takes longer to converge (for comparison, `K_HEUN` often converges between `-s10` and `-s20` for nature and food compositions, which means this took an extra 10 to 20 steps to converge). This is normal, as producing human/animal faces/bodies is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
 
-People.
+People. `"Ultra realistic photo, (Miranda Bloom-Kerr), young, stunning model, blue eyes, blond hair, beautiful face, intricate, highly detailed, smooth, art by artgerm and greg rutkowski and alphonse mucha, stained glass" -W512 -H512 -C7.5 -S2131956332`
+
+
+Not guaranteed to converge / end up with same person (or not always).
+
+At 200 steps
+Anime
+Nature
+Burger
+Tiger
+Person
 
 ### **Sampler generation times**
 
