@@ -15,8 +15,8 @@ In this document, we will talk about sampler convergence.
 | Tip   | Desc.  |
 |---|---|
 |  1 | Results tend to converge as steps (`-s`) are increased.  |
-|  2 | Producing a batch of candidate images at low step counts can save you a ton of time.  |
-|  3 | K_HEUN and K_DPM_2 tend to converge in less steps.  |
+|  2 | Producing a batch of candidate images at low step counts can save a lot of time.  |
+|  3 | K_HEUN and K_DPM_2 tend to converge in less steps (but are slower)  |
 |  4 | K_DPM_2_A and K_EULER_A incorporate a lot of creativity/variability.  |
 
 Adjusting convergence for it/s ->
@@ -25,14 +25,8 @@ Adjusting convergence for it/s ->
 | Topic   | K_HEUN/K_DPM_2 steps to conv.  |
 |---|---|
 |  Nature |   |
-|  Anime/People |   |
+|  Faces/bodies | (more steps increase coherence)  |
 |  Food |   |
-|  Animals |   |
-
-| Sampler   | it/s  |
-|---|---|
-|  K_HEUN |   |
-|  K_DPM_2 |   |
 ---
 
 ### **Sampler results**
@@ -83,9 +77,19 @@ Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
 <img width="1081" alt="image" src="https://user-images.githubusercontent.com/50542132/191771922-6029a4f5-f707-4684-9011-c6f96e25fe56.png">
 
-K_HEUN and K_DPM_2 once again are the quickest -converging around `-s30`, while other samplers are still struggling with several tails or malformed back legs. However, you can see how in general it takes longer to converge (for comparison, K_HEUN often converges between `-s10` and `-s20` for nature and food compositions, which means this took an extra 10 to 20 steps to converge).
+K_HEUN and K_DPM_2 once again are the quickest -converging around `-s30`, while other samplers are still struggling with several tails or malformed back legs.
 
-This is normal, as producing faces/bodies is one of the things the model struggles the most with. For these topics, it is recommended to run for more steps as it will increase coherence within the composition.
+However, you can see how in general it takes longer to converge (for comparison, K_HEUN often converges between `-s10` and `-s20` for nature and food compositions, which means this took an extra 10 to 20 steps to converge). This is normal, as producing faces/bodies (whether it is of animals or people) is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
 
+### **Sampler generation times**
 
-
+| Sampler   | it/s  |
+|---|---|
+|  DDIM |   |
+|  PLMS |   |
+|  K_EULER |   |
+|  K_LMS |   |
+|  K_HEUN |   |
+|  K_DPM_2 |   |
+|  K_DPM_2_A |   |
+|  K_EULER_A |   |
