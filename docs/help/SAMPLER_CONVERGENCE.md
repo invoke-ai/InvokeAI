@@ -16,8 +16,9 @@ In this document, we will talk about sampler convergence.
 
 ### **Sampler results**
 
-Let's start by choosing a prompt, `"an anime girl" -W512 -H512 -C7.5 -S3031912972` and using it with each of our 8 samplers.
+Let's start by choosing a prompt and using it with each of our 8 samplers, running it for 10, 20, 30, 40, 50 and 100 steps.
 
+Anime. `"an anime girl" -W512 -H512 -C7.5 -S3031912972`
 <img width="1082" alt="image" src="https://user-images.githubusercontent.com/50542132/191636411-083c8282-6ed1-4f78-9273-ee87c0a0f1b6.png">
 
 ### **Sampler convergence**
@@ -31,7 +32,15 @@ Among K-samplers, K_HEUN and K_DPM_2 seem to be the quickest to converge. And fi
 
 This realization is very useful because it means you don't need to create a batch of 100 images (`-n100`) at `-s100` to choose your favorite 2 or 3 images.
 You can produce the same 100 images at `-s10` to `-s30` (more on that later) using a K-sampler (since they converge faster), get a rough idea of the final result, choose your 2 or 3 favorite ones, and then run `-s100` on those images to polish some details.
-The latter technique is 3x to 10x faster.
+The latter technique is 3x to 8x faster.
+
+Example:
+
+At 60s per 100 steps:
+
+(Option A) 60s * 100 images = 6000s
+
+(Option B) 6s * 100 images + 60s * 3 images = 780s
 
 ### **Topic convergance**
 
@@ -45,7 +54,9 @@ Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
 <img width="1081" alt="image" src="https://user-images.githubusercontent.com/50542132/191639011-f81d9d38-0a15-45f0-9442-a5e8d5c25f1f.png">
 
-Actual bowl of fries.
+Again, we see K_HEUN and K_DPM_2 tend to converge faster towards the final result. K_DPM_2_A and K_EULER_A seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
+
+
 
 
 
