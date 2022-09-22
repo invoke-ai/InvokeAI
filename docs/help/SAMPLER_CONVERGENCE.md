@@ -79,7 +79,10 @@ Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
 Again, we see K_HEUN and K_DPM_2 tend to converge faster towards the final result. K_DPM_2_A and K_EULER_A seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
 
-Animals.
+Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
+
+<img width="1081" alt="image" src="https://user-images.githubusercontent.com/50542132/191771922-6029a4f5-f707-4684-9011-c6f96e25fe56.png">
+
 
 
 
