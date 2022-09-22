@@ -54,7 +54,7 @@ Anime. `"an anime girl" -W512 -H512 -C7.5 -S3031912972`
 Immediately, you can notice results tend to converge -that is, results with low `-s` (step) values are often indicative of results with high `-s` values.
 
 You can also notice how DDIM and PLMS eventually tend to converge to K-sampler results as steps are increased.
-Among K-samplers, K_HEUN and K_DPM_2 seem to be the quickest to converge. And finally, K_DPM_2_A and K_EULER_A seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
+Among K-samplers, K_HEUN and K_DPM_2 seem to require the fewest steps to converge. And finally, K_DPM_2_A and K_EULER_A seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
 
 ### **Batch generation speedup**
 
@@ -64,11 +64,13 @@ The latter technique is 3x to 8x faster.
 
 Example:
 
-At 60s per 100 steps:
+At 60s per 100 steps.
 
-(Option A) 60s * 100 images = 6000s
+(Option A) 60s * 100 images = 6000s (100 images at `-s100`, manually pick 3 favorites)
 
-(Option B) 6s * 100 images + 60s * 3 images = 780s
+(Option B) 6s * 100 images + 60s * 3 images = 780s (100 images at `-s10`, manually pick 3 favorites, run those 3 at `-s100` to polish details)
+
+The result is a 7.7x speedup.
 
 ### **Topic convergance**
 
@@ -84,13 +86,13 @@ Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
 <img width="1081" alt="image" src="https://user-images.githubusercontent.com/50542132/191639011-f81d9d38-0a15-45f0-9442-a5e8d5c25f1f.png">
 
-Again, we see K_HEUN and K_DPM_2 tend to converge faster towards the final result. K_DPM_2_A and K_EULER_A seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
+Again, we see K_HEUN and K_DPM_2 tend to converge in the fewest number of steps towards the final result. K_DPM_2_A and K_EULER_A seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
 
 Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
 <img width="1081" alt="image" src="https://user-images.githubusercontent.com/50542132/191771922-6029a4f5-f707-4684-9011-c6f96e25fe56.png">
 
-K_HEUN and K_DPM_2 once again are the quickest -converging around `-s30`, while other samplers are still struggling with several tails or malformed back legs.
+K_HEUN and K_DPM_2 once again are the quickest step-wise -converging around `-s30`, while other samplers are still struggling with several tails or malformed back legs.
 
 However, you can see how in general it takes longer to converge (for comparison, K_HEUN often converges between `-s10` and `-s20` for nature and food compositions, which means this took an extra 10 to 20 steps to converge). This is normal, as producing human/animal faces/bodies is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
 
