@@ -6,12 +6,10 @@ import {
   AccordionItem,
   AccordionButton,
   AccordionIcon,
-  Icon,
   AccordionPanel,
   Switch,
   ExpandedIndex,
 } from '@chakra-ui/react';
-import { MdHelp } from 'react-icons/md';
 
 import { RootState } from '../../app/store';
 import { useAppDispatch, useAppSelector } from '../../app/store';
@@ -32,7 +30,7 @@ import GFPGANOptions from './GFPGANOptions';
 import OutputOptions from './OutputOptions';
 import ImageToImageOptions from './ImageToImageOptions';
 import { ChangeEvent } from 'react';
-import GuidePopover from '../../common/components/GuidePopover';
+import GuideIcon from '../../common/components/GuideIcon';
 
 const sdSelector = createSelector(
   (state: RootState) => state.sd,
@@ -107,17 +105,13 @@ const OptionsAccordion = () => {
     >
       <AccordionItem>
         <h2>
-        
           <AccordionButton>
             <Box flex="1" textAlign="left">
               Seed & Variation
             </Box>
-            <GuidePopover feature={"SeedAndVariation"}>
-              <Icon as={MdHelp} />
-            </GuidePopover>
+            <GuideIcon feature={'SeedAndVariation'} />
             <AccordionIcon />
           </AccordionButton>
-
         </h2>
         <AccordionPanel>
           <SeedVariationOptions />
@@ -129,9 +123,7 @@ const OptionsAccordion = () => {
             <Box flex="1" textAlign="left">
               Sampler
             </Box>
-            <GuidePopover feature={"Sampler"}>
-              <Icon as={MdHelp} />
-            </GuidePopover>
+            <GuideIcon feature={'Sampler'} />
             <AccordionIcon />
           </AccordionButton>
         </h2>
@@ -149,16 +141,14 @@ const OptionsAccordion = () => {
               mr={2}
             >
               <Text>Upscale (ESRGAN)</Text>
-              
+
               <Switch
                 isDisabled={!isESRGANAvailable}
                 isChecked={shouldRunESRGAN}
                 onChange={handleChangeShouldRunESRGAN}
               />
             </Flex>
-            <GuidePopover feature={"ESRGAN"}>
-              <Icon as={MdHelp} />
-            </GuidePopover>
+            <GuideIcon feature={'ESRGAN'} />
             <AccordionIcon />
           </AccordionButton>
         </h2>
@@ -182,9 +172,7 @@ const OptionsAccordion = () => {
                 onChange={handleChangeShouldRunGFPGAN}
               />
             </Flex>
-            <GuidePopover feature={"FaceCorrection"}>
-              <Icon as={MdHelp} />
-            </GuidePopover>
+            <GuideIcon feature={'FaceCorrection'} />
             <AccordionIcon />
           </AccordionButton>
         </h2>
@@ -208,9 +196,7 @@ const OptionsAccordion = () => {
                 onChange={handleChangeShouldUseInitImage}
               />
             </Flex>
-            <GuidePopover feature={"ImageToImage"}>
-              <Icon as={MdHelp} />
-            </GuidePopover>
+            <GuideIcon feature={'ImageToImage'} />
             <AccordionIcon />
           </AccordionButton>
         </h2>
@@ -224,9 +210,7 @@ const OptionsAccordion = () => {
             <Box flex="1" textAlign="left">
               Output
             </Box>
-            <GuidePopover feature={"Output"}>
-              <Icon as={MdHelp} />
-            </GuidePopover>
+            <GuideIcon feature={'Output'} />
             <AccordionIcon />
           </AccordionButton>
         </h2>
