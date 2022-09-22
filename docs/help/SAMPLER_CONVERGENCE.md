@@ -48,7 +48,9 @@ Now, these results seem interesting, but do they hold for other topics? How abou
 
 Nature. `"valley landscape wallpaper, d&d art, fantasy, painted, 4k, high detail, sharp focus, washed colors, elaborate excellent painted illustration" -W512 -H512 -C7.5 -S1458228930`
 
-![samplers-nature-2](https://user-images.githubusercontent.com/50542132/191632502-218cdd83-9808-47c5-8e71-c2bf113642fc.png)
+<img width="1082" alt="191617318-40e08e67-d147-4768-b27c-349844d10461 copy" src="https://user-images.githubusercontent.com/50542132/191736091-dda76929-00d1-4590-bef4-7314ea4ea419.png">
+
+With nature, you can see how results tend to converge faster than with characters/people. K_HEUN and K_DPM_2 are again the fastest.
 
 Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
@@ -56,7 +58,7 @@ Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
 Again, we see K_HEUN and K_DPM_2 tend to converge faster towards the final result. K_DPM_2_A and K_EULER_A seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
 
-
+Animals.
 
 
 
