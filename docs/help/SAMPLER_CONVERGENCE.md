@@ -25,7 +25,7 @@ Let's start by choosing a prompt, `"an anime girl" -W512 -H512 -C7.5 -S303191297
 Immediately, you can notice results tend to converge -that is, results with low `-s` (step) values are often indicative of results with high `-s` values.
 
 You can also notice how DDIM and PLMS eventually tend to converge to K-sampler results as steps are increased.
-Among K-samplers, K_HEUN seems to be the quickest to converge. And finally, K_DPM_2_A and K_EULER_A seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
+Among K-samplers, K_HEUN and K_DPM_2 seem to be the quickest to converge. And finally, K_DPM_2_A and K_EULER_A seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
 
 ### **Batch generation speedup**
 
