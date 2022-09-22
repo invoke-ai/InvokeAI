@@ -12,18 +12,31 @@ The purpose of this series of documents is to help you better understand these t
 
 In this document, we will talk about sampler convergence.
 
-| Tip   | Desc.  |
+| Remember  |
+|:---|
+| Results tend to converge as steps (`-s`) are increased.  |
+| Producing a batch of candidate images at low step counts can save a lot of time.  |
+| `K_HEUN` and `K_DPM_2`  converge in less steps (but are currently slower)  |
+| `K_DPM_2_A` and `K_EULER_A` incorporate a lot of creativity/variability (`K_EULER_A` is 2x as quick)  |
+
+
+| Sampler   | (3 sample avg) it/s (M1 Max 64GB, 512x512)  |
 |---|---|
-|  1 | Results tend to converge as steps (`-s`) are increased.  |
-|  2 | Producing a batch of candidate images at low step counts can save a lot of time.  |
-|  3 | K_HEUN and K_DPM_2 tend to converge in less steps (but are slower)  |
-|  4 | K_DPM_2_A and K_EULER_A incorporate a lot of creativity/variability.  |
+|  DDIM | 1.89  |
+|  PLMS | 1.86  |
+|  K_EULER | 1.86  |
+|  K_LMS | 1.91  |
+|  K_HEUN | 0.95  |
+|  K_DPM_2 | 0.95  |
+|  K_DPM_2_A | 0.95  |
+|  K_EULER_A | 1.86  |
 
-Adjusting convergence for it/s ->
+Suggestion: If you want variability, `K_EULER_A`.
 
+Suggestion: If you want fast generations and convergence, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2`.
 
 | Topic   | K_HEUN/K_DPM_2 steps to conv.  |
-|---|---|
+|:---|:---|
 |  Nature |   |
 |  Faces/bodies | (more steps increase coherence)  |
 |  Food |   |
