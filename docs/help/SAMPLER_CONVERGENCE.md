@@ -84,6 +84,6 @@ Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 <img width="1081" alt="image" src="https://user-images.githubusercontent.com/50542132/191771922-6029a4f5-f707-4684-9011-c6f96e25fe56.png">
 
 
-
+K_HEUN and K_DPM_2 converge around -s30 while others still fail (tail), but longer time to converge. Paws, arms, legs, faces... struggles with that and more steps usually help improving coherence. 
 
 
