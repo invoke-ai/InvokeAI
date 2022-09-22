@@ -79,17 +79,28 @@ Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
 K_HEUN and K_DPM_2 once again are the quickest -converging around `-s30`, while other samplers are still struggling with several tails or malformed back legs.
 
-However, you can see how in general it takes longer to converge (for comparison, K_HEUN often converges between `-s10` and `-s20` for nature and food compositions, which means this took an extra 10 to 20 steps to converge). This is normal, as producing faces/bodies (whether it is of animals or people) is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
+However, you can see how in general it takes longer to converge (for comparison, K_HEUN often converges between `-s10` and `-s20` for nature and food compositions, which means this took an extra 10 to 20 steps to converge). This is normal, as producing human/animal faces/bodies is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
+
+People.
 
 ### **Sampler generation times**
 
-| Sampler   | it/s  |
+| Sampler   | (3 sample avg) it/s (M1 Max 64GB, 512x512)  |
 |---|---|
-|  DDIM |   |
-|  PLMS |   |
-|  K_EULER |   |
-|  K_LMS |   |
-|  K_HEUN |   |
-|  K_DPM_2 |   |
-|  K_DPM_2_A |   |
-|  K_EULER_A |   |
+|  DDIM | 1.89  |
+|  PLMS | 1.86  |
+|  K_EULER | 1.86  |
+|  K_LMS | 1.91  |
+|  K_HEUN | 0.95  |
+|  K_DPM_2 | 0.95  |
+|  K_DPM_2_A | 0.95  |
+|  K_EULER_A | 1.86  |
+
+If you want variability, K_EULER_A.
+
+If you want fast generations and convergence, K_LMS is a good choice, on par with K_HEUN and K_DPM_2.
+
+Specific step
+Anime -
+Burger - 
+Tiger -
