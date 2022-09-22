@@ -49,6 +49,17 @@ also frequently the solution to complaints about an unknown function in a module
 
 ### **QUESTION**
 
+`dream.py` dies, complaining of missing models like GFPGAN.
+```Exception: GFPGAN model not found at path ./src/gfpgan/experiments/pretrained_models/GFPGANv1.3.pth```
+
+### **SOLUTION**
+
+Run ```python scripts/preload_models.py``` which loads necessary models. This can happen if you had already an environment and checked out a new version, which has new functionalities.
+
+---
+
+### **QUESTION**
+
 There's a feature or bugfix in the Stable Diffusion GitHub that you want to try out.
 
 ### **SOLUTION**
@@ -63,7 +74,9 @@ use the command
 
 `pip install -e .` and/or
 
-`conda env update -f environment.yaml`
+`conda env update -f environment.yaml` (or environment-mac.yaml for Mac users)
+
+We recommend to add ```--prune``` to remove unnecessary requirements.
 
 (These commands won't break anything.)
 
