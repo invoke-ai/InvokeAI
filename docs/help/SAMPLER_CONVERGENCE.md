@@ -18,7 +18,7 @@ In this document, we will talk about sampler convergence.
 
 Let's start by choosing a prompt, `"an anime girl" -W512 -H512 -C7.5 -S3031912972` and using it with each of our 8 samplers.
 
-![samplers_anime](https://user-images.githubusercontent.com/50542132/191617807-92ede41a-5be6-4a8f-a013-87e63e16bd51.png)
+<img width="1082" alt="image" src="https://user-images.githubusercontent.com/50542132/191636411-083c8282-6ed1-4f78-9273-ee87c0a0f1b6.png">
 
 ### **Sampler convergence**
 
@@ -37,10 +37,16 @@ The latter technique is 3x to 10x faster.
 
 Now, these results seem interesting, but do they hold for other topics? How about nature? Food? People? Animals? Let's try!
 
-Nature.
+Nature. `"valley landscape wallpaper, d&d art, fantasy, painted, 4k, high detail, sharp focus, washed colors, elaborate excellent painted illustration" -W512 -H512 -C7.5 -S1458228930`
 
 ![samplers-nature-2](https://user-images.githubusercontent.com/50542132/191632502-218cdd83-9808-47c5-8e71-c2bf113642fc.png)
 
-Food.
+Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
+
+<img width="1081" alt="image" src="https://user-images.githubusercontent.com/50542132/191639011-f81d9d38-0a15-45f0-9442-a5e8d5c25f1f.png">
+
+Actual bowl of fries.
+
+
 
 
