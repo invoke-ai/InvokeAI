@@ -34,9 +34,9 @@ Looking for a short version? Here's a TL;DR in 4 tables.
 
 | Suggestions  |
 |:---|
-| For most use cases, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2` (both run 0.5x as quick, tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result.|
+| For most use cases, `K_LMS`, `K_HEUN` and `K_DPM_2` are the best choices (the latter 2 run 0.5x as quick, but tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result.|
 | For variability, use `K_EULER_A` (runs 2x as quick as `K_DPM_2_A`).  |
-| For people, use `K_HEUN` (predicts final result quicker than `K_DPM_2` and runs 0.5x as quick but converges 3-10x as quick as others)  |
+| For nature, `K_LMS` is preferred.  |
 
 | Topic   | Predict the final result K_HEUN  | Predict the final result K_LMS  |
 |:---|:---|:---|
@@ -138,17 +138,16 @@ In my M1 Max with 64GB of RAM, for a 512x512 image:
 |  `K_DPM_2_A` | 0.95 (slower)  |
 |  `K_EULER_A` | 1.86  |
 
-Adjusting our results from above, we can see how `K_LMS` is actually on par with `K_HEUN` and `K_DPM_2`, as the latter two run 0.5x as quick, but tend to converge 2x as quick as `K_LMS`. As an example, the tiger takes 150 steps for `K_HEUN` to converge and X for `K_LMS` to converge.
-However, for people `K_HEUN` seems to be the winner in terms of producing representations close to the final result. 
+Combining our results with the steps/s of each sampler, three choices seem to come out on top: `K_LMS`, `K_HEUN` and `K_DPM_2` (where the latter two run 0.5x as quick but tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result. Finally, for creativity and a lot of variation between iterations, `K_EULER_A` can be a good choice (which runs 2x as quick as `K_DPM_2_A`).
+
+Personally, I tend to prefer `K_LMS` for nature, as this topic tends to converge in fewer steps, and while 10 steps can be good enough for a rough representaton using `K_LMS`, 5 steps (half, to counter running 0.5x as quick) are not enough for `K_HEUN` or `K_DPM_2` to produce meaningful results.
+
+<img width="397" alt="image" src="https://user-images.githubusercontent.com/50542132/192044949-67d5d441-a0d5-4d5a-be30-5dda4fc28a00.png">
+
+However, topics such as people require more steps to obtain meaningful results, making `K_HEUN` and `K_DPM_2` a perfectly valid option.
+
+### **Minimum steps per topic**
 
 
-Observing the results, K_HEUN, K_DPM_2 are good, as is K_LMS, which is 2x as quick, and produces meaningful results 2x as late.
-For people, K_HEUN is still the favorite.
 
-Author: @Any-Winter-4079
-For any question/doubt
 
-Specific step
-Anime -
-Burger - 
-Tiger -
