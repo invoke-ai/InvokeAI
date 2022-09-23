@@ -418,7 +418,7 @@ class Generate:
         if not img_path:
             return None,None
 
-        image        = self._load_img(img_path, width, height, fit=fit) # this returns an Image
+        image        = img_path if isinstance(img_path, Image.Image) else self._load_img(img_path, width, height, fit=fit) # this returns an Image
         init_image   = self._create_init_image(image)                   # this returns a torch tensor
 
         if self._has_transparency(image) and not mask_path:      # if image has a transparent area and no mask was provided, then try to generate mask
@@ -432,7 +432,7 @@ class Generate:
             init_mask = self._create_init_mask(image)                   # this returns a torch tensor
 
         if mask_path:
-            mask_image  = self._load_img(mask_path, width, height, fit=fit) # this returns an Image
+            mask_image  = mask_path if isinstance(mask_path, Image.Image) else self._load_img(mask_path, width, height, fit=fit) # this returns an Image
             init_mask   = self._create_init_mask(mask_image)
 
         return init_image,init_mask
@@ -529,7 +529,8 @@ class Generate:
             print(traceback.format_exc(), file=sys.stderr)
             print('>> You may need to install the ESRGAN and/or GFPGAN modules')
             return
-            
+        
+        results = []
         for r in image_list:
             image, seed = r
             try:
@@ -554,10 +555,15 @@ class Generate:
                     f'>> Error running RealESRGAN or GFPGAN. Your image was not upscaled.\n{e}'
                 )
 
+
             if image_callback is not None:
                 image_callback(image, seed, upscaled=True)
             else:
                 r[0] = image
+
+            results.append([image, seed])
+
+        return results
 
     # to help WebGUI - front end to generator util function
     def sample_to_image(self,samples):

@@ -9,7 +9,6 @@ from enum import Enum
 from typing import Any, Dict, List, Union
 from uuid import uuid4
 
-
 class DreamBase:
     # Id
     id: str
