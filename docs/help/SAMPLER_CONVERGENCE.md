@@ -16,7 +16,7 @@ Looking for a short version? Here's a TL;DR in 4 tables.
 
 | Remember  |
 |:---|
-| Results converge as steps (`-s`) are increased (except for `K_DPM_2_A` and `K_EULER_A`). Often at ≥ `-s100`, but can require ≥ `-s700`).  |
+| Results converge as steps (`-s`) are increased (except for `K_DPM_2_A` and `K_EULER_A`). Often at ≥ `-s100`, but may require ≥ `-s700`).  |
 | Producing a batch of candidate images at low (`-s8` to `-s30`) step counts can save you hours of computation.  |
 | `K_HEUN` and `K_DPM_2`  converge in less steps (but are slower).  |
 | `K_DPM_2_A` and `K_EULER_A` incorporate a lot of creativity/variability. |
@@ -104,28 +104,30 @@ People. `"Ultra realistic photo, (Miranda Bloom-Kerr), young, stunning model, bl
 
 ![Screenshot 2022-09-23 at 02 05 48-min (1)](https://user-images.githubusercontent.com/50542132/191871743-6802f199-0ffd-4986-98c5-df2d8db30d18.png)
 
-Observing the results, it again takes longer for all samplers to converge (`K_HEUN` takes around 150 steps), but we can observe good indicative results much earlier (for `K_HEUN`, right from the start). Conversely, `DDIM` and `PLMS` are still undergoing moderate changes (see: lace around her neck), even at `-s300`.
+Observing the results, it again takes longer for all samplers to converge (`K_HEUN` takes around 150 steps), but we can observe good indicative results much earlier (for `K_HEUN`, almost right from the start). Conversely, `DDIM` and `PLMS` are still undergoing moderate changes (see: lace around her neck), even at `-s300`.
 
 In fact, as we can see in this other experiment, some samplers can take 700+ steps to converge when generating people.
 
 ![191988191-c586b75a-2d7f-4351-b705-83cc1149881a-min (1)](https://user-images.githubusercontent.com/50542132/191992123-7e0759d6-6220-42c4-a961-88c7071c5ee6.png)
 
-Note also the point of convergence may not be the most desirable state (e.g. I prefer an earlier version of the face, more rounded), but it will probably be the most coherent arms/hands/face attributes-wise. You can always merge results from different images in a photo editing tool as pass them through img2img to smooth the lines.
+Note also the point of convergence may not be the most desirable state (e.g. I prefer an earlier version of the face, more rounded), but it will probably be the most coherent arms/hands/face attributes-wise. You can always merge different images with a photo editing tool and pass it through `img2img` to smoothen the composition.
 
 ### **Three key points**
 
-Looking at the results above, it is important to distinguish 3 important moments in the process of image generation as steps increase:
-* The point at which an image becomes a good indicator of the final result (useful for batch generation, to then improve the quality/coherence of the chosen images via running the same prompt and seed for more steps).
-* The point at which an image becomes coherent, even if different from the result if steps are increased (useful for batch generation, where quality/coherence is improved via other techniques).
-* The point at which an image fully converges.
+Looking at the results above, it is important to distinguish 3 moments in the process of image generation as steps increase:
 
-From these 2 points, we will analyze the point at which an image becomes a good indicator of the final result.
+* The (earliest) point at which an image becomes a good indicator of the final result (useful for batch generation at low step values, to then improve the quality/coherence of the chosen images via running the same prompt and seed for more steps).
+
+* The (earliest) point at which an image becomes coherent, even if different from the result if steps are increased (useful for batch generation at low step values, where quality/coherence is improved via techniques other than increasing the steps -e.g. via inpainting).
+
+* The point at which an image fully converges.
 
 ### **Sampler generation times**
 
-First, we must look at times per sampler.
+In our case, we will further study the (earliest) point at which images become a good indicator of the final result for different topics (anime, nature, food, animals and people). But first, we must take into account the performance of each sampler in terms of steps (iterations) per second, as not all samplers run at the same speed.
 
-| Sampler   | (3 sample avg) it/s (M1 Max 64GB, 512x512)  |
+In my M1 Max with 64GB of RAM, for a 512x512 image:
+| Sampler   | (3 sample average) it/s |
 |---|---|
 |  `DDIM` | 1.89  |
 |  `PLMS` | 1.86  |
@@ -135,6 +137,10 @@ First, we must look at times per sampler.
 |  `K_DPM_2` | 0.95 (slower)  |
 |  `K_DPM_2_A` | 0.95 (slower)  |
 |  `K_EULER_A` | 1.86  |
+
+Adjusting our results from above, we can see how `K_LMS` is actually on par with `K_HEUN` and `K_DPM_2`, as the latter two run 0.5x as quick, but tend to converge 2x as quick as `K_LMS`. As an example, the tiger takes 150 steps for `K_HEUN` to converge and X for `K_LMS` to converge.
+However, for people `K_HEUN` seems to be the winner in terms of producing representations close to the final result. 
+
 
 Observing the results, K_HEUN, K_DPM_2 are good, as is K_LMS, which is 2x as quick, and produces meaningful results 2x as late.
 For people, K_HEUN is still the favorite.
