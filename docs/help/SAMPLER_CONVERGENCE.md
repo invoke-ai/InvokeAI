@@ -16,7 +16,7 @@ Looking for a short version? Here's a TL;DR in 4 tables.
 
 | Remember  |
 |:---|
-| Results tend to converge as steps (`-s`) are increased (except for `K_DPM_2_A` and `K_EULER_A`).  |
+| Results converge as steps (`-s`) are increased (except for `K_DPM_2_A` and `K_EULER_A`).  |
 | Producing a batch of candidate images at low step counts can save you hours of computation.  |
 | `K_HEUN` and `K_DPM_2`  converge in less steps (but are slower).  |
 | `K_DPM_2_A` and `K_EULER_A` incorporate a lot of creativity/variability. |
@@ -34,9 +34,9 @@ Looking for a short version? Here's a TL;DR in 4 tables.
 
 | Suggestions  |
 |:---|
-| For most use cases, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2` (both run 0.5x as quick, converge 2x as quick as `K_LMS`).  |
+| For most use cases, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2` (both run 0.5x as quick, tend to converge 2x as quick as `K_LMS`).  |
 | For variability, use `K_EULER_A` (runs 2x as quick as `K_DPM_2_A`).  |
-| For people, use `K_HEUN` (converges quicker than `K_DPM_2` and runs 0.5x as quick but converges 4-10x as quick as others)  |
+| For people, use `K_HEUN` (predicts final result quicker than `K_DPM_2` and runs 0.5x as quick but converges 4-10x as quick as others)  |
 
 | Topic   | K_HEUN/K_DPM_2 steps to conv.  |
 |:---|:---|
@@ -55,10 +55,10 @@ Anime. `"an anime girl" -W512 -H512 -C7.5 -S3031912972`
 
 ### **Sampler convergence**
 
-Immediately, you can notice results tend to converge -that is, as `-s` (step) values increase, there comes a point where the image no longer changes.
+Immediately, you can notice results tend to converge -that is, as `-s` (step) values increase, images look more and more similar until there comes a point where the image no longer changes.
 
 You can also notice how `DDIM` and `PLMS` eventually tend to converge to K-sampler results as steps are increased.
-Among K-samplers, `K_HEUN` and `K_DPM_2` seem to require the fewest steps to converge. And finally, `K_DPM_2_A` and `K_EULER_A` seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
+Among K-samplers, `K_HEUN` and `K_DPM_2` seem to require the fewest steps to converge, and even at low step counts they are good indicators of the final result. And finally, `K_DPM_2_A` and `K_EULER_A` seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
 
 ### **Batch generation speedup**
 
@@ -84,7 +84,7 @@ Nature. `"valley landscape wallpaper, d&d art, fantasy, painted, 4k, high detail
 
 ![191736091-dda76929-00d1-4590-bef4-7314ea4ea419-min (1)](https://user-images.githubusercontent.com/50542132/191868763-b151c69e-0a72-4cf1-a151-5a64edd0c93e.png)
 
-With nature, you can see how results tend to converge faster than with characters/people. `K_HEUN` and `K_DPM_2` are again the quickest to converge, almost right from the start.
+With nature, you can see how initial results are even more indicative of final result -more so than with characters/people. `K_HEUN` and `K_DPM_2` are again the quickest indicators, almost right from the start.
 
 Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
@@ -104,7 +104,12 @@ People. `"Ultra realistic photo, (Miranda Bloom-Kerr), young, stunning model, bl
 
 ![Screenshot 2022-09-23 at 02 05 48-min (1)](https://user-images.githubusercontent.com/50542132/191871743-6802f199-0ffd-4986-98c5-df2d8db30d18.png)
 
-Running up to 300 steps, K_HEUN converges in the least amount of steps, while DDIM and PLMS haven't yet converged by `-s300`. K_DPM_2, which has often been on par with H_HEUN, seems to struggle here a bit more. 
+`H_HEUN` is the clear winner for people, converging to the final result almost from the start, while `DDIM` and `PLMS` haven't yet fully converged by the end of the experiment (`-s300`)
+
+Running up to 300 steps, K_HEUN converges in the least amount of steps, while DDIM and PLMS haven't yet converged by `-s300`. K_DPM_2, which has often been on par with H_HEUN, seems to struggle here a bit more. In general, it takes much longer to converge.
+Here, 500 steps.
+
+<img width="1456" alt="image" src="https://user-images.githubusercontent.com/50542132/191946126-537b59a2-c042-46d6-9e1c-f64f1d3c9c0a.png">
 
 ### **Sampler generation times**
 
@@ -119,7 +124,7 @@ Running up to 300 steps, K_HEUN converges in the least amount of steps, while DD
 |  `K_DPM_2_A` | 0.95 (slower)  |
 |  `K_EULER_A` | 1.86  |
 
-
+Any question, tag me @Any-Winter-4079
 
 Specific step
 Anime -
