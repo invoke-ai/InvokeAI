@@ -16,8 +16,8 @@ Looking for a short version? Here's a TL;DR in 4 tables.
 
 | Remember  |
 |:---|
-| Results converge as steps (`-s`) are increased (except for `K_DPM_2_A` and `K_EULER_A`).  |
-| Producing a batch of candidate images at low step counts can save you hours of computation.  |
+| Results converge as steps (`-s`) are increased (except for `K_DPM_2_A` and `K_EULER_A`). Often at ≥ `-s100`, but can require ≥ `-s700`).  |
+| Producing a batch of candidate images at low (`-s8` to `-s30`) step counts can save you hours of computation.  |
 | `K_HEUN` and `K_DPM_2`  converge in less steps (but are slower).  |
 | `K_DPM_2_A` and `K_EULER_A` incorporate a lot of creativity/variability. |
 
@@ -34,15 +34,15 @@ Looking for a short version? Here's a TL;DR in 4 tables.
 
 | Suggestions  |
 |:---|
-| For most use cases, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2` (both run 0.5x as quick, tend to converge 2x as quick as `K_LMS`).  |
+| For most use cases, `K_LMS` is a good choice, on par with `K_HEUN` and `K_DPM_2` (both run 0.5x as quick, tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result.|
 | For variability, use `K_EULER_A` (runs 2x as quick as `K_DPM_2_A`).  |
-| For people, use `K_HEUN` (predicts final result quicker than `K_DPM_2` and runs 0.5x as quick but converges 4-10x as quick as others)  |
+| For people, use `K_HEUN` (predicts final result quicker than `K_DPM_2` and runs 0.5x as quick but converges 3-10x as quick as others)  |
 
-| Topic   | K_HEUN/K_DPM_2 steps to conv.  |
-|:---|:---|
-|  Nature |   |
-|  Faces/bodies | Not guaranteed (but more steps increase coherence)  |
-|  Food |   |
+| Topic   | Predict the final result K_HEUN  | Predict the final result K_LMS  |
+|:---|:---|:---|
+|  Nature | 8  | 8  |
+|  People | 20-30  | 8  |
+|  Food |   | 8  |
 ---
 
 ### **Sampler results**
@@ -90,7 +90,7 @@ Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
 ![191639011-f81d9d38-0a15-45f0-9442-a5e8d5c25f1f-min (1)](https://user-images.githubusercontent.com/50542132/191868898-98801a62-885f-4ea1-aee8-563503522aa9.png)
 
-Again, we see `K_HEUN` and `K_DPM_2` tend to converge in the fewest number of steps towards the final result. `K_DPM_2_A` and `K_EULER_A` seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
+Again, `K_HEUN` and `K_DPM_2` take the fewest number of steps to be good indicators of the final result. `K_DPM_2_A` and `K_EULER_A` seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
 
 Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
@@ -112,6 +112,8 @@ Here, 500 steps.
 <img width="1456" alt="image" src="https://user-images.githubusercontent.com/50542132/191946126-537b59a2-c042-46d6-9e1c-f64f1d3c9c0a.png">
 
 ### **Sampler generation times**
+
+there are 2 things. true convergence and being a good indicator. Convergance can take +100 steps most times (nature seems faster), but a reasonable result can be obtained earlier. And for batch generation, the most important thing is a sampler that at low steps is indicative of high step results. And for this, we need to take into account the speed of each sampler.
 
 | Sampler   | (3 sample avg) it/s (M1 Max 64GB, 512x512)  |
 |---|---|
