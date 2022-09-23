@@ -84,7 +84,7 @@ Nature. `"valley landscape wallpaper, d&d art, fantasy, painted, 4k, high detail
 
 ![191736091-dda76929-00d1-4590-bef4-7314ea4ea419-min (1)](https://user-images.githubusercontent.com/50542132/191868763-b151c69e-0a72-4cf1-a151-5a64edd0c93e.png)
 
-With nature, you can see how initial results are even more indicative of final result -more so than with characters/people. `K_HEUN` and `K_DPM_2` are again the quickest indicators, almost right from the start.
+With nature, you can see how initial results are even more indicative of final result -more so than with characters/people. `K_HEUN` and `K_DPM_2` are again the quickest indicators, almost right from the start. Results also converge faster (e.g. `K_HEUN` converges at `-s21`).
 
 Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
@@ -96,24 +96,34 @@ Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
 ![191771922-6029a4f5-f707-4684-9011-c6f96e25fe56-min (1)](https://user-images.githubusercontent.com/50542132/191868870-9e3b7d82-b909-429f-893a-13f6ec343454.png)
 
-`K_HEUN` and `K_DPM_2` once again are the quickest step-wise -converging around `-s30`, while other samplers are still struggling with several tails or malformed back legs.
+`K_HEUN` and `K_DPM_2` once again require the least number of steps to be indicative of the final result (around `-s30`), while other samplers are still struggling with several tails or malformed back legs.
 
-However, you can see how in general it takes longer to converge (for comparison, `K_HEUN` often converges between `-s10` and `-s20` for nature and food compositions, which means this took an extra 10 to 20 steps to converge). This is normal, as producing human/animal faces/bodies is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
+It also takes longer to converge (for comparison, `K_HEUN` requires around 150 steps to converge). This is normal, as producing human/animal faces/bodies is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
 
-People. `"Ultra realistic photo, (Miranda Bloom-Kerr), young, stunning model, blue eyes, blond hair, beautiful face, intricate, highly detailed, smooth, art by artgerm and greg rutkowski and alphonse mucha, stained glass" -W512 -H512 -C7.5 -S2131956332`
+People. `"Ultra realistic photo, (Miranda Bloom-Kerr), young, stunning model, blue eyes, blond hair, beautiful face, intricate, highly detailed, smooth, art by artgerm and greg rutkowski and alphonse mucha, stained glass" -W512 -H512 -C7.5 -S2131956332`. This time, we will go up to 300 steps.
 
 ![Screenshot 2022-09-23 at 02 05 48-min (1)](https://user-images.githubusercontent.com/50542132/191871743-6802f199-0ffd-4986-98c5-df2d8db30d18.png)
 
-`H_HEUN` is the clear winner for people, converging to the final result almost from the start, while `DDIM` and `PLMS` haven't yet fully converged by the end of the experiment (`-s300`)
+Observing the results, it again takes longer for all samplers to converge (`K_HEUN` takes around 150 steps), but we can observe good indicative results much earlier (for `K_HEUN`, right from the start). Conversely, `DDIM` and `PLMS` are still undergoing moderate changes (see: lace around her neck), even at `-s300`.
 
-Running up to 300 steps, K_HEUN converges in the least amount of steps, while DDIM and PLMS haven't yet converged by `-s300`. K_DPM_2, which has often been on par with H_HEUN, seems to struggle here a bit more. In general, it takes much longer to converge.
-Here, 500 steps.
+In fact, as we can see in this other experiment, some samplers can take 700+ steps to converge when generating people.
 
-<img width="1456" alt="image" src="https://user-images.githubusercontent.com/50542132/191946126-537b59a2-c042-46d6-9e1c-f64f1d3c9c0a.png">
+![191988191-c586b75a-2d7f-4351-b705-83cc1149881a-min (1)](https://user-images.githubusercontent.com/50542132/191992123-7e0759d6-6220-42c4-a961-88c7071c5ee6.png)
+
+Note also the point of convergence may not be the most desirable state (e.g. I prefer an earlier version of the face, more rounded), but it will probably be the most coherent arms/hands/face attributes-wise. You can always merge results from different images in a photo editing tool as pass them through img2img to smooth the lines.
+
+### **Three key points**
+
+Looking at the results above, it is important to distinguish 3 important moments in the process of image generation as steps increase:
+* The point at which an image becomes a good indicator of the final result (useful for batch generation, to then improve the quality/coherence of the chosen images via running the same prompt and seed for more steps).
+* The point at which an image becomes coherent, even if different from the result if steps are increased (useful for batch generation, where quality/coherence is improved via other techniques).
+* The point at which an image fully converges.
+
+From these 2 points, we will analyze the point at which an image becomes a good indicator of the final result.
 
 ### **Sampler generation times**
 
-there are 2 things. true convergence and being a good indicator. Convergance can take +100 steps most times (nature seems faster), but a reasonable result can be obtained earlier. And for batch generation, the most important thing is a sampler that at low steps is indicative of high step results. And for this, we need to take into account the speed of each sampler.
+First, we must look at times per sampler.
 
 | Sampler   | (3 sample avg) it/s (M1 Max 64GB, 512x512)  |
 |---|---|
@@ -126,7 +136,11 @@ there are 2 things. true convergence and being a good indicator. Convergance can
 |  `K_DPM_2_A` | 0.95 (slower)  |
 |  `K_EULER_A` | 1.86  |
 
-Any question, tag me @Any-Winter-4079
+Observing the results, K_HEUN, K_DPM_2 are good, as is K_LMS, which is 2x as quick, and produces meaningful results 2x as late.
+For people, K_HEUN is still the favorite.
+
+Author: @Any-Winter-4079
+For any question/doubt
 
 Specific step
 Anime -
