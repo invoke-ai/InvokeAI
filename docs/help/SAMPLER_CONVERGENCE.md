@@ -55,7 +55,7 @@ Anime. `"an anime girl" -W512 -H512 -C7.5 -S3031912972`
 
 ### **Sampler convergence**
 
-Immediately, you can notice results tend to converge -that is, results with low `-s` (step) values are often indicative of results with high `-s` values.
+Immediately, you can notice results tend to converge -that is, as `-s` (step) values increase, there comes a point where the image no longer changes.
 
 You can also notice how `DDIM` and `PLMS` eventually tend to converge to K-sampler results as steps are increased.
 Among K-samplers, `K_HEUN` and `K_DPM_2` seem to require the fewest steps to converge. And finally, `K_DPM_2_A` and `K_EULER_A` seem to do a bit of their own thing and don't keep much similarity with the rest of the samplers.
@@ -90,7 +90,7 @@ Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
 ![191639011-f81d9d38-0a15-45f0-9442-a5e8d5c25f1f-min (1)](https://user-images.githubusercontent.com/50542132/191868898-98801a62-885f-4ea1-aee8-563503522aa9.png)
 
-Again, we see `K_HEUN` and `K_DPM_2` tend to converge in the fewest number of steps towards the final result. `K_DPM_2`_A and `K_EULER_A` seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
+Again, we see `K_HEUN` and `K_DPM_2` tend to converge in the fewest number of steps towards the final result. `K_DPM_2_A` and `K_EULER_A` seem to incorporate a lot of creativity/variability, capable of producing rotten hamburgers, but also of adding lettuce to the mix. And they're the only samplers that produced an actual 'bowl of fries'!
 
 Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
@@ -103,6 +103,8 @@ However, you can see how in general it takes longer to converge (for comparison,
 People. `"Ultra realistic photo, (Miranda Bloom-Kerr), young, stunning model, blue eyes, blond hair, beautiful face, intricate, highly detailed, smooth, art by artgerm and greg rutkowski and alphonse mucha, stained glass" -W512 -H512 -C7.5 -S2131956332`
 
 ![Screenshot 2022-09-23 at 02 05 48-min (1)](https://user-images.githubusercontent.com/50542132/191871743-6802f199-0ffd-4986-98c5-df2d8db30d18.png)
+
+Running up to 300 steps, K_HEUN converges in the least amount of steps, while DDIM and PLMS haven't yet converged by `-s300`. K_DPM_2, which has often been on par with H_HEUN, seems to struggle here a bit more. 
 
 ### **Sampler generation times**
 
