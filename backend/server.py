@@ -192,7 +192,7 @@ def handle_request_all_images():
     paths = list(filter(os.path.isfile, glob.glob(result_path + "*.png")))
     paths.sort(key=lambda x: os.path.getmtime(x))
     image_array = []
-    for path in paths:
+    for path in paths[-500:]:
         metadata = retrieve_metadata(path)
         image_array.append({"url": path, "metadata": metadata["sd-metadata"]})
     socketio.emit("galleryImages", {"images": image_array})
