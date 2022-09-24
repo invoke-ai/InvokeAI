@@ -5,7 +5,7 @@ from typing_extensions import Annotated
 from pydantic import BaseModel, Field, root_validator
 from graphlib import TopologicalSorter, CycleError
 from ldm.dream.app.invocations import *
-from ldm.dream.app.invocations.baseinvocation import BaseInvocation
+from ldm.dream.app.invocations.baseinvocation import BaseInvocation, is_field_compatible
 
 
 class Node(BaseModel):
@@ -94,32 +94,11 @@ class InvocationGraph(BaseModel):
 
             from_node = nodes_dict[from_id]
             to_node = nodes_dict[to_id]
-
-            from_type = from_node.type
-            to_type = to_node.type
-
-            from_node_type = invoker_types[from_type]
-            to_node_type = invoker_types[to_type]
-
-            # Ensure field types match
             from_field = link.from_node.field
             to_field = link.to_node.field
 
-            # Get outputs of from node
-            from_node_outputs = get_type_hints(from_node_type.Outputs)
-            to_node_inputs = get_type_hints(to_node_type)
-
-            from_node_field = from_node_outputs.get(from_field) or None
-            to_node_field = to_node_inputs.get(to_field) or None
-
-            if not from_node_field:
-                errors['links'] = [f'field {from_field} not found on node {from_id} of type {from_type}']
-            if not to_node_field:
-                errors['links'] = [f'field {to_field} not found on node {to_id} of type {to_type}']
-            
-            if from_node_field and to_node_field:
-                if from_node_field != to_node_field and from_node_field not in get_args(to_node_field):
-                    errors['links'] = [f'node {from_id} field {from_field} ({from_type}) not compatible with node {to_id} field {to_field} ({to_type})']
+            if not is_field_compatible(from_node, from_field, to_node, to_field):
+                errors['links'] = [f'invalid link {from_node}[{from_field}] -> {to_node}[{to_field}]']
 
         if errors:
             raise ValueError(f'One or more errors validating map: {errors}')

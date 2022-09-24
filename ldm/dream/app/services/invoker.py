@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from ldm.dream.app.invocations.baseinvocation import InvocationContext, InvocationServices
+from ldm.dream.app.invocations.baseinvocation import InvocationContext, InvocationFieldLink, InvocationServices
 from ldm.dream.app.services.invocation_graph import InvocationGraph
 
 
@@ -34,13 +34,19 @@ class Invoker:
 
                 # Overwrite node inputs with links
                 input_links = invocation_graph.get_node_input_links(node)
-                for link in input_links:
-                    output_id = link.from_node.id
-                    output_field = link.from_node.field
-                    input_field = link.to_node.field
-                    # TODO: should these be deep copied in case they get transformed by another node?
-                    output_value = context.get_output(output_id, output_field)
-                    setattr(node, input_field, output_value)
+
+                # Create invocation links
+                invocation_links = list(map(lambda link: InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field), input_links))
+
+                context.map_outputs(node, invocation_links)
+
+                # for link in input_links:
+                #     output_id = link.from_node.id
+                #     output_field = link.from_node.field
+                #     input_field = link.to_node.field
+                #     # TODO: should these be deep copied in case they get transformed by another node?
+                #     output_value = context.get_output(output_id, output_field)
+                #     setattr(node, input_field, output_value)
 
                 # Invoke
                 #print(f'invoking {node_id} of type {node.type}')
