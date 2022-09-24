@@ -1,45 +1,54 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from marshmallow import fields
+from typing import Literal, Union
+from pydantic import BaseModel, Field
+from pydantic.dataclasses import dataclass
 from PIL import Image
-from ldm.dream.app.services.schemas import ImageField, InvocationSchemaBase
-from ldm.dream.app.invocations.invocationabc import InvocationABC
+from ldm.dream.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 
-class InvokeLoadImage(InvocationABC):
+class ImageFieldConfig:
+    arbitrary_types_allowed = True
+
+@dataclass(config=ImageFieldConfig)
+class ImageField:
+    """An image field used for passing image objects between invocations"""
+    image: Union[Image.Image,None]
+
+
+class BaseImageOutput(BaseInvocationOutput):
+    """Base class for invocations that output an image"""
+    image: ImageField = Field(default=None, description="The output image")
+
+
+class LoadImageInvocation(BaseInvocation):
     """Load an image from a filename and provide it as output."""
-    def invoke(self, image: str, **kwargs) -> dict:
-        output_image = Image.open(image)
-        return dict(
-            image = output_image
+    type: Literal['load_image']
+
+    # Inputs
+    uri: str = Field(description="The URI from which to load the image")
+
+    class Outputs(BaseImageOutput):
+        ...
+
+    def invoke(self, context: InvocationContext) -> Outputs:
+        output_image = Image.open(self.uri)
+        return LoadImageInvocation.Outputs.construct(
+            image = ImageField(image = output_image)
         )
 
 
-class LoadImageSchema(InvocationSchemaBase):
-  class Meta:
-    type = 'load_image'
-    invokes = InvokeLoadImage
-    outputs = {
-      'image': ImageField()
-    }
-
-  image = fields.String()
-
-
-class InvokeShowImage(InvocationABC):
+class ShowImageInvocation(BaseInvocation):
     """Displays a provided image, and passes it forward in the pipeline."""
-    def invoke(self, image: Image.Image, **kwargs) -> dict:
-        image.show()
-        return dict(
-            image = image
+    type: Literal['show_image']
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to show")
+
+    class Outputs(BaseImageOutput):
+        ...
+
+    def invoke(self, context: InvocationContext) -> Outputs:
+        self.image.image.show()
+        return ShowImageInvocation.Outputs.construct(
+            image = ImageField(image = self.image.image)
         )
-
-
-class LoadImageSchema(InvocationSchemaBase):
-  class Meta:
-    type = 'show_image'
-    invokes = InvokeShowImage
-    outputs = {
-      'image': ImageField()
-    }
-
-  image = ImageField()

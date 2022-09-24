@@ -1,90 +1,86 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from marshmallow import fields
-from marshmallow.validate import OneOf, Range
-from PIL.Image import Image
-from ldm.dream.app.services.schemas import ImageField, InvocationSchemaBase
-from ldm.dream.app.invocations.invocationabc import InvocationABC
-from ldm.generate import Generate
+from enum import Enum
+from typing import Literal, Union
+from pydantic import Field
+from ldm.dream.app.invocations.image import BaseImageOutput, ImageField
+from ldm.dream.app.invocations.baseinvocation import BaseInvocation, InvocationContext
 
+
+class SamplerEnum(str, Enum):
+    ddim = "ddim"
+    plms = "plms"
+    k_lms = "k_lms"
+    k_dpm_2 = "k_dpm_2"
+    k_dpm_2_a = "k_dpm_2_a"
+    k_euler = "k_euler"
+    k_euler_a = "k_euler_a"
+    k_heun = "k_heun"
 
 # Text to image
-class InvokeTextToImage(InvocationABC):
+class TextToImageInvocation(BaseInvocation):
     """Generates an image using text2img."""
-    def __init__(
-        self,
-        generate: Generate,
-        **kwargs # consume unused arguments
-    ):
-        self._generate: Generate = generate
+    type: Literal['txt2img']
 
-    def invoke(self, prompt: str, **kwargs) -> dict:  # See args in schema below
-        results = self._generate.prompt2image(
-            prompt=prompt,
-            **kwargs
+    # Inputs
+    # TODO: consider making prompt optional to enable providing prompt through a link
+    prompt: str               = Field(description="The prompt to generate an image from")
+    seed: int                 = Field(default=0, description="The seed to use (0 for a random seed)")
+    steps: int                = Field(default=10, gt=0, description="The number of steps to use to generate the image")
+    width: int                = Field(default=512, gt=0, description="The width of the resulting image")
+    height: int               = Field(default=512, gt=0, description="The height of the resulting image")
+    cfg_scale: float          = Field(default=7.5, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt")
+    sampler_name: SamplerEnum = Field(default="k_lms", description="The sampler to use")
+    seamless: bool            = Field(default=False, description="Whether or not to generate an image that can tile without seams")
+    model: str                = Field(default='', description="The model to use (currently ignored)")
+    progress_images: bool     = Field(default=False, description="Whether or not to produce progress images during generation")
+
+    class Outputs(BaseImageOutput):
+        ...
+
+    def invoke(self, context: InvocationContext) -> Outputs:
+        results = context.generate.prompt2image(
+            prompt = self.prompt,
+            **self.dict(exclude = {'prompt'}) # Shorthand for passing all of the parameters above manually
         )
 
-        # Results are image and seed, unwrap for now
-        # TODO: can this return multiple results?
-        return dict(image=results[0][0])
+        # TODO: send events on progress
+
+        # Results are image and seed, unwrap for now and ignore the seed
+        # TODO: pre-seed?
+        # TODO: can this return multiple results? Should it?
+        return TextToImageInvocation.Outputs.construct(
+            image = ImageField(image = results[0][0])
+        )
 
 
-class TextToImageSchema(InvocationSchemaBase):
-    """txt2img"""
-    class Meta:
-        type = "txt2img"
-        outputs = {
-            "image": ImageField()
-        }
-        invokes = InvokeTextToImage
-        # TODO: output intermediates? That doesn't seem quite right, since they couldn't be used
-        # Maybe send them to the job? Job context?
-
-    # TODO: consider making this optional and just fail if not supplied? (to provide prompt building capability)
-    prompt = fields.String(required=True)
-    seed = fields.Integer(load_default=0)  # 0 is random
-    steps = fields.Integer(load_default=10)
-    width = fields.Integer(load_default=512)
-    height = fields.Integer(load_default=512)
-    cfg_scale = fields.Float(load_default=7.5)
-    sampler_name = fields.String(
-        load_default="k_lms",
-        validate=OneOf(["ddim","plms","k_lms","k_dpm_2","k_dpm_2_a","k_euler","k_euler_a","k_heun"]),
-    )
-    seamless = fields.Boolean(load_default=False)
-    model = fields.String(load_default="")  # currently unused
-    embeddings = fields.Raw(load_default="")  # currently unused
-    progress_images = fields.Boolean(load_default="false")
 
 
-# Image to image
-class InvokeImageToImage(InvocationABC):
+
+class ImageToImageInvocation(TextToImageInvocation):
     """Generates an image using img2img."""
-    def __init__(
-        self,
-        generate: Generate,
-        **kwargs # consume unused arguments
-    ):
-        self._generate: Generate = generate
-        
-    def invoke(self, image: Image, prompt: str, **kwargs) -> dict:  # See args in schema below
-        results = self._generate.prompt2image(
-            prompt=prompt,
-            init_img=image,
-            **kwargs
+    type: Literal["img2img"]
+
+    # Inputs
+    image: Union[ImageField,None] = Field(description="The input image")
+    strength: float               = Field(default=0.75, gt=0, le=1, description="The strength of the original image")
+    fit: bool                     = Field(default=True, description="Whether or not the result should be fit to the aspect ratio of the input image")
+
+    class Outputs(BaseImageOutput):
+        ...
+
+    def invoke(self, context: InvocationContext) -> Outputs:
+        results = context.generate.prompt2image(
+            prompt   = self.prompt,
+            init_img = self.image.image,
+            **self.dict(exclude = {'prompt','image'}) # Shorthand for passing all of the parameters above manually
         )
 
-        # Results are image and seed, unwrap for now
-        # TODO: can this return multiple results?
-        return dict(image=results[0][0])
+        # TODO: send events on progress
 
-
-class ImageToImageSchema(TextToImageSchema):
-    """img2img, runs txt2img with a weighted initial image"""
-    class Meta(TextToImageSchema.Meta):
-        type = 'img2img'
-        invokes = InvokeImageToImage
-
-    image = ImageField()
-    strength = fields.Float(load_default=0.75, validate=Range(0.0, 1.0, min_inclusive=False, max_inclusive=True))
-    fit = fields.Boolean(load_default=True)
+        # Results are image and seed, unwrap for now and ignore the seed
+        # TODO: pre-seed?
+        # TODO: can this return multiple results? Should it?
+        return ImageToImageInvocation.Outputs.construct(
+            image = ImageField(image = results[0][0])
+        )
