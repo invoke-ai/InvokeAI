@@ -34,9 +34,9 @@ Looking for a short version? Here's a TL;DR in 3 tables.
 
 | Suggestions  |
 |:---|
-| For most use cases, `K_LMS`, `K_HEUN` and `K_DPM_2` are the best choices (the latter 2 run 0.5x as quick, but tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result.|
+| For most use cases, `K_LMS`, `K_HEUN` and `K_DPM_2` are the best choices (the latter 2 run 0.5x as quick, but tend to converge 2x as quick as `K_LMS`). At very low steps (≤ `-s8`), `K_HEUN` and `K_DPM_2` are not recommended. Use `K_LMS` at 2x the steps instead.|
 | For variability, use `K_EULER_A` (runs 2x as quick as `K_DPM_2_A`).  |
-| For nature, `K_LMS` is preferred.  |
+
 ---
 
 ### **Sampler results**
@@ -122,13 +122,11 @@ In my M1 Max with 64GB of RAM, for a 512x512 image:
 |  `K_DPM_2_A` | 0.95 (slower)  |
 |  `K_EULER_A` | 1.86  |
 
-Combining our results with the steps per second of each sampler, three choices come out on top: `K_LMS`, `K_HEUN` and `K_DPM_2` (where the latter two run 0.5x as quick but tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result. Finally, for creativity and a lot of variation between iterations, `K_EULER_A` can be a good choice (which runs 2x as quick as `K_DPM_2_A`).
+Combining our results with the steps per second of each sampler, three choices come out on top: `K_LMS`, `K_HEUN` and `K_DPM_2` (where the latter two run 0.5x as quick but tend to converge 2x as quick as `K_LMS`). For creativity and a lot of variation between iterations, `K_EULER_A` can be a good choice (which runs 2x as quick as `K_DPM_2_A`).
 
-A special case may be nature compositions, for which `K_LMS` might be preferable, as nature tends to converge in fewer steps, and while `-s10` may be good enough for a rough representaton using `K_LMS`, `-s5` (half, to counter running 0.5x as quick) is not enough for `K_HEUN` or `K_DPM_2` to produce meaningful results.
+Additionally, image generation at very low steps (≤ `-s8`) is not recommended for `K_HEUN` and `K_DPM_2`. Use `K_LMS` at 2x the steps instead.
 
 <img width="397" alt="192044949-67d5d441-a0d5-4d5a-be30-5dda4fc28a00-min" src="https://user-images.githubusercontent.com/50542132/192046823-2714cb29-bbf3-4eb1-9213-e27a0963905c.png">
-
-Other topics that are more complex, such as people, don't pose this problem for `K_HEUN` and `K_DPM_2`.
 
 ### **Three key points**
 
@@ -140,4 +138,4 @@ Finally, it is relevant to mention that, in general, there are 3 important momen
 
 * The point at which an image fully converges.
 
-Hence, remember that your workflow/strategy for image formation should define your optimal number of steps, even for the same prompt and seed (for example, if you seek full convergence, you may run `K_LMS` for `-s200` in the case of the red-haired girl, but `K_LMS` and `-s20`-taking one tenth the time- may do as well if your workflow includes adding small details, such as the missing shoulder strap, via `img2img`.
+Hence, remember that your workflow/strategy should define your optimal number of steps, even for the same prompt and seed (for example, if you seek full convergence, you may run `K_LMS` for `-s200` in the case of the red-haired girl, but `K_LMS` and `-s20`-taking one tenth the time- may do as well if your workflow includes adding small details, such as the missing shoulder strap, via `img2img`.
