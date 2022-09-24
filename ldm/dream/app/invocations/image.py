@@ -13,6 +13,7 @@ class ImageFieldConfig:
 class ImageField:
     """An image field used for passing image objects between invocations"""
     image: Union[Image.Image,None]
+    # TODO: add lineage/history information to carry to metadata
 
 
 class BaseImageOutput(BaseInvocationOutput):

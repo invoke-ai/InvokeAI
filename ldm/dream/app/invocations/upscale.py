@@ -24,7 +24,7 @@ class UpscaleInvocation(BaseInvocation):
         ...
 
     def invoke(self, context: InvocationContext) -> Outputs: 
-        results = context.generate.upscale_and_reconstruct(
+        results = context.services.generate.upscale_and_reconstruct(
             image_list     = [[self.image.image, 0]],
             upscale        = (self.level, self.strength),
             strength       = 0.0, # GFPGAN strength

@@ -39,7 +39,7 @@ class TextToImageInvocation(BaseInvocation):
         ...
 
     def invoke(self, context: InvocationContext) -> Outputs:
-        results = context.generate.prompt2image(
+        results = context.services.generate.prompt2image(
             prompt = self.prompt,
             **self.dict(exclude = {'prompt'}) # Shorthand for passing all of the parameters above manually
         )
@@ -70,7 +70,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         ...
 
     def invoke(self, context: InvocationContext) -> Outputs:
-        results = context.generate.prompt2image(
+        results = context.services.generate.prompt2image(
             prompt   = self.prompt,
             init_img = self.image.image,
             **self.dict(exclude = {'prompt','image'}) # Shorthand for passing all of the parameters above manually

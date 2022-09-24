@@ -22,6 +22,15 @@ class InvocationHistoryEntry():
         self.outputs = outputs
 
 
+class InvocationServices():
+    generate: Generate
+
+    def __init__(self,
+        generate: Generate
+    ):
+        self.generate = generate
+
+
 class InvocationContext():
     """The invocation context."""
 
@@ -30,12 +39,12 @@ class InvocationContext():
     history: List[str]
 
     # Services used by invocations
-    generate: Generate
+    services: InvocationServices
 
-    def __init__(self, generate: Generate):
+    def __init__(self, services: InvocationServices):
         self.invocation_results = dict()
         self.history = list()
-        self.generate = generate
+        self.services = services
     
     def add_history_entry(self, invocation: 'BaseInvocation', outputs: BaseInvocationOutput):
         self.invocation_results[invocation.id] = InvocationHistoryEntry(invocation, outputs)
