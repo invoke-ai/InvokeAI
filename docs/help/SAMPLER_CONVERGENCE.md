@@ -110,7 +110,7 @@ Note also the point of convergence may not be the most desirable state (e.g. I p
 
 Once we understand the concept of sampler convergence, we must look into the performance of each sampler in terms of steps (iterations) per second, as not all samplers run at the same speed.
 
-In my M1 Max with 64GB of RAM, for a 512x512 image:
+On my M1 Max with 64GB of RAM, for a 512x512 image:
 | Sampler   | (3 sample average) it/s |
 |---|---|
 |  `DDIM` | 1.89  |
@@ -138,4 +138,4 @@ Finally, it is relevant to mention that, in general, there are 3 important momen
 
 * The point at which an image fully converges.
 
-Hence, remember that your workflow/strategy should define your optimal number of steps, even for the same prompt and seed (for example, if you seek full convergence, you may run `K_LMS` for `-s200` in the case of the red-haired girl, but `K_LMS` and `-s20`-taking one tenth the time- may do as well if your workflow includes adding small details, such as the missing shoulder strap, via `img2img`.
+Hence, remember that your workflow/strategy should define your optimal number of steps, even for the same prompt and seed (for example, if you seek full convergence, you may run `K_LMS` for `-s200` in the case of the red-haired girl, but `K_LMS` and `-s20`-taking one tenth the time- may do as well if your workflow includes adding small details, such as the missing shoulder strap, via `img2img`).
