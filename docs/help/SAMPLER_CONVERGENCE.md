@@ -12,7 +12,7 @@ The purpose of this series of documents is to help you better understand these t
 
 In this document, we will talk about sampler convergence.
 
-Looking for a short version? Here's a TL;DR in 4 tables.
+Looking for a short version? Here's a TL;DR in 3 tables.
 
 | Remember  |
 |:---|
@@ -37,12 +37,6 @@ Looking for a short version? Here's a TL;DR in 4 tables.
 | For most use cases, `K_LMS`, `K_HEUN` and `K_DPM_2` are the best choices (the latter 2 run 0.5x as quick, but tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result.|
 | For variability, use `K_EULER_A` (runs 2x as quick as `K_DPM_2_A`).  |
 | For nature, `K_LMS` is preferred.  |
-
-| Topic   | Predict the final result K_HEUN  | Predict the final result K_LMS  |
-|:---|:---|:---|
-|  Nature | 8  | 8  |
-|  People | 20-30  | 8  |
-|  Food |   | 8  |
 ---
 
 ### **Sampler results**
@@ -63,7 +57,7 @@ Among K-samplers, `K_HEUN` and `K_DPM_2` seem to require the fewest steps to con
 ### **Batch generation speedup**
 
 This realization is very useful because it means you don't need to create a batch of 100 images (`-n100`) at `-s100` to choose your favorite 2 or 3 images.
-You can produce the same 100 images at `-s10` to `-s30` (more on that later) using a K-sampler (since they converge faster), get a rough idea of the final result, choose your 2 or 3 favorite ones, and then run `-s100` on those images to polish some details.
+You can produce the same 100 images at `-s10` to `-s30` using a K-sampler (since they converge faster), get a rough idea of the final result, choose your 2 or 3 favorite ones, and then run `-s100` on those images to polish some details.
 The latter technique is 3-8x as quick.
 
 Example:
@@ -84,7 +78,7 @@ Nature. `"valley landscape wallpaper, d&d art, fantasy, painted, 4k, high detail
 
 ![191736091-dda76929-00d1-4590-bef4-7314ea4ea419-min (1)](https://user-images.githubusercontent.com/50542132/191868763-b151c69e-0a72-4cf1-a151-5a64edd0c93e.png)
 
-With nature, you can see how initial results are even more indicative of final result -more so than with characters/people. `K_HEUN` and `K_DPM_2` are again the quickest indicators, almost right from the start. Results also converge faster (e.g. `K_HEUN` converges at `-s21`).
+With nature, you can see how initial results are even more indicative of final result -more so than with characters/people. `K_HEUN` and `K_DPM_2` are again the quickest indicators, almost right from the start. Results also converge faster (e.g. `K_HEUN` converged at `-s21`).
 
 Food. `"a hamburger with a bowl of french fries" -W512 -H512 -C7.5 -S4053222918`
 
@@ -98,13 +92,13 @@ Animals. `"grown tiger, full body" -W512 -H512 -C7.5 -S3721629802`
 
 `K_HEUN` and `K_DPM_2` once again require the least number of steps to be indicative of the final result (around `-s30`), while other samplers are still struggling with several tails or malformed back legs.
 
-It also takes longer to converge (for comparison, `K_HEUN` requires around 150 steps to converge). This is normal, as producing human/animal faces/bodies is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
+It also takes longer to converge (for comparison, `K_HEUN` required around 150 steps to converge). This is normal, as producing human/animal faces/bodies is one of the things the model struggles the most with. For these topics, running for more steps will often increase coherence within the composition.
 
 People. `"Ultra realistic photo, (Miranda Bloom-Kerr), young, stunning model, blue eyes, blond hair, beautiful face, intricate, highly detailed, smooth, art by artgerm and greg rutkowski and alphonse mucha, stained glass" -W512 -H512 -C7.5 -S2131956332`. This time, we will go up to 300 steps.
 
 ![Screenshot 2022-09-23 at 02 05 48-min (1)](https://user-images.githubusercontent.com/50542132/191871743-6802f199-0ffd-4986-98c5-df2d8db30d18.png)
 
-Observing the results, it again takes longer for all samplers to converge (`K_HEUN` takes around 150 steps), but we can observe good indicative results much earlier (for `K_HEUN`, almost right from the start). Conversely, `DDIM` and `PLMS` are still undergoing moderate changes (see: lace around her neck), even at `-s300`.
+Observing the results, it again takes longer for all samplers to converge (`K_HEUN` took around 150 steps), but we can observe good indicative results much earlier (see: `K_HEUN`). Conversely, `DDIM` and `PLMS` are still undergoing moderate changes (see: lace around her neck), even at `-s300`.
 
 In fact, as we can see in this other experiment, some samplers can take 700+ steps to converge when generating people.
 
@@ -112,19 +106,9 @@ In fact, as we can see in this other experiment, some samplers can take 700+ ste
 
 Note also the point of convergence may not be the most desirable state (e.g. I prefer an earlier version of the face, more rounded), but it will probably be the most coherent arms/hands/face attributes-wise. You can always merge different images with a photo editing tool and pass it through `img2img` to smoothen the composition.
 
-### **Three key points**
-
-Looking at the results above, it is important to distinguish 3 moments in the process of image generation as steps increase:
-
-* The (earliest) point at which an image becomes a good indicator of the final result (useful for batch generation at low step values, to then improve the quality/coherence of the chosen images via running the same prompt and seed for more steps).
-
-* The (earliest) point at which an image becomes coherent, even if different from the result if steps are increased (useful for batch generation at low step values, where quality/coherence is improved via techniques other than increasing the steps -e.g. via inpainting).
-
-* The point at which an image fully converges.
-
 ### **Sampler generation times**
 
-In our case, we will further study the (earliest) point at which images become a good indicator of the final result for different topics (anime, nature, food, animals and people). But first, we must take into account the performance of each sampler in terms of steps (iterations) per second, as not all samplers run at the same speed.
+Once we understand the concept of sampler convergence, we must look into the performance of each sampler in terms of steps (iterations) per second, as not all samplers run at the same speed.
 
 In my M1 Max with 64GB of RAM, for a 512x512 image:
 | Sampler   | (3 sample average) it/s |
@@ -138,16 +122,22 @@ In my M1 Max with 64GB of RAM, for a 512x512 image:
 |  `K_DPM_2_A` | 0.95 (slower)  |
 |  `K_EULER_A` | 1.86  |
 
-Combining our results with the steps/s of each sampler, three choices seem to come out on top: `K_LMS`, `K_HEUN` and `K_DPM_2` (where the latter two run 0.5x as quick but tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result. Finally, for creativity and a lot of variation between iterations, `K_EULER_A` can be a good choice (which runs 2x as quick as `K_DPM_2_A`).
+Combining our results with the steps per second of each sampler, three choices come out on top: `K_LMS`, `K_HEUN` and `K_DPM_2` (where the latter two run 0.5x as quick but tend to converge 2x as quick as `K_LMS`). For batch generation, all three are good indicators of the final result. Finally, for creativity and a lot of variation between iterations, `K_EULER_A` can be a good choice (which runs 2x as quick as `K_DPM_2_A`).
 
-Personally, I tend to prefer `K_LMS` for nature, as this topic tends to converge in fewer steps, and while 10 steps can be good enough for a rough representaton using `K_LMS`, 5 steps (half, to counter running 0.5x as quick) are not enough for `K_HEUN` or `K_DPM_2` to produce meaningful results.
+A special case may be nature compositions, for which `K_LMS` might be preferable, as nature tends to converge in fewer steps, and while `-s10` may be good enough for a rough representaton using `K_LMS`, `-s5` (half, to counter running 0.5x as quick) is not enough for `K_HEUN` or `K_DPM_2` to produce meaningful results.
 
-<img width="397" alt="image" src="https://user-images.githubusercontent.com/50542132/192044949-67d5d441-a0d5-4d5a-be30-5dda4fc28a00.png">
+<img width="397" alt="192044949-67d5d441-a0d5-4d5a-be30-5dda4fc28a00-min" src="https://user-images.githubusercontent.com/50542132/192046823-2714cb29-bbf3-4eb1-9213-e27a0963905c.png">
 
-However, topics such as people require more steps to obtain meaningful results, making `K_HEUN` and `K_DPM_2` a perfectly valid option.
+Other topics that are more complex, such as people, don't pose this problem for `K_HEUN` and `K_DPM_2`.
 
-### **Minimum steps per topic**
+### **Three key points**
 
+Finally, it is relevant to mention that, in general, there are 3 important moments in the process of image formation as steps increase:
 
+* The (earliest) point at which an image becomes a good indicator of the final result (useful for batch generation at low step values, to then improve the quality/coherence of the chosen images via running the same prompt and seed for more steps).
 
+* The (earliest) point at which an image becomes coherent, even if different from the result if steps are increased (useful for batch generation at low step values, where quality/coherence is improved via techniques other than increasing the steps -e.g. via inpainting).
 
+* The point at which an image fully converges.
+
+Hence, remember that your workflow/strategy for image formation should define your optimal number of steps, even for the same prompt and seed (for example, if you seek full convergence, you may run `K_LMS` for `-s200` in the case of the red-haired girl, but `K_LMS` and `-s20`-taking one tenth the time- may do as well if your workflow includes adding small details, such as the missing shoulder strap, via `img2img`.
