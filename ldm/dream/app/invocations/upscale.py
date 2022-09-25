@@ -12,7 +12,7 @@ class UpscaleLevel(IntEnum):
     four = 4
 
 class UpscaleInvocation(BaseInvocation):
-    """Generates an image using text2img."""
+    """Upscales an image."""
     type: Literal["upscale"]
 
     # Inputs

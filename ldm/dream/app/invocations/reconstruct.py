@@ -5,7 +5,7 @@ from ldm.dream.app.invocations.baseinvocation import BaseInvocation, InvocationC
 
 
 class RestoreFaceInvocation(BaseInvocation):
-    """Generates an image using text2img."""
+    """Restores faces in an image."""
     type: Literal["restore_face"]
 
     # Inputs
