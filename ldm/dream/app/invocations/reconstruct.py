@@ -17,7 +17,7 @@ class RestoreFaceInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> Outputs: 
         results = context.services.generate.upscale_and_reconstruct(
-            image_list     = [[self.image.image, 0]],
+            image_list     = [[self.image.get(), 0]],
             upscale        = None,
             strength       = self.strength, # GFPGAN strength
             save_original  = False,
@@ -27,5 +27,5 @@ class RestoreFaceInvocation(BaseInvocation):
         # Results are image and seed, unwrap for now
         # TODO: can this return multiple results?
         return RestoreFaceInvocation.Outputs.construct(
-            image = ImageField(image=results[0][0])
+            image = ImageField.from_image(results[0][0])
         )

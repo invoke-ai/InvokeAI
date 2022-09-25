@@ -50,7 +50,7 @@ class TextToImageInvocation(BaseInvocation):
         # TODO: pre-seed?
         # TODO: can this return multiple results? Should it?
         return TextToImageInvocation.Outputs.construct(
-            image = ImageField(image = results[0][0])
+            image = ImageField.from_image(results[0][0])
         )
 
 
@@ -72,7 +72,7 @@ class ImageToImageInvocation(TextToImageInvocation):
     def invoke(self, context: InvocationContext) -> Outputs:
         results = context.services.generate.prompt2image(
             prompt   = self.prompt,
-            init_img = self.image.image,
+            init_img = self.image.get(),
             **self.dict(exclude = {'prompt','image'}) # Shorthand for passing all of the parameters above manually
         )
 
@@ -82,5 +82,5 @@ class ImageToImageInvocation(TextToImageInvocation):
         # TODO: pre-seed?
         # TODO: can this return multiple results? Should it?
         return ImageToImageInvocation.Outputs.construct(
-            image = ImageField(image = results[0][0])
+            image = ImageField.from_image(results[0][0])
         )

@@ -25,7 +25,7 @@ class UpscaleInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> Outputs: 
         results = context.services.generate.upscale_and_reconstruct(
-            image_list     = [[self.image.image, 0]],
+            image_list     = [[self.image.get(), 0]],
             upscale        = (self.level, self.strength),
             strength       = 0.0, # GFPGAN strength
             save_original  = False,
@@ -35,5 +35,5 @@ class UpscaleInvocation(BaseInvocation):
         # Results are image and seed, unwrap for now
         # TODO: can this return multiple results?
         return UpscaleInvocation.Outputs.construct(
-            image = ImageField(image=results[0][0])
+            image = ImageField.from_image(results[0][0])
         )

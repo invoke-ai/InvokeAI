@@ -12,8 +12,18 @@ class ImageFieldConfig:
 @dataclass(config=ImageFieldConfig)
 class ImageField:
     """An image field used for passing image objects between invocations"""
-    image: Union[Image.Image,None]
+    _image: Image.Image
     # TODO: add lineage/history information to carry to metadata
+
+    def get(self) -> Image.Image:
+        return self._image
+
+    def set(self, image: Image.Image):
+        self._image = image
+
+    @classmethod
+    def from_image(cls, image: Image.Image) -> 'ImageField':
+        return cls(_image = image)
 
 
 class BaseImageOutput(BaseInvocationOutput):
@@ -34,7 +44,7 @@ class LoadImageInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> Outputs:
         output_image = Image.open(self.uri)
         return LoadImageInvocation.Outputs.construct(
-            image = ImageField(image = output_image)
+            image = ImageField.from_image(output_image)
         )
 
 
@@ -49,7 +59,7 @@ class ShowImageInvocation(BaseInvocation):
         ...
 
     def invoke(self, context: InvocationContext) -> Outputs:
-        self.image.image.show()
+        self.image.get().show()
         return ShowImageInvocation.Outputs.construct(
-            image = ImageField(image = self.image.image)
+            image = ImageField.from_image(self.image.get())
         )

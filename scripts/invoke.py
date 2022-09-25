@@ -1,11 +1,16 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from ldm.dream.app.cli import invoke_cli
+import os
+import sys
 
 def main():
-    # TODO: Parse some top-level args here.
-    # TODO: Add switch to run webapp/api
-    invoke_cli()
+    if '--api' in sys.argv:
+        from ldm.dream.app.api_app import invoke_api
+        invoke_api()
+    else:
+        # TODO: Parse some top-level args here.
+        from ldm.dream.app.cli_app import invoke_cli
+        invoke_cli()
 
 
 if __name__ == '__main__':

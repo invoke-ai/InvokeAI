@@ -390,6 +390,12 @@ class Args(object):
             help='Start in web server mode.',
         )
         web_server_group.add_argument(
+            '--api',
+            dest='api',
+            action='store_true',
+            help='Start in api mode.',
+        )
+        web_server_group.add_argument(
             '--host',
             type=str,
             default='127.0.0.1',
