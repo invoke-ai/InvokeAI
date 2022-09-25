@@ -25,7 +25,7 @@ export const socketioMiddleware = () => {
   const { hostname, port } = new URL(window.location.href);
 
   const socketio = io(`http://${hostname}:9090`, {
-    timeout: 120000,
+    timeout: 60000,
   });
 
   let areListenersSet = false;
