@@ -136,7 +136,7 @@ class InvocationContext():
             node_id = link.node_id
             # Get the results from history
             if type(node_id) is int and node_id < 0:
-                if abs(node_id) >= len(self.history):
+                if abs(node_id) > len(self.history):
                     raise IndexError()
                 else:
                     node_id = self.history[len(self.history) + node_id]
@@ -144,10 +144,10 @@ class InvocationContext():
             result = self.invocation_results[node_id]
 
             if link.from_field == '*':
-                output_fields = result.outputs.__fields__()
-                to_fields = invocation.__fields__()
+                output_fields = result.outputs.__fields__
+                to_fields = invocation.__fields__
                 for field_name in output_fields:
-                    if to_fields.has_key(field_name):
+                    if field_name in to_fields:
                         if is_field_compatible(result.invocation, field_name, invocation, field_name):
                             output_value = self.get_output(node_id, field_name)
                             setattr(invocation, field_name, output_value)

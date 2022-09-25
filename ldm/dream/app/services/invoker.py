@@ -1,6 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from ldm.dream.app.invocations.baseinvocation import InvocationContext, InvocationFieldLink, InvocationServices
+from typing import List
+from ldm.dream.app.invocations.baseinvocation import BaseInvocation, InvocationContext, InvocationFieldLink, InvocationServices
 from ldm.dream.app.services.invocation_graph import InvocationGraph
 
 
@@ -15,6 +16,17 @@ class Invoker:
 
     def create_context(self) -> InvocationContext:
         return InvocationContext(self.services)
+
+
+    def invoke(self, context: InvocationContext, invocation: BaseInvocation, links: List[InvocationFieldLink]):
+        # Get old outputs as inputs
+        context.map_outputs(invocation, links)
+
+        # TODO: clone invocation before invoking?
+        outputs = invocation.invoke(context)
+
+        # Store outputs
+        context.add_history_entry(invocation, outputs)
 
     ...
     def invoke_graph(self, invocation_graph: InvocationGraph):
@@ -38,20 +50,11 @@ class Invoker:
                 # Create invocation links
                 invocation_links = list(map(lambda link: InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field), input_links))
 
+                # Get old outputs as inputs
                 context.map_outputs(node, invocation_links)
 
-                # for link in input_links:
-                #     output_id = link.from_node.id
-                #     output_field = link.from_node.field
-                #     input_field = link.to_node.field
-                #     # TODO: should these be deep copied in case they get transformed by another node?
-                #     output_value = context.get_output(output_id, output_field)
-                #     setattr(node, input_field, output_value)
-
                 # Invoke
-                #print(f'invoking {node_id} of type {node.type}')
-                outputs = node.invoke(context)
+                self.invoke(context, node, invocation_links)
 
-                # Store outputs and mark node as complete
-                context.add_history_entry(node, outputs)
+                # Mark node as complete
                 graph.done(node_id)
