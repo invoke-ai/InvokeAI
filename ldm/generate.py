@@ -173,7 +173,8 @@ class Generate:
             config                = None,
             gfpgan=None,
             codeformer=None,
-            esrgan=None
+            esrgan=None,
+            free_gpu_mem=False,
     ):
         models              = OmegaConf.load(conf)
         mconfig             = models[model]
@@ -200,6 +201,7 @@ class Generate:
         self.gfpgan = gfpgan
         self.codeformer = codeformer
         self.esrgan = esrgan
+        self.free_gpu_mem = free_gpu_mem
 
         # Note that in previous versions, there was an option to pass the
         # device to Generate(). However the device was then ignored, so
