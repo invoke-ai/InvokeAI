@@ -15,6 +15,8 @@ from .api.routers import invocation
 from .api.dependencies import ApiDependencies
 from ..args import Args
 
+origins = []
+
 # Create the app
 app = FastAPI(
     title     = "Invoke AI",
