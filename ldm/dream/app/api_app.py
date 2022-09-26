@@ -5,6 +5,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.staticfiles import StaticFiles
 from pydantic import schema_of
+from pydantic.schema import schema
 import uvicorn
 
 
@@ -15,7 +16,11 @@ from .api.dependencies import ApiDependencies
 from ..args import Args
 
 # Create the app
-app = FastAPI()
+app = FastAPI(
+    title     = "Invoke AI",
+    docs_url  = None,
+    redoc_url = None
+)
 
 config = {}
 
@@ -38,18 +43,32 @@ def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
     openapi_schema = get_openapi(
-        title = "Invoke AI",
+        title       = app.title,
         description = "An API for invoking AI image operations",
-        version = "1.0.0",
-        routes=app.routes
+        version     = "1.0.0",
+        routes      = app.routes
     )
 
     # Add all outputs
     for invoker in BaseInvocation.get_invocations():
-        name = f'{invoker.__name__}Outputs'
-        schema = schema_of(invoker.Outputs)["definitions"]["Outputs"]
-        schema["title"] = name
-        openapi_schema["components"]["schemas"][name] = schema
+        invoker_name = invoker.__name__
+        name = f'{invoker_name}Outputs'
+        output_schema = schema([invoker.Outputs], ref_prefix="#/components/schemas/")['definitions']['Outputs']
+        output_schema["title"] = name
+        openapi_schema["components"]["schemas"][name] = output_schema
+
+        # Add a reference to the outputs to additionalProperties of the invoker schema
+        invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
+        outputs_ref = { '$ref': f'#/components/schemas/{name}' }
+        if 'additionalProperties' in invoker_schema:
+            invoker_schema['additionalProperties']['outputs'] = outputs_ref
+        else:
+            invoker_additional_properties = {
+                'outputs': {
+                    '$ref': f'#/components/schemas/{name}'
+                }
+            }
+            invoker_schema['additionalProperties'] = invoker_additional_properties
     
     app.openapi_schema = openapi_schema
     return app.openapi_schema
