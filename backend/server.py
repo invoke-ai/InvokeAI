@@ -379,7 +379,7 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
         "gfpganResult",
         {
             "url": os.path.relpath(path),
-            "mtime": os.path.mtime(path),
+            "mtime": os.path.getmtime(path),
             "metadata": metadata,
         },
     )
