@@ -4,11 +4,11 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.staticfiles import StaticFiles
-from pydantic import schema_of
+from fastapi_events.middleware import EventHandlerASGIMiddleware
+from fastapi_events.handlers.local import local_handler
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic.schema import schema
 import uvicorn
-
-
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
 from .api.routers import invocation
@@ -22,6 +22,24 @@ app = FastAPI(
     redoc_url = None
 )
 
+# Add event handler
+event_handler_id: int = id(app)
+app.add_middleware(
+    EventHandlerASGIMiddleware,
+    handlers = [local_handler], # TODO: consider doing this in services to support different configurations
+    middleware_id = event_handler_id)
+
+# Add CORS
+# TODO: use configuration for this
+origins = []
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 config = {}
 
 # Add startup event to load dependencies
@@ -30,7 +48,9 @@ async def startup_event():
     args = Args()
     config = args.parse_args()
 
-    ApiDependencies.Initialize(config)
+    ApiDependencies.Initialize(
+        config           = config,
+        event_handler_id = event_handler_id)
 
 # Include all routers
 app.include_router(

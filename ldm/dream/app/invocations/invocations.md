@@ -21,8 +21,8 @@ class UpscaleInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, context: InvocationContext) -> Outputs: 
-        result_image = context.services.generate.upscale(
+    def invoke(self, services: InvocationServices) -> Outputs: 
+        result_image = services.generate.upscale(
             image    = self.image.get(),
             level    = self.level
             strength = self.strength
@@ -74,7 +74,7 @@ Outputs follow the same format as inputs, so they can be validated against input
 
 ### Invoke Function
 ```py
-    def invoke(self, context: InvocationContext) -> Outputs: 
+    def invoke(self, services: InvocationServices) -> Outputs: 
         result_image = context.services.generate.upscale(
             image    = self.image.get(),
             level    = self.level
@@ -85,7 +85,7 @@ Outputs follow the same format as inputs, so they can be validated against input
             image = ImageField.from_image(result_image)
         )
 ```
-The `invoke` function is the last portion of an invocation. It is provided an `InvocationContext` which contains `services` to perform work. It should return an Outputs class that derives from `BaseInvocationOutput`.
+The `invoke` function is the last portion of an invocation. It is provided an `InvocationServices` which contains services to perform work. It should return an Outputs class that derives from `BaseInvocationOutput`.
 
 Before being called, the invocation will have all of its fields set from defaults, inputs, and finally links (overriding in that order).
 

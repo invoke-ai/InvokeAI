@@ -1,7 +1,8 @@
 from typing import Literal, Union
 from pydantic import Field
-from ldm.dream.app.invocations.image import BaseImageOutput, ImageField
-from ldm.dream.app.invocations.baseinvocation import BaseInvocation, InvocationContext
+from .image import BaseImageOutput, ImageField
+from .baseinvocation import BaseInvocation
+from ..services.invocation_services import InvocationServices
 
 
 class RestoreFaceInvocation(BaseInvocation):
@@ -15,8 +16,8 @@ class RestoreFaceInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, context: InvocationContext) -> Outputs: 
-        results = context.services.generate.upscale_and_reconstruct(
+    def invoke(self, services: InvocationServices) -> Outputs: 
+        results = services.generate.upscale_and_reconstruct(
             image_list     = [[self.image.get(), 0]],
             upscale        = None,
             strength       = self.strength, # GFPGAN strength

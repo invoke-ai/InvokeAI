@@ -4,8 +4,9 @@ from typing import List, Union
 from typing_extensions import Annotated
 from pydantic import BaseModel, Field, root_validator
 from graphlib import TopologicalSorter, CycleError
-from ldm.dream.app.invocations import *
-from ldm.dream.app.invocations.baseinvocation import BaseInvocation, is_field_compatible
+from ..invocations import *
+from ..invocations.baseinvocation import BaseInvocation
+from .invocation_context import is_field_compatible
 
 
 class Node(BaseModel):
@@ -22,6 +23,20 @@ class Link(BaseModel):
 
 class InvocationGraph(BaseModel):
     """A map of invocations"""
+    class Config:
+        schema_extra = {
+            "example": {
+                "nodes":[
+                    {"id":"1","type":"txt2img","prompt":"A photo of a cat eating sushi"},
+                    {"id":"2","type":"show_image"}
+                ],
+                "links":[
+                    {"from_node":{"id":"1","field":"image"},"to_node":{"id":"2","field":"image"}}
+                ]
+            }
+        }
+
+
     nodes: List[Annotated[Union[BaseInvocation.get_invocations()], Field(discriminator="type")]] = Field(description="The nodes in this map")
     links: List[Link] = Field(description="The links in this map")
 

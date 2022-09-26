@@ -1,17 +1,23 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal, Union
-from pydantic import BaseModel, Field
+from typing import Literal
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 from PIL import Image
-from ldm.dream.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import BaseInvocation, BaseInvocationOutput
+from ..services.invocation_services import InvocationServices
+
 
 class ImageFieldConfig:
     arbitrary_types_allowed = True
 
+
 @dataclass(config=ImageFieldConfig)
 class ImageField:
     """An image field used for passing image objects between invocations"""
+
+    # NOTE: The leading underscore prevent pydantic from validating/serializing this, but
+    #       warns about it: https://github.com/pydantic/pydantic/issues/2816 
     _image: Image.Image
     # TODO: add lineage/history information to carry to metadata
 
@@ -41,7 +47,7 @@ class LoadImageInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, context: InvocationContext) -> Outputs:
+    def invoke(self, services: InvocationServices) -> Outputs:
         output_image = Image.open(self.uri)
         return LoadImageInvocation.Outputs.construct(
             image = ImageField.from_image(output_image)
@@ -58,7 +64,7 @@ class ShowImageInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, context: InvocationContext) -> Outputs:
+    def invoke(self, services: InvocationServices) -> Outputs:
         self.image.get().show()
         return ShowImageInvocation.Outputs.construct(
             image = ImageField.from_image(self.image.get())

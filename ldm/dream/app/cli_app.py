@@ -2,14 +2,17 @@
 
 import argparse
 import shlex
-from typing import Union, get_args, get_type_hints
+from typing import Literal, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 from pydantic.fields import Field
-from ldm.dream.app.invocations.baseinvocation import BaseInvocation, InvocationFieldLink, InvocationServices
-from ldm.dream.app.services.invoker import Invoker
-from ldm.dream.args import Args
-from ldm.generate import Generate
-from ldm.dream.app.invocations import *
+from .invocations.baseinvocation import BaseInvocation
+from .services.invocation_context import InvocationFieldLink
+from .services.invocation_services import InvocationServices
+from .services.invoker import Invoker
+from .invocations import *
+from ..args import Args
+from ...generate import Generate
+from .service_bases import EventServiceBase
 
 
 class Command(BaseModel):
@@ -30,7 +33,12 @@ def invoke_cli():
     # NOTE: load model on first use
     #generate.load_model()
 
-    services = InvocationServices(generate = generate)
+    events = EventServiceBase()
+
+    services = InvocationServices(
+        generate = generate,
+        events = events
+    )
     invoker = Invoker(services)
     context = invoker.create_context()
     
@@ -58,13 +66,30 @@ def invoke_cli():
             if name in ['id', 'type']:
                 continue
             
-            command_parser.add_argument(
-                f"--{name}",
-                dest=name,
-                type=field.type_,
-                default=field.default,
-                help=field.field_info.description
-            )
+            if get_origin(field.type_) == Literal:
+                allowed_values = get_args(field.type_)
+                allowed_types = set()
+                for val in allowed_values:
+                    allowed_types.add(type(val))
+                allowed_types_list = list(allowed_types)
+                field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]
+
+                command_parser.add_argument(
+                    f"--{name}",
+                    dest=name,
+                    type=field_type,
+                    default=field.default,
+                    choices = allowed_values,                    
+                    help=field.field_info.description
+                )
+            else:
+                command_parser.add_argument(
+                    f"--{name}",
+                    dest=name,
+                    type=field.type_,
+                    default=field.default,   
+                    help=field.field_info.description
+                )
 
     while (True):
         try:

@@ -1,9 +1,9 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from ldm.dream.app.invocations.baseinvocation import InvocationServices
-from ldm.dream.app.services.invoker import Invoker
-from ldm.dream.args import Args
-from ldm.generate import Generate
+from ..services.invocation_services import InvocationServices
+from ..services.invoker import Invoker
+from ....generate import Generate
+from .events import FastAPIEventService
 
 
 class ApiDependencies:
@@ -11,7 +11,9 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def Initialize(config): # TODO: pass configuration to this method?
+    def Initialize(config,
+        event_handler_id: int
+        ):
         # TODO: lazy-initialize this by wrapping it
         generate = Generate(
             model=config.model,
@@ -20,5 +22,10 @@ class ApiDependencies:
             full_precision=config.full_precision,
         )
 
-        services = InvocationServices(generate = generate)
+        events = FastAPIEventService(event_handler_id)
+
+        services = InvocationServices(
+            generate = generate,
+            events = events
+            )
         ApiDependencies.invoker = Invoker(services)
