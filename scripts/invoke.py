@@ -3,6 +3,8 @@
 import os
 import sys
 
+sys.path.append('')
+
 def main():
     if '--api' in sys.argv:
         from ldm.dream.app.api_app import invoke_api
