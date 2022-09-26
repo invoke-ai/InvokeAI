@@ -7,10 +7,6 @@ from ldm.dream.app.invocations.image import BaseImageOutput, ImageField
 from ldm.dream.app.invocations.baseinvocation import BaseInvocation, InvocationContext
 
 
-class UpscaleLevel(IntEnum):
-    two = 2
-    four = 4
-
 class UpscaleInvocation(BaseInvocation):
     """Upscales an image."""
     type: Literal["upscale"]
@@ -18,7 +14,7 @@ class UpscaleInvocation(BaseInvocation):
     # Inputs
     image: Union[ImageField,None] = Field(description="The input image")
     strength: float               = Field(default=0.75, gt=0, le=1, description="The strength")
-    level: UpscaleLevel           = Field(default=2, description = "The upscale level")
+    level: Literal[2,4]           = Field(default=2, description = "The upscale level")
 
     class Outputs(BaseImageOutput):
         ...

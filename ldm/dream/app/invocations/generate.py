@@ -7,16 +7,6 @@ from ldm.dream.app.invocations.image import BaseImageOutput, ImageField
 from ldm.dream.app.invocations.baseinvocation import BaseInvocation, InvocationContext
 
 
-class SamplerEnum(str, Enum):
-    ddim = "ddim"
-    plms = "plms"
-    k_lms = "k_lms"
-    k_dpm_2 = "k_dpm_2"
-    k_dpm_2_a = "k_dpm_2_a"
-    k_euler = "k_euler"
-    k_euler_a = "k_euler_a"
-    k_heun = "k_heun"
-
 # Text to image
 class TextToImageInvocation(BaseInvocation):
     """Generates an image using text2img."""
@@ -30,7 +20,7 @@ class TextToImageInvocation(BaseInvocation):
     width: int                = Field(default=512, gt=0, description="The width of the resulting image")
     height: int               = Field(default=512, gt=0, description="The height of the resulting image")
     cfg_scale: float          = Field(default=7.5, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt")
-    sampler_name: SamplerEnum = Field(default="k_lms", description="The sampler to use")
+    sampler_name: Literal["ddim","plms","k_lms","k_dpm_2","k_dpm_2_a","k_euler","k_euler_a","k_heun"] = Field(default="k_lms", description="The sampler to use")
     seamless: bool            = Field(default=False, description="Whether or not to generate an image that can tile without seams")
     model: str                = Field(default='', description="The model to use (currently ignored)")
     progress_images: bool     = Field(default=False, description="Whether or not to produce progress images during generation")
