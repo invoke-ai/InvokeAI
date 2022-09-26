@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import schema_of
 from pydantic.schema import schema
 import uvicorn
@@ -15,11 +16,22 @@ from .api.routers import invocation
 from .api.dependencies import ApiDependencies
 from ..args import Args
 
+origins = []
+
 # Create the app
 app = FastAPI(
     title     = "Invoke AI",
     docs_url  = None,
     redoc_url = None
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 config = {}
