@@ -1,7 +1,9 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from ..services.context_manager import MemoryContextManager
+from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
-from ..services.invoker import Invoker
+from ..services.invoker import Invoker, InvokerServices
 from ....generate import Generate
 from .events import FastAPIEventService
 
@@ -27,5 +29,11 @@ class ApiDependencies:
         services = InvocationServices(
             generate = generate,
             events = events
-            )
-        ApiDependencies.invoker = Invoker(services)
+        )
+
+        invoker_services = InvokerServices(
+            queue = MemoryInvocationQueue(),
+            context_manager = MemoryContextManager()
+        )
+
+        ApiDependencies.invoker = Invoker(services, invoker_services)

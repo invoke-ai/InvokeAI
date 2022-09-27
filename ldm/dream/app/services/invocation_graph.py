@@ -21,6 +21,8 @@ class Link(BaseModel):
     to_node: Node = Field(description="The node field linked to")
 
 
+# TODO: a lot of the validation code in here is part of InvocationContext now.
+#       See if there's a way to reduce code.
 class InvocationGraph(BaseModel):
     """A map of invocations"""
     class Config:
@@ -42,7 +44,7 @@ class InvocationGraph(BaseModel):
 
     @staticmethod
     def build_graph(nodes, links):
-        graph_nodes = nodes_dict = dict({nodes[i].id: set() for i in range(0, len(nodes))})
+        graph_nodes = dict({nodes[i].id: set() for i in range(0, len(nodes))})
 
         # Link all predecessors
         for link in links:

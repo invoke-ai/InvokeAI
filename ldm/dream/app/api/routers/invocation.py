@@ -19,5 +19,6 @@ invocation_router = APIRouter(
         400: {'description': 'Invalid json'}
     })
 async def create_invocation(invocation_graph: InvocationGraph) -> dict:
-    ApiDependencies.invoker.invoke_graph(invocation_graph) # TODO: queue for invocation
-    return JSONResponse(status_code = status.HTTP_201_CREATED, content={}) # TODO: add content
+    context = ApiDependencies.invoker.create_context_from_graph(invocation_graph)
+    ApiDependencies.invoker.invoke(context, invoke_all = True)
+    return JSONResponse(status_code = status.HTTP_201_CREATED, content={ "id": context.id }) # TODO: add content schema

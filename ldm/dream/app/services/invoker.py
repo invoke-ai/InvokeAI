@@ -3,99 +3,146 @@
 from queue import Queue
 from threading import Event, Thread
 from typing import Dict, List
+
 from ..invocations.baseinvocation import BaseInvocation
 from .invocation_graph import InvocationGraph
 from .invocation_context import InvocationContext, InvocationFieldLink
 from .invocation_services import InvocationServices
+from .invocation_queue import InvocationQueueABC, InvocationQueueItem
+from .context_manager import ContextManagerABC
 
 
-# TODO: make this serializable
-class InvocationQueueItem:
-    context: InvocationContext
-    invocation: BaseInvocation
-    links: List[InvocationFieldLink]
+class InvokerServices:
+    queue: InvocationQueueABC
+    context_manager: ContextManagerABC
 
-    def __init__(self, context: InvocationContext, invocation: BaseInvocation, links: List[InvocationFieldLink]):
-        self.context = context
-        self.invocation = invocation
-        self.links = links
+    def __init__(self,
+        queue: InvocationQueueABC,
+        context_manager: ContextManagerABC):
+        self.queue           = queue
+        self.context_manager = context_manager
 
 
 class Invoker:
     """The invoker, used to execute invocations"""
 
     services: InvocationServices
+    invoker_services: InvokerServices
 
-    # TODO: This is naive, and should be its own service so it can use a different backend
-    __invocation_queue: Queue = Queue()
-    __thread: Thread
+    __invoker_thread: Thread
 
-    def __init__(self, services: InvocationServices):
+    def __init__(self,
+        services: InvocationServices,     # Services used by nodes to perform invocations
+        invoker_services: InvokerServices # Services used by the invoker for orchestration
+    ):
         self.services = services
-        self.__thread = Thread(
+        self.invoker_services = invoker_services
+        self.__invoker_thread = Thread(
             name = "invoker",
             target = self.__process
         )
-        self.__thread.start()
-
-
-    def create_context(self) -> InvocationContext:
-        return InvocationContext()
+        self.__invoker_thread.start()
 
 
     def __process(self):
         try:
-            while True: # TODO: I don't know the application lifetime event for Python to shut down a thread
-                queue_item: InvocationQueueItem = self.__invocation_queue.get()
+            # TODO: Figure out how to gracefully shut down a thread at exit
+            while True:
+                queue_item: InvocationQueueItem = self.invoker_services.queue.get()
+                context = self.invoker_services.context_manager.get(queue_item.context_id)
+                invocation = context.invocations[queue_item.invocation_id]
 
-                # Get old outputs as inputs
-                queue_item.context.map_outputs(queue_item.invocation, queue_item.links)
-                outputs = queue_item.invocation.invoke(self.services)
+                # Invoke
+                outputs = invocation.invoke(self.services)
 
-                # TODO: save context after this?
-                queue_item.context.complete_invocation(queue_item.invocation, outputs)
-        
+                # Save outputs and history
+                context._complete_invocation(invocation, outputs)
+
+                # Save the context changes
+                self.invoker_services.context_manager.set(context)
+
+                # Queue any further commands if invoking all
+                if queue_item.invoke_all and context.ready_to_invoke():
+                    self.invoke(context, invoke_all = True)
+
         except KeyboardInterrupt:
             ... # Log something?
 
 
-    def invoke(self, context: InvocationContext, invocation: BaseInvocation, links: List[InvocationFieldLink]):
-        self.__invocation_queue.put(InvocationQueueItem(
-            context = context,
-            invocation = invocation,
-            links = links
+    def invoke(self, context: InvocationContext, invoke_all: bool = False) -> str:
+        """Determines the next node to invoke and returns the id of the invoked node"""
+        invocation_id = context._get_next_invocation_id()
+        if not invocation_id:
+            return # TODO: raise an error?
+
+        # Save context in case user changed it
+        self.invoker_services.context_manager.set(context)
+
+        # Get updated input values
+        # TODO: consider using a copy to keep history separate from input configuration
+        context._map_inputs(invocation_id)
+        invocation = context.invocations[invocation_id]
+
+        # Queue the invocation
+        self.invoker_services.queue.put(InvocationQueueItem(
+            context_id    = context.id,
+            invocation_id = invocation.id,
+            invoke_all    = invoke_all
         ))
 
-        # For now just wait for the invocation to complete
-        context.wait_for_invocation(invocation.id)
+        # Return the id of the invocation
+        return invocation.id
 
 
-    def invoke_graph(self, invocation_graph: InvocationGraph):
+    def create_context(self) -> InvocationContext:
+        return self.invoker_services.context_manager.create()
+
+
+    def create_context_from_graph(self, invocation_graph: InvocationGraph) -> InvocationContext:
         # Create a new context
         context = self.create_context()
 
-        # Get and prepare the node graph for execution
-        graph = invocation_graph.get_graph()
-        graph.prepare()
+        # Directly create nodes and links, since graph is already validated
+        for node in invocation_graph.nodes:
+            context.invocations[node.id] = node
+        
+        for link in invocation_graph.links:
+            if not link.to_node.id in context.links:
+                context.links[link.to_node.id] = list()
+            
+            context.links[link.to_node.id].append(InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field))
 
-        # Execute the graph until all nodes are completed
-        while (graph.is_active()):
-            for node_id in graph.get_ready():
-                #print(f'Preparing invocation {node_id}')
-                # TODO: consider cloning the node at execution time, to handle looping
-                node = invocation_graph.get_node(node_id)
+        return context
 
-                # Overwrite node inputs with links
-                input_links = invocation_graph.get_node_input_links(node)
 
-                # Create invocation links
-                invocation_links = list(map(lambda link: InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field), input_links))
+    # def invoke_graph(self, invocation_graph: InvocationGraph) -> InvocationContext:
+    #     # Create a new context
+    #     context = self.create_context()
 
-                # Get old outputs as inputs
-                context.map_outputs(node, invocation_links)
+    #     # Get and prepare the node graph for execution
+    #     graph = invocation_graph.get_graph()
+    #     graph.prepare()
 
-                # Invoke
-                self.invoke(context, node, invocation_links)
+    #     # Execute the graph until all nodes are completed
+    #     while (graph.is_active()):
+    #         for node_id in graph.get_ready():
+    #             #print(f'Preparing invocation {node_id}')
+    #             # TODO: consider cloning the node at execution time, to handle looping
+    #             node = invocation_graph.get_node(node_id)
 
-                # Mark node as complete
-                graph.done(node_id)
+    #             # Overwrite node inputs with links
+    #             input_links = invocation_graph.get_node_input_links(node)
+
+    #             # Create invocation links
+    #             invocation_links = list(map(lambda link: InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field), input_links))
+
+    #             # Get old outputs as inputs
+    #             context._map_outputs(node, invocation_links)
+
+    #             # Invoke
+    #             self.invoke(context, node, invocation_links)
+
+    #             # Mark node as complete
+    #             graph.done(node_id)
+
+    #     return context

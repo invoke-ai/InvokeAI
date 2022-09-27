@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import asyncio
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
@@ -18,6 +19,7 @@ from ..args import Args
 origins = []
 
 # Create the app
+# TODO: create this all in a method so configuration/etc. can be passed in?
 app = FastAPI(
     title     = "Invoke AI",
     docs_url  = None,
@@ -28,7 +30,7 @@ app = FastAPI(
 event_handler_id: int = id(app)
 app.add_middleware(
     EventHandlerASGIMiddleware,
-    handlers = [local_handler], # TODO: consider doing this in services to support different configurations
+    handlers      = [local_handler], # TODO: consider doing this in services to support different configurations
     middleware_id = event_handler_id)
 
 # Add CORS
@@ -117,12 +119,18 @@ def overridden_redoc():
     )
 
 def invoke_api():
-    # TODO: load configuration
-    uvicorn.run(
-        app,
+    # Start our own event loop for eventing usage
+    # TODO: determine if there's a better way to do this
+    loop = asyncio.new_event_loop()
+    config = uvicorn.Config(
+        app = app,
         host = "0.0.0.0",
-        port = 9090
-    )
+        port = 9090,
+        loop = loop)
+        # Use access_log to turn off logging
+    
+    server = uvicorn.Server(config)
+    loop.run_until_complete(server.serve())
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from ....generate import Generate
 
 class InvocationServices():
     """Services that can be used by invocations"""
-    generate: Generate
+    generate: Generate # TODO: wrap Generate, or split it up from model?
     events: EventServiceBase
 
     def __init__(self,

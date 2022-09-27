@@ -5,10 +5,12 @@ import shlex
 from typing import Literal, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 from pydantic.fields import Field
+from .services.context_manager import MemoryContextManager
+from .services.invocation_queue import MemoryInvocationQueue
 from .invocations.baseinvocation import BaseInvocation
 from .services.invocation_context import InvocationFieldLink
 from .services.invocation_services import InvocationServices
-from .services.invoker import Invoker
+from .services.invoker import Invoker, InvokerServices
 from .invocations import *
 from ..args import Args
 from ...generate import Generate
@@ -19,33 +21,14 @@ class Command(BaseModel):
     invocation: Union[BaseInvocation.get_invocations()] = Field(discriminator="type")
 
 
-def invoke_cli():
-    args = Args()
-    config = args.parse_args()
+class InvalidArgs(Exception):
+    pass
 
-    generate = Generate(
-        model=config.model,
-        sampler_name=config.sampler_name,
-        embedding_path=config.embedding_path,
-        full_precision=config.full_precision,
-    )
 
-    # NOTE: load model on first use
-    #generate.load_model()
+def get_invocation_parser() -> argparse.ArgumentParser:
 
-    events = EventServiceBase()
-
-    services = InvocationServices(
-        generate = generate,
-        events = events
-    )
-    invoker = Invoker(services)
-    context = invoker.create_context()
-    
+    # Create invocation parser
     parser = argparse.ArgumentParser()
-
-    class InvalidArgs(Exception):
-        pass
     def exit(*args, **kwargs):
         raise InvalidArgs
     parser.exit = exit
@@ -91,29 +74,85 @@ def invoke_cli():
                     help=field.field_info.description
                 )
 
+    return parser
+
+
+def invoke_cli():
+    args = Args()
+    config = args.parse_args()
+
+    generate = Generate(
+        model=config.model,
+        sampler_name=config.sampler_name,
+        embedding_path=config.embedding_path,
+        full_precision=config.full_precision,
+    )
+
+    # NOTE: load model on first use, uncomment to load at startup
+    # TODO: Make this a config option?
+    #generate.load_model()
+
+    events = EventServiceBase()
+
+    services = InvocationServices(
+        generate = generate,
+        events = events
+    )
+
+    invoker_services = InvokerServices(
+        queue           = MemoryInvocationQueue(),
+        context_manager = MemoryContextManager()
+    )
+
+    invoker = Invoker(services, invoker_services)
+    context = invoker.create_context()
+    
+    parser = get_invocation_parser()
+
     while (True):
         try:
-            cmd = input("> ")
+            cmd_input = input("> ")
         except KeyboardInterrupt:
             # Ctrl-c exits
             break
 
-        if cmd in ['exit','q']:
+        if cmd_input in ['exit','q']:
             break;
 
-        if cmd in ['--help','help','h','?']:
+        if cmd_input in ['--help','help','h','?']:
             parser.print_help()
             continue
 
         try:
-            args = vars(parser.parse_args(shlex.split(cmd)))
-            args['id'] = str(len(context.history))
-            invocation = Command(invocation = args)
-            links = []
-            if len(context.history) > 0:
-                links.append(InvocationFieldLink(-1, "*", "*"))
+            # Split the command for piping
+            cmds = cmd_input.split('|')
+            start_id = len(context.history)
+            current_id = start_id
+            new_invocations = list()
+            for cmd in cmds:
+                # Parse args to create invocation
+                args = vars(parser.parse_args(shlex.split(cmd.strip())))
+                args['id'] = current_id
+                command = Command(invocation = args)
 
-            invoker.invoke(context, invocation.invocation, links)
+                # Pipe previous command output (if there was a previous command)
+                links = []
+                if len(context.history) > 0 or current_id != start_id:
+                    from_id = -1 if current_id == start_id else str(current_id - 1)
+                    links.append(InvocationFieldLink(from_id, "*", "*"))
+
+                new_invocations.append((command.invocation, links))
+
+                current_id = current_id + 1
+
+            # Command line was parsed successfully
+            # Add the invocations to the context
+            for invocation in new_invocations:
+                context.add_invocation(invocation[0], invocation[1])
+
+            # Execute all available invocations
+            invoker.invoke(context, invoke_all = True)
+            context.wait_for_all()
 
         except InvalidArgs:
             print('Invalid command, use "help" to list commands')
