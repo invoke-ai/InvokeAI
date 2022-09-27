@@ -53,7 +53,7 @@ class Invoker:
                 invocation = context.invocations[queue_item.invocation_id]
 
                 # Invoke
-                outputs = invocation.invoke(self.services)
+                outputs = invocation.invoke(self.services, context_id = context.id)
 
                 # Save outputs and history
                 context._complete_invocation(invocation, outputs)
@@ -113,36 +113,3 @@ class Invoker:
             context.links[link.to_node.id].append(InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field))
 
         return context
-
-
-    # def invoke_graph(self, invocation_graph: InvocationGraph) -> InvocationContext:
-    #     # Create a new context
-    #     context = self.create_context()
-
-    #     # Get and prepare the node graph for execution
-    #     graph = invocation_graph.get_graph()
-    #     graph.prepare()
-
-    #     # Execute the graph until all nodes are completed
-    #     while (graph.is_active()):
-    #         for node_id in graph.get_ready():
-    #             #print(f'Preparing invocation {node_id}')
-    #             # TODO: consider cloning the node at execution time, to handle looping
-    #             node = invocation_graph.get_node(node_id)
-
-    #             # Overwrite node inputs with links
-    #             input_links = invocation_graph.get_node_input_links(node)
-
-    #             # Create invocation links
-    #             invocation_links = list(map(lambda link: InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field), input_links))
-
-    #             # Get old outputs as inputs
-    #             context._map_outputs(node, invocation_links)
-
-    #             # Invoke
-    #             self.invoke(context, node, invocation_links)
-
-    #             # Mark node as complete
-    #             graph.done(node_id)
-
-    #     return context

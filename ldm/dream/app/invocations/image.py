@@ -1,35 +1,16 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal
-from pydantic import Field
+from typing import Literal, Optional
+from pydantic import Field, BaseModel
 from pydantic.dataclasses import dataclass
 from PIL import Image
 from .baseinvocation import BaseInvocation, BaseInvocationOutput
 from ..services.invocation_services import InvocationServices
 
 
-class ImageFieldConfig:
-    arbitrary_types_allowed = True
-
-
-@dataclass(config=ImageFieldConfig)
-class ImageField:
+class ImageField(BaseModel):
     """An image field used for passing image objects between invocations"""
-
-    # NOTE: The leading underscore prevent pydantic from validating/serializing this, but
-    #       warns about it: https://github.com/pydantic/pydantic/issues/2816 
-    _image: Image.Image
-    # TODO: add lineage/history information to carry to metadata
-
-    def get(self) -> Image.Image:
-        return self._image
-
-    def set(self, image: Image.Image):
-        self._image = image
-
-    @classmethod
-    def from_image(cls, image: Image.Image) -> 'ImageField':
-        return cls(_image = image)
+    uri: Optional[str] = Field(default=None, description="The relative path to the image")
 
 
 class BaseImageOutput(BaseInvocationOutput):
@@ -37,6 +18,7 @@ class BaseImageOutput(BaseInvocationOutput):
     image: ImageField = Field(default=None, description="The output image")
 
 
+# TODO: this isn't really necessary anymore
 class LoadImageInvocation(BaseInvocation):
     """Load an image from a filename and provide it as output."""
     type: Literal['load_image']
@@ -47,10 +29,9 @@ class LoadImageInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, services: InvocationServices) -> Outputs:
-        output_image = Image.open(self.uri)
+    def invoke(self, services: InvocationServices, context_id: str) -> Outputs:
         return LoadImageInvocation.Outputs.construct(
-            image = ImageField.from_image(output_image)
+            image = ImageField.construct(self.uri)
         )
 
 
@@ -64,8 +45,13 @@ class ShowImageInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, services: InvocationServices) -> Outputs:
-        self.image.get().show()
+    def invoke(self, services: InvocationServices, context_id: str) -> Outputs:
+        image = services.images.get(self.image.uri)
+        if image:
+            image.show()
+
+        # TODO: how to handle failure?
+
         return ShowImageInvocation.Outputs.construct(
-            image = ImageField.from_image(self.image.get())
+            image = ImageField.construct(self.image.uri)
         )

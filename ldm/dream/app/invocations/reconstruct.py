@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Literal, Union
 from pydantic import Field
 from .image import BaseImageOutput, ImageField
@@ -16,7 +17,7 @@ class RestoreFaceInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, services: InvocationServices) -> Outputs: 
+    def invoke(self, services: InvocationServices, context_id: str) -> Outputs: 
         results = services.generate.upscale_and_reconstruct(
             image_list     = [[self.image.get(), 0]],
             upscale        = None,
@@ -27,6 +28,8 @@ class RestoreFaceInvocation(BaseInvocation):
 
         # Results are image and seed, unwrap for now
         # TODO: can this return multiple results?
+        uri = f'results/{context_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        services.images.save(uri, results[0][0])
         return RestoreFaceInvocation.Outputs.construct(
-            image = ImageField.from_image(results[0][0])
+            image = ImageField.construct(uri = uri)
         )

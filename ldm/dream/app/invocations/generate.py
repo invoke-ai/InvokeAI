@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal, Optional, Union
 import numpy as np
@@ -19,7 +20,7 @@ class TextToImageInvocation(BaseInvocation):
     # Inputs
     # TODO: consider making prompt optional to enable providing prompt through a link
     prompt: Optional[str]     = Field(description="The prompt to generate an image from")
-    seed: int                 = Field(default=0, ge=0, le=np.iinfo(np.uint32).max description="The seed to use (0 for a random seed)")
+    seed: int                 = Field(default=0, ge=0, le=np.iinfo(np.uint32).max, description="The seed to use (0 for a random seed)")
     steps: int                = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     width: int                = Field(default=512, multiple_of=64, gt=0, description="The width of the resulting image")
     height: int               = Field(default=512, multiple_of=64, gt=0, description="The height of the resulting image")
@@ -41,7 +42,7 @@ class TextToImageInvocation(BaseInvocation):
             'percent': float(step) / float(self.steps)
         })
 
-    def invoke(self, services: InvocationServices) -> Outputs:
+    def invoke(self, services: InvocationServices, context_id: str) -> Outputs:
         results = services.generate.prompt2image(
             prompt = self.prompt,
             step_callback = lambda sample, step: self.dispatch_progress(services, sample, step),
@@ -53,8 +54,10 @@ class TextToImageInvocation(BaseInvocation):
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?
         # TODO: can this return multiple results? Should it?
+        uri = f'results/{context_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        services.images.save(uri, results[0][0])
         return TextToImageInvocation.Outputs.construct(
-            image = ImageField.from_image(results[0][0])
+            image = ImageField.construct(uri = uri)
         )
 
 
@@ -73,7 +76,7 @@ class ImageToImageInvocation(TextToImageInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, services: InvocationServices) -> Outputs:
+    def invoke(self, services: InvocationServices, context_id: str) -> Outputs:
         results = services.generate.prompt2image(
             prompt   = self.prompt,
             init_img = self.image.get(),
@@ -85,6 +88,8 @@ class ImageToImageInvocation(TextToImageInvocation):
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?
         # TODO: can this return multiple results? Should it?
+        uri = f'results/{context_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        services.images.save(uri, results[0][0])
         return ImageToImageInvocation.Outputs.construct(
-            image = ImageField.from_image(results[0][0])
+            image = ImageField.construct(uri = uri)
         )

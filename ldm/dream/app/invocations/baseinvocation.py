@@ -34,9 +34,10 @@ class BaseInvocation(ABC, BaseModel):
     def get_invocations_map(cls):
         # Get the type strings out of the literals and into a dictionary
         return dict(map(lambda t: (get_args(get_type_hints(t)['type'])[0], t),BaseInvocation.get_all_subclasses()))
-        
+    
+    # TODO: should probably just pass a context object around (would need to rename current context to e.g. session)
     @abstractmethod
-    def invoke(self, services: InvocationServices) -> BaseInvocationOutput:
+    def invoke(self, services: InvocationServices, context_id: str) -> BaseInvocationOutput:
         """Invoke with provided services and return outputs."""
         pass
 

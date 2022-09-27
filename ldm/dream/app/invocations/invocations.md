@@ -21,7 +21,7 @@ class UpscaleInvocation(BaseInvocation):
     class Outputs(BaseImageOutput):
         ...
 
-    def invoke(self, services: InvocationServices) -> Outputs: 
+    def invoke(self, services: InvocationServices, context_id: str) -> Outputs: 
         result_image = services.generate.upscale(
             image    = self.image.get(),
             level    = self.level
@@ -74,7 +74,7 @@ Outputs follow the same format as inputs, so they can be validated against input
 
 ### Invoke Function
 ```py
-    def invoke(self, services: InvocationServices) -> Outputs: 
+    def invoke(self, services: InvocationServices, context_id: str) -> Outputs: 
         result_image = context.services.generate.upscale(
             image    = self.image.get(),
             level    = self.level

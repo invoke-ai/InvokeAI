@@ -2,9 +2,11 @@
 
 import argparse
 import shlex
+import os
 from typing import Literal, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 from pydantic.fields import Field
+from .services.image_storage import DiskImageStorage
 from .services.context_manager import MemoryContextManager
 from .services.invocation_queue import MemoryInvocationQueue
 from .invocations.baseinvocation import BaseInvocation
@@ -94,9 +96,12 @@ def invoke_cli():
 
     events = EventServiceBase()
 
+    output_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../outputs'))
+
     services = InvocationServices(
         generate = generate,
-        events = events
+        events = events,
+        images          = DiskImageStorage(output_folder)
     )
 
     invoker_services = InvokerServices(

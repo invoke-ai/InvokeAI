@@ -1,5 +1,8 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import os
+
+from ..services.image_storage import DiskImageStorage
 from ..services.context_manager import MemoryContextManager
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
@@ -26,9 +29,14 @@ class ApiDependencies:
 
         events = FastAPIEventService(event_handler_id)
 
+        output_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../outputs'))
+
+        images = DiskImageStorage(output_folder)
+
         services = InvocationServices(
             generate = generate,
-            events = events
+            events   = events,
+            images   = images
         )
 
         invoker_services = InvokerServices(
