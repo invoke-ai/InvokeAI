@@ -1,6 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from base64 import urlsafe_b64encode
+from threading import Event
 from typing import Any, Dict, List, Union, get_args, get_type_hints
 from uuid import uuid4
 from ..invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
@@ -63,16 +64,41 @@ class InvocationContext():
     invocation_results: Dict[str, InvocationHistoryEntry]
     history: List[str]
 
+    __wait_events: Dict[str, Event] = dict()
+
     def __init__(self):
         # TODO: consider using a provided id generator from services
         self.id = urlsafe_b64encode(uuid4().bytes).decode("ascii")
         self.invocation_results = dict()
         self.history = list()
     
-    def add_history_entry(self, invocation: BaseInvocation, outputs: BaseInvocationOutput):
+    def complete_invocation(self, invocation: BaseInvocation, outputs: BaseInvocationOutput):
         self.invocation_results[invocation.id] = InvocationHistoryEntry(invocation, outputs)
         self.history.append(invocation.id)
-    
+
+        # Unblock any waiting threads
+        if invocation.id in self.__wait_events:
+            self.__wait_events[invocation.id].set()
+
+
+    def wait_for_invocation(self, invocation_id: str) -> None:
+        if invocation_id in self.invocation_results:
+            return
+        
+        if not invocation_id in self.__wait_events:
+            self.__wait_events[invocation_id] = Event()
+
+            # Check if complete again, in case completion happened during event creation
+            if invocation_id in self.invocation_results:
+                self.__wait_events[invocation_id].set()
+        
+        # Wait for completion
+        self.__wait_events[invocation_id].wait()
+
+        # Delete the event, since all waiters have a reference, and we can remove it otherwise
+        del self.__wait_events[invocation_id]
+
+
     def get_output(self, invocation_id: str, field_name: str) -> Any:
         return getattr(self.invocation_results[invocation_id].outputs, field_name)
     
