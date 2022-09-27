@@ -43,10 +43,6 @@ class Invoker:
         return InvocationContext()
 
 
-    def __invocation_id(self, context: InvocationContext, invocation: BaseInvocation) -> str:
-        return f'{context.id}-{invocation.id}'
-
-
     def __process(self):
         try:
             while True: # TODO: I don't know the application lifetime event for Python to shut down a thread
