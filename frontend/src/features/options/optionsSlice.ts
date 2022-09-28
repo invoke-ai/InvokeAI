@@ -30,6 +30,7 @@ export interface OptionsState {
   shouldRunESRGAN: boolean;
   shouldRunGFPGAN: boolean;
   shouldRandomizeSeed: boolean;
+  showAdvancedOptions: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -56,6 +57,7 @@ const initialOptionsState: OptionsState = {
   shouldRunGFPGAN: false,
   gfpganStrength: 0.8,
   shouldRandomizeSeed: true,
+  showAdvancedOptions: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -244,6 +246,9 @@ export const optionsSlice = createSlice({
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
+    setShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
+      state.showAdvancedOptions = action.payload;
+    },
   },
 });
 
@@ -275,6 +280,7 @@ export const {
   setShouldRunGFPGAN,
   setShouldRunESRGAN,
   setShouldRandomizeSeed,
+  setShowAdvancedOptions,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

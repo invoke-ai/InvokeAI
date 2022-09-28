@@ -1,14 +1,8 @@
-import {
-  Flex,
-  FormControl,
-  FormLabel,
-  Select,
-  SelectProps,
-  Text,
-} from '@chakra-ui/react';
+import { FormControl, Select, SelectProps } from '@chakra-ui/react';
 
 interface Props extends SelectProps {
   label: string;
+  styleClass?: string;
   validValues:
     | Array<number | string>
     | Array<{ key: string; value: string | number }>;
@@ -23,32 +17,30 @@ const SDSelect = (props: Props) => {
     validValues,
     size = 'sm',
     fontSize = 'md',
-    marginBottom = 1,
-    whiteSpace = 'nowrap',
+    styleClass,
     ...rest
   } = props;
   return (
-    <FormControl isDisabled={isDisabled}>
-      <Flex justifyContent={'space-between'} alignItems={'center'}>
-        <FormLabel marginBottom={marginBottom}>
-          <Text fontSize={fontSize} whiteSpace={whiteSpace}>
-            {label}
-          </Text>
-        </FormLabel>
-        <Select fontSize={fontSize} size={size} {...rest}>
-          {validValues.map((opt) => {
-            return typeof opt === 'string' || typeof opt === 'number' ? (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ) : (
-              <option key={opt.value} value={opt.value}>
-                {opt.key}
-              </option>
-            );
-          })}
-        </Select>
-      </Flex>
+    <FormControl isDisabled={isDisabled} className={`iai-select ${styleClass}`}>
+      <div className="iai-select-label">{label}</div>
+      <Select
+        fontSize={fontSize}
+        size={size}
+        {...rest}
+        className="iai-select-picker"
+      >
+        {validValues.map((opt) => {
+          return typeof opt === 'string' || typeof opt === 'number' ? (
+            <option key={opt} value={opt} className="iai-select-option">
+              {opt}
+            </option>
+          ) : (
+            <option key={opt.value} value={opt.value}>
+              {opt.key}
+            </option>
+          );
+        })}
+      </Select>
     </FormControl>
   );
 };

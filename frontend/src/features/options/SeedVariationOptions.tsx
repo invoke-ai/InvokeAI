@@ -19,7 +19,6 @@ import randomInt from '../../common/util/randomInt';
 import { validateSeedWeights } from '../../common/util/seedWeightPairs';
 import {
   OptionsState,
-  setIterations,
   setSeed,
   setSeedWeights,
   setShouldGenerateVariations,
@@ -56,13 +55,9 @@ const SeedVariationOptions = () => {
     seedWeights,
     shouldRandomizeSeed,
     seed,
-    iterations,
   } = useAppSelector(optionsSelector);
 
   const dispatch = useAppDispatch();
-
-  const handleChangeIterations = (v: string | number) =>
-    dispatch(setIterations(Number(v)));
 
   const handleChangeShouldRandomizeSeed = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setShouldRandomizeSeed(e.target.checked));
@@ -84,16 +79,8 @@ const SeedVariationOptions = () => {
 
   return (
     <Flex gap={2} direction={'column'}>
-      <SDNumberInput
-        label="Images to generate"
-        step={1}
-        min={1}
-        precision={0}
-        onChange={handleChangeIterations}
-        value={iterations}
-      />
       <SDSwitch
-        label="Randomize seed on generation"
+        label="Randomize Seed"
         isChecked={shouldRandomizeSeed}
         onChange={handleChangeShouldRandomizeSeed}
       />
@@ -121,13 +108,13 @@ const SeedVariationOptions = () => {
         </Button>
       </Flex>
       <SDSwitch
-        label="Generate variations"
+        label="Generate Variations"
         isChecked={shouldGenerateVariations}
         width={'auto'}
         onChange={handleChangeShouldGenerateVariations}
       />
       <SDNumberInput
-        label="Variation amount"
+        label="Variation Amount"
         value={variationAmount}
         step={0.01}
         min={0}

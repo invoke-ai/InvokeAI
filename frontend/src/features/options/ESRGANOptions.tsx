@@ -8,8 +8,7 @@ import {
   setUpscalingStrength,
   UpscalingLevel,
   OptionsState,
-} from '../options/optionsSlice';
-
+} from './optionsSlice';
 
 import { UPSCALING_LEVELS } from '../../app/constants';
 import { createSelector } from '@reduxjs/toolkit';
@@ -63,7 +62,7 @@ const ESRGANOptions = () => {
     dispatch(setUpscalingStrength(Number(v)));
 
   return (
-    <Flex direction={'column'} gap={2}>
+    <Flex gap={2}>
       <SDSelect
         isDisabled={!isESRGANAvailable}
         label="Scale"
@@ -79,6 +78,7 @@ const ESRGANOptions = () => {
         max={1}
         onChange={handleChangeStrength}
         value={upscalingStrength}
+        width="90px"
       />
     </Flex>
   );

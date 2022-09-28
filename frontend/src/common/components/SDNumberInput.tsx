@@ -2,18 +2,17 @@ import {
   FormControl,
   NumberInput,
   NumberInputField,
-  NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
   Text,
-  FormLabel,
   NumberInputProps,
-  Flex,
 } from '@chakra-ui/react';
 
 interface Props extends NumberInputProps {
+  styleClass?: string;
   label?: string;
   width?: string | number;
+  showStepper?: boolean;
 }
 
 /**
@@ -22,36 +21,48 @@ interface Props extends NumberInputProps {
 const SDNumberInput = (props: Props) => {
   const {
     label,
+    styleClass,
     isDisabled = false,
-    fontSize = 'md',
+    showStepper = true,
+    fontSize = '1rem',
     size = 'sm',
-    width,
+    width = '150px',
+    textAlign,
     isInvalid,
     ...rest
   } = props;
   return (
-    <FormControl isDisabled={isDisabled} width={width} isInvalid={isInvalid}>
-      <Flex gap={2} justifyContent={'space-between'} alignItems={'center'}>
-        {label && (
-          <FormLabel marginBottom={1}>
-            <Text fontSize={fontSize} whiteSpace="nowrap">
-              {label}
-            </Text>
-          </FormLabel>
-        )}
-        <NumberInput
-          size={size}
-          {...rest}
-          keepWithinRange={false}
-          clampValueOnBlur={true}
+    <FormControl
+      isDisabled={isDisabled}
+      isInvalid={isInvalid}
+      className={`number-input ${styleClass}`}
+    >
+      {label && (
+        <Text whiteSpace="nowrap" className="number-input-label">
+          {label}
+        </Text>
+      )}
+      <NumberInput
+        size={size}
+        {...rest}
+        keepWithinRange={false}
+        clampValueOnBlur={true}
+        className="number-input-field"
+      >
+        <NumberInputField
+          fontSize={fontSize}
+          className="number-input-entry"
+          width={width}
+          textAlign={textAlign}
+        />
+        <div
+          className="number-input-stepper"
+          style={showStepper ? { display: 'block' } : { display: 'none' }}
         >
-          <NumberInputField fontSize={'md'} />
-          <NumberInputStepper>
-            <NumberIncrementStepper />
-            <NumberDecrementStepper />
-          </NumberInputStepper>
-        </NumberInput>
-      </Flex>
+          <NumberIncrementStepper className="number-input-stepper-button" />
+          <NumberDecrementStepper className="number-input-stepper-button" />
+        </div>
+      </NumberInput>
     </FormControl>
   );
 };

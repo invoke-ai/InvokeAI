@@ -1,4 +1,5 @@
-import { Button, Center, Flex, Text } from '@chakra-ui/react';
+import { Button } from '@chakra-ui/react';
+import { MdPhotoLibrary } from 'react-icons/md';
 import { requestImages } from '../../app/socketio/actions';
 import { RootState, useAppDispatch } from '../../app/store';
 import { useAppSelector } from '../../app/store';
@@ -24,23 +25,35 @@ const ImageGallery = () => {
     dispatch(requestImages());
   };
 
-  return images.length ? (
-    <Flex direction={'column'} gap={2} pb={2}>
-      <Flex gap={2} wrap="wrap">
-        {images.map((image) => {
-          const { uuid } = image;
-          const isSelected = currentImageUuid === uuid;
-          return (
-            <HoverableImage key={uuid} image={image} isSelected={isSelected} />
-          );
-        })}
-      </Flex>
-      <Button onClick={handleClickLoadMore}>Load more...</Button>
-    </Flex>
-  ) : (
-    <Center height={'100%'} position={'relative'}>
-      <Text size={'xl'}>No images in gallery</Text>
-    </Center>
+  return (
+    <div className="image-gallery-container">
+      {images.length ? (
+        <>
+          <p>
+            <strong>Your Invocations</strong>
+          </p>
+          <div className="image-gallery">
+            {images.map((image) => {
+              const { uuid } = image;
+              const isSelected = currentImageUuid === uuid;
+              return (
+                <HoverableImage
+                  key={uuid}
+                  image={image}
+                  isSelected={isSelected}
+                />
+              );
+            })}
+          </div>
+          <Button onClick={handleClickLoadMore}>Load more...</Button>
+        </>
+      ) : (
+        <div className="image-gallery-container-placeholder">
+          <MdPhotoLibrary />
+          <p>No Images In Gallery</p>
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -1,0 +1,50 @@
+.main-options {
+  display: grid;
+  row-gap: 1rem;
+}
+
+.main-options-list {
+  display: grid;
+  row-gap: 1rem;
+}
+
+.main-options-row {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  column-gap: 1rem;
+}
+
+.main-option-block {
+  border-radius: 0.5rem;
+  grid-template-columns: auto !important;
+  row-gap: 0.4rem;
+
+  .number-input-label,
+  .iai-select-label {
+    width: 100%;
+    font-size: 0.9rem;
+    font-weight: bold;
+  }
+
+  .number-input-entry {
+    padding: 0;
+    height: 2.4rem;
+    border-radius: 0.3rem !important;
+  }
+
+  .iai-select-picker {
+    height: 2.4rem;
+    border-radius: 0.3rem;
+  }
+}
+
+.advanced_options_checker {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  column-gap: 0.5rem;
+  align-items: center;
+  background-color: var(--background-color-secondary);
+  padding: 1rem;
+  font-weight: bold;
+  border-radius: 0.5rem;
+}

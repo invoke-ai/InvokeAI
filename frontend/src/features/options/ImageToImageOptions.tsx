@@ -45,6 +45,7 @@ const ImageToImageOptions = () => {
         max={1}
         onChange={handleChangeStrength}
         value={img2imgStrength}
+        width="90px"
       />
       <SDSwitch
         label="Fit initial image to output size"

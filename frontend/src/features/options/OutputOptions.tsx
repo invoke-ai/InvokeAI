@@ -3,8 +3,7 @@ import { Flex } from '@chakra-ui/react';
 import { RootState } from '../../app/store';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 
-import { setHeight, setWidth, setSeamless, OptionsState } from '../options/optionsSlice';
-
+import { setHeight, setWidth, setSeamless, OptionsState } from './optionsSlice';
 
 import { HEIGHTS, WIDTHS } from '../../app/constants';
 import { createSelector } from '@reduxjs/toolkit';
@@ -47,7 +46,7 @@ const OutputOptions = () => {
 
   return (
     <Flex gap={2} direction={'column'}>
-      <Flex gap={2}>
+      {/* <Flex gap={2}>
         <SDSelect
           label="Width"
           value={width}
@@ -62,7 +61,7 @@ const OutputOptions = () => {
           onChange={handleChangeHeight}
           validValues={HEIGHTS}
         />
-      </Flex>
+      </Flex> */}
       <SDSwitch
         label="Seamless tiling"
         fontSize={'md'}

@@ -19,12 +19,10 @@ import {
   setShouldRunESRGAN,
   OptionsState,
   setShouldUseInitImage,
-} from '../options/optionsSlice';
+} from './optionsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { setOpenAccordions, SystemState } from '../system/systemSlice';
-import SeedVariationOptions from './SeedVariationOptions';
-import SamplerOptions from './SamplerOptions';
 import ESRGANOptions from './ESRGANOptions';
 import GFPGANOptions from './GFPGANOptions';
 import OutputOptions from './OutputOptions';
@@ -33,39 +31,8 @@ import { ChangeEvent } from 'react';
 
 import GuideIcon from '../../common/components/GuideIcon';
 import { Feature } from '../../app/features';
-
-const optionsSelector = createSelector(
-  (state: RootState) => state.options,
-  (options: OptionsState) => {
-    return {
-      initialImagePath: options.initialImagePath,
-      shouldUseInitImage: options.shouldUseInitImage,
-      shouldRunESRGAN: options.shouldRunESRGAN,
-      shouldRunGFPGAN: options.shouldRunGFPGAN,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
-  (system: SystemState) => {
-    return {
-      isGFPGANAvailable: system.isGFPGANAvailable,
-      isESRGANAvailable: system.isESRGANAvailable,
-      openAccordions: system.openAccordions,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import SeedOptions from './SeedOptions';
+import VariationsOptions from './VariationsOptions';
 
 /**
  * Main container for generation and processing parameters.
@@ -76,10 +43,10 @@ const OptionsAccordion = () => {
     shouldRunGFPGAN,
     shouldUseInitImage,
     initialImagePath,
-  } = useAppSelector(optionsSelector);
+  } = useAppSelector((state: RootState) => state.options);
 
   const { isGFPGANAvailable, isESRGANAvailable, openAccordions } =
-    useAppSelector(systemSelector);
+    useAppSelector((state: RootState) => state.system);
 
   const dispatch = useAppDispatch();
 
@@ -109,28 +76,28 @@ const OptionsAccordion = () => {
         <h2>
           <AccordionButton>
             <Box flex="1" textAlign="left">
-              Seed & Variation
+              Seed
             </Box>
-            <GuideIcon feature={Feature.SEED_AND_VARIATION} />
+            <GuideIcon feature={Feature.SEED} />
             <AccordionIcon />
           </AccordionButton>
         </h2>
         <AccordionPanel>
-          <SeedVariationOptions />
+          <SeedOptions />
         </AccordionPanel>
       </AccordionItem>
       <AccordionItem>
         <h2>
           <AccordionButton>
             <Box flex="1" textAlign="left">
-              Sampler
+              Variations
             </Box>
-            <GuideIcon feature={Feature.SAMPLER} />
+            <GuideIcon feature={Feature.VARIATIONS} />
             <AccordionIcon />
           </AccordionButton>
         </h2>
         <AccordionPanel>
-          <SamplerOptions />
+          <VariationsOptions />
         </AccordionPanel>
       </AccordionItem>
       <AccordionItem>
@@ -142,7 +109,7 @@ const OptionsAccordion = () => {
               width={'100%'}
               mr={2}
             >
-              <Text>Upscale (ESRGAN)</Text>
+              <Text>Upscale</Text>
               <Switch
                 isDisabled={!isESRGANAvailable}
                 isChecked={shouldRunESRGAN}
@@ -166,7 +133,7 @@ const OptionsAccordion = () => {
               width={'100%'}
               mr={2}
             >
-              <Text>Face Correction</Text>
+              <Text>Restore Face</Text>
               <Switch
                 isDisabled={!isGFPGANAvailable}
                 isChecked={shouldRunGFPGAN}
@@ -209,9 +176,9 @@ const OptionsAccordion = () => {
         <h2>
           <AccordionButton>
             <Box flex="1" textAlign="left">
-              Output
+              Other
             </Box>
-            <GuideIcon feature={Feature.OUTPUT} />
+            <GuideIcon feature={Feature.OTHER} />
             <AccordionIcon />
           </AccordionButton>
         </h2>

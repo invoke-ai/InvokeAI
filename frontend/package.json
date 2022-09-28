@@ -12,6 +12,7 @@
   "dependencies": {
     "@chakra-ui/icons": "^2.0.10",
     "@chakra-ui/react": "^2.3.1",
+    "@emotion/cache": "^11.10.3",
     "@emotion/react": "^11.10.4",
     "@emotion/styled": "^11.10.4",
     "@reduxjs/toolkit": "^1.8.5",
@@ -38,6 +39,7 @@
     "eslint": "^8.23.0",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "sass": "^1.55.0",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.6.4",
     "vite": "^3.0.7",

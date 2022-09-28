@@ -3,8 +3,7 @@ import { Flex } from '@chakra-ui/react';
 import { RootState } from '../../app/store';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 
-import { OptionsState, setGfpganStrength } from '../options/optionsSlice';
-
+import { OptionsState, setGfpganStrength } from './optionsSlice';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
@@ -60,6 +59,7 @@ const GFPGANOptions = () => {
         max={1}
         onChange={handleChangeStrength}
         value={gfpganStrength}
+        width="90px"
       />
     </Flex>
   );

@@ -1,7 +1,8 @@
-import { Button, ButtonProps } from '@chakra-ui/react';
+import { Button, ButtonProps, Tooltip } from '@chakra-ui/react';
 
 interface Props extends ButtonProps {
   label: string;
+  tooltip?: string;
 }
 
 /**
@@ -10,11 +11,13 @@ interface Props extends ButtonProps {
  * TODO: Get rid of this.
  */
 const SDButton = (props: Props) => {
-  const { label, size = 'sm', ...rest } = props;
+  const { label, tooltip = '', size = 'sm', ...rest } = props;
   return (
-    <Button size={size} {...rest}>
-      {label}
-    </Button>
+    <Tooltip label={tooltip}>
+      <Button size={size} {...rest}>
+        {label}
+      </Button>
+    </Tooltip>
   );
 };
 
