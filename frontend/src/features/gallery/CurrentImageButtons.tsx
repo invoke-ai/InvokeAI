@@ -1,4 +1,3 @@
-import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
@@ -15,6 +14,8 @@ import DeleteImageModal from './DeleteImageModal';
 import { SystemState } from '../system/systemSlice';
 import SDButton from '../../common/components/SDButton';
 import { runESRGAN, runGFPGAN } from '../../app/socketio/actions';
+import SDIconButton from '../../common/components/SDIconButton';
+import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -78,38 +79,32 @@ const CurrentImageButtons = ({
     setShouldShowImageDetails(!shouldShowImageDetails);
 
   return (
-    <Flex gap={2}>
-      <SDButton
-        label="Use as initial image"
-        colorScheme={'gray'}
-        flexGrow={1}
-        variant={'outline'}
+    <div className="current-image-options">
+      <SDIconButton
+        icon={<MdImage />}
+        tooltip="Use As Initial Image"
+        aria-label="Use As Initial Image"
         onClick={handleClickUseAsInitialImage}
       />
 
       <SDButton
-        label="Use all"
-        colorScheme={'gray'}
-        flexGrow={1}
-        variant={'outline'}
-        isDisabled={!['txt2img', 'img2img'].includes(image?.metadata?.image?.type)}
+        label="Use All"
+        isDisabled={
+          !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
+        }
         onClick={handleClickUseAllParameters}
       />
 
       <SDButton
-        label="Use seed"
-        colorScheme={'gray'}
-        flexGrow={1}
-        variant={'outline'}
+        label="Use Seed"
         isDisabled={!image?.metadata?.image?.seed}
         onClick={handleClickUseSeed}
       />
 
-      <SDButton
-        label="Upscale"
-        colorScheme={'gray'}
-        flexGrow={1}
-        variant={'outline'}
+      <SDIconButton
+        icon={<MdHd />}
+        tooltip="Upscale"
+        aria-label="Upscale"
         isDisabled={
           !isESRGANAvailable ||
           Boolean(intermediateImage) ||
@@ -118,11 +113,10 @@ const CurrentImageButtons = ({
         }
         onClick={handleClickUpscale}
       />
-      <SDButton
-        label="Fix faces"
-        colorScheme={'gray'}
-        flexGrow={1}
-        variant={'outline'}
+      <SDIconButton
+        icon={<MdFace />}
+        tooltip="Restore Faces"
+        aria-label="Restore Faces"
         isDisabled={
           !isGFPGANAvailable ||
           Boolean(intermediateImage) ||
@@ -131,24 +125,21 @@ const CurrentImageButtons = ({
         }
         onClick={handleClickFixFaces}
       />
-      <SDButton
-        label="Details"
-        colorScheme={'gray'}
-        variant={shouldShowImageDetails ? 'solid' : 'outline'}
-        borderWidth={1}
-        flexGrow={1}
+      <SDIconButton
+        icon={<MdInfo />}
+        tooltip="Details"
+        aria-label="Details"
         onClick={handleClickShowImageDetails}
       />
       <DeleteImageModal image={image}>
-        <SDButton
-          label="Delete"
-          colorScheme={'red'}
-          flexGrow={1}
-          variant={'outline'}
+        <SDIconButton
+          icon={<MdDelete />}
+          tooltip="Delete Image"
+          aria-label="Delete Image"
           isDisabled={Boolean(intermediateImage)}
         />
       </DeleteImageModal>
-    </Flex>
+    </div>
   );
 };
 

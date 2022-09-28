@@ -1,0 +1,28 @@
+[data-theme='dark'] {
+  // General Colors
+
+  // App Colors
+  --root-bg-color: rgb(10, 10, 10);
+  --background-color: rgb(20, 20, 26);
+  --background-color-secondary: rgb(16, 16, 22);
+
+  --text-color: rgb(255, 255, 255);
+  --text-color-secondary: rgb(160, 162, 188);
+
+  --subtext-color: rgb(24, 24, 34);
+  --subtext-color-bright: rgb(48, 48, 64);
+
+  --border-color: rgb(30, 30, 46);
+  --border-color-light: rgb(50, 50, 66);
+
+  --invalid: rgb(255, 75, 75);
+  --invalid-secondary: rgb(120, 5, 5);
+
+  // Theme Colors
+  --app-purple: rgb(165, 95, 255);
+
+  // Prompt Box Colors
+  --prompt-bg-color: rgb(10, 10, 10);
+  --prompt-border-color: rgb(200, 105, 255);
+  --prompt-box-shadow-color: rgb(105, 30, 210);
+}

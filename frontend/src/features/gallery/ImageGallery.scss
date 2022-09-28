@@ -1,0 +1,37 @@
+@use '../../styles/Mixins/' as *;
+
+.image-gallery-container {
+  display: grid;
+  row-gap: 1rem;
+  grid-auto-rows: max-content;
+  min-width: 16rem;
+  max-height: 100vh;
+  overflow: scroll;
+  @include HideScrollbar;
+}
+
+.image-gallery-container-placeholder {
+  display: grid;
+  background-color: var(--background-color-secondary);
+  min-width: 16rem;
+  border-radius: 0.5rem;
+  place-items: center;
+  padding: 2rem 0;
+
+  p {
+    color: var(--subtext-color-bright);
+  }
+
+  svg {
+    width: 5rem;
+    height: 5rem;
+    color: var(--subtext-color);
+  }
+}
+
+.image-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 0.6rem;
+  justify-items: center;
+}

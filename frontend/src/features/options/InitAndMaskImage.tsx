@@ -2,7 +2,7 @@ import { Flex, Image } from '@chakra-ui/react';
 import { useState } from 'react';
 import { useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
-import { OptionsState } from '../../features/options/optionsSlice';
+import { OptionsState } from './optionsSlice';
 import './InitAndMaskImage.css';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';

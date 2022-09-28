@@ -1,0 +1,41 @@
+// General Imports
+@use 'Colors_Dark';
+@use 'Colors_Light';
+@use 'Fonts';
+
+// Component Styles
+@use '../app/App.scss';
+@use '../features/system/SiteHeader.scss';
+@use '../features/options/PromptInput/PromptInput.scss';
+@use '../features/options/ProcessButtons/ProcessButtons.scss';
+@use '../features/options/MainOptions/MainOptions.scss';
+@use '../features/gallery/CurrentImageDisplay.scss';
+@use '../features/gallery/ImageGallery.scss';
+@use '../features/system/ProgressBar.scss';
+
+// Component Shared
+@use '../common/components/SDNumberInput.scss';
+@use '../common/components/SDSelect.scss';
+
+// Shared Styles
+@use './Mixins/' as *;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  @include HideScrollbar;
+  background-color: var(--root-bg-color);
+}
+
+#root {
+  background-color: var(--root-bg-color);
+  color: var(--text-color);
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+}

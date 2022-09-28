@@ -16,6 +16,8 @@ import { useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import SettingsModal from '../system/SettingsModal';
 import { SystemState } from '../system/systemSlice';
+import InvokeAILogo from '../../assets/images/logo.png';
+
 const systemSelector = createSelector(
   (state: RootState) => state.system,
   (system: SystemState) => {
@@ -61,59 +63,64 @@ const SiteHeader = () => {
   }
 
   return (
-    <Flex minWidth="max-content" alignItems="center" gap="1" pl={2} pr={1}>
-      <Heading size={'lg'}>InvokeUI</Heading>
+    <div className="site-header">
+      <div className="site-header-left-side">
+        <img src={InvokeAILogo} alt="invoke-ai-logo" />
+        <h1>
+          invoke <strong>ai</strong>
+        </h1>
+      </div>
 
-      <Spacer />
+      <div className="site-header-right-side">
+        <Text textColor={statusMessageTextColor}>{statusMessage}</Text>
 
-      <Text textColor={statusMessageTextColor}>{statusMessage}</Text>
+        <SettingsModal>
+          <IconButton
+            aria-label="Settings"
+            variant="link"
+            fontSize={24}
+            size={'sm'}
+            icon={<MdSettings />}
+          />
+        </SettingsModal>
 
-      <SettingsModal>
         <IconButton
-          aria-label="Settings"
+          aria-label="Link to Github Issues"
           variant="link"
-          fontSize={24}
+          fontSize={23}
           size={'sm'}
-          icon={<MdSettings />}
+          icon={
+            <Link
+              isExternal
+              href="http://github.com/lstein/stable-diffusion/issues"
+            >
+              <MdHelp />
+            </Link>
+          }
         />
-      </SettingsModal>
 
-      <IconButton
-        aria-label="Link to Github Issues"
-        variant="link"
-        fontSize={23}
-        size={'sm'}
-        icon={
-          <Link
-            isExternal
-            href="http://github.com/lstein/stable-diffusion/issues"
-          >
-            <MdHelp />
-          </Link>
-        }
-      />
+        <IconButton
+          aria-label="Link to Github Repo"
+          variant="link"
+          fontSize={20}
+          size={'sm'}
+          icon={
+            <Link isExternal href="http://github.com/lstein/stable-diffusion">
+              <FaGithub />
+            </Link>
+          }
+        />
 
-      <IconButton
-        aria-label="Link to Github Repo"
-        variant="link"
-        fontSize={20}
-        size={'sm'}
-        icon={
-          <Link isExternal href="http://github.com/lstein/stable-diffusion">
-            <FaGithub />
-          </Link>
-        }
-      />
-
-      <IconButton
-        aria-label="Toggle Dark Mode"
-        onClick={toggleColorMode}
-        variant="link"
-        size={'sm'}
-        fontSize={colorModeIconFontSize}
-        icon={colorModeIcon}
-      />
-    </Flex>
+        <IconButton
+          aria-label="Toggle Dark Mode"
+          onClick={toggleColorMode}
+          variant="link"
+          size={'sm'}
+          fontSize={colorModeIconFontSize}
+          icon={colorModeIcon}
+        />
+      </div>
+    </div>
   );
 };
 
