@@ -44,7 +44,7 @@ class DiskImageStorage(ImageStorageBase):
         Path(output_folder).mkdir(parents=True, exist_ok=True)
 
         # TODO: don't hard-code. get/save/delete should maybe take subpath?
-        Path(os.path.join(output_folder, '/results')).mkdir(parents=True, exist_ok=True)
+        Path(os.path.join(output_folder, 'results')).mkdir(parents=True, exist_ok=True)
 
     def get(self, image_uri: str) -> Image:
         cache_item = self.__get_cache(image_uri)
