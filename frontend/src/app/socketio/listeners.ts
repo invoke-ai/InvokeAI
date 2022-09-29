@@ -11,6 +11,7 @@ import {
   setSystemStatus,
   setCurrentStatus,
   setSystemConfig,
+  processingCanceled,
 } from '../../features/system/systemSlice';
 
 import {
@@ -90,7 +91,6 @@ const makeSocketIOListeners = (
             message: `Image generated: ${url}`,
           })
         );
-        dispatch(setIsProcessing(false));
       } catch (e) {
         console.error(e);
       }
@@ -116,7 +116,6 @@ const makeSocketIOListeners = (
             message: `Intermediate image generated: ${url}`,
           })
         );
-        dispatch(setIsProcessing(false));
       } catch (e) {
         console.error(e);
       }
@@ -143,7 +142,6 @@ const makeSocketIOListeners = (
             message: `Upscaled: ${url}`,
           })
         );
-        dispatch(setIsProcessing(false));
       } catch (e) {
         console.error(e);
       }
@@ -245,7 +243,7 @@ const makeSocketIOListeners = (
      * Callback to run when we receive a 'processingCanceled' event.
      */
     onProcessingCanceled: () => {
-      dispatch(setIsProcessing(false));
+      dispatch(processingCanceled());
 
       const { intermediateImage } = getState().gallery;
 
@@ -259,6 +257,7 @@ const makeSocketIOListeners = (
         );
         dispatch(clearIntermediateImage());
       }
+
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),

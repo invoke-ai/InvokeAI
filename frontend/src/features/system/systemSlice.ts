@@ -77,12 +77,7 @@ export const systemSlice = createSlice({
       state.currentStatus = action.payload;
     },
     setSystemStatus: (state, action: PayloadAction<InvokeAI.SystemStatus>) => {
-      const currentStatus =
-        !action.payload.isProcessing && state.isConnected
-          ? 'Connected'
-          : action.payload.currentStatus;
-
-      return { ...state, ...action.payload, currentStatus };
+      return { ...state, ...action.payload };
     },
     addLogEntry: (
       state,
@@ -130,6 +125,15 @@ export const systemSlice = createSlice({
     setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayGuides = action.payload;
     },
+    processingCanceled: (state) => {
+      state.isProcessing = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.currentIteration = 0;
+      state.totalIterations = 0;
+      state.currentStatusHasSteps = false;
+      state.currentStatus = 'Processing canceled'
+    },
   },
 });
 
@@ -146,6 +150,7 @@ export const {
   setCurrentStatus,
   setSystemConfig,
   setShouldDisplayGuides,
+  processingCanceled,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

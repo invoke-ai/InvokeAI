@@ -273,7 +273,7 @@ class InvokeAIWebServer:
                 f'[Upscaled] "{original_image_path}" > "{path}": {command}'
             )
 
-            progress['currentStatus'] = 'Finished'
+            progress['currentStatus'] = 'Processing complete'
             progress['currentStep'] = 0
             progress['totalSteps'] = 0
             progress['currentIteration'] = 0
@@ -301,7 +301,7 @@ class InvokeAIWebServer:
                 'totalSteps': 1,
                 'currentIteration': 1,
                 'totalIterations': 1,
-                'currentStatus': 'Preparing',
+                'currentStatus': 'Processing complete',
                 'isProcessing': True,
                 'currentStatusHasSteps': False,
             }
@@ -353,7 +353,7 @@ class InvokeAIWebServer:
                 f'[Fixed faces] "{original_image_path}" > "{path}": {command}'
             )
 
-            progress['currentStatus'] = 'Finished'
+            progress['currentStatus'] = 'Processing complete'
             progress['currentStep'] = 0
             progress['totalSteps'] = 0
             progress['currentIteration'] = 0
@@ -375,7 +375,6 @@ class InvokeAIWebServer:
         def handle_cancel():
             print(f'>> Cancel processing requested')
             self.canceled.set()
-            socketio.emit('processingCanceled')
 
         # TODO: I think this needs a safety mechanism.
         @socketio.on('deleteImage')
@@ -514,6 +513,7 @@ class InvokeAIWebServer:
 
         def image_progress(sample, step):
             if self.canceled.is_set():
+                self.socketio.emit('processingCanceled')
                 raise CanceledException
 
             nonlocal step_index
@@ -548,6 +548,10 @@ class InvokeAIWebServer:
             eventlet.sleep(0)
 
         def image_done(image, seed, first_seed):
+            if self.canceled.is_set():
+                self.socketio.emit('processingCanceled')
+                raise CanceledException
+
             nonlocal generation_parameters
             nonlocal esrgan_parameters
             nonlocal gfpgan_parameters
@@ -578,6 +582,10 @@ class InvokeAIWebServer:
             else:
                 all_parameters['seed'] = seed
 
+            if self.canceled.is_set():
+                self.socketio.emit('processingCanceled')
+                raise CanceledException
+
             if esrgan_parameters:
                 progress['currentStatus'] = 'Upscaling'
                 progress['currentStatusHasSteps'] = False
@@ -596,6 +604,10 @@ class InvokeAIWebServer:
                     esrgan_parameters['level'],
                     esrgan_parameters['strength'],
                 ]
+
+            if self.canceled.is_set():
+                self.socketio.emit('processingCanceled')
+                raise CanceledException
 
             if gfpgan_parameters:
                 progress['currentStatus'] = 'Fixing faces'
@@ -643,15 +655,14 @@ class InvokeAIWebServer:
 
             if progress['totalIterations'] > progress['currentIteration']:
                 progress['currentStep'] = 1
-                progress['currentIteration'] += 1
-                progress['currentStatus'] = 'Iteration finished'
+                progress['currentStatus'] = 'Iteration complete'
                 progress['currentStatusHasSteps'] = False
             else:
                 progress['currentStep'] = 0
                 progress['totalSteps'] = 0
                 progress['currentIteration'] = 0
                 progress['totalIterations'] = 0
-                progress['currentStatus'] = 'Finished'
+                progress['currentStatus'] = 'Processing complete'
                 progress['isProcessing'] = False
 
             self.socketio.emit('progressUpdate', progress)
@@ -666,6 +677,9 @@ class InvokeAIWebServer:
                 },
             )
             eventlet.sleep(0)
+
+            progress['currentIteration'] += 1
+
 
         try:
             self.generate.prompt2image(
