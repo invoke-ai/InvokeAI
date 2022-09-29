@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 from base64 import urlsafe_b64encode
+from glob import glob
 import json
 import os
 from pathlib import Path
 from queue import Queue
-from typing import Dict, Union
+from typing import Dict, List, Union
 from uuid import uuid4
+from pydantic import BaseModel
+from pydantic.fields import Field
 from .invocation_context import InvocationContext
 
 
@@ -24,6 +27,15 @@ class ContextManagerABC(ABC):
         pass
 
 
+# TODO: Consider making this generic to support more paginated result types in the future
+class PaginatedContexts(BaseModel):
+    items: List[str] = Field(description = "Context ids")
+    page: int        = Field(description = "Current Page")
+    pages: int       = Field(description = "Total number of pages")
+    per_page: int    = Field(description = "Number of items per page")
+    total: int       = Field(description = "Total number of items in result")
+
+
 class DiskContextManager(ContextManagerABC):
     """An in-memory context manager"""
     __output_folder: str
@@ -38,6 +50,29 @@ class DiskContextManager(ContextManagerABC):
         self.__max_cache_size = 10 # TODO: get this from config
 
         Path(self.__output_folder).mkdir(parents=True, exist_ok=True)
+
+    def list(self, page: int = 0, perPage: int = 10) -> PaginatedContexts:
+        files = sorted(
+            glob(os.path.join(self.__output_folder, "*.json")),
+            key=os.path.getmtime,
+            reverse=True,
+        )
+        count = len(files)
+
+        startId = page * perPage
+        pageCount = int(count / perPage) + 1
+        endId = min(startId + perPage, count)
+        items = [] if startId >= count else files[startId:endId]
+
+        items = list(map(lambda f: Path(f).stem, items))
+
+        return PaginatedContexts(
+            items = items,
+            page = page,
+            pages = pageCount,
+            per_page = perPage,
+            total = count
+        )
 
     def get(self, context_id: str) -> Union[InvocationContext,None]:
         cache_item = self.__get_cache(context_id)

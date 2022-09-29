@@ -114,6 +114,9 @@ def invoke_cli():
     
     parser = get_invocation_parser()
 
+    # Uncomment to print out previous contexts at startup
+    # print(invoker_services.context_manager.list())
+
     while (True):
         try:
             cmd_input = input("> ")
