@@ -134,14 +134,14 @@ class InvocationContext(BaseModel):
                         if is_field_compatible(from_node, field_name, invocation, field_name):
                             final_links.append(InvocationFieldLink(
                                 from_node_id = node_id,
-                                from_field = field_name,
-                                to_field = field_name))
+                                from_field   = field_name,
+                                to_field     = field_name))
             else:
                 if is_field_compatible(from_node, link.from_field, invocation, link.to_field):
                     final_links.append(InvocationFieldLink(
                         from_node_id = node_id,
-                        from_field = link.from_field,
-                        to_field = link.to_field))
+                        from_field   = link.from_field,
+                        to_field     = link.to_field))
 
         # Ensure the new invocation won't create a cycle
         if self._is_graph_addition_valid(invocation, final_links):

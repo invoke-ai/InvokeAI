@@ -13,7 +13,7 @@ from pydantic.schema import schema
 import uvicorn
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
-from .api.routers import invocation
+from .api.routers import invocation, contexts
 from .api.dependencies import ApiDependencies
 from ..args import Args
 
@@ -58,9 +58,15 @@ async def startup_event():
         event_handler_id = event_handler_id)
 
 # Include all routers
+# TODO: REMOVE
+# app.include_router(
+#     invocation.invocation_router,
+#     prefix = '/api')
+
 app.include_router(
-    invocation.invocation_router,
-    prefix = '/api')
+    contexts.context_router,
+    prefix = '/api'
+)
 
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?

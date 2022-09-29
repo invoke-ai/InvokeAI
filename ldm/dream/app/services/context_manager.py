@@ -51,7 +51,7 @@ class DiskContextManager(ContextManagerABC):
 
         Path(self.__output_folder).mkdir(parents=True, exist_ok=True)
 
-    def list(self, page: int = 0, perPage: int = 10) -> PaginatedContexts:
+    def list(self, page: int = 0, per_page: int = 10) -> PaginatedContexts:
         files = sorted(
             glob(os.path.join(self.__output_folder, "*.json")),
             key=os.path.getmtime,
@@ -59,9 +59,9 @@ class DiskContextManager(ContextManagerABC):
         )
         count = len(files)
 
-        startId = page * perPage
-        pageCount = int(count / perPage) + 1
-        endId = min(startId + perPage, count)
+        startId = page * per_page
+        pageCount = int(count / per_page) + 1
+        endId = min(startId + per_page, count)
         items = [] if startId >= count else files[startId:endId]
 
         items = list(map(lambda f: Path(f).stem, items))
@@ -70,7 +70,7 @@ class DiskContextManager(ContextManagerABC):
             items = items,
             page = page,
             pages = pageCount,
-            per_page = perPage,
+            per_page = per_page,
             total = count
         )
 

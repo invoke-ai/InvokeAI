@@ -109,6 +109,9 @@ class Invoker:
             if not link.to_node.id in context.links:
                 context.links[link.to_node.id] = list()
             
-            context.links[link.to_node.id].append(InvocationFieldLink(link.from_node.id, link.from_node.field, link.to_node.field))
+            context.links[link.to_node.id].append(InvocationFieldLink(
+                from_node_id = link.from_node.id,
+                from_field   = link.from_node.field,
+                to_field     = link.to_node.field))
 
         return context
