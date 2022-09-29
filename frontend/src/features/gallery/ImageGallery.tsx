@@ -8,7 +8,7 @@ import HoverableImage from './HoverableImage';
  * Simple image gallery.
  */
 const ImageGallery = () => {
-  const { images, currentImageUuid } = useAppSelector(
+  const { images, currentImageUuid, areMoreImagesAvailable } = useAppSelector(
     (state: RootState) => state.gallery
   );
   const dispatch = useAppDispatch();
@@ -35,7 +35,9 @@ const ImageGallery = () => {
           );
         })}
       </Flex>
-      <Button onClick={handleClickLoadMore}>Load more...</Button>
+      {areMoreImagesAvailable && (
+        <Button onClick={handleClickLoadMore}>Load more</Button>
+      )}
     </Flex>
   ) : (
     <Center height={'100%'} position={'relative'}>

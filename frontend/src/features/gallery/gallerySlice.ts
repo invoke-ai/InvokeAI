@@ -10,6 +10,7 @@ export interface GalleryState {
   intermediateImage?: InvokeAI.Image;
   nextPage: number;
   offset: number;
+  areMoreImagesAvailable: boolean;
 }
 
 const initialState: GalleryState = {
@@ -17,6 +18,7 @@ const initialState: GalleryState = {
   images: [],
   nextPage: 1,
   offset: 0,
+  areMoreImagesAvailable: true,
 };
 
 export const gallerySlice = createSlice({
@@ -75,7 +77,7 @@ export const gallerySlice = createSlice({
       state.currentImageUuid = action.payload.uuid;
       state.intermediateImage = undefined;
       state.currentImage = action.payload;
-      state.offset += 1
+      state.offset += 1;
     },
     setIntermediateImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       state.intermediateImage = action.payload;
@@ -92,7 +94,7 @@ export const gallerySlice = createSlice({
       }>
     ) => {
       const { images, nextPage, offset } = action.payload;
-      if (images.length) {
+      if (images.length > 0) {
         const newCurrentImage = images[0];
         state.images = state.images
           .concat(images)
@@ -101,6 +103,9 @@ export const gallerySlice = createSlice({
         state.currentImageUuid = newCurrentImage.uuid;
         state.nextPage = nextPage;
         state.offset = offset;
+      }
+      if (images.length < 50) {
+        state.areMoreImagesAvailable = false;
       }
     },
   },
