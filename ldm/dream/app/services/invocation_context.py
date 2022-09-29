@@ -1,31 +1,28 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from threading import Event
-from typing import Any, Dict, List, Union, get_args, get_type_hints
+from typing_extensions import Annotated
+from pydantic import BaseModel, PrivateAttr
+from pydantic.fields import Field
+from typing import Any, Callable, Dict, List, Union, get_args, get_type_hints
 from graphlib import TopologicalSorter, CycleError
-from itsdangerous import exc
 from ..invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
+from ..invocations import *
 
 
-class InvocationHistoryEntry():
+InvocationsUnion = Annotated[Union[BaseInvocation.get_invocations()], Field(discriminator="type")]
+InvocationOutputsUnion = Annotated[Union[BaseInvocationOutput.get_all_subclasses_tuple()], Field(discriminator="type")]
+
+class InvocationHistoryEntry(BaseModel):
     """The context of an invoked node"""
-    invocation: BaseInvocation
-    outputs: BaseInvocationOutput
-
-    def __init__(self, invocation: 'BaseInvocation', outputs: BaseInvocationOutput):
-        self.invocation = invocation
-        self.outputs = outputs
+    invocation: InvocationsUnion
+    outputs: InvocationOutputsUnion
 
 
-class InvocationFieldLink():
+class InvocationFieldLink(BaseModel):
     from_node_id: Union[str,int]
     from_field: str
     to_field: str
-
-    def __init__(self, node_id: Union[str,int], from_field: str, to_field: str):
-        self.from_node_id = node_id
-        self.from_field = from_field
-        self.to_field = to_field
 
 
 def is_field_compatible(
@@ -38,7 +35,7 @@ def is_field_compatible(
     to_node_type = type(to_invocation)
 
     # Get field type hints
-    from_node_outputs = get_type_hints(from_node_type.Outputs)
+    from_node_outputs = get_type_hints(from_node_type.get_output_type())
     to_node_inputs = get_type_hints(to_node_type)
 
     from_node_field = from_node_outputs.get(from_field) or None
@@ -60,30 +57,40 @@ def ContextConflict(Exception):
     pass
 
 
-# TODO: determine how to serialize and deserialize these
-# TODO: can this detect change and automatically save?
-class InvocationContext():
+class InvocationContext(BaseModel):
     """The invocation context.
     Maintains the current invocation graph, history, and results.
     """
     id: str
 
     # Invocations
-    invocations: Dict[str, BaseInvocation]
-    links: Dict[str, List[InvocationFieldLink]]
+    invocations: Dict[str, InvocationsUnion] = Field(description = "All invocations")
+    links: Dict[str, List[InvocationFieldLink]] = Field(description="All links between invocations")
 
     # Invocation history
-    invocation_results: Dict[str, InvocationHistoryEntry]
-    history: List[str]
+    invocation_results: Dict[str, InvocationHistoryEntry] = Field(description = "The outputs of executed invocations")
+    history: List[str] = Field(description = "The invocations that have been run, in order")
 
-    __wait_events: Dict[str, Event] = dict()
+    _wait_events: Dict[str, Event] = PrivateAttr()
+    _change_callback: Callable[['InvocationContext'], None] = PrivateAttr()
 
-    def __init__(self, id: str):
-        self.id = id
-        self.invocations = dict()
-        self.links = dict()
-        self.invocation_results = dict()
-        self.history = list()
+    def __init__(self,
+        id: str,
+        change_callback: Callable[['InvocationContext'], None] = None,
+        invocations: Dict[str, InvocationsUnion] = dict(),
+        links: Dict[str, List[InvocationFieldLink]] = dict(),
+        invocation_results: Dict[str, InvocationHistoryEntry] = dict(),
+        history: List[str] = list()
+    ):
+        super().__init__(
+            id = id,
+            invocations = invocations,
+            links = links,
+            invocation_results = invocation_results,
+            history = history
+        )
+        self._wait_events = dict()
+        self._change_callback = change_callback
 
 
     def ready_to_invoke(self) -> bool:
@@ -117,7 +124,7 @@ class InvocationContext():
             
             # TODO: validate node_id is in invocations
             from_node = self.invocations[node_id]
-            from_node_outputs_type = type(from_node).Outputs
+            from_node_outputs_type = type(from_node).get_output_type()
 
             if link.from_field == '*':
                 output_fields = from_node_outputs_type.__fields__
@@ -125,15 +132,22 @@ class InvocationContext():
                 for field_name in output_fields:
                     if field_name in to_fields:
                         if is_field_compatible(from_node, field_name, invocation, field_name):
-                            final_links.append(InvocationFieldLink(node_id, field_name, field_name))
+                            final_links.append(InvocationFieldLink(
+                                from_node_id = node_id,
+                                from_field = field_name,
+                                to_field = field_name))
             else:
                 if is_field_compatible(from_node, link.from_field, invocation, link.to_field):
-                    final_links.append(InvocationFieldLink(node_id, link.from_field, link.to_field))
+                    final_links.append(InvocationFieldLink(
+                        from_node_id = node_id,
+                        from_field = link.from_field,
+                        to_field = link.to_field))
 
         # Ensure the new invocation won't create a cycle
         if self._is_graph_addition_valid(invocation, final_links):
             self.invocations[invocation.id] = invocation
             self.links[invocation.id] = final_links
+            self._change_callback(self)
         else:
             raise ContextConflict("New links would create a cycle")
 
@@ -191,19 +205,19 @@ class InvocationContext():
         """Wait for a specific invocation to complete"""
         if invocation_id in self.invocation_results:
             return
-        
-        if not invocation_id in self.__wait_events:
-            self.__wait_events[invocation_id] = Event()
+
+        if not invocation_id in self._wait_events:
+            self._wait_events[invocation_id] = Event()
 
             # Check if complete again, in case completion happened during event creation
             if invocation_id in self.invocation_results:
-                self.__wait_events[invocation_id].set()
+                self._wait_events[invocation_id].set()
         
         # Wait for completion
-        self.__wait_events[invocation_id].wait()
+        self._wait_events[invocation_id].wait()
 
         # Delete the event, since all waiters have a reference, and we can remove it otherwise
-        del self.__wait_events[invocation_id]
+        del self._wait_events[invocation_id]
 
 
     def get_output(self, invocation_id: str, field_name: str) -> Any:
@@ -211,12 +225,16 @@ class InvocationContext():
     
     
     def _complete_invocation(self, invocation: BaseInvocation, outputs: BaseInvocationOutput):
-        self.invocation_results[invocation.id] = InvocationHistoryEntry(invocation, outputs)
+        self.invocation_results[invocation.id] = InvocationHistoryEntry(
+            invocation = invocation,
+            outputs = outputs)
         self.history.append(invocation.id)
 
+        self._change_callback(self)
+
         # Unblock any waiting threads
-        if invocation.id in self.__wait_events:
-            self.__wait_events[invocation.id].set()
+        if self._wait_events and invocation.id in self._wait_events:
+            self._wait_events[invocation.id].set()
     
 
     def _map_inputs(self, invocation_id: str):

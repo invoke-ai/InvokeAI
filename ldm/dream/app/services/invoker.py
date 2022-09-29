@@ -4,7 +4,6 @@ from queue import Queue
 from threading import Event, Thread
 from typing import Dict, List
 
-from ..invocations.baseinvocation import BaseInvocation
 from .invocation_graph import InvocationGraph
 from .invocation_context import InvocationContext, InvocationFieldLink
 from .invocation_services import InvocationServices

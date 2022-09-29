@@ -3,7 +3,7 @@
 import os
 
 from ..services.image_storage import DiskImageStorage
-from ..services.context_manager import MemoryContextManager
+from ..services.context_manager import DiskContextManager
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker, InvokerServices
@@ -41,7 +41,7 @@ class ApiDependencies:
 
         invoker_services = InvokerServices(
             queue = MemoryInvocationQueue(),
-            context_manager = MemoryContextManager()
+            context_manager = DiskContextManager(output_folder)
         )
 
         ApiDependencies.invoker = Invoker(services, invoker_services)
