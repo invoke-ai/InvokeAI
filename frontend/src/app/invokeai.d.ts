@@ -129,6 +129,7 @@ export declare type SystemStatus = {
   totalIterations: number;
   currentStatus: string;
   currentStatusHasSteps: boolean;
+  hasError: boolean;
 };
 
 export declare type SystemConfig = {

@@ -12,6 +12,7 @@ import {
   setCurrentStatus,
   setSystemConfig,
   processingCanceled,
+  errorOccurred,
 } from '../../features/system/systemSlice';
 
 import {
@@ -202,7 +203,7 @@ const makeSocketIOListeners = (
             level: 'error',
           })
         );
-        dispatch(setIsProcessing(false));
+        dispatch(errorOccurred());
         dispatch(clearIntermediateImage());
       } catch (e) {
         console.error(e);

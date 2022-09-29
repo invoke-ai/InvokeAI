@@ -1,8 +1,8 @@
-import { Text } from '@chakra-ui/react';
+import { Text, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
-import { RootState, useAppSelector } from '../../app/store';
-import { SystemState } from './systemSlice';
+import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
+import { errorSeen, SystemState } from './systemSlice';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -13,6 +13,8 @@ const systemSelector = createSelector(
       currentIteration: system.currentIteration,
       totalIterations: system.totalIterations,
       currentStatus: system.currentStatus,
+      hasError: system.hasError,
+      wasErrorSeen: system.wasErrorSeen,
     };
   },
   {
@@ -27,8 +29,12 @@ const StatusIndicator = () => {
     currentIteration,
     totalIterations,
     currentStatus,
+    hasError,
+    wasErrorSeen,
   } = useAppSelector(systemSelector);
-  const statusMessageTextColor = isConnected ? 'green.500' : 'red.500';
+  const dispatch = useAppDispatch();
+  const statusMessageTextColor =
+    isConnected && !hasError ? 'green.500' : 'red.500';
 
   let statusMessage = currentStatus;
 
@@ -37,7 +43,32 @@ const StatusIndicator = () => {
       statusMessage += ` (${currentIteration}/${totalIterations})`;
     }
   }
-  return <Text textColor={statusMessageTextColor}>{statusMessage}</Text>;
+
+  const tooltipLabel =
+    hasError && !wasErrorSeen
+      ? 'Click to clear, check logs for details'
+      : undefined;
+
+  const statusIndicatorCursor =
+    hasError && !wasErrorSeen ? 'pointer' : 'initial';
+
+  const handleClickStatusIndicator = () => {
+    if (hasError || !wasErrorSeen) {
+      dispatch(errorSeen());
+    }
+  };
+
+  return (
+    <Tooltip label={tooltipLabel}>
+      <Text
+        cursor={statusIndicatorCursor}
+        onClick={handleClickStatusIndicator}
+        textColor={statusMessageTextColor}
+      >
+        {statusMessage}
+      </Text>
+    </Tooltip>
+  );
 };
 
 export default StatusIndicator;

@@ -34,6 +34,7 @@ export interface SystemState
   currentStatus: string;
   currentStatusHasSteps: boolean;
   shouldDisplayGuides: boolean;
+  wasErrorSeen: boolean;
 }
 
 const initialSystemState = {
@@ -59,6 +60,8 @@ const initialSystemState = {
   model_hash: '',
   app_id: '',
   app_version: '',
+  hasError: false,
+  wasErrorSeen: true,
 };
 
 const initialState: SystemState = initialSystemState;
@@ -78,6 +81,22 @@ export const systemSlice = createSlice({
     },
     setSystemStatus: (state, action: PayloadAction<InvokeAI.SystemStatus>) => {
       return { ...state, ...action.payload };
+    },
+    errorOccurred: (state) => {
+      state.hasError = true;
+      state.isProcessing = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.currentIteration = 0;
+      state.totalIterations = 0;
+      state.currentStatusHasSteps = false;
+      state.currentStatus = 'Server error';
+      state.wasErrorSeen = false;
+    },
+    errorSeen: (state) => {
+      state.hasError = false;
+      state.wasErrorSeen = true;
+      state.currentStatus = state.isConnected ? 'Connected' : 'Disconnected';
     },
     addLogEntry: (
       state,
@@ -109,6 +128,7 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
+      state.hasError = false;
     },
     setSocketId: (state, action: PayloadAction<string>) => {
       state.socketId = action.payload;
@@ -132,7 +152,7 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Processing canceled'
+      state.currentStatus = 'Processing canceled';
     },
   },
 });
@@ -151,6 +171,8 @@ export const {
   setSystemConfig,
   setShouldDisplayGuides,
   processingCanceled,
+  errorOccurred,
+  errorSeen,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
