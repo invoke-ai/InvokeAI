@@ -59,7 +59,7 @@ const FaceRestoreOptions = () => {
         onChange={handleChangeStrength}
         value={gfpganStrength}
         width="90px"
-        clamp={false}
+        isInteger={false}
       />
     </Flex>
   );

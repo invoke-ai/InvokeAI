@@ -16,7 +16,6 @@ export default function MainSteps() {
       min={1}
       max={9999}
       step={1}
-      precision={0}
       onChange={handleChangeSteps}
       value={steps}
       width={inputWidth}

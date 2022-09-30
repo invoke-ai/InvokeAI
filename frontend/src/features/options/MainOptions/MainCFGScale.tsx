@@ -22,7 +22,7 @@ export default function MainCFGScale() {
       fontSize={fontSize}
       styleClass="main-option-block"
       textAlign="center"
-      clamp={false}
+      isInteger={false}
     />
   );
 }

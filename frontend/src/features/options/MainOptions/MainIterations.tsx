@@ -18,7 +18,6 @@ export default function MainIterations() {
       step={1}
       min={1}
       max={9999}
-      precision={0}
       onChange={handleChangeIterations}
       value={iterations}
       width={inputWidth}

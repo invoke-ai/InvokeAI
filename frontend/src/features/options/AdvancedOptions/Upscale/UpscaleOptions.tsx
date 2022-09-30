@@ -78,7 +78,7 @@ const UpscaleOptions = () => {
         onChange={handleChangeStrength}
         value={upscalingStrength}
         width="90px"
-        clamp={false}
+        isInteger={false}
       />
     </Flex>
   );

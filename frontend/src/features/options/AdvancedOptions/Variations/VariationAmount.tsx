@@ -30,7 +30,7 @@ export default function VariationAmount() {
       isDisabled={!shouldGenerateVariations}
       onChange={handleChangevariationAmount}
       width="90px"
-      clamp={false}
+      isInteger={false}
     />
   );
 }

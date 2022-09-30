@@ -4,11 +4,11 @@ import {
   NumberInputField,
   NumberIncrementStepper,
   NumberDecrementStepper,
-  Text,
   NumberInputProps,
+  FormLabel,
 } from '@chakra-ui/react';
 import _ from 'lodash';
-import { FocusEvent, useState } from 'react';
+import { FocusEvent, useEffect, useState } from 'react';
 
 interface Props extends Omit<NumberInputProps, 'onChange'> {
   styleClass?: string;
@@ -20,6 +20,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
   min: number;
   max: number;
   clamp?: boolean;
+  isInteger?: boolean;
 }
 
 /**
@@ -38,10 +39,9 @@ const SDNumberInput = (props: Props) => {
     isInvalid,
     value,
     onChange,
-    precision,
     min,
     max,
-    clamp = true,
+    isInteger = true,
     ...rest
   } = props;
 
@@ -57,21 +57,23 @@ const SDNumberInput = (props: Props) => {
 
   const [valueAsString, setValueAsString] = useState<string>(String(value));
 
+  /**
+   * When `value` changes (e.g. from a diff source than this component), we need
+   * to update the internal `valueAsString`, but only if the actual value is different
+   * from the current value.
+   */
+  useEffect(() => {
+    if (value !== Number(valueAsString)) {
+      setValueAsString(String(value));
+    }
+  }, [value]);
+
   const handleOnChange = (v: string) => {
     setValueAsString(v);
-
-    /**
-     * Cast the value to number.
-     *
-     * If there is no precision or the precision is 1, we infer that the value should be
-     * an integer, and floor() it also.
-     */
-    if (Number(v) === _.clamp(Number(v), min, max)) {
-      onChange(
-        !precision || precision === 1 ? Math.floor(Number(v)) : Number(v)
-      );
-    } else {
-      onChange(Number(v));
+    // This allows negatives and decimals e.g. '-123', `.5`, `-0.2`, etc.
+    if (!v.match(/-?0?\.?/)) {
+      // Cast the value to number. Floor it if it should be an integer.
+      onChange(isInteger ? Math.floor(Number(v)) : Number(v));
     }
   };
 
@@ -80,19 +82,13 @@ const SDNumberInput = (props: Props) => {
    * clamp it on blur and floor it if needed.
    */
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
-    if (clamp) {
-      const clamped = _.clamp(
-        !precision || precision === 1
-          ? Math.floor(Number(e.target.value))
-          : Number(e.target.value),
-        min,
-        max
-      );
-      setValueAsString(String(clamped));
-      onChange(clamped);
-    } else {
-      onChange(Number(e.target.value));
-    }
+    const clamped = _.clamp(
+      isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
+      min,
+      max
+    );
+    setValueAsString(String(clamped));
+    onChange(clamped);
   };
 
   return (
@@ -102,9 +98,15 @@ const SDNumberInput = (props: Props) => {
       className={`number-input ${styleClass}`}
     >
       {label && (
-        <Text whiteSpace="nowrap" className="number-input-label">
+        <FormLabel
+          fontSize={fontSize}
+          marginBottom={1}
+          flexGrow={2}
+          whiteSpace="nowrap"
+          className="number-input-label"
+        >
           {label}
-        </Text>
+        </FormLabel>
       )}
       <NumberInput
         size={size}
@@ -112,6 +114,7 @@ const SDNumberInput = (props: Props) => {
         className="number-input-field"
         value={valueAsString}
         keepWithinRange={true}
+        clampValueOnBlur={false}
         onChange={handleOnChange}
         onBlur={handleBlur}
       >

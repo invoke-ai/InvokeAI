@@ -25,7 +25,7 @@ export default function ImageToImageStrength() {
       onChange={handleChangeStrength}
       value={img2imgStrength}
       width="90px"
-      clamp={false}
+      isInteger={false}
     />
   );
 }
