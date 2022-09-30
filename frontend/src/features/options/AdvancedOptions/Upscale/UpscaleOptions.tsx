@@ -53,6 +53,9 @@ const systemSelector = createSelector(
 const UpscaleOptions = () => {
   const dispatch = useAppDispatch();
   const { upscalingLevel, upscalingStrength } = useAppSelector(optionsSelector);
+  const shouldRunESRGAN = useAppSelector(
+    (state: RootState) => state.options.shouldRunESRGAN
+  );
   const { isESRGANAvailable } = useAppSelector(systemSelector);
 
   const handleChangeLevel = (e: ChangeEvent<HTMLSelectElement>) =>
@@ -63,14 +66,14 @@ const UpscaleOptions = () => {
   return (
     <Flex gap={2}>
       <SDSelect
-        isDisabled={!isESRGANAvailable}
+        isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
         label="Scale"
         value={upscalingLevel}
         onChange={handleChangeLevel}
         validValues={UPSCALING_LEVELS}
       />
       <SDNumberInput
-        isDisabled={!isESRGANAvailable}
+        isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
         label="Strength"
         step={0.05}
         min={0}

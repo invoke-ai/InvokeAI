@@ -1,11 +1,11 @@
 import { Flex } from '@chakra-ui/layout';
-import { Switch } from '@chakra-ui/switch';
 import React, { ChangeEvent } from 'react';
 import {
   RootState,
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
+import SDSwitch from '../../../../common/components/SDSwitch';
 import { setShouldUseInitImage } from '../../optionsSlice';
 
 export default function ImageToImage() {
@@ -29,7 +29,7 @@ export default function ImageToImage() {
       mr={2}
     >
       <p>Image to Image</p>
-      <Switch
+      <SDSwitch
         isDisabled={!initialImagePath}
         isChecked={shouldUseInitImage}
         onChange={handleChangeShouldUseInitImage}

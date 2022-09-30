@@ -1,5 +1,6 @@
 [data-theme='light'] {
   // General Colors
+  --white: rgb(255, 255, 255);
 
   // App Colors
   --root-bg-color: rgb(255, 255, 255);
@@ -27,17 +28,20 @@
   --progress-bar-color: rgb(0, 0, 0);
 
   // Prompt Box Colors
-  --prompt-bg-color: rgb(225, 225, 225);
+  --prompt-bg-color: rgb(225, 227, 229);
   --prompt-border-color: rgb(0, 0, 0);
   --prompt-box-shadow-color: rgb(217, 217, 217);
 
   // Button Colors
+  --btn-svg-color: rgb(0, 0, 0);
+
   --btn-grey: rgb(220, 222, 224);
   --btn-grey-hover: rgb(198, 200, 202);
 
   --btn-purple: rgb(235, 185, 5);
   --btn-purple-hover: rgb(255, 200, 0);
 
-  --btn-red: rgb(235, 70, 70);
-  --btn-red-hover: rgb(255, 100, 100);
+  // Switch
+  --switch-bg-color: rgb(204, 206, 208);
+  --switch-bg-active-color: rgb(235, 185, 5);
 }

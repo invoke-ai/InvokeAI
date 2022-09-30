@@ -20,7 +20,7 @@ const SDSwitch = (props: Props) => {
     isDisabled = false,
     fontSize = 'md',
     size = 'md',
-    width,
+    width = 'auto',
     ...rest
   } = props;
   return (
@@ -36,7 +36,7 @@ const SDSwitch = (props: Props) => {
             {label}
           </FormLabel>
         )}
-        <Switch size={size} {...rest} />
+        <Switch size={size} className="switch-button" {...rest} />
       </Flex>
     </FormControl>
   );

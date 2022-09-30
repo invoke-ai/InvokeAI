@@ -23,6 +23,7 @@ import ImageToImage from './AdvancedOptions/ImageToImage/ImageToImage';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import { setOpenAccordions } from '../system/systemSlice';
 import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
+import Variations from './AdvancedOptions/Variations/Variations';
 
 /**
  * Main container for generation and processing parameters.
@@ -58,11 +59,7 @@ const OptionsAccordion = () => {
       />
 
       <InvokeAccordionItem
-        header={
-          <Box flex="1" textAlign="left">
-            Variations
-          </Box>
-        }
+        header={<Variations />}
         feature={Feature.VARIATIONS}
         options={<VariationsOptions />}
       />

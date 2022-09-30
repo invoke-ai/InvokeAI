@@ -57,7 +57,7 @@ const initialOptionsState: OptionsState = {
   shouldRunGFPGAN: false,
   gfpganStrength: 0.8,
   shouldRandomizeSeed: true,
-  showAdvancedOptions: false,
+  showAdvancedOptions: true,
 };
 
 const initialState: OptionsState = initialOptionsState;

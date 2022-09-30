@@ -37,6 +37,7 @@ export default function SeedWeights() {
         <Input
           size={'sm'}
           value={seedWeights}
+          disabled={!shouldGenerateVariations}
           onChange={handleChangeSeedWeights}
           width="12rem"
         />
