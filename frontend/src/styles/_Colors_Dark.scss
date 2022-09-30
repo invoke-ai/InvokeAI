@@ -1,5 +1,6 @@
 [data-theme='dark'] {
   // General Colors
+  --white: rgb(255, 255, 255);
 
   // App Colors
   --root-bg-color: rgb(10, 10, 10);
@@ -32,6 +33,8 @@
   --prompt-box-shadow-color: rgb(105, 30, 210);
 
   // Button Colors
+  --btn-svg-color: rgb(255, 255, 255);
+
   --btn-grey: rgb(45, 45, 55);
   --btn-grey-hover: rgb(65, 65, 75);
 
@@ -40,4 +43,8 @@
 
   --btn-red: rgb(185, 55, 55);
   --btn-red-hover: rgb(255, 75, 75);
+
+  // Switch
+  --switch-bg-color: rgb(100, 102, 110);
+  --switch-bg-active-color: rgb(165, 95, 255);
 }

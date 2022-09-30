@@ -1,11 +1,11 @@
 import { Flex } from '@chakra-ui/layout';
-import { Switch } from '@chakra-ui/switch';
 import React, { ChangeEvent } from 'react';
 import {
   RootState,
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
+import SDSwitch from '../../../../common/components/SDSwitch';
 import { setShouldRunGFPGAN } from '../../optionsSlice';
 
 export default function FaceRestore() {
@@ -30,7 +30,7 @@ export default function FaceRestore() {
       mr={2}
     >
       <p>Restore Face</p>
-      <Switch
+      <SDSwitch
         isDisabled={!isGFPGANAvailable}
         isChecked={shouldRunGFPGAN}
         onChange={handleChangeShouldRunGFPGAN}

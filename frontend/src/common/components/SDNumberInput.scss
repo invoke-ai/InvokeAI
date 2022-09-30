@@ -7,6 +7,7 @@
 
   .number-input-label {
     color: var(--text-color-secondary);
+    margin-right: 0;
   }
 
   .number-input-field {
@@ -27,6 +28,10 @@
       outline: none;
       border: 2px solid var(--prompt-border-color);
       box-shadow: 0 0 10px 0 var(--prompt-box-shadow-color);
+    }
+
+    &:disabled {
+      opacity: 0.2;
     }
   }
 

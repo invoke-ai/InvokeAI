@@ -7,8 +7,6 @@
   justify-items: center;
   background-color: var(--background-color-secondary);
   border-radius: 0.5rem;
-  min-width: 512px;
-  min-height: 768px;
 }
 
 .current-image-display-placeholder {
@@ -25,7 +23,6 @@
   grid-area: current-image;
   width: 100%;
   height: 100%;
-  z-index: 2;
   display: grid;
   justify-content: center;
 }
@@ -56,7 +53,8 @@
     border-radius: 0.5rem;
     object-fit: contain;
     width: auto;
-    max-height: 768px;
+    height: calc(100vh - 13rem);
+    z-index: 2;
   }
 }
 
@@ -67,5 +65,8 @@
   border-radius: 0.5rem;
   width: 100%;
   background-color: rgba(0, 0, 0, 0.7);
-  overflow: hidden;
+  height: calc(100vh - 11rem);
+  z-index: 1;
+  overflow: scroll;
+  @include HideScrollbar;
 }

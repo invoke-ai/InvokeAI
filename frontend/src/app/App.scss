@@ -11,19 +11,16 @@
   padding: 1rem;
   border-radius: 0.5rem;
   background-color: var(--background-color);
-}
-
-.app-content-prompt {
-  display: grid;
-  grid-template-columns: auto max-content;
-  column-gap: 1rem;
+  grid-auto-rows: max-content;
+  width: calc(100vw - 1.6rem);
+  height: calc(100vh - 1.6rem);
 }
 
 .app-options {
   display: grid;
   row-gap: 1rem;
   grid-auto-rows: max-content;
-  max-height: 60rem;
+  height: calc(100vh - 7rem);
   overflow: scroll;
   @include HideScrollbar;
 }

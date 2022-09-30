@@ -1,4 +1,4 @@
-import { FormControl, Select, SelectProps } from '@chakra-ui/react';
+import { FormControl, FormLabel, Select, SelectProps } from '@chakra-ui/react';
 
 interface Props extends SelectProps {
   label: string;
@@ -22,7 +22,15 @@ const SDSelect = (props: Props) => {
   } = props;
   return (
     <FormControl isDisabled={isDisabled} className={`iai-select ${styleClass}`}>
-      <div className="iai-select-label">{label}</div>
+      <FormLabel
+        fontSize={fontSize}
+        marginBottom={1}
+        flexGrow={2}
+        whiteSpace="nowrap"
+        className="iai-select-label"
+      >
+        {label}
+      </FormLabel>
       <Select
         fontSize={fontSize}
         size={size}

@@ -51,7 +51,6 @@ const CurrentImageDisplay = () => {
             p={3}
             boxSizing="border-box"
             backgroundColor={bgColor}
-            overflow="scroll"
           >
             <ImageMetadataViewer image={imageToDisplay} />
           </Flex>

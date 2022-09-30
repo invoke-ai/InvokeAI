@@ -1,11 +1,11 @@
 import { Flex } from '@chakra-ui/layout';
-import { Switch } from '@chakra-ui/switch';
 import React, { ChangeEvent } from 'react';
 import {
   RootState,
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
+import SDSwitch from '../../../../common/components/SDSwitch';
 import { setShouldRunESRGAN } from '../../optionsSlice';
 
 export default function Upscale() {
@@ -28,7 +28,7 @@ export default function Upscale() {
       mr={2}
     >
       <p>Upscale</p>
-      <Switch
+      <SDSwitch
         isDisabled={!isESRGANAvailable}
         isChecked={shouldRunESRGAN}
         onChange={handleChangeShouldRunESRGAN}

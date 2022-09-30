@@ -1,6 +1,4 @@
 import { Flex } from '@chakra-ui/react';
-
-import GenerateVariations from './GenerateVariations';
 import SeedWeights from './SeedWeights';
 import VariationAmount from './VariationAmount';
 
@@ -10,7 +8,6 @@ import VariationAmount from './VariationAmount';
 const VariationsOptions = () => {
   return (
     <Flex gap={2} direction={'column'}>
-      <GenerateVariations />
       <VariationAmount />
       <SeedWeights />
     </Flex>
