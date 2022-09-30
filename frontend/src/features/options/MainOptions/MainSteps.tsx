@@ -9,8 +9,8 @@ export default function MainSteps() {
   const dispatch = useDispatch();
   const steps = useAppSelector((state: RootState) => state.options.steps);
 
-  const handleChangeSteps = (v: string | number) =>
-    dispatch(setSteps(Number(v)));
+  const handleChangeSteps = (v: number) =>
+    dispatch(setSteps(v));
 
   return (
     <SDNumberInput

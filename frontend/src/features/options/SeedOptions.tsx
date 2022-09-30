@@ -20,7 +20,7 @@ const SeedOptions = () => {
   const handleChangeShouldRandomizeSeed = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setShouldRandomizeSeed(e.target.checked));
 
-  const handleChangeSeed = (v: string | number) => dispatch(setSeed(Number(v)));
+  const handleChangeSeed = (v: number) => dispatch(setSeed(v));
 
   const handleClickRandomizeSeed = () =>
     dispatch(setSeed(randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)));

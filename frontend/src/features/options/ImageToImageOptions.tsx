@@ -30,8 +30,8 @@ const ImageToImageOptions = () => {
   const { img2imgStrength, shouldFitToWidthHeight } =
     useAppSelector(optionsSelector);
 
-  const handleChangeStrength = (v: string | number) =>
-    dispatch(setImg2imgStrength(Number(v)));
+  const handleChangeStrength = (v: number) =>
+    dispatch(setImg2imgStrength(v));
 
   const handleChangeFit = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setShouldFitToWidthHeight(e.target.checked));

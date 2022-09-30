@@ -55,8 +55,8 @@ const VariationsOptions = () => {
     e: ChangeEvent<HTMLInputElement>
   ) => dispatch(setShouldGenerateVariations(e.target.checked));
 
-  const handleChangevariationAmount = (v: string | number) =>
-    dispatch(setVariationAmount(Number(v)));
+  const handleChangevariationAmount = (v: number) =>
+    dispatch(setVariationAmount(v));
 
   const handleChangeSeedWeights = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setSeedWeights(e.target.value));

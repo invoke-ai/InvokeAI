@@ -11,8 +11,8 @@ export default function MainIterations() {
     (state: RootState) => state.options.iterations
   );
 
-  const handleChangeIterations = (v: string | number) =>
-    dispatch(setIterations(Number(v)));
+  const handleChangeIterations = (v: number) =>
+    dispatch(setIterations(v));
 
   return (
     <SDNumberInput

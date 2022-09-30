@@ -46,8 +46,8 @@ const GFPGANOptions = () => {
   const { gfpganStrength } = useAppSelector(optionsSelector);
   const { isGFPGANAvailable } = useAppSelector(systemSelector);
 
-  const handleChangeStrength = (v: string | number) =>
-    dispatch(setGfpganStrength(Number(v)));
+  const handleChangeStrength = (v: number) =>
+    dispatch(setGfpganStrength(v));
 
   return (
     <Flex direction={'column'} gap={2}>

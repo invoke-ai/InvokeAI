@@ -9,8 +9,8 @@ export default function MainCFGScale() {
   const dispatch = useDispatch();
   const cfgScale = useAppSelector((state: RootState) => state.options.cfgScale);
 
-  const handleChangeCfgScale = (v: string | number) =>
-    dispatch(setCfgScale(Number(v)));
+  const handleChangeCfgScale = (v: number) =>
+    dispatch(setCfgScale(v));
 
   return (
     <SDNumberInput

@@ -58,8 +58,8 @@ const ESRGANOptions = () => {
   const handleChangeLevel = (e: ChangeEvent<HTMLSelectElement>) =>
     dispatch(setUpscalingLevel(Number(e.target.value) as UpscalingLevel));
 
-  const handleChangeStrength = (v: string | number) =>
-    dispatch(setUpscalingStrength(Number(v)));
+  const handleChangeStrength = (v: number) =>
+    dispatch(setUpscalingStrength(v));
 
   return (
     <Flex gap={2}>
