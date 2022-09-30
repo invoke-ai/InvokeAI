@@ -16,7 +16,7 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def Initialize(config,
+    def initialize(config,
         event_handler_id: int
         ):
         # TODO: lazy-initialize this by wrapping it
@@ -45,3 +45,8 @@ class ApiDependencies:
         )
 
         ApiDependencies.invoker = Invoker(services, invoker_services)
+    
+    @staticmethod
+    def shutdown():
+        if ApiDependencies.invoker:
+            ApiDependencies.invoker.stop()

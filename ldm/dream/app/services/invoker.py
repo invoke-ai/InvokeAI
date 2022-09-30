@@ -29,25 +29,35 @@ class Invoker:
     invoker_services: InvokerServices
 
     __invoker_thread: Thread
+    __stop_event: Event
 
     def __init__(self,
-        services: InvocationServices,     # Services used by nodes to perform invocations
+        services: InvocationServices,      # Services used by nodes to perform invocations
         invoker_services: InvokerServices # Services used by the invoker for orchestration
     ):
         self.services = services
         self.invoker_services = invoker_services
+        self.__stop_event = Event()
         self.__invoker_thread = Thread(
             name = "invoker",
-            target = self.__process
+            target = self.__process,
+            kwargs = dict(stop_event = self.__stop_event)
         )
         self.__invoker_thread.start()
 
 
-    def __process(self):
+    def __ensure_alive(self):
+        if self.__stop_event.isSet():
+            raise Exception("Invoker has been stopped. Must create a new invoker.")
+
+
+    def __process(self, stop_event: Event):
         try:
-            # TODO: Figure out how to gracefully shut down a thread at exit
-            while True:
+            while not stop_event.isSet():
                 queue_item: InvocationQueueItem = self.invoker_services.queue.get()
+                if not queue_item: # Probably stopping
+                    continue
+
                 context = self.invoker_services.context_manager.get(queue_item.context_id)
                 invocation = context.invocations[queue_item.invocation_id]
 
@@ -70,6 +80,8 @@ class Invoker:
 
     def invoke(self, context: InvocationContext, invoke_all: bool = False) -> str:
         """Determines the next node to invoke and returns the id of the invoked node"""
+        self.__ensure_alive()
+
         invocation_id = context._get_next_invocation_id()
         if not invocation_id:
             return # TODO: raise an error?
@@ -94,10 +106,13 @@ class Invoker:
 
 
     def create_context(self) -> InvocationContext:
+        self.__ensure_alive()
         return self.invoker_services.context_manager.create()
 
 
     def create_context_from_graph(self, invocation_graph: InvocationGraph) -> InvocationContext:
+        self.__ensure_alive()
+
         # Create a new context
         context = self.create_context()
 
@@ -115,3 +130,23 @@ class Invoker:
                 to_field     = link.to_node.field))
 
         return context
+
+
+    def __stop_service(self, service) -> None:
+        # Call stop() method on any services that have it
+        stop_op = getattr(service, 'stop', None)
+        if callable(stop_op):
+            stop_op()
+
+
+    def stop(self) -> None:
+        """Stops the invoker. A new invoker will have to be created to execute further."""
+        # First stop all services
+        for service in vars(self.services):
+            self.__stop_service(service)
+
+        for service in vars(self.invoker_services):
+            self.__stop_service(service)
+
+        self.__stop_event.set()
+        self.invoker_services.queue.put(None)

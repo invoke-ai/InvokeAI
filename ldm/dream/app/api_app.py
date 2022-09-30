@@ -53,9 +53,14 @@ async def startup_event():
     args = Args()
     config = args.parse_args()
 
-    ApiDependencies.Initialize(
+    ApiDependencies.initialize(
         config           = config,
         event_handler_id = event_handler_id)
+
+# Shut down threads
+@app.on_event('shutdown')
+async def shutdown_event():
+    ApiDependencies.shutdown()
 
 # Include all routers
 # TODO: REMOVE

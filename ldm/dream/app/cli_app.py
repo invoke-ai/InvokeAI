@@ -117,7 +117,7 @@ def invoke_cli():
     # Uncomment to print out previous contexts at startup
     # print(invoker_services.context_manager.list())
 
-    while (True):
+    while True:
         try:
             cmd_input = input("> ")
         except KeyboardInterrupt:
@@ -171,6 +171,9 @@ def invoke_cli():
 
         except SystemExit:
             continue
+    
+    invoker.stop()
+
 
 if __name__ == "__main__":
     invoke_cli()
