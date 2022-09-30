@@ -9,7 +9,7 @@ import copy
 import warnings
 import time
 sys.path.append('.')    # corrects a weird problem on Macs
-from ldm.dream.readline import completer
+from ldm.dream.readline import get_completer
 from ldm.dream.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
 from ldm.dream.pngwriter import PngWriter
 from ldm.dream.server import DreamServer, ThreadingDreamServer
@@ -17,9 +17,6 @@ from ldm.dream.image_util import make_grid
 from ldm.dream.log import write_log
 from omegaconf import OmegaConf
 
-# The output counter labels each output and is keyed to the
-# command-line history
-output_cntr = completer.get_current_history_length()+1
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
@@ -130,6 +127,12 @@ def main_loop(gen, opt, infile):
     last_results = list()
     model_config = OmegaConf.load(opt.conf)[opt.model]
 
+    # The readline completer reads history from the .dream_history file located in the
+    # output directory specified at the time of script launch. We do not currently support
+    # changing the history file midstream when the output directory is changed.
+    completer   = get_completer(opt)
+    output_cntr = completer.get_current_history_length()+1
+
     # os.pathconf is not available on Windows
     if hasattr(os, 'pathconf'):
         path_max = os.pathconf(opt.outdir, 'PC_PATH_MAX')
@@ -173,7 +176,7 @@ def main_loop(gen, opt, infile):
 
             elif subcommand.startswith('fetch'):
                 file_path = command.replace('!fetch ','',1)
-                retrieve_dream_command(opt,file_path)
+                retrieve_dream_command(opt,file_path,completer)
                 continue
 
             elif subcommand.startswith('history'):
@@ -353,7 +356,6 @@ def main_loop(gen, opt, infile):
 
         print('Outputs:')
         log_path = os.path.join(current_outdir, 'dream_log')
-        global output_cntr
         output_cntr = write_log(results, log_path ,('txt', 'md'), output_cntr)
         print()
         if operation == 'postprocess':
@@ -510,7 +512,7 @@ def split_variations(variations_string) -> list:
     else:
         return parts
 
-def retrieve_dream_command(opt,file_path):
+def retrieve_dream_command(opt,file_path,completer):
     '''
     Given a full or partial path to a previously-generated image file,
     will retrieve and format the dream command used to generate the image,
