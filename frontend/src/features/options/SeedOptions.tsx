@@ -1,6 +1,4 @@
 import { Flex, Text, Button } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
 import { ChangeEvent } from 'react';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
 import { useAppDispatch, useAppSelector } from '../../app/store';
@@ -8,33 +6,14 @@ import { RootState } from '../../app/store';
 import SDNumberInput from '../../common/components/SDNumberInput';
 import SDSwitch from '../../common/components/SDSwitch';
 import randomInt from '../../common/util/randomInt';
-import { OptionsState, setSeed, setShouldRandomizeSeed } from './optionsSlice';
-
-const optionsSelector = createSelector(
-  (state: RootState) => state.options,
-  (options: OptionsState) => {
-    return {
-      variationAmount: options.variationAmount,
-      seedWeights: options.seedWeights,
-      shouldGenerateVariations: options.shouldGenerateVariations,
-      shouldRandomizeSeed: options.shouldRandomizeSeed,
-      seed: options.seed,
-      iterations: options.iterations,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import { setSeed, setShouldRandomizeSeed } from './optionsSlice';
 
 /**
  * Seed & variation options. Includes iteration, seed, seed randomization, variation options.
  */
 const SeedOptions = () => {
   const { shouldGenerateVariations, shouldRandomizeSeed, seed } =
-    useAppSelector(optionsSelector);
+    useAppSelector((state: RootState) => state.options);
 
   const dispatch = useAppDispatch();
 

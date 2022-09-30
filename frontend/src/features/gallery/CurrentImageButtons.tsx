@@ -51,12 +51,16 @@ const CurrentImageButtons = ({
 }: CurrentImageButtonsProps) => {
   const dispatch = useAppDispatch();
 
-  const { intermediateImage } = useAppSelector(
-    (state: RootState) => state.gallery
+  const intermediateImage = useAppSelector(
+    (state: RootState) => state.gallery.intermediateImage
   );
 
-  const { upscalingLevel, gfpganStrength } = useAppSelector(
-    (state: RootState) => state.options
+  const upscalingLevel = useAppSelector(
+    (state: RootState) => state.options.upscalingLevel
+  );
+
+  const gfpganStrength = useAppSelector(
+    (state: RootState) => state.options.gfpganStrength
   );
 
   const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
