@@ -1,18 +1,16 @@
 import React from 'react';
-import { useDispatch } from 'react-redux';
-import { RootState, useAppSelector } from '../../../app/store';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import SDNumberInput from '../../../common/components/SDNumberInput';
 import { setIterations } from '../optionsSlice';
 import { fontSize, inputWidth } from './MainOptions';
 
 export default function MainIterations() {
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const iterations = useAppSelector(
     (state: RootState) => state.options.iterations
   );
 
-  const handleChangeIterations = (v: number) =>
-    dispatch(setIterations(v));
+  const handleChangeIterations = (v: number) => dispatch(setIterations(v));
 
   return (
     <SDNumberInput

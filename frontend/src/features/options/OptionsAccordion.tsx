@@ -1,52 +1,36 @@
 import {
-  Flex,
   Box,
-  Text,
   Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionIcon,
-  AccordionPanel,
-  Switch,
   ExpandedIndex,
+  // ExpandedIndex,
 } from '@chakra-ui/react';
 
-import { RootState } from '../../app/store';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+// import { RootState } from '../../app/store';
+// import { useAppDispatch, useAppSelector } from '../../app/store';
 
-import {
-  setShouldRunGFPGAN,
-  setShouldRunESRGAN,
-  OptionsState,
-  setShouldUseInitImage,
-} from './optionsSlice';
-import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
-import { setOpenAccordions, SystemState } from '../system/systemSlice';
-import ESRGANOptions from './ESRGANOptions';
-import GFPGANOptions from './GFPGANOptions';
+// import { setOpenAccordions } from '../system/systemSlice';
+
 import OutputOptions from './OutputOptions';
-import ImageToImageOptions from './ImageToImageOptions';
-import { ChangeEvent } from 'react';
-
-import GuideIcon from '../../common/components/GuideIcon';
+import ImageToImageOptions from './AdvancedOptions/ImageToImage/ImageToImageOptions';
 import { Feature } from '../../app/features';
-import SeedOptions from './SeedOptions';
-import VariationsOptions from './VariationsOptions';
+import SeedOptions from './AdvancedOptions/Seed/SeedOptions';
+import VariationsOptions from './AdvancedOptions/Variations/VariationsOptions';
+import Upscale from './AdvancedOptions/Upscale/Upscale';
+import UpscaleOptions from './AdvancedOptions/Upscale/UpscaleOptions';
+import FaceRestore from './AdvancedOptions/FaceRestore/FaceRestore';
+import FaceRestoreOptions from './AdvancedOptions/FaceRestore/FaceRestoreOptions';
+import ImageToImage from './AdvancedOptions/ImageToImage/ImageToImage';
+import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
+import { setOpenAccordions } from '../system/systemSlice';
+import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
 
 /**
  * Main container for generation and processing parameters.
  */
 const OptionsAccordion = () => {
-  const {
-    shouldRunESRGAN,
-    shouldRunGFPGAN,
-    shouldUseInitImage,
-    initialImagePath,
-  } = useAppSelector((state: RootState) => state.options);
-
-  const { isGFPGANAvailable, isESRGANAvailable, openAccordions } =
-    useAppSelector((state: RootState) => state.system);
+  const openAccordions = useAppSelector(
+    (state: RootState) => state.system.openAccordions
+  );
 
   const dispatch = useAppDispatch();
 
@@ -56,15 +40,6 @@ const OptionsAccordion = () => {
   const handleChangeAccordionState = (openAccordions: ExpandedIndex) =>
     dispatch(setOpenAccordions(openAccordions));
 
-  const handleChangeShouldRunESRGAN = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldRunESRGAN(e.target.checked));
-
-  const handleChangeShouldRunGFPGAN = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldRunGFPGAN(e.target.checked));
-
-  const handleChangeShouldUseInitImage = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldUseInitImage(e.target.checked));
-
   return (
     <Accordion
       defaultIndex={openAccordions}
@@ -72,120 +47,53 @@ const OptionsAccordion = () => {
       reduceMotion
       onChange={handleChangeAccordionState}
     >
-      <AccordionItem>
-        <h2>
-          <AccordionButton>
-            <Box flex="1" textAlign="left">
-              Seed
-            </Box>
-            <GuideIcon feature={Feature.SEED} />
-            <AccordionIcon />
-          </AccordionButton>
-        </h2>
-        <AccordionPanel>
-          <SeedOptions />
-        </AccordionPanel>
-      </AccordionItem>
-      <AccordionItem>
-        <h2>
-          <AccordionButton>
-            <Box flex="1" textAlign="left">
-              Variations
-            </Box>
-            <GuideIcon feature={Feature.VARIATIONS} />
-            <AccordionIcon />
-          </AccordionButton>
-        </h2>
-        <AccordionPanel>
-          <VariationsOptions />
-        </AccordionPanel>
-      </AccordionItem>
-      <AccordionItem>
-        <h2>
-          <AccordionButton>
-            <Flex
-              justifyContent={'space-between'}
-              alignItems={'center'}
-              width={'100%'}
-              mr={2}
-            >
-              <Text>Upscale</Text>
-              <Switch
-                isDisabled={!isESRGANAvailable}
-                isChecked={shouldRunESRGAN}
-                onChange={handleChangeShouldRunESRGAN}
-              />
-            </Flex>
-            <GuideIcon feature={Feature.ESRGAN} />
-            <AccordionIcon />
-          </AccordionButton>
-        </h2>
-        <AccordionPanel>
-          <ESRGANOptions />
-        </AccordionPanel>
-      </AccordionItem>
-      <AccordionItem>
-        <h2>
-          <AccordionButton>
-            <Flex
-              justifyContent={'space-between'}
-              alignItems={'center'}
-              width={'100%'}
-              mr={2}
-            >
-              <Text>Restore Face</Text>
-              <Switch
-                isDisabled={!isGFPGANAvailable}
-                isChecked={shouldRunGFPGAN}
-                onChange={handleChangeShouldRunGFPGAN}
-              />
-            </Flex>
-            <GuideIcon feature={Feature.FACE_CORRECTION} />
-            <AccordionIcon />
-          </AccordionButton>
-        </h2>
-        <AccordionPanel>
-          <GFPGANOptions />
-        </AccordionPanel>
-      </AccordionItem>
-      <AccordionItem>
-        <h2>
-          <AccordionButton>
-            <Flex
-              justifyContent={'space-between'}
-              alignItems={'center'}
-              width={'100%'}
-              mr={2}
-            >
-              <Text>Image to Image</Text>
-              <Switch
-                isDisabled={!initialImagePath}
-                isChecked={shouldUseInitImage}
-                onChange={handleChangeShouldUseInitImage}
-              />
-            </Flex>
-            <GuideIcon feature={Feature.IMAGE_TO_IMAGE} />
-            <AccordionIcon />
-          </AccordionButton>
-        </h2>
-        <AccordionPanel>
-          <ImageToImageOptions />
-        </AccordionPanel>
-      </AccordionItem>
-      <AccordionItem>
-        <h2>
-          <AccordionButton>
-            <Box flex="1" textAlign="left">
-              Other
-            </Box>
-            <GuideIcon feature={Feature.OTHER} />
-            <AccordionIcon />
-          </AccordionButton>
-        </h2>
-        <AccordionPanel>
-          <OutputOptions />
-        </AccordionPanel>
-      </AccordionItem>
+      <InvokeAccordionItem
+        header={
+          <Box flex="1" textAlign="left">
+            Seed
+          </Box>
+        }
+        feature={Feature.SEED}
+        options={<SeedOptions />}
+      />
+
+      <InvokeAccordionItem
+        header={
+          <Box flex="1" textAlign="left">
+            Variations
+          </Box>
+        }
+        feature={Feature.VARIATIONS}
+        options={<VariationsOptions />}
+      />
+
+      <InvokeAccordionItem
+        header={<Upscale />}
+        feature={Feature.UPSCALE}
+        options={<UpscaleOptions />}
+      />
+
+      <InvokeAccordionItem
+        header={<FaceRestore />}
+        feature={Feature.FACE_CORRECTION}
+        options={<FaceRestoreOptions />}
+      />
+
+      <InvokeAccordionItem
+        header={<ImageToImage />}
+        feature={Feature.IMAGE_TO_IMAGE}
+        options={<ImageToImageOptions />}
+      />
+
+      <InvokeAccordionItem
+        header={
+          <Box flex="1" textAlign="left">
+            Other
+          </Box>
+        }
+        feature={Feature.OTHER}
+        options={<OutputOptions />}
+      />
     </Accordion>
   );
 };

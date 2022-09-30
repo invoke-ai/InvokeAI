@@ -1,14 +1,13 @@
 import React, { ChangeEvent } from 'react';
-import { useDispatch } from 'react-redux';
 import { SAMPLERS } from '../../../app/constants';
-import { RootState, useAppSelector } from '../../../app/store';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import SDSelect from '../../../common/components/SDSelect';
 import { setSampler } from '../optionsSlice';
 import { fontSize } from './MainOptions';
 
 export default function MainSampler() {
   const sampler = useAppSelector((state: RootState) => state.options.sampler);
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
 
   const handleChangeSampler = (e: ChangeEvent<HTMLSelectElement>) =>
     dispatch(setSampler(e.target.value));

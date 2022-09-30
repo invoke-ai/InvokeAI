@@ -1,14 +1,13 @@
 import React, { ChangeEvent } from 'react';
-import { useDispatch } from 'react-redux';
 import { WIDTHS } from '../../../app/constants';
-import { RootState, useAppSelector } from '../../../app/store';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import SDSelect from '../../../common/components/SDSelect';
 import { setWidth } from '../optionsSlice';
 import { fontSize } from './MainOptions';
 
 export default function MainWidth() {
   const width = useAppSelector((state: RootState) => state.options.width);
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
 
   const handleChangeWidth = (e: ChangeEvent<HTMLSelectElement>) =>
     dispatch(setWidth(Number(e.target.value)));

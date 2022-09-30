@@ -1,22 +1,22 @@
 import { Flex } from '@chakra-ui/react';
 
-import { RootState } from '../../app/store';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+import { RootState } from '../../../../app/store';
+import { useAppDispatch, useAppSelector } from '../../../../app/store';
 
 import {
   setUpscalingLevel,
   setUpscalingStrength,
   UpscalingLevel,
   OptionsState,
-} from './optionsSlice';
+} from '../../optionsSlice';
 
-import { UPSCALING_LEVELS } from '../../app/constants';
+import { UPSCALING_LEVELS } from '../../../../app/constants';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
-import { SystemState } from '../system/systemSlice';
+import { SystemState } from '../../../system/systemSlice';
 import { ChangeEvent } from 'react';
-import SDNumberInput from '../../common/components/SDNumberInput';
-import SDSelect from '../../common/components/SDSelect';
+import SDNumberInput from '../../../../common/components/SDNumberInput';
+import SDSelect from '../../../../common/components/SDSelect';
 
 const optionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -50,7 +50,7 @@ const systemSelector = createSelector(
 /**
  * Displays upscaling/ESRGAN options (level and strength).
  */
-const ESRGANOptions = () => {
+const UpscaleOptions = () => {
   const dispatch = useAppDispatch();
   const { upscalingLevel, upscalingStrength } = useAppSelector(optionsSelector);
   const { isESRGANAvailable } = useAppSelector(systemSelector);
@@ -58,8 +58,7 @@ const ESRGANOptions = () => {
   const handleChangeLevel = (e: ChangeEvent<HTMLSelectElement>) =>
     dispatch(setUpscalingLevel(Number(e.target.value) as UpscalingLevel));
 
-  const handleChangeStrength = (v: number) =>
-    dispatch(setUpscalingStrength(v));
+  const handleChangeStrength = (v: number) => dispatch(setUpscalingStrength(v));
 
   return (
     <Flex gap={2}>
@@ -79,9 +78,10 @@ const ESRGANOptions = () => {
         onChange={handleChangeStrength}
         value={upscalingStrength}
         width="90px"
+        clamp={false}
       />
     </Flex>
   );
 };
 
-export default ESRGANOptions;
+export default UpscaleOptions;

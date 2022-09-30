@@ -3,8 +3,41 @@
 
   // App Colors
   --root-bg-color: rgb(255, 255, 255);
-  --background-color: rgb(230, 230, 230);
+  --background-color: rgb(220, 222, 224);
+  --background-color-secondary: rgb(204, 206, 208);
+
+  --text-color: rgb(0, 0, 0);
+  --text-color-secondary: rgb(40, 40, 40);
+
+  --subtext-color: rgb(24, 24, 34);
+  --subtext-color-bright: rgb(48, 48, 64);
+
+  --border-color: rgb(200, 200, 200);
+  --border-color-light: rgb(147, 147, 147);
+
+  --invalid: rgb(255, 75, 75);
+  --invalid-secondary: rgb(120, 5, 5);
+
+  --svg-color: rgb(220, 222, 224);
 
   // Theme Colors
-  --app-purple: rgb(165, 94, 253);
+  --app-main-accent: rgb(235, 185, 5);
+
+  // Progress Bar Color
+  --progress-bar-color: rgb(0, 0, 0);
+
+  // Prompt Box Colors
+  --prompt-bg-color: rgb(225, 225, 225);
+  --prompt-border-color: rgb(0, 0, 0);
+  --prompt-box-shadow-color: rgb(217, 217, 217);
+
+  // Button Colors
+  --btn-grey: rgb(220, 222, 224);
+  --btn-grey-hover: rgb(198, 200, 202);
+
+  --btn-purple: rgb(235, 185, 5);
+  --btn-purple-hover: rgb(255, 200, 0);
+
+  --btn-red: rgb(235, 70, 70);
+  --btn-red-hover: rgb(255, 100, 100);
 }

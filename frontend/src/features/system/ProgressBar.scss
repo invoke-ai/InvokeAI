@@ -1,7 +1,7 @@
 .progress-bar {
-  background-color: var(--background-color);
+  background-color: var(--root-bg-color);
 
   div {
-    background-color: var(--app-purple);
+    background-color: var(--progress-bar-color);
   }
 }

@@ -19,6 +19,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
   onChange: (v: number) => void;
   min: number;
   max: number;
+  clamp?: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ const SDNumberInput = (props: Props) => {
     precision,
     min,
     max,
+    clamp = true,
     ...rest
   } = props;
 
@@ -68,6 +70,8 @@ const SDNumberInput = (props: Props) => {
       onChange(
         !precision || precision === 1 ? Math.floor(Number(v)) : Number(v)
       );
+    } else {
+      onChange(Number(v));
     }
   };
 
@@ -76,15 +80,19 @@ const SDNumberInput = (props: Props) => {
    * clamp it on blur and floor it if needed.
    */
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
-    const clamped = _.clamp(
-      !precision || precision === 1
-        ? Math.floor(Number(e.target.value))
-        : Number(e.target.value),
-      min,
-      max
-    );
-    setValueAsString(String(clamped));
-    onChange(clamped);
+    if (clamp) {
+      const clamped = _.clamp(
+        !precision || precision === 1
+          ? Math.floor(Number(e.target.value))
+          : Number(e.target.value),
+        min,
+        max
+      );
+      setValueAsString(String(clamped));
+      onChange(clamped);
+    } else {
+      onChange(Number(e.target.value));
+    }
   };
 
   return (

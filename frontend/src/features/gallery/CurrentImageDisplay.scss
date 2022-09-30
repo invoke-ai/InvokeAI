@@ -17,7 +17,7 @@
   svg {
     width: 10rem;
     height: 10rem;
-    color: var(--subtext-color);
+    color: var(--svg-color);
   }
 }
 
@@ -38,7 +38,12 @@
   gap: 0.5rem;
 
   button {
-    @include Button($btn-width: 3rem, $icon-size: 22px);
+    @include Button(
+      $btn-width: 3rem,
+      $icon-size: 22px,
+      $btn-color: var(--btn-grey),
+      $btn-color-hover: var(--btn-grey-hover)
+    );
   }
 }
 

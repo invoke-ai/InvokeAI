@@ -1,13 +1,12 @@
 import React, { ChangeEvent } from 'react';
-import { useDispatch } from 'react-redux';
-import { RootState, useAppSelector } from '../../../app/store';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import { setShowAdvancedOptions } from '../optionsSlice';
 
 export default function MainAdvancedOptions() {
   const showAdvancedOptions = useAppSelector(
     (state: RootState) => state.options.showAdvancedOptions
   );
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
 
   const handleShowAdvancedOptions = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setShowAdvancedOptions(e.target.checked));

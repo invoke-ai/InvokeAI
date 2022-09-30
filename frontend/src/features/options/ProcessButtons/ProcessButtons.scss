@@ -7,16 +7,16 @@
 
   .invoke-btn {
     @include Button(
-      $btn-color: rgb(105, 30, 210),
-      $btn-color-hover: rgb(130, 35, 255),
+      $btn-color: var(--btn-purple),
+      $btn-color-hover: var(--btn-purple-hover),
       $btn-width: 5rem
     );
   }
 
   .cancel-btn {
     @include Button(
-      $btn-color: rgb(185, 55, 55),
-      $btn-color-hover: rgb(255, 75, 75),
+      $btn-color: var(--btn-red),
+      $btn-color-hover: var(--btn-red-hover),
       $btn-width: 3rem
     );
   }

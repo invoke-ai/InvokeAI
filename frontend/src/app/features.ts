@@ -10,7 +10,7 @@ export enum Feature {
   OTHER,
   SEED,
   VARIATIONS,
-  ESRGAN,
+  UPSCALE,
   FACE_CORRECTION,
   IMAGE_TO_IMAGE,
 }
@@ -41,7 +41,7 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },
-  [Feature.ESRGAN]: {
+  [Feature.UPSCALE]: {
     text: 'Using ESRGAN you can increase the output resolution without requiring a higher width/height in the initial generation.',
     href: 'link/to/docs/feature1.html',
     guideImage: 'asset/path.gif',

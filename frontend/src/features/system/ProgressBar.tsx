@@ -28,7 +28,7 @@ const ProgressBar = () => {
 
   return (
     <Progress
-      height="2px"
+      height="4px"
       value={value}
       isIndeterminate={isProcessing && !currentStatusHasSteps}
       className="progress-bar"

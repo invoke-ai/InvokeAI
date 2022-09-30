@@ -1,14 +1,14 @@
 import { Flex } from '@chakra-ui/react';
 
-import { RootState } from '../../app/store';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+import { RootState } from '../../../../app/store';
+import { useAppDispatch, useAppSelector } from '../../../../app/store';
 
-import { OptionsState, setGfpganStrength } from './optionsSlice';
+import { OptionsState, setGfpganStrength } from '../../optionsSlice';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
-import { SystemState } from '../system/systemSlice';
-import SDNumberInput from '../../common/components/SDNumberInput';
+import { SystemState } from '../../../system/systemSlice';
+import SDNumberInput from '../../../../common/components/SDNumberInput';
 
 const optionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -41,13 +41,12 @@ const systemSelector = createSelector(
 /**
  * Displays face-fixing/GFPGAN options (strength).
  */
-const GFPGANOptions = () => {
+const FaceRestoreOptions = () => {
   const dispatch = useAppDispatch();
   const { gfpganStrength } = useAppSelector(optionsSelector);
   const { isGFPGANAvailable } = useAppSelector(systemSelector);
 
-  const handleChangeStrength = (v: number) =>
-    dispatch(setGfpganStrength(v));
+  const handleChangeStrength = (v: number) => dispatch(setGfpganStrength(v));
 
   return (
     <Flex direction={'column'} gap={2}>
@@ -60,9 +59,10 @@ const GFPGANOptions = () => {
         onChange={handleChangeStrength}
         value={gfpganStrength}
         width="90px"
+        clamp={false}
       />
     </Flex>
   );
 };
 
-export default GFPGANOptions;
+export default FaceRestoreOptions;
