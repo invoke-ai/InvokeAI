@@ -11,8 +11,7 @@ seeds:
 import os
 import re
 import atexit
-
-completer = None
+from ldm.dream.args import Args
 
 # ---------------readline utilities---------------------
 try:
@@ -20,10 +19,6 @@ try:
     readline_available = True
 except:
     readline_available = False
-
-#to simulate what happens on windows systems, uncomment
-# this line
-#readline_available = False
 
 IMG_EXTENSIONS     = ('.png','.jpg','.jpeg')
 COMMANDS = (
@@ -49,18 +44,18 @@ COMMANDS = (
     '-save_orig','--save_original',
     '--skip_normalize','-x',
     '--log_tokenization','-t',
-    '!fix','!fetch',
+    '!fix','!fetch','!history',
     )
 IMG_PATH_COMMANDS = (
-    '--init_img[=\s]','-I',
-    '--init_mask[=\s]','-M',
-    '--init_color[=\s]',
-    '--embedding_path[=\s]',
-    '--outdir[=\s]'
+    '--outdir[=\s]',
     )
 IMG_FILE_COMMANDS=(
     '!fix',
     '!fetch',
+    '--init_img[=\s]','-I',
+    '--init_mask[=\s]','-M',
+    '--init_color[=\s]',
+    '--embedding_path[=\s]',
     )
 path_regexp = '('+'|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
 
@@ -71,6 +66,7 @@ class Completer:
         self.matches     = list()
         self.default_dir = None
         self.linebuffer  = None
+        self.auto_history_active = True
         return
 
     def complete(self, text, state):
@@ -109,7 +105,8 @@ class Completer:
         '''
         Pass thru to readline
         '''
-        readline.add_history(line)
+        if not self.auto_history_active:
+            readline.add_history(line)
 
     def remove_history_item(self,pos):
         readline.remove_history_item(pos)
@@ -178,7 +175,7 @@ class Completer:
             readline.redisplay()
             self.linebuffer = None
 
-    def _path_completions(self, text, state, extensions, shortcut_ok=False):
+    def _path_completions(self, text, state, extensions, shortcut_ok=True):
         # separate the switch from the partial path
         match = re.search('^(-\w|--\w+=?)(.*)',text)
         if match is None:
@@ -247,29 +244,35 @@ class DummyCompleter(Completer):
     def set_line(self,line):
         print(f'# {line}')
 
-if readline_available:
-    completer = Completer(COMMANDS)
-    
-    readline.set_completer(
-        completer.complete
-    )
-    readline.set_auto_history(False)
-    readline.set_pre_input_hook(completer._pre_input_hook)
-    readline.set_completer_delims(' ')
-    readline.parse_and_bind('tab: complete')
-    readline.parse_and_bind('set print-completions-horizontally off')
-    readline.parse_and_bind('set page-completions on')
-    readline.parse_and_bind('set skip-completed-text on')
-    readline.parse_and_bind('set bell-style visible')
-    readline.parse_and_bind('set show-all-if-ambiguous on')
-    
-    histfile = os.path.join(os.path.expanduser('~'), '.dream_history')
-    try:
-        readline.read_history_file(histfile)
-        readline.set_history_length(1000)
-    except FileNotFoundError:
-        pass
-    atexit.register(readline.write_history_file, histfile)
+def get_completer(opt:Args)->Completer:
+    if readline_available:
+        completer = Completer(COMMANDS)
 
-else:
-    completer = DummyCompleter(COMMANDS)
+        readline.set_completer(
+            completer.complete
+        )
+        # pyreadline3 does not have a set_auto_history() method
+        try:
+            readline.set_auto_history(False)
+            completer.auto_history_active = False
+        except:
+            completer.auto_history_active = True
+        readline.set_pre_input_hook(completer._pre_input_hook)
+        readline.set_completer_delims(' ')
+        readline.parse_and_bind('tab: complete')
+        readline.parse_and_bind('set print-completions-horizontally off')
+        readline.parse_and_bind('set page-completions on')
+        readline.parse_and_bind('set skip-completed-text on')
+        readline.parse_and_bind('set show-all-if-ambiguous on')
+
+        histfile = os.path.join(os.path.expanduser(opt.outdir), '.dream_history')
+        try:
+            readline.read_history_file(histfile)
+            readline.set_history_length(1000)
+        except FileNotFoundError:
+            pass
+        atexit.register(readline.write_history_file, histfile)
+
+    else:
+        completer = DummyCompleter(COMMANDS)
+    return completer
