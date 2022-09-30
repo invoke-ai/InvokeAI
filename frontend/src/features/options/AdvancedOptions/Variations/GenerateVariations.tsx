@@ -20,7 +20,6 @@ export default function GenerateVariations() {
 
   return (
     <SDSwitch
-      label="Generate Variations"
       isChecked={shouldGenerateVariations}
       width={'auto'}
       onChange={handleChangeShouldGenerateVariations}
