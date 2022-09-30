@@ -49,7 +49,7 @@ COMMANDS = (
     '-save_orig','--save_original',
     '--skip_normalize','-x',
     '--log_tokenization','-t',
-    '!fix','!fetch',
+    '!fix','!fetch','!history',
     )
 IMG_PATH_COMMANDS = (
     '--init_img[=\s]','-I',
@@ -71,6 +71,7 @@ class Completer:
         self.matches     = list()
         self.default_dir = None
         self.linebuffer  = None
+        self.auto_history_active = True
         return
 
     def complete(self, text, state):
@@ -109,7 +110,8 @@ class Completer:
         '''
         Pass thru to readline
         '''
-        readline.add_history(line)
+        if not self.auto_history_active:
+            readline.add_history(line)
 
     def remove_history_item(self,pos):
         readline.remove_history_item(pos)
@@ -253,7 +255,12 @@ if readline_available:
     readline.set_completer(
         completer.complete
     )
-    readline.set_auto_history(False)
+    # pyreadline3 does not have a set_auto_history() method
+    try:
+        readline.set_auto_history(False)
+        completer.auto_history_active = False
+    except:
+        completer.auto_history_active = True
     readline.set_pre_input_hook(completer._pre_input_hook)
     readline.set_completer_delims(' ')
     readline.parse_and_bind('tab: complete')

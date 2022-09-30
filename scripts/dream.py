@@ -161,29 +161,34 @@ def main_loop(gen, opt, infile):
             done = True
             break
 
-        if command.startswith('!dream'):   # in case a stored prompt still contains the !dream command
-            command = command.replace('!dream ','',1)
+        if command.startswith('!'):
+            subcommand = command[1:]
 
-        if command.startswith('!fix'):
-            command = command.replace('!fix ','',1)
-            operation = 'postprocess'
+            if subcommand.startswith('dream'):   # in case a stored prompt still contains the !dream command
+                command = command.replace('!dream ','',1)
 
-        if command.startswith('!fetch'):
-            file_path = command.replace('!fetch ','',1)
-            retrieve_dream_command(opt,file_path)
-            continue
+            elif subcommand.startswith('fix'):
+                command = command.replace('!fix ','',1)
+                operation = 'postprocess'
 
-        if command == '!history':
-            completer.show_history()
-            continue
+            elif subcommand.startswith('fetch'):
+                file_path = command.replace('!fetch ','',1)
+                retrieve_dream_command(opt,file_path)
+                continue
 
-        match = re.match('^!(\d+)',command)
-        if match:
-            command_no = match.groups()[0]
-            command    = completer.get_line(int(command_no))
-            completer.set_line(command)
-            continue
-            
+            elif subcommand.startswith('history'):
+                completer.show_history()
+                continue
+
+            elif re.match('^(\d+)',subcommand):
+                command_no = re.match('^(\d+)',subcommand).groups()[0]
+                command    = completer.get_line(int(command_no))
+                completer.set_line(command)
+                continue
+                
+            else:  # not a recognized subcommand, so give the --help text
+                command = '-h'
+
         if opt.parse_cmd(command) is None:
             continue
 
@@ -517,7 +522,11 @@ def retrieve_dream_command(opt,file_path):
         path = os.path.join(opt.outdir,basename)
     else:
         path = file_path
-    cmd = dream_cmd_from_png(path)
+    try:
+        cmd = dream_cmd_from_png(path)
+    except FileNotFoundError:
+        print(f'** {path}: file not found')
+        return
     completer.set_line(cmd)
 
 if __name__ == '__main__':
