@@ -3,12 +3,14 @@
 from typing import Literal, Optional
 from pydantic import Field, BaseModel
 from .baseinvocation import BaseInvocation, BaseInvocationOutput
+from ..services.image_storage import ImageType
 from ..services.invocation_services import InvocationServices
 
 
 class ImageField(BaseModel):
     """An image field used for passing image objects between invocations"""
-    uri: Optional[str] = Field(default=None, description="The relative path to the image")
+    image_type: ImageType = Field(default=ImageType.RESULT, description="The type of the image")
+    image_name: Optional[str] = Field(default=None, description="The name of the image")
 
 
 class ImageOutput(BaseInvocationOutput):
@@ -24,11 +26,12 @@ class LoadImageInvocation(BaseInvocation):
     type: Literal['load_image'] = 'load_image'
 
     # Inputs
-    uri: str = Field(description="The URI from which to load the image")
+    image_type: ImageType = Field(description="The type of the image")
+    image_name: str = Field(description="The name of the image")
 
     def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
         return ImageOutput(
-            image = ImageField(uri = self.uri)
+            image = ImageField(image_type = self.image_type, image_name = self.image_name)
         )
 
 
@@ -40,12 +43,12 @@ class ShowImageInvocation(BaseInvocation):
     image: ImageField = Field(default=None, description="The image to show")
 
     def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
-        image = services.images.get(self.image.uri)
+        image = services.images.get(self.image.image_type, self.image.image_name)
         if image:
             image.show()
 
         # TODO: how to handle failure?
 
         return ImageOutput(
-            image = ImageField(uri = self.image.uri)
+            image = ImageField(image_type = self.image.image_type, image_name = self.image.image_name)
         )

@@ -5,6 +5,7 @@ from typing import Literal, Union
 from pydantic import Field
 from .image import ImageField, ImageOutput
 from .baseinvocation import BaseInvocation
+from ..services.image_storage import ImageType
 from ..services.invocation_services import InvocationServices
 
 
@@ -28,8 +29,9 @@ class UpscaleInvocation(BaseInvocation):
 
         # Results are image and seed, unwrap for now
         # TODO: can this return multiple results?
-        uri = f'results/{session_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
-        services.images.save(uri, results[0][0])
+        image_type = ImageType.RESULT
+        image_name = f'{session_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        services.images.save(image_type, image_name, results[0][0])
         return ImageOutput(
-            image = ImageField(uri = uri)
+            image = ImageField(image_type = image_type, image_name = image_name)
         )

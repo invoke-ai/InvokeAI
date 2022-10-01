@@ -87,7 +87,7 @@ app.include_router(
 )
 
 app.include_router(
-    results.results_router,
+    results.images_router,
     prefix = '/api'
 )
 

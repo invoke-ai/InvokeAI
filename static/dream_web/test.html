@@ -26,8 +26,8 @@
 
         function log(event, data) {
             document.getElementById("output").innerHTML += `${event} => ${JSON.stringify(data)}<br/>`;
-            if (data.result?.image?.uri) {
-                document.getElementById("output").innerHTML += `<img src="/api/v1/results/?path=${data.result.image.uri}" />`;
+            if (data.result?.image?.image_type) {
+                document.getElementById("output").innerHTML += `<img src="/api/v1/images/${data.result.image.image_type}/${data.result.image.image_name}" />`;
             }
             console.log(`${event} => ${JSON.stringify(data)}`);
         }
