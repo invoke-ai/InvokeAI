@@ -18,9 +18,9 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
   const { header, feature, options } = props;
 
   return (
-    <AccordionItem>
+    <AccordionItem className="advanced-settings-item">
       <h2>
-        <AccordionButton>
+        <AccordionButton className="advanced-settings-header">
           {header}
           <GuideIcon feature={feature} />
           <AccordionIcon />

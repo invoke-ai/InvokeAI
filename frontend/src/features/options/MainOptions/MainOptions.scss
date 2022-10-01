@@ -10,8 +10,9 @@
 
 .main-options-row {
   display: grid;
-  grid-template-columns: repeat(3, max-content);
+  grid-template-columns: repeat(3, auto);
   column-gap: 1rem;
+  max-width: 24rem;
 }
 
 .main-option-block {

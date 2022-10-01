@@ -7,7 +7,7 @@ import MainSteps from './MainSteps';
 import MainWidth from './MainWidth';
 
 export const fontSize = '1.1rem';
-export const inputWidth = '70px';
+export const inputWidth = 'auto';
 
 export default function MainOptions() {
   return (

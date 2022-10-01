@@ -29,7 +29,6 @@ export default function VariationAmount() {
       max={1}
       isDisabled={!shouldGenerateVariations}
       onChange={handleChangevariationAmount}
-      width="90px"
       isInteger={false}
     />
   );

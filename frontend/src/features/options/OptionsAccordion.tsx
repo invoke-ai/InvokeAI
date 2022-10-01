@@ -47,6 +47,7 @@ const OptionsAccordion = () => {
       allowMultiple
       reduceMotion
       onChange={handleChangeAccordionState}
+      className="advanced-settings"
     >
       <InvokeAccordionItem
         header={

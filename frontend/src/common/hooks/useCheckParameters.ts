@@ -61,7 +61,7 @@ const useCheckParameters = (): boolean => {
 
   return useMemo(() => {
     // Cannot generate without a prompt
-    if (!prompt) {
+    if (!prompt || Boolean(prompt.match(/^[\s\r\n]+$/))) {
       return false;
     }
 

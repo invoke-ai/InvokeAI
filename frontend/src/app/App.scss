@@ -21,7 +21,7 @@
   row-gap: 1rem;
   grid-auto-rows: max-content;
   height: calc(100vh - 7rem);
-  overflow: scroll;
+  overflow-y: scroll;
   @include HideScrollbar;
 }
 

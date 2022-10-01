@@ -1,0 +1,21 @@
+.advanced-settings {
+  display: grid;
+}
+
+.advanced-settings-item {
+  display: grid;
+  max-width: 24rem;
+  border-color: var(--border-color);
+}
+
+.advanced-settings-header {
+  border-radius: 0.2rem;
+
+  &[aria-expanded='true'] {
+    background-color: var(--tab-color);
+  }
+
+  &:hover {
+    background-color: var(--tab-hover-color);
+  }
+}

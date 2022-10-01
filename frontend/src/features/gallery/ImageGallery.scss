@@ -31,6 +31,6 @@
   gap: 0.6rem;
   justify-items: center;
   max-height: calc(100vh - 13rem);
-  overflow: scroll;
+  overflow-y: scroll;
   @include HideScrollbar;
 }

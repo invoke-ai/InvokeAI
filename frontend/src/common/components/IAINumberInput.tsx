@@ -34,7 +34,7 @@ const IAINumberInput = (props: Props) => {
     showStepper = true,
     fontSize = '1rem',
     size = 'sm',
-    width = '150px',
+    width,
     textAlign,
     isInvalid,
     value,

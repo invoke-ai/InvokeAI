@@ -1,9 +1,8 @@
 .number-input {
   display: grid;
-  grid-template-columns: repeat(2, max-content);
+  grid-template-columns: max-content auto;
   column-gap: 1rem;
   align-items: center;
-  width: max-content;
 
   .number-input-label {
     color: var(--text-color-secondary);
@@ -12,7 +11,7 @@
 
   .number-input-field {
     display: grid;
-    grid-template-columns: repeat(2, max-content);
+    grid-template-columns: auto max-content;
     column-gap: 0.5rem;
     align-items: center;
     background-color: var(--background-color-secondary);
@@ -23,6 +22,7 @@
   .number-input-entry {
     border: none;
     font-weight: bold;
+    width: 100%;
 
     &:focus {
       outline: none;
