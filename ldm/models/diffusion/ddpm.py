@@ -1036,6 +1036,14 @@ class LatentDiffusion(DDPM):
     def decode_first_stage(
         self, z, predict_cids=False, force_not_quantize=False
     ):
+        """
+        z.shape: (3,4,64,64)
+        predict_cids=False
+        force_not_quantize=False
+
+        self.scale_factor = 0.18215
+        """
+
         if predict_cids:
             if z.dim() == 4:
                 z = torch.argmax(z.exp(), dim=1).long()
@@ -1281,7 +1289,10 @@ class LatentDiffusion(DDPM):
 
         return [rescale_bbox(b) for b in bboxes]
 
-    def apply_model(self, x_noisy, t, cond, return_ids=False):
+    def apply_model(self, x_noisy, t, cond, return_ids=False,
+                    sx_noisy=None,
+                    scond=None,
+                    pmask=None):
 
         if isinstance(cond, dict):
             # hybrid case, cond is exptected to be a dict
@@ -1294,7 +1305,17 @@ class LatentDiffusion(DDPM):
                 if self.model.conditioning_key == 'concat'
                 else 'c_crossattn'
             )
-            cond = {key: cond}
+            if not isinstance(cond, list):
+                cond = [cond]
+                cond = {key: cond}
+                if scond is not None:
+                    skey = (
+                        'c_concat'
+                        if self.model.conditioning_key == 'concat'
+                        else 'sc_crossattn'
+                    )
+                    scond = [scond]
+                    scond = {skey: scond}
 
         if hasattr(self, 'split_input_params'):
             assert (
@@ -1437,7 +1458,13 @@ class LatentDiffusion(DDPM):
             x_recon = fold(o) / normalization
 
         else:
-            x_recon = self.model(x_noisy, t, **cond)
+            """sw scond부분 추가."""
+            if scond is None:
+                x_recon = self.model(x_noisy, t, **cond)
+            else:
+                x_recon = self.model(
+                    x_noisy, t, **cond, **scond, sx=sx_noisy, pmask=pmask
+                )
 
         if isinstance(x_recon, tuple) and not return_ids:
             return x_recon[0]
@@ -2137,15 +2164,25 @@ class DiffusionWrapper(pl.LightningModule):
             'adm',
         ]
 
-    def forward(self, x, t, c_concat: list = None, c_crossattn: list = None):
+    def forward(self, x, t, c_concat: list = None, c_crossattn: list = None,
+                sc_crossattn: list = None,
+                sx=None,
+                pmask=None):
         if self.conditioning_key is None:
             out = self.diffusion_model(x, t)
         elif self.conditioning_key == 'concat':
             xc = torch.cat([x] + c_concat, dim=1)
             out = self.diffusion_model(xc, t)
         elif self.conditioning_key == 'crossattn':
-            cc = torch.cat(c_crossattn, 1)
-            out = self.diffusion_model(x, t, context=cc)
+            if sc_crossattn is not None:
+                cc = torch.cat(c_crossattn, 1)
+                scc = torch.cat(sc_crossattn, 1)
+                out = self.diffusion_model(
+                    x, t, context=cc, sx=sx, scontext=scc, pmask=pmask
+                )
+            else:
+                cc = torch.cat(c_crossattn, 1)
+                out = self.diffusion_model(x, t, context=cc)
         elif self.conditioning_key == 'hybrid':
             xc = torch.cat([x] + c_concat, dim=1)
             cc = torch.cat(c_crossattn, 1)

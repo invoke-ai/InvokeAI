@@ -8,6 +8,8 @@ from einops import rearrange, repeat
 from ldm.modules.diffusionmodules.util import checkpoint
 
 import psutil
+import os
+import numpy as np
 
 def exists(val):
     return val is not None
@@ -234,41 +236,180 @@ class CrossAttention(nn.Module):
         # Tested on i7 with 8MB L3 cache.
         return self.einsum_op_tensor_mem(q, k, v, 32)
 
-    def forward(self, x, context=None, mask=None):
-        h = self.heads
+    def forward(
+        self, x, context=None, scontext=None, pmask=None, time=None, mask=None
+    ):
+        """
+        x.shape: (6,4096,320)
+        context.shape(6,77,768)
+        q, k, v shape: (6, hw, 320), (6, 77, 320), (6, 77, 320)
+        -> q,k,v shape: (32, hw, 40=320/8=self.head), (32, 77, 40=320/8=self.head), (32, 77, 40=320/8=self.head)
 
+        - visualization.
+        1. aggregate all attention map across the "timesteps" and "heads"
+        2. Normalization divided by "max" with respecto to "each token"
+        """
+
+        h = self.heads
+        if scontext == 'selfattn':
+            sim, attn, v = self.get_attmap(
+                x=x, h=self.heads, context=context, mask=None
+            )
+            sattn = None
+        else:
+            if scontext is None:
+                sim, attn, v = self.get_attmap(
+                    x=x, h=self.heads, context=context, mask=None
+                )
+                sattn = None
+
+                """ cross attention control: only reweighting is possible. """
+                """
+                ex) A photo of a house on a snowy mountain
+                : for controlling "snowy":
+                the token index=8.
+                the weights for sample1~3 are -2, 1, 5 in this example.
+                """
+                attn = self.cross_attention_control(
+                    tattmap=attn,
+                    t=time,
+                    token_idx=[2],
+                    weights=[[-2.0, 1.0, 5.0]],
+                )
+            else:
+                x, sx = x.chunk(2)
+                sim, attn, v = self.get_attmap(
+                    x=x, h=self.heads, context=context, mask=None
+                )
+                ssim, sattn, sv = self.get_attmap(
+                    x=sx, h=self.heads, context=scontext, mask=None
+                )
+
+                """ cross attention control """
+                bh, hw, tleng = attn.shape
+                attn = self.cross_attention_control(
+                    tattmap=attn,
+                    sattmap=sattn,
+                    pmask=pmask,
+                    t=time,
+                    token_idx=[0],
+                    weights=[[1.0, 1.0, 1.0]],
+                )
+
+        """ target prompt """
+        out = einsum('b i j, b j d -> b i d', attn, v)
+        out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
+        out = self.to_out(out)
+
+        if scontext != 'selfattn':
+            if scontext is not None:
+                """source prompt"""
+                sout = einsum('b i j, b j d -> b i d', sattn, sv)
+                sout = rearrange(sout, '(b h) n d -> b n (h d)', h=h)
+                sout = self.to_out(sout)
+
+                """ aggregate again befroe return """
+                out = torch.cat((out, sout))
+                sim = torch.cat((sim, ssim))
+
+                return out, sim
+
+        return out, sim
+
+    def get_attmap(self, x, h, context, mask=None):
         q = self.to_q(x)
         context = default(context, x)
-        k = self.to_k(context) * self.scale
+        k = self.to_k(context)
         v = self.to_v(context)
-        del context, x
 
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
-        r = self.einsum_op(q, k, v)
-        return self.to_out(rearrange(r, '(b h) n d -> b n (h d)', h=h))
+        query, key, val = map(
+            lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v)
+        )
+        sim = einsum('b i d, b j d -> b i j', query, key) * self.scale
+        # attention, what we cannot get enough of
+        rear_sim = rearrange(sim, '(b h) n d -> b h n d', h=h)
+
+        if exists(mask):
+            mask = rearrange(mask, 'b ... -> b (...)')
+            max_neg_value = -torch.finfo(sim.dtype).max
+            mask = repeat(mask, 'b j -> (b h) () j', h=h)
+            sim.masked_fill_(~mask, max_neg_value)
+
+        attn = sim.softmax(dim=-1)
+
+        return rear_sim, attn, val
+
+    def cross_attention_control(
+        self,
+        tattmap,
+        sattmap=None,
+        pmask=None,
+        t=0,
+        tthres=0,
+        token_idx=[0],
+        weights=[[1.0, 1.0, 1.0]],
+    ):
+        attn = tattmap
+        sattn = sattmap
+
+        h = 8
+        bh, n, d = attn.shape
+
+        if t >= tthres:
+            """1. swap & ading new phrase"""
+            if sattmap is not None:
+                bh, n, d = attn.shape
+                pmask, sindices, indices = pmask
+                pmask = pmask.view(1, 1, -1).repeat(bh, n, 1)
+                attn = (1 - pmask) * attn[:, :, indices] + (pmask) * sattn[
+                    :, :, sindices
+                ]
+
+            """ 2. reweighting """
+            attn = rearrange(
+                attn, '(b h) n d -> b h n d', h=h
+            )
+            num_iter = bh // (h * 2)
+            for k in range(len(token_idx)):
+                for i in range(num_iter):
+                    attn[num_iter + i, :, :, token_idx[k]] *= weights[k][i]
+            attn = rearrange(
+                attn, 'b h n d -> (b h) n d', h=h
+            )
+
+        return attn
 
 
 class BasicTransformerBlock(nn.Module):
     def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True):
         super().__init__()
-        self.attn1 = CrossAttention(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout)  # is a self-attention
+        self.attn1 = CrossAttention(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout)
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
         self.attn2 = CrossAttention(query_dim=dim, context_dim=context_dim,
-                                    heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
+                                    heads=n_heads, dim_head=d_head, dropout=dropout)
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
 
-    def forward(self, x, context=None):
-        return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
+    def forward(self, x, context=None, scontext=None, pmask=None, time=None):
+        return checkpoint(self._forward, (x, context, scontext, pmask, time), self.parameters(), self.checkpoint, )
 
-    def _forward(self, x, context=None):
-        x = x.contiguous() if x.device.type == 'mps' else x
-        x += self.attn1(self.norm1(x.clone()))
-        x += self.attn2(self.norm2(x.clone()), context=context)
-        x += self.ff(self.norm3(x.clone()))
-        return x
+    def _forward(self, x, context=None, scontext=None, pmask=None, time=None):
+        x_att, self_attmap = self.attn1(
+            self.norm1(x), scontext='selfattn', time=time
+        )
+        x += x_att
+        x_att, cross_attmap = self.attn2(
+            self.norm2(x),
+            context=context,
+            scontext=scontext,
+            pmask=pmask,
+            time=time,
+        ) 
+        x += x_att
+        x = self.ff(self.norm3(x)) + x
+        return x, self_attmap, cross_attmap
 
 
 class SpatialTransformer(nn.Module):
@@ -280,7 +421,8 @@ class SpatialTransformer(nn.Module):
     Finally, reshape to image
     """
     def __init__(self, in_channels, n_heads, d_head,
-                 depth=1, dropout=0., context_dim=None):
+                 depth=1, dropout=0., context_dim=None,
+                 is_get_attn=False, attn_save_dir='./attenion_map_savedir'):
         super().__init__()
         self.in_channels = in_channels
         inner_dim = n_heads * d_head
@@ -303,7 +445,18 @@ class SpatialTransformer(nn.Module):
                                               stride=1,
                                               padding=0))
 
-    def forward(self, x, context=None):
+        self.is_get_attn = is_get_attn
+        if self.is_get_attn:
+            self.attmap_save_dir = attn_save_dir
+            os.makedirs(
+                os.path.join(self.attmap_save_dir, 'selfatt'), exist_ok=True
+            )
+            os.makedirs(
+                os.path.join(self.attmap_save_dir, 'crossatt'), exist_ok=True
+            )
+
+    def forward(self, x, context=None,
+                scontext=None, pmask=None, timestep_str=None):
         # note: if no context is given, cross-attention defaults to self-attention
         b, c, h, w = x.shape
         x_in = x
@@ -311,7 +464,55 @@ class SpatialTransformer(nn.Module):
         x = self.proj_in(x)
         x = rearrange(x, 'b c h w -> b (h w) c')
         for block in self.transformer_blocks:
-            x = block(x, context=context)
+            time = int(timestep_str.split('_')[1].split('time')[1])
+            x, self_attmap, cross_attmap = block(x, context=context,
+                                                 scontext=scontext,
+                                                 pmask=pmask,
+                                                 time=time)
+            if self.is_get_attn:
+                if scontext is not None:
+                    """save attention map"""
+                    cross_attmap, scross_attmap = cross_attmap.chunk(2)
+                    np.save(
+                        os.path.join(
+                            self.attmap_save_dir, 'crossatt', timestep_str
+                        ),
+                        self.avg_attmap(cross_attmap).detach().cpu().numpy(),
+                    )
+                else:
+                    """save attention map"""
+                    np.save(
+                        os.path.join(
+                            self.attmap_save_dir, 'crossatt', timestep_str
+                        ),
+                        self.avg_attmap(cross_attmap).detach().cpu().numpy(),
+                    )
         x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w)
         x = self.proj_out(x)
         return x + x_in
+
+    def avg_attmap(self, attmap, token_idx=0):
+        """
+        num_sample(=batch_size) = 3
+        uc,c = 2 #(unconditional, condiitonal)
+        -> 3*2=6
+
+        attmap.shape: similarity matrix.
+        token_idx: index of token for visualizing, 77: [SOS, ...text..., EOS]
+        """
+        nsample2, head, hw, context_dim = attmap.shape
+        attmap_sm = F.softmax(
+            attmap.float(), dim=-1
+        )
+        att_map_sm = attmap_sm[
+            nsample2 // 2 :, :, :, :
+        ]
+        att_map_mean = torch.mean(att_map_sm, dim=1)
+
+        b, hw, context_dim = att_map_mean.shape
+        h = int(math.sqrt(hw))
+        w = h
+
+        return att_map_mean.view(
+            b, h, w, context_dim
+        )

@@ -80,12 +80,12 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     support it as an extra input.
     """
 
-    def forward(self, x, emb, context=None):
+    def forward(self, x, emb, context=None, scontext=None, pmask=None, timestep_str=None):
         for layer in self:
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
             elif isinstance(layer, SpatialTransformer):
-                x = layer(x, context)
+                x = layer(x, context, scontext, pmask, timestep_str)
             else:
                 x = layer(x)
         return x
@@ -495,6 +495,8 @@ class UNetModel(nn.Module):
         context_dim=None,  # custom transformer support
         n_embed=None,  # custom support for prediction of discrete ids into codebook of first stage vq model
         legacy=True,
+        is_get_attn=False,                                 # sw가 추가한 부분.
+        save_attn_dir="./attention_map_save_dir",          # sw가 추가한 부분.
     ):
         super().__init__()
         if use_spatial_transformer:
@@ -604,6 +606,8 @@ class UNetModel(nn.Module):
                             dim_head,
                             depth=transformer_depth,
                             context_dim=context_dim,
+                            is_get_attn=is_get_attn,
+                            attn_save_dir=save_attn_dir,
                         )
                     )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
@@ -661,6 +665,8 @@ class UNetModel(nn.Module):
                 num_heads=num_heads,
                 num_head_channels=dim_head,
                 use_new_attention_order=use_new_attention_order,
+                is_get_attn=is_get_attn,
+                attn_save_dir=save_attn_dir,
             )
             if not use_spatial_transformer
             else SpatialTransformer(
@@ -717,6 +723,8 @@ class UNetModel(nn.Module):
                             num_heads=num_heads_upsample,
                             num_head_channels=dim_head,
                             use_new_attention_order=use_new_attention_order,
+                            is_get_attn=is_get_attn,
+                            attn_save_dir=save_attn_dir,
                         )
                         if not use_spatial_transformer
                         else SpatialTransformer(
@@ -779,7 +787,8 @@ class UNetModel(nn.Module):
         self.middle_block.apply(convert_module_to_f32)
         self.output_blocks.apply(convert_module_to_f32)
 
-    def forward(self, x, timesteps=None, context=None, y=None, **kwargs):
+    def forward(self, x, timesteps=None, context=None, y=None,
+                sx=None, scontext=None, pmask=None, **kwargs):
         """
         Apply the model to an input batch.
         :param x: an [N x C x ...] Tensor of inputs.
@@ -787,6 +796,8 @@ class UNetModel(nn.Module):
         :param context: conditioning plugged in via crossattn
         :param y: an [N] Tensor of labels, if class-conditional.
         :return: an [N x C x ...] Tensor of outputs.
+
+        sw: scontext, pmask, sx 추가. for swapping.
         """
         assert (y is not None) == (
             self.num_classes is not None
@@ -802,13 +813,33 @@ class UNetModel(nn.Module):
             emb = emb + self.label_emb(y)
 
         h = x.type(self.dtype)
-        for module in self.input_blocks:
-            h = module(h, emb, context)
+        if sx is not None:
+            sh = sx.type(self.dtype)
+            """ concat source and target to get attention mapout for cross-attention controlling"""
+            """ the output is divded by chunck operation in p_sample_ddim function."""
+            h = th.cat((h, sh))  # target, source
+            emb = th.cat((emb, emb))
+
+        for z, module in enumerate(self.input_blocks):
+            batch, channel, height, width = h.shape
+            h = module(h, emb, context, scontext, pmask,
+                       'down_time{0:04d}_res{1:03d}_num{2:03d}'.format(timesteps[0].item(), height, z) )
             hs.append(h)
-        h = self.middle_block(h, emb, context)
-        for module in self.output_blocks:
+
+        batch, channel, height, width = h.shape
+        h = self.middle_block(h, emb, context, scontext, pmask,
+                              'middle_time{0:04d}_res{1:03d}'.format(timesteps[0].item(), height))
+
+        for m, module in enumerate(self.output_blocks):
+            """
+            hm.shape = (4, 1280,7,8)
+            hs.pop().shape = (4,1280,7,8)
+            """
             h = th.cat([h, hs.pop()], dim=1)
-            h = module(h, emb, context)
+            batch, channel, height, width = h.shape
+            h = module(h, emb, context, scontext, pmask,
+                       'up_time{0:04d}_res{1:03d}_num{2:03d}'.format(timesteps[0].item(), height, m))
+
         h = h.type(x.dtype)
         if self.predict_codebook_ids:
             return self.id_predictor(h)
