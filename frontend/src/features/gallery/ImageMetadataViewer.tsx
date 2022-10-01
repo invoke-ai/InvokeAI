@@ -133,21 +133,21 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           {['esrgan', 'gfpgan'].includes(type) && (
             <MetadataItem label="Original image" value={orig_path} isLink />
           )}
-          {type === 'gfpgan' && strength && (
+          {type === 'gfpgan' && strength !== undefined && (
             <MetadataItem
               label="Fix faces strength"
               value={strength}
               onClick={() => dispatch(setGfpganStrength(strength))}
             />
           )}
-          {type === 'esrgan' && scale && (
+          {type === 'esrgan' && scale !== undefined && (
             <MetadataItem
               label="Upscaling scale"
               value={scale}
               onClick={() => dispatch(setUpscalingLevel(scale))}
             />
           )}
-          {type === 'esrgan' && strength && (
+          {type === 'esrgan' && strength !== undefined && (
             <MetadataItem
               label="Upscaling strength"
               value={strength}
@@ -161,7 +161,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               onClick={() => dispatch(setPrompt(prompt))}
             />
           )}
-          {seed && (
+          {seed !== undefined && (
             <MetadataItem
               label="Seed"
               value={seed}
@@ -182,7 +182,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               onClick={() => dispatch(setSteps(steps))}
             />
           )}
-          {cfg_scale && (
+          {cfg_scale !== undefined && (
             <MetadataItem
               label="CFG scale"
               value={cfg_scale}
