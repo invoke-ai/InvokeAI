@@ -67,8 +67,7 @@ async def startup_event():
 
     ApiDependencies.initialize(
         config           = config,
-        event_handler_id = event_handler_id,
-        socket_io        = socket_io
+        event_handler_id = event_handler_id
     )
 
 # Shut down threads

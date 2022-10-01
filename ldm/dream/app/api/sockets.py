@@ -1,6 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Dict, Union
 from fastapi import FastAPI
 from fastapi_socketio import SocketManager
 from fastapi_events.handlers.local import local_handler

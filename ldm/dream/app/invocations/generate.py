@@ -1,7 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any, Literal, Optional, Union
 import numpy as np
 from pydantic import Field

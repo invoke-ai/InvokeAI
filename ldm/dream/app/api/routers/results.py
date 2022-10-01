@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from fastapi import Path, Query
+from fastapi import Query
 from fastapi.routing import APIRouter
 from fastapi.responses import FileResponse
 from ..dependencies import ApiDependencies
