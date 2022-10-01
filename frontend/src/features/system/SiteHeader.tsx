@@ -4,63 +4,25 @@ import {
   IconButton,
   Link,
   Spacer,
-  Text,
   useColorMode,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
 
 import { FaSun, FaMoon, FaGithub } from 'react-icons/fa';
 import { MdHelp, MdSettings } from 'react-icons/md';
-import { useAppSelector } from '../../app/store';
-import { RootState } from '../../app/store';
 import SettingsModal from '../system/SettingsModal';
-import { SystemState } from '../system/systemSlice';
 import InvokeAILogo from '../../assets/images/logo.png';
-
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
-  (system: SystemState) => {
-    return {
-      isConnected: system.isConnected,
-      isProcessing: system.isProcessing,
-      currentIteration: system.currentIteration,
-      totalIterations: system.totalIterations,
-      currentStatus: system.currentStatus,
-    };
-  },
-  {
-    memoizeOptions: { resultEqualityCheck: isEqual },
-  }
-);
+import StatusIndicator from './StatusIndicator';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
  */
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
-  const {
-    isConnected,
-    isProcessing,
-    currentIteration,
-    totalIterations,
-    currentStatus,
-  } = useAppSelector(systemSelector);
-
-  const statusMessageTextColor = isConnected ? 'green.500' : 'red.500';
 
   const colorModeIcon = colorMode == 'light' ? <FaMoon /> : <FaSun />;
 
   // Make FaMoon and FaSun icon apparent size consistent
   const colorModeIconFontSize = colorMode == 'light' ? 18 : 20;
-
-  let statusMessage = currentStatus;
-
-  if (isProcessing) {
-    if (totalIterations > 1) {
-      statusMessage += ` [${currentIteration}/${totalIterations}]`;
-    }
-  }
 
   return (
     <div className="site-header">
@@ -72,7 +34,7 @@ const SiteHeader = () => {
       </div>
 
       <div className="site-header-right-side">
-        <Text textColor={statusMessageTextColor}>{statusMessage}</Text>
+        <StatusIndicator />
 
         <SettingsModal>
           <IconButton

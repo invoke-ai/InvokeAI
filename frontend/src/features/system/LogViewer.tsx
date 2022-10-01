@@ -7,11 +7,16 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
-import { setShouldShowLogViewer, SystemState } from './systemSlice';
+import {
+  errorSeen,
+  setShouldShowLogViewer,
+  SystemState,
+} from './systemSlice';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
+import { Resizable } from 're-resizable';
 
 const logSelector = createSelector(
   (state: RootState) => state.system,
@@ -27,7 +32,11 @@ const logSelector = createSelector(
 const systemSelector = createSelector(
   (state: RootState) => state.system,
   (system: SystemState) => {
-    return { shouldShowLogViewer: system.shouldShowLogViewer };
+    return {
+      shouldShowLogViewer: system.shouldShowLogViewer,
+      hasError: system.hasError,
+      wasErrorSeen: system.wasErrorSeen,
+    };
   },
   {
     memoizeOptions: {
@@ -42,7 +51,8 @@ const systemSelector = createSelector(
 const LogViewer = () => {
   const dispatch = useAppDispatch();
   const log = useAppSelector(logSelector);
-  const { shouldShowLogViewer } = useAppSelector(systemSelector);
+  const { shouldShowLogViewer, hasError, wasErrorSeen } =
+    useAppSelector(systemSelector);
 
   // Set colors based on dark/light mode
   const bg = useColorModeValue('gray.50', 'gray.900');
@@ -78,44 +88,49 @@ const LogViewer = () => {
   }, [shouldAutoscroll, log, shouldShowLogViewer]);
 
   const handleClickLogViewerToggle = () => {
+    dispatch(errorSeen());
     dispatch(setShouldShowLogViewer(!shouldShowLogViewer));
   };
 
   return (
     <>
       {shouldShowLogViewer && (
-        <Flex
-          position={'fixed'}
-          left={0}
-          bottom={0}
-          height="200px" // TODO: Make the log viewer resizeable.
-          width="100vw"
-          overflow="auto"
-          direction="column"
-          fontFamily="monospace"
-          fontSize="sm"
-          pl={12}
-          pr={2}
-          pb={2}
-          borderTopWidth="4px"
-          borderColor={borderColor}
-          background={bg}
-          ref={viewerRef}
+        <Resizable
+          defaultSize={{
+            width: '100%',
+            height: 200,
+          }}
+          style={{ display: 'flex', position: 'fixed', left: 0, bottom: 0 }}
+          maxHeight={'90vh'}
         >
-          {log.map((entry, i) => {
-            const { timestamp, message, level } = entry;
-            return (
-              <Flex gap={2} key={i} textColor={logTextColors[level]}>
-                <Text fontSize="sm" fontWeight={'semibold'}>
-                  {timestamp}:
-                </Text>
-                <Text fontSize="sm" wordBreak={'break-all'}>
-                  {message}
-                </Text>
-              </Flex>
-            );
-          })}
-        </Flex>
+          <Flex
+            overflow="auto"
+            direction="column"
+            fontFamily="monospace"
+            fontSize="sm"
+            pl={12}
+            pr={2}
+            pb={2}
+            borderTopWidth="4px"
+            borderColor={borderColor}
+            background={bg}
+            ref={viewerRef}
+          >
+            {log.map((entry, i) => {
+              const { timestamp, message, level } = entry;
+              return (
+                <Flex gap={2} key={i} textColor={logTextColors[level]}>
+                  <Text fontSize="sm" fontWeight={'semibold'}>
+                    {timestamp}:
+                  </Text>
+                  <Text fontSize="sm" wordBreak={'break-all'}>
+                    {message}
+                  </Text>
+                </Flex>
+              );
+            })}
+          </Flex>
+        </Resizable>
       )}
       {shouldShowLogViewer && (
         <Tooltip label={shouldAutoscroll ? 'Autoscroll on' : 'Autoscroll off'}>
@@ -140,6 +155,7 @@ const LogViewer = () => {
           bottom={2}
           variant={'solid'}
           aria-label="Toggle Log Viewer"
+          colorScheme={hasError || !wasErrorSeen ? 'red' : 'gray'}
           icon={shouldShowLogViewer ? <FaMinus /> : <FaCode />}
           onClick={handleClickLogViewerToggle}
         />

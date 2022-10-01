@@ -84,16 +84,12 @@ const makeSocketIOEmitters = (
       socketio.emit('deleteImage', url, uuid);
     },
     emitRequestImages: () => {
-      const { nextPage, offset } = getState().gallery;
-      socketio.emit('requestImages', nextPage, offset);
+      const { earliest_mtime } = getState().gallery;
+      socketio.emit('requestImages', earliest_mtime);
     },
     emitRequestNewImages: () => {
-      const { nextPage, offset, images } = getState().gallery;
-      if (images.length > 0) {
-        socketio.emit('requestImages', nextPage, offset, images[0].mtime);
-      } else {
-        socketio.emit('requestImages', nextPage, offset);
-      }
+      const { latest_mtime } = getState().gallery;
+      socketio.emit('requestLatestImages', latest_mtime);
     },
     emitCancelProcessing: () => {
       socketio.emit('cancel');
