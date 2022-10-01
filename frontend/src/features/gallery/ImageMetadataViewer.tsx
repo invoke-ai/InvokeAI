@@ -67,7 +67,7 @@ const MetadataItem = ({ label, value, onClick, isLink }: MetadataItemProps) => {
           {value.toString()} <ExternalLinkIcon mx="2px" />
         </Link>
       ) : (
-        <Text maxHeight={100} overflowY={'scroll'} wordBreak={'break-all'}>
+        <Text maxHeight={100} wordBreak={'break-all'}>
           {value.toString()}
         </Text>
       )}
@@ -119,7 +119,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
   const metadataJSON = JSON.stringify(metadata, null, 2);
 
   return (
-    <Flex gap={1} direction={'column'} overflowY={'scroll'} width={'100%'}>
+    <Flex gap={1} direction={'column'} width={'100%'}>
       <Flex gap={2}>
         <Text fontWeight={'semibold'}>File:</Text>
         <Link href={image.url} isExternal>
@@ -297,7 +297,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
             </Flex>
             <Box
               // maxHeight={200}
-              overflow={'scroll'}
+              overflowX={'scroll'}
               flexGrow={3}
               wordBreak={'break-all'}
               bgColor={jsonBgColor}
