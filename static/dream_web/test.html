@@ -21,7 +21,7 @@
             path: "/ws/socket.io"
         });
         socket.on('connect', (data) => {
-            //socket.emit('subscribe', { 'context': 'WcBtYATwT92Mrb9zLgeyNw==' });
+            //socket.emit('subscribe', { 'session': 'WcBtYATwT92Mrb9zLgeyNw==' });
         });
 
         function log(event, data) {
@@ -35,25 +35,25 @@
         socket.on('generator_progress', (data) => log('generator_progress', data));
         socket.on('invocation_complete', (data) => log('invocation_complete', data));
         socket.on('invocation_started', (data) => log('invocation_started', data));
-        socket.on('context_complete', (data) => {
-            log('context_complete', data);
+        socket.on('session_complete', (data) => {
+            log('session_complete', data);
 
-            // NOTE: you may not want to unsubscribe if you plan to continue using this context,
+            // NOTE: you may not want to unsubscribe if you plan to continue using this session,
             //       just make sure you unsubscribe eventually
-            socket.emit('unsubscribe', { 'context': data.context_id });
+            socket.emit('unsubscribe', { 'session': data.session_id });
         });
 
         function dostuff() {
             var defaultGraph = {"nodes": [{"id": "1","type": "txt2img","prompt": "A photo of a cat eating sushi"},{"id": "2","type": "show_image"}],"links": [{"from_node": {"id": "1","field": "image"},"to_node": {"id": "2","field": "image"}}]};
-            fetch('/api/v1/contexts/', {
+            fetch('/api/v1/sessions/', {
                 method: 'POST',
                 headers: new Headers({'content-type': 'application/json'}),
                 body: JSON.stringify(defaultGraph)
             }).then(response => response.json())
             .then(data => {
-                contextId = data.id;
-                socket.emit('subscribe', { 'context': contextId });
-                fetch(`/api/v1/contexts/${contextId}/invoke?all=true`, {
+                sessionId = data.id;
+                socket.emit('subscribe', { 'session': sessionId });
+                fetch(`/api/v1/sessions/${sessionId}/invoke?all=true`, {
                     method: 'PUT',
                     headers: new Headers({'content-type': 'application/json'}),
                     body: ''

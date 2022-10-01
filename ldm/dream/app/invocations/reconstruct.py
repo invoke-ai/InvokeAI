@@ -15,7 +15,7 @@ class RestoreFaceInvocation(BaseInvocation):
     strength: float               = Field(default=0.75, gt=0, le=1, description="The strength of the restoration")
 
 
-    def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput: 
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput: 
         results = services.generate.upscale_and_reconstruct(
             image_list     = [[self.image.get(), 0]],
             upscale        = None,
@@ -26,7 +26,7 @@ class RestoreFaceInvocation(BaseInvocation):
 
         # Results are image and seed, unwrap for now
         # TODO: can this return multiple results?
-        uri = f'results/{context_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        uri = f'results/{session_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
         services.images.save(uri, results[0][0])
         return ImageOutput(
             image = ImageField(uri = uri)

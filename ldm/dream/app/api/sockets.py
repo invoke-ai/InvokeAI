@@ -16,22 +16,22 @@ class SocketIO:
         self.__sio.on('unsubscribe', handler=self._handle_unsub)
         
         local_handler.register(
-            event_name = EventServiceBase.context_event,
-            _func=self._handle_context_event
+            event_name = EventServiceBase.session_event,
+            _func=self._handle_session_event
         )
 
-    async def _handle_context_event(self, event: Event):
+    async def _handle_session_event(self, event: Event):
         await self.__sio.emit(
             event = event[1]['event'],
             data = event[1]['data'],
-            room = event[1]['data']['context_id']
+            room = event[1]['data']['session_id']
         )
 
     async def _handle_sub(self, sid, data, *args, **kwargs):
-        if 'context' in data:
-            self.__sio.enter_room(sid, data['context'])
+        if 'session' in data:
+            self.__sio.enter_room(sid, data['session'])
         
         # @app.sio.on('unsubscribe')
     async def _handle_unsub(self, sid, data, *args, **kwargs):
-        if 'context' in data:
-            self.__sio.leave_room(sid, data['context'])
+        if 'session' in data:
+            self.__sio.leave_room(sid, data['session'])

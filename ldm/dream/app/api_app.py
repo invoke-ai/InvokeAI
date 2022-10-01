@@ -14,7 +14,7 @@ import uvicorn
 from .api.sockets import SocketIO
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
-from .api.routers import contexts, results
+from .api.routers import results, sessions
 from .api.dependencies import ApiDependencies
 from ..args import Args
 
@@ -83,7 +83,7 @@ async def shutdown_event():
 #     prefix = '/api')
 
 app.include_router(
-    contexts.context_router,
+    sessions.session_router,
     prefix = '/api'
 )
 

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, root_validator
 from graphlib import TopologicalSorter, CycleError
 from ..invocations import *
 from ..invocations.baseinvocation import BaseInvocation
-from .invocation_context import is_field_compatible
+from .invocation_session import is_field_compatible
 
 
 class Node(BaseModel):
@@ -21,7 +21,7 @@ class Link(BaseModel):
     to_node: Node = Field(description="The node field linked to")
 
 
-# TODO: a lot of the validation code in here is part of InvocationContext now.
+# TODO: a lot of the validation code in here is part of InvocationSession now.
 #       See if there's a way to reduce code.
 class InvocationGraph(BaseModel):
     """A map of invocations"""

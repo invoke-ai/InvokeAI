@@ -30,23 +30,23 @@ class TextToImageInvocation(BaseInvocation):
     model: str                = Field(default='', description="The model to use (currently ignored)")
     progress_images: bool     = Field(default=False, description="Whether or not to produce progress images during generation")
 
-    # TODO: pass this an emitter method or something? or a context for dispatching?
-    def dispatch_progress(self, services: InvocationServices, context_id: str, sample: Any, step: int) -> None:
+    # TODO: pass this an emitter method or something? or a session for dispatching?
+    def dispatch_progress(self, services: InvocationServices, session_id: str, sample: Any, step: int) -> None:
         services.events.emit_generator_progress(
-            context_id, self.id, step, float(step) / float(self.steps)
+            session_id, self.id, step, float(step) / float(self.steps)
         )
 
-    def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput:
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
         results = services.generate.prompt2image(
             prompt = self.prompt,
-            step_callback = lambda sample, step: self.dispatch_progress(services, context_id, sample, step),
+            step_callback = lambda sample, step: self.dispatch_progress(services, session_id, sample, step),
             **self.dict(exclude = {'prompt'}) # Shorthand for passing all of the parameters above manually
         )
 
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?
         # TODO: can this return multiple results? Should it?
-        uri = f'results/{context_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        uri = f'results/{session_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
         services.images.save(uri, results[0][0])
         return ImageOutput(
             image = ImageField(uri = uri)
@@ -61,7 +61,7 @@ class ImageToImageInvocation(TextToImageInvocation):
     strength: float               = Field(default=0.75, gt=0, le=1, description="The strength of the original image")
     fit: bool                     = Field(default=True, description="Whether or not the result should be fit to the aspect ratio of the input image")
 
-    def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput:
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
         results = services.generate.prompt2image(
             prompt   = self.prompt,
             init_img = self.image.get(),
@@ -73,7 +73,7 @@ class ImageToImageInvocation(TextToImageInvocation):
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?
         # TODO: can this return multiple results? Should it?
-        uri = f'results/{context_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        uri = f'results/{session_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
         services.images.save(uri, results[0][0])
         return ImageOutput(
             image = ImageField(uri = uri)

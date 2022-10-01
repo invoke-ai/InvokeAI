@@ -57,9 +57,9 @@ class BaseInvocation(ABC, BaseModel):
     def get_output_type(cls):
         return signature(cls.invoke).return_annotation
 
-    # TODO: should probably just pass a context object around (would need to rename current context to e.g. session)
+    # TODO: should probably just pass a session object around (would need to rename current session to e.g. session)
     @abstractmethod
-    def invoke(self, services: InvocationServices, context_id: str) -> BaseInvocationOutput:
+    def invoke(self, services: InvocationServices, session_id: str) -> BaseInvocationOutput:
         """Invoke with provided services and return outputs."""
         pass
 

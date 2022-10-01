@@ -14,7 +14,7 @@ InvocationsUnion = Annotated[Union[BaseInvocation.get_invocations()], Field(disc
 InvocationOutputsUnion = Annotated[Union[BaseInvocationOutput.get_all_subclasses_tuple()], Field(discriminator="type")]
 
 class InvocationHistoryEntry(BaseModel):
-    """The context of an invoked node"""
+    """The history of an invoked node"""
     invocation: InvocationsUnion
     outputs: InvocationOutputsUnion
 
@@ -53,12 +53,12 @@ def is_field_compatible(
     return True
 
 
-def ContextConflict(Exception):
+def SessionConflict(Exception):
     pass
 
 
-class InvocationContext(BaseModel):
-    """The invocation context.
+class InvocationSession(BaseModel):
+    """The invocation session.
     Maintains the current invocation graph, history, and results.
     """
     id: str
@@ -72,11 +72,11 @@ class InvocationContext(BaseModel):
     history: List[str] = Field(description = "The invocations that have been run, in order")
 
     _wait_events: Dict[str, Event] = PrivateAttr()
-    _change_callback: Callable[['InvocationContext'], None] = PrivateAttr()
+    _change_callback: Callable[['InvocationSession'], None] = PrivateAttr()
 
     def __init__(self,
         id: str,
-        change_callback: Callable[['InvocationContext'], None] = None,
+        change_callback: Callable[['InvocationSession'], None] = None,
         invocations: Dict[str, InvocationsUnion] = dict(),
         links: Dict[str, List[InvocationFieldLink]] = dict(),
         invocation_results: Dict[str, InvocationHistoryEntry] = dict(),
@@ -101,12 +101,12 @@ class InvocationContext(BaseModel):
 
 
     def add_invocation(self, invocation: BaseInvocation, links: List[InvocationFieldLink]):
-        """Add an invocation and links to it to the current context
+        """Add an invocation and links to it to the current session
         Links can use negative integers as their id to refer to previous history
         and can utilize * as their from_field to find all matching fields
         """
         if invocation.id in self.invocations:
-            raise ContextConflict(f"An invocation with id {id} already exists in this context")
+            raise SessionConflict(f"An invocation with id {id} already exists in this session")
         
         # Validate links
         final_links = list()
@@ -149,7 +149,7 @@ class InvocationContext(BaseModel):
             self.links[invocation.id] = final_links
             self._change_callback(self)
         else:
-            raise ContextConflict("New links would create a cycle")
+            raise SessionConflict("New links would create a cycle")
 
 
 

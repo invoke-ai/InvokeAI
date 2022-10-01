@@ -6,15 +6,15 @@ from queue import Queue
 
 # TODO: make this serializable
 class InvocationQueueItem:
-    context_id: str
+    session_id: str
     invocation_id: str
     invoke_all: bool
 
     def __init__(self,
-        context_id: str,
+        session_id: str,
         invocation_id: str,
         invoke_all: bool = False):
-        self.context_id = context_id
+        self.session_id = session_id
         self.invocation_id = invocation_id
         self.invoke_all = invoke_all
 

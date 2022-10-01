@@ -26,7 +26,7 @@ class LoadImageInvocation(BaseInvocation):
     # Inputs
     uri: str = Field(description="The URI from which to load the image")
 
-    def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput:
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
         return ImageOutput(
             image = ImageField(uri = self.uri)
         )
@@ -39,7 +39,7 @@ class ShowImageInvocation(BaseInvocation):
     # Inputs
     image: ImageField = Field(default=None, description="The image to show")
 
-    def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput:
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
         image = services.images.get(self.image.uri)
         if image:
             image.show()

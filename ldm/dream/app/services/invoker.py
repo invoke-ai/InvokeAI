@@ -5,21 +5,21 @@ from threading import Event, Thread
 from typing import Dict, List
 
 from .invocation_graph import InvocationGraph
-from .invocation_context import InvocationContext, InvocationFieldLink
+from .invocation_session import InvocationSession, InvocationFieldLink
 from .invocation_services import InvocationServices
 from .invocation_queue import InvocationQueueABC, InvocationQueueItem
-from .context_manager import ContextManagerABC
+from .session_manager import SessionManagerABC
 
 
 class InvokerServices:
     queue: InvocationQueueABC
-    context_manager: ContextManagerABC
+    session_manager: SessionManagerABC
 
     def __init__(self,
         queue: InvocationQueueABC,
-        context_manager: ContextManagerABC):
+        session_manager: SessionManagerABC):
         self.queue           = queue
-        self.context_manager = context_manager
+        self.session_manager = session_manager
 
 
 class Invoker:
@@ -58,57 +58,57 @@ class Invoker:
                 if not queue_item: # Probably stopping
                     continue
 
-                context = self.invoker_services.context_manager.get(queue_item.context_id)
-                invocation = context.invocations[queue_item.invocation_id]
+                session = self.invoker_services.session_manager.get(queue_item.session_id)
+                invocation = session.invocations[queue_item.invocation_id]
 
                 # Send starting event
                 self.services.events.emit_invocation_started(
-                    context.id, invocation.id
+                    session.id, invocation.id
                 )
 
                 # Invoke
-                outputs = invocation.invoke(self.services, context_id = context.id)
+                outputs = invocation.invoke(self.services, session_id = session.id)
 
                 # Save outputs and history
-                context._complete_invocation(invocation, outputs)
+                session._complete_invocation(invocation, outputs)
 
-                # Save the context changes
-                self.invoker_services.context_manager.set(context)
+                # Save the session changes
+                self.invoker_services.session_manager.set(session)
 
                 # Send complete event
                 self.services.events.emit_invocation_complete(
-                    context.id, invocation.id, outputs.dict()
+                    session.id, invocation.id, outputs.dict()
                 )
 
                 # Queue any further commands if invoking all
-                if queue_item.invoke_all and context.ready_to_invoke():
-                    self.invoke(context, invoke_all = True)
-                elif not context.ready_to_invoke():
-                    self.services.events.emit_context_invocation_complete(context.id)
+                if queue_item.invoke_all and session.ready_to_invoke():
+                    self.invoke(session, invoke_all = True)
+                elif not session.ready_to_invoke():
+                    self.services.events.emit_session_invocation_complete(session.id)
 
         except KeyboardInterrupt:
             ... # Log something?
 
 
-    def invoke(self, context: InvocationContext, invoke_all: bool = False) -> str:
+    def invoke(self, session: InvocationSession, invoke_all: bool = False) -> str:
         """Determines the next node to invoke and returns the id of the invoked node"""
         self.__ensure_alive()
 
-        invocation_id = context._get_next_invocation_id()
+        invocation_id = session._get_next_invocation_id()
         if not invocation_id:
             return # TODO: raise an error?
 
-        # Save context in case user changed it
-        self.invoker_services.context_manager.set(context)
+        # Save session in case user changed it
+        self.invoker_services.session_manager.set(session)
 
         # Get updated input values
         # TODO: consider using a copy to keep history separate from input configuration
-        context._map_inputs(invocation_id)
-        invocation = context.invocations[invocation_id]
+        session._map_inputs(invocation_id)
+        invocation = session.invocations[invocation_id]
 
         # Queue the invocation
         self.invoker_services.queue.put(InvocationQueueItem(
-            context_id    = context.id,
+            session_id    = session.id,
             invocation_id = invocation.id,
             invoke_all    = invoke_all
         ))
@@ -117,31 +117,31 @@ class Invoker:
         return invocation.id
 
 
-    def create_context(self) -> InvocationContext:
+    def create_session(self) -> InvocationSession:
         self.__ensure_alive()
-        return self.invoker_services.context_manager.create()
+        return self.invoker_services.session_manager.create()
 
 
-    def create_context_from_graph(self, invocation_graph: InvocationGraph) -> InvocationContext:
+    def create_session_from_graph(self, invocation_graph: InvocationGraph) -> InvocationSession:
         self.__ensure_alive()
 
-        # Create a new context
-        context = self.create_context()
+        # Create a new session
+        session = self.create_session()
 
         # Directly create nodes and links, since graph is already validated
         for node in invocation_graph.nodes:
-            context.invocations[node.id] = node
+            session.invocations[node.id] = node
         
         for link in invocation_graph.links:
-            if not link.to_node.id in context.links:
-                context.links[link.to_node.id] = list()
+            if not link.to_node.id in session.links:
+                session.links[link.to_node.id] = list()
             
-            context.links[link.to_node.id].append(InvocationFieldLink(
+            session.links[link.to_node.id].append(InvocationFieldLink(
                 from_node_id = link.from_node.id,
                 from_field   = link.from_node.field,
                 to_field     = link.to_node.field))
 
-        return context
+        return session
 
 
     def __stop_service(self, service) -> None:

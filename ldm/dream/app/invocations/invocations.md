@@ -18,7 +18,7 @@ class UpscaleInvocation(BaseInvocation):
     strength: float               = Field(default=0.75, gt=0, le=1, description="The strength")
     level: UpscaleLevel           = Field(default=2, description="The upscale level")
 
-    def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput: 
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput: 
         result_image = services.generate.upscale(
             image    = self.image.get(),
             level    = self.level
@@ -62,7 +62,7 @@ Finally, note that for all linking, the `type` of the linked fields must match. 
 
 ### Invoke Function
 ```py
-    def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput: 
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput: 
         result_image = context.services.generate.upscale(
             image    = self.image.get(),
             level    = self.level

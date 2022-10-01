@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from ..api.sockets import SocketIO
 from ..services.image_storage import DiskImageStorage
-from ..services.context_manager import DiskContextManager
+from ..services.session_manager import DiskSessionManager
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
 from ..services.invoker import Invoker, InvokerServices
@@ -45,7 +45,7 @@ class ApiDependencies:
 
         invoker_services = InvokerServices(
             queue = MemoryInvocationQueue(),
-            context_manager = DiskContextManager(output_folder)
+            session_manager = DiskSessionManager(output_folder)
         )
 
         ApiDependencies.invoker = Invoker(services, invoker_services)

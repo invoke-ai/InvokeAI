@@ -7,10 +7,10 @@ from typing import Literal, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 from pydantic.fields import Field
 from .services.image_storage import DiskImageStorage
-from .services.context_manager import DiskContextManager
+from .services.session_manager import DiskSessionManager
 from .services.invocation_queue import MemoryInvocationQueue
 from .invocations.baseinvocation import BaseInvocation
-from .services.invocation_context import InvocationFieldLink
+from .services.invocation_session import InvocationFieldLink
 from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker, InvokerServices
 from .invocations import *
@@ -106,16 +106,16 @@ def invoke_cli():
 
     invoker_services = InvokerServices(
         queue           = MemoryInvocationQueue(),
-        context_manager = DiskContextManager(output_folder)
+        session_manager = DiskSessionManager(output_folder)
     )
 
     invoker = Invoker(services, invoker_services)
-    context = invoker.create_context()
+    session = invoker.create_session()
     
     parser = get_invocation_parser()
 
-    # Uncomment to print out previous contexts at startup
-    # print(invoker_services.context_manager.list())
+    # Uncomment to print out previous sessions at startup
+    # print(invoker_services.session_manager.list())
 
     while True:
         try:
@@ -134,7 +134,7 @@ def invoke_cli():
         try:
             # Split the command for piping
             cmds = cmd_input.split('|')
-            start_id = len(context.history)
+            start_id = len(session.history)
             current_id = start_id
             new_invocations = list()
             for cmd in cmds:
@@ -145,7 +145,7 @@ def invoke_cli():
 
                 # Pipe previous command output (if there was a previous command)
                 links = []
-                if len(context.history) > 0 or current_id != start_id:
+                if len(session.history) > 0 or current_id != start_id:
                     from_id = -1 if current_id == start_id else str(current_id - 1)
                     links.append(InvocationFieldLink(
                         from_node_id=from_id,
@@ -157,13 +157,13 @@ def invoke_cli():
                 current_id = current_id + 1
 
             # Command line was parsed successfully
-            # Add the invocations to the context
+            # Add the invocations to the session
             for invocation in new_invocations:
-                context.add_invocation(invocation[0], invocation[1])
+                session.add_invocation(invocation[0], invocation[1])
 
             # Execute all available invocations
-            invoker.invoke(context, invoke_all = True)
-            context.wait_for_all()
+            invoker.invoke(session, invoke_all = True)
+            session.wait_for_all()
 
         except InvalidArgs:
             print('Invalid command, use "help" to list commands')
