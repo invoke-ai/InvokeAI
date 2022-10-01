@@ -8,6 +8,9 @@ import Loading from '../Loading';
 import { useAppDispatch } from './store';
 import { requestSystemConfig } from './socketio/actions';
 import WorkPanel from '../features/options/WorkPanel';
+import { keepGUIAlive } from './utils';
+
+keepGUIAlive();
 
 const App = () => {
   const dispatch = useAppDispatch();

@@ -53,7 +53,7 @@
     border-radius: 0.5rem;
     object-fit: contain;
     width: auto;
-    height: calc(100vh - 13rem);
+    max-height: calc(100vh - 13rem);
     z-index: 2;
   }
 }

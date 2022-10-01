@@ -15,6 +15,7 @@ from ldm.dream.pngwriter import PngWriter, retrieve_metadata
 from ldm.dream.conditioning import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
+from flaskwebgui import FlaskUI
 
 # Loading Arguments
 opt = Args()
@@ -76,6 +77,11 @@ class InvokeAIWebServer:
             ping_timeout=60,
         )
 
+        # Keep Server Alive Route
+        @self.app.route('/flaskwebgui-keep-server-alive')
+        def keep_alive():
+            return {"message": "Server Running"}
+
 
         # Outputs Route
         self.app.config['OUTPUTS_FOLDER'] = os.path.abspath(args.outdir)
@@ -99,18 +105,30 @@ class InvokeAIWebServer:
 
         self.load_socketio_listeners(self.socketio)
 
-        print('>> Started Invoke AI Web Server!')
-        if self.host == '0.0.0.0':
-            print(
-                f"Point your browser at http://localhost:{self.port} or use the host's DNS name or IP address."
-            )
+        if args.gui:
+            print(">> Launching Invoke AI GUI")
+            close_server_on_exit = True
+            if args.web_develop:
+                close_server_on_exit = False
+            try:
+                FlaskUI(app=self.app, socketio=self.socketio, start_server="flask-socketio",
+                host=self.host, port=self.port, width=1600, height=1000,
+                close_server_on_exit=close_server_on_exit).run()
+            except KeyboardInterrupt:
+                import sys
+                sys.exit(0)
         else:
-            print(
-                '>> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address.'
-            )
-            print(f'>> Point your browser at http://{self.host}:{self.port}')
-
-        self.socketio.run(app=self.app, host=self.host, port=self.port)
+            print('>> Started Invoke AI Web Server!')
+            if self.host == '0.0.0.0':
+                print(
+                    f"Point your browser at http://localhost:{self.port} or use the host's DNS name or IP address."
+                )
+            else:
+                print(
+                    '>> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address.'
+                )
+                print(f'>> Point your browser at http://{self.host}:{self.port}')
+            self.socketio.run(app=self.app, host=self.host, port=self.port)
 
     def setup_app(self):
         self.result_url = 'outputs/'
