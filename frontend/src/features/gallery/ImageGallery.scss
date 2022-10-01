@@ -30,7 +30,7 @@
   grid-template-columns: repeat(2, max-content);
   gap: 0.6rem;
   justify-items: center;
-  max-height: calc(100vh - 13rem);
+  max-height: calc(100vh - 16rem);
   overflow-y: scroll;
   @include HideScrollbar;
 }

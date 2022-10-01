@@ -7,6 +7,7 @@
   justify-items: center;
   background-color: var(--background-color-secondary);
   border-radius: 0.5rem;
+  height: calc(100vh - 10rem);
 }
 
 .current-image-display-placeholder {
@@ -53,7 +54,7 @@
     border-radius: 0.5rem;
     object-fit: contain;
     width: auto;
-    max-height: calc(100vh - 13rem);
+    max-height: calc(100vh - 16rem);
     z-index: 2;
   }
 }
