@@ -14,7 +14,7 @@
   --subtext-color-bright: rgb(48, 48, 64);
 
   --border-color: rgb(30, 30, 46);
-  --border-color-light: rgb(50, 50, 66);
+  --border-color-light: rgb(60, 60, 7col6);
 
   --invalid: rgb(255, 75, 75);
   --invalid-secondary: rgb(120, 5, 5);
@@ -55,4 +55,8 @@
   // Tabs
   --tab-color: rgb(30, 32, 42);
   --tab-hover-color: rgb(36, 38, 48);
+  --tab-list-bg: rgb(165, 95, 255);
+  --tab-list-text: rgb(0, 0, 0);
+  --tab-list-text-inactive: rgb(160, 162, 192);
+  --tab-panel-bg: rgb(20, 22, 28);
 }

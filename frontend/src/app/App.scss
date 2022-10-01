@@ -39,6 +39,17 @@
 .app-tabs-list {
   display: grid;
   grid-template-columns: repeat(6, max-content);
+  color: var(--tab-list-text-inactive);
+
+  button {
+    &[aria-selected='true'] {
+      background-color: var(--tab-list-bg);
+      color: var(--tab-list-text);
+      font-weight: bold;
+      border-radius: 0.3rem;
+      border: none;
+    }
+  }
 
   button {
     font-size: 0.85rem;
@@ -47,11 +58,4 @@
 
 .chakra-tabs__tab-panel {
   padding: 0;
-}
-
-.work-in-progress {
-  display: grid;
-  width: 100%;
-  place-items: center;
-  height: calc(100vh - 10rem);
 }

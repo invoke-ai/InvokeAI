@@ -3,7 +3,6 @@ import {
   PopoverArrow,
   PopoverContent,
   PopoverTrigger,
-  PopoverHeader,
   Flex,
   Box,
 } from '@chakra-ui/react';
@@ -12,7 +11,7 @@ import { useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import { ReactElement } from 'react';
-import {  Feature, FEATURES } from '../../app/features';
+import { Feature, FEATURES } from '../../app/features';
 
 type GuideProps = {
   children: ReactElement;

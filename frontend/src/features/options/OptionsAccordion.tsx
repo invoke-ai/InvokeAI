@@ -14,7 +14,6 @@ import OutputOptions from './OutputOptions';
 import ImageToImageOptions from './AdvancedOptions/ImageToImage/ImageToImageOptions';
 import { Feature } from '../../app/features';
 import SeedOptions from './AdvancedOptions/Seed/SeedOptions';
-import VariationsOptions from './AdvancedOptions/Variations/VariationsOptions';
 import Upscale from './AdvancedOptions/Upscale/Upscale';
 import UpscaleOptions from './AdvancedOptions/Upscale/UpscaleOptions';
 import FaceRestore from './AdvancedOptions/FaceRestore/FaceRestore';
@@ -24,6 +23,7 @@ import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import { setOpenAccordions } from '../system/systemSlice';
 import InvokeAccordionItem from './AccordionItems/InvokeAccordionItem';
 import Variations from './AdvancedOptions/Variations/Variations';
+import VariationsOptions from './AdvancedOptions/Variations/VariationsOptions';
 
 /**
  * Main container for generation and processing parameters.

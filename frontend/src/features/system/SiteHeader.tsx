@@ -1,11 +1,4 @@
-import {
-  Flex,
-  Heading,
-  IconButton,
-  Link,
-  Spacer,
-  useColorMode,
-} from '@chakra-ui/react';
+import { IconButton, Link, useColorMode } from '@chakra-ui/react';
 
 import { FaSun, FaMoon, FaGithub } from 'react-icons/fa';
 import { MdHelp, MdSettings } from 'react-icons/md';

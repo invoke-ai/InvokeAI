@@ -1,0 +1,22 @@
+.work-in-progress {
+  display: grid;
+  width: 100%;
+  height: calc(100vh - 10rem);
+  grid-auto-rows: max-content;
+  background-color: var(--background-color-secondary);
+  border-radius: 0.4rem;
+  place-content: center;
+  place-items: center;
+  row-gap: 1rem;
+
+  h1 {
+    font-size: 2rem;
+    font-weight: bold;
+  }
+
+  p {
+    text-align: center;
+    max-width: 50rem;
+    color: var(--subtext-color-bright);
+  }
+}

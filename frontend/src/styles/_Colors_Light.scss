@@ -11,7 +11,7 @@
   --text-color-secondary: rgb(40, 40, 40);
 
   --subtext-color: rgb(24, 24, 34);
-  --subtext-color-bright: rgb(160, 162, 164);
+  --subtext-color-bright: rgb(142, 144, 146);
 
   --border-color: rgb(200, 200, 200);
   --border-color-light: rgb(147, 147, 147);
@@ -23,7 +23,7 @@
   --border-color-invalid: rgb(255, 80, 50);
   --box-shadow-color-invalid: none;
 
-  --svg-color: rgb(220, 222, 224);
+  --svg-color: rgb(186, 188, 190);
 
   // Theme Colors
   --app-main-accent: rgb(235, 185, 5);
@@ -52,4 +52,8 @@
   // Tabs
   --tab-color: rgb(202, 204, 206);
   --tab-hover-color: rgb(206, 208, 210);
+  --tab-list-bg: rgb(235, 185, 5);
+  --tab-list-text: rgb(0, 0, 0);
+  --tab-list-text-inactive: rgb(106, 108, 110);
+  --tab-panel-bg: rgb(214, 216, 218);
 }

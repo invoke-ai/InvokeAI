@@ -56,7 +56,7 @@ const ImageGallery = () => {
         onClick={handleClickLoadMore}
         isDisabled={!areMoreImagesAvailable}
       >
-        {areMoreImagesAvailable ? 'Load more' : 'All images loaded'}
+        {areMoreImagesAvailable ? 'Load More' : 'All Images Loaded'}
       </Button>
     </div>
   );

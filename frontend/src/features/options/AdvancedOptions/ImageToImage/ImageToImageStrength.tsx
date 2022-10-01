@@ -20,8 +20,8 @@ export default function ImageToImageStrength() {
     <IAINumberInput
       label="Strength"
       step={0.01}
-      min={0}
-      max={1}
+      min={0.01}
+      max={0.99}
       onChange={handleChangeStrength}
       value={img2imgStrength}
       width="90px"

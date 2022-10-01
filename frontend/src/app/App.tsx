@@ -8,7 +8,11 @@ import { requestSystemConfig } from './socketio/actions';
 import { keepGUIAlive } from './utils';
 import { Tab, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
 import TextToImage from '../features/options/TextToImage/TextToImage';
-import { WorkInProgress } from '../common/components/WorkInProgress';
+import { ImageToImageWIP } from '../common/components/WorkInProgress/ImageToImageWIP';
+import InpaintingWIP from '../common/components/WorkInProgress/InpaintingWIP';
+import OutpaintingWIP from '../common/components/WorkInProgress/OutpaintingWIP';
+import NodesWIP from '../common/components/WorkInProgress/NodesWIP';
+import { PostProcessingWIP } from '../common/components/WorkInProgress/PostProcessingWIP';
 
 keepGUIAlive();
 
@@ -40,19 +44,19 @@ const App = () => {
               <TextToImage />
             </TabPanel>
             <TabPanel>
-              <WorkInProgress />
+              <ImageToImageWIP />
             </TabPanel>
             <TabPanel>
-              <WorkInProgress />
+              <InpaintingWIP />
             </TabPanel>
             <TabPanel>
-              <WorkInProgress />
+              <OutpaintingWIP />
             </TabPanel>
             <TabPanel>
-              <WorkInProgress />
+              <NodesWIP />
             </TabPanel>
             <TabPanel>
-              <WorkInProgress />
+              <PostProcessingWIP />
             </TabPanel>
           </TabPanels>
         </Tabs>

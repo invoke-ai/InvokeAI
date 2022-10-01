@@ -26,7 +26,9 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
           <AccordionIcon />
         </AccordionButton>
       </h2>
-      <AccordionPanel>{options}</AccordionPanel>
+      <AccordionPanel className="advanced-settings-panel">
+        {options}
+      </AccordionPanel>
     </AccordionItem>
   );
 }
