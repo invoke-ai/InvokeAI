@@ -35,7 +35,12 @@ const PromptInput = () => {
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && e.shiftKey === false && prompt.length > 0) {
+    if (
+      e.key === 'Enter' &&
+      e.shiftKey === false &&
+      prompt.length > 0 &&
+      Boolean(!prompt.match(/^[\s\r\n]+$/))
+    ) {
       e.preventDefault();
       dispatch(generateImage());
     }
@@ -43,7 +48,10 @@ const PromptInput = () => {
 
   return (
     <div className="prompt-bar">
-      <FormControl isInvalid={prompt.length === 0} isDisabled={isProcessing}>
+      <FormControl
+        isInvalid={prompt.length === 0 || Boolean(prompt.match(/^[\s\r\n]+$/))}
+        isDisabled={isProcessing}
+      >
         <Textarea
           id="prompt"
           name="prompt"
