@@ -9,7 +9,7 @@ import HoverableImage from './HoverableImage';
  * Simple image gallery.
  */
 const ImageGallery = () => {
-  const { images, currentImageUuid } = useAppSelector(
+  const { images, currentImageUuid, areMoreImagesAvailable } = useAppSelector(
     (state: RootState) => state.gallery
   );
   const dispatch = useAppDispatch();
@@ -45,7 +45,6 @@ const ImageGallery = () => {
               );
             })}
           </div>
-          <Button onClick={handleClickLoadMore}>Load more...</Button>
         </>
       ) : (
         <div className="image-gallery-container-placeholder">
@@ -53,6 +52,12 @@ const ImageGallery = () => {
           <p>No Images In Gallery</p>
         </div>
       )}
+      <Button
+        onClick={handleClickLoadMore}
+        isDisabled={!areMoreImagesAvailable}
+      >
+        {areMoreImagesAvailable ? 'Load more' : 'All images loaded'}
+      </Button>
     </div>
   );
 };
