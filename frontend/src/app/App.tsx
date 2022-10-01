@@ -10,7 +10,7 @@ import PromptInput from '../features/options/PromptInput';
 import LogViewer from '../features/system/LogViewer';
 import Loading from '../Loading';
 import { useAppDispatch } from './store';
-import { requestSystemConfig } from './socketio/actions';
+import { requestImages, requestSystemConfig } from './socketio/actions';
 
 const App = () => {
   const dispatch = useAppDispatch();

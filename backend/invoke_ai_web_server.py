@@ -40,15 +40,18 @@ class InvokeAIWebServer:
 
     def setup_flask(self):
         # Fix missing mimetypes on Windows
-        mimetypes.add_type("application/javascript", ".js")
-        mimetypes.add_type("text/css", ".css")
+        mimetypes.add_type('application/javascript', '.js')
+        mimetypes.add_type('text/css', '.css')
         # Socket IO
         logger = True if args.web_verbose else False
         engineio_logger = True if args.web_verbose else False
         max_http_buffer_size = 10000000
 
         # CORS Allowed Setup
-        cors_allowed_origins = ['http://127.0.0.1:5173', 'http://localhost:5173']
+        cors_allowed_origins = [
+            'http://127.0.0.1:5173',
+            'http://localhost:5173',
+        ]
         additional_allowed_origins = (
             opt.cors if opt.cors else []
         )  # additional CORS allowed origins
@@ -77,7 +80,6 @@ class InvokeAIWebServer:
             ping_timeout=60,
         )
 
-
         # Outputs Route
         self.app.config['OUTPUTS_FOLDER'] = os.path.abspath(args.outdir)
 
@@ -86,7 +88,6 @@ class InvokeAIWebServer:
             return send_from_directory(
                 self.app.config['OUTPUTS_FOLDER'], file_path
             )
-
 
         # Base Route
         @self.app.route('/')
@@ -147,36 +148,21 @@ class InvokeAIWebServer:
             config = self.get_system_config()
             socketio.emit('systemConfig', config)
 
-        @socketio.on('requestImages')
-        def handle_request_images(page=1, offset=0, last_mtime=None):
+        @socketio.on('requestLatestImages')
+        def handle_request_latest_images(latest_mtime):
             try:
-                chunk_size = 50
-
-                if last_mtime:
-                    print(f'>> Latest images requested')
-                else:
-                    print(
-                        f'>> Page {page} of images requested (page size {chunk_size} offset {offset})'
-                    )
-
                 paths = glob.glob(os.path.join(self.result_path, '*.png'))
-                sorted_paths = sorted(
+
+                image_paths = sorted(
                     paths, key=lambda x: os.path.getmtime(x), reverse=True
                 )
 
-                if last_mtime:
-                    image_paths = filter(
-                        lambda x: os.path.getmtime(x) > last_mtime, sorted_paths
+                image_paths = list(
+                    filter(
+                        lambda x: os.path.getmtime(x) > latest_mtime,
+                        image_paths,
                     )
-                else:
-
-                    image_paths = sorted_paths[
-                        slice(
-                            chunk_size * (page - 1) + offset,
-                            chunk_size * page + offset,
-                        )
-                    ]
-                    page = page + 1
+                )
 
                 image_array = []
 
@@ -194,9 +180,54 @@ class InvokeAIWebServer:
                     'galleryImages',
                     {
                         'images': image_array,
-                        'nextPage': page,
-                        'offset': offset,
-                        'onlyNewImages': True if last_mtime else False,
+                    },
+                )
+            except Exception as e:
+                self.socketio.emit('error', {'message': (str(e))})
+                print('\n')
+
+                traceback.print_exc()
+                print('\n')
+
+        @socketio.on('requestImages')
+        def handle_request_images(earliest_mtime=None):
+            try:
+                page_size = 50
+
+                paths = glob.glob(os.path.join(self.result_path, '*.png'))
+
+                image_paths = sorted(
+                    paths, key=lambda x: os.path.getmtime(x), reverse=True
+                )
+
+                if earliest_mtime:
+                    image_paths = list(
+                        filter(
+                            lambda x: os.path.getmtime(x) < earliest_mtime,
+                            image_paths,
+                        )
+                    )
+
+                areMoreImagesAvailable = len(image_paths) >= page_size
+                image_paths = image_paths[slice(0, page_size)]
+
+                image_array = []
+
+                for path in image_paths:
+                    metadata = retrieve_metadata(path)
+                    image_array.append(
+                        {
+                            'url': self.get_url_from_image_path(path),
+                            'mtime': os.path.getmtime(path),
+                            'metadata': metadata['sd-metadata'],
+                        }
+                    )
+
+                socketio.emit(
+                    'galleryImages',
+                    {
+                        'images': image_array,
+                        'areMoreImagesAvailable': areMoreImagesAvailable,
                     },
                 )
             except Exception as e:
@@ -238,13 +269,15 @@ class InvokeAIWebServer:
                     'currentStatus': 'Preparing',
                     'isProcessing': True,
                     'currentStatusHasSteps': False,
-                    'hasError': False
+                    'hasError': False,
                 }
 
                 socketio.emit('progressUpdate', progress)
                 eventlet.sleep(0)
 
-                original_image_path = self.get_image_path_from_url(original_image['url'])
+                original_image_path = self.get_image_path_from_url(
+                    original_image['url']
+                )
                 # os.path.join(self.result_path, os.path.basename(original_image['url']))
 
                 image = Image.open(original_image_path)
@@ -328,13 +361,15 @@ class InvokeAIWebServer:
                     'currentStatus': 'Processing complete',
                     'isProcessing': True,
                     'currentStatusHasSteps': False,
-                    'hasError': False
+                    'hasError': False,
                 }
 
                 socketio.emit('progressUpdate', progress)
                 eventlet.sleep(0)
 
-                original_image_path = self.get_image_path_from_url(original_image['url'])
+                original_image_path = self.get_image_path_from_url(
+                    original_image['url']
+                )
 
                 image = Image.open(original_image_path)
 
@@ -438,7 +473,11 @@ class InvokeAIWebServer:
                 newFile.write(bytes)
 
                 socketio.emit(
-                    'initialImageUploaded', {'url': self.get_url_from_image_path(file_path), 'uuid': ''}
+                    'initialImageUploaded',
+                    {
+                        'url': self.get_url_from_image_path(file_path),
+                        'uuid': '',
+                    },
                 )
             except Exception as e:
                 self.socketio.emit('error', {'message': (str(e))})
@@ -460,7 +499,13 @@ class InvokeAIWebServer:
                 newFile = open(file_path, 'wb')
                 newFile.write(bytes)
 
-                socketio.emit('maskImageUploaded', {'url': self.get_url_from_image_path(file_path), 'uuid': ''})
+                socketio.emit(
+                    'maskImageUploaded',
+                    {
+                        'url': self.get_url_from_image_path(file_path),
+                        'uuid': '',
+                    },
+                )
             except Exception as e:
                 self.socketio.emit('error', {'message': (str(e))})
                 print('\n')
@@ -530,18 +575,25 @@ class InvokeAIWebServer:
             #         else:
             #             generation_parameters['init_mas'] = os.path.abspath(os.path.join(self.mask_image_path, filename))
 
-
             # We need to give absolute paths to the generator, stash the URLs for later
-            init_img_url =  None;
-            mask_img_url =  None;
+            init_img_url = None
+            mask_img_url = None
 
             if 'init_img' in generation_parameters:
                 init_img_url = generation_parameters['init_img']
-                generation_parameters['init_img'] = self.get_image_path_from_url(generation_parameters['init_img'])
+                generation_parameters[
+                    'init_img'
+                ] = self.get_image_path_from_url(
+                    generation_parameters['init_img']
+                )
 
             if 'init_mask' in generation_parameters:
                 mask_img_url = generation_parameters['init_mask']
-                generation_parameters['init_mask'] = self.get_image_path_from_url(generation_parameters['init_mask'])
+                generation_parameters[
+                    'init_mask'
+                ] = self.get_image_path_from_url(
+                    generation_parameters['init_mask']
+                )
 
             totalSteps = self.calculate_real_steps(
                 steps=generation_parameters['steps'],
@@ -559,7 +611,7 @@ class InvokeAIWebServer:
                 'currentStatus': 'Preparing',
                 'isProcessing': True,
                 'currentStatusHasSteps': False,
-                'hasError': False
+                'hasError': False,
             }
 
             self.socketio.emit('progressUpdate', progress)
@@ -583,10 +635,19 @@ class InvokeAIWebServer:
                     and step < generation_parameters['steps'] - 1
                 ):
                     image = self.generate.sample_to_image(sample)
-                    metadata = self.parameters_to_generated_image_metadata(generation_parameters)
+                    metadata = self.parameters_to_generated_image_metadata(
+                        generation_parameters
+                    )
                     command = parameters_to_command(generation_parameters)
 
-                    path = self.save_image(image, command, metadata, self.intermediate_path, step_index=step_index, postprocessing=False)
+                    path = self.save_image(
+                        image,
+                        command,
+                        metadata,
+                        self.intermediate_path,
+                        step_index=step_index,
+                        postprocessing=False,
+                    )
 
                     step_index += 1
                     self.socketio.emit(
@@ -624,7 +685,9 @@ class InvokeAIWebServer:
                     and all_parameters['variation_amount'] > 0
                 ):
                     first_seed = first_seed or seed
-                    this_variation = [[seed, all_parameters['variation_amount']]]
+                    this_variation = [
+                        [seed, all_parameters['variation_amount']]
+                    ]
                     all_parameters['with_variations'] = (
                         prior_variations + this_variation
                     )
@@ -825,7 +888,9 @@ class InvokeAIWebServer:
                 rfc_dict['type'] = 'img2img'
                 rfc_dict['strength'] = parameters['strength']
                 rfc_dict['fit'] = parameters['fit']  # TODO: Noncompliant
-                rfc_dict['orig_hash'] = calculate_init_img_hash(self.get_image_path_from_url(parameters['init_img']))
+                rfc_dict['orig_hash'] = calculate_init_img_hash(
+                    self.get_image_path_from_url(parameters['init_img'])
+                )
                 rfc_dict['init_image_path'] = parameters[
                     'init_img'
                 ]  # TODO: Noncompliant
@@ -833,7 +898,9 @@ class InvokeAIWebServer:
                     'sampler'
                 ] = 'ddim'  # TODO: FIX ME WHEN IMG2IMG SUPPORTS ALL SAMPLERS
                 if 'init_mask' in parameters:
-                    rfc_dict['mask_hash'] = calculate_init_img_hash(self.get_image_path_from_url(parameters['init_mask'])) # TODO: Noncompliant
+                    rfc_dict['mask_hash'] = calculate_init_img_hash(
+                        self.get_image_path_from_url(parameters['init_mask'])
+                    )  # TODO: Noncompliant
                     rfc_dict['mask_image_path'] = parameters[
                         'init_mask'
                     ]  # TODO: Noncompliant
@@ -858,7 +925,9 @@ class InvokeAIWebServer:
             # top-level metadata minus `image` or `images`
             metadata = self.get_system_config()
 
-            orig_hash = calculate_init_img_hash(self.get_image_path_from_url(original_image_path))
+            orig_hash = calculate_init_img_hash(
+                self.get_image_path_from_url(original_image_path)
+            )
 
             image = {'orig_path': original_image_path, 'orig_hash': orig_hash}
 
@@ -911,7 +980,10 @@ class InvokeAIWebServer:
             filename += '.png'
 
             path = pngwriter.save_image_and_prompt_to_png(
-                image=image, dream_prompt=command, metadata=metadata, name=filename
+                image=image,
+                dream_prompt=command,
+                metadata=metadata,
+                name=filename,
             )
 
             return os.path.abspath(path)
@@ -938,6 +1010,7 @@ class InvokeAIWebServer:
 
     def calculate_real_steps(self, steps, strength, has_init_image):
         import math
+
         return math.floor(strength * steps) if has_init_image else steps
 
     def write_log_message(self, message):
@@ -958,13 +1031,21 @@ class InvokeAIWebServer:
         """Given a url to an image used by the client, returns the absolute file path to that image"""
         try:
             if 'init-images' in url:
-                return os.path.abspath(os.path.join(self.init_image_path, os.path.basename(url)))
+                return os.path.abspath(
+                    os.path.join(self.init_image_path, os.path.basename(url))
+                )
             elif 'mask-images' in url:
-                return os.path.abspath(os.path.join(self.mask_image_path, os.path.basename(url)))
+                return os.path.abspath(
+                    os.path.join(self.mask_image_path, os.path.basename(url))
+                )
             elif 'intermediates' in url:
-                return os.path.abspath(os.path.join(self.intermediate_path, os.path.basename(url)))
+                return os.path.abspath(
+                    os.path.join(self.intermediate_path, os.path.basename(url))
+                )
             else:
-                return os.path.abspath(os.path.join(self.result_path, os.path.basename(url)))
+                return os.path.abspath(
+                    os.path.join(self.result_path, os.path.basename(url))
+                )
         except Exception as e:
             self.socketio.emit('error', {'message': (str(e))})
             print('\n')
@@ -976,11 +1057,17 @@ class InvokeAIWebServer:
         """Given an absolute file path to an image, returns the URL that the client can use to load the image"""
         try:
             if 'init-images' in path:
-                return os.path.join(self.init_image_url, os.path.basename(path))
+                return os.path.join(
+                    self.init_image_url, os.path.basename(path)
+                )
             elif 'mask-images' in path:
-                return os.path.join(self.mask_image_url, os.path.basename(path))
+                return os.path.join(
+                    self.mask_image_url, os.path.basename(path)
+                )
             elif 'intermediates' in path:
-                return os.path.join(self.intermediate_url, os.path.basename(path))
+                return os.path.join(
+                    self.intermediate_url, os.path.basename(path)
+                )
             else:
                 return os.path.join(self.result_url, os.path.basename(path))
         except Exception as e:
@@ -989,7 +1076,6 @@ class InvokeAIWebServer:
 
             traceback.print_exc()
             print('\n')
-
 
 
 class CanceledException(Exception):

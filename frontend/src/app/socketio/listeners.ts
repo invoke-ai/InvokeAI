@@ -27,7 +27,7 @@ import {
   setInitialImagePath,
   setMaskPath,
 } from '../../features/options/optionsSlice';
-import { requestNewImages } from './actions';
+import { requestImages, requestNewImages } from './actions';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -46,7 +46,11 @@ const makeSocketIOListeners = (
       try {
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus('Connected'));
-        dispatch(requestNewImages());
+        if (getState().gallery.latest_mtime) {
+          dispatch(requestNewImages());
+        } else {
+          dispatch(requestImages());
+        }
       } catch (e) {
         console.error(e);
       }
@@ -213,7 +217,7 @@ const makeSocketIOListeners = (
      * Callback to run when we receive a 'galleryImages' event.
      */
     onGalleryImages: (data: InvokeAI.GalleryImagesResponse) => {
-      const { images, nextPage, offset } = data;
+      const { images, areMoreImagesAvailable } = data;
 
       /**
        * the logic here ideally would be in the reducer but we have a side effect:
@@ -231,7 +235,9 @@ const makeSocketIOListeners = (
         };
       });
 
-      dispatch(addGalleryImages({ images: preparedImages, nextPage, offset }));
+      dispatch(
+        addGalleryImages({ images: preparedImages, areMoreImagesAvailable })
+      );
 
       dispatch(
         addLogEntry({

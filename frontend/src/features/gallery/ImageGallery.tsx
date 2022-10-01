@@ -1,4 +1,4 @@
-import { Button, Center, Flex, Text } from '@chakra-ui/react';
+import { Button, Flex, Text } from '@chakra-ui/react';
 import { requestImages } from '../../app/socketio/actions';
 import { RootState, useAppDispatch } from '../../app/store';
 import { useAppSelector } from '../../app/store';
@@ -24,25 +24,34 @@ const ImageGallery = () => {
     dispatch(requestImages());
   };
 
-  return images.length ? (
+  return (
     <Flex direction={'column'} gap={2} pb={2}>
-      <Flex gap={2} wrap="wrap">
-        {images.map((image) => {
-          const { uuid } = image;
-          const isSelected = currentImageUuid === uuid;
-          return (
-            <HoverableImage key={uuid} image={image} isSelected={isSelected} />
-          );
-        })}
-      </Flex>
-      {areMoreImagesAvailable && (
-        <Button onClick={handleClickLoadMore}>Load more</Button>
+      {images.length ? (
+        <Flex gap={2} wrap="wrap">
+          {images.map((image) => {
+            const { uuid } = image;
+            const isSelected = currentImageUuid === uuid;
+            return (
+              <HoverableImage
+                key={uuid}
+                image={image}
+                isSelected={isSelected}
+              />
+            );
+          })}
+        </Flex>
+      ) : (
+        <Text size={'xl'} padding={5} textAlign={'center'}>
+          No images in gallery
+        </Text>
       )}
+      <Button
+        onClick={handleClickLoadMore}
+        isDisabled={!areMoreImagesAvailable}
+      >
+        {areMoreImagesAvailable ? 'Load more' : 'All images loaded'}
+      </Button>
     </Flex>
-  ) : (
-    <Center height={'100%'} position={'relative'}>
-      <Text size={'xl'}>No images in gallery</Text>
-    </Center>
   );
 };
 
