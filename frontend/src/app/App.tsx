@@ -22,9 +22,7 @@ const App = () => {
     <div className="App">
       <ProgressBar />
       <div className="app-content">
-        <div className="app-content-header">
-          <SiteHeader />
-        </div>
+        <SiteHeader />
         <div className="app-content-workarea">
           <WorkPanel />
           <CurrentImageDisplay />

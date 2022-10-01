@@ -7,8 +7,6 @@
   justify-items: center;
   background-color: var(--background-color-secondary);
   border-radius: 0.5rem;
-  min-width: 512px;
-  min-height: 768px;
 }
 
 .current-image-display-placeholder {
@@ -56,7 +54,7 @@
     border-radius: 0.5rem;
     object-fit: contain;
     width: auto;
-    max-height: 768px;
+    height: calc(100vh - 13rem);
   }
 }
 
