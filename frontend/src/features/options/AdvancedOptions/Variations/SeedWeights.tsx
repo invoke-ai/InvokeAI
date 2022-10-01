@@ -35,26 +35,4 @@ export default function SeedWeights() {
       onChange={handleChangeSeedWeights}
     />
   );
-  // return (
-  //   <FormControl
-  //     isInvalid={
-  //       shouldGenerateVariations &&
-  //       !(validateSeedWeights(seedWeights) || seedWeights === '')
-  //     }
-  //     flexGrow={1}
-  //   >
-  //     <HStack>
-  //       <FormLabel marginInlineEnd={0} marginBottom={1}>
-  //         <p>Seed Weights</p>
-  //       </FormLabel>
-  //       <Input
-  //         size={'sm'}
-  //         value={seedWeights}
-  //         disabled={!shouldGenerateVariations}
-  //         onChange={handleChangeSeedWeights}
-  //         width="12rem"
-  //       />
-  //     </HStack>
-  //   </FormControl>
-  // );
 }
