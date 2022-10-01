@@ -12,9 +12,9 @@ import {
 } from '../options/optionsSlice';
 import DeleteImageModal from './DeleteImageModal';
 import { SystemState } from '../system/systemSlice';
-import SDButton from '../../common/components/SDButton';
+import IAIButton from '../../common/components/IAIButton';
 import { runESRGAN, runGFPGAN } from '../../app/socketio/actions';
-import SDIconButton from '../../common/components/SDIconButton';
+import IAIIconButton from '../../common/components/IAIIconButton';
 import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
 
 const systemSelector = createSelector(
@@ -84,14 +84,14 @@ const CurrentImageButtons = ({
 
   return (
     <div className="current-image-options">
-      <SDIconButton
+      <IAIIconButton
         icon={<MdImage />}
         tooltip="Use As Initial Image"
         aria-label="Use As Initial Image"
         onClick={handleClickUseAsInitialImage}
       />
 
-      <SDButton
+      <IAIButton
         label="Use All"
         isDisabled={
           !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
@@ -99,13 +99,13 @@ const CurrentImageButtons = ({
         onClick={handleClickUseAllParameters}
       />
 
-      <SDButton
+      <IAIButton
         label="Use Seed"
         isDisabled={!image?.metadata?.image?.seed}
         onClick={handleClickUseSeed}
       />
 
-      <SDIconButton
+      <IAIIconButton
         icon={<MdHd />}
         tooltip="Upscale"
         aria-label="Upscale"
@@ -117,7 +117,7 @@ const CurrentImageButtons = ({
         }
         onClick={handleClickUpscale}
       />
-      <SDIconButton
+      <IAIIconButton
         icon={<MdFace />}
         tooltip="Restore Faces"
         aria-label="Restore Faces"
@@ -129,14 +129,14 @@ const CurrentImageButtons = ({
         }
         onClick={handleClickFixFaces}
       />
-      <SDIconButton
+      <IAIIconButton
         icon={<MdInfo />}
         tooltip="Details"
         aria-label="Details"
         onClick={handleClickShowImageDetails}
       />
       <DeleteImageModal image={image}>
-        <SDIconButton
+        <IAIIconButton
           icon={<MdDelete />}
           tooltip="Delete Image"
           aria-label="Delete Image"

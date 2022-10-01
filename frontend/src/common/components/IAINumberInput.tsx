@@ -26,7 +26,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
 /**
  * Customized Chakra FormControl + NumberInput multi-part component.
  */
-const SDNumberInput = (props: Props) => {
+const IAINumberInput = (props: Props) => {
   const {
     label,
     styleClass,
@@ -136,4 +136,4 @@ const SDNumberInput = (props: Props) => {
   );
 };
 
-export default SDNumberInput;
+export default IAINumberInput;

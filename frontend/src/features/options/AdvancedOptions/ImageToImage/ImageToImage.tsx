@@ -5,7 +5,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDSwitch from '../../../../common/components/SDSwitch';
+import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldUseInitImage } from '../../optionsSlice';
 
 export default function ImageToImage() {
@@ -29,7 +29,7 @@ export default function ImageToImage() {
       mr={2}
     >
       <p>Image to Image</p>
-      <SDSwitch
+      <IAISwitch
         isDisabled={!initialImagePath}
         isChecked={shouldUseInitImage}
         onChange={handleChangeShouldUseInitImage}

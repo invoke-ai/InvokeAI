@@ -2,7 +2,7 @@ import React from 'react';
 import { MdCancel } from 'react-icons/md';
 import { cancelProcessing } from '../../../app/socketio/actions';
 import { useAppDispatch, useAppSelector } from '../../../app/store';
-import SDIconButton from '../../../common/components/SDIconButton';
+import IAIIconButton from '../../../common/components/IAIIconButton';
 import { systemSelector } from '../../../common/hooks/useCheckParameters';
 
 export default function CancelButton() {
@@ -11,7 +11,7 @@ export default function CancelButton() {
   const handleClickCancel = () => dispatch(cancelProcessing());
 
   return (
-    <SDIconButton
+    <IAIIconButton
       icon={<MdCancel />}
       tooltip="Cancel"
       aria-label="Cancel"

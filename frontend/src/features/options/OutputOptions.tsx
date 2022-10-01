@@ -9,8 +9,8 @@ import { HEIGHTS, WIDTHS } from '../../app/constants';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { ChangeEvent } from 'react';
-import SDSelect from '../../common/components/SDSelect';
-import SDSwitch from '../../common/components/SDSwitch';
+import IAISelect from '../../common/components/IAISelect';
+import IAISwitch from '../../common/components/IAISwitch';
 
 const optionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -47,14 +47,14 @@ const OutputOptions = () => {
   return (
     <Flex gap={2} direction={'column'}>
       {/* <Flex gap={2}>
-        <SDSelect
+        <IAISelect
           label="Width"
           value={width}
           flexGrow={1}
           onChange={handleChangeWidth}
           validValues={WIDTHS}
         />
-        <SDSelect
+        <IAISelect
           label="Height"
           value={height}
           flexGrow={1}
@@ -62,7 +62,7 @@ const OutputOptions = () => {
           validValues={HEIGHTS}
         />
       </Flex> */}
-      <SDSwitch
+      <IAISwitch
         label="Seamless tiling"
         fontSize={'md'}
         isChecked={seamless}

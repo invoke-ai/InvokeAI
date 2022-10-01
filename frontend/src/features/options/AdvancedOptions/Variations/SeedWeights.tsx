@@ -5,6 +5,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
+import IAIInput from '../../../../common/components/IAIInput';
 import { validateSeedWeights } from '../../../../common/util/seedWeightPairs';
 import { setSeedWeights } from '../../optionsSlice';
 
@@ -23,25 +24,37 @@ export default function SeedWeights() {
     dispatch(setSeedWeights(e.target.value));
 
   return (
-    <FormControl
+    <IAIInput
+      label={'Seed Weights'}
+      value={seedWeights}
       isInvalid={
         shouldGenerateVariations &&
         !(validateSeedWeights(seedWeights) || seedWeights === '')
       }
-      flexGrow={1}
-    >
-      <HStack>
-        <FormLabel marginInlineEnd={0} marginBottom={1}>
-          <p>Seed Weights</p>
-        </FormLabel>
-        <Input
-          size={'sm'}
-          value={seedWeights}
-          disabled={!shouldGenerateVariations}
-          onChange={handleChangeSeedWeights}
-          width="12rem"
-        />
-      </HStack>
-    </FormControl>
+      isDisabled={!shouldGenerateVariations}
+      onChange={handleChangeSeedWeights}
+    />
   );
+  // return (
+  //   <FormControl
+  //     isInvalid={
+  //       shouldGenerateVariations &&
+  //       !(validateSeedWeights(seedWeights) || seedWeights === '')
+  //     }
+  //     flexGrow={1}
+  //   >
+  //     <HStack>
+  //       <FormLabel marginInlineEnd={0} marginBottom={1}>
+  //         <p>Seed Weights</p>
+  //       </FormLabel>
+  //       <Input
+  //         size={'sm'}
+  //         value={seedWeights}
+  //         disabled={!shouldGenerateVariations}
+  //         onChange={handleChangeSeedWeights}
+  //         width="12rem"
+  //       />
+  //     </HStack>
+  //   </FormControl>
+  // );
 }

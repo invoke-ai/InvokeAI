@@ -8,7 +8,7 @@ import { OptionsState, setGfpganStrength } from '../../optionsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { SystemState } from '../../../system/systemSlice';
-import SDNumberInput from '../../../../common/components/SDNumberInput';
+import IAINumberInput from '../../../../common/components/IAINumberInput';
 
 const optionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -53,7 +53,7 @@ const FaceRestoreOptions = () => {
 
   return (
     <Flex direction={'column'} gap={2}>
-      <SDNumberInput
+      <IAINumberInput
         isDisabled={!isGFPGANAvailable || !shouldRunGFPGAN}
         label="Strength"
         step={0.05}

@@ -2,7 +2,7 @@ import React from 'react';
 import { MdAddAPhoto } from 'react-icons/md';
 import { generateImage } from '../../../app/socketio/actions';
 import { useAppDispatch } from '../../../app/store';
-import SDIconButton from '../../../common/components/SDIconButton';
+import IAIIconButton from '../../../common/components/IAIIconButton';
 import useCheckParameters from '../../../common/hooks/useCheckParameters';
 
 export default function InvokeButton() {
@@ -14,7 +14,7 @@ export default function InvokeButton() {
   };
 
   return (
-    <SDIconButton
+    <IAIIconButton
       icon={<MdAddAPhoto />}
       tooltip="Invoke"
       aria-label="Invoke"

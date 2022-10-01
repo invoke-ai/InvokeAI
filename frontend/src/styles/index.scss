@@ -14,9 +14,10 @@
 @use '../features/system/ProgressBar.scss';
 
 // Component Shared
-@use '../common/components/SDNumberInput.scss';
-@use '../common/components/SDSelect.scss';
-@use '../common/components/SDSwitch.scss';
+@use '../common/components/IAINumberInput.scss';
+@use '../common/components/IAIInput.scss';
+@use '../common/components/IAISelect.scss';
+@use '../common/components/IAISwitch.scss';
 
 // Shared Styles
 @use './Mixins/' as *;

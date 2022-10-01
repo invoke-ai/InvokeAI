@@ -4,7 +4,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDNumberInput from '../../../../common/components/SDNumberInput';
+import IAINumberInput from '../../../../common/components/IAINumberInput';
 import { setImg2imgStrength } from '../../optionsSlice';
 
 export default function ImageToImageStrength() {
@@ -17,7 +17,7 @@ export default function ImageToImageStrength() {
   const handleChangeStrength = (v: number) => dispatch(setImg2imgStrength(v));
 
   return (
-    <SDNumberInput
+    <IAINumberInput
       label="Strength"
       step={0.01}
       min={0}

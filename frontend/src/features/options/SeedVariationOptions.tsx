@@ -13,8 +13,8 @@ import { ChangeEvent } from 'react';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
-import SDNumberInput from '../../common/components/SDNumberInput';
-import SDSwitch from '../../common/components/SDSwitch';
+import IAINumberInput from '../../common/components/IAINumberInput';
+import IAISwitch from '../../common/components/IAISwitch';
 import randomInt from '../../common/util/randomInt';
 import { validateSeedWeights } from '../../common/util/seedWeightPairs';
 import {
@@ -79,13 +79,13 @@ const SeedVariationOptions = () => {
 
   return (
     <Flex gap={2} direction={'column'}>
-      <SDSwitch
+      <IAISwitch
         label="Randomize Seed"
         isChecked={shouldRandomizeSeed}
         onChange={handleChangeShouldRandomizeSeed}
       />
       <Flex gap={2}>
-        <SDNumberInput
+        <IAINumberInput
           label="Seed"
           step={1}
           precision={0}
@@ -107,13 +107,13 @@ const SeedVariationOptions = () => {
           </Text>
         </Button>
       </Flex>
-      <SDSwitch
+      <IAISwitch
         label="Generate Variations"
         isChecked={shouldGenerateVariations}
         width={'auto'}
         onChange={handleChangeShouldGenerateVariations}
       />
-      <SDNumberInput
+      <IAINumberInput
         label="Variation Amount"
         value={variationAmount}
         step={0.01}

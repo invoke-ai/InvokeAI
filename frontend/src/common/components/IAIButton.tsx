@@ -10,7 +10,7 @@ interface Props extends ButtonProps {
  *
  * TODO: Get rid of this.
  */
-const SDButton = (props: Props) => {
+const IAIButton = (props: Props) => {
   const { label, tooltip = '', size = 'sm', ...rest } = props;
   return (
     <Tooltip label={tooltip}>
@@ -21,4 +21,4 @@ const SDButton = (props: Props) => {
   );
 };
 
-export default SDButton;
+export default IAIButton;

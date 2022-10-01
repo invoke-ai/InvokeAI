@@ -4,7 +4,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDSwitch from '../../../../common/components/SDSwitch';
+import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldFitToWidthHeight } from '../../optionsSlice';
 
 export default function ImageFit() {
@@ -18,7 +18,7 @@ export default function ImageFit() {
     dispatch(setShouldFitToWidthHeight(e.target.checked));
 
   return (
-    <SDSwitch
+    <IAISwitch
       label="Fit initial image to output size"
       isChecked={shouldFitToWidthHeight}
       onChange={handleChangeFit}

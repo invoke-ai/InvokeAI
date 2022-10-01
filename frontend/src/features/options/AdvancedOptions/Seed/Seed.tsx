@@ -5,7 +5,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDNumberInput from '../../../../common/components/SDNumberInput';
+import IAINumberInput from '../../../../common/components/IAINumberInput';
 import { setSeed } from '../../optionsSlice';
 
 export default function Seed() {
@@ -22,7 +22,7 @@ export default function Seed() {
   const handleChangeSeed = (v: number) => dispatch(setSeed(v));
 
   return (
-    <SDNumberInput
+    <IAINumberInput
       label="Seed"
       step={1}
       precision={0}

@@ -10,7 +10,7 @@ interface Props extends SelectProps {
 /**
  * Customized Chakra FormControl + Select multi-part component.
  */
-const SDSelect = (props: Props) => {
+const IAISelect = (props: Props) => {
   const {
     label,
     isDisabled,
@@ -53,4 +53,4 @@ const SDSelect = (props: Props) => {
   );
 };
 
-export default SDSelect;
+export default IAISelect;

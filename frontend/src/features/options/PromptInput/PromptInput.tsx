@@ -1,4 +1,4 @@
-import { Textarea } from '@chakra-ui/react';
+import { FormControl, Textarea } from '@chakra-ui/react';
 import { ChangeEvent, KeyboardEvent } from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import { generateImage } from '../../../app/socketio/actions';
@@ -43,18 +43,19 @@ const PromptInput = () => {
 
   return (
     <div className="prompt-bar">
-      <Textarea
-        id="prompt"
-        name="prompt"
-        placeholder="I'm dreaming of..."
-        size={'lg'}
-        value={prompt}
-        onChange={handleChangePrompt}
-        onKeyDown={handleKeyDown}
-        disabled={isProcessing}
-        resize="vertical"
-        height={30}
-      />
+      <FormControl isInvalid={prompt.length === 0} isDisabled={isProcessing}>
+        <Textarea
+          id="prompt"
+          name="prompt"
+          placeholder="I'm dreaming of..."
+          size={'lg'}
+          value={prompt}
+          onChange={handleChangePrompt}
+          onKeyDown={handleKeyDown}
+          resize="vertical"
+          height={30}
+        />
+      </FormControl>
     </div>
   );
 };

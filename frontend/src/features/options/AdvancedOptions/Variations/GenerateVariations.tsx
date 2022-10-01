@@ -4,7 +4,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDSwitch from '../../../../common/components/SDSwitch';
+import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldGenerateVariations } from '../../optionsSlice';
 
 export default function GenerateVariations() {
@@ -19,7 +19,7 @@ export default function GenerateVariations() {
   ) => dispatch(setShouldGenerateVariations(e.target.checked));
 
   return (
-    <SDSwitch
+    <IAISwitch
       isChecked={shouldGenerateVariations}
       width={'auto'}
       onChange={handleChangeShouldGenerateVariations}

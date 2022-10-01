@@ -4,7 +4,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDNumberInput from '../../../../common/components/SDNumberInput';
+import IAINumberInput from '../../../../common/components/IAINumberInput';
 import { setVariationAmount } from '../../optionsSlice';
 
 export default function VariationAmount() {
@@ -21,7 +21,7 @@ export default function VariationAmount() {
     dispatch(setVariationAmount(v));
 
   return (
-    <SDNumberInput
+    <IAINumberInput
       label="Variation Amount"
       value={variationAmount}
       step={0.01}

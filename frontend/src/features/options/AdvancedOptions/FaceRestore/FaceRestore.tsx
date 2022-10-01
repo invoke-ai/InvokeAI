@@ -5,7 +5,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDSwitch from '../../../../common/components/SDSwitch';
+import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldRunGFPGAN } from '../../optionsSlice';
 
 export default function FaceRestore() {
@@ -30,7 +30,7 @@ export default function FaceRestore() {
       mr={2}
     >
       <p>Restore Face</p>
-      <SDSwitch
+      <IAISwitch
         isDisabled={!isGFPGANAvailable}
         isChecked={shouldRunGFPGAN}
         onChange={handleChangeShouldRunGFPGAN}

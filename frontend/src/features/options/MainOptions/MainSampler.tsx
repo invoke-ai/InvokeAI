@@ -1,7 +1,7 @@
 import React, { ChangeEvent } from 'react';
 import { SAMPLERS } from '../../../app/constants';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import SDSelect from '../../../common/components/SDSelect';
+import IAISelect from '../../../common/components/IAISelect';
 import { setSampler } from '../optionsSlice';
 import { fontSize } from './MainOptions';
 
@@ -13,7 +13,7 @@ export default function MainSampler() {
     dispatch(setSampler(e.target.value));
 
   return (
-    <SDSelect
+    <IAISelect
       label="Sampler"
       value={sampler}
       onChange={handleChangeSampler}

@@ -1,7 +1,7 @@
 import React, { ChangeEvent } from 'react';
 import { WIDTHS } from '../../../app/constants';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import SDSelect from '../../../common/components/SDSelect';
+import IAISelect from '../../../common/components/IAISelect';
 import { setWidth } from '../optionsSlice';
 import { fontSize } from './MainOptions';
 
@@ -13,7 +13,7 @@ export default function MainWidth() {
     dispatch(setWidth(Number(e.target.value)));
 
   return (
-    <SDSelect
+    <IAISelect
       label="Width"
       value={width}
       flexGrow={1}

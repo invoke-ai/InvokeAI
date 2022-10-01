@@ -5,7 +5,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDSwitch from '../../../../common/components/SDSwitch';
+import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldRunESRGAN } from '../../optionsSlice';
 
 export default function Upscale() {
@@ -28,7 +28,7 @@ export default function Upscale() {
       mr={2}
     >
       <p>Upscale</p>
-      <SDSwitch
+      <IAISwitch
         isDisabled={!isESRGANAvailable}
         isChecked={shouldRunESRGAN}
         onChange={handleChangeShouldRunESRGAN}

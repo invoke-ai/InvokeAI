@@ -14,7 +14,7 @@ interface Props extends SwitchProps {
 /**
  * Customized Chakra FormControl + Switch multi-part component.
  */
-const SDSwitch = (props: Props) => {
+const IAISwitch = (props: Props) => {
   const {
     label,
     isDisabled = false,
@@ -42,4 +42,4 @@ const SDSwitch = (props: Props) => {
   );
 };
 
-export default SDSwitch;
+export default IAISwitch;

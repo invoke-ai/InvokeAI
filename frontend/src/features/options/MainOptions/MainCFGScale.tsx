@@ -1,6 +1,6 @@
 import React from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import SDNumberInput from '../../../common/components/SDNumberInput';
+import IAINumberInput from '../../../common/components/IAINumberInput';
 import { setCfgScale } from '../optionsSlice';
 import { fontSize, inputWidth } from './MainOptions';
 
@@ -11,7 +11,7 @@ export default function MainCFGScale() {
   const handleChangeCfgScale = (v: number) => dispatch(setCfgScale(v));
 
   return (
-    <SDNumberInput
+    <IAINumberInput
       label="CFG Scale"
       step={0.5}
       min={1}

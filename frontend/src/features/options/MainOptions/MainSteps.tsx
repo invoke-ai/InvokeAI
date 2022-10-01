@@ -1,6 +1,6 @@
 import React from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import SDNumberInput from '../../../common/components/SDNumberInput';
+import IAINumberInput from '../../../common/components/IAINumberInput';
 import { setSteps } from '../optionsSlice';
 import { fontSize, inputWidth } from './MainOptions';
 
@@ -11,7 +11,7 @@ export default function MainSteps() {
   const handleChangeSteps = (v: number) => dispatch(setSteps(v));
 
   return (
-    <SDNumberInput
+    <IAINumberInput
       label="Steps"
       min={1}
       max={9999}

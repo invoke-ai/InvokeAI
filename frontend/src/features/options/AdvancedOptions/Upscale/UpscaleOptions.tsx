@@ -15,8 +15,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { SystemState } from '../../../system/systemSlice';
 import { ChangeEvent } from 'react';
-import SDNumberInput from '../../../../common/components/SDNumberInput';
-import SDSelect from '../../../../common/components/SDSelect';
+import IAINumberInput from '../../../../common/components/IAINumberInput';
+import IAISelect from '../../../../common/components/IAISelect';
 
 const optionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -65,14 +65,14 @@ const UpscaleOptions = () => {
 
   return (
     <Flex gap={2}>
-      <SDSelect
+      <IAISelect
         isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
         label="Scale"
         value={upscalingLevel}
         onChange={handleChangeLevel}
         validValues={UPSCALING_LEVELS}
       />
-      <SDNumberInput
+      <IAINumberInput
         isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
         label="Strength"
         step={0.05}

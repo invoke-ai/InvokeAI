@@ -1,6 +1,6 @@
 import React from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import SDNumberInput from '../../../common/components/SDNumberInput';
+import IAINumberInput from '../../../common/components/IAINumberInput';
 import { setIterations } from '../optionsSlice';
 import { fontSize, inputWidth } from './MainOptions';
 
@@ -13,7 +13,7 @@ export default function MainIterations() {
   const handleChangeIterations = (v: number) => dispatch(setIterations(v));
 
   return (
-    <SDNumberInput
+    <IAINumberInput
       label="Images"
       step={1}
       min={1}

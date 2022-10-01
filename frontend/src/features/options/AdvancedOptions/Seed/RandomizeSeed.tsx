@@ -5,7 +5,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import SDSwitch from '../../../../common/components/SDSwitch';
+import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldRandomizeSeed } from '../../optionsSlice';
 
 export default function RandomizeSeed() {
@@ -19,7 +19,7 @@ export default function RandomizeSeed() {
     dispatch(setShouldRandomizeSeed(e.target.checked));
 
   return (
-    <SDSwitch
+    <IAISwitch
       label="Randomize Seed"
       isChecked={shouldRandomizeSeed}
       onChange={handleChangeShouldRandomizeSeed}
