@@ -17,6 +17,11 @@ class ImageStorageBase(ABC):
     def get(self, image_uri: str) -> Image:
         pass
 
+    # TODO: make this a bit more flexible for e.g. cloud storage
+    @abstractmethod
+    def get_path(self, image_uri: str) -> str:
+        pass
+
     @abstractmethod
     def save(self, image_uri: str, image: Image) -> None:
         pass
@@ -51,9 +56,15 @@ class DiskImageStorage(ImageStorageBase):
         if cache_item:
             return cache_item
 
-        image = Image.open(image_uri)
+        path = os.path.join(self.__output_folder, image_uri)
+        image = Image.open(path)
         self.__set_cache(image_uri, image)
         return image
+
+    # TODO: make this a bit more flexible for e.g. cloud storage
+    def get_path(self, image_uri: str) -> str:
+        path = os.path.join(self.__output_folder, image_uri)
+        return path
 
     def save(self, image_uri: str, image: Image) -> None:
         self.__pngWriter.save_image_and_prompt_to_png(image, "", image_uri, None)

@@ -30,23 +30,18 @@ class TextToImageInvocation(BaseInvocation):
     model: str                = Field(default='', description="The model to use (currently ignored)")
     progress_images: bool     = Field(default=False, description="Whether or not to produce progress images during generation")
 
-    def dispatch_progress(self, services: InvocationServices, sample: Any, step: int) -> None:
-        services.events.dispatch('progress', {
-            #'context_id': self.get_context_id(), # TODO: figure out how to do this
-            'invocation_id': self.id,
-#                'sample': sample,
-            'step': step,
-            'percent': float(step) / float(self.steps)
-        })
+    # TODO: pass this an emitter method or something? or a context for dispatching?
+    def dispatch_progress(self, services: InvocationServices, context_id: str, sample: Any, step: int) -> None:
+        services.events.emit_generator_progress(
+            context_id, self.id, step, float(step) / float(self.steps)
+        )
 
     def invoke(self, services: InvocationServices, context_id: str) -> ImageOutput:
         results = services.generate.prompt2image(
             prompt = self.prompt,
-            step_callback = lambda sample, step: self.dispatch_progress(services, sample, step),
+            step_callback = lambda sample, step: self.dispatch_progress(services, context_id, sample, step),
             **self.dict(exclude = {'prompt'}) # Shorthand for passing all of the parameters above manually
         )
-
-        # TODO: send events on progress
 
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?

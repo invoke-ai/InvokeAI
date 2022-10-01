@@ -97,7 +97,7 @@ async def invoke_context(
         return Response(status_code = 404)
     
     if not context.ready_to_invoke():
-        return Response(StatusCode = 400)
+        return Response(status_code = 400)
     
     ApiDependencies.invoker.invoke(context, invoke_all = all)
-    return Response(StatusCode=202)
+    return Response(status_code=202)

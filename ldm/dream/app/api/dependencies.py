@@ -1,7 +1,9 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import os
+from fastapi import FastAPI
 
+from ..api.sockets import SocketIO
 from ..services.image_storage import DiskImageStorage
 from ..services.context_manager import DiskContextManager
 from ..services.invocation_queue import MemoryInvocationQueue
@@ -16,8 +18,10 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def initialize(config,
-        event_handler_id: int
+    def initialize(
+        config,
+        event_handler_id: int,
+        socket_io: SocketIO
         ):
         # TODO: lazy-initialize this by wrapping it
         generate = Generate(
@@ -27,7 +31,7 @@ class ApiDependencies:
             full_precision=config.full_precision,
         )
 
-        events = FastAPIEventService(event_handler_id)
+        events = FastAPIEventService(event_handler_id, socket_io)
 
         output_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../outputs'))
 

@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 from ldm.dream.app.services.image_storage import ImageStorageBase
-from ..service_bases import EventServiceBase
+from .events import EventServiceBase
 from ....generate import Generate
 
 

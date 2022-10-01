@@ -61,6 +61,11 @@ class Invoker:
                 context = self.invoker_services.context_manager.get(queue_item.context_id)
                 invocation = context.invocations[queue_item.invocation_id]
 
+                # Send starting event
+                self.services.events.emit_invocation_started(
+                    context.id, invocation.id
+                )
+
                 # Invoke
                 outputs = invocation.invoke(self.services, context_id = context.id)
 
@@ -70,9 +75,16 @@ class Invoker:
                 # Save the context changes
                 self.invoker_services.context_manager.set(context)
 
+                # Send complete event
+                self.services.events.emit_invocation_complete(
+                    context.id, invocation.id, outputs.dict()
+                )
+
                 # Queue any further commands if invoking all
                 if queue_item.invoke_all and context.ready_to_invoke():
                     self.invoke(context, invoke_all = True)
+                elif not context.ready_to_invoke():
+                    self.services.events.emit_context_invocation_complete(context.id)
 
         except KeyboardInterrupt:
             ... # Log something?

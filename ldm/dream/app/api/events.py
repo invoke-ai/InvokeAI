@@ -2,23 +2,27 @@
 
 import asyncio
 from queue import Empty, Queue
-from typing import Any
+from typing import Any, Dict
 from fastapi_events.dispatcher import dispatch
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
-from ..service_bases import EventServiceBase
+from ..api.sockets import SocketIO
+from ..services.events import EventServiceBase
 import threading
 
 class FastAPIEventService(EventServiceBase):
     event_handler_id: int
+    __socket_io: SocketIO
     __queue: Queue
     __stop_event: threading.Event
 
-    def __init__(self, event_handler_id: int) -> None:
+    def __init__(self, event_handler_id: int, socket_io: SocketIO) -> None:
         self.event_handler_id = event_handler_id
+        self.__socket_io = socket_io
         self.__queue = Queue()
         self.__stop_event = threading.Event()
         asyncio.create_task(self.__dispatch_from_queue(stop_event = self.__stop_event))
+
         super().__init__()
 
 
@@ -53,8 +57,3 @@ class FastAPIEventService(EventServiceBase):
 
             except asyncio.CancelledError as e:
                 raise e # Raise a proper error
-
-
-@local_handler.register(event_name="progress")
-def handle_progress_event(event: Event):
-    print(event)

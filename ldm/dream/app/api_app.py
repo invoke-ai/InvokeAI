@@ -11,9 +11,10 @@ from fastapi_events.handlers.local import local_handler
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic.schema import schema
 import uvicorn
+from .api.sockets import SocketIO
 from .invocations import *
 from .invocations.baseinvocation import BaseInvocation
-from .api.routers import invocation, contexts
+from .api.routers import contexts, results
 from .api.dependencies import ApiDependencies
 from ..args import Args
 
@@ -45,6 +46,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# from fastapi_socketio import SocketManager
+
+# sio = SocketManager(app = app)
+
+# @app.sio.on('join')
+# async def handle_Join(sid, *args, **kwargs):
+#     ...
+
+socket_io = SocketIO(app)
+#initialize_sockets(app)
+
 config = {}
 
 # Add startup event to load dependencies
@@ -55,7 +67,9 @@ async def startup_event():
 
     ApiDependencies.initialize(
         config           = config,
-        event_handler_id = event_handler_id)
+        event_handler_id = event_handler_id,
+        socket_io        = socket_io
+    )
 
 # Shut down threads
 @app.on_event('shutdown')
@@ -70,6 +84,11 @@ async def shutdown_event():
 
 app.include_router(
     contexts.context_router,
+    prefix = '/api'
+)
+
+app.include_router(
+    results.results_router,
     prefix = '/api'
 )
 

@@ -16,7 +16,7 @@ from .services.invoker import Invoker, InvokerServices
 from .invocations import *
 from ..args import Args
 from ...generate import Generate
-from .service_bases import EventServiceBase
+from .services.events import EventServiceBase
 
 
 class Command(BaseModel):
