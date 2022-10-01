@@ -16,6 +16,7 @@ from ldm.dream.image_util import make_grid
 from ldm.dream.log import write_log
 from omegaconf import OmegaConf
 from backend.invoke_ai_web_server import InvokeAIWebServer
+from pathlib import Path
 
 
 def main():
@@ -123,6 +124,7 @@ def main():
 def main_loop(gen, opt, infile):
     """prompt/read/execute loop"""
     done = False
+    doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
     model_config = OmegaConf.load(opt.conf)[opt.model]
@@ -150,7 +152,8 @@ def main_loop(gen, opt, infile):
         try:
             command = get_next_command(infile)
         except EOFError:
-            done = True
+            done = doneAfterInFile
+            infile = None
             continue
 
         # skip empty lines
@@ -175,8 +178,14 @@ def main_loop(gen, opt, infile):
                 operation = 'postprocess'
 
             elif subcommand.startswith('fetch'):
-                file_path = command.replace('!fetch ','',1)
+                file_path = command.replace('!fetch','',1).strip()
                 retrieve_dream_command(opt,file_path,completer)
+                continue
+
+            elif subcommand.startswith('replay'):
+                file_path = command.replace('!replay','',1).strip()
+                if infile is None and os.path.isfile(file_path):
+                    infile = open(file_path, 'r', encoding='utf-8')
                 continue
 
             elif subcommand.startswith('history'):
@@ -510,18 +519,40 @@ def retrieve_dream_command(opt,file_path,completer):
     will retrieve and format the dream command used to generate the image,
     and pop it into the readline buffer (linux, Mac), or print out a comment
     for cut-and-paste (windows)
+    Given a wildcard path to a folder with image png files, 
+    will retrieve and format the dream command used to generate the images,
+    and save them to a file commands.txt for further processing
     '''
+    
     dir,basename = os.path.split(file_path)
     if len(dir) == 0:
-        path = os.path.join(opt.outdir,basename)
-    else:
-        path = file_path
+        dir = opt.outdir
     try:
-        cmd = dream_cmd_from_png(path)
-    except FileNotFoundError:
-        print(f'** {path}: file not found')
+        paths = list(Path(dir).glob(basename))
+    except ValueError:
+        print(f'## "{basename}": unacceptable pattern')
         return
-    completer.set_line(cmd)
+ 
+    commands = []
+    for path in paths:
+        try:
+            cmd = dream_cmd_from_png(path)
+        except OSError:
+            print(f'## {path}: file could not be read')
+            continue
+        except (KeyError, AttributeError):
+            print(f'## {path}: file has no metadata')
+            continue
+ 
+        commands.append(cmd)
+ 
+    outfile = os.path.join(dir,'commands.txt')
+    with open(outfile, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(commands))
+    print(f'>> File {outfile} with commands created')
+
+    if len(commands) == 1:
+       completer.set_line(commands[0])
 
 if __name__ == '__main__':
     main()
