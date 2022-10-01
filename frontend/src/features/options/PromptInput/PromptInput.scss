@@ -20,8 +20,8 @@
     }
 
     &[aria-invalid='true'] {
-      border: 2px solid var(--prompt-border-color-invalid);
-      box-shadow: 0 0 10px var(--prompt-border-color-invalid);
+      border: 2px solid var(--border-color-invalid);
+      box-shadow: 0 0 10px 0 var(--box-shadow-color-invalid);
     }
 
     &:disabled {
