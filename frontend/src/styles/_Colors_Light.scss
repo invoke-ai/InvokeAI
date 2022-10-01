@@ -11,7 +11,7 @@
   --text-color-secondary: rgb(40, 40, 40);
 
   --subtext-color: rgb(24, 24, 34);
-  --subtext-color-bright: rgb(48, 48, 64);
+  --subtext-color-bright: rgb(160, 162, 164);
 
   --border-color: rgb(200, 200, 200);
   --border-color-light: rgb(147, 147, 147);
@@ -21,7 +21,7 @@
 
   // Error status colors
   --border-color-invalid: rgb(255, 80, 50);
-  --box-shadow-color-invalid: rgb(210, 30, 10);
+  --box-shadow-color-invalid: none;
 
   --svg-color: rgb(220, 222, 224);
 
@@ -29,7 +29,7 @@
   --app-main-accent: rgb(235, 185, 5);
 
   // Progress Bar Color
-  --progress-bar-color: rgb(0, 0, 0);
+  --progress-bar-color: rgb(235, 185, 5);
 
   // Prompt Box Colors
   --prompt-bg-color: rgb(225, 227, 229);
@@ -46,7 +46,7 @@
   --btn-purple-hover: rgb(255, 200, 0);
 
   // Switch
-  --switch-bg-color: rgb(204, 206, 208);
+  --switch-bg-color: rgb(178, 180, 182);
   --switch-bg-active-color: rgb(235, 185, 5);
 
   // Tabs

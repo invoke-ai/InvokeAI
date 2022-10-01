@@ -10,7 +10,7 @@ export default function WorkPanel() {
     (state: RootState) => state.options.showAdvancedOptions
   );
   return (
-    <div className="app-options">
+    <div className="work-panel">
       <PromptInput />
       <ProcessButtons />
       <MainOptions />
