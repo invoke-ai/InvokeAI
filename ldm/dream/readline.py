@@ -44,6 +44,7 @@ COMMANDS = (
     '-save_orig','--save_original',
     '--skip_normalize','-x',
     '--log_tokenization','-t',
+    '--hires_fix',
     '!fix','!fetch','!history',
     )
 IMG_PATH_COMMANDS = (
