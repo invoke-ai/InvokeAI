@@ -1,4 +1,4 @@
-import { Flex, Image, useColorModeValue } from '@chakra-ui/react';
+import { Image } from '@chakra-ui/react';
 import { useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import { useState } from 'react';
@@ -12,11 +12,6 @@ import { MdPhoto } from 'react-icons/md';
 const CurrentImageDisplay = () => {
   const { currentImage, intermediateImage } = useAppSelector(
     (state: RootState) => state.gallery
-  );
-
-  const bgColor = useColorModeValue(
-    'rgba(255, 255, 255, 0.85)',
-    'rgba(0, 0, 0, 0.8)'
   );
 
   const [shouldShowImageDetails, setShouldShowImageDetails] =
@@ -40,22 +35,12 @@ const CurrentImageDisplay = () => {
           maxWidth={'100%'}
           maxHeight={'100%'}
         />
-      </div>
-      {shouldShowImageDetails && (
-        <div className="current-image-metadata-viewer">
-          <Flex
-            width={'100%'}
-            height={'100%'}
-            top={0}
-            left={0}
-            p={3}
-            boxSizing="border-box"
-            backgroundColor={bgColor}
-          >
+        {shouldShowImageDetails && (
+          <div className="current-image-metadata-viewer">
             <ImageMetadataViewer image={imageToDisplay} />
-          </Flex>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   ) : (
     <div className="current-image-display-placeholder">

@@ -1,17 +1,23 @@
 @use '../../styles/Mixins/' as *;
 
-.current-image-display,
-.current-image-display-placeholder {
+.current-image-display {
   display: grid;
-  grid-template-areas: 'current-image';
+  grid-template-areas:
+    'current-image-tools'
+    'current-image-preview';
+  grid-template-rows: auto 1fr;
   justify-items: center;
   background-color: var(--background-color-secondary);
   border-radius: 0.5rem;
-  height: $app-content-height;
 }
 
 .current-image-display-placeholder {
+  background-color: var(--background-color-secondary);
+  display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 
   svg {
     width: 10rem;
@@ -21,7 +27,7 @@
 }
 
 .current-image-tools {
-  grid-area: current-image;
+  grid-area: current-image-tools;
   width: 100%;
   height: 100%;
   display: grid;
@@ -46,28 +52,40 @@
 }
 
 .current-image-preview {
-  grid-area: current-image;
-  align-self: center;
-  padding: 4.5rem 0 1rem 0;
+  grid-area: current-image-preview;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  display: grid;
+  width: 100%;
 
   img {
     border-radius: 0.5rem;
     object-fit: contain;
     width: auto;
     max-height: $app-gallery-height;
-    z-index: 2;
   }
 }
 
 .current-image-metadata-viewer {
-  grid-area: current-image;
-  position: relative;
-  margin-top: 4.5rem;
   border-radius: 0.5rem;
-  width: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  height: $app-metadata-height;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% - 2rem);
+  padding: 0.5rem;
+  margin-left: 1rem;
+  background-color: var(--metadata-bg-color);
   z-index: 1;
   overflow: scroll;
-  @include HideScrollbar;
+  height: calc($app-metadata-height - 1rem);
+}
+
+.current-image-json-viewer {
+  border-radius: 0.5rem;
+  margin: 0 0.5rem 1rem 0.5rem;
+  padding: 1rem;
+  overflow-x: scroll;
+  word-break: break-all;
+  background-color: var(--metadata-json-bg-color);
 }

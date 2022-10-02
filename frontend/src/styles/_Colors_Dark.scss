@@ -14,7 +14,7 @@
   --subtext-color-bright: rgb(48, 48, 64);
 
   --border-color: rgb(30, 30, 46);
-  --border-color-light: rgb(60, 60, 7col6);
+  --border-color-light: rgb(60, 60, 76);
 
   --invalid: rgb(255, 75, 75);
   --invalid-secondary: rgb(120, 5, 5);
@@ -59,4 +59,8 @@
   --tab-list-text: rgb(0, 0, 0);
   --tab-list-text-inactive: rgb(160, 162, 192);
   --tab-panel-bg: rgb(20, 22, 28);
+
+  // Metadata Viewer
+  --metadata-bg-color: rgba(0,0,0,0.7);
+  --metadata-json-bg-color: rgba(255,255,255,0.1)
 }

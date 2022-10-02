@@ -40,12 +40,19 @@ type MetadataItemProps = {
   label: string;
   onClick?: () => void;
   value: number | string | boolean;
+  labelPosition?: string;
 };
 
 /**
  * Component to display an individual metadata item or parameter.
  */
-const MetadataItem = ({ label, value, onClick, isLink }: MetadataItemProps) => {
+const MetadataItem = ({
+  label,
+  value,
+  onClick,
+  isLink,
+  labelPosition,
+}: MetadataItemProps) => {
   return (
     <Flex gap={2}>
       {onClick && (
@@ -60,18 +67,20 @@ const MetadataItem = ({ label, value, onClick, isLink }: MetadataItemProps) => {
           />
         </Tooltip>
       )}
-      <Text fontWeight={'semibold'} whiteSpace={'nowrap'}>
-        {label}:
-      </Text>
-      {isLink ? (
-        <Link href={value.toString()} isExternal wordBreak={'break-all'}>
-          {value.toString()} <ExternalLinkIcon mx="2px" />
-        </Link>
-      ) : (
-        <Text maxHeight={100} wordBreak={'break-all'}>
-          {value.toString()}
+      <Flex direction={labelPosition ? 'column' : 'row'}>
+        <Text fontWeight={'semibold'} whiteSpace={'nowrap'} pr={2}>
+          {label}:
         </Text>
-      )}
+        {isLink ? (
+          <Link href={value.toString()} isExternal wordBreak={'break-all'}>
+            {value.toString()} <ExternalLinkIcon mx="2px" />
+          </Link>
+        ) : (
+          <Text overflowY={'scroll'} wordBreak={'break-all'}>
+            {value.toString()}
+          </Text>
+        )}
+      </Flex>
     </Flex>
   );
 };
@@ -94,7 +103,7 @@ const memoEqualityCheck = (
  */
 const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
   const dispatch = useAppDispatch();
-  const jsonBgColor = useColorModeValue('blackAlpha.100', 'whiteAlpha.100');
+  // const jsonBgColor = useColorModeValue('blackAlpha.100', 'whiteAlpha.100');
 
   const metadata = image?.metadata?.image || {};
   const {
@@ -130,9 +139,9 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
       </Flex>
       {Object.keys(metadata).length > 0 ? (
         <>
-          {type && <MetadataItem label="Type" value={type} />}
+          {type && <MetadataItem label="Generation type" value={type} />}
           {['esrgan', 'gfpgan'].includes(type) && (
-            <MetadataItem label="Original image" value={orig_path} isLink />
+            <MetadataItem label="Original image" value={orig_path} />
           )}
           {type === 'gfpgan' && strength !== undefined && (
             <MetadataItem
@@ -158,6 +167,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           {prompt && (
             <MetadataItem
               label="Prompt"
+              labelPosition="top"
               value={promptToString(prompt)}
               onClick={() => dispatch(setPrompt(prompt))}
             />
@@ -252,18 +262,16 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
           )}
           {postprocessing && postprocessing.length > 0 && (
             <>
-              {' '}
               <Heading size={'sm'}>Postprocessing</Heading>
               {postprocessing.map(
-                (postprocess: InvokeAI.PostProcessedImageMetadata, i: number) => {
+                (
+                  postprocess: InvokeAI.PostProcessedImageMetadata,
+                  i: number
+                ) => {
                   if (postprocess.type === 'esrgan') {
                     const { scale, strength } = postprocess;
                     return (
-                      <Flex
-                        pl={'2rem'}
-                        gap={1}
-                        direction={'column'}
-                      >
+                      <Flex key={i} pl={'2rem'} gap={1} direction={'column'}>
                         <Text size={'md'}>{`${i + 1}: Upscale (ESRGAN)`}</Text>
                         <MetadataItem
                           label="Scale"
@@ -282,12 +290,10 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
                   } else if (postprocess.type === 'gfpgan') {
                     const { strength } = postprocess;
                     return (
-                      <Flex
-                        pl={'2rem'}
-                        gap={1}
-                        direction={'column'}
-                      >
-                        <Text size={'md'}>{`${i + 1}: Face restoration (GFPGAN)`}</Text>
+                      <Flex key={i} pl={'2rem'} gap={1} direction={'column'}>
+                        <Text size={'md'}>{`${
+                          i + 1
+                        }: Face restoration (GFPGAN)`}</Text>
 
                         <MetadataItem
                           label="Strength"
@@ -315,16 +321,9 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               </Tooltip>
               <Text fontWeight={'semibold'}>Metadata JSON:</Text>
             </Flex>
-            <Box
-              // maxHeight={200}
-              overflowX={'scroll'}
-              flexGrow={3}
-              wordBreak={'break-all'}
-              bgColor={jsonBgColor}
-              padding={2}
-            >
+            <div className={'current-image-json-viewer'}>
               <pre>{metadataJSON}</pre>
-            </Box>
+            </div>
           </Flex>
         </>
       ) : (
