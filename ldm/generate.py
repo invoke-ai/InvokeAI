@@ -285,6 +285,8 @@ class Generate:
             codeformer_fidelity = None,
             save_original    = False,
             upscale          = None,
+            # this is specific to inpainting and causes more extreme inpainting
+            inpaint_replace  = False,
             # Set this True to handle KeyboardInterrupt internally
             catch_interrupts = False,
             hires_fix        = False,
@@ -430,6 +432,7 @@ class Generate:
                 strength=strength,
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
+                inpaint_replace=inpaint_replace,
             )
 
             if init_color:
@@ -950,10 +953,6 @@ class Generate:
         from ldm.dream.generator.base import downsampling
         image = image.resize((image.width//downsampling, image.height //
                               downsampling), resample=Image.Resampling.NEAREST)
-        # print(
-        #     f'>> DEBUG: writing the mask to mask.png'
-        #     )
-        # image.save('mask.png')
         image = np.array(image)
         image = image.astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)

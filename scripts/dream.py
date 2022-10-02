@@ -305,7 +305,7 @@ def main_loop(gen, opt, infile):
                         dream_prompt    = formatted_dream_prompt,
                         metadata        = metadata_dumps(
                             opt,
-                            seeds      = [seed],
+                            seeds      = [first_seed or seed],
                             model_hash = gen.model_hash,
                         ),
                         name      = filename,
@@ -324,7 +324,6 @@ def main_loop(gen, opt, infile):
                 opt.last_operation='generate'
                 gen.prompt2image(
                     image_callback=image_writer,
-#                    step_callback=gen.write_intermediate_images(5,'./outputs/img-samples/intermediates'), #DEBUGGING ONLY - DELETE
                     catch_interrupts=catch_ctrl_c,
                     **vars(opt)
                 )
@@ -433,6 +432,7 @@ def prepare_image_metadata(
         formatted_dream_prompt = '!fix '+opt.dream_prompt_str(seed=seed)
     else:
         formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
+
     return filename,formatted_dream_prompt
 
 def choose_postprocess_name(opt,prefix,seed) -> str:

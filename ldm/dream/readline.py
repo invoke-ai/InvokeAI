@@ -45,6 +45,7 @@ COMMANDS = (
     '--skip_normalize','-x',
     '--log_tokenization','-t',
     '--hires_fix',
+    '--inpaint_replace','-r',
     '!fix','!fetch','!history',
     )
 IMG_PATH_COMMANDS = (
