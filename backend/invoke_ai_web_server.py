@@ -310,37 +310,33 @@ class InvokeAIWebServer:
                     else 'unknown_seed'
                 )
 
-                match postprocessing_parameters['type']:
-                    case 'esrgan':
-                        progress.set_current_status('Upscaling')
-                    case 'gfpgan':
-                        progress.set_current_status('Restoring faces')
+                if postprocessing_parameters['type'] == 'esrgan':
+                    progress.set_current_status('Upscaling')
+                elif postprocessing_parameters['type'] == 'gfpgan':
+                    progress.set_current_status('Restoring faces')
 
                 socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
 
-                match postprocessing_parameters['type']:
-                    case 'esrgan':
-                        image = self.esrgan.process(
-                            image=image,
-                            upsampler_scale=postprocessing_parameters[
-                                'upscale'
-                            ][0],
-                            strength=postprocessing_parameters['upscale'][1],
-                            seed=seed,
-                        )
-                    case 'gfpgan':
-                        image = self.gfpgan.process(
-                            image=image,
-                            strength=postprocessing_parameters[
-                                'gfpgan_strength'
-                            ],
-                            seed=seed,
-                        )
-                    case _:
-                        raise TypeError(
-                            f'{postprocessing_parameters["type"]} is not a valid postprocessing type'
-                        )
+                if postprocessing_parameters['type'] == 'esrgan':
+                    image = self.esrgan.process(
+                        image=image,
+                        upsampler_scale=postprocessing_parameters['upscale'][
+                            0
+                        ],
+                        strength=postprocessing_parameters['upscale'][1],
+                        seed=seed,
+                    )
+                elif postprocessing_parameters['type'] == 'gfpgan':
+                    image = self.gfpgan.process(
+                        image=image,
+                        strength=postprocessing_parameters['gfpgan_strength'],
+                        seed=seed,
+                    )
+                else:
+                    raise TypeError(
+                        f'{postprocessing_parameters["type"]} is not a valid postprocessing type'
+                    )
 
                 progress.set_current_status('Saving image')
                 socketio.emit('progressUpdate', progress.to_formatted_dict())
