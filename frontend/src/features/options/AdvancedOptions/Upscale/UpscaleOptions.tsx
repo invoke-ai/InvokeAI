@@ -1,5 +1,3 @@
-import { Flex } from '@chakra-ui/react';
-
 import { RootState } from '../../../../app/store';
 import { useAppDispatch, useAppSelector } from '../../../../app/store';
 
@@ -62,7 +60,7 @@ const UpscaleOptions = () => {
   const handleChangeStrength = (v: number) => dispatch(setUpscalingStrength(v));
 
   return (
-    <Flex gap={2}>
+    <div className='upscale-options'>
       <IAISelect
         isDisabled={!isESRGANAvailable}
         label="Scale"
@@ -78,10 +76,9 @@ const UpscaleOptions = () => {
         max={1}
         onChange={handleChangeStrength}
         value={upscalingStrength}
-        width="90px"
         isInteger={false}
       />
-    </Flex>
+    </div>
   );
 };
 
