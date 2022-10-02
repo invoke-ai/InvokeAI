@@ -31,6 +31,6 @@
   }
 
   &:hover {
-    background-color: var(--tab-hover-color);
+    background-color: var(--tab-hover-color) !important;
   }
 }

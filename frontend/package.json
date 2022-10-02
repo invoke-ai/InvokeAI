@@ -12,7 +12,6 @@
   "dependencies": {
     "@chakra-ui/icons": "^2.0.10",
     "@chakra-ui/react": "^2.3.1",
-    "@emotion/cache": "^11.10.3",
     "@emotion/react": "^11.10.4",
     "@emotion/styled": "^11.10.4",
     "@reduxjs/toolkit": "^1.8.5",

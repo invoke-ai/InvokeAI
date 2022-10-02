@@ -14,24 +14,15 @@ import App from './app/App';
 
 // Custom Styling
 import './styles/index.scss';
-import createCache from '@emotion/cache';
-import { CacheProvider } from '@emotion/react';
-
-const emotionCache = createCache({
-  key: 'emotion-cache',
-  prepend: true,
-});
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <Provider store={store}>
       <PersistGate loading={<Loading />} persistor={persistor}>
-        <CacheProvider value={emotionCache}>
-          <ChakraProvider theme={theme}>
-            <ColorModeScript initialColorMode={theme.config.initialColorMode} />
-            <App />
-          </ChakraProvider>
-        </CacheProvider>
+        <ChakraProvider theme={theme}>
+          <ColorModeScript initialColorMode={theme.config.initialColorMode} />
+          <App />
+        </ChakraProvider>
       </PersistGate>
     </Provider>
   </React.StrictMode>
