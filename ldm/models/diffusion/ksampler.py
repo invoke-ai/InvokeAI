@@ -119,7 +119,7 @@ class KSampler(Sampler):
             'uncond': unconditional_conditioning,
             'cond_scale': unconditional_guidance_scale,
         }
-        print(f'>> Sampling with k__{self.schedule}')
+        print(f'>> Sampling with k_{self.schedule}')
         return (
             K.sampling.__dict__[f'sample_{self.schedule}'](
                 model_wrap_cfg, x, sigmas, extra_args=extra_args,
