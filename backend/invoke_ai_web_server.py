@@ -4,6 +4,7 @@ import os
 import shutil
 import mimetypes
 import traceback
+import math
 
 from flask import Flask, redirect, send_from_directory
 from flask_socketio import SocketIO
@@ -84,8 +85,7 @@ class InvokeAIWebServer:
         # Keep Server Alive Route
         @self.app.route('/flaskwebgui-keep-server-alive')
         def keep_alive():
-            return {"message": "Server Running"}
-
+            return {'message': 'Server Running'}
 
         # Outputs Route
         self.app.config['OUTPUTS_FOLDER'] = os.path.abspath(args.outdir)
@@ -109,16 +109,24 @@ class InvokeAIWebServer:
         self.load_socketio_listeners(self.socketio)
 
         if args.gui:
-            print(">> Launching Invoke AI GUI")
+            print('>> Launching Invoke AI GUI')
             close_server_on_exit = True
             if args.web_develop:
                 close_server_on_exit = False
             try:
-                FlaskUI(app=self.app, socketio=self.socketio, start_server="flask-socketio",
-                host=self.host, port=self.port, width=1600, height=1000,
-                close_server_on_exit=close_server_on_exit).run()
+                FlaskUI(
+                    app=self.app,
+                    socketio=self.socketio,
+                    start_server='flask-socketio',
+                    host=self.host,
+                    port=self.port,
+                    width=1600,
+                    height=1000,
+                    close_server_on_exit=close_server_on_exit,
+                ).run()
             except KeyboardInterrupt:
                 import sys
+
                 sys.exit(0)
         else:
             print('>> Started Invoke AI Web Server!')
@@ -130,7 +138,9 @@ class InvokeAIWebServer:
                 print(
                     '>> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address.'
                 )
-                print(f'>> Point your browser at http://{self.host}:{self.port}')
+                print(
+                    f'>> Point your browser at http://{self.host}:{self.port}'
+                )
             self.socketio.run(app=self.app, host=self.host, port=self.port)
 
     def setup_app(self):
@@ -274,116 +284,18 @@ class InvokeAIWebServer:
                 traceback.print_exc()
                 print('\n')
 
-        @socketio.on('runESRGAN')
-        def handle_run_esrgan_event(original_image, esrgan_parameters):
+        @socketio.on('runPostprocessing')
+        def handle_run_postprocessing(
+            original_image, postprocessing_parameters
+        ):
             try:
                 print(
-                    f'>> ESRGAN upscale requested for "{original_image["url"]}": {esrgan_parameters}'
-                )
-                progress = {
-                    'currentStep': 1,
-                    'totalSteps': 1,
-                    'currentIteration': 1,
-                    'totalIterations': 1,
-                    'currentStatus': 'Preparing',
-                    'isProcessing': True,
-                    'currentStatusHasSteps': False,
-                    'hasError': False,
-                }
-
-                socketio.emit('progressUpdate', progress)
-                eventlet.sleep(0)
-
-                original_image_path = self.get_image_path_from_url(
-                    original_image['url']
-                )
-                # os.path.join(self.result_path, os.path.basename(original_image['url']))
-
-                image = Image.open(original_image_path)
-
-                seed = (
-                    original_image['metadata']['seed']
-                    if 'seed' in original_image['metadata']
-                    else 'unknown_seed'
+                    f'>> Postprocessing requested for "{original_image["url"]}": {postprocessing_parameters}'
                 )
 
-                progress['currentStatus'] = 'Upscaling'
-                socketio.emit('progressUpdate', progress)
-                eventlet.sleep(0)
+                progress = Progress()
 
-                image = self.esrgan.process(
-                    image=image,
-                    upsampler_scale=esrgan_parameters['upscale'][0],
-                    strength=esrgan_parameters['upscale'][1],
-                    seed=seed,
-                )
-
-                progress['currentStatus'] = 'Saving image'
-                socketio.emit('progressUpdate', progress)
-                eventlet.sleep(0)
-
-                esrgan_parameters['seed'] = seed
-                metadata = self.parameters_to_post_processed_image_metadata(
-                    parameters=esrgan_parameters,
-                    original_image_path=original_image_path,
-                    type='esrgan',
-                )
-                command = parameters_to_command(esrgan_parameters)
-
-                path = self.save_image(
-                    image,
-                    command,
-                    metadata,
-                    self.result_path,
-                    postprocessing='esrgan',
-                )
-
-                self.write_log_message(
-                    f'[Upscaled] "{original_image_path}" > "{path}": {command}'
-                )
-
-                progress['currentStatus'] = 'Processing complete'
-                progress['currentStep'] = 0
-                progress['totalSteps'] = 0
-                progress['currentIteration'] = 0
-                progress['totalIterations'] = 0
-                progress['isProcessing'] = False
-                socketio.emit('progressUpdate', progress)
-                eventlet.sleep(0)
-
-                socketio.emit(
-                    'esrganResult',
-                    {
-                        'url': self.get_url_from_image_path(path),
-                        'mtime': os.path.getmtime(path),
-                        'metadata': metadata,
-                    },
-                )
-            except Exception as e:
-                self.socketio.emit('error', {'message': (str(e))})
-                print('\n')
-
-                traceback.print_exc()
-                print('\n')
-
-        @socketio.on('runGFPGAN')
-        def handle_run_gfpgan_event(original_image, gfpgan_parameters):
-            try:
-                print(
-                    f'>> GFPGAN face fix requested for "{original_image["url"]}": {gfpgan_parameters}'
-                )
-                progress = {
-                    'currentStep': 1,
-                    'totalSteps': 1,
-                    'currentIteration': 1,
-                    'totalIterations': 1,
-                    'currentStatus': 'Processing complete',
-                    'isProcessing': True,
-                    'currentStatusHasSteps': False,
-                    'hasError': False,
-                }
-
-                socketio.emit('progressUpdate', progress)
+                socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
 
                 original_image_path = self.get_image_path_from_url(
@@ -398,51 +310,68 @@ class InvokeAIWebServer:
                     else 'unknown_seed'
                 )
 
-                progress['currentStatus'] = 'Fixing faces'
-                socketio.emit('progressUpdate', progress)
+                match postprocessing_parameters['type']:
+                    case 'esrgan':
+                        progress.set_current_status('Upscaling')
+                    case 'gfpgan':
+                        progress.set_current_status('Restoring faces')
+
+                socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
 
-                image = self.gfpgan.process(
-                    image=image,
-                    strength=gfpgan_parameters['gfpgan_strength'],
-                    seed=seed,
-                )
+                match postprocessing_parameters['type']:
+                    case 'esrgan':
+                        image = self.esrgan.process(
+                            image=image,
+                            upsampler_scale=postprocessing_parameters[
+                                'upscale'
+                            ][0],
+                            strength=postprocessing_parameters['upscale'][1],
+                            seed=seed,
+                        )
+                    case 'gfpgan':
+                        image = self.gfpgan.process(
+                            image=image,
+                            strength=postprocessing_parameters[
+                                'gfpgan_strength'
+                            ],
+                            seed=seed,
+                        )
+                    case _:
+                        raise TypeError(
+                            f'{postprocessing_parameters["type"]} is not a valid postprocessing type'
+                        )
 
-                progress['currentStatus'] = 'Saving image'
-                socketio.emit('progressUpdate', progress)
+                progress.set_current_status('Saving image')
+                socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
 
-                gfpgan_parameters['seed'] = seed
+                postprocessing_parameters['seed'] = seed
                 metadata = self.parameters_to_post_processed_image_metadata(
-                    parameters=gfpgan_parameters,
+                    parameters=postprocessing_parameters,
                     original_image_path=original_image_path,
-                    type='gfpgan',
                 )
-                command = parameters_to_command(gfpgan_parameters)
 
-                path = self.save_image(
+                command = parameters_to_command(postprocessing_parameters)
+
+                path = self.save_result_image(
                     image,
                     command,
                     metadata,
                     self.result_path,
-                    postprocessing='gfpgan',
+                    postprocessing=postprocessing_parameters['type'],
                 )
 
                 self.write_log_message(
-                    f'[Fixed faces] "{original_image_path}" > "{path}": {command}'
+                    f'[Postprocessed] "{original_image_path}" > "{path}": {postprocessing_parameters}'
                 )
 
-                progress['currentStatus'] = 'Processing complete'
-                progress['currentStep'] = 0
-                progress['totalSteps'] = 0
-                progress['currentIteration'] = 0
-                progress['totalIterations'] = 0
-                progress['isProcessing'] = False
-                socketio.emit('progressUpdate', progress)
+                progress.mark_complete()
+                socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
 
                 socketio.emit(
-                    'gfpganResult',
+                    'postprocessingResult',
                     {
                         'url': self.get_url_from_image_path(path),
                         'mtime': os.path.getmtime(path),
@@ -483,19 +412,14 @@ class InvokeAIWebServer:
         def handle_upload_initial_image(bytes, name):
             try:
                 print(f'>> Init image upload requested "{name}"')
-                uuid = uuid4().hex
-                split = os.path.splitext(name)
-                name = f'{split[0]}.{uuid}{split[1]}'
-                file_path = os.path.join(self.init_image_path, name)
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                newFile = open(file_path, 'wb')
-                newFile.write(bytes)
+                file_path = self.save_file_unique_uuid_name(
+                    bytes=bytes, name=name, path=self.init_image_path
+                )
 
                 socketio.emit(
                     'initialImageUploaded',
                     {
                         'url': self.get_url_from_image_path(file_path),
-                        'uuid': '',
                     },
                 )
             except Exception as e:
@@ -510,19 +434,15 @@ class InvokeAIWebServer:
         def handle_upload_mask_image(bytes, name):
             try:
                 print(f'>> Mask image upload requested "{name}"')
-                uuid = uuid4().hex
-                split = os.path.splitext(name)
-                name = f'{split[0]}.{uuid}{split[1]}'
-                file_path = os.path.join(self.mask_image_path, name)
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                newFile = open(file_path, 'wb')
-                newFile.write(bytes)
+
+                file_path = self.save_file_unique_uuid_name(
+                    bytes=bytes, name=name, path=self.mask_image_path
+                )
 
                 socketio.emit(
                     'maskImageUploaded',
                     {
                         'url': self.get_url_from_image_path(file_path),
-                        'uuid': '',
                     },
                 )
             except Exception as e:
@@ -556,43 +476,10 @@ class InvokeAIWebServer:
             )
 
             """
-            TODO: RE-IMPLEMENT THE COMMENTED-OUT CODE
+            TODO:
             If a result image is used as an init image, and then deleted, we will want to be
-            able to use it as an init image in the future. Need to copy it.
-
-            If the init/mask image doesn't exist in the init_image_path/mask_image_path,
-            make a unique filename for it and copy it there.
+            able to use it as an init image in the future. Need to handle this case.
             """
-            # if 'init_img' in generation_parameters:
-            #     filename = os.path.basename(generation_parameters['init_img'])
-            #     abs_init_image_path = os.path.join(self.init_image_path, filename)
-            #     if not os.path.exists(
-            #         abs_init_image_path
-            #     ):
-            #         unique_filename = self.make_unique_init_image_filename(
-            #             filename
-            #         )
-            #         new_path = os.path.join(self.init_image_path, unique_filename)
-            #         shutil.copy(abs_init_image_path, new_path)
-            #         generation_parameters['init_img'] = os.path.abspath(new_path)
-            #     else:
-            #         generation_parameters['init_img'] = os.path.abspath(os.path.join(self.init_image_path, filename))
-
-            #     if 'init_mask' in generation_parameters:
-            #         filename = os.path.basename(generation_parameters['init_mask'])
-            #         if not os.path.exists(
-            #             os.path.join(self.mask_image_path, filename)
-            #         ):
-            #             unique_filename = self.make_unique_init_image_filename(
-            #                 filename
-            #             )
-            #             new_path = os.path.join(
-            #                 self.init_image_path, unique_filename
-            #             )
-            #             shutil.copy(generation_parameters['init_img'], new_path)
-            #             generation_parameters['init_mask'] = os.path.abspath(new_path)
-            #         else:
-            #             generation_parameters['init_mas'] = os.path.abspath(os.path.join(self.mask_image_path, filename))
 
             # We need to give absolute paths to the generator, stash the URLs for later
             init_img_url = None
@@ -622,18 +509,9 @@ class InvokeAIWebServer:
                 has_init_image='init_img' in generation_parameters,
             )
 
-            progress = {
-                'currentStep': 1,
-                'totalSteps': totalSteps,
-                'currentIteration': 1,
-                'totalIterations': generation_parameters['iterations'],
-                'currentStatus': 'Preparing',
-                'isProcessing': True,
-                'currentStatusHasSteps': False,
-                'hasError': False,
-            }
+            progress = Progress(generation_parameters=generation_parameters)
 
-            self.socketio.emit('progressUpdate', progress)
+            self.socketio.emit('progressUpdate', progress.to_formatted_dict())
             eventlet.sleep(0)
 
             def image_progress(sample, step):
@@ -644,9 +522,9 @@ class InvokeAIWebServer:
                 nonlocal generation_parameters
                 nonlocal progress
 
-                progress['currentStep'] = step + 1
-                progress['currentStatus'] = 'Generating'
-                progress['currentStatusHasSteps'] = True
+                progress.set_current_step(step + 1)
+                progress.set_current_status('Generating')
+                progress.set_current_status_has_steps(True)
 
                 if (
                     generation_parameters['progress_images']
@@ -659,7 +537,7 @@ class InvokeAIWebServer:
                     )
                     command = parameters_to_command(generation_parameters)
 
-                    path = self.save_image(
+                    path = self.save_result_image(
                         image,
                         command,
                         metadata,
@@ -677,7 +555,9 @@ class InvokeAIWebServer:
                             'metadata': metadata,
                         },
                     )
-                self.socketio.emit('progressUpdate', progress)
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
                 eventlet.sleep(0)
 
             def image_done(image, seed, first_seed):
@@ -692,8 +572,11 @@ class InvokeAIWebServer:
                 step_index = 1
                 nonlocal prior_variations
 
-                progress['currentStatus'] = 'Generation complete'
-                self.socketio.emit('progressUpdate', progress)
+                progress.set_current_status('Generation complete')
+
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
                 eventlet.sleep(0)
 
                 all_parameters = generation_parameters
@@ -720,9 +603,11 @@ class InvokeAIWebServer:
                     raise CanceledException
 
                 if esrgan_parameters:
-                    progress['currentStatus'] = 'Upscaling'
-                    progress['currentStatusHasSteps'] = False
-                    self.socketio.emit('progressUpdate', progress)
+                    progress.set_current_status('Upscaling')
+                    progress.set_current_status_has_steps(False)
+                    self.socketio.emit(
+                        'progressUpdate', progress.to_formatted_dict()
+                    )
                     eventlet.sleep(0)
 
                     image = self.esrgan.process(
@@ -742,9 +627,11 @@ class InvokeAIWebServer:
                     raise CanceledException
 
                 if gfpgan_parameters:
-                    progress['currentStatus'] = 'Fixing faces'
-                    progress['currentStatusHasSteps'] = False
-                    self.socketio.emit('progressUpdate', progress)
+                    progress.set_current_status('Restoring faces')
+                    progress.set_current_status_has_steps(False)
+                    self.socketio.emit(
+                        'progressUpdate', progress.to_formatted_dict()
+                    )
                     eventlet.sleep(0)
 
                     image = self.gfpgan.process(
@@ -757,8 +644,10 @@ class InvokeAIWebServer:
                         'strength'
                     ]
 
-                progress['currentStatus'] = 'Saving image'
-                self.socketio.emit('progressUpdate', progress)
+                progress.set_current_status('Saving image')
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
                 eventlet.sleep(0)
 
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
@@ -774,7 +663,7 @@ class InvokeAIWebServer:
 
                 command = parameters_to_command(all_parameters)
 
-                path = self.save_image(
+                path = self.save_result_image(
                     image,
                     command,
                     metadata,
@@ -785,19 +674,16 @@ class InvokeAIWebServer:
                 print(f'>> Image generated: "{path}"')
                 self.write_log_message(f'[Generated] "{path}": {command}')
 
-                if progress['totalIterations'] > progress['currentIteration']:
-                    progress['currentStep'] = 1
-                    progress['currentStatus'] = 'Iteration complete'
-                    progress['currentStatusHasSteps'] = False
+                if progress.total_iterations > progress.current_iteration:
+                    progress.set_current_step(1)
+                    progress.set_current_status('Iteration complete')
+                    progress.set_current_status_has_steps(False)
                 else:
-                    progress['currentStep'] = 0
-                    progress['totalSteps'] = 0
-                    progress['currentIteration'] = 0
-                    progress['totalIterations'] = 0
-                    progress['currentStatus'] = 'Processing complete'
-                    progress['isProcessing'] = False
+                    progress.mark_complete()
 
-                self.socketio.emit('progressUpdate', progress)
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
                 eventlet.sleep(0)
 
                 self.socketio.emit(
@@ -810,7 +696,7 @@ class InvokeAIWebServer:
                 )
                 eventlet.sleep(0)
 
-                progress['currentIteration'] += 1
+                progress.set_current_iteration(progress.current_iteration + 1)
 
             self.generate.prompt2image(
                 **generation_parameters,
@@ -938,30 +824,52 @@ class InvokeAIWebServer:
             print('\n')
 
     def parameters_to_post_processed_image_metadata(
-        self, parameters, original_image_path, type
+        self, parameters, original_image_path
     ):
         try:
-            # top-level metadata minus `image` or `images`
-            metadata = self.get_system_config()
+            current_metadata = retrieve_metadata(original_image_path)[
+                'sd-metadata'
+            ]
+            postprocessing_metadata = {}
 
-            orig_hash = calculate_init_img_hash(
-                self.get_image_path_from_url(original_image_path)
-            )
+            """
+            if we don't have an original image metadata to reconstruct,
+            need to record the original image and its hash
+            """
+            if 'image' not in current_metadata:
+                current_metadata['image'] = {}
 
-            image = {'orig_path': original_image_path, 'orig_hash': orig_hash}
+                orig_hash = calculate_init_img_hash(
+                    self.get_image_path_from_url(original_image_path)
+                )
 
-            if type == 'esrgan':
-                image['type'] = 'esrgan'
-                image['scale'] = parameters['upscale'][0]
-                image['strength'] = parameters['upscale'][1]
-            elif type == 'gfpgan':
-                image['type'] = 'gfpgan'
-                image['strength'] = parameters['gfpgan_strength']
+                postprocessing_metadata['orig_path'] = (original_image_path,)
+                postprocessing_metadata['orig_hash'] = orig_hash
+
+            if parameters['type'] == 'esrgan':
+                postprocessing_metadata['type'] = 'esrgan'
+                postprocessing_metadata['scale'] = parameters['upscale'][0]
+                postprocessing_metadata['strength'] = parameters['upscale'][1]
+            elif parameters['type'] == 'gfpgan':
+                postprocessing_metadata['type'] = 'gfpgan'
+                postprocessing_metadata['strength'] = parameters[
+                    'gfpgan_strength'
+                ]
             else:
-                raise TypeError(f'Invalid type: {type}')
+                raise TypeError(f"Invalid type: {parameters['type']}")
 
-            metadata['image'] = image
-            return metadata
+            if 'postprocessing' in current_metadata['image'] and isinstance(
+                current_metadata['image']['postprocessing'], list
+            ):
+                current_metadata['image']['postprocessing'].append(
+                    postprocessing_metadata
+                )
+            else:
+                current_metadata['image']['postprocessing'] = [
+                    postprocessing_metadata
+                ]
+
+            return current_metadata
 
         except Exception as e:
             self.socketio.emit('error', {'message': (str(e))})
@@ -970,7 +878,7 @@ class InvokeAIWebServer:
             traceback.print_exc()
             print('\n')
 
-    def save_image(
+    def save_result_image(
         self,
         image,
         command,
@@ -1095,6 +1003,96 @@ class InvokeAIWebServer:
 
             traceback.print_exc()
             print('\n')
+
+    def save_file_unique_uuid_name(self, bytes, name, path):
+        try:
+            uuid = uuid4().hex
+            split = os.path.splitext(name)
+            name = f'{split[0]}.{uuid}{split[1]}'
+            file_path = os.path.join(path, name)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            newFile = open(file_path, 'wb')
+            newFile.write(bytes)
+            return file_path
+        except Exception as e:
+            self.socketio.emit('error', {'message': (str(e))})
+            print('\n')
+
+            traceback.print_exc()
+            print('\n')
+
+
+class Progress:
+    def __init__(self, generation_parameters=None):
+        self.current_step = 1
+        self.total_steps = (
+            self._calculate_real_steps(
+                steps=generation_parameters['steps'],
+                strength=generation_parameters['strength']
+                if 'strength' in generation_parameters
+                else None,
+                has_init_image='init_img' in generation_parameters,
+            )
+            if generation_parameters
+            else 1
+        )
+        self.current_iteration = 1
+        self.total_iterations = (
+            generation_parameters['iterations'] if generation_parameters else 1
+        )
+        self.current_status = 'Preparing'
+        self.is_processing = True
+        self.current_status_has_steps = False
+        self.has_error = False
+
+    def set_current_step(self, current_step):
+        self.current_step = current_step
+
+    def set_total_steps(self, total_steps):
+        self.total_steps = total_steps
+
+    def set_current_iteration(self, current_iteration):
+        self.current_iteration = current_iteration
+
+    def set_total_iterations(self, total_iterations):
+        self.total_iterations = total_iterations
+
+    def set_current_status(self, current_status):
+        self.current_status = current_status
+
+    def set_is_processing(self, is_processing):
+        self.is_processing = is_processing
+
+    def set_current_status_has_steps(self, current_status_has_steps):
+        self.current_status_has_steps = current_status_has_steps
+
+    def set_has_error(self, has_error):
+        self.has_error = has_error
+
+    def mark_complete(self):
+        self.current_status = 'Processing complete'
+        self.current_step = 0
+        self.total_steps = 0
+        self.current_iteration = 0
+        self.total_iterations = 0
+        self.is_processing = False
+
+    def to_formatted_dict(
+        self,
+    ):
+        return {
+            'currentStep': self.current_step,
+            'totalSteps': self.total_steps,
+            'currentIteration': self.current_iteration,
+            'totalIterations': self.total_iterations,
+            'currentStatus': self.current_status,
+            'isProcessing': self.is_processing,
+            'currentStatusHasSteps': self.current_status_has_steps,
+            'hasError': self.has_error,
+        }
+
+    def _calculate_real_steps(self, steps, strength, has_init_image):
+        return math.floor(strength * steps) if has_init_image else steps
 
 
 class CanceledException(Exception):

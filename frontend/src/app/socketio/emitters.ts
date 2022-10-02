@@ -50,7 +50,10 @@ const makeSocketIOEmitters = (
       const esrganParameters = {
         upscale: [upscalingLevel, upscalingStrength],
       };
-      socketio.emit('runESRGAN', imageToProcess, esrganParameters);
+      socketio.emit('runPostprocessing', imageToProcess, {
+        type: 'esrgan',
+        ...esrganParameters,
+      });
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -68,7 +71,10 @@ const makeSocketIOEmitters = (
       const gfpganParameters = {
         gfpgan_strength: gfpganStrength,
       };
-      socketio.emit('runGFPGAN', imageToProcess, gfpganParameters);
+      socketio.emit('runPostprocessing', imageToProcess, {
+        type: 'gfpgan',
+        ...gfpganParameters,
+      });
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),

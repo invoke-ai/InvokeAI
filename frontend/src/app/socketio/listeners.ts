@@ -128,7 +128,7 @@ const makeSocketIOListeners = (
     /**
      * Callback to run when we receive an 'esrganResult' event.
      */
-    onESRGANResult: (data: InvokeAI.ImageResultResponse) => {
+    onPostprocessingResult: (data: InvokeAI.ImageResultResponse) => {
       try {
         const { url, metadata, mtime } = data;
 
@@ -144,7 +144,7 @@ const makeSocketIOListeners = (
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Upscaled: ${url}`,
+            message: `Postprocessed: ${url}`,
           })
         );
       } catch (e) {

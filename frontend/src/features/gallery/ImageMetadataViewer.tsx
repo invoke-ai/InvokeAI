@@ -2,6 +2,7 @@ import {
   Box,
   Center,
   Flex,
+  Heading,
   IconButton,
   Link,
   Text,
@@ -249,38 +250,57 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               onClick={() => dispatch(setShouldFitToWidthHeight(fit))}
             />
           )}
-          {postprocessing &&
-            postprocessing.length > 0 &&
-            postprocessing.map(
-              (postprocess: InvokeAI.PostProcessedImageMetadata) => {
-                if (postprocess.type === 'esrgan') {
-                  const { scale, strength } = postprocess;
-                  return (
-                    <>
-                      <MetadataItem
-                        label="Upscaling scale"
-                        value={scale}
-                        onClick={() => dispatch(setUpscalingLevel(scale))}
-                      />
-                      <MetadataItem
-                        label="Upscaling strength"
-                        value={strength}
-                        onClick={() => dispatch(setUpscalingStrength(strength))}
-                      />
-                    </>
-                  );
-                } else if (postprocess.type === 'gfpgan') {
-                  const { strength } = postprocess;
-                  return (
-                    <MetadataItem
-                      label="Fix faces strength"
-                      value={strength}
-                      onClick={() => dispatch(setGfpganStrength(strength))}
-                    />
-                  );
+          {postprocessing && postprocessing.length > 0 && (
+            <>
+              {' '}
+              <Heading size={'sm'}>Postprocessing</Heading>
+              {postprocessing.map(
+                (postprocess: InvokeAI.PostProcessedImageMetadata, i: number) => {
+                  if (postprocess.type === 'esrgan') {
+                    const { scale, strength } = postprocess;
+                    return (
+                      <Flex
+                        pl={'2rem'}
+                        gap={1}
+                        direction={'column'}
+                      >
+                        <Text size={'md'}>{`${i + 1}: Upscale (ESRGAN)`}</Text>
+                        <MetadataItem
+                          label="Scale"
+                          value={scale}
+                          onClick={() => dispatch(setUpscalingLevel(scale))}
+                        />
+                        <MetadataItem
+                          label="Strength"
+                          value={strength}
+                          onClick={() =>
+                            dispatch(setUpscalingStrength(strength))
+                          }
+                        />
+                      </Flex>
+                    );
+                  } else if (postprocess.type === 'gfpgan') {
+                    const { strength } = postprocess;
+                    return (
+                      <Flex
+                        pl={'2rem'}
+                        gap={1}
+                        direction={'column'}
+                      >
+                        <Text size={'md'}>{`${i + 1}: Face restoration (GFPGAN)`}</Text>
+
+                        <MetadataItem
+                          label="Strength"
+                          value={strength}
+                          onClick={() => dispatch(setGfpganStrength(strength))}
+                        />
+                      </Flex>
+                    );
+                  }
                 }
-              }
-            )}
+              )}
+            </>
+          )}
           <Flex gap={2} direction={'column'}>
             <Flex gap={2}>
               <Tooltip label={`Copy metadata JSON`}>
