@@ -108,35 +108,43 @@ const CurrentImageButtons = ({
         onClick={handleClickUseSeed}
       />
 
-      <InvokePopover title="Upscale" popoverOptions={<UpscaleOptions />}>
-        <IAIIconButton
-          icon={<MdHd />}
-          aria-label="Upscale"
-          isDisabled={
-            !isESRGANAvailable ||
-            Boolean(intermediateImage) ||
-            !(isConnected && !isProcessing) ||
-            !upscalingLevel
-          }
-          onClick={handleClickUpscale}
-        />
+      <InvokePopover
+        title="Upscale"
+        styleClass="upscale-popover"
+        popoverOptions={<UpscaleOptions />}
+        actionButton={
+          <IAIButton
+            label={'Upscale Image'}
+            isDisabled={
+              !isESRGANAvailable ||
+              Boolean(intermediateImage) ||
+              !(isConnected && !isProcessing) ||
+              !upscalingLevel
+            }
+            onClick={handleClickUpscale}
+          />
+        }
+      >
+        <IAIIconButton icon={<MdHd />} aria-label="Upscale" />
       </InvokePopover>
 
       <InvokePopover
         title="Restore Faces"
         popoverOptions={<FaceRestoreOptions />}
+        actionButton={
+          <IAIButton
+            label={'Restore Faces'}
+            isDisabled={
+              !isGFPGANAvailable ||
+              Boolean(intermediateImage) ||
+              !(isConnected && !isProcessing) ||
+              !gfpganStrength
+            }
+            onClick={handleClickFixFaces}
+          />
+        }
       >
-        <IAIIconButton
-          icon={<MdFace />}
-          aria-label="Restore Faces"
-          isDisabled={
-            !isGFPGANAvailable ||
-            Boolean(intermediateImage) ||
-            !(isConnected && !isProcessing) ||
-            !gfpganStrength
-          }
-          onClick={handleClickFixFaces}
-        />
+        <IAIIconButton icon={<MdFace />} aria-label="Restore Faces" />
       </InvokePopover>
 
       <IAIIconButton
@@ -145,6 +153,7 @@ const CurrentImageButtons = ({
         aria-label="Details"
         onClick={handleClickShowImageDetails}
       />
+
       <DeleteImageModal image={image}>
         <IAIIconButton
           icon={<MdDelete />}

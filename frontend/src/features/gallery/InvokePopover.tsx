@@ -13,6 +13,7 @@ type PopoverProps = {
   delay?: number;
   styleClass?: string;
   popoverOptions?: ReactNode;
+  actionButton?: ReactNode;
   children: ReactNode;
 };
 
@@ -21,6 +22,7 @@ const InvokePopover = ({
   styleClass,
   delay = 50,
   popoverOptions,
+  actionButton,
   children,
 }: PopoverProps) => {
   return (
@@ -33,6 +35,7 @@ const InvokePopover = ({
         <PopoverHeader className="popover-header">{title}</PopoverHeader>
         <div className="popover-options">
           {popoverOptions ? popoverOptions : null}
+          {actionButton}
         </div>
       </PopoverContent>
     </Popover>

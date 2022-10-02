@@ -10,10 +10,10 @@ interface Props extends IconButtonProps {
  * TODO: Get rid of this.
  */
 const IAIIconButton = (props: Props) => {
-  const { tooltip = '', ...rest } = props;
+  const { tooltip = '', onClick, ...rest } = props;
   return (
     <Tooltip label={tooltip}>
-      <IconButton {...rest} />
+      <IconButton {...rest} cursor={onClick ? 'pointer' : 'unset'} onClick={onClick}/>
     </Tooltip>
   );
 };
