@@ -45,16 +45,13 @@ const FaceRestoreOptions = () => {
   const dispatch = useAppDispatch();
   const { gfpganStrength } = useAppSelector(optionsSelector);
   const { isGFPGANAvailable } = useAppSelector(systemSelector);
-  const shouldRunGFPGAN = useAppSelector(
-    (state: RootState) => state.options.shouldRunGFPGAN
-  );
 
   const handleChangeStrength = (v: number) => dispatch(setGfpganStrength(v));
 
   return (
     <Flex direction={'column'} gap={2}>
       <IAINumberInput
-        isDisabled={!isGFPGANAvailable || !shouldRunGFPGAN}
+        isDisabled={!isGFPGANAvailable}
         label="Strength"
         step={0.05}
         min={0}

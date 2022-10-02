@@ -10,6 +10,8 @@ import {
 import _ from 'lodash';
 import { FocusEvent, useEffect, useState } from 'react';
 
+const numberStringRegex = /^-?0?\.?$/;
+
 interface Props extends Omit<NumberInputProps, 'onChange'> {
   styleClass?: string;
   label?: string;
@@ -63,15 +65,15 @@ const IAINumberInput = (props: Props) => {
    * from the current value.
    */
   useEffect(() => {
-    if (value !== Number(valueAsString)) {
+    if (!valueAsString.match(numberStringRegex) && value !== Number(valueAsString)) {
       setValueAsString(String(value));
     }
-  }, [value]);
+  }, [value, valueAsString]);
 
   const handleOnChange = (v: string) => {
     setValueAsString(v);
     // This allows negatives and decimals e.g. '-123', `.5`, `-0.2`, etc.
-    if (!v.match(/-?0?\.?/)) {
+    if (!v.match(numberStringRegex)) {
       // Cast the value to number. Floor it if it should be an integer.
       onChange(isInteger ? Math.floor(Number(v)) : Number(v));
     }

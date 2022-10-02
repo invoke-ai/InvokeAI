@@ -16,6 +16,8 @@ import IAIButton from '../../common/components/IAIButton';
 import { runESRGAN, runGFPGAN } from '../../app/socketio/actions';
 import IAIIconButton from '../../common/components/IAIIconButton';
 import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
+import UpscalePopover from './UpscalePopover';
+import FaceRestorePopover from './FaceRestorePopover';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -105,30 +107,34 @@ const CurrentImageButtons = ({
         onClick={handleClickUseSeed}
       />
 
-      <IAIIconButton
-        icon={<MdHd />}
-        tooltip="Upscale"
-        aria-label="Upscale"
-        isDisabled={
-          !isESRGANAvailable ||
-          Boolean(intermediateImage) ||
-          !(isConnected && !isProcessing) ||
-          !upscalingLevel
-        }
-        onClick={handleClickUpscale}
-      />
-      <IAIIconButton
-        icon={<MdFace />}
-        tooltip="Restore Faces"
-        aria-label="Restore Faces"
-        isDisabled={
-          !isGFPGANAvailable ||
-          Boolean(intermediateImage) ||
-          !(isConnected && !isProcessing) ||
-          !gfpganStrength
-        }
-        onClick={handleClickFixFaces}
-      />
+      <UpscalePopover>
+        <IAIIconButton
+          icon={<MdHd />}
+          aria-label="Upscale"
+          isDisabled={
+            !isESRGANAvailable ||
+            Boolean(intermediateImage) ||
+            !(isConnected && !isProcessing) ||
+            !upscalingLevel
+          }
+          onClick={handleClickUpscale}
+        />
+      </UpscalePopover>
+
+      <FaceRestorePopover>
+        <IAIIconButton
+          icon={<MdFace />}
+          aria-label="Restore Faces"
+          isDisabled={
+            !isGFPGANAvailable ||
+            Boolean(intermediateImage) ||
+            !(isConnected && !isProcessing) ||
+            !gfpganStrength
+          }
+          onClick={handleClickFixFaces}
+        />
+      </FaceRestorePopover>
+
       <IAIIconButton
         icon={<MdInfo />}
         tooltip="Details"

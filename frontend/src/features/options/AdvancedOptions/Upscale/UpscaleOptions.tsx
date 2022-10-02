@@ -53,9 +53,7 @@ const systemSelector = createSelector(
 const UpscaleOptions = () => {
   const dispatch = useAppDispatch();
   const { upscalingLevel, upscalingStrength } = useAppSelector(optionsSelector);
-  const shouldRunESRGAN = useAppSelector(
-    (state: RootState) => state.options.shouldRunESRGAN
-  );
+
   const { isESRGANAvailable } = useAppSelector(systemSelector);
 
   const handleChangeLevel = (e: ChangeEvent<HTMLSelectElement>) =>
@@ -66,14 +64,14 @@ const UpscaleOptions = () => {
   return (
     <Flex gap={2}>
       <IAISelect
-        isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
+        isDisabled={!isESRGANAvailable}
         label="Scale"
         value={upscalingLevel}
         onChange={handleChangeLevel}
         validValues={UPSCALING_LEVELS}
       />
       <IAINumberInput
-        isDisabled={!isESRGANAvailable || !shouldRunESRGAN}
+        isDisabled={!isESRGANAvailable}
         label="Strength"
         step={0.05}
         min={0}
