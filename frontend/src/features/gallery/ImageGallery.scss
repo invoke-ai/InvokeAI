@@ -34,3 +34,18 @@
   overflow-y: scroll;
   @include HideScrollbar;
 }
+
+.image-gallery-load-more-btn {
+  background-color: var(--btn-load-more) !important;
+  font-size: 0.85rem !important;
+
+  &:disabled {
+    &:hover {
+      background-color: var(--btn-load-more) !important;
+    }
+  }
+
+  &:hover {
+    background-color: var(--btn-load-more-hover) !important;
+  }
+}
