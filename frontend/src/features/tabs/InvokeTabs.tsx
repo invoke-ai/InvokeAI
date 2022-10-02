@@ -5,16 +5,41 @@ import InpaintingWIP from '../../common/components/WorkInProgress/InpaintingWIP'
 import NodesWIP from '../../common/components/WorkInProgress/NodesWIP';
 import OutpaintingWIP from '../../common/components/WorkInProgress/OutpaintingWIP';
 import { PostProcessingWIP } from '../../common/components/WorkInProgress/PostProcessingWIP';
+import ImageToImageIcon from '../../common/icons/ImageToImageIcon';
+import InpaintIcon from '../../common/icons/InpaintIcon';
+import NodesIcon from '../../common/icons/NodesIcon';
+import OutpaintIcon from '../../common/icons/OutpaintIcon';
+import PostprocessingIcon from '../../common/icons/PostprocessingIcon';
+import TextToImageIcon from '../../common/icons/TextToImageIcon';
 import TextToImage from './TextToImage/TextToImage';
+
 
 export default function InvokeTabs() {
   const tab_dict = {
-    txt2img: { title: 'TI', panel: <TextToImage /> },
-    img2img: { title: 'II', panel: <ImageToImageWIP /> },
-    inpainting: { title: 'IN', panel: <InpaintingWIP /> },
-    outpainting: { title: 'OP', panel: <OutpaintingWIP /> },
-    nodes: { title: 'ND', panel: <NodesWIP /> },
-    postprocess: { title: 'PP', panel: <PostProcessingWIP /> },
+    txt2img: {
+      title: <TextToImageIcon fill={'black'} boxSize={'2.5rem'} />,
+      panel: <TextToImage />,
+    },
+    img2img: {
+      title: <ImageToImageIcon fill={'black'} boxSize={'2.5rem'} />,
+      panel: <ImageToImageWIP />,
+    },
+    inpainting: {
+      title: <InpaintIcon fill={'black'} boxSize={'2.5rem'} />,
+      panel: <InpaintingWIP />,
+    },
+    outpainting: {
+      title: <OutpaintIcon fill={'black'} boxSize={'2.5rem'} />,
+      panel: <OutpaintingWIP />,
+    },
+    nodes: {
+      title: <NodesIcon fill={'black'} boxSize={'2.5rem'} />,
+      panel: <NodesWIP />,
+    },
+    postprocess: {
+      title: <PostprocessingIcon fill={'black'} boxSize={'2.5rem'} />,
+      panel: <PostProcessingWIP />,
+    },
   };
 
   const renderTabs = () => {
@@ -40,7 +65,7 @@ export default function InvokeTabs() {
   };
 
   return (
-    <Tabs className="app-tabs">
+    <Tabs className="app-tabs" variant={'unstyled'}>
       <div className="app-tabs-list">{renderTabs()}</div>
       <TabPanels className="app-tabs-panels">{renderTabPanels()}</TabPanels>
     </Tabs>
