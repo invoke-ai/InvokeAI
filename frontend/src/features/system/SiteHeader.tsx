@@ -2,8 +2,9 @@ import { IconButton, Link, useColorMode } from '@chakra-ui/react';
 
 import { FaSun, FaMoon, FaGithub } from 'react-icons/fa';
 import { MdHelp, MdSettings } from 'react-icons/md';
-import SettingsModal from '../system/SettingsModal';
+
 import InvokeAILogo from '../../assets/images/logo.png';
+import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 
 /**

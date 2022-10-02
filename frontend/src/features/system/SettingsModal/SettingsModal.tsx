@@ -1,10 +1,7 @@
 import {
   Button,
   Flex,
-  FormControl,
-  FormLabel,
   Heading,
-  HStack,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -12,22 +9,21 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Switch,
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import {
-  setShouldConfirmOnDelete,
-  setShouldDisplayInProgress,
-  setShouldDisplayGuides,
-  SystemState,
-} from './systemSlice';
-import { RootState } from '../../app/store';
-import { persistor } from '../../main';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { cloneElement, ReactElement } from 'react';
+import { RootState, useAppSelector } from '../../../app/store';
+import { persistor } from '../../../main';
+import {
+  setShouldConfirmOnDelete,
+  setShouldDisplayGuides,
+  setShouldDisplayInProgress,
+  SystemState,
+} from '../systemSlice';
+import SettingsModalItem from './SettingsModalItem';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -78,8 +74,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldDisplayGuides,
   } = useAppSelector(systemSelector);
 
-  const dispatch = useAppDispatch();
-
   /**
    * Resets localstorage, then opens a secondary modal informing user to
    * refresh their browser.
@@ -99,49 +93,31 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
 
       <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
         <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Settings</ModalHeader>
+        <ModalContent className="settings-modal">
+          <ModalHeader className="settings-modal-header">Settings</ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
-            <Flex gap={5} direction="column">
-              <FormControl>
-                <HStack>
-                  <FormLabel marginBottom={1}>
-                    Display in-progress images (slower)
-                  </FormLabel>
-                  <Switch
-                    isChecked={shouldDisplayInProgress}
-                    onChange={(e) =>
-                      dispatch(setShouldDisplayInProgress(e.target.checked))
-                    }
-                  />
-                </HStack>
-              </FormControl>
-              <FormControl>
-                <HStack>
-                  <FormLabel marginBottom={1}>Confirm on delete</FormLabel>
-                  <Switch
-                    isChecked={shouldConfirmOnDelete}
-                    onChange={(e) =>
-                      dispatch(setShouldConfirmOnDelete(e.target.checked))
-                    }
-                  />
-                </HStack>
-              </FormControl>
-              <FormControl>
-                <HStack>
-                  <FormLabel marginBottom={1}>
-                    Display help guides in configuration menus
-                  </FormLabel>
-                  <Switch
-                    isChecked={shouldDisplayGuides}
-                    onChange={(e) =>
-                      dispatch(setShouldDisplayGuides(e.target.checked))
-                    }
-                  />
-                </HStack>
-              </FormControl>
+          <ModalBody className="settings-modal-content">
+            <div className="settings-modal-items">
+              <SettingsModalItem
+                settingTitle="Display In-Progress Images (slower)"
+                isChecked={shouldDisplayInProgress}
+                dispatcher={setShouldDisplayInProgress}
+              />
 
+              <SettingsModalItem
+                settingTitle="Confirm on Delete"
+                isChecked={shouldConfirmOnDelete}
+                dispatcher={setShouldConfirmOnDelete}
+              />
+
+              <SettingsModalItem
+                settingTitle="Display Help Icons"
+                isChecked={shouldDisplayGuides}
+                dispatcher={setShouldDisplayGuides}
+              />
+            </div>
+
+            <div className="settings-modal-reset">
               <Heading size={'md'}>Reset Web UI</Heading>
               <Text>
                 Resetting the web UI only resets the browser's local cache of
@@ -156,7 +132,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               <Button colorScheme="red" onClick={handleClickResetWebUI}>
                 Reset Web UI
               </Button>
-            </Flex>
+            </div>
           </ModalBody>
 
           <ModalFooter>

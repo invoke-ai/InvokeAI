@@ -36,14 +36,14 @@ const InitAndMaskImage = () => {
             src={initialImagePath}
             rounded={'md'}
             className={'checkerboard'}
-            maxWidth={350}
+            maxWidth={320}
           />
           {shouldShowMask && maskPath && (
             <Image
               position={'absolute'}
               top={0}
               left={0}
-              maxWidth={350}
+              maxWidth={320}
               fit={'contain'}
               src={maskPath}
               rounded={'md'}
