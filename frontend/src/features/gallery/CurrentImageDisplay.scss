@@ -7,7 +7,7 @@
   justify-items: center;
   background-color: var(--background-color-secondary);
   border-radius: 0.5rem;
-  height: calc(100vh - 10rem);
+  height: $app-content-height;
 }
 
 .current-image-display-placeholder {
@@ -54,7 +54,7 @@
     border-radius: 0.5rem;
     object-fit: contain;
     width: auto;
-    max-height: calc(100vh - 16rem);
+    max-height: $app-gallery-height;
     z-index: 2;
   }
 }
@@ -66,7 +66,7 @@
   border-radius: 0.5rem;
   width: 100%;
   background-color: rgba(0, 0, 0, 0.7);
-  height: calc(100vh - 11rem);
+  height: $app-metadata-height;
   z-index: 1;
   overflow: scroll;
   @include HideScrollbar;

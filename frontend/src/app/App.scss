@@ -1,3 +1,5 @@
+@use '../styles/Mixins/' as *;
+
 .App {
   display: grid;
 }
@@ -10,6 +12,6 @@
   border-radius: 0.5rem;
   background-color: var(--background-color);
   grid-auto-rows: max-content;
-  width: calc(100vw - 1.6rem);
-  height: calc(100vh - 1.6rem);
+  width: $app-width;
+  height: $app-height;
 }

@@ -1,11 +1,16 @@
+@use '../../styles/Mixins/' as *;
+
 .app-tabs {
-  display: grid;
-  row-gap: 1rem;
+  display: grid !important;
+  grid-template-columns: min-content auto;
+  column-gap: 1rem;
 }
 
 .app-tabs-list {
   display: grid;
-  grid-template-columns: repeat(6, max-content);
+  // grid-template-columns: repeat(6, max-content);
+  grid-auto-rows: max-content;
+
   color: var(--tab-list-text-inactive);
 
   button {
@@ -20,5 +25,11 @@
 
   button {
     font-size: 0.85rem;
+  }
+}
+
+.app-tabs-panels {
+  .app-tabs-panel {
+    padding: 0;
   }
 }

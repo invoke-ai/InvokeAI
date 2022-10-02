@@ -1,7 +1,9 @@
+@use '../../../styles/Mixins/' as *;
+
 .work-in-progress {
   display: grid;
   width: 100%;
-  height: calc(100vh - 10rem);
+  height: $app-content-height;
   grid-auto-rows: max-content;
   background-color: var(--background-color-secondary);
   border-radius: 0.4rem;

@@ -31,7 +31,7 @@ export default function InvokeTabs() {
     const tabPanelsToRender: ReactElement[] = [];
     Object.keys(tab_dict).forEach((key) => {
       tabPanelsToRender.push(
-        <TabPanel key={key}>
+        <TabPanel className="app-tabs-panel" key={key}>
           {tab_dict[key as keyof typeof tab_dict].panel}
         </TabPanel>
       );
@@ -42,7 +42,7 @@ export default function InvokeTabs() {
   return (
     <Tabs className="app-tabs">
       <div className="app-tabs-list">{renderTabs()}</div>
-      <TabPanels>{renderTabPanels()}</TabPanels>
+      <TabPanels className="app-tabs-panels">{renderTabPanels()}</TabPanels>
     </Tabs>
   );
 }

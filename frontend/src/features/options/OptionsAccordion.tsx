@@ -66,15 +66,15 @@ const OptionsAccordion = () => {
       />
 
       <InvokeAccordionItem
-        header={<Upscale />}
-        feature={Feature.UPSCALE}
-        options={<UpscaleOptions />}
-      />
-
-      <InvokeAccordionItem
         header={<FaceRestore />}
         feature={Feature.FACE_CORRECTION}
         options={<FaceRestoreOptions />}
+      />
+
+      <InvokeAccordionItem
+        header={<Upscale />}
+        feature={Feature.UPSCALE}
+        options={<UpscaleOptions />}
       />
 
       <InvokeAccordionItem

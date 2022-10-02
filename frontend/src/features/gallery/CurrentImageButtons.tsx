@@ -109,6 +109,25 @@ const CurrentImageButtons = ({
       />
 
       <InvokePopover
+        title="Restore Faces"
+        popoverOptions={<FaceRestoreOptions />}
+        actionButton={
+          <IAIButton
+            label={'Restore Faces'}
+            isDisabled={
+              !isGFPGANAvailable ||
+              Boolean(intermediateImage) ||
+              !(isConnected && !isProcessing) ||
+              !gfpganStrength
+            }
+            onClick={handleClickFixFaces}
+          />
+        }
+      >
+        <IAIIconButton icon={<MdFace />} aria-label="Restore Faces" />
+      </InvokePopover>
+
+      <InvokePopover
         title="Upscale"
         styleClass="upscale-popover"
         popoverOptions={<UpscaleOptions />}
@@ -126,25 +145,6 @@ const CurrentImageButtons = ({
         }
       >
         <IAIIconButton icon={<MdHd />} aria-label="Upscale" />
-      </InvokePopover>
-
-      <InvokePopover
-        title="Restore Faces"
-        popoverOptions={<FaceRestoreOptions />}
-        actionButton={
-          <IAIButton
-            label={'Restore Faces'}
-            isDisabled={
-              !isGFPGANAvailable ||
-              Boolean(intermediateImage) ||
-              !(isConnected && !isProcessing) ||
-              !gfpganStrength
-            }
-            onClick={handleClickFixFaces}
-          />
-        }
-      >
-        <IAIIconButton icon={<MdFace />} aria-label="Restore Faces" />
       </InvokePopover>
 
       <IAIIconButton
