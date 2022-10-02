@@ -9,12 +9,12 @@ import TextToImage from './TextToImage/TextToImage';
 
 export default function InvokeTabs() {
   const tab_dict = {
-    txt2img: { title: 'Text To Image', panel: <TextToImage /> },
-    img2img: { title: 'Image To Image', panel: <ImageToImageWIP /> },
-    inpainting: { title: 'Inpainting', panel: <InpaintingWIP /> },
-    outpainting: { title: 'Outpainting', panel: <OutpaintingWIP /> },
-    nodes: { title: 'Nodes', panel: <NodesWIP /> },
-    postprocess: { title: 'Post Processing', panel: <PostProcessingWIP /> },
+    txt2img: { title: 'TI', panel: <TextToImage /> },
+    img2img: { title: 'II', panel: <ImageToImageWIP /> },
+    inpainting: { title: 'IN', panel: <InpaintingWIP /> },
+    outpainting: { title: 'OP', panel: <OutpaintingWIP /> },
+    nodes: { title: 'ND', panel: <NodesWIP /> },
+    postprocess: { title: 'PP', panel: <PostProcessingWIP /> },
   };
 
   const renderTabs = () => {
