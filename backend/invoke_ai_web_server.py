@@ -313,7 +313,7 @@ class InvokeAIWebServer:
                 if postprocessing_parameters['type'] == 'esrgan':
                     progress.set_current_status('Upscaling')
                 elif postprocessing_parameters['type'] == 'gfpgan':
-                    progress.set_current_status('Restoring faces')
+                    progress.set_current_status('Restoring Faces')
 
                 socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -338,7 +338,7 @@ class InvokeAIWebServer:
                         f'{postprocessing_parameters["type"]} is not a valid postprocessing type'
                     )
 
-                progress.set_current_status('Saving image')
+                progress.set_current_status('Saving Image')
                 socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
 
@@ -623,7 +623,7 @@ class InvokeAIWebServer:
                     raise CanceledException
 
                 if gfpgan_parameters:
-                    progress.set_current_status('Restoring faces')
+                    progress.set_current_status('Restoring Faces')
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit(
                         'progressUpdate', progress.to_formatted_dict()
@@ -640,7 +640,7 @@ class InvokeAIWebServer:
                         'strength'
                     ]
 
-                progress.set_current_status('Saving image')
+                progress.set_current_status('Saving Image')
                 self.socketio.emit(
                     'progressUpdate', progress.to_formatted_dict()
                 )
@@ -1066,7 +1066,7 @@ class Progress:
         self.has_error = has_error
 
     def mark_complete(self):
-        self.current_status = 'Processing complete'
+        self.current_status = 'Processing Complete'
         self.current_step = 0
         self.total_steps = 0
         self.current_iteration = 0

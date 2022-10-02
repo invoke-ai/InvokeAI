@@ -61,6 +61,14 @@
   --tab-panel-bg: rgb(20, 22, 28);
 
   // Metadata Viewer
-  --metadata-bg-color: rgba(0,0,0,0.7);
-  --metadata-json-bg-color: rgba(255,255,255,0.1)
+  --metadata-bg-color: rgba(0, 0, 0, 0.7);
+  --metadata-json-bg-color: rgba(255, 255, 255, 0.1);
+
+  // Status Message
+  --status-good-color: rgb(125, 255, 100);
+  --status-good-glow: rgb(40, 215, 40);
+  --status-working-color: rgb(255, 175, 55);
+  --status-working-glow: rgb(255, 160, 55);
+  --status-bad-color: rgb(255, 90, 90);
+  --status-bad-glow: rgb(255, 40, 40);
 }

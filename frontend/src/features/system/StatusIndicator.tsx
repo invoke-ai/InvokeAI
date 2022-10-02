@@ -33,16 +33,36 @@ const StatusIndicator = () => {
     wasErrorSeen,
   } = useAppSelector(systemSelector);
   const dispatch = useAppDispatch();
-  const statusMessageTextColor =
-    isConnected && !hasError ? 'green.500' : 'red.500';
+  // const statusMessageTextColor =
+  //   isConnected && !hasError ? 'green.500' : 'red.500';
+
+  let statusStyle;
+  if (isConnected && !hasError) {
+    statusStyle = 'status-good';
+  } else {
+    statusStyle = 'status-bad';
+  }
 
   let statusMessage = currentStatus;
 
-  if (isProcessing) {
-    if (totalIterations > 1) {
-      statusMessage += ` (${currentIteration}/${totalIterations})`;
-    }
+  const intermediateStatuses = [
+    'generating',
+    'preparing',
+    'saving image',
+    'restoring faces',
+    'upscaling',
+  ];
+
+  if (intermediateStatuses.includes(statusMessage.toLowerCase())) {
+    statusStyle = 'status-working';
   }
+
+  if (statusMessage)
+    if (isProcessing) {
+      if (totalIterations > 1) {
+        statusMessage += ` (${currentIteration}/${totalIterations})`;
+      }
+    }
 
   const tooltipLabel =
     hasError && !wasErrorSeen
@@ -63,7 +83,8 @@ const StatusIndicator = () => {
       <Text
         cursor={statusIndicatorCursor}
         onClick={handleClickStatusIndicator}
-        textColor={statusMessageTextColor}
+        className={`status ${statusStyle}`}
+        // textColor={statusMessageTextColor}
       >
         {statusMessage}
       </Text>
