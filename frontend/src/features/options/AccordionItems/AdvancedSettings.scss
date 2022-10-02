@@ -1,3 +1,5 @@
+@use '../../../styles/Mixins/' as *;
+
 .advanced-settings {
   display: grid;
   row-gap: 0.5rem;
@@ -5,7 +7,7 @@
 
 .advanced-settings-item {
   display: grid;
-  max-width: 24rem;
+  max-width: $options-bar-max-width;
   border: none;
   border-top: 0px;
   border-radius: 0.4rem;

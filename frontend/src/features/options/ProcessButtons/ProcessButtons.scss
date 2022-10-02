@@ -2,7 +2,7 @@
 
 .process-buttons {
   display: grid;
-  grid-template-columns: auto repeat(2, max-content);
+  grid-template-columns: auto max-content;
   column-gap: 0.5rem;
 
   .invoke-btn {
