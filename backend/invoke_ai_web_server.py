@@ -568,7 +568,7 @@ class InvokeAIWebServer:
                 step_index = 1
                 nonlocal prior_variations
 
-                progress.set_current_status('Generation complete')
+                progress.set_current_status('Generation Complete')
 
                 self.socketio.emit(
                     'progressUpdate', progress.to_formatted_dict()

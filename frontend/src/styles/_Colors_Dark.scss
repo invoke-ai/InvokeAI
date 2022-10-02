@@ -25,25 +25,22 @@
 
   --svg-color: rgb(24, 24, 34);
 
-  // Theme Colors
-  --app-main-accent: rgb(165, 95, 255);
-
   // Progress Bar Color
-  --progress-bar-color: rgb(165, 95, 255);
+  --progress-bar-color: rgb(100, 50, 245);
 
   // Prompt Box Colors
   --prompt-bg-color: rgb(10, 10, 10);
-  --prompt-border-color: rgb(200, 105, 255);
-  --prompt-box-shadow-color: rgb(105, 30, 210);
+  --prompt-border-color: rgb(140, 110, 255);
+  --prompt-box-shadow-color: rgb(80, 30, 210);
 
   // Button Colors
   --btn-svg-color: rgb(255, 255, 255);
 
-  --btn-grey: rgb(45, 45, 55);
-  --btn-grey-hover: rgb(65, 65, 75);
+  --btn-grey: rgb(30, 32, 42);
+  --btn-grey-hover: rgb(46, 48, 68);
 
-  --btn-purple: rgb(105, 30, 210);
-  --btn-purple-hover: rgb(130, 35, 255);
+  --btn-purple: rgb(80, 40, 200);
+  --btn-purple-hover: rgb(104, 60, 230);
 
   --btn-red: rgb(185, 55, 55);
   --btn-red-hover: rgb(255, 75, 75);
@@ -53,14 +50,14 @@
 
   // Switch
   --switch-bg-color: rgb(100, 102, 110);
-  --switch-bg-active-color: rgb(165, 95, 255);
+  --switch-bg-active-color: rgb(80, 40, 200);
 
   // Tabs
   --tab-color: rgb(30, 32, 42);
   --tab-hover-color: rgb(36, 38, 48);
-  --tab-list-bg: rgb(165, 95, 255);
-  --tab-list-text: rgb(0, 0, 0);
-  --tab-list-text-inactive: rgb(160, 162, 192);
+  --tab-list-bg: rgb(100, 50, 255);
+  --tab-list-text: rgb(20, 20, 20);
+  --tab-list-text-inactive: rgb(92, 94, 114);
   --tab-panel-bg: rgb(20, 22, 28);
 
   // Metadata Viewer

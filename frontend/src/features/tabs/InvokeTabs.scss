@@ -8,12 +8,24 @@
 
 .app-tabs-list {
   display: grid;
-  // grid-template-columns: repeat(6, max-content);
+  row-gap: 0.3rem;
   grid-auto-rows: max-content;
-
   color: var(--tab-list-text-inactive);
 
   button {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+
+    &:hover {
+      background-color: var(--tab-hover-color);
+      border-radius: 0.3rem;
+    }
+
+    svg {
+      width: 26px;
+      height: 26px;
+    }
+
     &[aria-selected='true'] {
       background-color: var(--tab-list-bg);
       color: var(--tab-list-text);
@@ -21,12 +33,6 @@
       border-radius: 0.3rem;
       border: none;
     }
-  }
-
-  button {
-    font-size: 0.85rem;
-    padding-inline-start: 0.5rem;
-    padding-inline-end: 0.5rem;
   }
 }
 
