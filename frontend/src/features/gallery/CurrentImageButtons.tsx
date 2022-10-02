@@ -16,8 +16,9 @@ import IAIButton from '../../common/components/IAIButton';
 import { runESRGAN, runGFPGAN } from '../../app/socketio/actions';
 import IAIIconButton from '../../common/components/IAIIconButton';
 import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
-import UpscalePopover from './UpscalePopover';
-import FaceRestorePopover from './FaceRestorePopover';
+import InvokePopover from './InvokePopover';
+import UpscaleOptions from '../options/AdvancedOptions/Upscale/UpscaleOptions';
+import FaceRestoreOptions from '../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -107,7 +108,7 @@ const CurrentImageButtons = ({
         onClick={handleClickUseSeed}
       />
 
-      <UpscalePopover>
+      <InvokePopover title="Upscale" popoverOptions={<UpscaleOptions />}>
         <IAIIconButton
           icon={<MdHd />}
           aria-label="Upscale"
@@ -119,9 +120,12 @@ const CurrentImageButtons = ({
           }
           onClick={handleClickUpscale}
         />
-      </UpscalePopover>
+      </InvokePopover>
 
-      <FaceRestorePopover>
+      <InvokePopover
+        title="Restore Faces"
+        popoverOptions={<FaceRestoreOptions />}
+      >
         <IAIIconButton
           icon={<MdFace />}
           aria-label="Restore Faces"
@@ -133,7 +137,7 @@ const CurrentImageButtons = ({
           }
           onClick={handleClickFixFaces}
         />
-      </FaceRestorePopover>
+      </InvokePopover>
 
       <IAIIconButton
         icon={<MdInfo />}

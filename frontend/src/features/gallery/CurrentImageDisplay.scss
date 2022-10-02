@@ -71,11 +71,3 @@
   overflow: scroll;
   @include HideScrollbar;
 }
-
-.popover-content {
-  background: var(--background-color-secondary);
-}
-
-.popover-arrow {
-  background: var(--background-color-secondary) !important;
-}
