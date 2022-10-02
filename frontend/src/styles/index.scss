@@ -15,6 +15,10 @@
 @use '../features/gallery/InvokePopover.scss';
 @use '../features/system/ProgressBar.scss';
 
+// Tabs
+@use '../features/tabs/InvokeTabs.scss';
+@use '../features/tabs/TextToImage/TextToImage.scss';
+
 // Component Shared
 @use '../common/components/IAINumberInput.scss';
 @use '../common/components/IAIInput.scss';
