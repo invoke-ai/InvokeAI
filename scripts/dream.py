@@ -513,7 +513,7 @@ def split_variations(variations_string) -> list:
     else:
         return parts
 
-def retrieve_dream_command(opt,file_path,completer):
+def retrieve_dream_command(opt,command,completer):
     '''
     Given a full or partial path to a previously-generated image file,
     will retrieve and format the dream command used to generate the image,
@@ -523,10 +523,22 @@ def retrieve_dream_command(opt,file_path,completer):
     will retrieve and format the dream command used to generate the images,
     and save them to a file commands.txt for further processing
     '''
-    
+    if len(command) == 0:
+        return
+    tokens = command.split()
+    if len(tokens) > 1:
+        outfilepath = tokens[1]
+    else:
+        outfilepath = "commands.txt"
+        
+    file_path = tokens[0]    
     dir,basename = os.path.split(file_path)
     if len(dir) == 0:
         dir = opt.outdir
+        
+    outdir,outname = os.path.split(outfilepath)    
+    if len(outdir) == 0:
+        outfilepath = os.path.join(dir,outname)
     try:
         paths = list(Path(dir).glob(basename))
     except ValueError:
@@ -543,16 +555,15 @@ def retrieve_dream_command(opt,file_path,completer):
         except (KeyError, AttributeError):
             print(f'## {path}: file has no metadata')
             continue
- 
+        commands.append(f'# {path}')
         commands.append(cmd)
  
-    outfile = os.path.join(dir,'commands.txt')
-    with open(outfile, 'w', encoding='utf-8') as f:
+    with open(outfilepath, 'w', encoding='utf-8') as f:
         f.write('\n'.join(commands))
-    print(f'>> File {outfile} with commands created')
+    print(f'>> File {outfilepath} with commands created')
 
-    if len(commands) == 1:
-       completer.set_line(commands[0])
+    if len(commands) == 2:
+       completer.set_line(commands[1])
 
 if __name__ == '__main__':
     main()
