@@ -91,6 +91,7 @@ import copy
 import base64
 import functools
 import ldm.dream.pngwriter
+import sys
 from ldm.dream.conditioning import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
@@ -132,6 +133,14 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             self._arg_switches = self._arg_parser.parse_args()
+
+            if self._arg_switches.laion400m:
+                print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
+                sys.exit(-1)
+            if self._arg_switches.weights:
+                print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
+                sys.exit(-1)
+
             return self._arg_switches
         except:
             return None
@@ -274,7 +283,7 @@ class Args(object):
         # the arg value. For example, the --grid and --individual options are a little
         # funny because of their push/pull relationship. This is how to handle it.
         if name=='grid':
-            return not cmd_switches.individual and value_arg  # arg supersedes cmd
+            return not cmd_switches.individual and (value_arg or value_cmd)  # arg supersedes cmd
         return value_cmd if value_cmd is not None else value_arg
 
     def __setattr__(self,name,value):
@@ -447,6 +456,12 @@ class Args(object):
             help="Additional allowed origins, comma-separated",
         )
         web_server_group.add_argument(
+            '--api',
+            dest='api',
+            action='store_true',
+            help='Start in api mode.',
+        )
+        web_server_group.add_argument(
             '--host',
             type=str,
             default='127.0.0.1',
@@ -457,6 +472,11 @@ class Args(object):
             type=int,
             default='9090',
             help='Web server: Port to listen on'
+        )
+        web_server_group.add_argument(
+            '--cors',
+            type=str,
+            help='Web server: CORS origin for API'
         )
         return parser
 

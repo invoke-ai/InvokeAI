@@ -608,12 +608,7 @@ class Generate:
         if not img:
             return None, None
 
-        image = self._load_img(
-            img,
-            width,
-            height,
-            fit=fit
-        ) # this returns an Image
+        image        = img if isinstance(img, Image.Image) else self._load_img(img, width, height, fit=fit) # this returns an Image
         if out_direction:
             image    = self._create_outpaint_image(image, out_direction)
         init_image   = self._create_init_image(image)                   # this returns a torch tensor
@@ -632,9 +627,8 @@ class Generate:
             init_mask = self._create_init_mask(image)
 
         if mask:
-            mask_image = self._load_img(
-                mask, width, height, fit=fit)  # this returns an Image
-            init_mask = self._create_init_mask(mask_image)
+            mask_image  = mask if isinstance(mask, Image.Image) else self._load_img(mask, width, height, fit=fit) # this returns an Image
+            init_mask   = self._create_init_mask(mask_image)
 
         return init_image, init_mask
 
@@ -734,7 +728,8 @@ class Generate:
                                 image_callback = None,
                                 prefix = None,
     ):
-            
+
+        results = []
         for r in image_list:
             image, seed = r
             try:
@@ -770,6 +765,10 @@ class Generate:
                 image_callback(image, seed, upscaled=True, use_prefix=prefix)
             else:
                 r[0] = image
+
+            results.append([image, seed])
+
+        return results
 
     # to help WebGUI - front end to generator util function
     def sample_to_image(self, samples):

@@ -1,0 +1,66 @@
+<html lang="en">
+
+<head>
+  <title>InvokeAI Test</title>
+  <meta charset="utf-8">
+  <link rel="icon" type="image/x-icon" href="static/dream_web/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!--<script src="config.js"></script>-->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+    integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+    crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <button onclick="dostuff();">Test Invoke</button>
+    <span id="output"></span>
+    <script type="text/javascript">
+        const socket_url = `ws://${window.location.host}`;
+        const socket = io(socket_url, {
+            path: "/ws/socket.io"
+        });
+        socket.on('connect', (data) => {
+            //socket.emit('subscribe', { 'session': 'WcBtYATwT92Mrb9zLgeyNw==' });
+        });
+
+        function log(event, data) {
+            document.getElementById("output").innerHTML += `${event} => ${JSON.stringify(data)}<br/>`;
+            if (data.result?.image?.image_type) {
+                document.getElementById("output").innerHTML += `<img src="/api/v1/images/${data.result.image.image_type}/${data.result.image.image_name}" />`;
+            }
+            console.log(`${event} => ${JSON.stringify(data)}`);
+        }
+
+        socket.on('generator_progress', (data) => log('generator_progress', data));
+        socket.on('invocation_complete', (data) => log('invocation_complete', data));
+        socket.on('invocation_started', (data) => log('invocation_started', data));
+        socket.on('session_complete', (data) => {
+            log('session_complete', data);
+
+            // NOTE: you may not want to unsubscribe if you plan to continue using this session,
+            //       just make sure you unsubscribe eventually
+            socket.emit('unsubscribe', { 'session': data.session_id });
+        });
+
+        function dostuff() {
+            var defaultGraph = {"nodes": [{"id": "1","type": "txt2img","prompt": "A photo of a cat eating sushi"},{"id": "2","type": "show_image"}],"links": [{"from_node": {"id": "1","field": "image"},"to_node": {"id": "2","field": "image"}}]};
+            fetch('/api/v1/sessions/', {
+                method: 'POST',
+                headers: new Headers({'content-type': 'application/json'}),
+                body: JSON.stringify(defaultGraph)
+            }).then(response => response.json())
+            .then(data => {
+                sessionId = data.id;
+                socket.emit('subscribe', { 'session': sessionId });
+                fetch(`/api/v1/sessions/${sessionId}/invoke?all=true`, {
+                    method: 'PUT',
+                    headers: new Headers({'content-type': 'application/json'}),
+                    body: ''
+                });
+            });
+        }
+    </script>
+</body>
+
+</html>
