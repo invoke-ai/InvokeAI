@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import ProgressBar from '../features/system/ProgressBar';
 import SiteHeader from '../features/system/SiteHeader';
-import LogViewer from '../features/system/LogViewer';
+import Console from '../features/system/Console';
 import Loading from '../Loading';
 import { useAppDispatch } from './store';
 import { requestSystemConfig } from './socketio/actions';
@@ -26,7 +26,7 @@ const App = () => {
         <SiteHeader />
         <InvokeTabs />
       </div>
-      <LogViewer />
+      <Console />
     </div>
   ) : (
     <Loading />

@@ -1,5 +1,4 @@
 import {
-  Box,
   Center,
   Flex,
   Heading,
@@ -7,7 +6,6 @@ import {
   Link,
   Text,
   Tooltip,
-  useColorModeValue,
 } from '@chakra-ui/react';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { memo } from 'react';

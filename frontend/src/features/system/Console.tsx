@@ -1,17 +1,7 @@
-import {
-  IconButton,
-  useColorModeValue,
-  Flex,
-  Text,
-  Tooltip,
-} from '@chakra-ui/react';
+import { IconButton, Tooltip } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
-import {
-  errorSeen,
-  setShouldShowLogViewer,
-  SystemState,
-} from './systemSlice';
+import { errorSeen, setShouldShowLogViewer, SystemState } from './systemSlice';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
 import { createSelector } from '@reduxjs/toolkit';
@@ -48,27 +38,11 @@ const systemSelector = createSelector(
 /**
  * Basic log viewer, floats on bottom of page.
  */
-const LogViewer = () => {
+const Console = () => {
   const dispatch = useAppDispatch();
   const log = useAppSelector(logSelector);
   const { shouldShowLogViewer, hasError, wasErrorSeen } =
     useAppSelector(systemSelector);
-
-  // Set colors based on dark/light mode
-  const bg = useColorModeValue('gray.50', 'gray.900');
-  const borderColor = useColorModeValue('gray.500', 'gray.500');
-  const logTextColors = useColorModeValue(
-    {
-      info: undefined,
-      warning: 'yellow.500',
-      error: 'red.500',
-    },
-    {
-      info: undefined,
-      warning: 'yellow.300',
-      error: 'red.300',
-    }
-  );
 
   // Rudimentary autoscroll
   const [shouldAutoscroll, setShouldAutoscroll] = useState<boolean>(true);
@@ -103,59 +77,43 @@ const LogViewer = () => {
           style={{ display: 'flex', position: 'fixed', left: 0, bottom: 0 }}
           maxHeight={'90vh'}
         >
-          <Flex
-            overflow="auto"
-            direction="column"
-            fontFamily="monospace"
-            fontSize="sm"
-            pl={12}
-            pr={2}
-            pb={2}
-            borderTopWidth="4px"
-            borderColor={borderColor}
-            background={bg}
-            ref={viewerRef}
-          >
+          <div className="console" ref={viewerRef}>
             {log.map((entry, i) => {
               const { timestamp, message, level } = entry;
               return (
-                <Flex gap={2} key={i} textColor={logTextColors[level]}>
-                  <Text fontSize="sm" fontWeight={'semibold'}>
-                    {timestamp}:
-                  </Text>
-                  <Text fontSize="sm" wordBreak={'break-all'}>
-                    {message}
-                  </Text>
-                </Flex>
+                <div key={i} className={`console-entry console-${level}-color`}>
+                  <p className="console-timestamp">{timestamp}:</p>
+                  <p className="console-message">{message}</p>
+                </div>
               );
             })}
-          </Flex>
+          </div>
         </Resizable>
       )}
       {shouldShowLogViewer && (
-        <Tooltip label={shouldAutoscroll ? 'Autoscroll on' : 'Autoscroll off'}>
+        <Tooltip label={shouldAutoscroll ? 'Autoscroll On' : 'Autoscroll Off'}>
           <IconButton
+            className={`console-autoscroll-icon-button ${
+              shouldAutoscroll && 'autoscroll-enabled'
+            }`}
             size="sm"
-            position={'fixed'}
-            left={2}
-            bottom={12}
             aria-label="Toggle autoscroll"
             variant={'solid'}
-            colorScheme={shouldAutoscroll ? 'blue' : 'gray'}
             icon={<FaAngleDoubleDown />}
             onClick={() => setShouldAutoscroll(!shouldAutoscroll)}
           />
         </Tooltip>
       )}
-      <Tooltip label={shouldShowLogViewer ? 'Hide logs' : 'Show logs'}>
+      <Tooltip label={shouldShowLogViewer ? 'Hide Console' : 'Show Console'}>
         <IconButton
+          className={`console-toggle-icon-button ${
+            (hasError || !wasErrorSeen) && 'error-seen'
+          }`}
           size="sm"
           position={'fixed'}
-          left={2}
-          bottom={2}
           variant={'solid'}
           aria-label="Toggle Log Viewer"
-          colorScheme={hasError || !wasErrorSeen ? 'red' : 'gray'}
+          // colorScheme={hasError || !wasErrorSeen ? 'red' : 'gray'}
           icon={shouldShowLogViewer ? <FaMinus /> : <FaCode />}
           onClick={handleClickLogViewerToggle}
         />
@@ -164,4 +122,4 @@ const LogViewer = () => {
   );
 };
 
-export default LogViewer;
+export default Console;

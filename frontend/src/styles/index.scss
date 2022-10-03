@@ -11,6 +11,7 @@
 @use '../features/system/SiteHeader.scss';
 @use '../features/system/StatusIndicator.scss';
 @use '../features/system/SettingsModal/SettingsModal.scss';
+@use '../features/system/Console.scss';
 
 // options
 @use '../features/options/PromptInput/PromptInput.scss';
@@ -35,6 +36,7 @@
 @use '../common/components/IAISelect.scss';
 @use '../common/components/IAISwitch.scss';
 @use '../common/components/WorkInProgress/WorkInProgress.scss';
+@use '../common/components/GuidePopover.scss';
 
 // Shared Styles
 @use './Mixins/' as *;
