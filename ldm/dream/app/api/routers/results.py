@@ -12,7 +12,9 @@ images_router = APIRouter(
 )
 
 
-@images_router.get('/{image_type}/{image_name}')
+@images_router.get('/{image_type}/{image_name}',
+    operation_id = 'get_image'
+    )
 async def get_image(
     image_type: ImageType = Path(description = "The type of image to get"),
     image_name: str = Path(description = "The name of the image to get")

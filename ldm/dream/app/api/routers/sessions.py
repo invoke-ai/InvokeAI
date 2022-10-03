@@ -20,6 +20,7 @@ session_router = APIRouter(
 
 
 @session_router.post('/',
+    operation_id = 'create_session',
     responses = {
         400: {'description': 'Invalid json'}
     })
@@ -31,7 +32,7 @@ async def create_session(
     return sessions
 
 
-@session_router.get('/')
+@session_router.get('/', operation_id = 'list_sessions')
 async def list_sessions(
     page: Optional[int]     = Query(default = 0, description = "The page of results to get"),
     per_page: Optional[int] = Query(default = 10, description = "The number of results per page")
@@ -42,6 +43,7 @@ async def list_sessions(
 
 
 @session_router.get('/{session_id}',
+    operation_id = 'get_session',
     responses = {
         404: {'description': 'Session not found'}
     })
@@ -57,6 +59,7 @@ async def get_session(
 
 
 @session_router.post('/{session_id}/invocations',
+    operation_id = 'append_invocation',
     responses = {
         400: {'description': 'Invalid invocation or link'},
         404: {'description': 'Session not found'}
@@ -81,6 +84,7 @@ async def append_invocation(
 
 
 @session_router.put('/{session_id}/invoke',
+    operation_id = 'invoke_session',
     responses = {
         202: {'description': 'The invocation is queued'},
         400: {'description': 'The session has no invocations ready to invoke'},
