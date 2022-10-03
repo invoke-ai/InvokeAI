@@ -10,7 +10,7 @@ import {
 import _ from 'lodash';
 import { FocusEvent, useEffect, useState } from 'react';
 
-const numberStringRegex = /^-?0?\.?$/;
+const numberStringRegex = /^-?(0\.)?\.?$/;
 
 interface Props extends Omit<NumberInputProps, 'onChange'> {
   styleClass?: string;
