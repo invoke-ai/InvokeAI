@@ -32,15 +32,19 @@ class TextToImageInvocation(BaseInvocation):
     progress_images: bool     = Field(default=False, description="Whether or not to produce progress images during generation")
 
     # TODO: pass this an emitter method or something? or a session for dispatching?
-    def dispatch_progress(self, services: InvocationServices, session_id: str, sample: Any, step: int) -> None:
+    def dispatch_progress(self, services: InvocationServices, session_id: str, sample: Any = None, step: int = 0) -> None:
         services.events.emit_generator_progress(
             session_id, self.id, step, float(step) / float(self.steps)
         )
 
     def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
+
+        def step_callback(sample, step = 0):
+            self.dispatch_progress(services, session_id, sample, step)
+
         results = services.generate.prompt2image(
             prompt = self.prompt,
-            step_callback = lambda sample, step: self.dispatch_progress(services, session_id, sample, step),
+            step_callback = step_callback,
             **self.dict(exclude = {'prompt'}) # Shorthand for passing all of the parameters above manually
         )
 

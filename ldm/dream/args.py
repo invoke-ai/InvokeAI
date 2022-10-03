@@ -473,11 +473,6 @@ class Args(object):
             default='9090',
             help='Web server: Port to listen on'
         )
-        web_server_group.add_argument(
-            '--cors',
-            type=str,
-            help='Web server: CORS origin for API'
-        )
         return parser
 
     # This creates the parser that processes commands on the dream> command line

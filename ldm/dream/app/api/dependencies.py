@@ -27,6 +27,7 @@ class ApiDependencies:
             embedding_path=config.embedding_path,
             full_precision=config.full_precision,
         )
+        generate.free_gpu_mem = config.free_gpu_mem
 
         events = FastAPIEventService(event_handler_id)
 

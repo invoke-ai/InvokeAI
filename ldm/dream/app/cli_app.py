@@ -89,6 +89,7 @@ def invoke_cli():
         embedding_path=config.embedding_path,
         full_precision=config.full_precision,
     )
+    generate.free_gpu_mem = config.free_gpu_mem
 
     # NOTE: load model on first use, uncomment to load at startup
     # TODO: Make this a config option?
