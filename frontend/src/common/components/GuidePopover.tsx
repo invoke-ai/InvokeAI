@@ -3,7 +3,6 @@ import {
   PopoverArrow,
   PopoverContent,
   PopoverTrigger,
-  Flex,
   Box,
 } from '@chakra-ui/react';
 import { SystemState } from '../../features/system/systemSlice';

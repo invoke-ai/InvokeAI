@@ -1,10 +1,4 @@
-import {
-  IconButton,
-  useColorModeValue,
-  Flex,
-  Text,
-  Tooltip,
-} from '@chakra-ui/react';
+import { IconButton, Tooltip } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import { errorSeen, setShouldShowLogViewer, SystemState } from './systemSlice';
@@ -49,22 +43,6 @@ const Console = () => {
   const log = useAppSelector(logSelector);
   const { shouldShowLogViewer, hasError, wasErrorSeen } =
     useAppSelector(systemSelector);
-
-  // Set colors based on dark/light mode
-  const bg = useColorModeValue('gray.50', 'gray.900');
-  const borderColor = useColorModeValue('gray.500', 'gray.500');
-  const logTextColors = useColorModeValue(
-    {
-      info: undefined,
-      warning: 'yellow.500',
-      error: 'red.500',
-    },
-    {
-      info: undefined,
-      warning: 'yellow.300',
-      error: 'red.300',
-    }
-  );
 
   // Rudimentary autoscroll
   const [shouldAutoscroll, setShouldAutoscroll] = useState<boolean>(true);
