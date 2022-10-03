@@ -45,6 +45,8 @@ class KSampler(Sampler):
             ddim_eta=0.0,
             verbose=False,
     ):
+        ddim_num_steps += 1
+        
         outer_model = self.model
         self.model  = outer_model.inner_model
         super().make_schedule(
@@ -99,6 +101,7 @@ class KSampler(Sampler):
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs,
     ):
+        S += 1
         def route_callback(k_callback_values):
             if img_callback is not None:
                 img_callback(k_callback_values['x'],k_callback_values['i'])
@@ -119,7 +122,7 @@ class KSampler(Sampler):
             'uncond': unconditional_conditioning,
             'cond_scale': unconditional_guidance_scale,
         }
-        print(f'>> Sampling with k__{self.schedule}')
+        print(f'>> Sampling with k_{self.schedule}')
         return (
             K.sampling.__dict__[f'sample_{self.schedule}'](
                 model_wrap_cfg, x, sigmas, extra_args=extra_args,
