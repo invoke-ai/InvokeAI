@@ -17,7 +17,7 @@ from ldm.dream.pngwriter import PngWriter, retrieve_metadata
 from ldm.dream.conditioning import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
-from flaskwebgui import FlaskUI
+
 
 # Loading Arguments
 opt = Args()
@@ -114,6 +114,7 @@ class InvokeAIWebServer:
             if args.web_develop:
                 close_server_on_exit = False
             try:
+                from flaskwebgui import FlaskUI
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
