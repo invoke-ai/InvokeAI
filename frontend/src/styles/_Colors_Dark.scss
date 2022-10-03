@@ -74,4 +74,14 @@
 
   // Settings Modal
   --settings-modal-bg: rgb(30, 32, 42);
+
+  // Console
+  --error-level-info: rgb(200, 202, 224);
+  --error-level-warning: rgb(255, 225, 105);
+  --error-level-error: rgb(255, 81, 46);
+  --console-bg-color: rgb(30, 30, 36);
+  --console-border-color: rgb(80, 82, 112);
+
+  --console-icon-button-bg-color: rgb(50, 53, 64);
+  --console-icon-button-bg-color-hover: rgb(70, 73, 84);
 }
