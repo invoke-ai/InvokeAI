@@ -26,9 +26,9 @@
 
 .image-gallery {
   display: grid;
-  grid-template-columns:repeat(auto-fit, minmax(120px, max-content));;
+  grid-template-columns: repeat(auto-fit, minmax(120px, max-content));
   gap: 0.6rem;
-  justify-centent: center;
+  justify-content: center;
   max-height: $app-gallery-height;
   overflow-y: scroll;
   @include HideScrollbar;
