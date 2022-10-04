@@ -4,6 +4,7 @@
   display: grid;
   row-gap: 1rem;
   grid-auto-rows: max-content;
+  min-width: 16rem;
 }
 
 .image-gallery-container-placeholder {
