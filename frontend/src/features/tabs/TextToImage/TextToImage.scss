@@ -2,7 +2,7 @@
 
 .text-to-image-workarea {
   display: grid;
-  grid-template-columns: max-content auto max-content;
+  grid-template-columns: max-content 3fr 1fr;
   column-gap: 1rem;
 }
 
