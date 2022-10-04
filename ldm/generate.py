@@ -19,6 +19,7 @@ import cv2
 import skimage
 
 from omegaconf import OmegaConf
+from ldm.dream.generator.base import downsampling
 from PIL import Image, ImageOps
 from torch import nn
 from pytorch_lightning import seed_everything, logging
@@ -287,6 +288,7 @@ class Generate:
             upscale          = None,
             # Set this True to handle KeyboardInterrupt internally
             catch_interrupts = False,
+            hires_fix        = False,
             **args,
     ):   # eat up additional cruft
         """
@@ -403,6 +405,8 @@ class Generate:
                 generator = self._make_embiggen()
             elif init_image is not None:
                 generator = self._make_img2img()
+            elif hires_fix:
+                generator = self._make_txt2img2img()
             else:
                 generator = self._make_txt2img()
 
@@ -490,25 +494,26 @@ class Generate:
             opt                 = None,
             ):
         # retrieve the seed from the image;
-        # note that we will try both the new way and the old way, since not all files have the
-        # metadata (yet)
         seed   = None
         image_metadata = None
         prompt = None
-        try:
-            args = metadata_from_png(image_path)
-            seed   = args.seed
-            prompt = args.prompt
-            print(f'>> retrieved seed {seed} and prompt "{prompt}" from {image_path}')
-        except:
-            m    = re.search('(\d+)\.png$',image_path)
-            if m:
-                seed = m.group(1)
+
+        args   = metadata_from_png(image_path)
+        seed   = args.seed
+        prompt = args.prompt
+        print(f'>> retrieved seed {seed} and prompt "{prompt}" from {image_path}')
 
         if not seed:
             print('* Could not recover seed for image. Replacing with 42. This will not affect image quality')
             seed = 42
-        
+
+        # try to reuse the same filename prefix as the original file.
+        # note that this is hacky
+        prefix = None
+        m    = re.search('(\d+)\.',os.path.basename(image_path))
+        if m:
+            prefix = m.groups()[0]
+
         # face fixers and esrgan take an Image, but embiggen takes a path
         image = Image.open(image_path)
 
@@ -530,6 +535,7 @@ class Generate:
                 save_original = save_original,
                 upscale = upscale,
                 image_callback = callback,
+                prefix = prefix,
             )
 
         elif tool == 'embiggen':
@@ -581,6 +587,9 @@ class Generate:
                 strength    = opt.strength,
                 image_callback = callback,
                 )
+        elif tool is None:
+            print(f'* please provide at least one postprocessing option, such as -G or -U')
+            return None
         else:
             print(f'* postprocessing tool {tool} is not yet supported')
             return None
@@ -604,11 +613,7 @@ class Generate:
             img,
             width,
             height,
-            fit=fit
-        ) # this returns an Image
-        if out_direction:
-            image    = self._create_outpaint_image(image, out_direction)
-        init_image   = self._create_init_image(image)                   # this returns a torch tensor
+            ) # this returns an Image
 
         # if image has a transparent area and no mask was provided, then try to generate mask
         if self._has_transparency(image) and not mask:
@@ -621,12 +626,17 @@ class Generate:
                     '>>          a transparency mask, or provide mask explicitly using --init_mask (-M).'
                 )
             # this returns a torch tensor
-            init_mask = self._create_init_mask(image)
+            init_mask = self._create_init_mask(image,width,height,fit=fit)
+            
+        if (image.width * image.height) > (self.width * self.height):
+            print(">> This input is larger than your defaults. If you run out of memory, please use a smaller image.")
+
+        init_image   = self._create_init_image(image,width,height,fit=fit)                   # this returns a torch tensor
 
         if mask:
             mask_image = self._load_img(
-                mask, width, height, fit=fit)  # this returns an Image
-            init_mask = self._create_init_mask(mask_image)
+                mask, width, height)  # this returns an Image
+            init_mask = self._create_init_mask(mask_image,width,height,fit=fit)
 
         return init_image, init_mask
 
@@ -654,6 +664,13 @@ class Generate:
             self.generators['txt2img'] = Txt2Img(self.model, self.precision)
             self.generators['txt2img'].free_gpu_mem = self.free_gpu_mem
         return self.generators['txt2img']
+
+    def _make_txt2img2img(self):
+        if not self.generators.get('txt2img2'):
+            from ldm.dream.generator.txt2img2img import Txt2Img2Img
+            self.generators['txt2img2'] = Txt2Img2Img(self.model, self.precision)
+            self.generators['txt2img2'].free_gpu_mem = self.free_gpu_mem
+        return self.generators['txt2img2']
 
     def _make_inpaint(self):
         if not self.generators.get('inpaint'):
@@ -716,7 +733,9 @@ class Generate:
                                 strength      =  0.0,
                                 codeformer_fidelity = 0.75,
                                 save_original = False,
-                                image_callback = None):
+                                image_callback = None,
+                                prefix = None,
+    ):
             
         for r in image_list:
             image, seed = r
@@ -750,7 +769,7 @@ class Generate:
                 )
 
             if image_callback is not None:
-                image_callback(image, seed, upscaled=True)
+                image_callback(image, seed, upscaled=True, use_prefix=prefix)
             else:
                 r[0] = image
 
@@ -833,7 +852,7 @@ class Generate:
 
         return model
 
-    def _load_img(self, img, width, height, fit=False):
+    def _load_img(self, img, width, height)->Image:
         if isinstance(img, Image.Image):
             image = img
             print(
@@ -851,19 +870,15 @@ class Generate:
             print(
                 f'>> loaded input image of size {image.width}x{image.height}'
             )
+        return image
 
+    def _create_init_image(self, image, width, height, fit=True):
+        image = image.convert('RGB')
         if fit:
             image = self._fit_image(image, (width, height))
         else:
             image = self._squeeze_image(image)
-        return image
 
-    def _create_init_image(self, image):
-        image = image.convert('RGB')
-        # print(
-        #     f'>> DEBUG: writing the image to img.png'
-        # )
-        # image.save('img.png')
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
@@ -930,18 +945,20 @@ class Generate:
 
         return new_img
 
-    def _create_init_mask(self, image):
+    def _create_init_mask(self, image, width, height, fit=True):
         # convert into a black/white mask
         image = self._image_to_mask(image)
         image = image.convert('RGB')
-        # BUG: We need to use the model's downsample factor rather than hardcoding "8"
-        from ldm.dream.generator.base import downsampling
+
+        # now we adjust the size
+        if fit:
+            image = self._fit_image(image, (width, height))
+        else:
+            image = self._squeeze_image(image)
+
         image = image.resize((image.width//downsampling, image.height //
                               downsampling), resample=Image.Resampling.NEAREST)
-        # print(
-        #     f'>> DEBUG: writing the mask to mask.png'
-        #     )
-        # image.save('mask.png')
+
         image = np.array(image)
         image = image.astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
@@ -1023,10 +1040,6 @@ class Generate:
             height = h
             width = w
             resize_needed = True
-
-        if (width * height) > (self.width * self.height):
-            print(">> This input is larger than your defaults. If you run out of memory, please use a smaller image.")
-
         return width, height, resize_needed
 
 
@@ -1053,3 +1066,15 @@ class Generate:
             f.write(hash)
         return hash
 
+    def write_intermediate_images(self,modulus,path):
+        counter = -1
+        if not os.path.exists(path):
+            os.makedirs(path)
+        def callback(img):
+            nonlocal counter
+            counter += 1
+            if counter % modulus != 0:
+                return;
+            image = self.sample_to_image(img)
+            image.save(os.path.join(path,f'{counter:03}.png'),'PNG')
+        return callback

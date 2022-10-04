@@ -50,6 +50,7 @@ host = opt.host  # Web & socket.io host
 port = opt.port  # Web & socket.io port
 verbose = opt.verbose  # enables copious socket.io logging
 precision = opt.precision
+free_gpu_mem = opt.free_gpu_mem
 embedding_path = opt.embedding_path
 additional_allowed_origins = (
     opt.cors if opt.cors else []
@@ -148,6 +149,7 @@ generate = Generate(
     precision=precision,
     embedding_path=embedding_path,
 )
+generate.free_gpu_mem = free_gpu_mem
 generate.load_model()
 
 
@@ -672,9 +674,10 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
             and step < generation_parameters["steps"] - 1
         ):
             image = generate.sample_to_image(sample)
-            path = save_image(
-                image, generation_parameters, intermediate_path, step_index
-            )
+
+            metadata = parameters_to_generated_image_metadata(generation_parameters)
+            command = parameters_to_command(generation_parameters)
+            path = save_image(image, command, metadata, intermediate_path, step_index=step_index, postprocessing=False)
 
             step_index += 1
             socketio.emit(
@@ -682,7 +685,7 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
                 {
                     "url": os.path.relpath(path),
                     "mtime": os.path.getmtime(path),
-                    "metadata": generation_parameters,
+                    "metadata": metadata,
                 },
             )
         socketio.emit("progressUpdate", progress)
