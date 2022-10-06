@@ -11,6 +11,7 @@ def build_opt(post_data, seed, gfpgan_model_exists):
     opt = argparse.Namespace()
     setattr(opt, 'prompt', post_data['prompt'])
     setattr(opt, 'init_img', post_data['initimg'])
+    setattr(opt, 'init_mask', post_data['initmask'] if post_data['initmask'] else None)
     setattr(opt, 'strength', float(post_data['strength']))
     setattr(opt, 'iterations', int(post_data['iterations']))
     setattr(opt, 'steps', int(post_data['steps']))
@@ -138,6 +139,7 @@ class DreamServer(BaseHTTPRequestHandler):
         # the outer scope of image_done()
         config = post_data.copy() # Shallow copy
         config['initimg'] = config.pop('initimg_name', '')
+        config['initmask'] = config.pop('initmask_name', '')
 
         images_generated = 0    # helps keep track of when upscaling is started
         images_upscaled = 0     # helps keep track of when upscaling is completed
@@ -227,12 +229,22 @@ class DreamServer(BaseHTTPRequestHandler):
                 opt1 = argparse.Namespace(**vars(opt))
                 opt1.init_img = "./img2img-tmp.png"
 
+                if opt.init_mask is not None:
+                    # Decode mask as base64 to temp file
+                    with open("./img2img-mask-tmp.png", "wb") as f:
+                        mask = opt.init_mask.split(",")[1]  # Ignore mime type
+                        f.write(base64.b64decode(mask))
+                    opt1 = argparse.Namespace(**vars(opt1))
+                    opt1.init_mask = "./img2img-mask-tmp.png"
+
                 try:
                     # Run img2img
                     self.model.prompt2image(**vars(opt1), step_callback=image_progress, image_callback=image_done)
                 finally:
                     # Remove the temp file
                     os.remove("./img2img-tmp.png")
+                    os.remove("./img2img-mask-tmp.png")
+
         except CanceledException:
             print(f"Canceled.")
             return

@@ -144,14 +144,14 @@ async function generateSubmit(form) {
         document.querySelector("#prompt").value = prompt;
         document.querySelector('progress').setAttribute('value', '0');
 
-        if (noOutputs) {
+        if (typeof noOutputs !== 'undefined' && noOutputs) {
             alert("Error occurred while generating.");
         }
     });
 
     // Disable form while generating
     form.querySelector('fieldset').setAttribute('disabled','');
-    document.querySelector("#prompt").value = `Generating: "${prompt}"`;
+    document.querySelector("#prompt").value = 'Generating: "${prompt}"';
 }
 
 async function fetchRunLog() {
