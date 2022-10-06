@@ -605,6 +605,11 @@ class Args(object):
             dest='hires_fix',
             help='Create hires image using img2img to prevent duplicated objects'
         )
+        render_group.add_argument(
+            '--model_name',
+            default=None,
+            help='Indicates which diffusion model to load.',
+        )
         img2img_group.add_argument(
             '-I',
             '--init_img',

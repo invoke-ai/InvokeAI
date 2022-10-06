@@ -17,6 +17,7 @@ import io
 import hashlib
 import cv2
 import skimage
+import gc
 
 from omegaconf import OmegaConf
 from ldm.dream.generator.base import downsampling
@@ -144,8 +145,9 @@ class Generate:
             codeformer=None,
             esrgan=None
     ):
-        models              = OmegaConf.load(conf)
-        mconfig             = models[model]
+        self.mconfigs       = OmegaConf.load(conf)
+        self.model_name     = model
+        mconfig             = self.mconfigs[model]
         self.weights        = mconfig.weights if weights is None else weights
         self.config         = mconfig.config  if config  is None else config
         self.height         = mconfig.height
@@ -160,6 +162,7 @@ class Generate:
         self.seamless       = False
         self.embedding_path = embedding_path
         self.model          = None     # empty for now
+        self.models         = {}
         self.sampler        = None
         self.device         = None
         self.session_peakmem = None
@@ -237,6 +240,7 @@ class Generate:
             seamless         = False,
             log_tokenization = False,
             with_variations  = None,
+            model_name       = None,
             variation_amount = 0.0,
             threshold        = 0.0,
             perlin           = 0.0,
@@ -314,7 +318,7 @@ class Generate:
         with_variations = [] if with_variations is None else with_variations
 
         # will instantiate the model or return it from cache
-        model = self.load_model()
+        model = self.load_model(model_name)
         
         for m in model.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
@@ -657,29 +661,65 @@ class Generate:
             self.generators['inpaint'] = Inpaint(self.model, self.precision)
         return self.generators['inpaint']
 
-    def load_model(self):
-        """Load and initialize the model from configuration variables passed at object creation time"""
-        if self.model is None:
-            seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
-            try:
-                model = self._load_model_from_config(self.config, self.weights)
-                if self.embedding_path is not None:
-                    model.embedding_manager.load(
-                        self.embedding_path, self.precision == 'float32' or self.precision == 'autocast'
-                    )
-                self.model = model.to(self.device)
-                # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
-                self.model.cond_stage_model.device = self.device
-            except AttributeError as e:
-                print(f'>> Error loading model. {str(e)}', file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
-                raise SystemExit from e
+    def load_model(self, model_name = None):
+        """Load and initialize the model from configuration variables and model name"""
+        m_name = model_name or self.model_name
+        # current model, just return it
+        if m_name == self.model_name:
+           if self.model is not None:
+               return self.model
+        
+        seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
+        try:
+            mconfig         = self.mconfigs[m_name]
+            model           = self._load_model_from_config(mconfig.config, mconfig.weights)
+            self.model_name = m_name
+            self.weights    = mconfig.weights
+            self.config     = mconfig.config
+            self.height     = mconfig.height
+            self.width      = mconfig.width
+            
+            if self.embedding_path is not None:
+                model.embedding_manager.load(
+                    self.embedding_path, self.precision == 'float32' or self.precision == 'autocast'
+                )
+            # here we are ready to replace current model
+            if self.model is not None:
+                # looks like generators have a copy of model and next generation will fail unless we clean them
+                self.generators = {}
+                # it was not enough to simply set self.model = None to free gpu memory
+                del self.model.first_stage_model
+                del self.model.cond_stage_model 
+                del self.model.model
+                del self.model
+                self.model = None
+                gc.collect()
+                torch.cuda.empty_cache() 
+            
+            # assign new model and move it to device
+            self.model = model
+            self.model.to(self.device)
+            self.model.eval()
+            if self._has_cuda():
+                print(
+                    '>> Max VRAM used to load the model:',
+                    '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
+                    '\n>> Current VRAM usage:'
+                    '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
+                )
+            
+            # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
+            self.model.cond_stage_model.device = self.device
+        except AttributeError as e:
+            print(f'>> Error loading model. {str(e)}', file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
+            raise SystemExit from e
 
-            self._set_sampler()
+        self._set_sampler()
 
-            for m in self.model.modules():
-                if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                    m._orig_padding_mode = m.padding_mode
+        for m in self.model.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                m._orig_padding_mode = m.padding_mode
 
         return self.model
 
@@ -801,6 +841,10 @@ class Generate:
         with open(weights,'rb') as f:
             weight_bytes = f.read()
         self.model_hash  = self._cached_sha256(weights,weight_bytes)
+        toc = time.time()
+        print(
+            f'>> Weights loaded in', '%4.2fs' % (toc - tic)
+        )
         pl_sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
         del weight_bytes
         sd    = pl_sd['state_dict']
@@ -813,21 +857,15 @@ class Generate:
         else:
             print('>> Using more accurate float32 precision')
 
-        model.to(self.device)
-        model.eval()
+        #will do it later    
+        #model.to(self.device)
+        #model.eval()
 
         # usage statistics
         toc = time.time()
         print(
             f'>> Model loaded in', '%4.2fs' % (toc - tic)
         )
-        if self._has_cuda():
-            print(
-                '>> Max VRAM used to load the model:',
-                '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
-                '\n>> Current VRAM usage:'
-                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
-            )
 
         return model
 

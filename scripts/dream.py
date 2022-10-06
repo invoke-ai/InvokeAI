@@ -191,6 +191,14 @@ def main_loop(gen, opt, infile):
             elif subcommand.startswith('clear'):
                 completer.clear_history()
                 continue
+                
+            elif subcommand.startswith('model'):
+                model = command.replace('!model','',1).strip()
+                if model == '':
+                   print(f"Current model: {gen.model_name}")
+                else:
+                   gen.load_model(model)
+                continue
 
             elif re.match('^(\d+)',subcommand):
                 command_no = re.match('^(\d+)',subcommand).groups()[0]
