@@ -669,11 +669,32 @@ class Generate:
            if self.model is not None:
                return self.model
         
+        if m_name in self.models:
+            tic = time.time()
+            # send currrent model to RAM / CPU
+            self.generators = {}
+            # it was not enough to simply set self.model = None to free gpu memory
+            
+            if self.model is not None:
+                self._model_to_cache()
+                gc.collect()
+                torch.cuda.empty_cache()
+            
+            # move old model to device
+            self._model_from_cache(m_name)
+            self._set_sampler()
+            
+            toc = time.time()
+            print(
+                f'>> Model switched in', '%4.2fs' % (toc - tic)
+            )
+            
+            return self.model
+        
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         try:
             mconfig         = self.mconfigs[m_name]
             model           = self._load_model_from_config(mconfig.config, mconfig.weights)
-            self.model_name = m_name
             self.weights    = mconfig.weights
             self.config     = mconfig.config
             self.height     = mconfig.height
@@ -688,15 +709,12 @@ class Generate:
                 # looks like generators have a copy of model and next generation will fail unless we clean them
                 self.generators = {}
                 # it was not enough to simply set self.model = None to free gpu memory
-                del self.model.first_stage_model
-                del self.model.cond_stage_model 
-                del self.model.model
-                del self.model
-                self.model = None
+                self._model_to_cache()
                 gc.collect()
-                torch.cuda.empty_cache() 
+                torch.cuda.empty_cache()               
             
             # assign new model and move it to device
+            self.model_name = m_name
             self.model = model
             self.model.to(self.device)
             self.model.eval()
@@ -722,7 +740,21 @@ class Generate:
                 m._orig_padding_mode = m.padding_mode
 
         return self.model
-
+        
+    def _model_to_cache(self):
+        self.model.first_stage_model.to("cpu")
+        self.model.cond_stage_model.to("cpu") 
+        self.model.model.to("cpu")
+        self.models[self.model_name] = self.model
+        self.model = None
+        
+    def _model_from_cache(self, model_name):
+        self.model_name = model_name
+        self.model = self.models[self.model_name]
+        self.model.to(self.device)
+        self.model.first_stage_model.to(self.device)
+        self.model.cond_stage_model.to(self.device) 
+    
     def correct_colors(self,
                        image_list,
                        reference_image_path,
