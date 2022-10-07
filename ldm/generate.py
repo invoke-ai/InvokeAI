@@ -258,6 +258,7 @@ class Generate:
             # Set this True to handle KeyboardInterrupt internally
             catch_interrupts = False,
             hires_fix        = False,
+            use_mps_noise    = False,
             **args,
     ):   # eat up additional cruft
         """
@@ -386,6 +387,7 @@ class Generate:
 
             generator.set_variation(
                 self.seed, variation_amount, with_variations)
+            generator.use_mps_noise = use_mps_noise
             results = generator.generate(
                 prompt,
                 iterations=iterations,

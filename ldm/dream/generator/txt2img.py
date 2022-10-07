@@ -59,7 +59,7 @@ class Txt2Img(Generator):
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height):
         device         = self.model.device
-        if device.type == 'mps':
+        if self.use_mps_noise or device.type == 'mps':
             x = torch.randn([1,
                                 self.latent_channels,
                                 height // self.downsampling_factor,

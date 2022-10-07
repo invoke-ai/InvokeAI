@@ -23,6 +23,7 @@ class Generator():
         self.downsampling_factor = downsampling   # BUG: should come from model or config
         self.variation_amount    = 0
         self.with_variations     = []
+        self.use_mps_noise       = False
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
     def get_make_image(self,prompt,**kwargs):

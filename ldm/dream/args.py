@@ -753,6 +753,13 @@ class Args(object):
             type=str,
             help='list of variations to apply, in the format `seed:weight,seed:weight,...'
         )
+        render_group.add_argument(
+            '--use_mps_noise',
+            action='store_true',
+            dest='use_mps_noise',
+            help='Simulate noise on M1 systems to get the same results'
+        )
+
         return parser
 
 def format_metadata(**kwargs):
