@@ -116,6 +116,7 @@ const ImageMetadataViewer = memo(
       steps,
       cfg_scale,
       seamless,
+      hires_fix,
       width,
       height,
       strength,
@@ -215,6 +216,13 @@ const ImageMetadataViewer = memo(
                   label="Seamless"
                   value={seamless}
                   onClick={() => dispatch(setWidth(seamless))}
+                />
+              )}
+              {hires_fix && (
+                <MetadataItem
+                  label="High Resolution Optimization"
+                  value={hires_fix}
+                  onClick={() => dispatch(setWidth(hires_fix))}
                 />
               )}
               {width && (
