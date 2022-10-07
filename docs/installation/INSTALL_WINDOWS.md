@@ -3,7 +3,7 @@
 ## **Notebook install (semi-automated)**
 
 We have a [Jupyter
-notebook](https://github.com/lstein/stable-diffusion/blob/main/notebooks/Stable-Diffusion-local-Windows.ipynb)
+notebook](https://github.com/invoke-ai/InvokeAI/blob/main/notebooks/Stable-Diffusion-local-Windows.ipynb)
 with cell-by-cell installation steps. It will download the code in
 this repo as one of the steps, so instead of cloning this repo, simply
 download the notebook from the link above and load it up in VSCode
@@ -12,14 +12,14 @@ start running the cells one-by-one.
 
 Note that you will need NVIDIA drivers, Python 3.10, and Git installed
 beforehand - simplified [step-by-step
-instructions](https://github.com/lstein/stable-diffusion/wiki/Easy-peasy-Windows-install)
+instructions](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
 are available in the wiki (you'll only need steps 1, 2, & 3 ).
 
 ## **Manual Install**
 
 ### **pip**
 
-See [Easy-peasy Windows install](https://github.com/lstein/stable-diffusion/wiki/Easy-peasy-Windows-install)
+See [Easy-peasy Windows install](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
 in the wiki
 
 ### **Conda**
@@ -97,7 +97,7 @@ python scripts\dream.py
 10. Subsequently, to relaunch the script, first activate the Anaconda command window (step 3),enter the InvokeAI directory (step 5, `cd \path\to\InvokeAI`), run `conda activate ldm` (step 6b), and then launch the dream script (step 9).
 
 **Note:** Tildebyte has written an alternative ["Easy peasy Windows
-install"](https://github.com/lstein/stable-diffusion/wiki/Easy-peasy-Windows-install)
+install"](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
 which uses the Windows Powershell and pew. If you are having trouble with Anaconda on Windows, give this a try (or try it first!)
 
 ### Updating to newer versions of the script

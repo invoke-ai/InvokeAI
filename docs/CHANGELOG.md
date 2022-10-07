@@ -33,7 +33,7 @@
   Seed memory only extends back to the previous command, but will work on all images generated with the -n# switch.
 - Variant generation support temporarily disabled pending more general solution.
 - Created a feature branch named **yunsaki-morphing-dream** which adds experimental support for
-  iteratively modifying the prompt and its parameters. Please see[ Pull Request #86](https://github.com/lstein/stable-diffusion/pull/86)
+  iteratively modifying the prompt and its parameters. Please see[ Pull Request #86](https://github.com/invoke-ai/InvokeAI/pull/86)
   for a synopsis of how this works. Note that when this feature is eventually added to the main branch, it will may be modified
   significantly.
 
@@ -49,7 +49,7 @@
 
 - A new -v option allows you to generate multiple variants of an initial image
   in img2img mode. (kudos to [Oceanswave](https://github.com/Oceanswave). [
-  See this discussion in the PR for examples and details on use](https://github.com/lstein/stable-diffusion/pull/71#issuecomment-1226700810))
+  See this discussion in the PR for examples and details on use](https://github.com/invoke-ai/InvokeAI/pull/71#issuecomment-1226700810))
 - Added ability to personalize text to image generation (kudos to [Oceanswave](https://github.com/Oceanswave) and [nicolai256](https://github.com/nicolai256))
 - Enabled all of the samplers from k_diffusion
 

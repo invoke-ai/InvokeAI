@@ -1,7 +1,7 @@
 ## **Google Colab**
 
 Stable Diffusion AI Notebook: <a
-href="https://colab.research.google.com/github/lstein/stable-diffusion/blob/main/notebooks/Stable_Diffusion_AI_Notebook.ipynb"
+href="https://colab.research.google.com/github/invoke-ai/InvokeAI/blob/main/notebooks/Stable_Diffusion_AI_Notebook.ipynb"
 target="_parent"><img
 src="https://colab.research.google.com/assets/colab-badge.svg"
 alt="Open In Colab"/></a> <br> Open and follow instructions to use an
