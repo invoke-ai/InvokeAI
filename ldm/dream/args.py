@@ -185,6 +185,7 @@ class Args(object):
         switches.append(f'-W {a["width"]}')
         switches.append(f'-H {a["height"]}')
         switches.append(f'-C {a["cfg_scale"]}')
+        switches.append(f'--fnformat {a["fnformat"]}')
         if a['perlin'] > 0:
             switches.append(f'--perlin {a["perlin"]}')
         if a['threshold'] > 0:
@@ -560,6 +561,12 @@ class Args(object):
             help='Perlin noise scale (0.0 - 1.0) - add perlin noise to the initialization instead of the usual gaussian noise.',
         )
         render_group.add_argument(
+            '--fnformat',
+            default='%(prefix)s.%(seed)s.png',
+            type=str,
+            help='Specify the template of the generated files names.',
+        )
+        render_group.add_argument(
             '--grid',
             '-g',
             action='store_true',
@@ -757,7 +764,7 @@ def metadata_dumps(opt,
 
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
-                         'cfg_scale','threshold','perlin','step_number','width','height','extra','strength']
+                         'cfg_scale','threshold','perlin','fnformat','step_number','width','height','extra','strength']
 
     rfc_dict ={}
 

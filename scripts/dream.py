@@ -458,7 +458,23 @@ def prepare_image_metadata(
     if postprocessed and opt.save_original:
         filename = choose_postprocess_name(opt,prefix,seed)
     else:
-        filename = f'{prefix}.{seed}.png'
+        filename = opt.fnformat % {
+            'prefix': prefix,
+            'seed': seed,
+            'steps': opt.steps,
+            'prompt': opt.prompt,
+            'width': opt.width,
+            'height': opt.height,
+            'cfg_scale': opt.cfg_scale,
+            'perlin': opt.perlin,
+            'threshold': opt.threshold,
+            'gfpgan_strength': opt.gfpgan_strength,
+            'outcrop': opt.outcrop,
+            'upscale': opt.upscale,
+            'embiggen': opt.embiggen,
+            'embiggen_tiles': opt.embiggen_tiles,
+            'out_direction': opt.out_direction
+        } 
 
     if opt.variation_amount > 0:
         first_seed             = first_seed or seed
