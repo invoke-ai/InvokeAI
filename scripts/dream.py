@@ -356,7 +356,7 @@ def main_loop(gen, opt, infile):
                 grid_img   = make_grid(list(grid_images.values()))
                 grid_seeds = list(grid_images.keys())
                 first_seed = last_results[0][1]
-                filename   = f'{prefix}.png'
+                filename   = f'{prefix}.{first_seed}.png'
                 formatted_dream_prompt  = opt.dream_prompt_str(seed=first_seed,grid=True,iterations=len(grid_images))
                 formatted_dream_prompt += f' # {grid_seeds}'
                 metadata = metadata_dumps(
