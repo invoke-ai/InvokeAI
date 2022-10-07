@@ -562,9 +562,9 @@ class Args(object):
         )
         render_group.add_argument(
             '--fnformat',
-            default='%(prefix)s.%(seed)s.png',
+            default='{prefix}.{seed}.png',
             type=str,
-            help='Specify the template of the generated files names.',
+            help='Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png',
         )
         render_group.add_argument(
             '--grid',

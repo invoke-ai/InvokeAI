@@ -356,7 +356,7 @@ def main_loop(gen, opt, infile):
                 grid_img   = make_grid(list(grid_images.values()))
                 grid_seeds = list(grid_images.keys())
                 first_seed = last_results[0][1]
-                filename   = f'{prefix}.{first_seed}.png'
+                filename   = f'{prefix}.png'
                 formatted_dream_prompt  = opt.dream_prompt_str(seed=first_seed,grid=True,iterations=len(grid_images))
                 formatted_dream_prompt += f' # {grid_seeds}'
                 metadata = metadata_dumps(
@@ -458,23 +458,17 @@ def prepare_image_metadata(
     if postprocessed and opt.save_original:
         filename = choose_postprocess_name(opt,prefix,seed)
     else:
-        filename = opt.fnformat % {
-            'prefix': prefix,
-            'seed': seed,
-            'steps': opt.steps,
-            'prompt': opt.prompt,
-            'width': opt.width,
-            'height': opt.height,
-            'cfg_scale': opt.cfg_scale,
-            'perlin': opt.perlin,
-            'threshold': opt.threshold,
-            'gfpgan_strength': opt.gfpgan_strength,
-            'outcrop': opt.outcrop,
-            'upscale': opt.upscale,
-            'embiggen': opt.embiggen,
-            'embiggen_tiles': opt.embiggen_tiles,
-            'out_direction': opt.out_direction
-        } 
+        wildcards = dict(opt.__dict__)
+        wildcards['prefix'] = prefix
+        wildcards['seed'] = seed
+        try:
+            filename = opt.fnformat.format(**wildcards)
+        except KeyError as e:
+            print(f'The filename format contains an unknown key \'{e.args[0]}\'. Will use \'{{prefix}}.{{seed}}.png\' instead')
+            filename = f'{prefix}.{seed}.png'
+        except IndexError as e:
+            print(f'The filename format is broken or complete. Will use \'{{prefix}}.{{seed}}.png\' instead')
+            filename = f'{prefix}.{seed}.png'
 
     if opt.variation_amount > 0:
         first_seed             = first_seed or seed
