@@ -25,6 +25,7 @@ export interface OptionsState {
   initialImagePath: string | null;
   maskPath: string;
   seamless: boolean;
+  hiresFix: boolean;
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   variationAmount: number;
@@ -49,6 +50,7 @@ const initialOptionsState: OptionsState = {
   perlin: 0,
   seed: 0,
   seamless: false,
+  hiresFix: false,
   shouldUseInitImage: false,
   img2imgStrength: 0.75,
   initialImagePath: null,
@@ -136,6 +138,9 @@ export const optionsSlice = createSlice({
     setSeamless: (state, action: PayloadAction<boolean>) => {
       state.seamless = action.payload;
     },
+    setHiresFix: (state, action: PayloadAction<boolean>) => {
+      state.hiresFix = action.payload;
+    },
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
     },
@@ -178,6 +183,7 @@ export const optionsSlice = createSlice({
         threshold,
         perlin,
         seamless,
+        hires_fix,
         width,
         height,
         strength,
@@ -252,6 +258,7 @@ export const optionsSlice = createSlice({
       if (threshold) state.threshold = threshold;
       if (perlin) state.perlin = perlin;
       if (typeof seamless === 'boolean') state.seamless = seamless;
+      if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix;
       if (width) state.width = width;
       if (height) state.height = height;
     },
@@ -294,6 +301,7 @@ export const {
   setSampler,
   setSeed,
   setSeamless,
+  setHiresFix,
   setImg2imgStrength,
   setGfpganStrength,
   setUpscalingLevel,

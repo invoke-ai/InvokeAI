@@ -102,6 +102,9 @@ def main():
     if opt.seamless:
         print(">> changed to seamless tiling mode")
 
+    if opt.hires_fix:
+        print(">> initializing High Resolution Optimizations")
+
     # preload the model
     gen.load_model()
     #set additional option
