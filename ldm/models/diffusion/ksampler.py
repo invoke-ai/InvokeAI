@@ -172,12 +172,12 @@ class KSampler(Sampler):
 
         # sigmas are set up in make_schedule - we take the last steps items
         total_steps = len(self.karras_sigmas)
-        sigmas = self.karras_sigmas[-S-1:]
+        self.sigmas = self.karras_sigmas[-S-1:]
         
         if x_T is not None:
-            x = x_T + torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
+            x = x_T + torch.randn([batch_size, *shape], device=self.device) * self.sigmas[0]
         else:
-            x = torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
+            x = torch.randn([batch_size, *shape], device=self.device) * self.sigmas[0]
 
         model_wrap_cfg = CFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
         extra_args = {
@@ -188,7 +188,7 @@ class KSampler(Sampler):
         print(f'>> Sampling with k_{self.schedule} starting at step {len(self.sigmas)-S-1} of {len(self.sigmas)-1} ({S} new sampling steps)')
         return (
             K.sampling.__dict__[f'sample_{self.schedule}'](
-                model_wrap_cfg, x, sigmas, extra_args=extra_args,
+                model_wrap_cfg, x, self.sigmas, extra_args=extra_args,
                 callback=route_callback
             ),
             None,
