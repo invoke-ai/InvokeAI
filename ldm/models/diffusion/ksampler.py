@@ -97,6 +97,8 @@ class KSampler(Sampler):
             rho=7.,
             device=self.device,
         )
+        # to check if it is img2img or txt2img
+        self.img2img_noise = None
         
     # ALERT: We are completely overriding the sample() method in the base class, which
     # means that inpainting will not work. To get this to work we need to be able to
@@ -133,6 +135,8 @@ class KSampler(Sampler):
     # this is a no-op, provided here for compatibility with ddim and plms samplers
     @torch.no_grad()
     def stochastic_encode(self, x0, t, use_original_steps=False, noise=None):
+        # called in img2img with x0 = self.init_latent, torch.tensor([t_enc]).to(self.model.device), noise=x_T
+        self.img2img_noise = noise
         return x0
     
     # Most of these arguments are ignored and are only present for compatibility with
@@ -173,7 +177,11 @@ class KSampler(Sampler):
         total_steps = len(self.karras_sigmas)
         sigmas = self.karras_sigmas[-S-1:]
         
-        if x_T is not None:
+        if self.img2img_noise is not None:
+            # we are in img2img
+            x = x_T + torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
+        elif x_T is not None:
+            # txt2img 
             x = x_T * sigmas[0]
         else:
             x = torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
