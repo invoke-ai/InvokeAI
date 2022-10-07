@@ -118,7 +118,7 @@ ln -s "$PATH_TO_CKPT/sd-v1-4.ckpt" \
         ```bash
         PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 \
           conda env create \
-          -f environment-mac.yml \
+          -f environment-mac.yaml \
           && conda activate ldm
         ```
 
@@ -128,7 +128,7 @@ ln -s "$PATH_TO_CKPT/sd-v1-4.ckpt" \
         ```bash
         PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
           conda env create \
-          -f environment-mac.yml \
+          -f environment-mac.yaml \
           && conda activate ldm
         ```
 
