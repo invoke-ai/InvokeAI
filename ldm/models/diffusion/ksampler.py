@@ -179,7 +179,7 @@ class KSampler(Sampler):
         # more randomness to the starting image.
         if x_T is not None:
             if x0 is not None:
-                x = x_T + torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
+                x = x_T + torch.randn_like(x0, device=self.device) * sigmas[0]
             else:
                 x = x_T * sigmas[0]
         else:
