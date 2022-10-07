@@ -6,6 +6,8 @@ import { useAppDispatch, useAppSelector } from '../../app/store';
 import {
   setCfgScale,
   setSampler,
+  setThreshold,
+  setPerlin,
   setSteps,
   OptionsState,
 } from './optionsSlice';
@@ -24,6 +26,8 @@ const optionsSelector = createSelector(
       steps: options.steps,
       cfgScale: options.cfgScale,
       sampler: options.sampler,
+      threshold: options.threshold,
+      perlin: options.perlin,
     };
   },
   {
@@ -37,8 +41,9 @@ const optionsSelector = createSelector(
  * Sampler options. Includes steps, CFG scale, sampler.
  */
 const SamplerOptions = () => {
+
   const dispatch = useAppDispatch();
-  const { steps, cfgScale, sampler } = useAppSelector(optionsSelector);
+  const { steps, cfgScale, sampler, threshold, perlin } = useAppSelector(optionsSelector);
 
   const handleChangeSteps = (v: string | number) =>
     dispatch(setSteps(Number(v)));
@@ -48,6 +53,12 @@ const SamplerOptions = () => {
 
   const handleChangeSampler = (e: ChangeEvent<HTMLSelectElement>) =>
     dispatch(setSampler(e.target.value));
+
+  const handleChangeThreshold = (v: string | number) =>
+    dispatch(setThreshold(Number(v)));
+
+  const handleChangePerlin = (v: string | number) =>
+    dispatch(setPerlin(Number(v)));
 
   return (
     <Flex gap={2} direction={'column'}>
@@ -71,6 +82,21 @@ const SamplerOptions = () => {
         onChange={handleChangeSampler}
         validValues={SAMPLERS}
       />
+      {/* <IAINumberInput
+          label='Threshold'
+          min={0}
+          step={0.1}
+          onChange={handleChangeThreshold}
+          value={threshold}
+      /> */}
+      {/* <IAINumberInput
+          label='Perlin'
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={handleChangePerlin}
+          value={perlin}
+      /> */}
     </Flex>
   );
 };

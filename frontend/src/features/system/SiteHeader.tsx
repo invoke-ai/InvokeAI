@@ -1,9 +1,12 @@
 import { IconButton, Link, useColorMode } from '@chakra-ui/react';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 import { FaSun, FaMoon, FaGithub } from 'react-icons/fa';
-import { MdHelp, MdSettings } from 'react-icons/md';
+import { MdHelp, MdKeyboard, MdSettings } from 'react-icons/md';
 
 import InvokeAILogo from '../../assets/images/logo.png';
+import HotkeysModal from './HotkeysModal/HotkeysModal';
+
 import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 
@@ -12,6 +15,14 @@ import StatusIndicator from './StatusIndicator';
  */
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
+
+  useHotkeys(
+    'shift+d',
+    () => {
+      toggleColorMode();
+    },
+    [colorMode, toggleColorMode]
+  );
 
   const colorModeIcon = colorMode == 'light' ? <FaMoon /> : <FaSun />;
 
@@ -39,6 +50,16 @@ const SiteHeader = () => {
             icon={<MdSettings />}
           />
         </SettingsModal>
+
+        <HotkeysModal>
+          <IconButton
+            aria-label="Hotkeys"
+            variant="link"
+            fontSize={24}
+            size={'sm'}
+            icon={<MdKeyboard />}
+          />
+        </HotkeysModal>
 
         <IconButton
           aria-label="Link to Github Issues"

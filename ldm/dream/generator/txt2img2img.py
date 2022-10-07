@@ -40,7 +40,12 @@ class Txt2Img2Img(Generator):
                 init_width // self.downsampling_factor,
             ]
             
-            x = self.get_noise(init_width, init_height)
+            sampler.make_schedule(
+                    ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
+            )
+            
+            #x = self.get_noise(init_width, init_height)
+            x = x_T
             
             if self.free_gpu_mem and self.model.model.device != self.model.device:
                 self.model.model.to(self.model.device)
@@ -71,28 +76,16 @@ class Txt2Img2Img(Generator):
 
             t_enc = int(strength * steps)
 
-            x = None
+            x = self.get_noise(width,height,False)
 
-            # Other samplers not supported yet, so ignore previous sampler
-            if not isinstance(sampler,DDIMSampler):
-                print(
-                    f"\n>> Sampler '{sampler.__class__.__name__}' is not yet supported for img2img. Using DDIM sampler"
-                )
-                img_sampler = DDIMSampler(self.model, device=self.model.device)
-                img_sampler.make_schedule(
-                    ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
-                )
-            else:
-                img_sampler = sampler
-            
-            z_enc = img_sampler.stochastic_encode(
+            z_enc = sampler.stochastic_encode(
                 samples,
                 torch.tensor([t_enc]).to(self.model.device),
-                noise=x_T
+                noise=x
             )
 
             # decode it
-            samples = img_sampler.decode(
+            samples = sampler.decode(
                 z_enc,
                 c,
                 t_enc,
@@ -110,17 +103,28 @@ class Txt2Img2Img(Generator):
 
 
     # returns a tensor filled with random numbers from a normal distribution
-    def get_noise(self,width,height):
+    def get_noise(self,width,height,scale = True):
+        # print(f"Get noise: {width}x{height}")
+        if scale:
+            trained_square = 512 * 512
+            actual_square = width * height
+            scale = math.sqrt(trained_square / actual_square)
+            scaled_width = math.ceil(scale * width / 64) * 64
+            scaled_height = math.ceil(scale * height / 64) * 64
+        else:
+            scaled_width = width
+            scaled_height = height
+            
         device      = self.model.device
         if device.type == 'mps':
             return torch.randn([1,
                                 self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
+                                scaled_height // self.downsampling_factor,
+                                scaled_width  // self.downsampling_factor],
                                 device='cpu').to(device)
         else:
             return torch.randn([1,
                                 self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
+                                scaled_height // self.downsampling_factor,
+                                scaled_width  // self.downsampling_factor],
                                 device=device)

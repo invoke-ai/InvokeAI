@@ -53,17 +53,14 @@ class InvokeAIWebServer:
         cors_allowed_origins = [
             'http://127.0.0.1:5173',
             'http://localhost:5173',
+            'http://localhost:9090'
         ]
         additional_allowed_origins = (
             opt.cors if opt.cors else []
         )  # additional CORS allowed origins
-        if self.host == '127.0.0.1':
-            cors_allowed_origins.extend(
-                [
-                    f'http://{self.host}:{self.port}',
-                    f'http://localhost:{self.port}',
-                ]
-            )
+        cors_allowed_origins.append(f'http://{self.host}:{self.port}')
+        if self.host == '127.0.0.1' or self.host == '0.0.0.0':
+            cors_allowed_origins.append(f'http://localhost:{self.port}')
         cors_allowed_origins = (
             cors_allowed_origins + additional_allowed_origins
         )
@@ -729,6 +726,8 @@ class InvokeAIWebServer:
                 'variations',
                 'steps',
                 'cfg_scale',
+                'threshold',
+                'perlin',
                 'step_number',
                 'width',
                 'height',
@@ -797,9 +796,6 @@ class InvokeAIWebServer:
                 rfc_dict['init_image_path'] = parameters[
                     'init_img'
                 ]  # TODO: Noncompliant
-                rfc_dict[
-                    'sampler'
-                ] = 'ddim'  # TODO: FIX ME WHEN IMG2IMG SUPPORTS ALL SAMPLERS
                 if 'init_mask' in parameters:
                     rfc_dict['mask_hash'] = calculate_init_img_hash(
                         self.get_image_path_from_url(parameters['init_mask'])

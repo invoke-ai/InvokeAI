@@ -4,18 +4,49 @@ import torch
 import torch.nn as nn
 from ldm.dream.devices import choose_torch_device
 from ldm.models.diffusion.sampler import Sampler
+from ldm.util import rand_perlin_2d
+from ldm.modules.diffusionmodules.util import (
+    make_ddim_sampling_parameters,
+    make_ddim_timesteps,
+    noise_like,
+    extract_into_tensor,
+)
+
+def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
+    if threshold <= 0.0:
+        return result
+    maxval = 0.0 + torch.max(result).cpu().numpy()
+    minval = 0.0 + torch.min(result).cpu().numpy()
+    if maxval < threshold and minval > -threshold:
+        return result
+    if maxval > threshold:
+        maxval = min(max(1, scale*maxval), threshold)
+    if minval < -threshold:
+        minval = max(min(-1, scale*minval), -threshold)
+    return torch.clamp(result, min=minval, max=maxval)
+
 
 class CFGDenoiser(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, threshold = 0, warmup = 0):
         super().__init__()
         self.inner_model = model
+        self.threshold = threshold
+        self.warmup_max = warmup
+        self.warmup = max(warmup / 10, 1)
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
         x_in = torch.cat([x] * 2)
         sigma_in = torch.cat([sigma] * 2)
         cond_in = torch.cat([uncond, cond])
         uncond, cond = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
-        return uncond + (cond - uncond) * cond_scale
+        if self.warmup < self.warmup_max:
+            thresh = max(1, 1 + (self.threshold - 1) * (self.warmup / self.warmup_max))
+            self.warmup += 1
+        else:
+            thresh = self.threshold
+        if thresh > self.threshold:
+            thresh = self.threshold
+        return cfg_apply_threshold(uncond + (cond - uncond) * cond_scale, thresh)
 
 
 class KSampler(Sampler):
@@ -38,6 +69,7 @@ class KSampler(Sampler):
             ).chunk(2)
             return uncond + (cond - uncond) * cond_scale
 
+
     def make_schedule(
             self,
             ddim_num_steps,
@@ -53,23 +85,56 @@ class KSampler(Sampler):
             ddim_eta=0.0,
             verbose=False,
         )
-        self.model = outer_model
+        self.model          = outer_model
         self.ddim_num_steps = ddim_num_steps
-        sigmas = K.sampling.get_sigmas_karras(
+        # we don't need both of these sigmas, but storing them here to make
+        # comparison easier later on
+        self.model_sigmas  = self.model.get_sigmas(ddim_num_steps)
+        self.karras_sigmas = K.sampling.get_sigmas_karras(
             n=ddim_num_steps,
             sigma_min=self.model.sigmas[0].item(),
             sigma_max=self.model.sigmas[-1].item(),
             rho=7.,
             device=self.device,
-            # Birch-san recommends this, but it doesn't match the call signature in his branch of k-diffusion
-            # concat_zero=False
         )
-        self.sigmas = sigmas
+        self.sigmas = self.karras_sigmas
         
     # ALERT: We are completely overriding the sample() method in the base class, which
-    # means that inpainting will (probably?) not work correctly. To get this to work
-    # we need to be able to modify the inner loop of k_heun, k_lms, etc, as is done
-    # in an ugly way in the lstein/k-diffusion branch.
+    # means that inpainting will not work. To get this to work we need to be able to
+    # modify the inner loop of k_heun, k_lms, etc, as is done in an ugly way
+    # in the lstein/k-diffusion branch.
+    
+    @torch.no_grad()
+    def decode(
+            self,
+            z_enc,
+            cond,
+            t_enc,
+            img_callback=None,
+            unconditional_guidance_scale=1.0,
+            unconditional_conditioning=None,
+            use_original_steps=False,
+            init_latent       = None,
+            mask              = None,
+    ):
+        samples,_ = self.sample(
+            batch_size = 1,
+            S          = t_enc,
+            x_T        = z_enc,
+            shape      = z_enc.shape[1:],
+            conditioning = cond,
+            unconditional_guidance_scale=unconditional_guidance_scale,
+            unconditional_conditioning = unconditional_conditioning,
+            img_callback = img_callback,
+            x0           = init_latent,
+            mask         = mask
+            )
+        return samples
+
+    # this is a no-op, provided here for compatibility with ddim and plms samplers
+    @torch.no_grad()
+    def stochastic_encode(self, x0, t, use_original_steps=False, noise=None):
+        return x0
     
     # Most of these arguments are ignored and are only present for compatibility with
     # other samples
@@ -96,6 +161,8 @@ class KSampler(Sampler):
         log_every_t=100,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
+        threshold = 0,
+        perlin = 0,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs,
     ):
@@ -103,23 +170,27 @@ class KSampler(Sampler):
             if img_callback is not None:
                 img_callback(k_callback_values['x'],k_callback_values['i'])
 
-        # sigmas = self.model.get_sigmas(S)
-        # sigmas are now set up in make_schedule - we take the last steps items
-        sigmas = self.sigmas[-S:]
+        # sigmas are set up in make_schedule - we take the last steps items
+        total_steps = len(self.sigmas)
+        sigmas = self.sigmas[-S-1:]
+
+        # x_T is variation noise. When an init image is provided (in x0) we need to add
+        # more randomness to the starting image.
         if x_T is not None:
-            x = x_T * sigmas[0]
+            if x0 is not None:
+                x = x_T + torch.randn_like(x0, device=self.device) * sigmas[0]
+            else:
+                x = x_T * sigmas[0]
         else:
-            x = (
-                torch.randn([batch_size, *shape], device=self.device)
-                * sigmas[0]
-            )   # for GPU draw
-        model_wrap_cfg = CFGDenoiser(self.model)
+            x = torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
+
+        model_wrap_cfg = CFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
         extra_args = {
             'cond': conditioning,
             'uncond': unconditional_conditioning,
             'cond_scale': unconditional_guidance_scale,
         }
-        print(f'>> Sampling with k__{self.schedule}')
+        print(f'>> Sampling with k_{self.schedule}')
         return (
             K.sampling.__dict__[f'sample_{self.schedule}'](
                 model_wrap_cfg, x, sigmas, extra_args=extra_args,
@@ -174,11 +245,17 @@ class KSampler(Sampler):
 
         return img, None, None
 
+    # REVIEW THIS METHOD: it has never been tested. In particular,
+    # we should not be multiplying by self.sigmas[0] if we
+    # are at an intermediate step in img2img. See similar in
+    # sample() which does work.
     def get_initial_image(self,x_T,shape,steps):
+        print(f'WARNING: ksampler.get_initial_image(): get_initial_image needs testing')
+        x = (torch.randn(shape, device=self.device) * self.sigmas[0])
         if x_T is not None:
-            return x_T + x_T * self.sigmas[0]
+            return x_T + x
         else:
-            return (torch.randn(shape, device=self.device) * self.sigmas[0])
+            return x
         
     def prepare_to_sample(self,t_enc):
         self.t_enc      = t_enc
@@ -192,29 +269,3 @@ class KSampler(Sampler):
         '''
         return self.model.inner_model.q_sample(x0,ts)
 
-    @torch.no_grad()
-    def decode(
-            self,
-            z_enc,
-            cond,
-            t_enc,
-            img_callback=None,
-            unconditional_guidance_scale=1.0,
-            unconditional_conditioning=None,
-            use_original_steps=False,
-            init_latent       = None,
-            mask              = None,
-    ):
-        samples,_ = self.sample(
-            batch_size = 1,
-            S          = t_enc,
-            x_T        = z_enc,
-            shape      = z_enc.shape[1:],
-            conditioning = cond,
-            unconditional_guidance_scale=unconditional_guidance_scale,
-            unconditional_conditioning = unconditional_conditioning,
-            img_callback = img_callback,
-            x0           = init_latent,
-            mask         = mask
-            )
-        return samples

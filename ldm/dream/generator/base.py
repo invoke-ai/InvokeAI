@@ -10,6 +10,7 @@ from PIL               import Image
 from einops import rearrange, repeat
 from pytorch_lightning import seed_everything
 from ldm.dream.devices import choose_autocast
+from ldm.util import rand_perlin_2d
 
 downsampling = 8
 
@@ -37,7 +38,7 @@ class Generator():
         self.with_variations  = with_variations
 
     def generate(self,prompt,init_image,width,height,iterations=1,seed=None,
-                 image_callback=None, step_callback=None,
+                 image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  **kwargs):
         scope = choose_autocast(self.precision)
         make_image          = self.get_make_image(
@@ -46,6 +47,8 @@ class Generator():
             width         = width,
             height        = height,
             step_callback = step_callback,
+            threshold     = threshold,
+            perlin        = perlin,
             **kwargs
         )
 
@@ -65,10 +68,11 @@ class Generator():
                     x_T = initial_noise
                 else:
                     seed_everything(seed)
-                    if self.model.device.type == 'mps':
+                    try:
                         x_T = self.get_noise(width,height)
+                    except:
+                        pass
 
-                # make_image will do the equivalent of get_noise itself
                 image = make_image(x_T)
                 results.append([image, seed])
                 if image_callback is not None:
@@ -116,6 +120,10 @@ class Generator():
         (txt2img) or from the latent image (img2img, inpaint)
         """
         raise NotImplementedError("get_noise() must be implemented in a descendent class")
+    
+    def get_perlin_noise(self,width,height):
+        fixdevice = 'cpu' if (self.model.device.type == 'mps') else self.model.device
+        return torch.stack([rand_perlin_2d((height, width), (8, 8), device = self.model.device).to(fixdevice) for _ in range(self.latent_channels)], dim=0).to(self.model.device)
     
     def new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)

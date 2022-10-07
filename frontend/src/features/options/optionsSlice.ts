@@ -14,13 +14,15 @@ export interface OptionsState {
   height: number;
   width: number;
   sampler: string;
+  threshold: number;
+  perlin: number;
   seed: number;
   img2imgStrength: number;
   gfpganStrength: number;
   upscalingLevel: UpscalingLevel;
   upscalingStrength: number;
   shouldUseInitImage: boolean;
-  initialImagePath: string;
+  initialImagePath: string | null;
   maskPath: string;
   seamless: boolean;
   shouldFitToWidthHeight: boolean;
@@ -31,6 +33,8 @@ export interface OptionsState {
   shouldRunGFPGAN: boolean;
   shouldRandomizeSeed: boolean;
   showAdvancedOptions: boolean;
+  activeTab: number;
+  shouldShowImageDetails: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -41,11 +45,13 @@ const initialOptionsState: OptionsState = {
   height: 512,
   width: 512,
   sampler: 'k_lms',
+  threshold: 0,
+  perlin: 0,
   seed: 0,
   seamless: false,
   shouldUseInitImage: false,
   img2imgStrength: 0.75,
-  initialImagePath: '',
+  initialImagePath: null,
   maskPath: '',
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
@@ -58,6 +64,8 @@ const initialOptionsState: OptionsState = {
   gfpganStrength: 0.8,
   shouldRandomizeSeed: true,
   showAdvancedOptions: true,
+  activeTab: 0,
+  shouldShowImageDetails: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -82,6 +90,12 @@ export const optionsSlice = createSlice({
     },
     setCfgScale: (state, action: PayloadAction<number>) => {
       state.cfgScale = action.payload;
+    },
+    setThreshold: (state, action: PayloadAction<number>) => {
+      state.threshold = action.payload;
+    },
+    setPerlin: (state, action: PayloadAction<number>) => {
+      state.perlin = action.payload;
     },
     setHeight: (state, action: PayloadAction<number>) => {
       state.height = action.payload;
@@ -111,7 +125,7 @@ export const optionsSlice = createSlice({
     setShouldUseInitImage: (state, action: PayloadAction<boolean>) => {
       state.shouldUseInitImage = action.payload;
     },
-    setInitialImagePath: (state, action: PayloadAction<string>) => {
+    setInitialImagePath: (state, action: PayloadAction<string | null>) => {
       const newInitialImagePath = action.payload;
       state.shouldUseInitImage = newInitialImagePath ? true : false;
       state.initialImagePath = newInitialImagePath;
@@ -161,6 +175,8 @@ export const optionsSlice = createSlice({
         variations,
         steps,
         cfg_scale,
+        threshold,
+        perlin,
         seamless,
         width,
         height,
@@ -233,6 +249,8 @@ export const optionsSlice = createSlice({
       if (sampler) state.sampler = sampler;
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
+      if (threshold) state.threshold = threshold;
+      if (perlin) state.perlin = perlin;
       if (typeof seamless === 'boolean') state.seamless = seamless;
       if (width) state.width = width;
       if (height) state.height = height;
@@ -255,6 +273,12 @@ export const optionsSlice = createSlice({
     setShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
       state.showAdvancedOptions = action.payload;
     },
+    setActiveTab: (state, action: PayloadAction<number>) => {
+      state.activeTab = action.payload;
+    },
+    setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowImageDetails = action.payload;
+    },
   },
 });
 
@@ -263,6 +287,8 @@ export const {
   setIterations,
   setSteps,
   setCfgScale,
+  setThreshold,
+  setPerlin,
   setHeight,
   setWidth,
   setSampler,
@@ -287,6 +313,8 @@ export const {
   setShouldRunESRGAN,
   setShouldRandomizeSeed,
   setShowAdvancedOptions,
+  setActiveTab,
+  setShouldShowImageDetails,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

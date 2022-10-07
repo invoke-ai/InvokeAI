@@ -185,10 +185,16 @@ class Args(object):
         switches.append(f'-W {a["width"]}')
         switches.append(f'-H {a["height"]}')
         switches.append(f'-C {a["cfg_scale"]}')
+        if a['perlin'] > 0:
+            switches.append(f'--perlin {a["perlin"]}')
+        if a['threshold'] > 0:
+            switches.append(f'--threshold {a["threshold"]}')
         if a['grid']:
             switches.append('--grid')
         if a['seamless']:
             switches.append('--seamless')
+        if a['hires_fix']:
+            switches.append('--hires_fix')
 
         # img2img generations have parameters relevant only to them and have special handling
         if a['init_img'] and len(a['init_img'])>0:
@@ -208,6 +214,9 @@ class Args(object):
         # gfpgan-specific parameters
         if a['gfpgan_strength']:
             switches.append(f'-G {a["gfpgan_strength"]}')
+
+        if a['outcrop']:
+            switches.append(f'-c {" ".join([str(u) for u in a["outcrop"]])}')
 
         # esrgan-specific parameters
         if a['upscale']:
@@ -539,6 +548,18 @@ class Args(object):
             help='Classifier free guidance (CFG) scale - higher numbers cause generator to "try" harder.',
         )
         render_group.add_argument(
+            '--threshold',
+            default=0.0,
+            type=float,
+            help='Latent threshold for classifier free guidance (CFG) - prevent generator from "trying" too hard. Use positive values, 0 disables.',
+        )
+        render_group.add_argument(
+            '--perlin',
+            default=0.0,
+            type=float,
+            help='Perlin noise scale (0.0 - 1.0) - add perlin noise to the initialization instead of the usual gaussian noise.',
+        )
+        render_group.add_argument(
             '--grid',
             '-g',
             action='store_true',
@@ -622,6 +643,14 @@ class Args(object):
             type=str,
             metavar=('direction', 'pixels'),
             help='Direction to extend the given image (left|right|top|bottom). If a distance pixel value is not specified it defaults to half the image size'
+        )
+        img2img_group.add_argument(
+            '-c',
+            '--outcrop',
+            nargs='+',
+            type=str,
+            metavar=('direction','pixels'),
+            help='Outcrop the image with one or more direction/pixel pairs: -c top 64 bottom 128 left 64 right 64',
         )
         postprocessing_group.add_argument(
             '-ft',
@@ -720,27 +749,15 @@ def metadata_dumps(opt,
         'app_version' : APP_VERSION,
     }
 
-    # add some RFC266 fields that are generated internally, and not as
-    # user args
+    # # add some RFC266 fields that are generated internally, and not as
+    # # user args
     image_dict = opt.to_dict(
-        postprocessing=postprocessing
+         postprocessing=postprocessing
     )
-
-    # 'postprocessing' is either null or an array of postprocessing metadatal
-    if postprocessing:
-        # TODO: This is just a hack until postprocessing pipeline work completed
-        image_dict['postprocessing'] = []
-
-        if image_dict['gfpgan_strength'] and image_dict['gfpgan_strength'] > 0:
-            image_dict['postprocessing'].append('GFPGAN (not RFC compliant)')
-        if image_dict['upscale'] and image_dict['upscale'][0] > 0:
-            image_dict['postprocessing'].append('ESRGAN (not RFC compliant)')
-    else:
-        image_dict['postprocessing'] = None
 
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
-                         'cfg_scale','step_number','width','height','extra','strength']
+                         'cfg_scale','threshold','perlin','step_number','width','height','extra','strength']
 
     rfc_dict ={}
 

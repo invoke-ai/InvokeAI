@@ -1,10 +1,8 @@
-import { Image } from '@chakra-ui/react';
-import { useAppSelector } from '../../app/store';
-import { RootState } from '../../app/store';
-import { useState } from 'react';
-import ImageMetadataViewer from './ImageMetadataViewer';
+import { RootState, useAppSelector } from '../../app/store';
 import CurrentImageButtons from './CurrentImageButtons';
 import { MdPhoto } from 'react-icons/md';
+import CurrentImagePreview from './CurrentImagePreview';
+import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 
 /**
  * Displays the current image if there is one, plus associated actions.
@@ -14,33 +12,24 @@ const CurrentImageDisplay = () => {
     (state: RootState) => state.gallery
   );
 
-  const [shouldShowImageDetails, setShouldShowImageDetails] =
-    useState<boolean>(false);
+  const shouldShowImageDetails = useAppSelector(
+    (state: RootState) => state.options.shouldShowImageDetails
+  );
 
   const imageToDisplay = intermediateImage || currentImage;
 
   return imageToDisplay ? (
     <div className="current-image-display">
       <div className="current-image-tools">
-        <CurrentImageButtons
+        <CurrentImageButtons image={imageToDisplay} />
+      </div>
+      <CurrentImagePreview imageToDisplay={imageToDisplay} />
+      {shouldShowImageDetails && (
+        <ImageMetadataViewer
           image={imageToDisplay}
-          shouldShowImageDetails={shouldShowImageDetails}
-          setShouldShowImageDetails={setShouldShowImageDetails}
+          styleClass="current-image-metadata"
         />
-      </div>
-      <div className="current-image-preview">
-        <Image
-          src={imageToDisplay.url}
-          fit="contain"
-          maxWidth={'100%'}
-          maxHeight={'100%'}
-        />
-        {shouldShowImageDetails && (
-          <div className="current-image-metadata-viewer">
-            <ImageMetadataViewer image={imageToDisplay} />
-          </div>
-        )}
-      </div>
+      )}
     </div>
   ) : (
     <div className="current-image-display-placeholder">
