@@ -16,11 +16,13 @@ import {
   setCfgScale,
   setGfpganStrength,
   setHeight,
+  setHiresFix,
   setImg2imgStrength,
   setInitialImagePath,
   setMaskPath,
   setPrompt,
   setSampler,
+  setSeamless,
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,
@@ -215,14 +217,14 @@ const ImageMetadataViewer = memo(
                 <MetadataItem
                   label="Seamless"
                   value={seamless}
-                  onClick={() => dispatch(setWidth(seamless))}
+                  onClick={() => dispatch(setSeamless(seamless))}
                 />
               )}
               {hires_fix && (
                 <MetadataItem
                   label="High Resolution Optimization"
                   value={hires_fix}
-                  onClick={() => dispatch(setWidth(hires_fix))}
+                  onClick={() => dispatch(setHiresFix(hires_fix))}
                 />
               )}
               {width && (
