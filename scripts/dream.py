@@ -593,9 +593,13 @@ def retrieve_dream_command(opt,command,completer):
         except OSError:
             print(f'## {path}: file could not be read')
             continue
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, IndexError):
             print(f'## {path}: file has no metadata')
             continue
+        except:
+            print(f'## {path}: file could not be processed')
+            continue
+            
         commands.append(f'# {path}')
         commands.append(cmd)
  
