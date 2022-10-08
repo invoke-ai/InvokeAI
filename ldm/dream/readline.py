@@ -47,7 +47,7 @@ COMMANDS = (
     '--skip_normalize','-x',
     '--log_tokenization','-t',
     '--hires_fix',
-    '!fix','!fetch',!replay','!history','!search','!clear',
+    '!fix','!fetch','!replay','!history','!search','!clear',
     )
 IMG_PATH_COMMANDS = (
     '--outdir[=\s]',
