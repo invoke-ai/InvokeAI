@@ -1,14 +1,17 @@
-import { Button, Center, Flex, Text } from '@chakra-ui/react';
+import { Button } from '@chakra-ui/react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { MdPhotoLibrary } from 'react-icons/md';
 import { requestImages } from '../../app/socketio/actions';
 import { RootState, useAppDispatch } from '../../app/store';
 import { useAppSelector } from '../../app/store';
+import { selectNextImage, selectPrevImage } from './gallerySlice';
 import HoverableImage from './HoverableImage';
 
 /**
  * Simple image gallery.
  */
 const ImageGallery = () => {
-  const { images, currentImageUuid } = useAppSelector(
+  const { images, currentImageUuid, areMoreImagesAvailable } = useAppSelector(
     (state: RootState) => state.gallery
   );
   const dispatch = useAppDispatch();
@@ -24,23 +27,57 @@ const ImageGallery = () => {
     dispatch(requestImages());
   };
 
-  return images.length ? (
-    <Flex direction={'column'} gap={2} pb={2}>
-      <Flex gap={2} wrap="wrap">
-        {images.map((image) => {
-          const { uuid } = image;
-          const isSelected = currentImageUuid === uuid;
-          return (
-            <HoverableImage key={uuid} image={image} isSelected={isSelected} />
-          );
-        })}
-      </Flex>
-      <Button onClick={handleClickLoadMore}>Load more...</Button>
-    </Flex>
-  ) : (
-    <Center height={'100%'} position={'relative'}>
-      <Text size={'xl'}>No images in gallery</Text>
-    </Center>
+  useHotkeys(
+    'left',
+    () => {
+      dispatch(selectPrevImage());
+    },
+    []
+  );
+
+  useHotkeys(
+    'right',
+    () => {
+      dispatch(selectNextImage());
+    },
+    []
+  );
+
+  return (
+    <div className="image-gallery-container">
+      {images.length ? (
+        <>
+          <p>
+            <strong>Your Invocations</strong>
+          </p>
+          <div className="image-gallery">
+            {images.map((image) => {
+              const { uuid } = image;
+              const isSelected = currentImageUuid === uuid;
+              return (
+                <HoverableImage
+                  key={uuid}
+                  image={image}
+                  isSelected={isSelected}
+                />
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="image-gallery-container-placeholder">
+          <MdPhotoLibrary />
+          <p>No Images In Gallery</p>
+        </div>
+      )}
+      <Button
+        onClick={handleClickLoadMore}
+        isDisabled={!areMoreImagesAvailable}
+        className="image-gallery-load-more-btn"
+      >
+        {areMoreImagesAvailable ? 'Load More' : 'All Images Loaded'}
+      </Button>
+    </div>
   );
 };
 

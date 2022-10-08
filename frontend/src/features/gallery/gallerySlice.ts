@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { clamp } from 'lodash';
+import _, { clamp } from 'lodash';
 import * as InvokeAI from '../../app/invokeai';
 
 export interface GalleryState {
@@ -8,15 +8,15 @@ export interface GalleryState {
   currentImageUuid: string;
   images: Array<InvokeAI.Image>;
   intermediateImage?: InvokeAI.Image;
-  nextPage: number;
-  offset: number;
+  areMoreImagesAvailable: boolean;
+  latest_mtime?: number;
+  earliest_mtime?: number;
 }
 
 const initialState: GalleryState = {
   currentImageUuid: '',
   images: [],
-  nextPage: 1,
-  offset: 0,
+  areMoreImagesAvailable: true,
 };
 
 export const gallerySlice = createSlice({
@@ -71,11 +71,13 @@ export const gallerySlice = createSlice({
       state.images = newImages;
     },
     addImage: (state, action: PayloadAction<InvokeAI.Image>) => {
-      state.images.unshift(action.payload);
-      state.currentImageUuid = action.payload.uuid;
+      const newImage = action.payload;
+      const { uuid, mtime } = newImage;
+      state.images.unshift(newImage);
+      state.currentImageUuid = uuid;
       state.intermediateImage = undefined;
-      state.currentImage = action.payload;
-      state.offset += 1
+      state.currentImage = newImage;
+      state.latest_mtime = mtime;
     },
     setIntermediateImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       state.intermediateImage = action.payload;
@@ -83,24 +85,57 @@ export const gallerySlice = createSlice({
     clearIntermediateImage: (state) => {
       state.intermediateImage = undefined;
     },
+    selectNextImage: (state) => {
+      const { images, currentImage } = state;
+      if (currentImage) {
+        const currentImageIndex = images.findIndex(
+          (i) => i.uuid === currentImage.uuid
+        );
+        if (_.inRange(currentImageIndex, 0, images.length)) {
+          const newCurrentImage = images[currentImageIndex + 1];
+          state.currentImage = newCurrentImage;
+          state.currentImageUuid = newCurrentImage.uuid;
+        }
+      }
+    },
+    selectPrevImage: (state) => {
+      const { images, currentImage } = state;
+      if (currentImage) {
+        const currentImageIndex = images.findIndex(
+          (i) => i.uuid === currentImage.uuid
+        );
+        if (_.inRange(currentImageIndex, 1, images.length + 1)) {
+          const newCurrentImage = images[currentImageIndex - 1];
+          state.currentImage = newCurrentImage;
+          state.currentImageUuid = newCurrentImage.uuid;
+        }
+      }
+    },
     addGalleryImages: (
       state,
       action: PayloadAction<{
         images: Array<InvokeAI.Image>;
-        nextPage: number;
-        offset: number;
+        areMoreImagesAvailable: boolean;
       }>
     ) => {
-      const { images, nextPage, offset } = action.payload;
-      if (images.length) {
-        const newCurrentImage = images[0];
+      const { images, areMoreImagesAvailable } = action.payload;
+      if (images.length > 0) {
         state.images = state.images
           .concat(images)
           .sort((a, b) => b.mtime - a.mtime);
-        state.currentImage = newCurrentImage;
-        state.currentImageUuid = newCurrentImage.uuid;
-        state.nextPage = nextPage;
-        state.offset = offset;
+
+        if (!state.currentImage) {
+          const newCurrentImage = images[0];
+          state.currentImage = newCurrentImage;
+          state.currentImageUuid = newCurrentImage.uuid;
+        }
+
+        // keep track of the timestamps of latest and earliest images received
+        state.latest_mtime = images[0].mtime;
+        state.earliest_mtime = images[images.length - 1].mtime;
+      }
+      if (areMoreImagesAvailable !== undefined) {
+        state.areMoreImagesAvailable = areMoreImagesAvailable;
       }
     },
   },
@@ -113,6 +148,8 @@ export const {
   setCurrentImage,
   addGalleryImages,
   setIntermediateImage,
+  selectNextImage,
+  selectPrevImage,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

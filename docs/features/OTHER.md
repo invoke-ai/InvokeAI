@@ -55,6 +55,43 @@ outputs/img-samples/000040.3498014304.png: "a cute child playing hopscotch" -G1.
 
 ---
 
+## **Weighted Prompts**
+
+You may weight different sections of the prompt to tell the sampler to attach different levels of
+priority to them, by adding `:(number)` to the end of the section you wish to up- or downweight. For
+example consider this prompt:
+
+```bash
+tabby cat:0.25 white duck:0.75 hybrid
+```
+
+This will tell the sampler to invest 25% of its effort on the tabby cat aspect of the image and 75%
+on the white duck aspect (surprisingly, this example actually works). The prompt weights can use any
+combination of integers and floating point numbers, and they do not need to add up to 1.
+
+---
+
+## Thresholding and Perlin Noise Initialization Options
+
+Two new options are the thresholding (`--threshold`) and the perlin noise initialization (`--perlin`) options. Thresholding limits the range of the latent values during optimization, which helps combat oversaturation with higher CFG scale values. Perlin noise initialization starts with a percentage (a value ranging from 0 to 1) of perlin noise mixed into the initial noise. Both features allow for more variations and options in the course of generating images.
+
+For better intuition into what these options do in practice, [here is a graphic demonstrating them both](static/truncation_comparison.jpg) in use. In generating this graphic, perlin noise at initialization was programmatically varied going across on the diagram by values 0.0, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 1.0; and the threshold was varied going down from
+0, 1, 2, 3, 4, 5, 10, 20, 100. The other options are fixed, so the initial prompt is as follows (no thresholding or perlin noise):
+
+```
+    a portrait of a beautiful young lady -S 1950357039 -s 100 -C 20 -A k_euler_a --threshold 0 --perlin 0
+```
+
+Here's an example of another prompt used when setting the threshold to 5 and perlin noise to 0.2:
+
+```
+    a portrait of a beautiful young lady -S 1950357039 -s 100 -C 20 -A k_euler_a --threshold 5 --perlin 0.2
+```
+
+Note: currently the thresholding feature is only implemented for the k-diffusion style samplers, and empirically appears to work best with `k_euler_a` and `k_dpm_2_a`. Using 0 disables thresholding. Using 0 for perlin noise disables using perlin noise for initialization. Finally, using 1 for perlin noise uses only perlin noise for initialization.
+
+---
+
 ## **Simplified API**
 
 For programmers who wish to incorporate stable-diffusion into other products, this repository

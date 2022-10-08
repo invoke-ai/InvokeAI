@@ -8,10 +8,11 @@ import shlex
 import copy
 import warnings
 import time
+import traceback
 sys.path.append('.')    # corrects a weird problem on Macs
 from ldm.dream.readline import get_completer
 from ldm.dream.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
-from ldm.dream.pngwriter import PngWriter
+from ldm.dream.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.dream.image_util import make_grid
 from ldm.dream.log import write_log
 from omegaconf import OmegaConf
@@ -58,7 +59,6 @@ def main():
         else:
             print('>> Face restoration and upscaling disabled')
     except (ModuleNotFoundError, ImportError):
-        import traceback
         print(traceback.format_exc(), file=sys.stderr)
         print('>> You may need to install the ESRGAN and/or GFPGAN modules')
 
@@ -109,7 +109,7 @@ def main():
     gen.free_gpu_mem = opt.free_gpu_mem
 
     # web server loops forever
-    if opt.web:
+    if opt.web or opt.gui:
         invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
         sys.exit(0)
 
@@ -192,6 +192,15 @@ def main_loop(gen, opt, infile):
                 completer.show_history()
                 continue
 
+            elif subcommand.startswith('search'):
+                search_str = command.replace('!search ','',1)
+                completer.show_history(search_str)
+                continue
+
+            elif subcommand.startswith('clear'):
+                completer.clear_history()
+                continue
+
             elif re.match('^(\d+)',subcommand):
                 command_no = re.match('^(\d+)',subcommand).groups()[0]
                 command    = completer.get_line(int(command_no))
@@ -210,9 +219,7 @@ def main_loop(gen, opt, infile):
                     oldargs    = metadata_from_png(opt.init_img)
                     opt.prompt = oldargs.prompt
                     print(f'>> Retrieved old prompt "{opt.prompt}" from {opt.init_img}')
-            except AttributeError:
-                pass
-            except KeyError:
+            except (OSError, AttributeError, KeyError):
                 pass
 
         if len(opt.prompt) == 0:
@@ -243,7 +250,7 @@ def main_loop(gen, opt, infile):
                 path     = os.path.join(opt.outdir,basename)
                 setattr(opt,attr,path)
 
-        # retrieve previous valueof seed if requested
+        # retrieve previous value of seed if requested
         if opt.seed is not None and opt.seed < 0:   
             try:
                 opt.seed = last_results[opt.seed][1]
@@ -310,20 +317,32 @@ def main_loop(gen, opt, infile):
                         postprocessed,
                         first_seed
                     )
-
                     path = file_writer.save_image_and_prompt_to_png(
                         image           = image,
                         dream_prompt    = formatted_dream_prompt,
                         metadata        = metadata_dumps(
                             opt,
-                            seeds      = [seed],
+                            seeds      = [seed if opt.variation_amount==0 and len(prior_variations)==0 else first_seed],
                             model_hash = gen.model_hash,
                         ),
                         name      = filename,
                     )
-                    if (not upscaled) or opt.save_original:
+
+                    # update rfc metadata
+                    if operation == 'postprocess':
+                        tool = re.match('postprocess:(\w+)',opt.last_operation).groups()[0]
+                        add_postprocessing_to_metadata(
+                            opt,
+                            opt.prompt,
+                            filename,
+                            tool,
+                            formatted_dream_prompt,
+                        )                           
+                        
+                    if (not postprocessed) or opt.save_original:
                         # only append to results if we didn't overwrite an earlier output
                         results.append([path, formatted_dream_prompt])
+
                 # so that the seed autocompletes (on linux|mac when -S or --seed specified
                 if completer:
                     completer.add_seed(seed)
@@ -385,9 +404,6 @@ def do_postprocess (gen, opt, callback):
     file_path = opt.prompt     # treat the prompt as the file pathname
     if os.path.dirname(file_path) == '': #basename given
         file_path = os.path.join(opt.outdir,file_path)
-    if not os.path.exists(file_path):
-        print(f'* file {file_path} does not exist')
-        return
 
     tool=None
     if opt.gfpgan_strength > 0:
@@ -398,20 +414,45 @@ def do_postprocess (gen, opt, callback):
         tool = 'upscale'
     elif opt.out_direction:
         tool = 'outpaint'
-    opt.save_original = True # do not overwrite old image!
-    opt.last_operation    = f'postprocess:{tool}'
-    gen.apply_postprocessor(
-        image_path      = file_path,
-        tool            = tool,
-        gfpgan_strength = opt.gfpgan_strength,
-        codeformer_fidelity = opt.codeformer_fidelity,
-        save_original       = opt.save_original,
-        upscale             = opt.upscale,
-        out_direction       = opt.out_direction,
-        callback            = callback,
-        opt                 = opt,
+    elif opt.outcrop:
+        tool = 'outcrop'
+    opt.save_original  = True # do not overwrite old image!
+    opt.last_operation = f'postprocess:{tool}'
+    try:
+        gen.apply_postprocessor(
+            image_path      = file_path,
+            tool            = tool,
+            gfpgan_strength = opt.gfpgan_strength,
+            codeformer_fidelity = opt.codeformer_fidelity,
+            save_original       = opt.save_original,
+            upscale             = opt.upscale,
+            out_direction       = opt.out_direction,
+            outcrop             = opt.outcrop,
+            callback            = callback,
+            opt                 = opt,
         )
+    except OSError:
+        print(f'** {file_path}: file could not be read')
+        return
+    except (KeyError, AttributeError):
+        print(traceback.format_exc(), file=sys.stderr)
+        return
     return opt.last_operation
+
+def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
+    original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir,original_file)
+    new_file       = new_file     if os.path.exists(new_file)      else os.path.join(opt.outdir,new_file)
+    meta = retrieve_metadata(original_file)['sd-metadata']
+    img_data = meta['image']
+    pp = img_data.get('postprocessing',[]) or []
+    pp.append(
+        {
+            'tool':tool,
+            'dream_command':command,
+        }
+    )
+    meta['image']['postprocessing'] = pp
+    write_metadata(new_file,meta)
     
 def prepare_image_metadata(
         opt,
@@ -426,8 +467,8 @@ def prepare_image_metadata(
     if postprocessed and opt.save_original:
         filename = choose_postprocess_name(opt,prefix,seed)
     else:
-        filename = f'{prefix}.{seed}.png'        
-        
+        filename = f'{prefix}.{seed}.png'
+
     if opt.variation_amount > 0:
         first_seed             = first_seed or seed
         this_variation         = [[seed, opt.variation_amount]]

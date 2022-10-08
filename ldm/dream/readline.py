@@ -17,7 +17,7 @@ from ldm.dream.args import Args
 try:
     import readline
     readline_available = True
-except:
+except (ImportError,ModuleNotFoundError):
     readline_available = False
 
 IMG_EXTENSIONS     = ('.png','.jpg','.jpeg')
@@ -27,6 +27,8 @@ COMMANDS = (
     '--iterations','-n',
     '--width','-W','--height','-H',
     '--cfg_scale','-C',
+    '--threshold',
+    '--perlin',
     '--grid','-g',
     '--individual','-i',
     '--init_img','-I',
@@ -44,7 +46,8 @@ COMMANDS = (
     '-save_orig','--save_original',
     '--skip_normalize','-x',
     '--log_tokenization','-t',
-    '!fix','!fetch','!history','!replay'
+    '--hires_fix',
+    '!fix','!fetch',!replay','!history','!search','!clear',
     )
 IMG_PATH_COMMANDS = (
     '--outdir[=\s]',
@@ -59,7 +62,7 @@ IMG_FILE_COMMANDS=(
     )
 path_regexp = '('+'|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
 
-class Completer:
+class Completer(object):
     def __init__(self, options):
         self.options     = sorted(options)
         self.seeds       = set()
@@ -108,6 +111,19 @@ class Completer:
         if not self.auto_history_active:
             readline.add_history(line)
 
+    def clear_history(self):
+        '''
+        Pass clear_history() thru to readline
+        '''
+        readline.clear_history()
+
+    def search_history(self,match:str):
+        '''
+        Like show_history() but only shows items that
+        contain the match string.
+        '''
+        self.show_history(match)
+
     def remove_history_item(self,pos):
         readline.remove_history_item(pos)
 
@@ -134,7 +150,7 @@ class Completer:
     def get_history_item(self,index):
         return readline.get_history_item(index)
 
-    def show_history(self):
+    def show_history(self,match=None):
         '''
         Print the session history using the pydoc pager
         '''
@@ -146,7 +162,10 @@ class Completer:
             return
         
         for i in range(0,h_len):
-            lines.append(f'[{i+1}] {self.get_history_item(i+1)}')
+            line = self.get_history_item(i+1)
+            if match and match not in line:
+                continue
+            lines.append(f'[{i+1}] {line}')
         pydoc.pager('\n'.join(lines))
 
     def set_line(self,line)->None:
@@ -231,6 +250,9 @@ class DummyCompleter(Completer):
         
     def add_history(self,line):
         self.history.append(line)
+
+    def clear_history(self):
+        self.history = list()
 
     def get_current_history_length(self):
         return len(self.history)

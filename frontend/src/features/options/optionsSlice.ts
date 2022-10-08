@@ -14,13 +14,15 @@ export interface OptionsState {
   height: number;
   width: number;
   sampler: string;
+  threshold: number;
+  perlin: number;
   seed: number;
   img2imgStrength: number;
   gfpganStrength: number;
   upscalingLevel: UpscalingLevel;
   upscalingStrength: number;
   shouldUseInitImage: boolean;
-  initialImagePath: string;
+  initialImagePath: string | null;
   maskPath: string;
   seamless: boolean;
   shouldFitToWidthHeight: boolean;
@@ -30,6 +32,9 @@ export interface OptionsState {
   shouldRunESRGAN: boolean;
   shouldRunGFPGAN: boolean;
   shouldRandomizeSeed: boolean;
+  showAdvancedOptions: boolean;
+  activeTab: number;
+  shouldShowImageDetails: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -40,11 +45,13 @@ const initialOptionsState: OptionsState = {
   height: 512,
   width: 512,
   sampler: 'k_lms',
+  threshold: 0,
+  perlin: 0,
   seed: 0,
   seamless: false,
   shouldUseInitImage: false,
   img2imgStrength: 0.75,
-  initialImagePath: '',
+  initialImagePath: null,
   maskPath: '',
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
@@ -56,6 +63,9 @@ const initialOptionsState: OptionsState = {
   shouldRunGFPGAN: false,
   gfpganStrength: 0.8,
   shouldRandomizeSeed: true,
+  showAdvancedOptions: true,
+  activeTab: 0,
+  shouldShowImageDetails: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -80,6 +90,12 @@ export const optionsSlice = createSlice({
     },
     setCfgScale: (state, action: PayloadAction<number>) => {
       state.cfgScale = action.payload;
+    },
+    setThreshold: (state, action: PayloadAction<number>) => {
+      state.threshold = action.payload;
+    },
+    setPerlin: (state, action: PayloadAction<number>) => {
+      state.perlin = action.payload;
     },
     setHeight: (state, action: PayloadAction<number>) => {
       state.height = action.payload;
@@ -109,7 +125,7 @@ export const optionsSlice = createSlice({
     setShouldUseInitImage: (state, action: PayloadAction<boolean>) => {
       state.shouldUseInitImage = action.payload;
     },
-    setInitialImagePath: (state, action: PayloadAction<string>) => {
+    setInitialImagePath: (state, action: PayloadAction<string | null>) => {
       const newInitialImagePath = action.payload;
       state.shouldUseInitImage = newInitialImagePath ? true : false;
       state.initialImagePath = newInitialImagePath;
@@ -153,13 +169,14 @@ export const optionsSlice = createSlice({
     setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
       const {
         type,
-        postprocessing,
         sampler,
         prompt,
         seed,
         variations,
         steps,
         cfg_scale,
+        threshold,
+        perlin,
         seamless,
         width,
         height,
@@ -191,40 +208,49 @@ export const optionsSlice = createSlice({
         state.shouldRandomizeSeed = false;
       }
 
-      let postprocessingNotDone = ['gfpgan', 'esrgan'];
-      if (postprocessing && postprocessing.length > 0) {
-        postprocessing.forEach(
-          (postprocess: InvokeAI.PostProcessedImageMetadata) => {
-            if (postprocess.type === 'gfpgan') {
-              const { strength } = postprocess;
-              if (strength) state.gfpganStrength = strength;
-              state.shouldRunGFPGAN = true;
-              postprocessingNotDone = postprocessingNotDone.filter(
-                (p) => p !== 'gfpgan'
-              );
-            }
-            if (postprocess.type === 'esrgan') {
-              const { scale, strength } = postprocess;
-              if (scale) state.upscalingLevel = scale;
-              if (strength) state.upscalingStrength = strength;
-              state.shouldRunESRGAN = true;
-              postprocessingNotDone = postprocessingNotDone.filter(
-                (p) => p !== 'esrgan'
-              );
-            }
-          }
-        );
-      }
+      /**
+       * We support arbitrary numbers of postprocessing steps, so it
+       * doesnt make sense to be include postprocessing metadata when
+       * we use all parameters. Because this code needed a bit of braining
+       * to figure out, I am leaving it, in case it is needed again.
+       */
 
-      postprocessingNotDone.forEach((p) => {
-        if (p === 'esrgan') state.shouldRunESRGAN = false;
-        if (p === 'gfpgan') state.shouldRunGFPGAN = false;
-      });
+      // let postprocessingNotDone = ['gfpgan', 'esrgan'];
+      // if (postprocessing && postprocessing.length > 0) {
+      //   postprocessing.forEach(
+      //     (postprocess: InvokeAI.PostProcessedImageMetadata) => {
+      //       if (postprocess.type === 'gfpgan') {
+      //         const { strength } = postprocess;
+      //         if (strength) state.gfpganStrength = strength;
+      //         state.shouldRunGFPGAN = true;
+      //         postprocessingNotDone = postprocessingNotDone.filter(
+      //           (p) => p !== 'gfpgan'
+      //         );
+      //       }
+      //       if (postprocess.type === 'esrgan') {
+      //         const { scale, strength } = postprocess;
+      //         if (scale) state.upscalingLevel = scale;
+      //         if (strength) state.upscalingStrength = strength;
+      //         state.shouldRunESRGAN = true;
+      //         postprocessingNotDone = postprocessingNotDone.filter(
+      //           (p) => p !== 'esrgan'
+      //         );
+      //       }
+      //     }
+      //   );
+      // }
+
+      // postprocessingNotDone.forEach((p) => {
+      //   if (p === 'esrgan') state.shouldRunESRGAN = false;
+      //   if (p === 'gfpgan') state.shouldRunGFPGAN = false;
+      // });
 
       if (prompt) state.prompt = promptToString(prompt);
       if (sampler) state.sampler = sampler;
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
+      if (threshold) state.threshold = threshold;
+      if (perlin) state.perlin = perlin;
       if (typeof seamless === 'boolean') state.seamless = seamless;
       if (width) state.width = width;
       if (height) state.height = height;
@@ -244,6 +270,15 @@ export const optionsSlice = createSlice({
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
+    setShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
+      state.showAdvancedOptions = action.payload;
+    },
+    setActiveTab: (state, action: PayloadAction<number>) => {
+      state.activeTab = action.payload;
+    },
+    setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowImageDetails = action.payload;
+    },
   },
 });
 
@@ -252,6 +287,8 @@ export const {
   setIterations,
   setSteps,
   setCfgScale,
+  setThreshold,
+  setPerlin,
   setHeight,
   setWidth,
   setSampler,
@@ -275,6 +312,9 @@ export const {
   setShouldRunGFPGAN,
   setShouldRunESRGAN,
   setShouldRandomizeSeed,
+  setShowAdvancedOptions,
+  setActiveTab,
+  setShouldShowImageDetails,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

@@ -6,6 +6,7 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
 import { OptionsState } from '../../features/options/optionsSlice';
 import { SystemState } from '../../features/system/systemSlice';
+
 import {
   seedWeightsToString,
   stringToSeedWeightsArray,
@@ -21,6 +22,8 @@ export const frontendToBackendParameters = (
     iterations,
     steps,
     cfgScale,
+    threshold,
+    perlin,
     height,
     width,
     sampler,
@@ -49,6 +52,8 @@ export const frontendToBackendParameters = (
     iterations,
     steps,
     cfg_scale: cfgScale,
+    threshold,
+    perlin,
     height,
     width,
     sampler_name: sampler,
@@ -111,6 +116,8 @@ export const backendToFrontendParameters = (parameters: {
     iterations,
     steps,
     cfg_scale,
+    threshold,
+    perlin,
     height,
     width,
     sampler_name,
@@ -171,6 +178,8 @@ export const backendToFrontendParameters = (parameters: {
     options.iterations = iterations;
     options.steps = steps;
     options.cfgScale = cfg_scale;
+    options.threshold = threshold;
+    options.perlin = perlin;
     options.height = height;
     options.width = width;
     options.sampler = sampler_name;

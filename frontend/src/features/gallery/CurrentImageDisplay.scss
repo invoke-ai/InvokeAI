@@ -1,0 +1,108 @@
+@use '../../styles/Mixins/' as *;
+
+.current-image-display {
+  display: grid;
+  grid-template-areas:
+    'current-image-tools'
+    'current-image-preview';
+  grid-template-rows: auto 1fr;
+  justify-items: center;
+  background-color: var(--background-color-secondary);
+  border-radius: 0.5rem;
+}
+
+.current-image-display-placeholder {
+  background-color: var(--background-color-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+
+  svg {
+    width: 10rem;
+    height: 10rem;
+    color: var(--svg-color);
+  }
+}
+
+.current-image-tools {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  justify-content: center;
+}
+
+.current-image-options {
+  display: grid;
+  grid-auto-flow: column;
+  padding: 1rem;
+  height: fit-content;
+  gap: 0.5rem;
+
+  button {
+    @include Button(
+      $btn-width: 3rem,
+      $icon-size: 22px,
+      $btn-color: var(--btn-grey),
+      $btn-color-hover: var(--btn-grey-hover)
+    );
+  }
+}
+
+.current-image-preview {
+  grid-area: current-image-preview;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  display: grid;
+  width: 100%;
+  grid-template-areas: 'current-image-content';
+
+  img {
+    grid-area: current-image-content;
+    background-color: var(--img2img-img-bg-color);
+    border-radius: 0.5rem;
+    object-fit: contain;
+    width: auto;
+    height: $app-gallery-height;
+    max-height: $app-gallery-height;
+  }
+}
+
+.current-image-metadata {
+  grid-area: current-image-preview;
+}
+
+.current-image-next-prev-buttons {
+  grid-area: current-image-content;
+  display: flex;
+  justify-content: space-between;
+  z-index: 1;
+  height: 100%;
+  pointer-events: none;
+}
+
+.next-prev-button-trigger-area {
+  width: 7rem;
+  height: 100%;
+  width: 100%;
+  display: grid;
+  align-items: center;
+  pointer-events: auto;
+
+  &.prev-button-trigger-area {
+    justify-content: flex-start;
+  }
+
+  &.next-button-trigger-area {
+    justify-content: flex-end;
+  }
+}
+
+.next-prev-button {
+  font-size: 4rem;
+  fill: var(--white);
+  filter: drop-shadow(0 0 1rem var(--text-color-secondary));
+  opacity: 70%;
+}

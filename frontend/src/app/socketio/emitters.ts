@@ -6,6 +6,7 @@ import {
   addLogEntry,
   setIsProcessing,
 } from '../../features/system/systemSlice';
+import { tabMap, tab_dict } from '../../features/tabs/InvokeTabs';
 import * as InvokeAI from '../invokeai';
 
 /**
@@ -23,8 +24,14 @@ const makeSocketIOEmitters = (
     emitGenerateImage: () => {
       dispatch(setIsProcessing(true));
 
+      const options = { ...getState().options };
+
+      if (tabMap[options.activeTab] === 'txt2img') {
+        options.shouldUseInitImage = false;
+      }
+
       const { generationParameters, esrganParameters, gfpganParameters } =
-        frontendToBackendParameters(getState().options, getState().system);
+        frontendToBackendParameters(options, getState().system);
 
       socketio.emit(
         'generateImage',
@@ -50,7 +57,10 @@ const makeSocketIOEmitters = (
       const esrganParameters = {
         upscale: [upscalingLevel, upscalingStrength],
       };
-      socketio.emit('runESRGAN', imageToProcess, esrganParameters);
+      socketio.emit('runPostprocessing', imageToProcess, {
+        type: 'esrgan',
+        ...esrganParameters,
+      });
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -68,7 +78,10 @@ const makeSocketIOEmitters = (
       const gfpganParameters = {
         gfpgan_strength: gfpganStrength,
       };
-      socketio.emit('runGFPGAN', imageToProcess, gfpganParameters);
+      socketio.emit('runPostprocessing', imageToProcess, {
+        type: 'gfpgan',
+        ...gfpganParameters,
+      });
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -84,16 +97,12 @@ const makeSocketIOEmitters = (
       socketio.emit('deleteImage', url, uuid);
     },
     emitRequestImages: () => {
-      const { nextPage, offset } = getState().gallery;
-      socketio.emit('requestImages', nextPage, offset);
+      const { earliest_mtime } = getState().gallery;
+      socketio.emit('requestImages', earliest_mtime);
     },
     emitRequestNewImages: () => {
-      const { nextPage, offset, images } = getState().gallery;
-      if (images.length > 0) {
-        socketio.emit('requestImages', nextPage, offset, images[0].mtime);
-      } else {
-        socketio.emit('requestImages', nextPage, offset);
-      }
+      const { latest_mtime } = getState().gallery;
+      socketio.emit('requestLatestImages', latest_mtime);
     },
     emitCancelProcessing: () => {
       socketio.emit('cancel');
