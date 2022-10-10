@@ -2,6 +2,8 @@
 title: InvokeAI Web Server
 ---
 
+# :material-web: InvokeAI Web Server
+
 As of version 2.0.0, this distribution comes with a full-featured web
 server (see screenshot). To use it, run the `invoke.py` script by
 adding the `--web` option:
