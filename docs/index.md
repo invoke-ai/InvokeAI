@@ -96,7 +96,7 @@ You wil need one of the following:
     To run in full-precision mode, start `invoke.py` with the `--full_precision` flag:
 
     ```bash
-    (ldm) ~/InvokeAI$ python scripts/invoke.py --full_precision
+    (invokeai) ~/InvokeAI$ python scripts/invoke.py --full_precision
     ```
 ## :octicons-log-16: Latest Changes
 
