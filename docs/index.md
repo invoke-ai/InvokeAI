@@ -12,7 +12,7 @@ title: Home
 -->
 <div align="center" markdown>
 
-# :material-script-text-outline: ^^**InvokeAI: A Stable Diffusion Toolkit**^^ <br> <small>Formally known as lstein/stable-diffusion</small>
+# ^^**InvokeAI: A Stable Diffusion Toolkit**^^ :tools: <br> <small>Formally known as lstein/stable-diffusion</small>
 
 ![project logo](assets/logo.png)
 
