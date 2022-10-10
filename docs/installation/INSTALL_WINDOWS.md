@@ -96,11 +96,11 @@ you may instead create a shortcut to it from within `models\ldm\stable-diffusion
 9. Start generating images!
 
     ```bash
-    # for the pre-release weights
-    python scripts\invoke.py -l
-
-    # for the post-release weights
+    # for the command-line interface
     python scripts\invoke.py
+
+    # for the Web GUI, launch and point your browser at http://localhost:9090
+    python scripts\invoke.py --web
     ```
 
 10. Subsequently, to relaunch the script, first activate the Anaconda command window (step 3),enter the InvokeAI directory (step 5, `cd \path\to\InvokeAI`), run `conda activate invokeai` (step 6b), and then launch the invoke script (step 9).

@@ -59,17 +59,15 @@ This will create InvokeAI folder where you will follow the rest of the steps.
 (invokeai) ~/InvokeAI$ python3 scripts/preload_models.py
 ```
 
-    !!! note
-
-        This step is necessary because I modified the original just-in-time
-        model loading scheme to allow the script to work on GPU machines that are not
-        internet connected. See [Preload Models](../features/OTHER.md#preload-models)
+*Note:* This step is necessary because we modified the original just-in-time
+model loading scheme to allow the script to work on GPU machines that are not
+internet connected. See [Preload Models](../features/OTHER.md#preload-models)
 
 7. Now you need to install the weights for the stable diffusion model.
 
       - For running with the released weights, you will first need to set up an acount
         with [Hugging Face](https://huggingface.co).
-      - Use your credentials to log in, and then point your browser [here](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original.)
+      - Use your credentials to log in, and then point your browser [here](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original).
       - You may be asked to sign a license agreement at this point.
       - Click on "Files and versions" near the top of the page, and then click on the
         file named "sd-v1-4.ckpt". You'll be taken to a page that prompts you to click
@@ -88,14 +86,15 @@ This will create InvokeAI folder where you will follow the rest of the steps.
 8. Start generating images!
 
 ```
-# for the pre-release weights use the -l or --liaon400m switch
-(invokeai) ~/InvokeAI$ python3 scripts/invoke.py -l
-
-# for the post-release weights do not use the switch
+# for the command-line interface (CLI):
 (invokeai) ~/InvokeAI$ python3 scripts/invoke.py
 
 # for additional configuration switches and arguments, use -h or --help
 (invokeai) ~/InvokeAI$ python3 scripts/invoke.py -h
+
+# for the web GUI, launch like this and point your browser at http://localhost:9090
+(invokeai) ~/InvokeAI$ python3 scripts/invoke.py --web
+
 ```
 
 9. Subsequently, to relaunch the script, be sure to run "conda

@@ -105,7 +105,7 @@ python scripts/preload_models.py
 
 # Run SD!
 python scripts/invoke.py
-```
+
 # or run the web interface!
 python scripts/invoke.py --web
 
