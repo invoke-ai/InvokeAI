@@ -2,7 +2,7 @@
 title: Changelog
 ---
 
-# **Changelog**
+# :octicons-log-16: **Changelog**
 
 - v2.0.0 (9 October 2022)
 
