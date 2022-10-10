@@ -152,15 +152,16 @@ steps and dimensions, but it will (usually) be close.
 
 #### Variations on a theme
 
-5. Let's try generating some variations. Select your favorite sushi
+8. Let's try generating some variations. Select your favorite sushi
 image from the gallery to load it. Then select "Use All" from the list
 of buttons above. This will load up all the settings used to generate
 this image, including its unique seed.
 
 Go down to the Variations section of the Control Panel and set the
 button to On. Set Variation Amount to 0.2 to generate a modest
-number of variations on the image, and also set the Image counter to
-4. Press the `invoke` button. This will generate a series of related
+number of variations on the image, and set the Image counter to 4.
+
+Press the `invoke` button. This will generate a series of related
 images. To obtain smaller variations, just lower the Variation
 Amount. You may also experiment with changing the Sampler. Some
 samplers generate more variability than others. *k_euler_a* is
