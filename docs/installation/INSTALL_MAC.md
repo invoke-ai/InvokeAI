@@ -2,6 +2,7 @@
 title: macOS
 ---
 
+# :fontawesome-brands-apple: macOS
 Invoke AI runs quite well on M1 Macs and we have a number of M1 users
 in the community.
 
