@@ -2,7 +2,7 @@
 title: TEXTUAL_INVERSION
 ---
 
-# :material-file-document-plus-outline: TEXTUAL_INVERSION
+# :material-file-document-plus-outline: Textual Inversion
 
 ## **Personalizing Text-to-Image Generation**
 
