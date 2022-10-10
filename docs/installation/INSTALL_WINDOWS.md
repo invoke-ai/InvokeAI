@@ -55,15 +55,11 @@ cd InvokeAI
 6. Run the following two commands:
 
 ```
-conda env create       (step 6a)
+conda env create -f install/environment.yml  (step 6a)
 conda activate invokeai     (step 6b)
 ```
     This will install all python requirements and activate the "invokeai" environment
     which sets PATH and other environment variables properly.
-
-    Note that the long form of the first command is `conda env create -f environment.yml`. If the
-    environment file isn't specified, conda will default to `environment.yml`. You will need
-    to provide the `-f` option if you wish to load a different environment file at any point.
 
 7. Run the command:
 
@@ -125,7 +121,7 @@ latest and greatest version, launch the Anaconda window, enter
 
 ```bash
 git pull
-conda env update
+conda env update -f install/environment.yml
 ```
 
 This will bring your local copy into sync with the remote one.

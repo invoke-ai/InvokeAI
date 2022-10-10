@@ -199,3 +199,7 @@ models/ldm/stable-diffusion-v1/model.sha256
 
 # GFPGAN model files
 gfpgan/
+
+# front end
+yarn.lock
+node_modules/

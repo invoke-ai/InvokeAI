@@ -140,7 +140,7 @@ If you're on a **Linux container** the `invoke` script is **automatically
 started** and the output dir set to the Docker volume you created earlier.
 
 If you're **directly on macOS follow these startup instructions**.  
-With the Conda environment activated (`conda activate ldm`), run the interactive
+With the Conda environment activated (`conda activate invokeai`), run the interactive
 interface that combines the functionality of the original scripts `txt2img` and
 `img2img`:  
 Use the more accurate but VRAM-intensive full precision math because

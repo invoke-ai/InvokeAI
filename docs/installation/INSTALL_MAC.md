@@ -90,21 +90,21 @@ ln -s "$PATH_TO_CKPT/sd-v1-4.ckpt" models/ldm/stable-diffusion-v1/model.ckpt
 
 # BEGIN ARCHITECTURE-DEPENDENT STEP #
 # For M1: Create the environment & install packages
-PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac.yml
+PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -f install/environment-mac.yml
 
 # For Intel: Create the environment & install packages
-PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create -f environment-mac.yml
+PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create -f install/environment-mac.yml
 
 # END ARCHITECTURE-DEPENDENT STEP #
 
 # Activate the environment (you need to do this every time you want to run SD)
-conda activate ldm
+conda activate invokeai
 
 # This will download some bits and pieces and make take a while
 python scripts/preload_models.py
 
 # Run SD!
-python scripts/dream.py
+python scripts/invoke.py
 ```
 # or run the web interface!
 python scripts/invoke.py --web
@@ -154,11 +154,11 @@ conda install \
   pytorch \
   torchvision \
   -c pytorch-nightly \
-  -n ldm
+  -n invokeai
 ```
 
 
-If it takes forever to run `conda env create -f environment-mac.yml`, try this:
+If it takes forever to run `conda env create -f install/environment-mac.yml`, try this:
 
 ```bash
 git clean -f
@@ -179,12 +179,12 @@ Or you could try to completley reset Anaconda:
 
 ---
 
-### "No module named cv2", torch, 'ldm', 'transformers', 'taming', etc
+### "No module named cv2", torch, 'invokeai', 'transformers', 'taming', etc
 
 There are several causes of these errors:
 
-1. Did you remember to `conda activate ldm`? If your terminal prompt begins with
-   "(ldm)" then you activated it. If it begins with "(base)" or something else
+1. Did you remember to `conda activate invokeai`? If your terminal prompt begins with
+   "(invokeai)" then you activated it. If it begins with "(base)" or something else
    you haven't.
 
 2. You might've run `./scripts/preload_models.py` or `./scripts/invoke.py`
@@ -198,17 +198,17 @@ There are several causes of these errors:
 
     ```bash
     conda deactivate
-    conda env remove -n ldm
-    conda env create -f environment-mac.yml
+    conda env remove -n invokeai
+    conda env create -f install/environment-mac.yml
     ```
     
-4. If you have activated the ldm virtual environment and tried rebuilding it,
+4. If you have activated the invokeai virtual environment and tried rebuilding it,
    maybe the problem could be that I have something installed that you don't and
    you'll just need to manually install it. Make sure you activate the virtual
    environment so it installs there instead of globally.
 
     ```bash
-    conda activate ldm
+    conda activate invokeai
     pip install <package name>
     ```
 
@@ -266,12 +266,12 @@ should actually be the _same python_, which you can verify by comparing the
 output of `python3 -V` and `python -V`.
 
 ```bash
-(ldm) % which python
-/Users/name/miniforge3/envs/ldm/bin/python
+(invokeai) % which python
+/Users/name/miniforge3/envs/invokeai/bin/python
 ```
 
 The above is what you'll see if you have miniforge and correctly activated the
-ldm environment, while usingd the standalone setup instructions above.
+invokeai environment, while usingd the standalone setup instructions above.
 
 If you otherwise installed via pyenv, you will get this result:
 
@@ -451,7 +451,7 @@ this issue too. I should probably test it.
 ### "view size is not compatible with input tensor's size and stride"
 
 ```bash
-File "/opt/anaconda3/envs/ldm/lib/python3.10/site-packages/torch/nn/functional.py", line 2511, in layer_norm
+File "/opt/anaconda3/envs/invokeai/lib/python3.10/site-packages/torch/nn/functional.py", line 2511, in layer_norm
 return torch.layer_norm(input, normalized_shape, weight, bias, eps, torch.backends.cudnn.enabled)
 RuntimeError: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Use .reshape(...) instead.
 ```
@@ -482,12 +482,12 @@ May appear when just starting to generate, e.g.:
 
 ```bash
 invoke> clouds
-Generating:   0%|                                                              | 0/1 [00:00<?, ?it/s]/Users/[...]/dev/stable-diffusion/ldm/modules/embedding_manager.py:152: UserWarning: The operator 'aten::nonzero' is not currently supported on the MPS backend and will fall back to run on the CPU. This may have performance implications. (Triggered internally at /Users/runner/work/_temp/anaconda/conda-bld/pytorch_1662016319283/work/aten/src/ATen/mps/MPSFallback.mm:11.)
+Generating:   0%|                                                              | 0/1 [00:00<?, ?it/s]/Users/[...]/dev/stable-diffusion/invokeai/modules/embedding_manager.py:152: UserWarning: The operator 'aten::nonzero' is not currently supported on the MPS backend and will fall back to run on the CPU. This may have performance implications. (Triggered internally at /Users/runner/work/_temp/anaconda/conda-bld/pytorch_1662016319283/work/aten/src/ATen/mps/MPSFallback.mm:11.)
   placeholder_idx = torch.where(
                                                                                                     loc("mps_add"("(mpsFileLoc): /AppleInternal/Library/BuildRoots/20d6c351-ee94-11ec-bcaf-7247572f23b4/Library/Caches/com.apple.xbs/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":219:0)): error: input types 'tensor<2x1280xf32>' and 'tensor<*xf16>' are not broadcast compatible
 LLVM ERROR: Failed to infer result type(s).
 Abort trap: 6
-/Users/[...]/opt/anaconda3/envs/ldm/lib/python3.9/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+/Users/[...]/opt/anaconda3/envs/invokeai/lib/python3.9/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
   warnings.warn('resource_tracker: There appear to be %d '
 ```
 

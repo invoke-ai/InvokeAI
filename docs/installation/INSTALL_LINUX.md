@@ -44,7 +44,7 @@ This will create InvokeAI folder where you will follow the rest of the steps.
 
 
 ```
-(base) ~/InvokeAI$ conda env create
+(base) ~/InvokeAI$ conda env create -f install/environment.yml
 (base) ~/InvokeAI$ conda activate invokeai
 (invokeai) ~/InvokeAI$
 ```
@@ -98,7 +98,11 @@ This will create InvokeAI folder where you will follow the rest of the steps.
 (invokeai) ~/InvokeAI$ python3 scripts/invoke.py -h
 ```
 
-9. Subsequently, to relaunch the script, be sure to run "conda activate invokeai" (step 5, second command), enter the `InvokeAI` directory, and then launch the invoke script (step 8). If you forget to activate the 'invokeai' environment, the script will fail with multiple `ModuleNotFound` errors.
+9. Subsequently, to relaunch the script, be sure to run "conda
+activate invokeai" (step 5, second command), enter the `InvokeAI`
+directory, and then launch the invoke script (step 8). If you forget
+to activate the 'invokeai' environment, the script will fail with
+multiple `ModuleNotFound` errors.
 
 ## Updating to newer versions of the script
 
