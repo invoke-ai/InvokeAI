@@ -67,7 +67,7 @@ title: Linux
 
       - For running with the released weights, you will first need to set up an acount
         with [Hugging Face](https://huggingface.co).
-      - Use your credentials to log in, and then point your browser [here](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original.)
+      - Use your credentials to log in, and then point your browser [here](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original).
       - You may be asked to sign a license agreement at this point.
       - Click on "Files and versions" near the top of the page, and then click on the
         file named "sd-v1-4.ckpt". You'll be taken to a page that prompts you to click
