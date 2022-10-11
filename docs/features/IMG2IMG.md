@@ -18,13 +18,13 @@ tree on a hill with a river, nature photograph, national geographic -I./test-pic
 This will take the original image shown here:
 
 <div align="center" markdown>
-![original image](https://user-images.githubusercontent.com/50542132/193946000-c42a96d8-5a74-4f8a-b4c3-5213e6cadcce.png){width=350}
+<img src="https://user-images.githubusercontent.com/50542132/193946000-c42a96d8-5a74-4f8a-b4c3-5213e6cadcce.png" width=350>
 </div>
 
 and generate a new image based on it as shown here:
 
 <div align="center" markdown>
-![generated result](https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png){width=350}
+<img src="https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png" width=350>
 </div>
 
 The `--init_img (-I)` option gives the path to the seed picture. `--strength (-f)` controls how much
@@ -70,9 +70,9 @@ information underneath the transparent needs to be preserved, not erased.
 
 ## How does it actually work, though?
 
-The main difference between `img2img` and `prompt2img` is the starting point. While `prompt2img` always starts with pure 
-gaussian noise and progressively refines it over the requested number of steps, `img2img` skips some of these earlier steps 
-(how many it skips is indirectly controlled by the `--strength` parameter), and uses instead your initial image mixed with gaussian noise as the starting image. 
+The main difference between `img2img` and `prompt2img` is the starting point. While `prompt2img` always starts with pure
+gaussian noise and progressively refines it over the requested number of steps, `img2img` skips some of these earlier steps
+(how many it skips is indirectly controlled by the `--strength` parameter), and uses instead your initial image mixed with gaussian noise as the starting image.
 
 **Let's start** by thinking about vanilla `prompt2img`, just generating an image from a prompt. If the step count is 10, then the "latent space" (Stable Diffusion's internal representation of the image) for the prompt "fire" with seed `1592514025` develops something like this:
 
@@ -90,7 +90,7 @@ Put simply: starting from a frame of fuzz/static, SD finds details in each frame
 
 ### A concrete example
 
-Say I want SD to draw a fire based on this hand-drawn image:
+I want SD to draw a fire based on this hand-drawn image:
 
 <div align="center" markdown>
 ![drawing of a fireplace](../assets/img2img/fire-drawing.png)
@@ -99,13 +99,13 @@ Say I want SD to draw a fire based on this hand-drawn image:
 Let's only do 10 steps, to make it easier to see what's happening. If strength is `0.7`, this is what the internal steps the algorithm has to take will look like:
 
 <div align="center" markdown>
-![](../assets/img2img/000032.steps.gravity.png)
+![gravity32](../assets/img2img/000032.steps.gravity.png)
 </div>
 
 With strength `0.4`, the steps look more like this:
 
 <div align="center" markdown>
-![](../assets/img2img/000030.steps.gravity.png)
+![gravity30](../assets/img2img/000030.steps.gravity.png)
 </div>
 
 Notice how much more fuzzy the starting image is for strength `0.7` compared to `0.4`, and notice also how much longer the sequence is with `0.7`:
@@ -139,7 +139,7 @@ invoke> "fire" -s50 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.4
 ```
 
 <div align="center" markdown>
-![](../assets/img2img/000035.1592514025.png)
+![000035.1592514025](../assets/img2img/000035.1592514025.png)
 </div>
 
 and here is strength `0.7` (note step count `30`, which is roughly `20 ÷ 0.7` to make sure SD does `20` steps from my image):
@@ -149,28 +149,28 @@ invoke> "fire" -s30 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.7
 ```
 
 <div align="center" markdown>
-![](../assets/img2img/000046.1592514025.png)
+![000046.1592514025](../assets/img2img/000046.1592514025.png)
 </div>
 
 In both cases the image is nice and clean and "finished", but because at strength `0.7` Stable Diffusion has been give so much more freedom to improve on my badly-drawn flames, they've come out looking much better. You can really see the difference when looking at the latent steps. There's more noise on the first image with strength `0.7`:
 
-![](../assets/img2img/000046.steps.gravity.png)
+![gravity46](../assets/img2img/000046.steps.gravity.png)
 
 than there is for strength `0.4`:
 
-![](../assets/img2img/000035.steps.gravity.png)
+![gravity35](../assets/img2img/000035.steps.gravity.png)
 
 and that extra noise gives the algorithm more choices when it is evaluating how to denoise any particular pixel in the image.
 
 Unfortunately, it seems that `img2img` is very sensitive to the step count. Here's strength `0.7` with a step count of `29` (SD did 19 steps from my image):
 
 <div align="center" markdown>
-![](../assets/img2img/000045.1592514025.png)
+![gravity45](../assets/img2img/000045.1592514025.png)
 </div>
 
 By comparing the latents we can sort of see that something got interpreted differently enough on the third or fourth step to lead to a rather different interpretation of the flames.
 
-![](../assets/img2img/000046.steps.gravity.png)
-![](../assets/img2img/000045.steps.gravity.png)
+![gravity46](../assets/img2img/000046.steps.gravity.png)
+![gravity45](../assets/img2img/000045.steps.gravity.png)
 
 This is the result of a difference in the de-noising "schedule" - basically the noise has to be cleaned by a certain degree each step or the model won't "converge" on the image properly (see [stable diffusion blog](https://huggingface.co/blog/stable_diffusion) for more about that). A different step count means a different schedule, which means things get interpreted slightly differently at every step.
