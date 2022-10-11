@@ -175,6 +175,14 @@ class Args(object):
             else:
                 print(f'>> Initialization file {INITFILE} not found. Applying default settings...')
             self._arg_switches = self._arg_parser.parse_args(sysargs)
+
+            if self._arg_switches.laion400m:
+                print('--laion400m flag has been deprecated. Please use --model laion400m instead.')
+                sys.exit(-1)
+            if self._arg_switches.weights:
+                print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
+                sys.exit(-1)
+
             return self._arg_switches
         except Exception as e:
             print(f'An exception has occurred: {e}')
@@ -583,6 +591,12 @@ class Args(object):
             nargs="*",
             type=str,
             help="Additional allowed origins, comma-separated",
+        )
+        web_server_group.add_argument(
+            '--api',
+            dest='api',
+            action='store_true',
+            help='Start in api mode.',
         )
         web_server_group.add_argument(
             '--host',

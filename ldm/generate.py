@@ -718,7 +718,7 @@ class Generate:
         if not img:
             return None, None
 
-        image = self._load_img(img)
+        image = img if isinstance(img, Image.Image) else self._load_img(img)
 
         if image.width < self.width and image.height < self.height:
             print(f'>> WARNING: img2img and inpainting may produce unexpected results with initial images smaller than {self.width}x{self.height} in both dimensions')
@@ -735,7 +735,7 @@ class Generate:
         init_image   = self._create_init_image(image,width,height,fit=fit)
 
         if mask:
-            mask_image = self._load_img(mask)
+            mask_image = mask if isinstance(mask, Image.Image) else self._load_img(mask)
             init_mask = self._create_init_mask(mask_image,width,height,fit=fit)
 
         elif text_mask:
@@ -878,7 +878,8 @@ class Generate:
                                 image_callback = None,
                                 prefix = None,
     ):
-            
+
+        results = []
         for r in image_list:
             image, seed = r
             try:
@@ -914,6 +915,10 @@ class Generate:
                 image_callback(image, seed, upscaled=True, use_prefix=prefix)
             else:
                 r[0] = image
+
+            results.append([image, seed])
+
+        return results
 
     def apply_textmask(self, image_path:str, prompt:str, callback, threshold:float=0.5):
         assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'

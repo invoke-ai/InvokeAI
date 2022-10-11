@@ -30,8 +30,13 @@ flask_socketio==5.3.0
 flask_cors==3.0.10
 flaskwebgui==0.3.7
 send2trash
-dependency_injector==4.40.0
 eventlet
+graphlib-backport
+fastapi
+uvicorn[standard]
+fastapi-events
+fastapi-socketio
+python-multipart
 realesrgan
 diffusers
 git+https://github.com/openai/CLIP.git@main#egg=clip
