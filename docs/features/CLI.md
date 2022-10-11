@@ -100,16 +100,20 @@ overridden on a per-prompt basis (see [List of prompt arguments](#list-of-prompt
 | `--free_gpu_mem`                          |                                           | `False`                                        | Free GPU memory after sampling, to allow image decoding and saving in low VRAM conditions            |
 | `--precision`                             |                                           | `auto`                                         | Set model precision, default is selected by device. Options: auto, float32, float16, autocast        |
 
-#### deprecated
+!!! warning deprecated
 
-These arguments are deprecated but still work:
+    These arguments are deprecated but still work:
 
-| Argument           |  Shortcut  |  Default            |  Description |
-|--------------------|------------|---------------------|--------------|
-| `--weights <path>`   |            | `None`                | Pth to weights file; use `--model stable-diffusion-1.4` instead |
-| `--laion400m`        | `-l`         | `False`               | Use older LAION400m weights; use `--model=laion400m` instead |
+    <div align="center" markdown>
 
-!!! note
+    | Argument           |  Shortcut  |  Default            |  Description |
+    |--------------------|------------|---------------------|--------------|
+    | `--weights <path>`   |            | `None`                | Pth to weights file; use `--model stable-diffusion-1.4` instead |
+    | `--laion400m`        | `-l`         | `False`               | Use older LAION400m weights; use `--model=laion400m` instead |
+
+    </div>
+
+!!! tip
 
       On Windows systems, you may run into
       problems when passing the invoke script standard backslashed path
