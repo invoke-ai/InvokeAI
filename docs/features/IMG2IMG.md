@@ -27,7 +27,7 @@ and generate a new image based on it as shown here:
 <img src="https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png" width=350>
 </div>
 
-The `--init_img (-I)` option gives the path to the seed picture. `--strength (-f)` controls how much
+The `--init_img` (`-I`) option gives the path to the seed picture. `--strength` (`-f`) controls how much
 the original will be modified, ranging from `0.0` (keep the original intact), to `1.0` (ignore the
 original completely). The default is `0.75`, and ranges from `0.25-0.90` give interesting results. 
 Other relevant options include `-C` (classification free guidance scale), and `-s` (steps). Unlike `txt2img`, 
@@ -39,7 +39,9 @@ back into img2img the requested number of times. It generates
 interesting variants.
 
 Note that the prompt makes a big difference. For example, this slight variation on the prompt produces
-a very different image: `photograph of a tree on a hill with a river`
+a very different image:
+
+`photograph of a tree on a hill with a river`
 
 <div align="center" markdown>
 <img src="https://user-images.githubusercontent.com/111189/194135220-16b62181-b60c-4248-8989-4834a8fd7fbd.png" width=350>
@@ -65,7 +67,7 @@ information underneath the transparent needs to be preserved, not erased.
     by width x height:
 
     ```bash
-    tree on a hill with a river, national geographic -I./test-pictures/big-sketch.png -H512 -W512 --fit
+    invoke> "tree on a hill with a river, national geographic" -I./test-pictures/big-sketch.png -H512 -W512 --fit
     ```
 
 ## How does it actually work, though?
@@ -112,11 +114,11 @@ Notice how much more fuzzy the starting image is for strength `0.7` compared to 
 
 |  | strength = 0.7 | strength = 0.4 |
 | -- | :--: | :--: |
-| initial image that SD sees | ![](../assets/img2img/000032.step-0.png) | ![](../assets/img2img/000030.step-0.png) |
+| initial image that SD sees | ![step-0-32](../assets/img2img/000032.step-0.png) | ![step-0-30](../assets/img2img/000030.step-0.png) |
 | steps argument to `dream>` | `-S10` | `-S10` |
 | steps actually taken | 7 | 4 |
-| latent space at each step | ![](../assets/img2img/000032.steps.gravity.png) | ![](../assets/img2img/000030.steps.gravity.png) |
-| output | ![](../assets/img2img/000032.1592514025.png) | ![](../assets/img2img/000030.1592514025.png) |
+| latent space at each step | ![gravity32](../assets/img2img/000032.steps.gravity.png) | ![gravity30](../assets/img2img/000030.steps.gravity.png) |
+| output | ![000032.1592514025](../assets/img2img/000032.1592514025.png) | ![000030.1592514025](../assets/img2img/000030.1592514025.png) |
 
 Both of the outputs look kind of like what I was thinking of. With the strength higher, my input becomes more vague, *and* Stable Diffusion has more steps to refine its output. But it's not really making what I want, which is a picture of cheery open fire. With the strength lower, my input is more clear, *but* Stable Diffusion has less chance to refine itself, so the result ends up inheriting all the problems of my bad drawing.
 
@@ -134,7 +136,7 @@ After putting this guide together I was curious to see how the difference would 
 
 Here's strength `0.4` (note step count `50`, which is `20 ÷ 0.4` to make sure SD does `20` steps from my image):
 
-```commandline
+```bash
 invoke> "fire" -s50 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.4
 ```
 
