@@ -34,6 +34,7 @@
 @use '../features/tabs/InvokeTabs.scss';
 @use '../features/tabs/TextToImage/TextToImage.scss';
 @use '../features/tabs/ImageToImage/ImageToImage.scss';
+@use '../features/tabs/Inpainting/Inpainting.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';

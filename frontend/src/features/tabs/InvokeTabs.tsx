@@ -3,7 +3,6 @@ import _ from 'lodash';
 import React, { ReactElement } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import InpaintingWIP from '../../common/components/WorkInProgress/InpaintingWIP';
 import NodesWIP from '../../common/components/WorkInProgress/NodesWIP';
 import OutpaintingWIP from '../../common/components/WorkInProgress/OutpaintingWIP';
 import { PostProcessingWIP } from '../../common/components/WorkInProgress/PostProcessingWIP';
@@ -14,8 +13,9 @@ import OutpaintIcon from '../../common/icons/OutpaintIcon';
 import PostprocessingIcon from '../../common/icons/PostprocessingIcon';
 import TextToImageIcon from '../../common/icons/TextToImageIcon';
 import { setActiveTab } from '../options/optionsSlice';
-import ImageToImage from './ImageToImage/ImageToImage';
 import TextToImage from './TextToImage/TextToImage';
+import ImageToImage from './ImageToImage/ImageToImage';
+import Inpainting from './Inpainting/Inpainting';
 
 export const tab_dict = {
   txt2img: {
@@ -30,7 +30,7 @@ export const tab_dict = {
   },
   inpainting: {
     title: <InpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <InpaintingWIP />,
+    panel: <Inpainting />,
     tooltip: 'Inpainting',
   },
   outpainting: {

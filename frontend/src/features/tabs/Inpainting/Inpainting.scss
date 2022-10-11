@@ -1,0 +1,34 @@
+@use '../../../styles/Mixins/' as *;
+
+.inpainting-wrapper {
+  position: relative;
+  width: min-content;
+}
+
+.checkerboard {
+  background-position: 0px 0px, 10px 10px;
+  background-size: 20px 20px;
+  background-image: linear-gradient(
+      45deg,
+      #eee 25%,
+      transparent 25%,
+      transparent 75%,
+      #eee 75%,
+      #eee 100%
+    ),
+    linear-gradient(45deg, #eee 25%, white 25%, white 75%, #eee 75%, #eee 100%);
+}
+
+.brush-preview-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.brush-preview {
+  border-radius: 50%;
+  border: 1px black solid;
+}

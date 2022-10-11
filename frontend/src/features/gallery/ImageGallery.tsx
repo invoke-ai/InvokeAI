@@ -91,7 +91,6 @@ export default function ImageGallery() {
           className="image-gallery-popup"
           onResize={handleResize}
         >
-          {/* <div className="image-gallery-popup"></div> */}
           <div className="image-gallery-header">
             <h1>Your Invocations</h1>
             <IconButton
@@ -109,7 +108,6 @@ export default function ImageGallery() {
                 columnClassName="masonry-grid_column"
                 breakpointCols={column}
               >
-                {/* <div className="image-gallery"> */}
                 {images.map((image) => {
                   const { uuid } = image;
                   const isSelected = currentImageUuid === uuid;
@@ -121,7 +119,6 @@ export default function ImageGallery() {
                     />
                   );
                 })}
-                {/* </div> */}
               </Masonry>
             ) : (
               <div className="image-gallery-container-placeholder">

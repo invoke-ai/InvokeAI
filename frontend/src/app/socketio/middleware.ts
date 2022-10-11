@@ -120,7 +120,7 @@ export const socketioMiddleware = () => {
      */
     switch (action.type) {
       case 'socketio/generateImage': {
-        emitGenerateImage();
+        emitGenerateImage(action.payload);
         break;
       }
 

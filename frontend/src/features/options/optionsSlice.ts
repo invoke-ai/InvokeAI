@@ -6,6 +6,8 @@ import { seedWeightsToString } from '../../common/util/seedWeightPairs';
 
 export type UpscalingLevel = 2 | 4;
 
+export type InpaintingTool = 'eraser' | 'uneraser';
+
 export interface OptionsState {
   prompt: string;
   iterations: number;
@@ -37,6 +39,8 @@ export interface OptionsState {
   activeTab: number;
   shouldShowImageDetails: boolean;
   shouldShowGallery: boolean;
+  inpaintingTool: 'eraser' | 'uneraser';
+  inpaintingBrushRadius: number;
 }
 
 const initialOptionsState: OptionsState = {
@@ -70,6 +74,8 @@ const initialOptionsState: OptionsState = {
   activeTab: 0,
   shouldShowImageDetails: false,
   shouldShowGallery: false,
+  inpaintingTool: 'eraser',
+  inpaintingBrushRadius: 20,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -260,7 +266,7 @@ export const optionsSlice = createSlice({
       if (threshold) state.threshold = threshold;
       if (typeof threshold === 'undefined') state.threshold = 0;
       if (perlin) state.perlin = perlin;
-      if (typeof perlin === 'undefined') state.perlin = 0;      
+      if (typeof perlin === 'undefined') state.perlin = 0;
       if (typeof seamless === 'boolean') state.seamless = seamless;
       if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix;
       if (width) state.width = width;
@@ -292,6 +298,12 @@ export const optionsSlice = createSlice({
     },
     setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGallery = action.payload;
+    },
+    setInpaintingTool: (state, action: PayloadAction<InpaintingTool>) => {
+      state.inpaintingTool = action.payload;
+    },
+    setInpaintingBrushRadius: (state, action: PayloadAction<number>) => {
+      state.inpaintingBrushRadius = action.payload;
     },
   },
 });
@@ -331,6 +343,8 @@ export const {
   setActiveTab,
   setShouldShowImageDetails,
   setShouldShowGallery,
+  setInpaintingTool,
+  setInpaintingBrushRadius,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
