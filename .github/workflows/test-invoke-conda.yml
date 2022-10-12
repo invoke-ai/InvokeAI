@@ -9,7 +9,7 @@ jobs:
   os_matrix:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-12]
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
     steps:
@@ -65,11 +65,10 @@ jobs:
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
-            && sed -E 's/ldm/ldm-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml \
-            && CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n ldm-updated | awk ' {print "  - " $1 "==" $2;} '
-            # && conda update -n base -c defaults conda \
-            # && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
-            #    conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+            && brew install cmake protobuf rust \
+            && conda update -n base -c defaults conda \
+            && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
+               conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
           [[ "$RUNNER_OS" != "macOS" ]] \
             && conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
