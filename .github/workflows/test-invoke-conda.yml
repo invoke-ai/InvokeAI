@@ -22,7 +22,7 @@ jobs:
           # Note, can't "activate" via github action; specifying the env's python has the same effect
           if [ "$RUNNER_OS" = "macOS" ]; then
               echo "::set-output name=ENV_FILE::environment-mac.yml"
-              echo "::set-output name=PYTHON_BIN::/usr/local/miniconda/envs/ldm/bin/python"
+              echo "::set-output name=PYTHON_BIN::/usr/local/miniconda/envs/invokeai/bin/python"
           elif [ "$RUNNER_OS" = "Linux" ]; then
               echo "::set-output name=ENV_FILE::environment.yml"
               echo "::set-output name=PYTHON_BIN::/usr/share/miniconda/envs/invokeai/bin/python"
@@ -67,10 +67,10 @@ jobs:
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
-            export PIP_EXISTS_ACTION=w
-            export CONDA_SUBDIR=osx-64
+            PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
+          else
+            conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
           fi
-          conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
