@@ -59,7 +59,7 @@ fi
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$PATH;$INSTALL_ENV_DIR/bin"; fi
 
 # get the repo (and load into the current directory)
-if [ ! -e ".git"]; then
+if [ ! -e ".git" ]; then
     git config --global init.defaultBranch main
     git init
     git remote add origin https://github.com/cmdr2/InvokeAI.git
