@@ -18,12 +18,12 @@ jobs:
       - name: Set platform variables
         id: vars
         run: |
-          # # Note, can't "activate" via github action; specifying the env's python has the same effect
-          # [[ "$RUNNER_OS" = "macOS" ]] \
-          #   && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
+          # Note, can't "activate" via github action; specifying the env's python has the same effect
+          [[ "$RUNNER_OS" = "macOS" ]] \
+            && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
 
-          # [[ "$RUNNER_OS" = "Linux" ]] \
-          #   && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
+          [[ "$RUNNER_OS" = "Linux" ]] \
+            && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
 
           echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
           echo "PYTHON_BIN=$CONDA/envs/invokeai/bin/python" >> $GITHUB_OUTPUT
@@ -65,12 +65,13 @@ jobs:
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          # [[ "$RUNNER_OS" == "macOS" ]] \
-          #   && brew install cmake protobuf rust pyenv-virtualenv \
-          #   && pyenv install anaconda3-2022.05 \
-          #   && pyenv virtualenv anaconda3-2022.05 \
-          #   && eval "$(pyenv init -)" \
-          #   && pyenv activate anaconda3-2022.05
+          [[ "$RUNNER_OS" == "macOS" ]] \
+            && brew install cmake protobuf rust pyenv-virtualenv \
+            && pyenv install anaconda3-2022.05 \
+            && pyenv virtualenv anaconda3-2022.05 \
+            && eval "$(pyenv init -)" \
+            && pyenv activate anaconda3-2022.05 \
+            && pip install -r requirements-mac-MPS-CPU.txt
             # && conda update -n base -c defaults conda --yes  \
             # && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
             #    conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
