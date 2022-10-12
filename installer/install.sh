@@ -69,9 +69,9 @@ fi
 
 # create the environment
 if [ "$OS_NAME" == "mac" ]; then
-    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -y -f environment-mac.yml
+    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac.yml
 else
-    conda env create -y -f environment.yml
+    conda env create -f environment.yml
 fi
 
 conda activate invokeai
