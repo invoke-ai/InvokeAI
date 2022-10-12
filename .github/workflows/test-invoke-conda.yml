@@ -14,6 +14,7 @@ jobs:
     steps:
       - run: |
           echo The PR was merged
+
       - name: Set platform variables
         id: vars
         run: |
@@ -23,10 +24,12 @@ jobs:
               echo "::set-output name=PYTHON_BIN::/usr/local/miniconda/envs/ldm/bin/python"
           elif [ "$RUNNER_OS" = "Linux" ]; then
               echo "::set-output name=ENV_FILE::environment.yml"
-              echo "::set-output name=PYTHON_BIN::/usr/share/miniconda/envs/ldm/bin/python"
+              echo "::set-output name=PYTHON_BIN::/usr/share/miniconda/envs/invokeai/bin/python"
           fi
+
       - name: Checkout sources
         uses: actions/checkout@v3
+
       - name: Use Cached Stable Diffusion v1.4 Model
         id: cache-sd-v1-4
         uses: actions/cache@v3
@@ -37,6 +40,7 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}
+
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
         run: |
@@ -46,6 +50,7 @@ jobs:
           if [ ! -e models/ldm/stable-diffusion-v1/model.ckpt ]; then
             curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
           fi
+
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
         uses: actions/cache@v3
@@ -56,10 +61,16 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.ENV_FILE) }}
+
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            export PIP_EXISTS_ACTION=w
+            export CONDA_SUBDIR=osx-64
+          fi
           conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
+
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
         uses: actions/cache@v3
@@ -70,13 +81,15 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
+
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
           ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
-#       - name: Run tmate
-#         uses: mxschmitt/action-tmate@v3
-#         timeout-minutes: 30
+      #       - name: Run tmate
+      #         uses: mxschmitt/action-tmate@v3
+      #         timeout-minutes: 30
+
       - name: Run the tests
         run: |
           # Note, can't "activate" via github action; specifying the env's python has the same effect
@@ -90,6 +103,7 @@ jobs:
             time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py --from_file tests/dev_prompts.txt
           fi
           mkdir -p outputs/img-samples
+
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
