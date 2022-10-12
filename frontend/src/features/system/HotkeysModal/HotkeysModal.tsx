@@ -81,6 +81,31 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       desc: 'Open and close console',
       hotkey: '`',
     },
+    {
+      title: 'Mask Brush - Inpainting',
+      desc: 'Select Mask Brush',
+      hotkey: 'b',
+    },
+    {
+      title: 'Erase Mask - Inpainting',
+      desc: 'Select Erase Mask Brush',
+      hotkey: 'e',
+    },
+    {
+      title: 'Clear Mask - Inpainting',
+      desc: 'Clear the inpainting mask',
+      hotkey: 'c',
+    },
+    {
+      title: 'Decrease Canvas Brush Size',
+      desc: 'Decrease canvas brush size in Inpainting',
+      hotkey: '[',
+    },
+    {
+      title: 'Increase Canvas Brush Size',
+      desc: 'Increase canvas brush size in Inpainting',
+      hotkey: ']',
+    },
   ];
 
   const renderHotkeyModalItems = () => {

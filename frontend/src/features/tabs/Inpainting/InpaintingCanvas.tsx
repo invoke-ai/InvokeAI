@@ -210,7 +210,7 @@ const InpaintingCanvas = () => {
 
   useLayoutEffect(() => {
     let requestId: number;
-    let lineDashOffset = 0;
+    const lineDashOffset = 0;
 
     if (!canvasRef.current) return;
     const canvasContext = canvasRef.current.getContext('2d');
@@ -373,7 +373,7 @@ const InpaintingCanvas = () => {
         canvasContext.lineWidth = 1;
         canvasContext.stroke();
         canvasContext.closePath();
-        lineDashOffset += 0.3;
+        // lineDashOffset += 0.3; // Disable Marching Ants
       }
 
       // update cursor pos

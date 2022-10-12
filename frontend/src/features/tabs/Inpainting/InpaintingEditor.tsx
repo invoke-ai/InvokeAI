@@ -8,6 +8,7 @@ import {
   FormControl,
   FormLabel,
   SliderMark,
+  useToast,
 } from '@chakra-ui/react';
 
 import {
@@ -18,6 +19,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEraser, FaPaintBrush, FaTrash } from 'react-icons/fa';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import IAIIconButton from '../../../common/components/IAIIconButton';
@@ -57,7 +59,12 @@ const InpaintingEditor = () => {
   const { inpaintingTool: tool, inpaintingBrushRadius: brushRadius } =
     useAppSelector(inpaintingOptionsSelector);
 
+  const activeTab = useAppSelector(
+    (state: RootState) => state.options.activeTab
+  );
+
   const dispatch = useAppDispatch();
+  const toast = useToast();
 
   // TODO: add mask invert display (so u can see exactly what parts of image are masked)
   const [shouldInvertMask, setShouldInvertMask] = useState<boolean>(false);
@@ -73,6 +80,53 @@ const InpaintingEditor = () => {
     y: 0,
   });
   //
+
+  // Hotkeys
+  useHotkeys(
+    '[',
+    () => {
+      if (activeTab === 2 && brushRadius - 5 > 0) {
+        dispatch(setInpaintingBrushRadius(brushRadius - 5));
+      } else {
+        dispatch(setInpaintingBrushRadius(1));
+      }
+    },
+    [brushRadius]
+  );
+
+  useHotkeys(
+    ']',
+    () => {
+      if (activeTab === 2) {
+        dispatch(setInpaintingBrushRadius(brushRadius + 5));
+      }
+    },
+    [brushRadius]
+  );
+
+  useHotkeys('b', () => {
+    if (activeTab == 2) {
+      dispatch(setInpaintingTool('eraser'));
+    }
+  });
+
+  useHotkeys('e', () => {
+    if (activeTab == 2) {
+      dispatch(setInpaintingTool('uneraser'));
+    }
+  });
+
+  useHotkeys('c', () => {
+    if (activeTab == 2) {
+      handleClickClearMask();
+      toast({
+        title: 'Mask Cleared',
+        status: 'success',
+        duration: 2500,
+        isClosable: true,
+      });
+    }
+  });
 
   const handleMouseOverBrushControls = () => {
     setShouldShowBrushPreview(true);
@@ -112,22 +166,22 @@ const InpaintingEditor = () => {
       <Flex gap={4} direction={'column'} padding={2}>
         <Flex gap={4}>
           <IAIIconButton
-            aria-label="Eraser"
-            tooltip="Eraser"
+            aria-label="Mask Brush (B)"
+            tooltip="Mask Brush (B)"
             icon={<FaEraser />}
             colorScheme={tool === 'eraser' ? 'green' : undefined}
             onClick={() => dispatch(setInpaintingTool('eraser'))}
           />
           <IAIIconButton
-            aria-label="Un-eraser"
-            tooltip="Un-eraser"
+            aria-label="Erase Mask (E)"
+            tooltip="Erase Mask (E)"
             icon={<FaPaintBrush />}
             colorScheme={tool === 'uneraser' ? 'green' : undefined}
             onClick={() => dispatch(setInpaintingTool('uneraser'))}
           />
           <IAIIconButton
-            aria-label="Clear mask"
-            tooltip="Clear mask"
+            aria-label="Clear Mask (C)"
+            tooltip="Clear Mask (C)"
             icon={<FaTrash />}
             colorScheme={'red'}
             onClick={handleClickClearMask}
@@ -148,7 +202,7 @@ const InpaintingEditor = () => {
                 dispatch(setInpaintingBrushRadius(v));
               }}
               min={1}
-              max={500}
+              max={brushRadius > 500 ? brushRadius : 500}
             >
               <SliderTrack>
                 <SliderFilledTrack />
