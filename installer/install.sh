@@ -71,9 +71,9 @@ fi
 
 # create the environment
 if [ "$OS_NAME" == "mac" ]; then
-    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 micromamba create -f environment-mac.yml
+    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 micromamba create -y -f environment-mac.yml
 else
-    micromamba create -f environment.yml
+    micromamba create -y -f environment.yml
 fi
 
 micromamba activate invokeai
