@@ -20,11 +20,8 @@ jobs:
         id: vars
         run: |
           # Note, can't "activate" via github action; specifying the env's python has the same effect
-          if [ "$RUNNER_OS" == "macOS" ]; then
-              echo "::set-output name=ENV_FILE::environment-mac.yml"
-          elif [ "$RUNNER_OS" == "Linux" ]; then
-              echo "::set-output name=ENV_FILE::environment.yml"
-          fi
+          [[ "$RUNNER_OS" == "macOS" ]] && echo "::set-output name=ENV_FILE::environment-mac.yml"
+          [[ "$RUNNER_OS" == "Linux" ]] && echo "::set-output name=ENV_FILE::environment.yml"
           echo "::set-output name=PYTHON_BIN::$CONDA/envs/invokeai/bin/python"
 
       - name: Checkout sources
