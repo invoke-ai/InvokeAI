@@ -11,8 +11,11 @@ jobs:
       - name: Set platform variables
         id: vars
         run: |
-          [[ "$RUNNER_OS" == "macOS" ]] && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
-          [[ "$RUNNER_OS" == "Linux" ]] && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
+          [[ "$RUNNER_OS" == "macOS" ]] \
+            && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
+
+          [[ "$RUNNER_OS" == "Linux" ]] \
+            && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
 
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -31,8 +34,11 @@ jobs:
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
         run: |
-          [[ -e models/ldm/stable-diffusion-v1 ]] || mkdir -p models/ldm/stable-diffusion-v1
-          [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] || curl -o models/ldm/stable-diffusion-v1/model.ckpt "${{ secrets.SD_V1_4_URL }}"
+          [[ -e models/ldm/stable-diffusion-v1 ]] \
+            || mkdir -p models/ldm/stable-diffusion-v1
+
+          [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] \
+            || curl -o models/ldm/stable-diffusion-v1/model.ckpt "${{ secrets.SD_V1_4_URL }}"
 
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
@@ -64,4 +70,4 @@ jobs:
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-huggingface-torch.outputs.cache-hit != 'true' }}
         run: |
-          $CONDA/envs/ldm/bin/python scripts/preload_models.py
+          $CONDA/envs/invokeai/bin/python scripts/preload_models.py

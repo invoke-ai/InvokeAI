@@ -21,8 +21,10 @@ jobs:
           # Note, can't "activate" via github action; specifying the env's python has the same effect
           [[ "$RUNNER_OS" = "macOS" ]] \
             && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
+
           [[ "$RUNNER_OS" = "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
+
           echo "PYTHON_BIN=$CONDA/envs/invokeai/bin/python" >> $GITHUB_OUTPUT
 
       - name: Checkout sources
@@ -44,6 +46,7 @@ jobs:
         run: |
           [[ -e models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
+
           [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] \
             || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
@@ -62,9 +65,9 @@ jobs:
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
-            && PIP_EXISTS_ACTION=w \
-               CONDA_SUBDIR=osx-64 \
+            && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
                conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+
           [[ "$RUNNER_OS" != "macOS" ]] \
             && conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
@@ -89,13 +92,16 @@ jobs:
           # Note, can't "activate" via github action; specifying the env's python has the same effect
           [[ "$RUNNER_OS" == "macOS" ]] \
             && export PYTORCH_ENABLE_MPS_FALLBACK=1
+
           # Utterly hacky, but I don't know how else to do this
           [[ ${{ github.ref }} == 'refs/heads/main' ]] \
             && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/preflight_prompts.txt
+
           [[ ${{ github.ref }} == 'refs/heads/development' ]] \
             && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/dev_prompts.txt
+
           mkdir -p outputs/img-samples
 
       - name: Archive results
