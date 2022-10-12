@@ -66,7 +66,7 @@ jobs:
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
             && brew install cmake protobuf rust \
-            && conda update -n base -c defaults conda \
+            && conda update -n base -c defaults conda --yes  \
             && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
                conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
           [[ "$RUNNER_OS" != "macOS" ]] \
