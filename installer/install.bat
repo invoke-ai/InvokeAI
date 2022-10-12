@@ -20,10 +20,10 @@ set MICROMAMBA_BINARY_FILE=%cd%\installer_files\micromamba_win_x64.exe
 @rem figure out whether git and conda needs to be installed
 set PACKAGES_TO_INSTALL=
 
-call conda --version >tmp/stdout.txt 2>tmp/stderr.txt
+call conda --version >.tmp1 2>.tmp2
 if "%ERRORLEVEL%" NEQ "0" set PACKAGES_TO_INSTALL=%PACKAGES_TO_INSTALL% conda
 
-call git --version >tmp/stdout.txt 2>tmp/stderr.txt
+call git --version >.tmp1 2>.tmp2
 if "%ERRORLEVEL%" NEQ "0" set PACKAGES_TO_INSTALL=%PACKAGES_TO_INSTALL% git
 
 @rem (if necessary) install git and conda into a contained environment
