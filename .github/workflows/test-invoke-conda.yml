@@ -4,6 +4,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'update-gh-actions'
 jobs:
   os_matrix:
     strategy:
