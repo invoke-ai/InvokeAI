@@ -68,7 +68,7 @@ if not exist ".git" (
 )
 
 @rem create the environment
-call micromamba create -f environment.yml
+call micromamba create -y -f environment.yml
 call micromamba activate invokeai
 
 @rem preload the models
