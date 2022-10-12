@@ -19,11 +19,9 @@ jobs:
         id: vars
         run: |
           # Note, can't "activate" via github action; specifying the env's python has the same effect
-          [[ "$RUNNER_OS" = "macOS" ]] \
-            && echo "{CONDA_ENV_FILE}={environment-mac.yml}" >> $GITHUB_ENV
-          [[ "$RUNNER_OS" = "Linux" ]] \
-            && echo "{CONDA_ENV_FILE}={environment.yml}" >> $GITHUB_ENV
-          echo "{PYTHON_BIN}={$CONDA/envs/ldm/bin/python}" >> $GITHUB_ENV
+          [[ "$RUNNER_OS" = "macOS" ]] && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
+          [[ "$RUNNER_OS" = "Linux" ]] && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
+          echo "PYTHON_BIN=$CONDA/envs/ldm/bin/python" >> $GITHUB_OUTPUT
 
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -42,10 +40,8 @@ jobs:
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
         run: |
-          [[ -e models/ldm/stable-diffusion-v1 ]] \
-            || mkdir -p models/ldm/stable-diffusion-v1
-          [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] \
-            || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
+          [[ -e models/ldm/stable-diffusion-v1 ]] || mkdir -p models/ldm/stable-diffusion-v1
+          [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
@@ -56,7 +52,7 @@ jobs:
           path: ~/.conda/envs/ldm
           key: ${{ env.cache-name }}
           restore-keys: |
-            ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.CONDA_ENV_FILE) }}
+            ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.CONDA_ENV_FILE) }}
 
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
@@ -65,7 +61,7 @@ jobs:
             && export \
               PIP_EXISTS_ACTION=w \
               CONDA_SUBDIR=osx-64
-          conda env create -f ${{ env.CONDA_ENV_FILE }}
+          conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
@@ -81,7 +77,7 @@ jobs:
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
-          ${{ env.PYTHON_BIN }} scripts/preload_models.py
+          ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
 
       - name: Run the tests
         run: |
@@ -92,10 +88,10 @@ jobs:
 
           # Utterly hacky, but I don't know how else to do this
           [[ ${{ github.ref }} == 'refs/heads/main' ]] \
-            && time ${{ env.PYTHON_BIN }} scripts/invoke.py \
+            && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/preflight_prompts.txt
           [[ ${{ github.ref }} == 'refs/heads/development' ]] \
-            && time ${{ env.PYTHON_BIN }} scripts/invoke.py \
+            && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/dev_prompts.txt
           mkdir -p outputs/img-samples
 

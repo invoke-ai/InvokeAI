@@ -48,7 +48,7 @@ jobs:
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          conda env create -f "${{ steps.vars.outputs.CONDA_ENV_FILE }}"
+          conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
       - name: Use Cached Huggingface and Torch models
         id: cache-huggingface-torch
