@@ -4,6 +4,8 @@ ldm.models.diffusion.sampler
 Base class for ldm.models.diffusion.ddim, ldm.models.diffusion.ksampler, etc
 
 '''
+from enum import Enum
+
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -411,3 +413,6 @@ class Sampler(object):
         return self.model.inner_model.q_sample(x0,ts)
         '''
         return self.model.q_sample(x0,ts)
+
+
+
