@@ -54,11 +54,6 @@ jobs:
         with:
           python-version: '3.9'
 
-      - uses: s-weigand/setup-conda@v4
-        with:
-          activate-conda: false
-
-
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
         uses: actions/cache@v3
