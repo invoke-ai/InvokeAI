@@ -51,10 +51,6 @@ jobs:
             curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
           fi
 
-      - uses: s-weigand/setup-conda@v4
-        with:
-          activate-conda: false
-
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
         uses: actions/cache@v3
