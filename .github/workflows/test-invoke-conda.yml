@@ -19,9 +19,11 @@ jobs:
         id: vars
         run: |
           # Note, can't "activate" via github action; specifying the env's python has the same effect
-          [[ "$RUNNER_OS" == "macOS" ]] && echo "::set-output name=ENV_FILE::environment-mac.yml"
-          [[ "$RUNNER_OS" == "Linux" ]] && echo "::set-output name=ENV_FILE::environment.yml"
-          echo "::set-output name=PYTHON_BIN::$CONDA/envs/invokeai/bin/python"
+          [[ "$RUNNER_OS" = "macOS" ]] \
+            && echo "{CONDA_ENV_FILE}={environment-mac.yml}" >> $GITHUB_ENV
+          [[ "$RUNNER_OS" = "Linux" ]] \
+            && echo "{CONDA_ENV_FILE}={environment.yml}" >> $GITHUB_ENV
+          echo "{PYTHON_BIN}={$CONDA/envs/ldm/bin/python}" >> $GITHUB_ENV
 
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -54,7 +56,7 @@ jobs:
           path: ~/.conda/envs/ldm
           key: ${{ env.cache-name }}
           restore-keys: |
-            ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.ENV_FILE) }}
+            ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.CONDA_ENV_FILE) }}
 
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
@@ -63,7 +65,7 @@ jobs:
             && export \
               PIP_EXISTS_ACTION=w \
               CONDA_SUBDIR=osx-64
-          conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
+          conda env create -f ${{ env.CONDA_ENV_FILE }}
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
@@ -79,7 +81,7 @@ jobs:
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
-          ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
+          ${{ env.PYTHON_BIN }} scripts/preload_models.py
 
       - name: Run the tests
         run: |
@@ -90,10 +92,10 @@ jobs:
 
           # Utterly hacky, but I don't know how else to do this
           [[ ${{ github.ref }} == 'refs/heads/main' ]] \
-            && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
+            && time ${{ env.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/preflight_prompts.txt
           [[ ${{ github.ref }} == 'refs/heads/development' ]] \
-            && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
+            && time ${{ env.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/dev_prompts.txt
           mkdir -p outputs/img-samples
 
