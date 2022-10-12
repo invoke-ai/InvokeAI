@@ -20,11 +20,12 @@ jobs:
         id: vars
         run: |
           # Note, can't "activate" via github action; specifying the env's python has the same effect
-          if [ "$RUNNER_OS" = "macOS" ]; then
+          if [ "$RUNNER_OS" == "macOS" ]; then
               echo "::set-output name=ENV_FILE::environment-mac.yml"
-          elif [ "$RUNNER_OS" = "Linux" ]; then
+          elif [ "$RUNNER_OS" == "Linux" ]; then
               echo "::set-output name=ENV_FILE::environment.yml"
           fi
+          echo "::set-output name=PYTHON_BIN::$CONDA/envs/invokeai/bin/python"
 
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -50,9 +51,9 @@ jobs:
             curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
           fi
 
-      - uses: actions/setup-python@v4
+      - uses: s-weigand/setup-conda@v4
         with:
-          python-version: '3.9'
+          activate-conda: false
 
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
@@ -68,8 +69,8 @@ jobs:
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create -f "${{ steps.vars.outputs.ENV_FILE }}"
           else
             conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
           fi
@@ -88,8 +89,7 @@ jobs:
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
-          python scripts/preload_models.py
-
+          ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
       #       - name: Run tmate
       #         uses: mxschmitt/action-tmate@v3
       #         timeout-minutes: 30
@@ -102,9 +102,9 @@ jobs:
           fi
           # Utterly hacky, but I don't know how else to do this
           if [[ ${{ github.ref }} == 'refs/heads/master' ]]; then
-            time python scripts/invoke.py --from_file tests/preflight_prompts.txt
+            time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py --from_file tests/preflight_prompts.txt
           elif [[ ${{ github.ref }} == 'refs/heads/development' ]]; then
-            time python scripts/invoke.py --from_file tests/dev_prompts.txt
+            time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py --from_file tests/dev_prompts.txt
           fi
           mkdir -p outputs/img-samples
 
