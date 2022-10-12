@@ -8,4 +8,6 @@ if exist ".git" (
     call git pull
 )
 
+conda env update
+
 pause
