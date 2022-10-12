@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# This script will install git and python (if not found on the PATH variable)
+# This script will install git and conda (if not found on the PATH variable)
 #  using micromamba (an 8mb static-linked single-file binary, conda replacement).
-# For users who already have git and python, this step will be skipped.
+# For users who already have git and conda, this step will be skipped.
 
 # Next, it'll checkout the project's git repo, if necessary.
 # Finally, it'll create the conda environment and preload the models.
 
-# This enables a user to install this project without manually installing python and git.
+# This enables a user to install this project without manually installing conda and git.
 
 OS_NAME=$(uname -s)
 case "${OS_NAME}" in
@@ -27,42 +27,40 @@ esac
 export MAMBA_ROOT_PREFIX="$(pwd)/installer_files/mamba"
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 MICROMAMBA_BINARY_FILE="$(pwd)/installer_files/micromamba_${OS_NAME}_${OS_ARCH}"
-if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$PATH;$INSTALL_ENV_DIR/bin"; fi
 
-# figure out what needs to be installed
+# figure out whether git and conda needs to be installed
 PACKAGES_TO_INSTALL=""
 
-if ! hash "python" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python"; fi
+if ! hash "conda" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL conda"; fi
 if ! hash "git" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL git"; fi
 
-# initialize micromamba
-mkdir -p "$MAMBA_ROOT_PREFIX"
-cp "$MICROMAMBA_BINARY_FILE" "$MAMBA_ROOT_PREFIX/micromamba"
-
-# test the mamba binary
-echo Micromamba version:
-"$MAMBA_ROOT_PREFIX/micromamba" --version
-
-# run the shell hook, otherwise activate will fail
-eval "$($MAMBA_ROOT_PREFIX/micromamba shell hook -s posix)"
-
-# install git and python into a contained environment (if necessary)
+# (if necessary) install git and conda into a contained environment
 if [ "$PACKAGES_TO_INSTALL" != "" ]; then
-    echo "Packages to install: $PACKAGES_TO_INSTALL"
+    # initialize micromamba
+    if [ ! -e "$MAMBA_ROOT_PREFIX" ]; then
+        mkdir -p "$MAMBA_ROOT_PREFIX"
+        cp "$MICROMAMBA_BINARY_FILE" "$MAMBA_ROOT_PREFIX/micromamba"
 
-    # install git and python into the installer env
-    if [ ! -e "$INSTALL_ENV_DIR" ]; then
-        micromamba create -y --prefix "$INSTALL_ENV_DIR"
+        # test the mamba binary
+        echo "Micromamba version:"
+        "$MAMBA_ROOT_PREFIX/micromamba" --version
     fi
 
-    micromamba install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge $PACKAGES_TO_INSTALL
+    # create the installer env
+    if [ ! -e "$INSTALL_ENV_DIR" ]; then
+        "$MAMBA_ROOT_PREFIX/micromamba" create -y --prefix "$INSTALL_ENV_DIR"
+    fi
 
-    # activate
-    micromamba activate "$INSTALL_ENV_DIR"
+    echo "Packages to install:$PACKAGES_TO_INSTALL"
+
+    "$MAMBA_ROOT_PREFIX/micromamba" install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge $PACKAGES_TO_INSTALL
 fi
 
+if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$PATH;$INSTALL_ENV_DIR/bin"; fi
+
 # get the repo (and load into the current directory)
-if [ ! -e ".git" ]; then
+if [ ! -e ".git"]; then
+    git config --global init.defaultBranch main
     git init
     git remote add origin https://github.com/cmdr2/InvokeAI.git
     git fetch
@@ -71,15 +69,27 @@ fi
 
 # create the environment
 if [ "$OS_NAME" == "mac" ]; then
-    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 micromamba create -y -f environment-mac.yml
+    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -y -f environment-mac.yml
 else
-    micromamba create -y -f environment.yml
+    conda env create -y -f environment.yml
 fi
 
-micromamba activate invokeai
+conda activate invokeai
 
 # preload the models
 python scripts/preload_models.py
 
 # make the models dir
-mkdir -p models/ldm/stable-diffusion-v1
+mkdir models/ldm/stable-diffusion-v1
+
+# tell the user that they need to download the ckpt
+WEIGHTS_DOC_URL="https://invoke-ai.github.io/InvokeAI/installation/INSTALL_LINUX/"
+if [ "$OS_NAME" == "mac" ]; then
+    WEIGHTS_DOC_URL="https://invoke-ai.github.io/InvokeAI/installation/INSTALL_MAC/"
+fi
+
+echo.
+echo "Now you need to install the weights for the stable diffusion model."
+echo "Please follow the steps at $WEIGHTS_DOC_URL to complete the installation"
+
+# it would be nice if the weights downloaded automatically, and didn't need the user to do this manually.
