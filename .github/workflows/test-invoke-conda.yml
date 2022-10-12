@@ -62,10 +62,9 @@ jobs:
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
-            && ${{ steps.vars.outputs.PYTHON_BIN }} -m \
-              pip install -r requirements-mac-MPS-CPU.txt \
-            && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create \
-              -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+            && PIP_EXISTS_ACTION=w \
+               CONDA_SUBDIR=osx-64 \
+               conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
           [[ "$RUNNER_OS" != "macOS" ]] \
             && conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
