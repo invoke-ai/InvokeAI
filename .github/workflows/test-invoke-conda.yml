@@ -41,12 +41,10 @@ jobs:
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
         run: |
-          if [ ! -e models/ldm/stable-diffusion-v1 ]; then
-              mkdir -p models/ldm/stable-diffusion-v1
-          fi
-          if [ ! -e models/ldm/stable-diffusion-v1/model.ckpt ]; then
-            curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
-          fi
+          [[ -e models/ldm/stable-diffusion-v1 ]] \
+            || mkdir -p models/ldm/stable-diffusion-v1
+          [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] \
+            || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
@@ -62,7 +60,7 @@ jobs:
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          if [ "$RUNNER_OS" == "macOS" ]; then
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
             PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create -f "${{ steps.vars.outputs.ENV_FILE }}"
           else
             conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
@@ -83,9 +81,6 @@ jobs:
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
           ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
-      #       - name: Run tmate
-      #         uses: mxschmitt/action-tmate@v3
-      #         timeout-minutes: 30
 
       - name: Run the tests
         run: |
