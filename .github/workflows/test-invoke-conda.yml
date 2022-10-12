@@ -23,7 +23,7 @@ jobs:
             && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
           [[ "$RUNNER_OS" = "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
-          echo "PYTHON_BIN=$CONDA/envs/ldm/bin/python" >> $GITHUB_OUTPUT
+          echo "PYTHON_BIN=$CONDA/envs/invokeai/bin/python" >> $GITHUB_OUTPUT
 
       - name: Checkout sources
         uses: actions/checkout@v3
