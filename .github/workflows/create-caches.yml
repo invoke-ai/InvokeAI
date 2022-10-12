@@ -11,11 +11,8 @@ jobs:
       - name: Set platform variables
         id: vars
         run: |
-          [[ "$RUNNER_OS" = "macOS" ]] \
-            && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_ENV
-          [[ "$RUNNER_OS" = "Linux" ]] \
-            && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_ENV
-          echo "PYTHON_BIN=$CONDA/envs/ldm/bin/python" >> $GITHUB_ENV
+          [[ "$RUNNER_OS" = "macOS" ]] && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_ENV
+          [[ "$RUNNER_OS" = "Linux" ]] && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_ENV
 
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -51,7 +48,7 @@ jobs:
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          conda env create -f ${{ env.CONDA_ENV_FILE }}
+          conda env create -f "${{ env.CONDA_ENV_FILE }}"
 
       - name: Use Cached Huggingface and Torch models
         id: cache-huggingface-torch
@@ -67,4 +64,4 @@ jobs:
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-huggingface-torch.outputs.cache-hit != 'true' }}
         run: |
-          ${{ env.PYTHON_BIN }} scripts/preload_models.py
+          $CONDA/envs/ldm/bin/python scripts/preload_models.py
