@@ -29,6 +29,12 @@ INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 MICROMAMBA_BINARY_FILE="$(pwd)/installer_files/micromamba_${OS_NAME}_${OS_ARCH}"
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$PATH;$INSTALL_ENV_DIR/bin"; fi
 
+# figure out what needs to be installed
+PACKAGES_TO_INSTALL=""
+
+if ! hash "python" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python"; fi
+if ! hash "git" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL git"; fi
+
 # initialize micromamba
 mkdir -p "$MAMBA_ROOT_PREFIX"
 cp "$MICROMAMBA_BINARY_FILE" "$MAMBA_ROOT_PREFIX/micromamba"
@@ -39,12 +45,6 @@ echo Micromamba version:
 
 # run the shell hook, otherwise activate will fail
 eval "$($MAMBA_ROOT_PREFIX/micromamba shell hook -s posix)"
-
-# figure out what needs to be installed
-PACKAGES_TO_INSTALL=""
-
-if ! hash "python" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL python"; fi
-if ! hash "git" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL git"; fi
 
 # install git and python into a contained environment (if necessary)
 if [ "$PACKAGES_TO_INSTALL" != "" ]; then

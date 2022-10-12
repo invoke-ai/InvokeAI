@@ -18,6 +18,15 @@ set INSTALL_ENV_DIR=%cd%\installer_files\env
 set MICROMAMBA_BINARY_FILE=%cd%\installer_files\micromamba_win_x64.exe
 set PATH=%PATH%;%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scripts
 
+@rem figure out whether git and python needs to be installed
+set PACKAGES_TO_INSTALL=
+
+call python --version "" >tmp/stdout.txt 2>tmp/stderr.txt
+if "%ERRORLEVEL%" NEQ "0" set PACKAGES_TO_INSTALL=%PACKAGES_TO_INSTALL% python
+
+call git --version "" >tmp/stdout.txt 2>tmp/stderr.txt
+if "%ERRORLEVEL%" NEQ "0" set PACKAGES_TO_INSTALL=%PACKAGES_TO_INSTALL% git
+
 @rem initialize micromamba
 if not exist "%MAMBA_ROOT_PREFIX%" (
     mkdir "%MAMBA_ROOT_PREFIX%"
@@ -34,15 +43,6 @@ if not exist "%MAMBA_ROOT_PREFIX%" (
 )
 
 call "%MAMBA_ROOT_PREFIX%\condabin\mamba_hook.bat"
-
-@rem figure out whether git and python needs to be installed
-set PACKAGES_TO_INSTALL=
-
-call python --version "" >tmp/stdout.txt 2>tmp/stderr.txt
-if "%ERRORLEVEL%" NEQ "0" set PACKAGES_TO_INSTALL=%PACKAGES_TO_INSTALL% python
-
-call git --version "" >tmp/stdout.txt 2>tmp/stderr.txt
-if "%ERRORLEVEL%" NEQ "0" set PACKAGES_TO_INSTALL=%PACKAGES_TO_INSTALL% git
 
 @rem (if necessary) install git and python into a contained environment
 if "%PACKAGES_TO_INSTALL%" NEQ "" (
