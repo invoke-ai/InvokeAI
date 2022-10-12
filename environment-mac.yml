@@ -36,7 +36,7 @@ dependencies:
   - pudb==2022.1
   - pytorch-lightning==1.7.5
   - scipy==1.9.1
-  - streamlit # ==1.12.2
+  - streamlit==1.12.2
   - sympy==1.10.1
   - tensorboard==2.10.0
   - torchmetrics==0.9.3
