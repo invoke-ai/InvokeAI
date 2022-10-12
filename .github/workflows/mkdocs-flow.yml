@@ -3,9 +3,6 @@ on:
   push:
     branches:
       - main
-  # pull_request:
-  #   branches:
-  #     - main
 jobs:
   build:
     name: Deploy docs to GitHub Pages
@@ -15,14 +12,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Build
-        uses: Tiryoh/actions-mkdocs@v0
+      - uses: actions/setup-python@v4
         with:
-          mkdocs_version: 'latest' # option
-          requirements: '/requirements-mkdocs.txt' # option
-          configfile: '/mkdocs.yml' # option
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          python-version: '3.10'
+      - run: python -m \
+          pip install -r requirements-mkdocs.txt
+      - run: python -m \
+          mkdocs gh-deploy \
+          --clean \
+          --force
