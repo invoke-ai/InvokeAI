@@ -65,12 +65,16 @@ jobs:
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
-            && brew install cmake protobuf rust \
-            && conda update -n base -c defaults conda --yes  \
-            && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
-               conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
-          [[ "$RUNNER_OS" != "macOS" ]] \
-            && conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+            && brew install cmake protobuf rust pyenv-virtualenv \
+            && pyenv install anaconda3-2022.05 \
+            && pyenv virtualenv anaconda3-2022.05 \
+            && eval "$(pyenv init -)" \
+            && pyenv activate anaconda3-2022.05
+            # && conda update -n base -c defaults conda --yes  \
+            # && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
+            #    conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+          # [[ "$RUNNER_OS" != "macOS" ]] \
+          conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
