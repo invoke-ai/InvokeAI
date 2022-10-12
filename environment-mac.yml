@@ -7,8 +7,8 @@ dependencies:
   - pip==22.2.2
 
   # pytorch left unpinned
-  - pytorch==1.12.1
-  - torchvision==0.13.1
+  - pytorch # ==1.12.1
+  - torchvision # ==0.13.1
 
   # I suggest to keep the other deps sorted for convenience.
   # To determine what the latest versions should be, run:
