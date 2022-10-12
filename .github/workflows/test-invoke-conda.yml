@@ -64,12 +64,13 @@ jobs:
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
-            && conda update -n base \
+            && conda update -n base -c defaults conda \
             && PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
                conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
           [[ "$RUNNER_OS" != "macOS" ]] \
-            && conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+            && conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }} \
+            || echo
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
