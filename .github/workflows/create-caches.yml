@@ -12,15 +12,15 @@ jobs:
       - name: Set platform variables
         id: vars
         run: |
-            if [ "$RUNNER_OS" = "macOS" ]; then
-                echo "::set-output name=ENV_FILE::environment-mac.yml"
-                echo "::set-output name=PYTHON_BIN::/usr/local/miniconda/envs/ldm/bin/python"
-            elif [ "$RUNNER_OS" = "Linux" ]; then
-                echo "::set-output name=ENV_FILE::environment.yml"
-                echo "::set-output name=PYTHON_BIN::/usr/share/miniconda/envs/ldm/bin/python"
-            fi
+            [[ "$RUNNER_OS" = "macOS" ]] \
+              && echo "::set-output name=ENV_FILE::environment-mac.yml"
+            [[ "$RUNNER_OS" = "Linux" ]] \
+              && echo "::set-output name=ENV_FILE::environment.yml"
+            echo "::set-output name=PYTHON_BIN::$CONDA/envs/ldm/bin/python"
+
       - name: Checkout sources
         uses: actions/checkout@v3
+
       - name: Use Cached Stable Diffusion v1.4 Model
         id: cache-sd-v1-4
         uses: actions/cache@v3
@@ -31,15 +31,15 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}
+
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
         run: |
-          if [ ! -e models/ldm/stable-diffusion-v1 ]; then
-              mkdir -p models/ldm/stable-diffusion-v1
-          fi
-          if [ ! -e models/ldm/stable-diffusion-v1/model.ckpt ]; then
-            curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
-          fi
+          [[ -e models/ldm/stable-diffusion-v1 ]] \\
+            || mkdir -p models/ldm/stable-diffusion-v1
+          [[ ! -e models/ldm/stable-diffusion-v1/model.ckpt ]] \\
+            || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
+
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
         uses: actions/cache@v3
@@ -50,10 +50,12 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.ENV_FILE) }}
+
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           conda env create -f ${{ steps.vars.outputs.ENV_FILE }}
+
       - name: Use Cached Huggingface and Torch models
         id: cache-huggingface-torch
         uses: actions/cache@v3
@@ -64,6 +66,7 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
+
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-huggingface-torch.outputs.cache-hit != 'true' }}
         run: |
