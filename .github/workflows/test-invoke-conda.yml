@@ -22,10 +22,8 @@ jobs:
           # Note, can't "activate" via github action; specifying the env's python has the same effect
           if [ "$RUNNER_OS" = "macOS" ]; then
               echo "::set-output name=ENV_FILE::environment-mac.yml"
-              echo "::set-output name=PYTHON_BIN::/usr/local/miniconda/envs/invokeai/bin/python"
           elif [ "$RUNNER_OS" = "Linux" ]; then
               echo "::set-output name=ENV_FILE::environment.yml"
-              echo "::set-output name=PYTHON_BIN::/usr/share/miniconda/envs/invokeai/bin/python"
           fi
 
       - name: Checkout sources
@@ -51,6 +49,15 @@ jobs:
           if [ ! -e models/ldm/stable-diffusion-v1/model.ckpt ]; then
             curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
           fi
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - uses: s-weigand/setup-conda@v4
+        with:
+          activate-conda: false
+
 
       - name: Use Cached Dependencies
         id: cache-conda-env-ldm
@@ -86,7 +93,8 @@ jobs:
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
-          ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
+          python scripts/preload_models.py
+
       #       - name: Run tmate
       #         uses: mxschmitt/action-tmate@v3
       #         timeout-minutes: 30
@@ -99,9 +107,9 @@ jobs:
           fi
           # Utterly hacky, but I don't know how else to do this
           if [[ ${{ github.ref }} == 'refs/heads/master' ]]; then
-            time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py --from_file tests/preflight_prompts.txt
+            time python scripts/invoke.py --from_file tests/preflight_prompts.txt
           elif [[ ${{ github.ref }} == 'refs/heads/development' ]]; then
-            time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py --from_file tests/dev_prompts.txt
+            time python scripts/invoke.py --from_file tests/dev_prompts.txt
           fi
           mkdir -p outputs/img-samples
 
