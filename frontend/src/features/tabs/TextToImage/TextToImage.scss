@@ -2,7 +2,7 @@
 
 .text-to-image-workarea {
   display: grid;
-  grid-template-columns: max-content auto max-content;
+  grid-template-columns: max-content auto;
   column-gap: 1rem;
 }
 
@@ -13,4 +13,22 @@
   height: $app-content-height;
   overflow-y: scroll;
   @include HideScrollbar;
+}
+
+.text-to-image-display {
+  display: grid;
+  grid-template-areas: 'text-to-image-display';
+  column-gap: 0.5rem;
+
+  .current-image-display,
+  .current-image-display-placeholder {
+    grid-area: text-to-image-display;
+    height: $app-content-height;
+  }
+
+  .image-gallery-area {
+    height: 100%;
+    z-index: 2;
+    place-self: end;
+  }
 }

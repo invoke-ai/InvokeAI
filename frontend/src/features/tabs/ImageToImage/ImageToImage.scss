@@ -2,7 +2,7 @@
 
 .image-to-image-workarea {
   display: grid;
-  grid-template-columns: max-content auto max-content;
+  grid-template-columns: max-content auto;
   column-gap: 1rem;
 }
 
@@ -14,6 +14,16 @@
   height: $app-content-height;
   overflow-y: scroll;
   @include HideScrollbar;
+}
+
+.image-to-image-display-area {
+  display: grid;
+  column-gap: 0.5rem;
+
+  .image-gallery-area {
+    z-index: 2;
+    height: 100%;
+  }
 }
 
 .image-to-image-strength-main-option {
@@ -29,6 +39,7 @@
   border-radius: 0.5rem;
   background-color: var(--background-color-secondary);
   display: grid;
+  height: $app-content-height;
 
   .current-image-options {
     grid-auto-columns: max-content;

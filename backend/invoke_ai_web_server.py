@@ -12,9 +12,9 @@ from PIL import Image
 from uuid import uuid4
 from threading import Event
 
-from ldm.dream.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.dream.pngwriter import PngWriter, retrieve_metadata
-from ldm.dream.conditioning import split_weighted_subprompts
+from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
+from ldm.invoke.conditioning import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
 
@@ -49,21 +49,16 @@ class InvokeAIWebServer:
         engineio_logger = True if args.web_verbose else False
         max_http_buffer_size = 10000000
 
-        # CORS Allowed Setup
-        cors_allowed_origins = [
-            'http://127.0.0.1:5173',
-            'http://localhost:5173',
-            'http://localhost:9090'
-        ]
-        additional_allowed_origins = (
-            opt.cors if opt.cors else []
-        )  # additional CORS allowed origins
-        cors_allowed_origins.append(f'http://{self.host}:{self.port}')
-        if self.host == '127.0.0.1' or self.host == '0.0.0.0':
-            cors_allowed_origins.append(f'http://localhost:{self.port}')
-        cors_allowed_origins = (
-            cors_allowed_origins + additional_allowed_origins
-        )
+        socketio_args = {
+            'logger': logger,
+            'engineio_logger': engineio_logger,
+            'max_http_buffer_size': max_http_buffer_size,
+            'ping_interval': (50, 50),
+            'ping_timeout': 60,
+        }
+
+        if opt.cors:
+            socketio_args['cors_allowed_origins'] = opt.cors
 
         self.app = Flask(
             __name__, static_url_path='', static_folder='../frontend/dist/'
@@ -71,12 +66,7 @@ class InvokeAIWebServer:
 
         self.socketio = SocketIO(
             self.app,
-            logger=logger,
-            engineio_logger=engineio_logger,
-            max_http_buffer_size=max_http_buffer_size,
-            cors_allowed_origins=cors_allowed_origins,
-            ping_interval=(50, 50),
-            ping_timeout=60,
+            **socketio_args
         )
 
         # Keep Server Alive Route
@@ -157,7 +147,7 @@ class InvokeAIWebServer:
         self.init_image_path = os.path.join(self.result_path, 'init-images/')
         self.mask_image_path = os.path.join(self.result_path, 'mask-images/')
         # txt log
-        self.log_path = os.path.join(self.result_path, 'dream_log.txt')
+        self.log_path = os.path.join(self.result_path, 'invoke_log.txt')
         # make all output paths
         [
             os.makedirs(path, exist_ok=True)

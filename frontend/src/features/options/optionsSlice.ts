@@ -36,6 +36,7 @@ export interface OptionsState {
   showAdvancedOptions: boolean;
   activeTab: number;
   shouldShowImageDetails: boolean;
+  shouldShowGallery: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -68,6 +69,7 @@ const initialOptionsState: OptionsState = {
   showAdvancedOptions: true,
   activeTab: 0,
   shouldShowImageDetails: false,
+  shouldShowGallery: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -256,7 +258,9 @@ export const optionsSlice = createSlice({
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
       if (threshold) state.threshold = threshold;
+      if (typeof threshold === 'undefined') state.threshold = 0;
       if (perlin) state.perlin = perlin;
+      if (typeof perlin === 'undefined') state.perlin = 0;      
       if (typeof seamless === 'boolean') state.seamless = seamless;
       if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix;
       if (width) state.width = width;
@@ -285,6 +289,9 @@ export const optionsSlice = createSlice({
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
+    },
+    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowGallery = action.payload;
     },
   },
 });
@@ -323,6 +330,7 @@ export const {
   setShowAdvancedOptions,
   setActiveTab,
   setShouldShowImageDetails,
+  setShouldShowGallery,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

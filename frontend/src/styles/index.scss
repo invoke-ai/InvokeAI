@@ -2,6 +2,7 @@
 @use 'Colors_Dark';
 @use 'Colors_Light';
 @use 'Fonts';
+@use 'Animations';
 
 // Component Styles
 //app
@@ -25,6 +26,7 @@
 // gallery
 @use '../features/gallery/CurrentImageDisplay.scss';
 @use '../features/gallery/ImageGallery.scss';
+@use '../features/gallery/HoverableImage.scss';
 @use '../features/gallery/InvokePopover.scss';
 @use '../features/gallery/ImageMetaDataViewer/ImageMetadataViewer.scss';
 
