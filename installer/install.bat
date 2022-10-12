@@ -76,4 +76,3 @@ echo "Please follow the steps at https://invoke-ai.github.io/InvokeAI/installati
 
 @rem it would be nice if the weights downloaded automatically, and didn't need the user to do this manually.
 
-pause
