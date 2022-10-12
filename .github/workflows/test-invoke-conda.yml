@@ -64,7 +64,7 @@ jobs:
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
-            && brew install cmake protobuf rust pyenv-virtualenv \
+            && brew install protobuf rust pyenv-virtualenv \
             && pyenv install anaconda3-2022.05 \
             && eval "$(pyenv init -)" \
             && pyenv activate anaconda3-2022.05 \
