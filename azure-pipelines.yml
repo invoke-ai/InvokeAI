@@ -27,6 +27,7 @@ steps:
       cacheHitVar: CACHE_RESTORED
 
   - script: |
+      mkdir -p $(CHECKPOINT_CACHE_DIR)
       curl -o $(CHECKPOINT_CACHE_DIR)/model.ckpt $(chekpoint-url)
     displayName: download checkpoints
     condition: ne(variables.CACHE_RESTORED, 'true')
