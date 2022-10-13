@@ -9,9 +9,6 @@
 
 @rem This enables a user to install this project without manually installing conda and git.
 
-@rem prevent the window from closing after an error
-if not defined in_subprocess (cmd /k set in_subprocess=y ^& %0 %*) & exit )
-
 @rem config
 set MAMBA_ROOT_PREFIX=%cd%\installer_files\mamba
 set INSTALL_ENV_DIR=%cd%\installer_files\env
@@ -76,3 +73,4 @@ echo "Please follow the steps at https://invoke-ai.github.io/InvokeAI/installati
 
 @rem it would be nice if the weights downloaded automatically, and didn't need the user to do this manually.
 
+pause
