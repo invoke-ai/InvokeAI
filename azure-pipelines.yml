@@ -26,11 +26,12 @@ steps:
       path: $(CHECKPOINT_CACHE_DIR)
       cacheHitVar: CACHE_RESTORED
 
-  - script: 'curl -o $(CHECKPOINT_CACHE_DIR)/model.ckpt $(checkpoint-url)'
+  - script: |
+      curl -o $(CHECKPOINT_CACHE_DIR)/model.ckpt $(chekpoint-url)
     displayName: download checkpoints
     condition: ne(variables.CACHE_RESTORED, 'true')
     env:
-      checkpoint-url: $(checkpoint-url)
+      chekpoint-url: $(chekpoint-url)
 
   - script: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
