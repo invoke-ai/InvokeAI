@@ -1,12 +1,17 @@
 #!/bin/bash
 
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
-if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$PATH:$INSTALL_ENV_DIR/bin"; fi
+if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
 
 # update the repo
 if [ -e ".git" ]; then
     git pull
 fi
+
+CONDA_BASEPATH=$(conda info --base)
+source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains about 'shell not initialized' (needed when running in a script)
+
+conda activate invokeai
 
 OS_NAME=$(uname -s)
 case "${OS_NAME}" in
