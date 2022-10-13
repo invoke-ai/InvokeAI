@@ -56,7 +56,7 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
     "$MAMBA_ROOT_PREFIX/micromamba" install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge $PACKAGES_TO_INSTALL
 fi
 
-if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$PATH;$INSTALL_ENV_DIR/bin"; fi
+if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$PATH:$INSTALL_ENV_DIR/bin"; fi
 
 # get the repo (and load into the current directory)
 if [ ! -e ".git" ]; then
