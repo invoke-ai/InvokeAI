@@ -1,5 +1,6 @@
 trigger:
 - main
+- update-gh-actions
 
 pool:
   vmImage: macOS-12
