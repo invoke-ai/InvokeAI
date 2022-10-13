@@ -59,15 +59,18 @@ jobs:
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.CONDA_ENV_FILE) }}
 
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          [[ "$RUNNER_OS" == "macOS" ]] && \
-            PIP_EXISTS_ACTION=w \
-            CONDA_SUBDIR=osx-64 \
-            conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
-          [[ "$RUNNER_OS" == "Linux" ]] && \
-            conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          $CONDA/bin/conda env update \
+            --file ${{ steps.vars.outputs.CONDA_ENV_FILE }} \
+            --name invokeai
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
