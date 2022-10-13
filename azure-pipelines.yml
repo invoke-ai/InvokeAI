@@ -8,6 +8,9 @@ trigger:
       - azure-pipelines.yml
       - environment-mac.yml
 
+pr:
+  - main
+
 variables:
   - name: CHECKPOINT_CACHE_DIR
     value: '$(Pipeline.Workspace)/models/ldm/stable-diffusion-v1'
@@ -38,7 +41,7 @@ steps:
     displayName: Add conda to PATH
 
   - task: Cache@2
-    displayName: Use cached Anaconda environment
+    displayName: anaconda cache
     inputs:
       key: 'conda | "$(Agent.OS)" | environment.yml'
       restoreKeys: |
