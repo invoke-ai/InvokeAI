@@ -91,7 +91,7 @@ if [ "$OS_NAME" == "mac" ]; then
     WEIGHTS_DOC_URL="https://invoke-ai.github.io/InvokeAI/installation/INSTALL_MAC/"
 fi
 
-echo.
+echo ""
 echo "Now you need to install the weights for the stable diffusion model."
 echo "Please follow the steps at $WEIGHTS_DOC_URL to complete the installation"
 
