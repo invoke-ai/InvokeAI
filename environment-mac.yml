@@ -14,8 +14,8 @@ dependencies:
   # To determine what the latest versions should be, run:
   #
   # ```shell
-  # sed -E 's/ldm/ldm-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
-  # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n ldm-updated | awk ' {print "  - " $1 "==" $2;} '
+  # sed -E 's/inokeai/inokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
+  # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n inokeai-updated | awk ' {print "  - " $1 "==" $2;} '
   # ```
   - albumentations==1.2.1
   - coloredlogs==15.0.1
@@ -46,7 +46,7 @@ dependencies:
       - flask_cors==3.0.10
       - dependency_injector==4.40.0
       - eventlet==0.33.1
-      - opencv-python==4.6.0
+      # - opencv-python==4.6.0
       - protobuf==3.19.5
       - realesrgan==0.2.5.0
       - send2trash==1.8.0
