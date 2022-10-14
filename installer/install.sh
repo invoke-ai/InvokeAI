@@ -9,6 +9,7 @@
 
 # This enables a user to install this project without manually installing conda and git.
 
+
 OS_NAME=$(uname -s)
 case "${OS_NAME}" in
     Linux*)     OS_NAME="linux";;
