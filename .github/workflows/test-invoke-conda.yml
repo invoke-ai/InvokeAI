@@ -5,6 +5,7 @@ on:
       - 'main'
       - 'development'
       - 'update-gh-actions'
+
 jobs:
   os_matrix:
     strategy:
@@ -15,8 +16,6 @@ jobs:
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
     steps:
-      - run: echo The PR was merged
-
       - name: Set platform variables
         id: vars
         run: |
@@ -64,14 +63,17 @@ jobs:
         with:
           python-version: 3.9
 
+      - name: Setup conda
+        uses: s-weigand/setup-conda@v1
+        with:
+          update-conda: true
+          python-version: 3.9
+          conda-channels: pytorch, anaconda, conda-forge
+
       - name: Install Dependencies
         if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
         run: |
-          # $CONDA is an environment variable pointing to the root of the miniconda directory
-          $CONDA/bin/conda update \
-            -n base \
-            -c defaults conda
-          $CONDA/bin/conda env update \
+          conda env update \
             --file ${{ steps.vars.outputs.CONDA_ENV_FILE }} \
             --name invokeai
 
@@ -103,7 +105,6 @@ jobs:
           [[ ${{ github.ref }} == 'refs/heads/development' ]] \
             && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/dev_prompts.txt
-
           mkdir -p outputs/img-samples
 
       - name: Archive results
