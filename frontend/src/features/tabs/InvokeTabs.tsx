@@ -5,7 +5,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import InpaintingWIP from '../../common/components/WorkInProgress/InpaintingWIP';
 import NodesWIP from '../../common/components/WorkInProgress/NodesWIP';
-import OutpaintingWIP from '../../common/components/WorkInProgress/OutpaintingWIP';
+import Outpainting from './Outpainting/Outpainting';
 import { PostProcessingWIP } from '../../common/components/WorkInProgress/PostProcessingWIP';
 import ImageToImageIcon from '../../common/icons/ImageToImageIcon';
 import InpaintIcon from '../../common/icons/InpaintIcon';
@@ -35,7 +35,7 @@ export const tab_dict = {
   },
   outpainting: {
     title: <OutpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <OutpaintingWIP />,
+    panel: <Outpainting />,
     tooltip: 'Outpainting',
   },
   nodes: {

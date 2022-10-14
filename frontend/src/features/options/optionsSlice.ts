@@ -37,6 +37,8 @@ export interface OptionsState {
   activeTab: number;
   shouldShowImageDetails: boolean;
   shouldShowGallery: boolean;
+  canvasWidth: number;
+  canvasHeight: number;
 }
 
 const initialOptionsState: OptionsState = {
@@ -70,6 +72,8 @@ const initialOptionsState: OptionsState = {
   activeTab: 0,
   shouldShowImageDetails: false,
   shouldShowGallery: false,
+  canvasWidth: 1024,
+  canvasHeight: 1024,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -172,6 +176,12 @@ export const optionsSlice = createSlice({
     },
     setSeedWeights: (state, action: PayloadAction<string>) => {
       state.seedWeights = action.payload;
+    },
+    setCanvasWidth: (state, action: PayloadAction<number>) => {
+      state.canvasWidth = action.payload;
+    },
+    setCanvasHeight: (state, action: PayloadAction<number>) => {
+      state.canvasHeight = action.payload;
     },
     setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
       const {
@@ -331,6 +341,8 @@ export const {
   setActiveTab,
   setShouldShowImageDetails,
   setShouldShowGallery,
+  setCanvasWidth,
+  setCanvasHeight,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
