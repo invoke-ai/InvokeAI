@@ -16,6 +16,21 @@ jobs:
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Setup conda
+        uses: s-weigand/setup-conda@v1
+        with:
+          update-conda: true
+          python-version: 3.9
+          conda-channels: pytorch, anaconda, conda-forge
+
       - name: Set platform variables
         id: vars
         run: |
@@ -24,9 +39,6 @@ jobs:
           [[ "$RUNNER_OS" == "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
           echo "PYTHON_BIN=$CONDA/envs/invokeai/bin/python" >> $GITHUB_OUTPUT
-
-      - name: Checkout sources
-        uses: actions/checkout@v3
 
       - name: Use Cached Stable Diffusion v1.4 Model
         id: cache-sd-v1-4
@@ -48,30 +60,18 @@ jobs:
             || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
       - name: Use Cached Dependencies
-        id: cache-conda-env-ldm
+        id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
-          cache-name: cache-conda-env-ldm
+          cache-name: cache-conda-env-invokeai
         with:
-          path: ~/.conda/envs/ldm
+          path: ~/.conda/envs/invokeai
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.CONDA_ENV_FILE) }}
 
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - name: Setup conda
-        uses: s-weigand/setup-conda@v1
-        with:
-          update-conda: true
-          python-version: 3.9
-          conda-channels: pytorch, anaconda, conda-forge
-
       - name: Install Dependencies
-        if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
         run: |
           conda env update \
             --file ${{ steps.vars.outputs.CONDA_ENV_FILE }} \
