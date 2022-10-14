@@ -65,7 +65,7 @@ jobs:
         env:
           cache-name: cache-conda-env-invokeai
         with:
-          path: ~/.conda/envs/invokeai
+          path: $CONDA/envs/invokeai
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.CONDA_ENV_FILE) }}
