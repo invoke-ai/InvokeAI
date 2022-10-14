@@ -27,13 +27,13 @@ steps:
       key: checkpoint | stable-diffusion-v1
       restoreKeys: checkpoint
       path: $(CHECKPOINT_CACHE_DIR)
-      cacheHitVar: CACHE_RESTORED
+      cacheHitVar: CHECKPOINT_CACHE_RESTORED
 
   - script: |
       mkdir -p $(CHECKPOINT_CACHE_DIR)
       curl -o $(CHECKPOINT_CACHE_DIR)/model.ckpt $(chekpoint-url)
     displayName: download checkpoints
-    condition: ne(variables.CACHE_RESTORED, 'true')
+    condition: ne(variables.CHECKPOINT_CACHE_RESTORED, 'true')
     env:
       chekpoint-url: $(chekpoint-url)
 
@@ -55,7 +55,7 @@ steps:
         --quiet \
         --file environment-mac.yml
     displayName: Create Anaconda environment
-    condition: eq(variables.CONDA_CACHE_RESTORED, 'false')
+    condition: ne(variables.CONDA_CACHE_RESTORED, 'true')
 
   - task: Bash@3
     displayName: 'Create and test Conda Env'
