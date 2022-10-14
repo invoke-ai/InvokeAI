@@ -18,11 +18,11 @@ variables:
     value: '/usr/share/miniconda/envs'
 
 pool:
-  vmImage: macOS-12
+  vmImage: macOS-latest
 
 steps:
   - task: Cache@2
-    displayName: checkpoint cache
+    displayName: 'checkpoint cache'
     inputs:
       key: checkpoint | stable-diffusion-v1
       restoreKeys: checkpoint
@@ -32,7 +32,7 @@ steps:
   - script: |
       mkdir -p $(CHECKPOINT_CACHE_DIR)
       curl -o $(CHECKPOINT_CACHE_DIR)/model.ckpt $(chekpoint-url)
-    displayName: download checkpoints
+    displayName: 'download checkpoints'
     condition: ne(variables.CHECKPOINT_CACHE_RESTORED, 'true')
     env:
       chekpoint-url: $(chekpoint-url)
@@ -41,7 +41,7 @@ steps:
     displayName: Add conda to PATH
 
   - task: Cache@2
-    displayName: anaconda cache
+    displayName: 'anaconda cache'
     inputs:
       key: 'conda | "$(Agent.OS)" | environment.yml'
       restoreKeys: |
@@ -54,11 +54,11 @@ steps:
       conda env create \
         --quiet \
         --file environment-mac.yml
-    displayName: Create Anaconda environment
+    displayName: 'create conda env'
     condition: ne(variables.CONDA_CACHE_RESTORED, 'true')
 
   - task: Bash@3
-    displayName: 'Create and test Conda Env'
+    displayName: 'run tests'
     inputs:
       targetType: inline
       script: |
