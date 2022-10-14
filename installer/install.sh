@@ -78,6 +78,7 @@ CONDA_BASEPATH=$(conda info --base)
 source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains about 'shell not initialized' (needed when running in a script)
 
 if [ "$OS_NAME" == "mac" ]; then
+    if [ "$OS_ARCH" == "x64" ]; then OS_ARCH="64"; fi
     PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-${OS_ARCH} conda env create -f environment-mac.yml
 else
     conda env create -f environment.yml
