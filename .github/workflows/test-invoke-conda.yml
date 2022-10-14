@@ -12,7 +12,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+          - macos-12
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
     steps:
