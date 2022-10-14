@@ -102,7 +102,7 @@ jobs:
           [[ ${{ github.ref }} == 'refs/heads/main' ]] \
             && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/preflight_prompts.txt
-          [[ ${{ github.ref }} == 'refs/heads/development' ]] \
+          [[ ${{ github.ref }} != 'refs/heads/main' ]] \
             && time ${{ steps.vars.outputs.PYTHON_BIN }} scripts/invoke.py \
               --from_file tests/dev_prompts.txt
           mkdir -p outputs/img-samples
