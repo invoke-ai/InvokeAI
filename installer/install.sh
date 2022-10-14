@@ -55,6 +55,11 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
     echo "Packages to install:$PACKAGES_TO_INSTALL"
 
     "$MAMBA_ROOT_PREFIX/micromamba" install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge $PACKAGES_TO_INSTALL
+
+    if [ ! -e "$INSTALL_ENV_DIR" ]; then
+        echo "There was a problem while initializing micromamba. Cannot continue."
+        exit
+    fi
 fi
 
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
