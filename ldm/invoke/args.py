@@ -82,6 +82,7 @@ with metadata_from_png():
 
 import argparse
 from argparse import Namespace, RawTextHelpFormatter
+import argunparse
 import pydoc
 import shlex
 import json
@@ -202,80 +203,14 @@ class Args(object):
         a.update(kwargs)
         return a
 
-    # Isn't there a more automated way of doing this?
-    # Ideally we get the switch strings out of the argparse objects,
-    # but I don't see a documented API for this.
     def dream_prompt_str(self,**kwargs):
-        """Normalized dream_prompt."""
-        a = vars(self)
-        a.update(kwargs)
-        switches = list()
-        switches.append(f'"{a["prompt"]}"')
-        switches.append(f'-s {a["steps"]}')
-        switches.append(f'-S {a["seed"]}')
-        switches.append(f'-W {a["width"]}')
-        switches.append(f'-H {a["height"]}')
-        switches.append(f'-C {a["cfg_scale"]}')
-        if a['perlin'] > 0:
-            switches.append(f'--perlin {a["perlin"]}')
-        if a['threshold'] > 0:
-            switches.append(f'--threshold {a["threshold"]}')
-        if a['grid']:
-            switches.append('--grid')
-        if a['seamless']:
-            switches.append('--seamless')
-        if a['hires_fix']:
-            switches.append('--hires_fix')
+        # Invert the argparse union of args and cmd switches
+        unparser = argunparse.ArgumentUnparser()
+        opts = vars(self)
+        opts.update(kwargs)
+        unparsed = unparser.unparse_options(opts)
 
-        # img2img generations have parameters relevant only to them and have special handling
-        if a['init_img'] and len(a['init_img'])>0:
-            switches.append(f'-I {a["init_img"]}')
-            switches.append(f'-A {a["sampler_name"]}')
-            if a['fit']:
-                switches.append(f'--fit')
-            if a['init_mask'] and len(a['init_mask'])>0:
-                switches.append(f'-M {a["init_mask"]}')
-            if a['init_color'] and len(a['init_color'])>0:
-                switches.append(f'--init_color {a["init_color"]}')
-            if a['strength'] and a['strength']>0:
-                switches.append(f'-f {a["strength"]}')
-        else:
-            switches.append(f'-A {a["sampler_name"]}')
-
-        # facetool-specific parameters
-        if a['facetool']:
-            switches.append(f'-ft {a["facetool"]}')
-        if a['facetool_strength']:
-            switches.append(f'-G {a["facetool_strength"]}')
-        if a['codeformer_fidelity']:
-            switches.append(f'-cf {a["codeformer_fidelity"]}')
-
-        if a['outcrop']:
-            switches.append(f'-c {" ".join([str(u) for u in a["outcrop"]])}')
-
-        # esrgan-specific parameters
-        if a['upscale']:
-            switches.append(f'-U {" ".join([str(u) for u in a["upscale"]])}')
-
-        # embiggen parameters
-        if a['embiggen']:
-            switches.append(f'--embiggen {" ".join([str(u) for u in a["embiggen"]])}')
-        if a['embiggen_tiles']:
-            switches.append(f'--embiggen_tiles {" ".join([str(u) for u in a["embiggen_tiles"]])}')
-
-        # outpainting parameters
-        if a['out_direction']:
-            switches.append(f'-D {" ".join([str(u) for u in a["out_direction"]])}')
-        # LS: slight semantic drift which needs addressing in the future:
-        # 1. Variations come out of the stored metadata as a packed string with the keyword "variations"
-        # 2. However, they come out of the CLI (and probably web) with the keyword "with_variations" and
-        #    in broken-out form. Variation (1) should be changed to comply with (2)
-        if a['with_variations']:
-            formatted_variations = ','.join(f'{seed}:{weight}' for seed, weight in (a["with_variations"]))
-            switches.append(f'-V {formatted_variations}')
-        if 'variations' in a and len(a['variations'])>0:
-            switches.append(f'-V {a["variations"]}')
-        return ' '.join(switches)
+        return unparsed
 
     def __getattribute__(self,name):
         '''
