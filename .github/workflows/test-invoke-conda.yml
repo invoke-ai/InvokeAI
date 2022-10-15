@@ -8,6 +8,9 @@ on:
 
 jobs:
   os_matrix:
+    defaults:
+      run:
+        shell: bash -l {0}
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-12]
@@ -82,7 +85,7 @@ jobs:
             --name ${{ env.CONDA_ENV_NAME }}
 
       - name: activate conda env
-        run: source <(${{ env.CONDA_EXE }} shell.bash activate ${{ env.CONDA_ENV_NAME }})
+        run: ${{ env.CONDA_EXE }} shell.bash activate ${{ env.CONDA_ENV_NAME }}
 
       - name: run preload_models.py
         run: python scripts/preload_models.py
