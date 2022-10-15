@@ -109,5 +109,5 @@ jobs:
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
-          name: results
+          name: results_${{ runner.os }}
           path: outputs/img-samples
