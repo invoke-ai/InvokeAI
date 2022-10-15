@@ -1,5 +1,5 @@
 import React from 'react';
-import CurrentImageDisplay from '../../gallery/CurrentImageDisplay';
+import OutpaintingImageDisplay from '../../gallery/OutpaintingImageDisplay';
 import OutpaintingPanel from './OutpaintingPanel';
 
 export default function Outpainting() {
@@ -7,7 +7,7 @@ export default function Outpainting() {
     <div className="outpainting-workarea">
       <OutpaintingPanel />
       <div className="outpainting-display" style={{ gridTemplateColumns: 'auto' }}>
-        <CurrentImageDisplay />
+        <OutpaintingImageDisplay />
       </div>
     </div>
   );
