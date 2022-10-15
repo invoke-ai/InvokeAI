@@ -438,7 +438,7 @@ class Generate:
                 sampler=self.sampler,
                 steps=steps,
                 cfg_scale=cfg_scale,
-                conditioning=(uc, c), # here change to arrays
+                conditioning=(uc, c),
                 ddim_eta=ddim_eta,
                 image_callback=image_callback,  # called after the final image is generated
                 step_callback=step_callback,   # called after each intermediate image is generated
@@ -477,10 +477,6 @@ class Generate:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
-        # brute-force fallback
-        except Exception as e:
-            print(traceback.format_exc(), file=sys.stderr)
-            print('>> Could not generate image.')
 
         toc = time.time()
         print('>> Usage stats:')
