@@ -17,11 +17,6 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      # - name: Set up Python 3.9
-      #   uses: actions/setup-python@v4
-      #   with:
-      #     python-version: 3.9
-
       - name: Setup conda
         uses: s-weigand/setup-conda@v1
         with:
@@ -84,21 +79,20 @@ jobs:
           conda env create \
             --file ${{ steps.vars.outputs.CONDA_ENV_FILE }}
 
-      - name: Use Cached Huggingface and Torch models
-        id: cache-hugginface-torch
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-hugginface-torch
-        with:
-          path: ~/.cache
-          key: ${{ env.cache-name }}
-          restore-keys: |
-            ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
+      # - name: Use Cached Huggingface and Torch models
+      #   id: cache-hugginface-torch
+      #   uses: actions/cache@v3
+      #   env:
+      #     cache-name: cache-hugginface-torch
+      #   with:
+      #     path: ~/.cache
+      #     key: ${{ env.cache-name }}
+      #     restore-keys: |
+      #       ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
 
       - name: Download Huggingface and Torch models
-        if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
-        run: |
-          $CONDA/envs/invokeai/bin/python scripts/preload_models.py
+        # if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
+        run: $CONDA/envs/invokeai/bin/python scripts/preload_models.py
 
       - name: Run the tests
         run: |
