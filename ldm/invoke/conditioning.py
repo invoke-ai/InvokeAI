@@ -35,9 +35,10 @@ def get_uc_and_c(prompt_string_uncleaned, model, log_tokens=False, skip_normaliz
 
     pp = PromptParser()
 
-    def build_conditioning_list(prompt_string:str):
+    def build_conditioning_list(prompt_string:str, verbose:bool = False):
         parsed_conjunction: Conjunction = pp.parse(prompt_string)
-        print(f"parsed '{prompt_string}' to {parsed_conjunction}")
+        if verbose:
+            print(f"parsed '{prompt_string}' to {parsed_conjunction}")
         assert (type(parsed_conjunction) is Conjunction)
 
         conditioning_list = []
@@ -46,7 +47,7 @@ def get_uc_and_c(prompt_string_uncleaned, model, log_tokens=False, skip_normaliz
                 raise f"embeddings can only be made from FlattenedPrompts, got {type(flattened_prompt)} instead"
             fragments = [x[0] for x in flattened_prompt.children]
             attention_weights = [x[1] for x in flattened_prompt.children]
-            print(fragments, attention_weights)
+            #print(fragments, attention_weights)
             return model.get_learned_conditioning([fragments], attention_weights=[attention_weights])
 
         for part,weight in zip(parsed_conjunction.prompts, parsed_conjunction.weights):
@@ -65,14 +66,14 @@ def get_uc_and_c(prompt_string_uncleaned, model, log_tokens=False, skip_normaliz
 
         return conditioning_list
 
-    positive_conditioning_list = build_conditioning_list(prompt_string_cleaned)
-    negative_conditioning_list = build_conditioning_list(unconditioned_words)
+    positive_conditioning_list = build_conditioning_list(prompt_string_cleaned, verbose=True)
+    negative_conditioning_list = build_conditioning_list(unconditioned_words, verbose=(len(unconditioned_words)>0) )
 
     if len(negative_conditioning_list) == 0:
         negative_conditioning = model.get_learned_conditioning([['']], attention_weights=[[1]])
     else:
         if len(negative_conditioning_list)>1:
-            print("cannot do conjunctions on unconditioning for now")
+            print("cannot do conjunctions on unconditioning for now, everything except the first prompt will be ignored")
         negative_conditioning = negative_conditioning_list[0][0]
 
     #positive_conditioning_list.append((get_blend_prompts_and_weights(prompt), this_weight))
