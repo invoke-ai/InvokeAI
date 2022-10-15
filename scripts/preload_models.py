@@ -102,14 +102,11 @@ this program and resume later.\n'''
 #--------------------------------------------
 def postscript():
     print(
-        '''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
-Web version: 
+        '''
+***** Model Installation Successful *****
 
-    python scripts/invoke.py --web  (connect to http://localhost:9090)
-
-Command-line version:
-
-   python scripts/invoke.py
+    You're all set! You may now launch InvokeAI using 'invoke.bat' or 'invoke.sh',
+    depending on your platform.
 
 Have fun!
 '''
