@@ -12,18 +12,19 @@ jobs:
       run:
         shell: bash -l {0}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-12, macos-latest]
         include:
           - os: ubuntu-latest
             environment-file: environment.yml
-            miniforge-version: latest
+            miniforge-variant: Miniforge3
           - os: macos-12
             environment-file: environment-mac.yml
-            miniforge-version: Miniforge-pypy3
+            miniforge-variant: Miniforge-pypy3
           - os: macos-latest
             environment-file: environment-mac.yml
-            miniforge-version: latest
+            miniforge-variant: Miniforge3
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
     steps:
@@ -93,7 +94,7 @@ jobs:
           auto-update-conda: false
           activate-environment: ${{ env.CONDA_ENV_NAME }}
           environment-file: ${{ matrix.environment-file }}
-          miniforge-version: ${{ matrix.miniforge-version }}
+          miniforge-variant: ${{ matrix.miniforge-variant }}
 
       - name: run preload_models.py
         run: python scripts/preload_models.py
