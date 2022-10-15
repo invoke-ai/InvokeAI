@@ -82,7 +82,7 @@ jobs:
             --name ${{ env.CONDA_ENV_NAME }}
 
       - name: activate conda env
-        run: ${{ env.CONDA_EXE }} shell.bash activate ${{ env.CONDA_ENV_NAME }}
+        run: source <(${{ env.CONDA_EXE }} shell.bash activate ${{ env.CONDA_ENV_NAME }})
 
       - name: run preload_models.py
         run: python scripts/preload_models.py
