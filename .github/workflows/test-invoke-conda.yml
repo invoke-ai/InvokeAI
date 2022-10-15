@@ -25,11 +25,11 @@ jobs:
 
       - name: set environment
         run: |
-          [[ "$RUNNER_OS" == "macOS" ]] \
+          [[ "$RUNNER_OS" =~ "macOS" ]] \
             && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_ENV \
             && echo "PYTORCH_ENABLE_MPS_FALLBACK=1" >> $GITHUB_ENV \
             && echo "PIP_EXISTS_ACTION=w" >> $GITHUB_ENV
-          [[ "$RUNNER_OS" == "Linux" ]] \
+          [[ "$RUNNER_OS" =~ "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_ENV
           [[ "$GITHUB_REF" == 'refs/heads/main' ]] \
             && echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_ENV \
@@ -50,9 +50,9 @@ jobs:
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
         run: |
-          [[ -e models/ldm/stable-diffusion-v1 ]] \
+          [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
-          [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] \
+          [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
             || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
       - name: Use Cached Dependencies
