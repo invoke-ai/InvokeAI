@@ -7,9 +7,8 @@ dependencies:
   - pip>=22.2.2
 
   # pytorch left unpinned
-  - pytorch==1.12.1
-  - torchvision==0.13.1
-
+  - pytorch
+  - torchvision
   # I suggest to keep the other deps sorted for convenience.
   # To determine what the latest versions should be, run:
   #
@@ -27,7 +26,7 @@ dependencies:
   - imgaug
   - kornia
   - mpmath
-  - nomkl=1.0
+  - nomkl
   - numpy
   - omegaconf
   - openh264
@@ -46,7 +45,6 @@ dependencies:
       - flask_cors
       - dependency_injector
       - eventlet
-      - opencv-python
       - protobuf
       - realesrgan
       - send2trash
