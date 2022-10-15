@@ -1,24 +1,40 @@
 name: Create Caches
+
 on: workflow_dispatch
+
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-12]
+        os:
+          - ubuntu-latest
+          - macos-12
     name: Create Caches on ${{ matrix.os }} conda
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Setup conda
+        uses: s-weigand/setup-conda@v1
+        with:
+          update-conda: true
+          python-version: 3.9
+          conda-channels: pytorch, anaconda, conda-forge
+
       - name: Set platform variables
         id: vars
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
             && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
-
           [[ "$RUNNER_OS" == "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
-
-      - name: Checkout sources
-        uses: actions/checkout@v3
+          echo "PYTHON_BIN=$CONDA/envs/invokeai/bin/python" >> $GITHUB_OUTPUT
 
       - name: Use Cached Stable Diffusion v1.4 Model
         id: cache-sd-v1-4
@@ -36,31 +52,32 @@ jobs:
         run: |
           [[ -e models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
-
           [[ -e models/ldm/stable-diffusion-v1/model.ckpt ]] \
-            || curl -o models/ldm/stable-diffusion-v1/model.ckpt "${{ secrets.SD_V1_4_URL }}"
+            || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
       - name: Use Cached Dependencies
-        id: cache-conda-env-ldm
+        id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
-          cache-name: cache-conda-env-ldm
+          cache-name: cache-conda-env-invokeai
         with:
-          path: ~/.conda/envs/ldm
+          path: /usr/share/miniconda/envs/invokeai
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.CONDA_ENV_FILE) }}
 
       - name: Install Dependencies
-        if: ${{ steps.cache-conda-env-ldm.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
         run: |
-          conda env create -f ${{ steps.vars.outputs.CONDA_ENV_FILE }}
+          conda env update \
+            --file ${{ steps.vars.outputs.CONDA_ENV_FILE }} \
+            --name invokeai
 
       - name: Use Cached Huggingface and Torch models
-        id: cache-huggingface-torch
+        id: cache-hugginface-torch
         uses: actions/cache@v3
         env:
-          cache-name: cache-huggingface-torch
+          cache-name: cache-hugginface-torch
         with:
           path: ~/.cache
           key: ${{ env.cache-name }}
@@ -68,6 +85,6 @@ jobs:
             ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
 
       - name: Download Huggingface and Torch models
-        if: ${{ steps.cache-huggingface-torch.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
-          $CONDA/envs/invokeai/bin/python scripts/preload_models.py
+          ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
