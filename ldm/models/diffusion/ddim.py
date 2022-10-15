@@ -34,23 +34,21 @@ class DDIMSampler(Sampler):
         b, *_, device = *x.shape, x.device
 
         if (
-            unconditional_conditioning is None
-            or unconditional_guidance_scale == 1.0
+            (unconditional_conditioning is None
+             or unconditional_guidance_scale == 1.0)
+            and c is not list
         ):
             e_t = self.model.apply_model(x, t, c)
         else:
-            x_in = torch.cat([x] * 2)
-            t_in = torch.cat([t] * 2)
-            c_in = torch.cat([unconditional_conditioning, c])
-            e_t_uncond, e_t = self.model.apply_model(x_in, t_in, c_in).chunk(2)
-            e_t = e_t_uncond + unconditional_guidance_scale * (
-                e_t - e_t_uncond
-            )
+            e_t = self.apply_weighted_conditioning_list(x, t, self.model.apply_model, unconditional_conditioning, c, unconditional_guidance_scale)
 
         if score_corrector is not None:
             assert self.model.parameterization == 'eps'
+            if c is list and len(c)>1:
+                print("warning: ddim score modifier currently ignores all but the first part of the prompt conjunction, this is probably wrong")
+            corrector_c = [c[0][0] if c is list else c]
             e_t = score_corrector.modify_score(
-                self.model, e_t, x, t, c, **corrector_kwargs
+                self.model, e_t, x, t, corrector_c, **corrector_kwargs
             )
 
         alphas = (

@@ -38,7 +38,8 @@ class CFGDenoiser(nn.Module):
         x_in = torch.cat([x] * 2)
         sigma_in = torch.cat([sigma] * 2)
         cond_in = torch.cat([uncond, cond])
-        uncond, cond = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
+        unconditioned_x, conditioned_x = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
+
         if self.warmup < self.warmup_max:
             thresh = max(1, 1 + (self.threshold - 1) * (self.warmup / self.warmup_max))
             self.warmup += 1
@@ -46,7 +47,28 @@ class CFGDenoiser(nn.Module):
             thresh = self.threshold
         if thresh > self.threshold:
             thresh = self.threshold
-        return cfg_apply_threshold(uncond + (cond - uncond) * cond_scale, thresh)
+
+        # damian0815 thinking out loud notes:
+        # b + (a - b)*scale
+        # starting at the output that emerges applying the negative prompt (by default ''),
+        # (-> this is why the unconditioning feels like hammer)
+        # move toward the positive prompt by an amount controlled by cond_scale.
+        return cfg_apply_threshold(unconditioned_x + (conditioned_x - unconditioned_x) * cond_scale, thresh)
+
+
+class ProgrammableCFGDenoiser(CFGDenoiser):
+    def forward(self, x, sigma, uncond, cond, cond_scale):
+        forward_lambda = lambda x, t, c: self.inner_model(x, t, cond=c)
+        x_new = Sampler.apply_weighted_conditioning_list(x, sigma, forward_lambda, uncond, cond, cond_scale)
+
+        if self.warmup < self.warmup_max:
+            thresh = max(1, 1 + (self.threshold - 1) * (self.warmup / self.warmup_max))
+            self.warmup += 1
+        else:
+            thresh = self.threshold
+        if thresh > self.threshold:
+            thresh = self.threshold
+        return cfg_apply_threshold(x_new, threshold=thresh)
 
 
 class KSampler(Sampler):
@@ -181,7 +203,6 @@ class KSampler(Sampler):
             )
 
         # sigmas are set up in make_schedule - we take the last steps items
-        total_steps = len(self.sigmas)
         sigmas = self.sigmas[-S-1:]
 
         # x_T is variation noise. When an init image is provided (in x0) we need to add
@@ -194,7 +215,7 @@ class KSampler(Sampler):
         else:
             x = torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
 
-        model_wrap_cfg = CFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
+        model_wrap_cfg = ProgrammableCFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
         extra_args = {
             'cond': conditioning,
             'uncond': unconditional_conditioning,

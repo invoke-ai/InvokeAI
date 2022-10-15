@@ -12,42 +12,76 @@ log_tokenization()              print out colour-coded tokens and warn if trunca
 import re
 import torch
 
-def get_uc_and_c(prompt, model, log_tokens=False, skip_normalize=False):
+from .prompt_parser import PromptParser, Fragment, Attention, Blend, Conjunction, FlattenedPrompt
+from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
+
+
+def get_uc_and_c(prompt_string_uncleaned, model, log_tokens=False, skip_normalize=False):
+
     # Extract Unconditioned Words From Prompt
     unconditioned_words = ''
     unconditional_regex = r'\[(.*?)\]'
-    unconditionals = re.findall(unconditional_regex, prompt)
+    unconditionals = re.findall(unconditional_regex, prompt_string_uncleaned)
 
     if len(unconditionals) > 0:
         unconditioned_words = ' '.join(unconditionals)
 
         # Remove Unconditioned Words From Prompt
         unconditional_regex_compile = re.compile(unconditional_regex)
-        clean_prompt = unconditional_regex_compile.sub(' ', prompt)
-        prompt = re.sub(' +', ' ', clean_prompt)
+        clean_prompt = unconditional_regex_compile.sub(' ', prompt_string_uncleaned)
+        prompt_string_cleaned = re.sub(' +', ' ', clean_prompt)
+    else:
+        prompt_string_cleaned = prompt_string_uncleaned
 
-    uc = model.get_learned_conditioning([unconditioned_words])
+    pp = PromptParser()
 
-    # get weighted sub-prompts
-    weighted_subprompts = split_weighted_subprompts(
-        prompt, skip_normalize
-    )
+    def build_conditioning_list(prompt_string:str):
+        parsed_conjunction: Conjunction = pp.parse(prompt_string)
+        print(f"parsed '{prompt_string}' to {parsed_conjunction}")
+        assert (type(parsed_conjunction) is Conjunction)
 
-    if len(weighted_subprompts) > 1:
-        # i dont know if this is correct.. but it works
-        c = torch.zeros_like(uc)
-        # normalize each "sub prompt" and add it
-        for subprompt, weight in weighted_subprompts:
-            log_tokenization(subprompt, model, log_tokens, weight)
-            c = torch.add(
-                c,
-                model.get_learned_conditioning([subprompt]),
-                alpha=weight,
-            )
-    else:   # just standard 1 prompt
-        log_tokenization(prompt, model, log_tokens, 1)
-        c = model.get_learned_conditioning([prompt])
-        uc = model.get_learned_conditioning([unconditioned_words])
+        conditioning_list = []
+        def make_embeddings_for_flattened_prompt(flattened_prompt: FlattenedPrompt):
+            if type(flattened_prompt) is not FlattenedPrompt:
+                raise f"embeddings can only be made from FlattenedPrompts, got {type(flattened_prompt)} instead"
+            fragments = [x[0] for x in flattened_prompt.children]
+            attention_weights = [x[1] for x in flattened_prompt.children]
+            print(fragments, attention_weights)
+            return model.get_learned_conditioning([fragments], attention_weights=[attention_weights])
+
+        for part,weight in zip(parsed_conjunction.prompts, parsed_conjunction.weights):
+            if type(part) is Blend:
+                blend:Blend = part
+                embeddings_to_blend = None
+                for flattened_prompt in blend.prompts:
+                    this_embedding = make_embeddings_for_flattened_prompt(flattened_prompt)
+                    embeddings_to_blend = this_embedding if embeddings_to_blend is None else torch.cat((embeddings_to_blend, this_embedding))
+                blended_embeddings = WeightedFrozenCLIPEmbedder.apply_embedding_weights(embeddings_to_blend.unsqueeze(0), blend.weights, normalize=blend.normalize_weights)
+                conditioning_list.append((blended_embeddings, weight))
+            else:
+                flattened_prompt: FlattenedPrompt = part
+                embeddings = make_embeddings_for_flattened_prompt(flattened_prompt)
+                conditioning_list.append((embeddings, weight))
+
+        return conditioning_list
+
+    positive_conditioning_list = build_conditioning_list(prompt_string_cleaned)
+    negative_conditioning_list = build_conditioning_list(unconditioned_words)
+
+    if len(negative_conditioning_list) == 0:
+        negative_conditioning = model.get_learned_conditioning([['']], attention_weights=[[1]])
+    else:
+        if len(negative_conditioning_list)>1:
+            print("cannot do conjunctions on unconditioning for now")
+        negative_conditioning = negative_conditioning_list[0][0]
+
+    #positive_conditioning_list.append((get_blend_prompts_and_weights(prompt), this_weight))
+    #print("got empty_conditionining with shape", empty_conditioning.shape, "c[0][0] with shape", positive_conditioning[0][0].shape)
+
+    # "unconditioned" means "the conditioning tensor is empty"
+    uc = negative_conditioning
+    c = positive_conditioning_list
+
     return (uc, c)
 
 def split_weighted_subprompts(text, skip_normalize=False)->list:

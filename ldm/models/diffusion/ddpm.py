@@ -820,13 +820,13 @@ class LatentDiffusion(DDPM):
             )
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c):
+    def get_learned_conditioning(self, c, attention_weights=None):
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(
                 self.cond_stage_model.encode
             ):
                 c = self.cond_stage_model.encode(
-                    c, embedding_manager=self.embedding_manager
+                    c, embedding_manager=self.embedding_manager, attention_weights=attention_weights
                 )
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()
