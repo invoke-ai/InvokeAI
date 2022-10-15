@@ -8,34 +8,44 @@ on:
 
 jobs:
   os_matrix:
-    defaults:
-      run:
-        shell: bash -l {0}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-12, macos-latest]
         include:
           - os: ubuntu-latest
+            auto-activate-base: false
+            auto-update-conda: false
             environment-file: environment.yml
-            miniforge-variant: Miniforge3
+            miniconda-version: latest
+            default-shell: bash -l {0}
           - os: macos-12
+            auto-activate-base: true
+            auto-update-conda: true
             environment-file: environment-mac.yml
-            miniforge-variant: Miniforge-pypy3
+            miniconda-version: latest
+            default-shell: zsh -l {0}
           - os: macos-latest
+            auto-activate-base: false
+            auto-update-conda: false
             environment-file: environment-mac.yml
-            miniforge-variant: Miniforge3
+            miniconda-version: latest
+            default-shell: bash -l {0}
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.default-shell }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      # - name: Setup conda
-      #   uses: s-weigand/setup-conda@v1
-      #   with:
-      #     update-conda: true
-      #   #   conda-channels: anaconda, conda-forge, pytorch
+      - name: setup miniconda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-activate-base: ${{ matrix.auto-activate-base }}
+          auto-update-conda: ${{ matrix.auto-update-conda }}
+          miniconda-version: ${{ matrix.miniconda-version }}
 
       - name: set environment
         run: |
@@ -73,28 +83,11 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
 
-      # - name: update conda env
-      #   if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit == 'true' }}
-      #   run: |
-      #     ${{ env.CONDA_EXE }} env update \
-      #       --file ${{ matrix.environment-file }} \
-      #       --name ${{ env.CONDA_ENV_NAME }}
-
-      # - name: create conda env
-      #   if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
-      #   run: |
-      #     ${{ env.CONDA_EXE }} env create \
-      #       --file ${{ matrix.environment-file }} \
-      #       --name ${{ env.CONDA_ENV_NAME }}
-
       - name: activate conda env
         uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-activate-base: false
-          auto-update-conda: false
           activate-environment: ${{ env.CONDA_ENV_NAME }}
           environment-file: ${{ matrix.environment-file }}
-          miniforge-variant: ${{ matrix.miniforge-variant }}
 
       - name: run preload_models.py
         run: python scripts/preload_models.py
