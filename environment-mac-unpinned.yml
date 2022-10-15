@@ -1,0 +1,62 @@
+name: invokeai
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python>=3.9.13
+  - pip>=22.2.2
+
+  # pytorch left unpinned
+  - pytorch==1.12.1
+  - torchvision==0.13.1
+
+  # I suggest to keep the other deps sorted for convenience.
+  # To determine what the latest versions should be, run:
+  #
+  # ```shell
+  # sed -E 's/invokeai-updated/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
+  # PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated-updated | awk ' {print "  - " $1 "==" $2;} '
+  # ```
+  - albumentations
+  - coloredlogs
+  - einops
+  - grpcio
+  - humanfriendly
+  - imageio
+  - imageio-ffmpeg
+  - imgaug
+  - kornia
+  - mpmath
+  - nomkl=1.0
+  - numpy
+  - omegaconf
+  - openh264
+  - onnx
+  - onnxruntime
+  - pudb
+  - pytorch-lightning
+  - scipy
+  - streamlit
+  - sympy
+  - tensorboard
+  - torchmetrics
+  - pip:
+      - flask
+      - flask_socketio
+      - flask_cors
+      - dependency_injector
+      - eventlet
+      - opencv-python
+      - protobuf
+      - realesrgan
+      - send2trash
+      - test-tube
+      - transformers
+      - torch-fidelity
+      - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
+      - -e git+https://github.com/openai/CLIP.git@main#egg=clip
+      - -e git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
+      - -e git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
+      - -e .
+variables:
+  PYTORCH_ENABLE_MPS_FALLBACK: 1

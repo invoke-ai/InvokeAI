@@ -22,13 +22,13 @@ jobs:
           - os: macos-12
             auto-activate-base: true
             auto-update-conda: true
-            environment-file: environment-mac.yml
+            environment-file: environment-mac-unpinned.yml
             miniconda-version: latest
             default-shell: zsh -l {0}
           - os: macos-latest
             auto-activate-base: false
             auto-update-conda: false
-            environment-file: environment-mac.yml
+            environment-file: environment-mac-unpinned.yml
             miniconda-version: latest
             default-shell: bash -l {0}
     name: Test invoke.py on ${{ matrix.os }} with conda
