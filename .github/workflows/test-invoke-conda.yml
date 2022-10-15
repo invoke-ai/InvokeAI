@@ -88,6 +88,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: ${{ env.CONDA_ENV_NAME }}
+          environment-file: ${{ env.CONDA_ENV_FILE }}
 
       - name: run preload_models.py
         run: python scripts/preload_models.py
