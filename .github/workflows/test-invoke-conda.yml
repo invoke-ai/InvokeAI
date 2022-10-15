@@ -10,7 +10,7 @@ jobs:
   os_matrix:
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest]
+        os: [ubuntu-latest, macOS-12]
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
     steps:
@@ -27,7 +27,9 @@ jobs:
         id: vars
         run: |
           [[ "$RUNNER_OS" == "macOS" ]] \
-            && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
+            && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT \
+            && echo "PIP_EXISTS_ACTION=w" >> $GITHUB_ENV \
+            && echo "CONDA_SUBDIR=osx-x64" >> $GITHUB_ENV
           [[ "$RUNNER_OS" == "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
           [[ "$GITHUB_REF" == 'refs/heads/main' ]] \
