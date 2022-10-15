@@ -80,19 +80,7 @@ jobs:
             --file ${{ steps.vars.outputs.CONDA_ENV_FILE }} \
           || echo "temporary ignoring this error"
 
-      # - name: Use Cached Huggingface and Torch models
-      #   id: cache-hugginface-torch
-      #   uses: actions/cache@v3
-      #   env:
-      #     cache-name: cache-hugginface-torch
-      #   with:
-      #     path: ~/.cache
-      #     key: ${{ env.cache-name }}
-      #     restore-keys: |
-      #       ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
-
-      - name: Download Huggingface and Torch models
-        # if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
+      - name: run preload_models.py
         run: $CONDA/envs/invokeai/bin/python scripts/preload_models.py
 
       - name: Run the tests
