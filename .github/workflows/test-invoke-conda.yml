@@ -19,9 +19,9 @@ jobs:
 
       - name: Setup conda
         uses: s-weigand/setup-conda@v1
-        with:
-          update-conda: true
-          conda-channels: anaconda, conda-forge, pytorch
+        # with:
+        #   update-conda: true
+        #   conda-channels: anaconda, conda-forge, pytorch
 
       - name: Set platform variables
         id: vars
@@ -31,9 +31,8 @@ jobs:
           [[ "$RUNNER_OS" == "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
           [[ "$GITHUB_REF" == 'refs/heads/main' ]] \
-            && echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_OUTPUT
-          [[ "$GITHUB_REF" != 'refs/heads/main' ]] \
-            && echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_OUTPUT
+            && echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_OUTPUT \
+            || echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_OUTPUT
           echo "CONDA_ROOT=$CONDA" >> $GITHUB_OUTPUT
 
       - name: Use Cached Stable Diffusion v1.4 Model
