@@ -1,23 +1,26 @@
-name: Deploy
+name: build mkdocs
 on:
   push:
     branches:
       - main
+
 jobs:
   build:
-    name: Deploy docs to GitHub Pages
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: checkout sources
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v4
+      - name: setup python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      - run: python -m \
+      - name: install requirements
+        run: python -m \
           pip install -r requirements-mkdocs.txt
-      - run: python -m \
+      - name: mkdocs gh-deploy
+        run: python -m \
           mkdocs gh-deploy \
           --clean \
           --force
