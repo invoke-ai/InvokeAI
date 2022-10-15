@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Python 3.9
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
 
@@ -35,7 +35,6 @@ jobs:
           [[ "$RUNNER_OS" == "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
           echo "CONDA_ROOT=$CONDA" >> $GITHUB_OUTPUT
-          echo "PYTHON_BIN=$CONDA/envs/invokeai/bin/python" >> $GITHUB_OUTPUT
 
       - name: Use Cached Stable Diffusion v1.4 Model
         id: cache-sd-v1-4
@@ -89,4 +88,4 @@ jobs:
       - name: Download Huggingface and Torch models
         if: ${{ steps.cache-hugginface-torch.outputs.cache-hit != 'true' }}
         run: |
-          ${{ steps.vars.outputs.PYTHON_BIN }} scripts/preload_models.py
+          $CONDA/envs/invokeai/bin/python scripts/preload_models.py
