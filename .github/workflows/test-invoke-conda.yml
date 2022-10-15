@@ -23,16 +23,21 @@ jobs:
           update-conda: true
         #   conda-channels: anaconda, conda-forge, pytorch
 
+      - name: set macOS conda env
+        if: ${{ matrix.os ==  'macOS-12' }}
+        run: echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_ENV
+
+      - name: set Linux conda env
+        if: ${{ matrix.os ==  'ubuntu-latest' }}
+        run: echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_ENV
+
       - name: set environment
         run: |
-          [[ "$RUNNER_OS" =~ "macOS" ]] \
-            && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_ENV
-          [[ "$RUNNER_OS" =~ "Linux" ]] \
-            && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_ENV
           [[ "$GITHUB_REF" == 'refs/heads/main' ]] \
             && echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_ENV \
             || echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_ENV
           echo "CONDA_ROOT=$CONDA" >> $GITHUB_ENV
+          echo "CONDA_ENV_NAME=invokeai" >> $GITHUB_ENV
 
       - name: Use Cached Stable Diffusion v1.4 Model
         id: cache-sd-v1-4
@@ -42,8 +47,7 @@ jobs:
         with:
           path: models/ldm/stable-diffusion-v1/model.ckpt
           key: ${{ env.cache-name }}
-          restore-keys: |
-            ${{ env.cache-name }}
+          restore-keys: ${{ env.cache-name }}
 
       - name: Download Stable Diffusion v1.4 Model
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
@@ -59,25 +63,26 @@ jobs:
         env:
           cache-name: cache-conda-env-invokeai
         with:
-          path: ${{ env.CONDA_ROOT }}/envs/invokeai
+          path: ${{ env.CONDA_ROOT }}/envs/${{ env.CONDA_ENV_NAME }}
           key: ${{ env.cache-name }}
-          restore-keys: |
-            ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.CONDA_ENV_FILE) }}
+          restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.CONDA_ENV_FILE) }}
 
       - name: update conda env
         if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit == 'true' }}
         run: |
-          conda env update \
-            --file ${{ env.CONDA_ENV_FILE }}
+          ${{ env.CONDA_EXE }} env update \
+            --file ${{ env.CONDA_ENV_FILE }} \
+            --name ${{ env.CONDA_ENV_NAME }}
 
       - name: create conda env
         if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
         run: |
-          conda env create \
-            --file ${{ env.CONDA_ENV_FILE }}
+          ${{ env.CONDA_EXE }} env create \
+            --file ${{ env.CONDA_ENV_FILE }} \
+            --name ${{ env.CONDA_ENV_NAME }}
 
       - name: activate conda env
-        run: conda activate invokeai
+        run: ${{ env.CONDA_EXE }} shell.bash activate ${{ env.CONDA_ENV_NAME }}
 
       - name: run preload_models.py
         run: python scripts/preload_models.py
