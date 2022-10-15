@@ -76,12 +76,15 @@ jobs:
           conda env create \
             --file ${{ env.CONDA_ENV_FILE }}
 
+      - name: activate conda env
+        run: conda activate invokeai
+
       - name: run preload_models.py
-        run: $CONDA/envs/invokeai/bin/python scripts/preload_models.py
+        run: python scripts/preload_models.py
 
       - name: Run the tests
         run: |
-          time $CONDA/envs/invokeai/bin/python scripts/invoke.py \
+          time python scripts/invoke.py \
             --from_file ${{ env.TEST_PROMPTS }}
           mkdir -p outputs/img-samples
 
