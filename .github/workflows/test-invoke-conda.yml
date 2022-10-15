@@ -19,8 +19,8 @@ jobs:
 
       - name: Setup conda
         uses: s-weigand/setup-conda@v1
-        # with:
-        #   update-conda: true
+        with:
+          update-conda: true
         #   conda-channels: anaconda, conda-forge, pytorch
 
       - name: set environment
