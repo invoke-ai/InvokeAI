@@ -1,4 +1,4 @@
-name: mkdocs
+name: mkdocs-material
 on:
   push:
     branches:
@@ -11,7 +11,7 @@ on:
       - 'development'
 
 jobs:
-  build:
+  mkdocs-material:
     runs-on: ubuntu-latest
     steps:
       - name: checkout sources
