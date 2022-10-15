@@ -20,11 +20,11 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      - name: Setup conda
-        uses: s-weigand/setup-conda@v1
-        with:
-          update-conda: true
-        #   conda-channels: anaconda, conda-forge, pytorch
+      # - name: Setup conda
+      #   uses: s-weigand/setup-conda@v1
+      #   with:
+      #     update-conda: true
+      #   #   conda-channels: anaconda, conda-forge, pytorch
 
       - name: set macOS conda env
         if: ${{ matrix.os ==  'macOS-12' }}
@@ -70,23 +70,25 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.CONDA_ENV_FILE) }}
 
-      - name: update conda env
-        if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit == 'true' }}
-        run: |
-          ${{ env.CONDA_EXE }} env update \
-            --file ${{ env.CONDA_ENV_FILE }} \
-            --name ${{ env.CONDA_ENV_NAME }}
+      # - name: update conda env
+      #   if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit == 'true' }}
+      #   run: |
+      #     ${{ env.CONDA_EXE }} env update \
+      #       --file ${{ env.CONDA_ENV_FILE }} \
+      #       --name ${{ env.CONDA_ENV_NAME }}
 
-      - name: create conda env
-        if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
-        run: |
-          ${{ env.CONDA_EXE }} env create \
-            --file ${{ env.CONDA_ENV_FILE }} \
-            --name ${{ env.CONDA_ENV_NAME }}
+      # - name: create conda env
+      #   if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
+      #   run: |
+      #     ${{ env.CONDA_EXE }} env create \
+      #       --file ${{ env.CONDA_ENV_FILE }} \
+      #       --name ${{ env.CONDA_ENV_NAME }}
 
       - name: activate conda env
         uses: conda-incubator/setup-miniconda@v2
         with:
+          auto-activate-base: true
+          auto-update-conda: true
           activate-environment: ${{ env.CONDA_ENV_NAME }}
           environment-file: ${{ env.CONDA_ENV_FILE }}
 
