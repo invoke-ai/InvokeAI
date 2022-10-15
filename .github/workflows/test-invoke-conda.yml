@@ -70,8 +70,8 @@ jobs:
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.CONDA_ENV_FILE) }}
 
-      - name: Install Dependencies
-        if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
+      - name: update conda env
+        # if: ${{ steps.cache-conda-env-invokeai.outputs.cache-hit != 'true' }}
         run: |
           conda env update \
             --file ${{ steps.vars.outputs.CONDA_ENV_FILE }} \
