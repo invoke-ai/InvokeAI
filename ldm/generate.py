@@ -683,8 +683,7 @@ class Generate:
 
         model_data = self.model_cache.get_model(model_name)
         if model_data is None or len(model_data) == 0:
-            print(f'** Model switch failed **')
-            return self.model
+            return None
 
         self.model = model_data['model']
         self.width = model_data['width']

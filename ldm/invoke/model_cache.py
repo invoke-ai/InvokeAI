@@ -73,7 +73,8 @@ class ModelCache(object):
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
                 print(f'** restoring {self.current_model}')
-                return self.get_model(self.current_model)
+                self.get_model(self.current_model)
+                return None
         
         self.current_model = model_name
         self._push_newest_model(model_name)
@@ -120,6 +121,16 @@ class ModelCache(object):
                 print(f'\033[1m{line}\033[0m')
             else:
                 print(line)
+
+    def del_model(self, model_name:str) ->str:
+        '''
+        Delete the named model and return the YAML
+        '''
+        omega = self.config
+        del omega[model_name]
+        if model_name in self.stack:
+            self.stack.remove(model_name)
+        return OmegaConf.to_yaml(omega)
 
     def add_model(self, model_name:str, model_attributes:dict, clobber=False) ->str:
         '''

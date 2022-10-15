@@ -53,11 +53,12 @@ COMMANDS = (
     '--log_tokenization','-t',
     '--hires_fix',
     '!fix','!fetch','!history','!search','!clear',
-    '!models','!switch','!import_model','!edit_model'
+    '!models','!switch','!import_model','!edit_model','!del_model',
     )
 MODEL_COMMANDS = (
     '!switch',
     '!edit_model',
+    '!del_model',
     )
 WEIGHT_COMMANDS = (
     '!import_model',
@@ -205,8 +206,23 @@ class Completer(object):
         pydoc.pager('\n'.join(lines))
 
     def set_line(self,line)->None:
+        '''
+        Set the default string displayed in the next line of input.
+        '''
         self.linebuffer = line
         readline.redisplay()
+
+    def add_model(self,model_name:str)->None:
+        '''
+        add a model name to the completion list
+        '''
+        self.models.append(model_name)
+
+    def del_model(self,model_name:str)->None:
+        '''
+        removes a model name from the completion list
+        '''
+        self.models.remove(model_name)
 
     def _seed_completions(self, text, state):
         m = re.search('(-S\s?|--seed[=\s]?)(\d*)',text)

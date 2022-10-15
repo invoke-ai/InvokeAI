@@ -519,7 +519,7 @@ class Args(object):
             formatter_class=ArgFormatter,
             description=
             """
-            *Image generation:*
+            *Image generation*
                  invoke> a fantastic alien landscape -W576 -H512 -s60 -n4
 
             *postprocessing*
@@ -534,6 +534,13 @@ class Args(object):
             !history lists all the commands issued during the current session.
 
             !NN retrieves the NNth command from the history
+
+            *Model manipulation*
+            !models                                 -- list models in configs/models.yaml
+            !switch <model_name>                    -- switch to model named <model_name>
+            !import_model path/to/weights/file.ckpt -- adds a model to your config
+            !edit_model <model_name>                -- edit a model's description
+            !del_model <model_name>                 -- delete a model
             """
         )
         render_group     = parser.add_argument_group('General rendering')
