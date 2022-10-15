@@ -29,7 +29,7 @@ jobs:
         with:
           update-conda: true
           python-version: 3.9
-          conda-channels: pytorch, anaconda, conda-forge
+          conda-channels: anaconda, conda-forge, pytorch
 
       - name: Set platform variables
         id: vars
