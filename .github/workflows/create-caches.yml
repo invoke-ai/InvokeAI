@@ -34,6 +34,7 @@ jobs:
             && echo "CONDA_ENV_FILE=environment-mac.yml" >> $GITHUB_OUTPUT
           [[ "$RUNNER_OS" == "Linux" ]] \
             && echo "CONDA_ENV_FILE=environment.yml" >> $GITHUB_OUTPUT
+          echo "CONDA_ROOT=$CONDA" >> $GITHUB_OUTPUT
           echo "PYTHON_BIN=$CONDA/envs/invokeai/bin/python" >> $GITHUB_OUTPUT
 
       - name: Use Cached Stable Diffusion v1.4 Model
@@ -60,8 +61,9 @@ jobs:
         uses: actions/cache@v3
         env:
           cache-name: cache-conda-env-invokeai
+          conda-root: ${{ steps.vars.outputs.CONDA_ROOT }}
         with:
-          path: ${{ env.CONDA }}/envs/invokeai
+          path: ${{ env.conda-root }}/envs/invokeai
           key: ${{ env.cache-name }}
           restore-keys: |
             ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(steps.vars.outputs.CONDA_ENV_FILE) }}
