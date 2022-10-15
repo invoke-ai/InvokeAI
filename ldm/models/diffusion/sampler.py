@@ -429,7 +429,6 @@ class Sampler(object):
         conditionings = [uc] + [c for c,weight in weighted_cond_list]
         weights = [1] + [weight for c,weight in weighted_cond_list]
         chunk_count = ceil(len(conditionings)/2)
-        assert(len(conditionings)>=2, "need at least one uncond and one cond")
         deltas = None
         for chunk_index in range(chunk_count):
             offset = chunk_index*2
