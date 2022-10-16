@@ -16,7 +16,7 @@ jobs:
             environment-file: environment.yml
             default-shell: bash -l {0}
           - os: macos-latest
-            environment-file: environment-mac-unpinned.yml
+            environment-file: environment-mac.yml
             default-shell: bash -l {0}
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
