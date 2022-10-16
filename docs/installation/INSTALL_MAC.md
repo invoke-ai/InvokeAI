@@ -51,7 +51,15 @@ While that is downloading, open Terminal and run the following commands one at a
         brew install cmake protobuf rust
         ```
 
-        Then choose the kind of your Mac and install miniconda:
+        Then clone the InvokeAI repository:
+        
+        ```bash title="Clone the InvokeAI repository:
+         # Clone the Invoke AI repo
+         git clone https://github.com/invoke-ai/InvokeAI.git
+         cd InvokeAI
+         ```
+  
+      Choose the appropriate architecture for your system and install miniconda:
 
         === "M1 arm64"
 
