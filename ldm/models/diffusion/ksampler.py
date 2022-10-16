@@ -27,9 +27,6 @@ def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
         minval = max(min(-1, scale*minval), -threshold)
     return torch.clamp(result, min=minval, max=maxval)
 
-class AttentionLayer(Enum):
-    SELF = 1
-    TOKENS = 2
 
 class CFGDenoiser(nn.Module):
     def __init__(self, model, threshold = 0, warmup = 0):
@@ -38,13 +35,6 @@ class CFGDenoiser(nn.Module):
         self.threshold = threshold
         self.warmup_max = warmup
         self.warmup = max(warmup / 10, 1)
-
-
-    def get_attention_module(self, which: AttentionLayer):
-        which_attn = "attn1" if which is AttentionLayer.SELF else "attn2"
-        module = next(module for name,module in self.inner_model.named_modules() if
-                      type(module).__name__ == "CrossAttention" and which_attn in name)
-        return module
 
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
