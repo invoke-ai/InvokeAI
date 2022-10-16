@@ -86,6 +86,17 @@ jobs:
           activate-environment: ${{ env.CONDA_ENV_NAME }}
           environment-file: ${{ matrix.environment-file }}
 
+      - name: Use Cached Huggingface and Torch models
+        id: cache-hugginface-torch
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-hugginface-torch
+        with:
+          path: ~/.cache
+          key: ${{ env.cache-name }}
+          restore-keys: |
+            ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
+
       - name: run preload_models.py
         run: python scripts/preload_models.py
 
