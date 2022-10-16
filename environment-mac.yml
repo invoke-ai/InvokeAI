@@ -4,7 +4,7 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.10, <3.11
-  - pip>=23
+  - pip>=22
 
   # pytorch left unpinned
   - pytorch
@@ -22,7 +22,7 @@ dependencies:
   - einops==0.4.1
   - grpcio==1.47.1
   - humanfriendly==10.0
-  - imageio==2.22.2
+  - imageio==2.21.2
   - imageio-ffmpeg==0.4.7
   - imgaug==0.4.0
   - kornia==0.6.8
