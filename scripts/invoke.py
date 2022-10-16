@@ -120,12 +120,20 @@ def main_loop(gen, opt, infile):
         path_max = 260
         name_max = 255
 
+    catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
+
     while not done:
 
         operation = 'generate'
 
         try:
             command = get_next_command(infile)
+        except KeyboardInterrupt:
+            if catch_ctrl_c:
+                print()
+                continue
+            else:
+                raise
         except EOFError:
             done = True
             continue
@@ -294,7 +302,6 @@ def main_loop(gen, opt, infile):
                 last_results.append([path, seed])
 
             if operation == 'generate':
-                catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
                 opt.last_operation='generate'
                 gen.prompt2image(
                     image_callback=image_writer,
