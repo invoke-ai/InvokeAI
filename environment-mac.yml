@@ -5,10 +5,8 @@ channels:
 dependencies:
   - python=3.9.13
   - pip=22.2.2
-
   - pytorch=1.12.1
   - torchvision=0.13.1
-
   # I suggest to keep the other deps sorted for convenience.
   # To determine what the latest versions should be, run:
   #
@@ -16,7 +14,6 @@ dependencies:
   # sed -E 's/invokeai/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
   # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
   # ```
-
   - albumentations=1.2.1
   - coloredlogs=15.0.1
   - diffusers=0.6.0
