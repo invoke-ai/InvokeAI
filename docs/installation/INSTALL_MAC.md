@@ -219,7 +219,7 @@ There are several causes of these errors:
     conda env remove -n invokeai
     conda env create -f environment-mac.yml
     ```
-    
+
 4. If you have activated the invokeai virtual environment and tried rebuilding it,
    maybe the problem could be that I have something installed that you don't and
    you'll just need to manually install it. Make sure you activate the virtual
