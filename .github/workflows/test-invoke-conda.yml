@@ -61,7 +61,6 @@ jobs:
             || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
       - name: Use cached Conda Environment
-        id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
           cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
@@ -71,7 +70,6 @@ jobs:
           restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
 
       - name: Use cached Conda Packages
-        id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
           cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
