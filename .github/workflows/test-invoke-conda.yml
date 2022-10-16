@@ -84,7 +84,7 @@ jobs:
       #     restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
 
       - name: Use Cached Conda Packages
-        if: ${{ matrix.os != macos-12 }}
+        if: ${{ matrix.os != 'macos-12' }}
         id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
