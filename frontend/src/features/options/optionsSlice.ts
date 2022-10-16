@@ -3,6 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import * as InvokeAI from '../../app/invokeai';
 import promptToString from '../../common/util/promptToString';
 import { seedWeightsToString } from '../../common/util/seedWeightPairs';
+import { BrushShape } from '../tabs/Inpainting/drawBrush';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -40,7 +41,8 @@ export interface OptionsState {
   shouldShowImageDetails: boolean;
   shouldShowGallery: boolean;
   inpaintingTool: 'eraser' | 'uneraser';
-  inpaintingBrushRadius: number;
+  inpaintingBrushSize: number;
+  inpaintingBrushShape: BrushShape;
 }
 
 const initialOptionsState: OptionsState = {
@@ -75,7 +77,8 @@ const initialOptionsState: OptionsState = {
   shouldShowImageDetails: false,
   shouldShowGallery: false,
   inpaintingTool: 'eraser',
-  inpaintingBrushRadius: 20,
+  inpaintingBrushSize: 20,
+  inpaintingBrushShape: 'circle',
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -302,8 +305,11 @@ export const optionsSlice = createSlice({
     setInpaintingTool: (state, action: PayloadAction<InpaintingTool>) => {
       state.inpaintingTool = action.payload;
     },
-    setInpaintingBrushRadius: (state, action: PayloadAction<number>) => {
-      state.inpaintingBrushRadius = action.payload;
+    setInpaintingBrushSize: (state, action: PayloadAction<number>) => {
+      state.inpaintingBrushSize = action.payload;
+    },
+    setInpaintingBrushShape: (state, action: PayloadAction<BrushShape>) => {
+      state.inpaintingBrushShape = action.payload;
     },
   },
 });
@@ -344,7 +350,7 @@ export const {
   setShouldShowImageDetails,
   setShouldShowGallery,
   setInpaintingTool,
-  setInpaintingBrushRadius,
+  setInpaintingBrushSize,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

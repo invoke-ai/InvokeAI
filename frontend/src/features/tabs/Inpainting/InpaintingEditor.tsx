@@ -11,20 +11,13 @@ import {
   useToast,
 } from '@chakra-ui/react';
 
-import {
-  MouseEvent,
-  MutableRefObject,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEraser, FaPaintBrush, FaTrash } from 'react-icons/fa';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import { useAppDispatch, useAppSelector } from '../../../app/store';
 import IAIIconButton from '../../../common/components/IAIIconButton';
 import {
-  setInpaintingBrushRadius,
+  setInpaintingBrushSize,
   setInpaintingTool,
 } from '../../options/optionsSlice';
 import InpaintingCanvas, {
@@ -34,33 +27,9 @@ import InpaintingCanvas, {
   maskCanvas,
 } from './InpaintingCanvas';
 
-type Tool = 'pen' | 'eraser';
-
-type Point = {
-  x: number;
-  y: number;
-};
-
-function distanceBetween(point1: Point, point2: Point) {
-  return Math.sqrt(
-    Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2)
-  );
-}
-
-function angleBetween(point1: Point, point2: Point) {
-  return Math.atan2(point2.x - point1.x, point2.y - point1.y);
-}
-
-// export let canvasRef: MutableRefObject<HTMLCanvasElement | null>;
-// const maskCanvas = document.createElement('canvas');
-// const brushPreviewCanvas = document.createElement('canvas');
-
 const InpaintingEditor = () => {
-  const { inpaintingTool: tool, inpaintingBrushRadius: brushRadius } =
-    useAppSelector(inpaintingOptionsSelector);
-
-  const activeTab = useAppSelector(
-    (state: RootState) => state.options.activeTab
+  const { tool, brushSize, activeTab } = useAppSelector(
+    inpaintingOptionsSelector
   );
 
   const dispatch = useAppDispatch();
@@ -72,52 +41,43 @@ const InpaintingEditor = () => {
   // TODO: add mask overlay display
   const [shouldOverlayMask, setShouldOverlayMask] = useState<boolean>(false);
 
-  // TODO: draw brush preview separately using this and cursorPos
-  const [shouldShowBrushPreview, setShouldShowBrushPreview] =
-    useState<boolean>(false);
-  const [lastCursorPosition, setLastCursorPosition] = useState<Point>({
-    x: 0,
-    y: 0,
-  });
-  //
-
   // Hotkeys
   useHotkeys(
     '[',
     () => {
-      if (activeTab === 2 && brushRadius - 5 > 0) {
-        dispatch(setInpaintingBrushRadius(brushRadius - 5));
+      if (activeTab === 'inpainting' && brushSize - 5 > 0) {
+        dispatch(setInpaintingBrushSize(brushSize - 5));
       } else {
-        dispatch(setInpaintingBrushRadius(1));
+        dispatch(setInpaintingBrushSize(1));
       }
     },
-    [brushRadius]
+    [brushSize]
   );
 
   useHotkeys(
     ']',
     () => {
-      if (activeTab === 2) {
-        dispatch(setInpaintingBrushRadius(brushRadius + 5));
+      if (activeTab === 'inpainting') {
+        dispatch(setInpaintingBrushSize(brushSize + 5));
       }
     },
-    [brushRadius]
+    [brushSize]
   );
 
   useHotkeys('b', () => {
-    if (activeTab == 2) {
+    if (activeTab === 'inpainting') {
       dispatch(setInpaintingTool('eraser'));
     }
   });
 
   useHotkeys('e', () => {
-    if (activeTab == 2) {
+    if (activeTab === 'inpainting') {
       dispatch(setInpaintingTool('uneraser'));
     }
   });
 
   useHotkeys('c', () => {
-    if (activeTab == 2) {
+    if (activeTab === 'inpainting') {
       handleClickClearMask();
       toast({
         title: 'Mask Cleared',
@@ -127,15 +87,6 @@ const InpaintingEditor = () => {
       });
     }
   });
-
-  const handleMouseOverBrushControls = () => {
-    setShouldShowBrushPreview(true);
-  };
-
-  const handleMouseOutBrushControls = () => {
-    setShouldShowBrushPreview(false);
-  };
-
   const handleClickClearMask = () => {
     if (!canvasRef.current) return;
     const canvasContext = canvasRef.current.getContext('2d');
@@ -166,49 +117,45 @@ const InpaintingEditor = () => {
       <Flex gap={4} direction={'column'} padding={2}>
         <Flex gap={4}>
           <IAIIconButton
-            aria-label="Mask Brush (B)"
-            tooltip="Mask Brush (B)"
+            aria-label="Eraser"
+            tooltip="Eraser"
             icon={<FaEraser />}
             colorScheme={tool === 'eraser' ? 'green' : undefined}
             onClick={() => dispatch(setInpaintingTool('eraser'))}
           />
           <IAIIconButton
-            aria-label="Erase Mask (E)"
-            tooltip="Erase Mask (E)"
+            aria-label="Un-eraser"
+            tooltip="Un-eraser"
             icon={<FaPaintBrush />}
             colorScheme={tool === 'uneraser' ? 'green' : undefined}
             onClick={() => dispatch(setInpaintingTool('uneraser'))}
           />
           <IAIIconButton
-            aria-label="Clear Mask (C)"
-            tooltip="Clear Mask (C)"
+            aria-label="Clear mask"
+            tooltip="Clear mask"
             icon={<FaTrash />}
             colorScheme={'red'}
             onClick={handleClickClearMask}
           />
         </Flex>
         <Flex gap={4}>
-          <FormControl
-            width={300}
-            onMouseOver={handleMouseOverBrushControls}
-            onMouseOut={handleMouseOutBrushControls}
-          >
+          <FormControl width={300}>
             <FormLabel>Brush Radius</FormLabel>
 
             <Slider
               aria-label="radius"
-              value={brushRadius}
+              value={brushSize}
               onChange={(v: number) => {
-                dispatch(setInpaintingBrushRadius(v));
+                dispatch(setInpaintingBrushSize(v));
               }}
               min={1}
-              max={brushRadius > 500 ? brushRadius : 500}
+              max={500}
             >
               <SliderTrack>
                 <SliderFilledTrack />
               </SliderTrack>
               <SliderMark
-                value={brushRadius}
+                value={brushSize}
                 textAlign="center"
                 bg="gray.800"
                 color="white"
@@ -216,7 +163,7 @@ const InpaintingEditor = () => {
                 ml="-5"
                 w="12"
               >
-                {brushRadius}px
+                {brushSize}px
               </SliderMark>
               <SliderThumb />
             </Slider>
@@ -232,9 +179,7 @@ const InpaintingEditor = () => {
           </FormControl>
         </Flex>
       </Flex>
-      <div className="inpainting-wrapper checkerboard">
-        <InpaintingCanvas />
-      </div>
+      <InpaintingCanvas />
     </div>
   );
 };
