@@ -12,7 +12,7 @@ from PIL import Image
 from uuid import uuid4
 from threading import Event
 
-from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash, metadata_from_png
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.conditioning import split_weighted_subprompts
 
@@ -265,6 +265,24 @@ class InvokeAIWebServer:
                 )
                 self.generate_images(
                     generation_parameters, esrgan_parameters, gfpgan_parameters
+                )
+            except Exception as e:
+                self.socketio.emit('error', {'message': (str(e))})
+                print('\n')
+
+                traceback.print_exc()
+                print('\n')
+        
+        @socketio.on('outpaintImage')
+        def handle_outpaint_image_event(
+            original_image, outpaint_parameters,
+        ):
+            try:
+                print(
+                    f'>> Image outpainting requested: {outpaint_parameters}'
+                )
+                self.outpaint_images(
+                    original_image, outpaint_parameters
                 )
             except Exception as e:
                 self.socketio.emit('error', {'message': (str(e))})
@@ -687,6 +705,224 @@ class InvokeAIWebServer:
                 **generation_parameters,
                 step_callback=image_progress,
                 image_callback=image_done,
+            )
+
+        except KeyboardInterrupt:
+            raise
+        except CanceledException:
+            self.socketio.emit('processingCanceled')
+            pass
+        except Exception as e:
+            print(e)
+            self.socketio.emit('error', {'message': (str(e))})
+            print('\n')
+
+            traceback.print_exc()
+            print('\n')
+
+    def outpaint_images(
+        self, original_image, outpaint_parameters
+    ):
+        try:
+            self.canceled.clear()
+
+            step_index = 1
+            prior_variations = (
+                outpaint_parameters['with_variations']
+                if 'with_variations' in outpaint_parameters
+                else []
+            )
+
+            args   = metadata_from_png(original_image['url'])
+
+            init_img_url = None
+            mask_img_url = None
+
+            if 'init_img' in outpaint_parameters:
+                init_img_url = outpaint_parameters['init_img']
+                outpaint_parameters[
+                    'init_img'
+                ] = self.get_image_path_from_url(
+                    outpaint_parameters['init_img']
+                )
+
+            if 'init_mask' in outpaint_parameters:
+                mask_img_url = outpaint_parameters['init_mask']
+                outpaint_parameters[
+                    'init_mask'
+                ] = self.get_image_path_from_url(
+                    outpaint_parameters['init_mask']
+                )
+
+            totalSteps = self.calculate_real_steps(
+                steps=outpaint_parameters['steps'],
+                strength=outpaint_parameters['strength']
+                if 'strength' in outpaint_parameters
+                else None,
+                has_init_image='init_img' in outpaint_parameters,
+            )
+
+            progress = Progress(generation_parameters=outpaint_parameters)
+
+            self.socketio.emit('progressUpdate', progress.to_formatted_dict())
+            eventlet.sleep(0)
+
+            def image_progress(sample, step):
+                if self.canceled.is_set():
+                    raise CanceledException
+
+                nonlocal step_index
+                nonlocal outpaint_parameters
+                nonlocal progress
+
+                progress.set_current_step(step + 1)
+                progress.set_current_status('Generating')
+                progress.set_current_status_has_steps(True)
+
+                if (
+                    outpaint_parameters['progress_images']
+                    and step % 5 == 0
+                    and step < outpaint_parameters['steps'] - 1
+                ):
+                    image = self.generate.sample_to_image(sample)
+                    metadata = self.parameters_to_generated_image_metadata(
+                        outpaint_parameters
+                    )
+                    command = parameters_to_command(outpaint_parameters)
+
+                    path = self.save_result_image(
+                        image,
+                        command,
+                        metadata,
+                        self.intermediate_path,
+                        step_index=step_index,
+                        postprocessing=False,
+                    )
+
+                    step_index += 1
+                    self.socketio.emit(
+                        'intermediateResult',
+                        {
+                            'url': self.get_url_from_image_path(path),
+                            'mtime': os.path.getmtime(path),
+                            'metadata': metadata,
+                        },
+                    )
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
+                eventlet.sleep(0)
+
+            def image_done(image, seed, first_seed):
+                if self.canceled.is_set():
+                    raise CanceledException
+
+                nonlocal outpaint_parameters
+                nonlocal progress
+
+                step_index = 1
+                nonlocal prior_variations
+
+                progress.set_current_status('Generation Complete')
+
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
+                eventlet.sleep(0)
+
+                all_parameters = outpaint_parameters
+                postprocessing = False
+
+                if (
+                    'variation_amount' in all_parameters
+                    and all_parameters['variation_amount'] > 0
+                ):
+                    first_seed = first_seed or seed
+                    this_variation = [
+                        [seed, all_parameters['variation_amount']]
+                    ]
+                    all_parameters['with_variations'] = (
+                        prior_variations + this_variation
+                    )
+                    all_parameters['seed'] = first_seed
+                elif 'with_variations' in all_parameters:
+                    all_parameters['seed'] = first_seed
+                else:
+                    all_parameters['seed'] = seed
+
+                if self.canceled.is_set():
+                    raise CanceledException
+
+                if self.canceled.is_set():
+                    raise CanceledException
+
+                progress.set_current_status('Saving Image')
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
+                eventlet.sleep(0)
+
+                # restore the stashed URLS and discard the paths, we are about to send the result to client
+                if 'init_img' in all_parameters:
+                    all_parameters['init_img'] = init_img_url
+
+                if 'init_mask' in all_parameters:
+                    all_parameters['init_mask'] = mask_img_url
+
+                metadata = self.parameters_to_generated_image_metadata(
+                    all_parameters
+                )
+
+                command = parameters_to_command(all_parameters)
+
+                path = self.save_result_image(
+                    image,
+                    command,
+                    metadata,
+                    self.result_path,
+                    postprocessing=postprocessing,
+                )
+
+                print(f'>> Image generated: "{path}"')
+                self.write_log_message(f'[Generated] "{path}": {command}')
+
+                if progress.total_iterations > progress.current_iteration:
+                    progress.set_current_step(1)
+                    progress.set_current_status('Iteration complete')
+                    progress.set_current_status_has_steps(False)
+                else:
+                    progress.mark_complete()
+
+                self.socketio.emit(
+                    'progressUpdate', progress.to_formatted_dict()
+                )
+                eventlet.sleep(0)
+
+                self.socketio.emit(
+                    'generationResult',
+                    {
+                        'url': self.get_url_from_image_path(path),
+                        'mtime': os.path.getmtime(path),
+                        'metadata': metadata,
+                    },
+                )
+                eventlet.sleep(0)
+
+                progress.set_current_iteration(progress.current_iteration + 1)
+
+            self.generate.prompt2image(
+                prompt         = outpaint_parameters['prompt'],
+                seed           = args.seed,
+                sampler        = self.generate.sampler,
+                steps          = opt.steps,
+                cfg_scale      = opt.cfg_scale,
+                ddim_eta       = self.generate.ddim_eta,
+                width          = opt.width,
+                height         = opt.height,
+                init_img       = original_image['url'],
+                strength       = 0.83,
+                step_callback  = image_progress,
+                image_callback = image_done,
             )
 
         except KeyboardInterrupt:
