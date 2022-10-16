@@ -73,13 +73,23 @@ jobs:
           [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
             || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
-      - name: Use Cached Dependencies
+      # - name: Use Cached Dependencies
+      #   id: cache-conda-env-invokeai
+      #   uses: actions/cache@v3
+      #   env:
+      #     cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
+      #   with:
+      #     path: ${{ env.CONDA_ROOT }}/envs/${{ env.CONDA_ENV_NAME }}
+      #     key: ${{ env.cache-name }}
+      #     restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
+
+      - name: Use Cached Conda Packages
         id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
           cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
         with:
-          path: ${{ env.CONDA_ROOT }}/envs/${{ env.CONDA_ENV_NAME }}
+          path: ${{ env.CONDA_PKGS_DIR }}
           key: ${{ env.cache-name }}
           restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
 
