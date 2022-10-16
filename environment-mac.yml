@@ -15,7 +15,7 @@ dependencies:
   #
   # ```shell
   # sed -E 's/invokeai/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
-  # PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
+  # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
   # ```
   - albumentations==1.3.0
   - coloredlogs==15.0.1
