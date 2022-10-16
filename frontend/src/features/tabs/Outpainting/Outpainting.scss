@@ -20,8 +20,8 @@
   grid-template-areas: 'outpainting-display';
   column-gap: 0.5rem;
 
-  .current-image-display,
-  .current-image-display-placeholder {
+  .outpainting-image-display,
+  .outpainting-image-display-placeholder {
     grid-area: outpainting-display;
     height: $app-content-height;
   }

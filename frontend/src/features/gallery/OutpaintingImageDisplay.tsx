@@ -15,14 +15,14 @@ const OutpaintingImageDisplay = () => {
   const imageToDisplay = intermediateImage || currentImage;
 
   return imageToDisplay ? (
-    <div className="current-image-display">
-      <div className="current-image-tools">
+    <div className="outpainting-image-display">
+      <div className="outpainting-image-tools">
         <CurrentImageButtons image={imageToDisplay} />
       </div>
       <OutpaintingImagePreview imageToDisplay={imageToDisplay} />
     </div>
   ) : (
-    <div className="current-image-display-placeholder">
+    <div className="outpainting-image-display-placeholder">
       <MdPhoto />
     </div>
   );

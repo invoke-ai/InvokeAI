@@ -1,0 +1,39 @@
+@use '../../styles/Mixins/' as *;
+
+.outpainting-image-display {
+  display: grid;
+  grid-template-areas:
+    'outpainting-image-tools'
+    'outpainting-image-preview';
+  grid-template-rows: auto 1fr;
+  justify-items: center;
+  background-color: var(--background-color-secondary);
+  border-radius: 0.5rem;
+}
+  
+.outpainting-image-tools {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  justify-content: center;
+}
+
+.outpainting-image-preview {
+  grid-area: outpainting-image-preview;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  display: grid;
+  width: 100%;
+  grid-template-areas: 'outpainting-image-content';
+
+  canvas {
+    grid-area: outpainting-image-content;
+    background-color: var(--img2img-img-bg-color);
+    border-radius: 0.5rem;
+    object-fit: contain;
+    width: auto;
+    height: $app-gallery-height;
+    max-height: $app-gallery-height;
+  }
+}
