@@ -20,11 +20,11 @@ jobs:
             miniconda-version: latest
             default-shell: bash -l {0}
           - os: macos-12
-            auto-activate-base: true
+            auto-activate-base: false
             auto-update-conda: true
             environment-file: environment-mac-unpinned.yml
             miniconda-version: latest
-            default-shell: zsh -l {0}
+            default-shell: bash -l {0}
           - os: macos-latest
             auto-activate-base: false
             auto-update-conda: false
@@ -84,6 +84,7 @@ jobs:
       #     restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
 
       - name: Use Cached Conda Packages
+        if: ${{ matrix.os != macos-12 }}
         id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
