@@ -9,6 +9,7 @@ import * as InvokeAI from '../invokeai';
  */
 
 export const generateImage = createAction<undefined>('socketio/generateImage');
+export const outpaintImage = createAction<undefined>('socketio/outpaintImage');
 export const runESRGAN = createAction<InvokeAI.Image>('socketio/runESRGAN');
 export const runGFPGAN = createAction<InvokeAI.Image>('socketio/runGFPGAN');
 export const deleteImage = createAction<InvokeAI.Image>('socketio/deleteImage');

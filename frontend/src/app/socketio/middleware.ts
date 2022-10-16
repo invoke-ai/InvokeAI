@@ -49,6 +49,7 @@ export const socketioMiddleware = () => {
 
     const {
       emitGenerateImage,
+      emitOutpaintImage,
       emitRunESRGAN,
       emitRunGFPGAN,
       emitDeleteImage,
@@ -121,6 +122,11 @@ export const socketioMiddleware = () => {
     switch (action.type) {
       case 'socketio/generateImage': {
         emitGenerateImage();
+        break;
+      }
+
+      case 'socketio/outpaintImage': {
+        emitOutpaintImage();
         break;
       }
 

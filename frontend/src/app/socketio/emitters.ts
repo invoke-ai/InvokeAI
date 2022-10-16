@@ -51,6 +51,28 @@ const makeSocketIOEmitters = (
         })
       );
     },
+    emitOutpaintImage: () =>  {
+      dispatch(setIsProcessing(true));
+      const { currentImage, intermediateImage } = getState().gallery;
+      const options = { ...getState().options };
+      const imageToProcess = intermediateImage || currentImage;
+      const { generationParameters, esrganParameters, gfpganParameters } =
+        frontendToBackendParameters(options, getState().system);
+
+      socketio.emit('outpaintImage', imageToProcess, {
+        type: 'outpaint',
+        ...generationParameters,
+      });
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Outpaint requested: ${JSON.stringify({
+            file: imageToProcess.url,
+            ...generationParameters,
+          })}`,
+        })
+      );
+    },
     emitRunESRGAN: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
       const { upscalingLevel, upscalingStrength } = getState().options;
