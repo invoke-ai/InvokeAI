@@ -4,6 +4,10 @@ on:
     branches:
       - 'main'
       - 'development'
+  pull_request:
+    branches:
+      - 'main'
+      - 'development'
 
 jobs:
   os_matrix:
