@@ -9,27 +9,14 @@ on:
 jobs:
   os_matrix:
     strategy:
-      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-12, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            auto-activate-base: false
-            auto-update-conda: false
             environment-file: environment.yml
-            miniconda-version: latest
-            default-shell: bash -l {0}
-          - os: macos-12
-            auto-activate-base: false
-            auto-update-conda: true
-            environment-file: environment-mac-unpinned.yml
-            miniconda-version: latest
             default-shell: bash -l {0}
           - os: macos-latest
-            auto-activate-base: false
-            auto-update-conda: false
             environment-file: environment-mac-unpinned.yml
-            miniconda-version: latest
             default-shell: bash -l {0}
     name: Test invoke.py on ${{ matrix.os }} with conda
     runs-on: ${{ matrix.os }}
@@ -43,9 +30,9 @@ jobs:
       - name: setup miniconda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-activate-base: ${{ matrix.auto-activate-base }}
-          auto-update-conda: ${{ matrix.auto-update-conda }}
-          miniconda-version: ${{ matrix.miniconda-version }}
+          auto-activate-base: false
+          auto-update-conda: false
+          miniconda-version: latest
 
       - name: set environment
         run: |
@@ -73,18 +60,17 @@ jobs:
           [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
             || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
-      # - name: Use Cached Dependencies
-      #   id: cache-conda-env-invokeai
-      #   uses: actions/cache@v3
-      #   env:
-      #     cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
-      #   with:
-      #     path: ${{ env.CONDA_ROOT }}/envs/${{ env.CONDA_ENV_NAME }}
-      #     key: ${{ env.cache-name }}
-      #     restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
+      - name: Use cached Conda Environment
+        id: cache-conda-env-invokeai
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
+        with:
+          path: ${{ env.CONDA_ROOT }}/envs/${{ env.CONDA_ENV_NAME }}
+          key: ${{ env.cache-name }}
+          restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
 
-      - name: Use Cached Conda Packages
-        if: ${{ matrix.os != 'macos-12' }}
+      - name: Use cached Conda Packages
         id: cache-conda-env-invokeai
         uses: actions/cache@v3
         env:
@@ -94,7 +80,7 @@ jobs:
           key: ${{ env.cache-name }}
           restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(matrix.environment-file) }}
 
-      - name: activate conda env
+      - name: Activate Conda Env
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: ${{ env.CONDA_ENV_NAME }}
@@ -112,5 +98,5 @@ jobs:
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ runner.os }}
+          name: results_${{ matrix.os }}
           path: outputs/img-samples
