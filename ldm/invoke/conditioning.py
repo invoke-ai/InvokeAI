@@ -12,7 +12,7 @@ log_tokenization()              print out colour-coded tokens and warn if trunca
 import re
 import torch
 
-def get_uc_and_c(prompt, model, log_tokens=False, skip_normalize=False):
+def get_uc_and_c_and_ec(prompt, model, log_tokens=False, skip_normalize=False):
     # Extract Unconditioned Words From Prompt
     unconditioned_words = ''
     unconditional_regex = r'\[(.*?)\]'
@@ -26,7 +26,19 @@ def get_uc_and_c(prompt, model, log_tokens=False, skip_normalize=False):
         clean_prompt = unconditional_regex_compile.sub(' ', prompt)
         prompt = re.sub(' +', ' ', clean_prompt)
 
+    edited_words = None
+    edited_regex = r'\{(.*?)\}'
+    edited = re.findall(edited_regex, prompt)
+    if len(edited) > 0:
+        edited_words = ' '.join(edited)
+        edited_regex_compile = re.compile(edited_regex)
+        clean_prompt = edited_regex_compile.sub(' ', prompt)
+        prompt = re.sub(' +', ' ', clean_prompt)
+
     uc = model.get_learned_conditioning([unconditioned_words])
+    ec = None
+    if edited_words is not None:
+        ec = model.get_learned_conditioning([edited_words])
 
     # get weighted sub-prompts
     weighted_subprompts = split_weighted_subprompts(
@@ -48,7 +60,7 @@ def get_uc_and_c(prompt, model, log_tokens=False, skip_normalize=False):
         log_tokenization(prompt, model, log_tokens, 1)
         c = model.get_learned_conditioning([prompt])
         uc = model.get_learned_conditioning([unconditioned_words])
-    return (uc, c)
+    return (uc, c, ec)
 
 def split_weighted_subprompts(text, skip_normalize=False)->list:
     """

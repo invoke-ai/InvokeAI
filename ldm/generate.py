@@ -32,7 +32,7 @@ from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.args import metadata_from_png
 from ldm.invoke.image_util import InitImageResizer
 from ldm.invoke.devices import choose_torch_device, choose_precision
-from ldm.invoke.conditioning import get_uc_and_c
+from ldm.invoke.conditioning import get_uc_and_c_and_ec
 from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
@@ -400,7 +400,7 @@ class Generate:
         mask_image = None
 
         try:
-            uc, c = get_uc_and_c(
+            uc, c, ec = get_uc_and_c_and_ec(
                 prompt, model =self.model,
                 skip_normalize=skip_normalize,
                 log_tokens    =self.log_tokenization
@@ -438,7 +438,7 @@ class Generate:
                 sampler=self.sampler,
                 steps=steps,
                 cfg_scale=cfg_scale,
-                conditioning=(uc, c),
+                conditioning=(uc, c, ec),
                 ddim_eta=ddim_eta,
                 image_callback=image_callback,  # called after the final image is generated
                 step_callback=step_callback,   # called after each intermediate image is generated
@@ -469,14 +469,14 @@ class Generate:
                                              save_original  = save_original,
                                              image_callback = image_callback)
 
-        except RuntimeError as e:
-            print(traceback.format_exc(), file=sys.stderr)
-            print('>> Could not generate image.')
         except KeyboardInterrupt:
             if catch_interrupts:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
+        except (RuntimeError, Exception) as e:
+            print(traceback.format_exc(), file=sys.stderr)
+            print('>> Could not generate image.')
 
         toc = time.time()
         print('>> Usage stats:')

@@ -170,6 +170,8 @@ class CrossAttention(nn.Module):
 
         self.mem_total_gb = psutil.virtual_memory().total // (1 << 30)
 
+        self.cross_attention_callback = None
+
     def einsum_op_compvis(self, q, k, v):
         s = einsum('b i d, b j d -> b i j', q, k)
         s = s.softmax(dim=-1, dtype=s.dtype)
@@ -244,8 +246,13 @@ class CrossAttention(nn.Module):
         del context, x
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
-        r = self.einsum_op(q, k, v)
-        return self.to_out(rearrange(r, '(b h) n d -> b n (h d)', h=h))
+
+        if self.cross_attention_callback is not None:
+            r = self.cross_attention_callback(q, k, v)
+        else:
+            r = self.einsum_op(q, k, v)
+        hidden_states = rearrange(r, '(b h) n d -> b n (h d)', h=h)
+        return self.to_out(hidden_states)
 
 
 class BasicTransformerBlock(nn.Module):

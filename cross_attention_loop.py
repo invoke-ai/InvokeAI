@@ -1,4 +1,5 @@
 import random
+import traceback
 
 import numpy as np
 import torch
@@ -8,7 +9,7 @@ from PIL import Image
 from torch import autocast
 from tqdm.auto import tqdm
 
-import c_a_c
+import .ldm.models.diffusion.cross_attention
 
 
 @torch.no_grad()
@@ -41,7 +42,7 @@ def stablediffusion(
 
     # If seed is None, randomly select seed from 0 to 2^32-1
     if seed is None: seed = random.randrange(2**32 - 1)
-    generator = torch.cuda.manual_seed(seed)
+    generator = torch.manual_seed(seed)
 
     # Set inference timesteps to scheduler
     scheduler = LMSDiscreteScheduler(beta_start=0.00085,
