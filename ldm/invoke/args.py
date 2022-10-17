@@ -245,19 +245,20 @@ class Args(object):
             switches.append(f'-A {a["sampler_name"]}')
 
         # facetool-specific parameters
-        if a['facetool']:
-            switches.append(f'-ft {a["facetool"]}')
         if a['facetool_strength']:
             switches.append(f'-G {a["facetool_strength"]}')
-        if a['codeformer_fidelity']:
-            switches.append(f'-cf {a["codeformer_fidelity"]}')
+            if a['facetool']:
+                switches.append(f'-ft {a["facetool"]}')
+            if a['codeformer_fidelity']:
+                switches.append(f'-cf {a["codeformer_fidelity"]}')
 
-        if a['outcrop']:
-            switches.append(f'-c {" ".join([str(u) for u in a["outcrop"]])}')
-
-        # esrgan-specific parameters
+        # esrgan/upscaling
         if a['upscale']:
             switches.append(f'-U {" ".join([str(u) for u in a["upscale"]])}')
+
+        # outcropping
+        if a['outcrop']:
+            switches.append(f'-c {" ".join([str(u) for u in a["outcrop"]])}')
 
         # embiggen parameters
         if a['embiggen']:
