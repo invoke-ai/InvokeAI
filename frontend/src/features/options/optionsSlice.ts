@@ -3,8 +3,11 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import * as InvokeAI from '../../app/invokeai';
 import promptToString from '../../common/util/promptToString';
 import { seedWeightsToString } from '../../common/util/seedWeightPairs';
+import { BrushShape } from '../tabs/Inpainting/drawBrush';
 
 export type UpscalingLevel = 2 | 4;
+
+export type InpaintingTool = 'eraser' | 'uneraser';
 
 export interface OptionsState {
   prompt: string;
@@ -39,6 +42,9 @@ export interface OptionsState {
   shouldShowGallery: boolean;
   canvasWidth: number;
   canvasHeight: number;
+  inpaintingTool: 'eraser' | 'uneraser';
+  inpaintingBrushSize: number;
+  inpaintingBrushShape: BrushShape;
 }
 
 const initialOptionsState: OptionsState = {
@@ -74,6 +80,9 @@ const initialOptionsState: OptionsState = {
   shouldShowGallery: false,
   canvasWidth: 1024,
   canvasHeight: 1024,
+  inpaintingTool: 'eraser',
+  inpaintingBrushSize: 20,
+  inpaintingBrushShape: 'circle',
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -270,7 +279,7 @@ export const optionsSlice = createSlice({
       if (threshold) state.threshold = threshold;
       if (typeof threshold === 'undefined') state.threshold = 0;
       if (perlin) state.perlin = perlin;
-      if (typeof perlin === 'undefined') state.perlin = 0;      
+      if (typeof perlin === 'undefined') state.perlin = 0;
       if (typeof seamless === 'boolean') state.seamless = seamless;
       if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix;
       if (width) state.width = width;
@@ -302,6 +311,15 @@ export const optionsSlice = createSlice({
     },
     setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGallery = action.payload;
+    },
+    setInpaintingTool: (state, action: PayloadAction<InpaintingTool>) => {
+      state.inpaintingTool = action.payload;
+    },
+    setInpaintingBrushSize: (state, action: PayloadAction<number>) => {
+      state.inpaintingBrushSize = action.payload;
+    },
+    setInpaintingBrushShape: (state, action: PayloadAction<BrushShape>) => {
+      state.inpaintingBrushShape = action.payload;
     },
   },
 });
@@ -343,6 +361,8 @@ export const {
   setShouldShowGallery,
   setCanvasWidth,
   setCanvasHeight,
+  setInpaintingTool,
+  setInpaintingBrushSize
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

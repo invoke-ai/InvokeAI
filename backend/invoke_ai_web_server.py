@@ -5,6 +5,8 @@ import shutil
 import mimetypes
 import traceback
 import math
+import io
+import base64
 
 from flask import Flask, redirect, send_from_directory
 from flask_socketio import SocketIO
@@ -260,9 +262,16 @@ class InvokeAIWebServer:
             generation_parameters, esrgan_parameters, gfpgan_parameters
         ):
             try:
-                print(
-                    f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}'
-                )
+                # truncate long init_mask base64 if needed
+                if 'init_mask' in generation_parameters:
+                    printable_parameters = {**generation_parameters, 'init_mask': generation_parameters['init_mask'][:20]+"..."}
+                    print(
+                        f'>> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}'
+                    )
+                else:
+                    print(
+                        f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}'
+                    )
                 self.generate_images(
                     generation_parameters, esrgan_parameters, gfpgan_parameters
                 )
@@ -496,13 +505,17 @@ class InvokeAIWebServer:
                     generation_parameters['init_img']
                 )
 
+            # if 'init_mask' in generation_parameters:
+            #     mask_img_url = generation_parameters['init_mask']
+            #     generation_parameters[
+            #         'init_mask'
+            #     ] = self.get_image_path_from_url(
+            #         generation_parameters['init_mask']
+            #     )
+
             if 'init_mask' in generation_parameters:
-                mask_img_url = generation_parameters['init_mask']
-                generation_parameters[
-                    'init_mask'
-                ] = self.get_image_path_from_url(
-                    generation_parameters['init_mask']
-                )
+                mask_image = Image.open(io.BytesIO(base64.decodebytes(bytes(generation_parameters['init_mask'], "utf-8"))))
+                generation_parameters['init_mask'] = mask_image
 
             totalSteps = self.calculate_real_steps(
                 steps=generation_parameters['steps'],
@@ -658,7 +671,7 @@ class InvokeAIWebServer:
                     all_parameters['init_img'] = init_img_url
 
                 if 'init_mask' in all_parameters:
-                    all_parameters['init_mask'] = mask_img_url
+                    all_parameters['init_mask'] = '' #
 
                 metadata = self.parameters_to_generated_image_metadata(
                     all_parameters
@@ -1023,13 +1036,13 @@ class InvokeAIWebServer:
                 rfc_dict['init_image_path'] = parameters[
                     'init_img'
                 ]  # TODO: Noncompliant
-                if 'init_mask' in parameters:
-                    rfc_dict['mask_hash'] = calculate_init_img_hash(
-                        self.get_image_path_from_url(parameters['init_mask'])
-                    )  # TODO: Noncompliant
-                    rfc_dict['mask_image_path'] = parameters[
-                        'init_mask'
-                    ]  # TODO: Noncompliant
+                # if 'init_mask' in parameters:
+                #     rfc_dict['mask_hash'] = calculate_init_img_hash(
+                #         self.get_image_path_from_url(parameters['init_mask'])
+                #     )  # TODO: Noncompliant
+                #     rfc_dict['mask_image_path'] = parameters[
+                #         'init_mask'
+                #     ]  # TODO: Noncompliant
             else:
                 rfc_dict['type'] = 'txt2img'
 

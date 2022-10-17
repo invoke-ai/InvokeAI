@@ -58,7 +58,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     }
   };
 
-  const handleClickImage = () => dispatch(setCurrentImage(image));
+  const handleClickImage = () => {
+    dispatch(setCurrentImage(image));
+  };
 
   return (
     <Box

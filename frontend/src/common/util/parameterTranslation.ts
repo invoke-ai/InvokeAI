@@ -12,10 +12,14 @@ import {
   stringToSeedWeightsArray,
 } from './seedWeightPairs';
 import randomInt from './randomInt';
+import { tabMap, tab_dict } from '../../features/tabs/InvokeTabs';
 
 export const frontendToBackendParameters = (
   optionsState: OptionsState,
-  systemState: SystemState
+  systemState: SystemState,
+  mode: keyof typeof tab_dict,
+  inpaintingMask?: string,
+  currentImageUrl?: string
 ): { [key: string]: any } => {
   const {
     prompt,
@@ -68,13 +72,17 @@ export const frontendToBackendParameters = (
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
     : seed;
 
-  if (shouldUseInitImage) {
+  if (mode === 'img2img') {
     generationParameters.init_img = initialImagePath;
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = shouldFitToWidthHeight;
-    if (maskPath) {
-      generationParameters.init_mask = maskPath;
-    }
+  }
+
+  if (mode === 'inpainting') {
+    generationParameters.init_img = currentImageUrl;
+    generationParameters.strength = img2imgStrength;
+    generationParameters.fit = shouldFitToWidthHeight;
+    generationParameters.init_mask = inpaintingMask;
   }
 
   if (shouldGenerateVariations) {
