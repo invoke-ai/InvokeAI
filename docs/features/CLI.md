@@ -101,9 +101,7 @@ overridden on a per-prompt basis (see [List of prompt arguments](#list-of-prompt
 | `--free_gpu_mem`                          |                                           | `False`                                        | Free GPU memory after sampling, to allow image decoding and saving in low VRAM conditions            |
 | `--precision`                             |                                           | `auto`                                         | Set model precision, default is selected by device. Options: auto, float32, float16, autocast        |
 
-!!! warning deprecated
-
-    These arguments are deprecated but still work:
+!!! warning "These arguments are deprecated but still work"
 
     <div align="center" markdown>
 
@@ -132,7 +130,7 @@ from text ([txt2img](#txt2img)), to embellish an existing image or sketch
 
 ### txt2img
 
-!!! example
+!!! example ""
 
     ```bash
     invoke> waterfall and rainbow -W640 -H480
@@ -200,7 +198,7 @@ accepts additional options:
 
 ### inpainting
 
-!!! example
+!!! example ""
 
     ```bash
     invoke> waterfall and rainbow -I./vacation-photo.png -M./vacation-mask.png -W640 -H480 --fit
