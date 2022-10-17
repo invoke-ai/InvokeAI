@@ -34,7 +34,8 @@ from ldm.invoke.image_util import InitImageResizer
 from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.conditioning import get_uc_and_c
 from ldm.invoke.model_cache import ModelCache
-
+from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
+    
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         def new_func(*args, **kw):
@@ -188,6 +189,7 @@ class Generate:
         self.esrgan = esrgan
         self.free_gpu_mem = free_gpu_mem
         self.size_matters = True  # used to warn once about large image sizes and VRAM
+        self.txt2mask = None
 
         # Note that in previous versions, there was an option to pass the
         # device to Generate(). However the device was then ignored, so
@@ -266,6 +268,7 @@ class Generate:
             # these are specific to img2img and inpaint
             init_img         = None,
             init_mask        = None,
+            text_mask        = None,
             fit              = False,
             strength         = None,
             init_color       = None,
@@ -298,6 +301,8 @@ class Generate:
            seamless                        // whether the generated image should tile
            hires_fix                        // whether the Hires Fix should be applied during generation
            init_img                        // path to an initial image
+           init_mask                       // path to a mask for the initial image
+           text_mask                       // a text string that will be used to guide clipseg generation of the init_mask
            strength                        // strength for noising/unnoising init_img. 0.0 preserves image exactly, 1.0 replaces it completely
            facetool_strength               // strength for GFPGAN/CodeFormer. 0.0 preserves image exactly, 1.0 replaces it completely
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
@@ -405,6 +410,7 @@ class Generate:
                 width,
                 height,
                 fit=fit,
+                text_mask=text_mask,
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
@@ -620,17 +626,14 @@ class Generate:
             width,
             height,
             fit=False,
+            text_mask=None,
     ):
         init_image      = None
         init_mask       = None
         if not img:
             return None, None
 
-        image = self._load_img(
-            img,
-            width,
-            height,
-        )
+        image = self._load_img(img)
 
         if image.width < self.width and image.height < self.height:
             print(f'>> WARNING: img2img and inpainting may produce unexpected results with initial images smaller than {self.width}x{self.height} in both dimensions')
@@ -648,9 +651,11 @@ class Generate:
         init_image   = self._create_init_image(image,width,height,fit=fit)                   # this returns a torch tensor
 
         if mask:
-            mask_image = self._load_img(
-                mask, width, height)  # this returns an Image
+            mask_image = self._load_img(mask)  # this returns an Image
             init_mask = self._create_init_mask(mask_image,width,height,fit=fit)
+
+        elif text_mask:
+            init_mask = self._txt2mask(image, text_mask, width, height, fit=fit)
 
         return init_image, init_mask
 
@@ -830,7 +835,7 @@ class Generate:
 
         print(msg)
 
-    def _load_img(self, img, width, height)->Image:
+    def _load_img(self, img)->Image:
         if isinstance(img, Image.Image):
             image = img
             print(
@@ -891,6 +896,29 @@ class Generate:
         if invert:
             mask = ImageOps.invert(mask)
         return mask
+
+    # TODO: The latter part of this method repeats code from _create_init_mask()
+    def _txt2mask(self, image:Image, text_mask:list, width, height, fit=True) -> Image:
+        prompt = text_mask[0]
+        confidence_level = text_mask[1] if len(text_mask)>1 else 0.5
+        if self.txt2mask is None:
+            self.txt2mask = Txt2Mask(device = self.device)
+
+        segmented = self.txt2mask.segment(image, prompt)
+        mask = segmented.to_mask(float(confidence_level))
+        mask = mask.convert('RGB')
+        # now we adjust the size
+        if fit:
+            mask = self._fit_image(mask, (width, height))
+        else:
+            mask = self._squeeze_image(mask)
+        mask = mask.resize((mask.width//downsampling, mask.height //
+                              downsampling), resample=Image.Resampling.NEAREST)
+        mask = np.array(mask)
+        mask = mask.astype(np.float32) / 255.0
+        mask = mask[None].transpose(0, 3, 1, 2)
+        mask = torch.from_numpy(mask)
+        return mask.to(self.device)
 
     def _has_transparency(self, image):
         if image.info.get("transparency", None) is not None:
