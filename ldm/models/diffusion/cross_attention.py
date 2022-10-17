@@ -75,11 +75,12 @@ class CrossAttentionControl:
     @classmethod
     def inject_attention_functions(cls, unet):
         # ORIGINAL SOURCE CODE: https://github.com/huggingface/diffusers/blob/91ddd2a25b848df0fa1262d4f1cd98c7ccb87750/src/diffusers/models/attention.py#L276
+
         def new_attention(self, query, key, value):
-            # TODO: use baddbmm for better performance
-            attention_scores = torch.matmul(query, key.transpose(-1, -2)) * self.scale
-            attn_slice = attention_scores.softmax(dim=-1)
-            # compute attention output
+
+            attention_scores = torch.functional.einsum('b i d, b j d -> b i j', query, key)
+            # calculate attention slice by taking the best scores for each latent pixel
+            attn_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
 
             if self.use_last_attn_slice:
                 if self.last_attn_slice_mask is not None:
@@ -100,12 +101,11 @@ class CrossAttentionControl:
                 attn_slice = attn_slice * self.last_attn_slice_weights
                 self.use_last_attn_weights = False
 
-            hidden_states = torch.matmul(attn_slice, value)
-            # reshape hidden_states
-            hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
-            return hidden_states
+            return torch.functional.einsum('b i j, b j d -> b i d', attn_slice, value)
 
         def new_sliced_attention(self, query, key, value, sequence_length, dim):
+
+            raise NotImplementedError("not tested yet")
 
             batch_size_attention = query.shape[0]
             hidden_states = torch.zeros(
@@ -146,6 +146,12 @@ class CrossAttentionControl:
             hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
             return hidden_states
 
+        def select_attention_func(module, q, k, v, dim, offset, slice_size):
+            if dim == 0 or dim == 1:
+                return new_sliced_attention(module, q, k, v, sequence_length=slice_size, dim=dim)
+            else:
+                return new_attention(module, q, k, v)
+
         for name, module in unet.named_modules():
             module_name = type(module).__name__
             if module_name == "CrossAttention":
@@ -153,8 +159,7 @@ class CrossAttentionControl:
                 module.use_last_attn_slice = False
                 module.use_last_attn_weights = False
                 module.save_last_attn_slice = False
-                module._sliced_attention = new_sliced_attention.__get__(module, type(module))
-                module._attention = new_attention.__get__(module, type(module))
+                module.set_custom_attention_calculator(select_attention_func)
 
 
 # original code below

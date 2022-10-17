@@ -48,21 +48,21 @@ class CFGDenoiser(nn.Module):
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
 
-        print('generating unconditioned latents')
+        #rint('generating unconditioned latents')
         unconditioned_latents = self.inner_model(x, sigma, cond=uncond)
 
         # process x using the original prompt, saving the attention maps if required
         if self.edited_conditioning is not None:
             # this is automatically toggled off after the model forward()
             CrossAttentionControl.request_save_attention_maps(self.inner_model)
-        print('generating conditioned latents')
+        #print('generating conditioned latents')
         conditioned_latents = self.inner_model(x, sigma, cond=cond)
 
         if self.edited_conditioning is not None:
             # process x again, using the saved attention maps but the new conditioning
             # this is automatically toggled off after the model forward()
             CrossAttentionControl.request_apply_saved_attention_maps(self.inner_model)
-            print('generating edited conditioned latents')
+            #print('generating edited conditioned latents')
             conditioned_latents = self.inner_model(x, sigma, cond=self.edited_conditioning)
 
         if self.warmup < self.warmup_max:
