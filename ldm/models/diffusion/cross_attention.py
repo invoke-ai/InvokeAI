@@ -2,89 +2,99 @@ from enum import Enum
 import torch
 
 
+# adapted from bloc97's CrossAttentionControl colab
+# https://github.com/bloc97/CrossAttentionControl
+
 class CrossAttentionControl:
     class AttentionType(Enum):
         SELF = 1
         TOKENS = 2
 
     @classmethod
-    def get_attention_module(cls, model, which: AttentionType):
-        which_attn = "attn1" if which is cls.AttentionType.SELF else "attn2"
-        module = next(module for name, module in model.named_modules() if
-                      type(module).__name__ == "CrossAttention" and which_attn in name)
-        return module
-
-    @classmethod
-    def setup_attention_editing(cls, model, original_tokens_length: int,
+    def setup_attention_editing(cls, model,
                                 substitute_conditioning: torch.Tensor = None,
-                                token_indices_to_edit: list = None):
+                                edit_opcodes: list = None):
+        """
+        :param model: The unet model to inject into.
+        :param substitute_conditioning: The "edited" conditioning vector, [Bx77x768]
+        :param edit_opcodes: Opcodes from difflib.SequenceMatcher describing how the base
+                             conditionings map to the "edited" conditionings.
+        :return:
+        """
 
         # adapted from init_attention_edit
-        self_attention_module = cls.get_attention_module(model, cls.AttentionType.SELF)
-        tokens_attention_module = cls.get_attention_module(model, cls.AttentionType.TOKENS)
-
         if substitute_conditioning is not None:
 
             device = substitute_conditioning.device
 
-            # this is not very torch-y
-            mask = torch.zeros(original_tokens_length)
-            for i in token_indices_to_edit:
-                mask[i] = 1
+            max_length = model.inner_model.cond_stage_model.max_length
+            # mask=1 means use base prompt attention, mask=0 means use edited prompt attention
+            mask = torch.zeros(max_length)
+            indices_target = torch.arange(max_length, dtype=torch.long)
+            indices = torch.zeros(max_length, dtype=torch.long)
+            for name, a0, a1, b0, b1 in edit_opcodes:
+                if b0 < max_length:
+                    if name == "equal":# or (name == "replace" and a1 - a0 == b1 - b0):
+                        # these tokens have not been edited
+                        indices[b0:b1] = indices_target[a0:a1]
+                        mask[b0:b1] = 1
 
-            self_attention_module.last_attn_slice_mask = None
-            self_attention_module.last_attn_slice_indices = None
-            tokens_attention_module.last_attn_slice_mask = mask.to(device)
-            tokens_attention_module.last_attn_slice_indices = torch.tensor(token_indices_to_edit, device=device)
+            for m in cls.get_attention_modules(model, cls.AttentionType.SELF):
+                m.last_attn_slice_mask = None
+                m.last_attn_slice_indices = None
+
+            for m in cls.get_attention_modules(model, cls.AttentionType.TOKENS):
+                m.last_attn_slice_mask = mask.to(device)
+                m.last_attn_slice_indices = indices.to(device)
 
         cls.inject_attention_functions(model)
 
+
+    @classmethod
+    def get_attention_modules(cls, model, which: AttentionType):
+        which_attn = "attn1" if which is cls.AttentionType.SELF else "attn2"
+        return [module for name, module in model.named_modules() if
+                      type(module).__name__ == "CrossAttention" and which_attn in name]
+
+
     @classmethod
     def request_save_attention_maps(cls, model):
-        self_attention_module = cls.get_attention_module(model, cls.AttentionType.SELF)
-        tokens_attention_module = cls.get_attention_module(model, cls.AttentionType.TOKENS)
-        self_attention_module.save_last_attn_slice = True
-        tokens_attention_module.save_last_attn_slice = True
+        self_attention_modules = cls.get_attention_modules(model, cls.AttentionType.SELF)
+        tokens_attention_modules = cls.get_attention_modules(model, cls.AttentionType.TOKENS)
+        for m in self_attention_modules+tokens_attention_modules:
+            m.save_last_attn_slice = True
 
     @classmethod
     def request_apply_saved_attention_maps(cls, model):
-        self_attention_module = cls.get_attention_module(model, cls.AttentionType.SELF)
-        tokens_attention_module = cls.get_attention_module(model, cls.AttentionType.TOKENS)
-        self_attention_module.use_last_attn_slice = True
-        tokens_attention_module.use_last_attn_slice = True
+        self_attention_modules = cls.get_attention_modules(model, cls.AttentionType.SELF)
+        tokens_attention_modules = cls.get_attention_modules(model, cls.AttentionType.TOKENS)
+        for m in self_attention_modules+tokens_attention_modules:
+            m.use_last_attn_slice = True
+
 
     @classmethod
     def inject_attention_functions(cls, unet):
         # ORIGINAL SOURCE CODE: https://github.com/huggingface/diffusers/blob/91ddd2a25b848df0fa1262d4f1cd98c7ccb87750/src/diffusers/models/attention.py#L276
         def new_attention(self, query, key, value):
             # TODO: use baddbmm for better performance
-            print(f"entered new_attention")
             attention_scores = torch.matmul(query, key.transpose(-1, -2)) * self.scale
             attn_slice = attention_scores.softmax(dim=-1)
             # compute attention output
 
             if self.use_last_attn_slice:
                 if self.last_attn_slice_mask is not None:
-                    print('using masked last_attn_slice')
-
-                    new_attn_slice = (torch.index_select(self.last_attn_slice, -1,
-                                                         self.last_attn_slice_indices))
-                    attn_slice = (attn_slice * (1 - self.last_attn_slice_mask)
-                                  + new_attn_slice * self.last_attn_slice_mask)
+                    base_attn_slice = torch.index_select(self.last_attn_slice, -1, self.last_attn_slice_indices)
+                    base_attn_slice_mask = self.last_attn_slice_mask
+                    this_attn_slice_mask = 1 - self.last_attn_slice_mask
+                    attn_slice = attn_slice * this_attn_slice_mask + base_attn_slice * base_attn_slice_mask
                 else:
-                    print('using unmasked last_attn_slice')
                     attn_slice = self.last_attn_slice
 
                 self.use_last_attn_slice = False
-            else:
-                print('not using last_attn_slice')
 
             if self.save_last_attn_slice:
-                print('saving last_attn_slice')
                 self.last_attn_slice = attn_slice
                 self.save_last_attn_slice = False
-            else:
-                print('not saving last_attn_slice')
 
             if self.use_last_attn_weights and self.last_attn_slice_weights is not None:
                 attn_slice = attn_slice * self.last_attn_slice_weights
@@ -92,16 +102,59 @@ class CrossAttentionControl:
 
             hidden_states = torch.matmul(attn_slice, value)
             # reshape hidden_states
+            hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
             return hidden_states
 
-        for _, module in unet.named_modules():
+        def new_sliced_attention(self, query, key, value, sequence_length, dim):
+
+            batch_size_attention = query.shape[0]
+            hidden_states = torch.zeros(
+                (batch_size_attention, sequence_length, dim // self.heads), device=query.device, dtype=query.dtype
+            )
+            slice_size = self._slice_size if self._slice_size is not None else hidden_states.shape[0]
+            for i in range(hidden_states.shape[0] // slice_size):
+                start_idx = i * slice_size
+                end_idx = (i + 1) * slice_size
+                attn_slice = (
+                        torch.matmul(query[start_idx:end_idx], key[start_idx:end_idx].transpose(1, 2)) * self.scale
+                )  # TODO: use baddbmm for better performance
+                attn_slice = attn_slice.softmax(dim=-1)
+
+                if self.use_last_attn_slice:
+                    if self.last_attn_slice_mask is not None:
+                        new_attn_slice = torch.index_select(self.last_attn_slice, -1, self.last_attn_slice_indices)
+                        attn_slice = attn_slice * (
+                                1 - self.last_attn_slice_mask) + new_attn_slice * self.last_attn_slice_mask
+                    else:
+                        attn_slice = self.last_attn_slice
+
+                    self.use_last_attn_slice = False
+
+                if self.save_last_attn_slice:
+                    self.last_attn_slice = attn_slice
+                    self.save_last_attn_slice = False
+
+                if self.use_last_attn_weights and self.last_attn_slice_weights is not None:
+                    attn_slice = attn_slice * self.last_attn_slice_weights
+                    self.use_last_attn_weights = False
+
+                attn_slice = torch.matmul(attn_slice, value[start_idx:end_idx])
+
+                hidden_states[start_idx:end_idx] = attn_slice
+
+            # reshape hidden_states
+            hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
+            return hidden_states
+
+        for name, module in unet.named_modules():
             module_name = type(module).__name__
-            if module_name == 'CrossAttention':
+            if module_name == "CrossAttention":
                 module.last_attn_slice = None
                 module.use_last_attn_slice = False
                 module.use_last_attn_weights = False
                 module.save_last_attn_slice = False
-                module.cross_attention_callback = new_attention.__get__(module, type(module))
+                module._sliced_attention = new_sliced_attention.__get__(module, type(module))
+                module._attention = new_attention.__get__(module, type(module))
 
 
 # original code below

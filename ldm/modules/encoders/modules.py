@@ -449,7 +449,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         tokens = batch_encoding['input_ids'].to(self.device)
         z = self.transformer(input_ids=tokens, **kwargs)
 
-        return z
+        return z, tokens
 
     def encode(self, text, **kwargs):
         return self(text, **kwargs)

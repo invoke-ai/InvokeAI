@@ -10,6 +10,8 @@ log_tokenization()              print out colour-coded tokens and warn if trunca
 
 '''
 import re
+from difflib import SequenceMatcher
+
 import torch
 
 def get_uc_and_c_and_ec(prompt, model, log_tokens=False, skip_normalize=False):
@@ -35,15 +37,15 @@ def get_uc_and_c_and_ec(prompt, model, log_tokens=False, skip_normalize=False):
         clean_prompt = edited_regex_compile.sub(' ', prompt)
         prompt = re.sub(' +', ' ', clean_prompt)
 
-    uc = model.get_learned_conditioning([unconditioned_words])
-    ec = None
-    if edited_words is not None:
-        ec = model.get_learned_conditioning([edited_words])
-
     # get weighted sub-prompts
     weighted_subprompts = split_weighted_subprompts(
         prompt, skip_normalize
     )
+
+    ec = None
+    edit_opcodes = None
+
+    uc, _ = model.get_learned_conditioning([unconditioned_words])
 
     if len(weighted_subprompts) > 1:
         # i dont know if this is correct.. but it works
@@ -51,16 +53,30 @@ def get_uc_and_c_and_ec(prompt, model, log_tokens=False, skip_normalize=False):
         # normalize each "sub prompt" and add it
         for subprompt, weight in weighted_subprompts:
             log_tokenization(subprompt, model, log_tokens, weight)
+            subprompt_embeddings, _ = model.get_learned_conditioning([subprompt])
             c = torch.add(
                 c,
-                model.get_learned_conditioning([subprompt]),
+                subprompt_embeddings,
                 alpha=weight,
             )
+        if edited_words is not None:
+            print("can't do cross-attention control with blends just yet, ignoring edits")
     else:   # just standard 1 prompt
         log_tokenization(prompt, model, log_tokens, 1)
-        c = model.get_learned_conditioning([prompt])
-        uc = model.get_learned_conditioning([unconditioned_words])
-    return (uc, c, ec)
+        c, c_tokens = model.get_learned_conditioning([prompt])
+        if edited_words is not None:
+            ec, ec_tokens = model.get_learned_conditioning([edited_words])
+            edit_opcodes = build_token_edit_opcodes(c_tokens, ec_tokens)
+
+    return (uc, c, ec, edit_opcodes)
+
+def build_token_edit_opcodes(c_tokens, ec_tokens):
+    tokens = c_tokens.cpu().numpy()[0]
+    tokens_edit = ec_tokens.cpu().numpy()[0]
+
+    opcodes = SequenceMatcher(None, tokens, tokens_edit).get_opcodes()
+    return opcodes
+
 
 def split_weighted_subprompts(text, skip_normalize=False)->list:
     """
