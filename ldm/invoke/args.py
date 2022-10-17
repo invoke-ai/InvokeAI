@@ -761,6 +761,12 @@ class Args(object):
             action='store_true',
             help='Change the model to seamless tiling (circular) mode',
         )
+        special_effects_group.add_argument(
+            '--seamless_axes',
+            default=['x', 'y'],
+            type=list[str],
+            help='Specify which axes to use circular convolution on.',
+        )
         variation_group.add_argument(
             '-v',
             '--variation_amount',

@@ -173,6 +173,7 @@ class Generate:
         self.precision      = precision
         self.strength       = 0.75
         self.seamless       = False
+        self.seamless_axes  = {'x','y'}
         self.hires_fix      = False
         self.embedding_path = embedding_path
         self.model          = None     # empty for now
@@ -258,6 +259,7 @@ class Generate:
             height           = None,
             sampler_name     = None,
             seamless         = False,
+            seamless_axes    = {'x','y'},
             log_tokenization = False,
             with_variations  = None,
             variation_amount = 0.0,
@@ -330,6 +332,7 @@ class Generate:
         width = width or self.width
         height = height or self.height
         seamless = seamless or self.seamless
+        seamless_axes = seamless_axes or self.seamless_axes
         hires_fix = hires_fix or self.hires_fix
         cfg_scale = cfg_scale or self.cfg_scale
         ddim_eta = ddim_eta or self.ddim_eta
@@ -348,9 +351,30 @@ class Generate:
         width = width or self.width
         height = height or self.height
         
+        def _conv_forward_asymmetric(self, input, weight, bias):
+            """
+            Patch for Conv2d._conv_forward that supports asymmetric padding
+            """
+            working = nn.functional.pad(input, self.asymmetric_padding['x'], mode=self.asymmetric_padding_mode['x'])
+            working = nn.functional.pad(working, self.asymmetric_padding['y'], mode=self.asymmetric_padding_mode['y'])
+            return nn.functional.conv2d(working, weight, bias, self.stride, nn.modules.utils._pair(0), self.dilation, self.groups)
+
         for m in model.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                m.padding_mode = 'circular' if seamless else m._orig_padding_mode
+                if seamless:
+                    m.asymmetric_padding_mode = {}
+                    m.asymmetric_padding = {}
+                    m.asymmetric_padding_mode['x'] = 'circular' if ('x' in seamless_axes) else 'constant'
+                    m.asymmetric_padding['x'] = (m._reversed_padding_repeated_twice[0], m._reversed_padding_repeated_twice[1], 0, 0)
+                    m.asymmetric_padding_mode['y'] = 'circular' if ('y' in seamless_axes) else 'constant'
+                    m.asymmetric_padding['y'] = (0, 0, m._reversed_padding_repeated_twice[2], m._reversed_padding_repeated_twice[3])
+                    m._conv_forward = _conv_forward_asymmetric.__get__(m, nn.Conv2d)
+                else:
+                    m._conv_forward = nn.Conv2d._conv_forward.__get__(m, nn.Conv2d)
+                    if hasattr(m, 'asymmetric_padding_mode'):
+                        del m.asymmetric_padding_mode
+                    if hasattr(m, 'asymmetric_padding'):
+                        del m.asymmetric_padding
 
         assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert threshold >= 0.0, '--threshold must be >=0.0'
