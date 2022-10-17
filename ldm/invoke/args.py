@@ -679,6 +679,14 @@ class Args(object):
             help='Path to input mask for inpainting mode (supersedes width and height)',
         )
         img2img_group.add_argument(
+            '-tm',
+            '--text_mask',
+            nargs='+',
+            type=str,
+            help='Use the clipseg classifier to generate the mask area for inpainting. Provide a description of the area to mask ("a mug"), optionally followed by the confidence level threshold (0-1.0; defaults to 0.5).',
+            default=None,
+        )
+        img2img_group.add_argument(
             '--init_color',
             type=str,
             help='Path to reference image for color correction (used for repeated img2img and inpainting)'

@@ -36,6 +36,7 @@ from torchvision import transforms
 
 CLIP_VERSION = 'ViT-B/16'
 CLIPSEG_WEIGHTS = 'src/clipseg/weights/rd64-uni.pth'
+CLIPSEG_SIZE = 352
 
 class SegmentedGrayscale(object):
     def __init__(self, image:Image, heatmap:torch.Tensor):
@@ -43,16 +44,25 @@ class SegmentedGrayscale(object):
         self.image = image
         
     def to_grayscale(self)->Image:
-        return Image.fromarray(np.uint8(self.heatmap*255))
+        return self._rescale(Image.fromarray(np.uint8(self.heatmap*255)))
 
     def to_mask(self,threshold:float=0.5)->Image:
         discrete_heatmap = self.heatmap.lt(threshold).int()
-        return Image.fromarray(np.uint8(discrete_heatmap*255),mode='L')
+        return self._rescale(Image.fromarray(np.uint8(discrete_heatmap*255),mode='L'))
 
     def to_transparent(self)->Image:
         transparent_image = self.image.copy()
-        transparent_image.putalpha(self.to_image)
+        transparent_image.putalpha(self.to_grayscale())
         return transparent_image
+
+    # unscales and uncrops the 352x352 heatmap so that it matches the image again
+    def _rescale(self, heatmap:Image)->Image:
+        size = self.image.width if (self.image.width > self.image.height) else self.image.height
+        resized_image = heatmap.resize(
+            (size,size),
+            resample=Image.Resampling.LANCZOS
+        )
+        return resized_image.crop((0,0,self.image.width,self.image.height))
 
 class Txt2Mask(object):
     '''
@@ -60,11 +70,13 @@ class Txt2Mask(object):
     'cuda', 'mps' or 'cpu'.
     '''
     def __init__(self,device='cpu'):
-        print('>> Initializing clipseg model')
+        print('>> Initializing clipseg model for text to mask inference')
+        self.device = device
         self.model = CLIPDensePredT(version=CLIP_VERSION, reduce_dim=64, )
         self.model.eval()
-        self.model.to(device)
-        self.model.load_state_dict(torch.load(CLIPSEG_WEIGHTS, map_location=torch.device(device)), strict=False)
+        # initially we keep everything in cpu to conserve space
+        self.model.to('cpu')
+        self.model.load_state_dict(torch.load(CLIPSEG_WEIGHTS, map_location=torch.device('cpu')), strict=False)
 
     @torch.no_grad()
     def segment(self, image:Image, prompt:str) -> SegmentedGrayscale:
@@ -73,18 +85,38 @@ class Txt2Mask(object):
         provided image and returns a SegmentedGrayscale object in which the brighter
         pixels indicate where the object is inferred to be.
         '''
+        self._to_device(self.device)
         prompts = [prompt]   # right now we operate on just a single prompt at a time
 
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            transforms.Resize((image.width, image.height)), # must be multiple of 64...
+            transforms.Resize((CLIPSEG_SIZE, CLIPSEG_SIZE)), # must be multiple of 64...
         ])
-        img = transform(image).unsqueeze(0)
+
+        img = self._scale_and_crop(image)
+        img = transform(img).unsqueeze(0)
+
         preds = self.model(img.repeat(len(prompts),1,1,1), prompts)[0]
         heatmap = torch.sigmoid(preds[0][0]).cpu()
+        self._to_device('cpu')
         return SegmentedGrayscale(image, heatmap)
 
+    def _to_device(self, device):
+        self.model.to(device)
 
-
-        
+    def _scale_and_crop(self, image:Image)->Image:
+        scaled_image = Image.new('RGB',(CLIPSEG_SIZE,CLIPSEG_SIZE))
+        if image.width > image.height: # width is constraint
+            scale = CLIPSEG_SIZE / image.width
+        else:
+            scale = CLIPSEG_SIZE / image.height
+        scaled_image.paste(
+            image.resize(
+                (int(scale * image.width),
+                 int(scale * image.height)
+                ),
+                resample=Image.Resampling.LANCZOS
+            ),box=(0,0)
+        )
+        return scaled_image

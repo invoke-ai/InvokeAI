@@ -54,6 +54,7 @@ COMMANDS = (
     '--hires_fix',
     '--inpaint_replace','-r',
     '--png_compression','-z',
+    '--text_mask','-tm',
     '!fix','!fetch','!history','!search','!clear',
     '!models','!switch','!import_model','!edit_model'
     )
