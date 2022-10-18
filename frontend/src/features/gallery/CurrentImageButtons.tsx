@@ -66,8 +66,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     (state: RootState) => state.options.upscalingLevel
   );
 
-  const gfpganStrength = useAppSelector(
-    (state: RootState) => state.options.gfpganStrength
+  const facetoolStrength = useAppSelector(
+    (state: RootState) => state.options.facetoolStrength
   );
 
   const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
@@ -195,7 +195,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         Boolean(!intermediateImage) &&
         isConnected &&
         !isProcessing &&
-        gfpganStrength
+        facetoolStrength
       ) {
         handleClickFixFaces();
       } else {
@@ -213,7 +213,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
       intermediateImage,
       isConnected,
       isProcessing,
-      gfpganStrength,
+      facetoolStrength,
     ]
   );
 
@@ -270,7 +270,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
               !isGFPGANAvailable ||
               Boolean(intermediateImage) ||
               !(isConnected && !isProcessing) ||
-              !gfpganStrength
+              !facetoolStrength
             }
             onClick={handleClickFixFaces}
           />

@@ -50,7 +50,7 @@ export const socketioMiddleware = () => {
     const {
       emitGenerateImage,
       emitRunESRGAN,
-      emitRunGFPGAN,
+      emitRunFacetool: emitRunGFPGAN,
       emitDeleteImage,
       emitRequestImages,
       emitRequestNewImages,
