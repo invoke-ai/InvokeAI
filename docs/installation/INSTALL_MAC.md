@@ -214,7 +214,7 @@ conda update \
 
 There are several causes of these errors:
 
-1. Did you remember to `conda activate invokeai`? If your terminal prompt begins with
+1. Did you remember to `conda activate ldm`? If your terminal prompt begins with
    "(invokeai)" then you activated it. If it begins with "(base)" or something else
    you haven't.
 
@@ -232,7 +232,7 @@ There are several causes of these errors:
     conda env remove -n invokeai
     conda env create -f environment-mac.yml
     ```
-    
+
 4. If you have activated the invokeai virtual environment and tried rebuilding it,
    maybe the problem could be that I have something installed that you don't and
    you'll just need to manually install it. Make sure you activate the virtual
@@ -302,7 +302,7 @@ output of `python3 -V` and `python -V`.
 ```
 
 The above is what you'll see if you have miniforge and correctly activated the
-invokeai environment, while usingd the standalone setup instructions above.
+ldm environment, while usingd the standalone setup instructions above.
 
 If you otherwise installed via pyenv, you will get this result:
 
@@ -521,4 +521,3 @@ Abort trap: 6
 /Users/[...]/opt/anaconda3/envs/invokeai/lib/python3.9/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
   warnings.warn('resource_tracker: There appear to be %d '
 ```
-
