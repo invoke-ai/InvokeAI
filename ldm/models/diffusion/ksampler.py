@@ -43,7 +43,7 @@ class CFGDenoiser(nn.Module, CrossAttentionControllableDiffusionMixin):
         edited_conditioning = kwargs.get('edited_conditioning', None)
         conditioning_edit_opcodes = kwargs.get('conditioning_edit_opcodes', None)
 
-        self.setup_cross_attention_control_if_appropriate(self.model, edited_conditioning, conditioning_edit_opcodes)
+        self.setup_cross_attention_control_if_appropriate(self.inner_model, edited_conditioning, conditioning_edit_opcodes)
 
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
