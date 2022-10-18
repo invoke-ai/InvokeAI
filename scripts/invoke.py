@@ -95,7 +95,10 @@ def main():
             "\n* Initialization done! Awaiting your command (-h for help, 'q' to quit)"
         )
 
-    main_loop(gen, opt, infile)
+    try:
+        main_loop(gen, opt, infile)
+    except KeyboardInterrupt:
+        print("\ngoodbye!")
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt, infile):
@@ -270,6 +273,7 @@ def main_loop(gen, opt, infile):
                             model_hash = gen.model_hash,
                         ),
                         name      = filename,
+                        compress_level = opt.png_compression,
                     )
 
                     # update rfc metadata
