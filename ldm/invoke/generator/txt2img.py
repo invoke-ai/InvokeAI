@@ -74,3 +74,4 @@ class Txt2Img(Generator):
         if self.perlin > 0.0:
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(width  // self.downsampling_factor, height // self.downsampling_factor)
         return x
+
