@@ -74,6 +74,8 @@ class CrossAttentionControl:
         self_attention_modules = cls.get_attention_modules(model, cls.AttentionType.SELF)
         tokens_attention_modules = cls.get_attention_modules(model, cls.AttentionType.TOKENS)
         for m in self_attention_modules+tokens_attention_modules:
+            # clear out the saved slice in case the outermost dim changes
+            m.last_attn_slice = None
             m.save_last_attn_slice = True
 
     @classmethod
@@ -90,6 +92,8 @@ class CrossAttentionControl:
         # ORIGINAL SOURCE CODE: https://github.com/huggingface/diffusers/blob/91ddd2a25b848df0fa1262d4f1cd98c7ccb87750/src/diffusers/models/attention.py#L276
 
         def attention_slice_wrangler(self, attention_scores, suggested_attention_slice, dim, offset, slice_size):
+
+            #print("in wrangler with suggested_attention_slice shape", suggested_attention_slice.shape, "dim", dim)
 
             attn_slice = suggested_attention_slice
             if dim is not None:
