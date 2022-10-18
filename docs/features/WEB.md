@@ -317,6 +317,7 @@ updates!
 `--host HOST` | Web server: Host or IP to listen on. Set to 0.0.0.0 to accept traffic from other devices on your network.
 `--port PORT` | Web server: Port to listen on
 `--gui` | Start InvokeAI GUI - This is the "desktop mode" version of the web app. It uses Flask to create a desktop app experience of the webserver.
+`--collaborative` | Updates the prompt on all connected viewers when one user generates an image.
 
 ### Web Specific Features
 

@@ -521,6 +521,12 @@ class Args(object):
             action='store_true',
             help='Start InvokeAI GUI',
         )
+        web_server_group.add_argument(
+            '--collaborative',
+            dest='collaborative',
+            action='store_true',
+            help='Update prompt on all connected viewers during Invoke'
+        )
         return parser
 
     # This creates the parser that processes commands on the invoke> command line

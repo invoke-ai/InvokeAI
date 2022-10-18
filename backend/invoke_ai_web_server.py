@@ -25,7 +25,7 @@ args = opt.parse_args()
 
 
 class InvokeAIWebServer:
-    def __init__(self, generate, gfpgan, codeformer, esrgan) -> None:
+    def __init__(self, generate, gfpgan, codeformer, esrgan, collaborative) -> None:
         self.host = args.host
         self.port = args.port
 
@@ -33,6 +33,7 @@ class InvokeAIWebServer:
         self.gfpgan = gfpgan
         self.codeformer = codeformer
         self.esrgan = esrgan
+        self.collaborative = collaborative
 
         self.canceled = Event()
 
@@ -263,9 +264,10 @@ class InvokeAIWebServer:
                 print(
                     f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}'
                 )
-                socketio.emit('updatePrompt', {
-                    'prompt': generation_parameters['prompt'],
-                })
+                if self.collaborative:
+                    socketio.emit('updatePrompt', {
+                        'prompt': generation_parameters['prompt'],
+                    })
                 self.generate_images(
                     generation_parameters, esrgan_parameters, gfpgan_parameters
                 )

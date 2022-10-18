@@ -87,7 +87,7 @@ def main():
 
     # web server loops forever
     if opt.web or opt.gui:
-        invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan)
+        invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan, opt.collaborative)
         sys.exit(0)
 
     if not infile:
@@ -609,7 +609,7 @@ def get_next_command(infile=None) -> str:  # command string
             print(f'#{command}')
     return command
 
-def invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan):
+def invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan, collaborative):
     print('\n* --web was specified, starting web server...')
     from backend.invoke_ai_web_server import InvokeAIWebServer
     # Change working directory to the stable-diffusion directory
@@ -617,7 +617,7 @@ def invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan):
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     )
     
-    invoke_ai_web_server = InvokeAIWebServer(generate=gen, gfpgan=gfpgan, codeformer=codeformer, esrgan=esrgan)
+    invoke_ai_web_server = InvokeAIWebServer(generate=gen, gfpgan=gfpgan, codeformer=codeformer, esrgan=esrgan, collaborative=collaborative)
 
     try:
         invoke_ai_web_server.run()
