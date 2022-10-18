@@ -43,7 +43,7 @@ export const PARAMETERS: { [key: string]: string } = {
   sampler: 'Sampler',
   seed: 'Seed',
   img2imgStrength: 'img2img Strength',
-  gfpganStrength: 'GFPGAN Strength',
+  facetoolStrength: 'GFPGAN Strength',
   upscalingLevel: 'Upscaling Level',
   upscalingStrength: 'Upscaling Strength',
   initialImagePath: 'Initial Image',
@@ -56,3 +56,5 @@ export const PARAMETERS: { [key: string]: string } = {
 export const NUMPY_RAND_MIN = 0;
 
 export const NUMPY_RAND_MAX = 4294967295;
+
+export const FACETOOL_TYPES = ['gfpgan', 'codeformer'] as const;
