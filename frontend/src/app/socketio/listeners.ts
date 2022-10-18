@@ -177,6 +177,29 @@ const makeSocketIOListeners = (
         console.error(e);
       }
     },
+    onCodeformerResult: (data: InvokeAI.ImageResultResponse) => {
+      try {
+        const { url, metadata, mtime } = data;
+
+        dispatch(
+          addImage({
+            uuid: uuidv4(),
+            url,
+            mtime,
+            metadata,
+          })
+        );
+
+        dispatch(
+          addLogEntry({
+            timestamp: dateFormat(new Date(), 'isoDateTime'),
+            message: `Fixed faces: ${url}`,
+          })
+        );
+      } catch (e) {
+        console.error(e);
+      }
+    },
     /**
      * Callback to run when we receive a 'progressUpdate' event.
      * TODO: Add additional progress phases

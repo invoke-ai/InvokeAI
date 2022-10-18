@@ -257,14 +257,14 @@ class InvokeAIWebServer:
 
         @socketio.on('generateImage')
         def handle_generate_image_event(
-            generation_parameters, esrgan_parameters, gfpgan_parameters
+            generation_parameters, esrgan_parameters, gfpgan_parameters, codeformer_parameters
         ):
             try:
                 print(
-                    f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}'
+                    f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}\nGFPGAN parameters: {codeformer_parameters}'
                 )
                 self.generate_images(
-                    generation_parameters, esrgan_parameters, gfpgan_parameters
+                    generation_parameters, esrgan_parameters, gfpgan_parameters, codeformer_parameters
                 )
             except Exception as e:
                 self.socketio.emit('error', {'message': (str(e))})
@@ -303,6 +303,8 @@ class InvokeAIWebServer:
                     progress.set_current_status('Upscaling')
                 elif postprocessing_parameters['type'] == 'gfpgan':
                     progress.set_current_status('Restoring Faces')
+                elif postprocessing_parameters['type'] == 'codeformer':
+                    progress.set_current_status('Restoring Faces')
 
                 socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -321,6 +323,13 @@ class InvokeAIWebServer:
                         image=image,
                         strength=postprocessing_parameters['facetool_strength'],
                         seed=seed,
+                    )
+                elif postprocessing_parameters['type'] == 'codeformer':
+                    image = self.codeformer.process(
+                        image=image,
+                        strength=postprocessing_parameters["facetool_strength"], 
+                        fidelity=postprocessing_parameters["codeformer_fidelity"], 
+                        seed=seed
                     )
                 else:
                     raise TypeError(
@@ -448,7 +457,7 @@ class InvokeAIWebServer:
         }
 
     def generate_images(
-        self, generation_parameters, esrgan_parameters, gfpgan_parameters
+        self, generation_parameters, esrgan_parameters, gfpgan_parameters, codeformer_parameters
     ):
         try:
             self.canceled.clear()
@@ -552,6 +561,7 @@ class InvokeAIWebServer:
                 nonlocal generation_parameters
                 nonlocal esrgan_parameters
                 nonlocal gfpgan_parameters
+                nonlocal codeformer_parameters
                 nonlocal progress
 
                 step_index = 1
@@ -623,6 +633,25 @@ class InvokeAIWebServer:
                         image=image,
                         strength=gfpgan_parameters['strength'],
                         seed=seed,
+                    )
+                    postprocessing = True
+                    all_parameters['facetool_strength'] = gfpgan_parameters[
+                        'strength'
+                    ]
+
+                if codeformer_parameters:
+                    progress.set_current_status('Restoring Faces')
+                    progress.set_current_status_has_steps(False)
+                    self.socketio.emit(
+                        'progressUpdate', progress.to_formatted_dict()
+                    )
+                    eventlet.sleep(0)
+
+                    image = self.codeformer.process(
+                        image=image,
+                        strength=codeformer_parameters["facetool_strength"], 
+                        fidelity=codeformer_parameters["codeformer_fidelity"], 
+                        seed=seed
                     )
                     postprocessing = True
                     all_parameters['facetool_strength'] = gfpgan_parameters[
@@ -737,13 +766,22 @@ class InvokeAIWebServer:
 
             # 'postprocessing' is either null or an
             if 'facetool_strength' in parameters:
+                if "codeformer_fidelity" not in parameters:
+                    postprocessing.append(
+                        {
+                            "type": "gfpgan", 
+                            "strength": float(parameters["facetool_strength"])
+                        }
+                    )
+                if "codeformer_fidelity" in parameters:
+                    postprocessing.append(
+                        {
+                            "type": "codeformer", 
+                            "strength": float(parameters["facetool_strength"]), 
+                            "fidelity": float(parameters["codeformer_fidelity"])
+                        }
+                    )
 
-                postprocessing.append(
-                    {
-                        'type': 'gfpgan',
-                        'strength': float(parameters['facetool_strength']),
-                    }
-                )
 
             if 'upscale' in parameters:
                 postprocessing.append(
@@ -839,6 +877,14 @@ class InvokeAIWebServer:
                 postprocessing_metadata['type'] = 'gfpgan'
                 postprocessing_metadata['strength'] = parameters[
                     'facetool_strength'
+                ]
+            elif parameters['type'] == 'codeformer':
+                postprocessing_metadata['type'] = 'codeformer'
+                postprocessing_metadata['strength'] = parameters[
+                    'facetool_strength'
+                ]
+                postprocessing_metadata['fidelity'] = parameters[
+                    'codeformer_fidelity'
                 ]
             else:
                 raise TypeError(f"Invalid type: {parameters['type']}")

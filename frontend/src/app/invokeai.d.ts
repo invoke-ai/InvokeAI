@@ -37,7 +37,7 @@ export declare type SeedWeights = Array<SeedWeightPair>;
 
 // All generated images contain these metadata.
 export declare type CommonGeneratedImageMetadata = {
-  postprocessing: null | Array<ESRGANMetadata | GFPGANMetadata>;
+  postprocessing: null | Array<ESRGANMetadata | GFPGANMetadata | CodeformerMetadata>;
   sampler:
     | 'ddim'
     | 'k_dpm_2_a'
@@ -94,10 +94,18 @@ export declare type GFPGANMetadata = CommonPostProcessedImageMetadata & {
   strength: number;
 };
 
+export declare type CodeformerMetadata = CommonPostProcessedImageMetadata & {
+  type: 'codeformer';
+  strength: number;
+  fidelity: number;
+};
+
+
 // Superset of all postprocessed image metadata types..
 export declare type PostProcessedImageMetadata =
   | ESRGANMetadata
-  | GFPGANMetadata;
+  | GFPGANMetadata
+  | CodeformerMetadata;
 
 // Metadata includes the system config and image metadata.
 export declare type Metadata = SystemConfig & {

@@ -30,14 +30,15 @@ const makeSocketIOEmitters = (
         options.shouldUseInitImage = false;
       }
 
-      const { generationParameters, esrganParameters, gfpganParameters } =
+      const { generationParameters, esrganParameters, gfpganParameters, codeformerParameters } =
         frontendToBackendParameters(options, getState().system);
 
       socketio.emit(
         'generateImage',
         generationParameters,
         esrganParameters,
-        gfpganParameters
+        gfpganParameters,
+        codeformerParameters
       );
 
       dispatch(
@@ -47,6 +48,7 @@ const makeSocketIOEmitters = (
             ...generationParameters,
             ...esrganParameters,
             ...gfpganParameters,
+            ...codeformerParameters
           })}`,
         })
       );
@@ -88,6 +90,28 @@ const makeSocketIOEmitters = (
           message: `GFPGAN fix faces requested: ${JSON.stringify({
             file: imageToProcess.url,
             ...gfpganParameters,
+          })}`,
+        })
+      );
+    },
+    emitRunCodeformer: (imageToProcess: InvokeAI.Image) => {
+      dispatch(setIsProcessing(true));
+      const { codeformerStrength } = getState().options;
+      const { codeformerFidelity } = getState().options;
+
+      const codeformerParameters = {
+        facetool_strength: codeformerStrength, codeformerFidelity
+      };
+      socketio.emit('runPostprocessing', imageToProcess, {
+        type: 'codeformer',
+        ...codeformerParameters,
+      });
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `CodeFormer fix faces requested: ${JSON.stringify({
+            file: imageToProcess.url,
+            ...codeformerParameters,
           })}`,
         })
       );

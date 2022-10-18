@@ -49,7 +49,7 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     guideImage: 'asset/path.gif',
   },
   [Feature.FACE_CORRECTION]: {
-    text: 'Using GFPGAN, Face Correction will attempt to identify faces in outputs, and correct any defects/abnormalities. Higher values will apply a stronger corrective pressure on outputs, resulting in more appealing faces (with less respect for accuracy of the original subject).',
+    text: 'Using GFPGAN or Codeformer, Face Correction will attempt to identify faces in outputs, and correct any defects/abnormalities. Higher strength values will apply a stronger corrective pressure on outputs, resulting in more appealing faces. With Codeformer, a higher fidelity will attempt to preserve the original image, at the expense of face correction strength. ',
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },

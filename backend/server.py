@@ -135,7 +135,7 @@ try:
 
 except (ModuleNotFoundError, ImportError):
     print(traceback.format_exc(), file=sys.stderr)
-    print(">> You may need to install the ESRGAN and/or GFPGAN modules")
+    print(">> You may need to install the ESRGAN GFPGAN and/or Codeformer modules")
 
 canceled = Event()
 
@@ -238,12 +238,12 @@ def handle_request_images(page=1, offset=0, last_mtime=None):
 
 @socketio.on("generateImage")
 def handle_generate_image_event(
-    generation_parameters, esrgan_parameters, gfpgan_parameters
+    generation_parameters, esrgan_parameters, gfpgan_parameters, codeformer_parameters
 ):
     print(
-        f">> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}"
+        f">> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}\nCodeformer parameters: {codeformer_parameters}"
     )
-    generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
+    generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters, codeformer_parameters)
 
 
 @socketio.on("runESRGAN")
@@ -387,6 +387,74 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
     )
 
 
+@socketio.on("runCodeformer")
+def handle_run_codeformer_event(original_image, codeformer_parameters):
+    print(
+        f'>> Codeformer face fix requested for "{original_image["url"]}": {codeformer_parameters}'
+    )
+    progress = {
+        "currentStep": 1,
+        "totalSteps": 1,
+        "currentIteration": 1,
+        "totalIterations": 1,
+        "currentStatus": "Preparing",
+        "isProcessing": True,
+        "currentStatusHasSteps": False,
+    }
+
+    socketio.emit("progressUpdate", progress)
+    eventlet.sleep(0)
+
+    image = Image.open(original_image["url"])
+
+    seed = (
+        original_image["metadata"]["seed"]
+        if "seed" in original_image["metadata"]
+        else "unknown_seed"
+    )
+
+    progress["currentStatus"] = "Fixing faces"
+    socketio.emit("progressUpdate", progress)
+    eventlet.sleep(0)
+
+    image = codeformer.process(
+        image=image, strength=codeformer_parameters["facetool_strength"], fidelity=codeformer_parameters["codeformer_fidelity"], seed=seed
+    )
+
+    progress["currentStatus"] = "Saving image"
+    socketio.emit("progressUpdate", progress)
+    eventlet.sleep(0)
+
+    codeformer_parameters["seed"] = seed
+    metadata = parameters_to_post_processed_image_metadata(
+        parameters=codeformer_parameters,
+        original_image_path=original_image["url"],
+        type="codeformer",
+    )
+    command = parameters_to_command(codeformer_parameters)
+
+    path = save_image(image, command, metadata, result_path, postprocessing="codeformer")
+
+    write_log_message(f'[Fixed faces] "{original_image["url"]}" > "{path}": {command}')
+
+    progress["currentStatus"] = "Finished"
+    progress["currentStep"] = 0
+    progress["totalSteps"] = 0
+    progress["currentIteration"] = 0
+    progress["totalIterations"] = 0
+    progress["isProcessing"] = False
+    socketio.emit("progressUpdate", progress)
+    eventlet.sleep(0)
+
+    socketio.emit(
+        "codeformerResult",
+        {
+            "url": os.path.relpath(path),
+            "mtime": os.path.mtime(path),
+            "metadata": metadata,
+        },
+    )
+
 @socketio.on("cancel")
 def handle_cancel():
     print(f">> Cancel processing requested")
@@ -465,6 +533,10 @@ def parameters_to_post_processed_image_metadata(parameters, original_image_path,
     elif type == "gfpgan":
         image["type"] = "gfpgan"
         image["strength"] = parameters["facetool_strength"]
+    elif type == "codeformer":
+        image["type"] = "codeformer"
+        image["strength"] = parameters["facetool_strength"]
+        image["fidelity"] = parameters["codeformer_fidelity"]
     else:
         raise TypeError(f"Invalid type: {type}")
 
@@ -507,10 +579,14 @@ def parameters_to_generated_image_metadata(parameters):
 
     # 'postprocessing' is either null or an
     if "facetool_strength" in parameters:
-
-        postprocessing.append(
-            {"type": "gfpgan", "strength": float(parameters["facetool_strength"])}
-        )
+        if "codeformer_fidelity" not in parameters:
+            postprocessing.append(
+                {"type": "gfpgan", "strength": float(parameters["facetool_strength"])}
+                )
+        if "codeformer_fidelity" in parameters:
+            postprocessing.append(
+                {"type": "codeformer", "strength": float(parameters["facetool_strength"]), "fidelity": float(parameters["codeformer_fidelity"])}
+                )
 
     if "upscale" in parameters:
         postprocessing.append(
@@ -607,7 +683,7 @@ def calculate_real_steps(steps, strength, has_init_image):
     return math.floor(strength * steps) if has_init_image else steps
 
 
-def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters):
+def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters, codeformer_parameters):
     canceled.clear()
 
     step_index = 1
@@ -750,6 +826,18 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
 
             image = gfpgan.process(
                 image=image, strength=gfpgan_parameters["strength"], seed=seed
+            )
+            postprocessing = True
+            all_parameters["facetool_strength"] = gfpgan_parameters["strength"]
+
+        if codeformer_parameters:
+            progress["currentStatus"] = "Fixing faces"
+            progress["currentStatusHasSteps"] = False
+            socketio.emit("progressUpdate", progress)
+            eventlet.sleep(0)
+
+            image = codeformer.process(
+                image=image, strength=codeformer_parameters["facetool_strength"], fidelity=codeformer_parameters["codeformer_fidelity"], seed=seed
             )
             postprocessing = True
             all_parameters["facetool_strength"] = gfpgan_parameters["strength"]

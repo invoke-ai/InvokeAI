@@ -45,6 +45,7 @@ const systemPersistConfig = {
     'socketId',
     'isESRGANAvailable',
     'isGFPGANAvailable',
+    'isCodeformerAvailable',
     'currentStep',
     'totalSteps',
     'currentIteration',

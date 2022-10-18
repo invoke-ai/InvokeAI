@@ -18,7 +18,10 @@ export interface OptionsState {
   perlin: number;
   seed: number;
   img2imgStrength: number;
+  facetool: string;
   gfpganStrength: number;
+  codeformerStrength: number;
+  codeformerFidelity: number;
   upscalingLevel: UpscalingLevel;
   upscalingStrength: number;
   shouldUseInitImage: boolean;
@@ -32,6 +35,7 @@ export interface OptionsState {
   seedWeights: string;
   shouldRunESRGAN: boolean;
   shouldRunGFPGAN: boolean;
+  shouldRunCodeformer: boolean;
   shouldRandomizeSeed: boolean;
   showAdvancedOptions: boolean;
   activeTab: number;
@@ -63,8 +67,12 @@ const initialOptionsState: OptionsState = {
   shouldRunESRGAN: false,
   upscalingLevel: 4,
   upscalingStrength: 0.75,
+  facetool: 'gfpgan',
   shouldRunGFPGAN: false,
   gfpganStrength: 0.8,
+  shouldRunCodeformer: false,
+  codeformerStrength: 0.8,
+  codeformerFidelity: 0.5,
   shouldRandomizeSeed: true,
   showAdvancedOptions: true,
   activeTab: 0,
@@ -117,8 +125,17 @@ export const optionsSlice = createSlice({
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
     },
+    setFacetool: (state, action: PayloadAction<string>) => {
+      state.facetool = action.payload;
+    },
     setGfpganStrength: (state, action: PayloadAction<number>) => {
       state.gfpganStrength = action.payload;
+    },
+    setCodeformerStrength: (state, action: PayloadAction<number>) => {
+      state.codeformerStrength = action.payload;
+    },
+    setCodeformerFidelity: (state, action: PayloadAction<number>) => {
+      state.codeformerFidelity = action.payload;
     },
     setUpscalingLevel: (state, action: PayloadAction<UpscalingLevel>) => {
       state.upscalingLevel = action.payload;
@@ -278,6 +295,9 @@ export const optionsSlice = createSlice({
     setShouldRunESRGAN: (state, action: PayloadAction<boolean>) => {
       state.shouldRunESRGAN = action.payload;
     },
+    setShouldRunCodeformer: (state, action: PayloadAction<boolean>) => {
+      state.shouldRunCodeformer = action.payload;
+    },
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
@@ -310,7 +330,10 @@ export const {
   setSeamless,
   setHiresFix,
   setImg2imgStrength,
+  setFacetool,
   setGfpganStrength,
+  setCodeformerStrength,
+  setCodeformerFidelity,
   setUpscalingLevel,
   setUpscalingStrength,
   setShouldUseInitImage,
@@ -324,6 +347,7 @@ export const {
   setSeedWeights,
   setVariationAmount,
   setAllParameters,
+  setShouldRunCodeformer,
   setShouldRunGFPGAN,
   setShouldRunESRGAN,
   setShouldRandomizeSeed,

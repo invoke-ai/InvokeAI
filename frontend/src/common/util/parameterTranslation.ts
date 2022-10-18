@@ -43,6 +43,9 @@ export const frontendToBackendParameters = (
     upscalingStrength,
     shouldRunGFPGAN,
     gfpganStrength,
+    shouldRunCodeformer,
+    codeformerStrength,
+    codeformerFidelity,
     shouldRandomizeSeed,
   } = optionsState;
 
@@ -89,6 +92,7 @@ export const frontendToBackendParameters = (
 
   let esrganParameters: false | { [k: string]: any } = false;
   let gfpganParameters: false | { [k: string]: any } = false;
+  let codeformerParameters: false | { [k: string]: any } = false;
 
   if (shouldRunESRGAN) {
     esrganParameters = {
@@ -103,10 +107,18 @@ export const frontendToBackendParameters = (
     };
   }
 
+  if (shouldRunCodeformer) {
+    codeformerParameters = {
+      strength: codeformerStrength,
+      fidelity: codeformerFidelity,
+    };
+  }
+
   return {
     generationParameters,
     esrganParameters,
     gfpganParameters,
+    codeformerParameters,
   };
 };
 
@@ -129,7 +141,9 @@ export const backendToFrontendParameters = (parameters: {
     progress_images,
     variation_amount,
     with_variations,
+    facetool,
     facetool_strength,
+    codeformer_fidelity,
     upscale,
     init_img,
     init_mask,
@@ -142,6 +156,7 @@ export const backendToFrontendParameters = (parameters: {
     shouldGenerateVariations: false,
     shouldRunESRGAN: false,
     shouldRunGFPGAN: false,
+    shouldRunCodeformer: false,
     initialImagePath: '',
     maskPath: '',
   };
@@ -155,8 +170,13 @@ export const backendToFrontendParameters = (parameters: {
   }
 
   if (facetool_strength > 0) {
-    options.shouldRunGFPGAN = true;
-    options.gfpganStrength = facetool_strength;
+    if (facetool == 'gfpgan') {
+      options.shouldRunGFPGAN = true;
+      options.gfpganStrength = facetool_strength;}
+    if (facetool == 'codeformer') {
+      options.shouldRunCodeformer = true;
+      options.codeformerStrength = facetool_strength;
+      options.codeformerFidelity = codeformer_fidelity}
   }
 
   if (upscale) {
