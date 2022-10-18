@@ -32,7 +32,7 @@ class Img2Img(Generator):
             ) # move to latent space
 
         t_enc = int(strength * steps)
-        uc, c   = conditioning
+        uc, c, ec, edit_opcodes   = conditioning
 
         def make_image(x_T):
             # encode (scaled latent)
@@ -49,7 +49,10 @@ class Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
-                init_latent = self.init_latent,  # changes how noising is performed in ksampler
+                init_latent = self.init_latent,
+                edited_conditioning = ec,
+                conditioning_edit_opcodes = edit_opcodes
+                # changes how noising is performed in ksampler
             )
 
             return self.sample_to_image(samples)

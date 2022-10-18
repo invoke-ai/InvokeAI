@@ -541,7 +541,8 @@ class Generate:
         image = Image.open(image_path)
 
         # used by multiple postfixers
-        uc, c = get_uc_and_c(
+        # todo: cross-attention
+        uc, c, _, _ = get_uc_and_c_and_ec(
             prompt, model =self.model,
             skip_normalize=opt.skip_normalize,
             log_tokens    =opt.log_tokenization

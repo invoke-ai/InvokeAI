@@ -132,6 +132,7 @@ class KSampler(Sampler):
             use_original_steps=False,
             init_latent       = None,
             mask              = None,
+            **kwargs
     ):
         samples,_ = self.sample(
             batch_size = 1,
@@ -143,7 +144,8 @@ class KSampler(Sampler):
             unconditional_conditioning = unconditional_conditioning,
             img_callback = img_callback,
             x0           = init_latent,
-            mask         = mask
+            mask         = mask,
+            **kwargs
             )
         return samples
 
@@ -238,6 +240,8 @@ class KSampler(Sampler):
             index,
             unconditional_guidance_scale=1.0,
             unconditional_conditioning=None,
+            edited_conditioning=None,
+            conditioning_edit_opcodes=None,
             **kwargs,
     ):
         if self.model_wrap is None:
@@ -263,6 +267,7 @@ class KSampler(Sampler):
         # so the actual formula for indexing into sigmas:
         # sigma_index = (steps-index)
         s_index = t_enc - index - 1
+        self.model_wrap.prepare_to_sample(s_index, edited_conditioning=edited_conditioning, conditioning_edit_opcodes=conditioning_edit_opcodes)
         img =  K.sampling.__dict__[f'_{self.schedule}'](
             self.model_wrap,
             img,
