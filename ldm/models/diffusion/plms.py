@@ -5,13 +5,23 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 from ldm.invoke.devices import choose_torch_device
+from ldm.models.diffusion.cross_attention import CrossAttentionControllableDiffusionMixin
 from ldm.models.diffusion.sampler import Sampler
 from ldm.modules.diffusionmodules.util import  noise_like
 
 
-class PLMSSampler(Sampler):
+class PLMSSampler(Sampler, CrossAttentionControllableDiffusionMixin):
     def __init__(self, model, schedule='linear', device=None, **kwargs):
         super().__init__(model,schedule,model.num_timesteps, device)
+
+    def prepare_to_sample(self, t_enc, **kwargs):
+        super().prepare_to_sample(t_enc, **kwargs)
+
+        edited_conditioning = kwargs.get('edited_conditioning', None)
+        edit_opcodes = kwargs.get('conditioning_edit_opcodes', None)
+
+        self.setup_cross_attention_control_if_appropriate(self.model, edited_conditioning, edit_opcodes)
+
 
     # this is the essential routine
     @torch.no_grad()
@@ -41,14 +51,18 @@ class PLMSSampler(Sampler):
                 unconditional_conditioning is None
                 or unconditional_guidance_scale == 1.0
             ):
+                # damian0815 does not think this code path is ever used
                 e_t = self.model.apply_model(x, t, c)
             else:
-                x_in = torch.cat([x] * 2)
-                t_in = torch.cat([t] * 2)
-                c_in = torch.cat([unconditional_conditioning, c])
-                e_t_uncond, e_t = self.model.apply_model(
-                    x_in, t_in, c_in
-                ).chunk(2)
+                #x_in = torch.cat([x] * 2)
+                #t_in = torch.cat([t] * 2)
+                #c_in = torch.cat([unconditional_conditioning, c])
+                #e_t_uncond, e_t = self.model.apply_model(
+                #    x_in, t_in, c_in
+                #).chunk(2)
+                e_t_uncond, e_t = self.do_cross_attention_controllable_diffusion_step(x, t, unconditional_conditioning, c, self.model,
+                    model_forward_callback=lambda x, sigma, cond: self.model.apply_model(x, sigma, cond))
+
                 e_t = e_t_uncond + unconditional_guidance_scale * (
                     e_t - e_t_uncond
                 )

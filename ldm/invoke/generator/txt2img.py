@@ -19,7 +19,7 @@ class Txt2Img(Generator):
         kwargs are 'width' and 'height'
         """
         self.perlin = perlin
-        uc, c, ec, edit_index_map   = conditioning
+        uc, c, ec, edit_opcodes   = conditioning
 
         @torch.no_grad()
         def make_image(x_T):
@@ -44,7 +44,7 @@ class Txt2Img(Generator):
                 unconditional_guidance_scale = cfg_scale,
                 unconditional_conditioning   = uc,
                 edited_conditioning          = ec,
-                edit_token_index_map         = edit_index_map,
+                conditioning_edit_opcodes    = edit_opcodes,
                 eta                          = ddim_eta,
                 img_callback                 = step_callback,
                 threshold                    = threshold,

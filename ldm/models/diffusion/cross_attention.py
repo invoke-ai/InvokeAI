@@ -2,6 +2,55 @@ from enum import Enum
 import torch
 
 
+
+class CrossAttentionControllableDiffusionMixin:
+
+    def setup_cross_attention_control_if_appropriate(self, model, edited_conditioning, edit_opcodes):
+        self.edited_conditioning = edited_conditioning
+
+        if edited_conditioning is not None:
+            # <start> a cat sitting on a car <end>
+            CrossAttentionControl.setup_attention_editing(model, edited_conditioning, edit_opcodes)
+        else:
+            # pass through the attention func but don't act on it
+            CrossAttentionControl.clear_attention_editing(model)
+
+    def cleanup_cross_attention_control(self, model):
+        CrossAttentionControl.clear_attention_editing(model)
+
+    def do_cross_attention_controllable_diffusion_step(self, x, sigma, unconditioning, conditioning, model, model_forward_callback):
+
+        CrossAttentionControl.clear_requests(model)
+
+        if self.edited_conditioning is None:
+            # faster batched path
+            x_twice = torch.cat([x]*2)
+            sigma_twice = torch.cat([sigma]*2)
+            both_conditionings = torch.cat([unconditioning, conditioning])
+            unconditioned_next_x, conditioned_next_x = model_forward_callback(x_twice, sigma_twice, both_conditionings).chunk(2)
+        else:
+            # slower non-batched path (20% slower on mac MPS)
+            # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of
+            # unconditioned_next_x causes attention maps to *also* be saved for the unconditioned_next_x.
+            # This messes app their application later, due to mismatched shape of dim 0 (seems to be 16 for batched vs. 8)
+            # (For the batched invocation the `wrangler` function gets attention tensor with shape[0]=16,
+            # representing batched uncond + cond, but then when it comes to applying the saved attention, the
+            # wrangler gets an attention tensor which only has shape[0]=8, representing just self.edited_conditionings.)
+            # todo: give CrossAttentionControl's `wrangler` function more info so it can work with a batched call as well.
+            unconditioned_next_x = model_forward_callback(x, sigma, unconditioning)
+
+            # process x using the original prompt, saving the attention maps
+            CrossAttentionControl.request_save_attention_maps(model)
+            _ = model_forward_callback(x, sigma, cond=conditioning)
+            CrossAttentionControl.clear_requests(model)
+
+            # process x again, using the saved attention maps to control where self.edited_conditioning will be applied
+            CrossAttentionControl.request_apply_saved_attention_maps(model)
+            conditioned_next_x = model_forward_callback(x, sigma, self.edited_conditioning)
+            CrossAttentionControl.clear_requests(model)
+
+        return unconditioned_next_x, conditioned_next_x
+
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
 
@@ -27,7 +76,8 @@ class CrossAttentionControl:
         # adapted from init_attention_edit
         device = substitute_conditioning.device
 
-        max_length = model.inner_model.cond_stage_model.max_length
+        # urgh. should this be hardcoded?
+        max_length = 77
         # mask=1 means use base prompt attention, mask=0 means use edited prompt attention
         mask = torch.zeros(max_length)
         indices_target = torch.arange(max_length, dtype=torch.long)
