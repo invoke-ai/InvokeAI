@@ -56,6 +56,13 @@ class CrossAttentionControl:
         return [module for name, module in model.named_modules() if
                       type(module).__name__ == "CrossAttention" and which_attn in name]
 
+    @classmethod
+    def clear_requests(cls, model):
+        self_attention_modules = cls.get_attention_modules(model, cls.AttentionType.SELF)
+        tokens_attention_modules = cls.get_attention_modules(model, cls.AttentionType.TOKENS)
+        for m in self_attention_modules+tokens_attention_modules:
+            m.save_last_attn_slice = False
+            m.use_last_attn_slice = False
 
     @classmethod
     def request_save_attention_maps(cls, model):
@@ -76,81 +83,84 @@ class CrossAttentionControl:
     def inject_attention_functions(cls, unet):
         # ORIGINAL SOURCE CODE: https://github.com/huggingface/diffusers/blob/91ddd2a25b848df0fa1262d4f1cd98c7ccb87750/src/diffusers/models/attention.py#L276
 
-        def new_attention(self, query, key, value):
+        def attention_slice_wrangler(self, attention_scores, suggested_attention_slice, dim, offset, slice_size):
 
-            attention_scores = torch.functional.einsum('b i d, b j d -> b i j', query, key)
-            # calculate attention slice by taking the best scores for each latent pixel
-            attn_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
+            attn_slice = suggested_attention_slice
+            if dim is not None:
+                start = offset
+                end = start+slice_size
+                #print(f"in wrangler, sliced dim {dim} {start}-{end}, use_last_attn_slice is {self.use_last_attn_slice}, save_last_attn_slice is {self.save_last_attn_slice}")
+            #else:
+            #    print(f"in wrangler, whole, use_last_attn_slice is {self.use_last_attn_slice}, save_last_attn_slice is {self.save_last_attn_slice}")
+
 
             if self.use_last_attn_slice:
+                this_attn_slice = attn_slice
                 if self.last_attn_slice_mask is not None:
-                    base_attn_slice = torch.index_select(self.last_attn_slice, -1, self.last_attn_slice_indices)
+                    # indices and mask operate on dim=2, no need to slice
+                    base_attn_slice_full = torch.index_select(self.last_attn_slice, -1, self.last_attn_slice_indices)
                     base_attn_slice_mask = self.last_attn_slice_mask
-                    this_attn_slice_mask = 1 - self.last_attn_slice_mask
-                    attn_slice = attn_slice * this_attn_slice_mask + base_attn_slice * base_attn_slice_mask
-                else:
-                    attn_slice = self.last_attn_slice
+                    if dim is None:
+                        base_attn_slice = base_attn_slice_full
+                        #print("using whole base slice of shape", base_attn_slice.shape, "from complete shape", base_attn_slice_full.shape)
+                    elif dim == 0:
+                        base_attn_slice = base_attn_slice_full[start:end]
+                        #print("using base dim 0 slice of shape", base_attn_slice.shape, "from complete shape", base_attn_slice_full.shape)
+                    elif dim == 1:
+                        base_attn_slice = base_attn_slice_full[:, start:end]
+                        #print("using base dim 1 slice of shape", base_attn_slice.shape, "from complete shape", base_attn_slice_full.shape)
 
-                self.use_last_attn_slice = False
+                    attn_slice = this_attn_slice * (1 - base_attn_slice_mask) + \
+                                 base_attn_slice * base_attn_slice_mask
+                else:
+                    if dim is None:
+                        attn_slice = self.last_attn_slice
+                        #print("took whole slice of shape", attn_slice.shape, "from complete shape", self.last_attn_slice.shape)
+                    elif dim == 0:
+                        attn_slice = self.last_attn_slice[start:end]
+                        #print("took dim 0 slice of shape", attn_slice.shape, "from complete shape", self.last_attn_slice.shape)
+                    elif dim == 1:
+                        attn_slice = self.last_attn_slice[:, start:end]
+                        #print("took dim 1 slice of shape", attn_slice.shape, "from complete shape", self.last_attn_slice.shape)
 
             if self.save_last_attn_slice:
-                self.last_attn_slice = attn_slice
-                self.save_last_attn_slice = False
+                if dim is None:
+                    self.last_attn_slice = attn_slice
+                elif dim == 0:
+                    # dynamically grow last_attn_slice if needed
+                    if self.last_attn_slice is None:
+                        self.last_attn_slice = attn_slice
+                        #print("no last_attn_slice: shape now", self.last_attn_slice.shape)
+                    elif self.last_attn_slice.shape[0] == start:
+                        self.last_attn_slice = torch.cat([self.last_attn_slice, attn_slice], dim=0)
+                        assert(self.last_attn_slice.shape[0] == end)
+                        #print("last_attn_slice too small, appended dim 0 shape", attn_slice.shape, ", shape now", self.last_attn_slice.shape)
+                    else:
+                        # no need to grow
+                        self.last_attn_slice[start:end] = attn_slice
+                        #print("last_attn_slice shape is fine, setting dim 0 shape", attn_slice.shape, ", shape now", self.last_attn_slice.shape)
+
+                elif dim == 1:
+                    # dynamically grow last_attn_slice if needed
+                    if self.last_attn_slice is None:
+                        self.last_attn_slice = attn_slice
+                    elif self.last_attn_slice.shape[1] == start:
+                        self.last_attn_slice = torch.cat([self.last_attn_slice, attn_slice], dim=1)
+                        assert(self.last_attn_slice.shape[1] == end)
+                    else:
+                        # no need to grow
+                        self.last_attn_slice[:, start:end] = attn_slice
 
             if self.use_last_attn_weights and self.last_attn_slice_weights is not None:
-                attn_slice = attn_slice * self.last_attn_slice_weights
-                self.use_last_attn_weights = False
+                if dim is None:
+                    weights = self.last_attn_slice_weights
+                elif dim == 0:
+                    weights = self.last_attn_slice_weights[start:end]
+                elif dim == 1:
+                    weights = self.last_attn_slice_weights[:, start:end]
+                attn_slice = attn_slice * weights
 
-            return torch.functional.einsum('b i j, b j d -> b i d', attn_slice, value)
-
-        def new_sliced_attention(self, query, key, value, sequence_length, dim):
-
-            raise NotImplementedError("not tested yet")
-
-            batch_size_attention = query.shape[0]
-            hidden_states = torch.zeros(
-                (batch_size_attention, sequence_length, dim // self.heads), device=query.device, dtype=query.dtype
-            )
-            slice_size = self._slice_size if self._slice_size is not None else hidden_states.shape[0]
-            for i in range(hidden_states.shape[0] // slice_size):
-                start_idx = i * slice_size
-                end_idx = (i + 1) * slice_size
-                attn_slice = (
-                        torch.matmul(query[start_idx:end_idx], key[start_idx:end_idx].transpose(1, 2)) * self.scale
-                )  # TODO: use baddbmm for better performance
-                attn_slice = attn_slice.softmax(dim=-1)
-
-                if self.use_last_attn_slice:
-                    if self.last_attn_slice_mask is not None:
-                        new_attn_slice = torch.index_select(self.last_attn_slice, -1, self.last_attn_slice_indices)
-                        attn_slice = attn_slice * (
-                                1 - self.last_attn_slice_mask) + new_attn_slice * self.last_attn_slice_mask
-                    else:
-                        attn_slice = self.last_attn_slice
-
-                    self.use_last_attn_slice = False
-
-                if self.save_last_attn_slice:
-                    self.last_attn_slice = attn_slice
-                    self.save_last_attn_slice = False
-
-                if self.use_last_attn_weights and self.last_attn_slice_weights is not None:
-                    attn_slice = attn_slice * self.last_attn_slice_weights
-                    self.use_last_attn_weights = False
-
-                attn_slice = torch.matmul(attn_slice, value[start_idx:end_idx])
-
-                hidden_states[start_idx:end_idx] = attn_slice
-
-            # reshape hidden_states
-            hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
-            return hidden_states
-
-        def select_attention_func(module, q, k, v, dim, offset, slice_size):
-            if dim == 0 or dim == 1:
-                return new_sliced_attention(module, q, k, v, sequence_length=slice_size, dim=dim)
-            else:
-                return new_attention(module, q, k, v)
+            return attn_slice
 
         for name, module in unet.named_modules():
             module_name = type(module).__name__
@@ -159,7 +169,7 @@ class CrossAttentionControl:
                 module.use_last_attn_slice = False
                 module.use_last_attn_weights = False
                 module.save_last_attn_slice = False
-                module.set_custom_attention_calculator(select_attention_func)
+                module.set_attention_slice_wrangler(attention_slice_wrangler)
 
 
 # original code below

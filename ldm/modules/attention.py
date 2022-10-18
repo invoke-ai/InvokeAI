@@ -173,59 +173,75 @@ class CrossAttention(nn.Module):
 
         self.mem_total_gb = psutil.virtual_memory().total // (1 << 30)
 
-        self.custom_attention_calculator = None
+        self.attention_slice_wrangler = None
 
-    def set_custom_attention_calculator(self, callback:Callable[[torch.Tensor, torch.Tensor, torch.Tensor, int, int, int], torch.Tensor]):
+    def set_attention_slice_wrangler(self, wrangler:Callable[[nn.Module, torch.Tensor, torch.Tensor, int, int, int], torch.Tensor]):
         '''
         Set custom attention calculator to be called when attention is calculated
-        :param callback: Callback, with args q, k, v, dim, offset, slice_size, which returns attention info.
-            q, k, v are as regular attention calculator.
+        :param wrangler: Callback, with args (self, attention_scores, suggested_attention_slice, dim, offset, slice_size),
+        which returns either the suggested_attention_slice or an adjusted equivalent.
+            self is the current CrossAttention module for which the callback is being invoked.
+            attention_scores are the scores for attention
+            suggested_attention_slice is a softmax(dim=-1) over attention_scores
             dim is -1 if the call is non-sliced, or 0 or 1 for dimension-0 or dimension-1 slicing.
                 If dim is >= 0, offset and slice_size specify the slice start and length.
+
         Pass None to use the default attention calculation.
         :return:
         '''
-        self.custom_attention_calculator = callback
+        self.attention_slice_wrangler = wrangler
 
-    def einsum_op_slice_dim0(self, q, k, v, slice_size, callback):
+    def einsum_lowest_level(self, q, k, v, dim, offset, slice_size):
+        # calculate attention scores
+        attention_scores = einsum('b i d, b j d -> b i j', q, k)
+        # calculate attenion slice by taking the best scores for each latent pixel
+        default_attention_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
+        if self.attention_slice_wrangler is not None:
+            attention_slice = self.attention_slice_wrangler(self, attention_scores, default_attention_slice, dim, offset, slice_size)
+        else:
+            attention_slice = default_attention_slice
+
+        return einsum('b i j, b j d -> b i d', attention_slice, v)
+
+    def einsum_op_slice_dim0(self, q, k, v, slice_size):
         r = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
         for i in range(0, q.shape[0], slice_size):
             end = i + slice_size
-            r[i:end] = callback(q[i:end], k[i:end], v[i:end], dim=0, offset=i, slice_size=slice_size)
+            r[i:end] = self.einsum_lowest_level(q[i:end], k[i:end], v[i:end], dim=0, offset=i, slice_size=slice_size)
         return r
 
-    def einsum_op_slice_dim1(self, q, k, v, slice_size, callback):
+    def einsum_op_slice_dim1(self, q, k, v, slice_size):
         r = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
         for i in range(0, q.shape[1], slice_size):
             end = i + slice_size
-            r[:, i:end] = callback(self, q[:, i:end], k, v, dim=1, offset=i, slice_size=slice_size)
+            r[:, i:end] = self.einsum_lowest_level(q[:, i:end], k, v, dim=1, offset=i, slice_size=slice_size)
         return r
 
-    def einsum_op_mps_v1(self, q, k, v, callback):
+    def einsum_op_mps_v1(self, q, k, v):
         if q.shape[1] <= 4096: # (512x512) max q.shape[1]: 4096
-            return callback(self, q, k, v, -1, 0, 0)
+            return self.einsum_lowest_level(q, k, v, None, None, None)
         else:
             slice_size = math.floor(2**30 / (q.shape[0] * q.shape[1]))
-            return self.einsum_op_slice_dim1(q, k, v, slice_size, callback)
+            return self.einsum_op_slice_dim1(q, k, v, slice_size)
 
-    def einsum_op_mps_v2(self, q, k, v, callback):
+    def einsum_op_mps_v2(self, q, k, v):
         if self.mem_total_gb > 8 and q.shape[1] <= 4096:
-            return callback(self, q, k, v, -1, 0, 0)
+            return self.einsum_lowest_level(q, k, v, None, None, None)
         else:
-            return self.einsum_op_slice_dim0(q, k, v, 1, callback)
+            return self.einsum_op_slice_dim0(q, k, v, 1)
 
-    def einsum_op_tensor_mem(self, q, k, v, max_tensor_mb, callback):
+    def einsum_op_tensor_mem(self, q, k, v, max_tensor_mb):
         size_mb = q.shape[0] * q.shape[1] * k.shape[1] * q.element_size() // (1 << 20)
         if size_mb <= max_tensor_mb:
-            return callback(self, q, k, v, offset=0)
+            return self.einsum_lowest_level(q, k, v, None, None, None)
         div = 1 << int((size_mb - 1) / max_tensor_mb).bit_length()
         if div <= q.shape[0]:
             print("warning: untested call to einsum_op_slice_dim0")
-            return self.einsum_op_slice_dim0(q, k, v, q.shape[0] // div, callback)
+            return self.einsum_op_slice_dim0(q, k, v, q.shape[0] // div)
         print("warning: untested call to einsum_op_slice_dim1")
-        return self.einsum_op_slice_dim1(q, k, v, max(q.shape[1] // div, 1), callback)
+        return self.einsum_op_slice_dim1(q, k, v, max(q.shape[1] // div, 1))
 
-    def einsum_op_cuda(self, q, k, v, callback):
+    def einsum_op_cuda(self, q, k, v):
         stats = torch.cuda.memory_stats(q.device)
         mem_active = stats['active_bytes.all.current']
         mem_reserved = stats['reserved_bytes.all.current']
@@ -233,20 +249,20 @@ class CrossAttention(nn.Module):
         mem_free_torch = mem_reserved - mem_active
         mem_free_total = mem_free_cuda + mem_free_torch
         # Divide factor of safety as there's copying and fragmentation
-        return self.einsum_op_tensor_mem(q, k, v, mem_free_total / 3.3 / (1 << 20), callback)
+        return self.einsum_op_tensor_mem(q, k, v, mem_free_total / 3.3 / (1 << 20))
 
-    def get_attention_mem_efficient(self, q, k, v, callback):
+    def get_attention_mem_efficient(self, q, k, v):
         if q.device.type == 'cuda':
-            return self.einsum_op_cuda(q, k, v, callback)
+            return self.einsum_op_cuda(q, k, v)
 
         if q.device.type == 'mps':
             if self.mem_total_gb >= 32:
-                return self.einsum_op_mps_v1(q, k, v, callback)
-            return self.einsum_op_mps_v2(q, k, v, callback)
+                return self.einsum_op_mps_v1(q, k, v)
+            return self.einsum_op_mps_v2(q, k, v)
 
         # Smaller slices are faster due to L2/L3/SLC caches.
         # Tested on i7 with 8MB L3 cache.
-        return self.einsum_op_tensor_mem(q, k, v, 32, callback)
+        return self.einsum_op_tensor_mem(q, k, v, 32)
 
     def forward(self, x, context=None, mask=None):
         h = self.heads
@@ -259,21 +275,12 @@ class CrossAttention(nn.Module):
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
 
-        def default_attention_calculator(q, k, v, **kwargs):
-            # calculate attention scores
-            attention_scores = einsum('b i d, b j d -> b i j', q, k)
-            # calculate attenion slice by taking the best scores for each latent pixel
-            attention_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
-            return einsum('b i j, b j d -> b i d', attention_slice, v)
-
-        attention_calculator = \
-            self.custom_attention_calculator if self.custom_attention_calculator is not None \
-            else default_attention_calculator
-
-        r = self.get_attention_mem_efficient(q, k, v, attention_calculator)
+        r = self.get_attention_mem_efficient(q, k, v)
 
         hidden_states = rearrange(r, '(b h) n d -> b n (h d)', h=h)
         return self.to_out(hidden_states)
+
+
 
 
 class BasicTransformerBlock(nn.Module):
