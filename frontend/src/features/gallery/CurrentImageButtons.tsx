@@ -15,7 +15,7 @@ import {
 import DeleteImageModal from './DeleteImageModal';
 import { SystemState } from '../system/systemSlice';
 import IAIButton from '../../common/components/IAIButton';
-import { runESRGAN, runGFPGAN } from '../../app/socketio/actions';
+import { runESRGAN, runFacetool } from '../../app/socketio/actions';
 import IAIIconButton from '../../common/components/IAIIconButton';
 import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
 import InvokePopover from './InvokePopover';
@@ -186,7 +186,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     ]
   );
 
-  const handleClickFixFaces = () => dispatch(runGFPGAN(image));
+  const handleClickFixFaces = () => dispatch(runFacetool(image));
+
   useHotkeys(
     'r',
     () => {
