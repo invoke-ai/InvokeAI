@@ -26,6 +26,7 @@ import {
 import {
   setInitialImagePath,
   setMaskPath,
+  setPrompt,
 } from '../../features/options/optionsSlice';
 import { requestImages, requestNewImages } from './actions';
 
@@ -325,6 +326,9 @@ const makeSocketIOListeners = (
     },
     onSystemConfig: (data: InvokeAI.SystemConfig) => {
       dispatch(setSystemConfig(data));
+    },
+    onUpdatePrompt: (data: InvokeAI.UpdatePromptResponse) => {
+      dispatch(setPrompt(data.prompt));
     },
   };
 };

@@ -45,6 +45,7 @@ export const socketioMiddleware = () => {
       onInitialImageUploaded,
       onMaskImageUploaded,
       onSystemConfig,
+      onUpdatePrompt,
     } = makeSocketIOListeners(store);
 
     const {
@@ -110,6 +111,10 @@ export const socketioMiddleware = () => {
 
       socketio.on('systemConfig', (data: InvokeAI.SystemConfig) => {
         onSystemConfig(data);
+      });
+
+      socketio.on('updatePrompt', (data: InvokeAI.UpdatePromptResponse) => {
+        onUpdatePrompt(data);
       });
 
       areListenersSet = true;

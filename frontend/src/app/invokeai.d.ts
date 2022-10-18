@@ -173,3 +173,7 @@ export declare type ImageUrlAndUuidResponse = {
 export declare type ImageUrlResponse = {
   url: string;
 };
+
+export declare type UpdatePromptResponse = {
+  prompt: Prompt;
+};

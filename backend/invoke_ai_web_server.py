@@ -263,6 +263,9 @@ class InvokeAIWebServer:
                 print(
                     f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}'
                 )
+                socketio.emit('updatePrompt', {
+                    'prompt': generation_parameters['prompt'],
+                })
                 self.generate_images(
                     generation_parameters, esrgan_parameters, gfpgan_parameters
                 )
