@@ -15,8 +15,8 @@ export enum Feature {
   IMAGE_TO_IMAGE,
 }
 /** For each tooltip in the UI, the below feature definitions & props will pull relevant information into the tooltip.
- * 
- * To-do: href & GuideImages are placeholders, and are not currently utilized, but will be updated (along with the tooltip UI) as feature and UI development and we get a better idea on where things "forever homes" will be . 
+ *
+ * To-do: href & GuideImages are placeholders, and are not currently utilized, but will be updated (along with the tooltip UI) as feature and UI development and we get a better idea on where things "forever homes" will be .
  */
 export const FEATURES: Record<Feature, FeatureHelpInfo> = {
   [Feature.PROMPT]: {
@@ -30,7 +30,8 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     guideImage: 'asset/path.gif',
   },
   [Feature.OTHER]: {
-    text: 'These options will enable alternative processing modes for Invoke. Seamless tiling will work to generate repeating patterns in the output. High Resolution Optimization performs a two-step generation cycle, and should be used at higher resolutions when you desire a more coherent image/composition. ',    href: 'link/to/docs/feature3.html',
+    text: 'These options will enable alternative processing modes for Invoke. Seamless tiling will work to generate repeating patterns in the output. High Resolution Optimization performs a two-step generation cycle, and should be used at higher resolutions when you desire a more coherent image/composition. ',
+    href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },
   [Feature.SEED]: {
@@ -49,7 +50,7 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     guideImage: 'asset/path.gif',
   },
   [Feature.FACE_CORRECTION]: {
-    text: 'Using GFPGAN, Face Correction will attempt to identify faces in outputs, and correct any defects/abnormalities. Higher values will apply a stronger corrective pressure on outputs, resulting in more appealing faces (with less respect for accuracy of the original subject).',
+    text: 'Using GFPGAN or Codeformer, Face Correction will attempt to identify faces in outputs, and correct any defects/abnormalities. Higher strength values will apply a stronger corrective pressure on outputs, resulting in more appealing faces. With Codeformer, a higher fidelity will attempt to preserve the original image, at the expense of face correction strength.',
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },

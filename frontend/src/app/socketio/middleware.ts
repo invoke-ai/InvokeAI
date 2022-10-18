@@ -50,7 +50,7 @@ export const socketioMiddleware = () => {
     const {
       emitGenerateImage,
       emitRunESRGAN,
-      emitRunFacetool: emitRunGFPGAN,
+      emitRunFacetool,
       emitDeleteImage,
       emitRequestImages,
       emitRequestNewImages,
@@ -129,8 +129,8 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/runGFPGAN': {
-        emitRunGFPGAN(action.payload);
+      case 'socketio/runFacetool': {
+        emitRunFacetool(action.payload);
         break;
       }
 
