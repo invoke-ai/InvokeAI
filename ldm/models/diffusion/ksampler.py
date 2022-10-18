@@ -44,7 +44,7 @@ class CFGDenoiser(nn.Module):
             CrossAttentionControl.setup_attention_editing(self.inner_model, edited_conditioning, edit_opcodes)
         else:
             # pass through the attention func but don't act on it
-            CrossAttentionControl.setup_attention_editing(self.inner_model)
+            CrossAttentionControl.clear_attention_editing(self.inner_model)
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
 
