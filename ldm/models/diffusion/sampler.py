@@ -309,8 +309,6 @@ class Sampler(object):
             use_original_steps=False,
             init_latent       = None,
             mask              = None,
-            edited_conditioning = None,
-            conditioning_edit_opcodes = None,
             **kwargs
     ):
 
