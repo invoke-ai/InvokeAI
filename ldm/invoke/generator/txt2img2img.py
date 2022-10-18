@@ -22,7 +22,7 @@ class Txt2Img2Img(Generator):
         Return value depends on the seed at the time you call it
         kwargs are 'width' and 'height'
         """
-        uc, c   = conditioning
+        uc, c, ec, edit_opcodes = conditioning
 
         @torch.no_grad()
         def make_image(x_T):           
@@ -60,7 +60,9 @@ class Txt2Img2Img(Generator):
                 unconditional_guidance_scale = cfg_scale,
                 unconditional_conditioning   = uc,
                 eta                          = ddim_eta,
-                img_callback                 = step_callback
+                img_callback                 = step_callback,
+                edited_conditioning          = ec,
+                conditioning_edit_opcodes    = edit_opcodes
             )
             
             print(
@@ -94,6 +96,8 @@ class Txt2Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
+                edited_conditioning = ec,
+                conditioning_edit_opcodes = edit_opcodes
             )
 
             if self.free_gpu_mem:
