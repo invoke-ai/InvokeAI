@@ -159,6 +159,7 @@ Here are the invoke> command that apply to txt2img:
 | --individual       | -i        | True                | Turn off grid mode (deprecated; leave off --grid instead) |
 | --outdir <path>    |  -o<path> | outputs/img_samples  | Temporarily change the location of these images |
 | --seamless         |           | False               | Activate seamless tiling for interesting effects |
+| --seamless_axes    |           | x,y                 | Specify which axes to use circular convolution on. |
 | --log_tokenization | -t        | False               | Display a color-coded list of the parsed tokens derived from the prompt |
 | --skip_normalization| -x       | False               | Weighted subprompts will not be normalized. See [Weighted Prompts](./OTHER.md#weighted-prompts) |
 | --upscale <int> <float> | -U <int> <float> | -U 1 0.75| Upscale image by magnification factor (2, 4), and set strength of upscaling (0.0-1.0). If strength not set, will default to 0.75. |

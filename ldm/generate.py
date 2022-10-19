@@ -34,6 +34,7 @@ from ldm.invoke.image_util import InitImageResizer
 from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.conditioning import get_uc_and_c
 from ldm.invoke.model_cache import ModelCache
+from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
     
 def fix_func(orig):
@@ -174,6 +175,7 @@ class Generate:
         self.precision      = precision
         self.strength       = 0.75
         self.seamless       = False
+        self.seamless_axes  = {'x','y'}
         self.hires_fix      = False
         self.embedding_path = embedding_path
         self.model          = None     # empty for now
@@ -260,6 +262,7 @@ class Generate:
             height           = None,
             sampler_name     = None,
             seamless         = False,
+            seamless_axes    = {'x','y'},
             log_tokenization = False,
             with_variations  = None,
             variation_amount = 0.0,
@@ -335,6 +338,7 @@ class Generate:
         width = width or self.width
         height = height or self.height
         seamless = seamless or self.seamless
+        seamless_axes = seamless_axes or self.seamless_axes
         hires_fix = hires_fix or self.hires_fix
         cfg_scale = cfg_scale or self.cfg_scale
         ddim_eta = ddim_eta or self.ddim_eta
@@ -352,10 +356,8 @@ class Generate:
         # to the width and height of the image training set
         width = width or self.width
         height = height or self.height
-        
-        for m in model.modules():
-            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                m.padding_mode = 'circular' if seamless else m._orig_padding_mode
+
+        configure_model_padding(model, seamless, seamless_axes)
 
         assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert threshold >= 0.0, '--threshold must be >=0.0'
