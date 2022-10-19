@@ -1,33 +1,70 @@
 from enum import Enum
+from typing import Callable
+
 import torch
 
 
+class InvokeAIDiffuserComponent:
 
-class CrossAttentionControllableDiffusionMixin:
+    class Conditioning:
+        def __init__(self, edited_conditioning: torch.Tensor = None, edit_opcodes: list[tuple] = None):
+            """
+            :param edited_conditioning: if doing cross-attention control, the edited conditioning (1 x 77 x 768)
+            :param edit_opcodes: if doing cross-attention control, opcodes from a SequenceMatcher describing how to map original conditioning tokens to edited conditioning tokens
+            """
+            #self.conditioning = conditioning
+            #self.unconditioning = unconditioning
+            self.edited_conditioning = edited_conditioning
+            self.edit_opcodes = edit_opcodes
 
-    def setup_cross_attention_control_if_appropriate(self, model, edited_conditioning, edit_opcodes):
+    '''
+    The aim of this component is to provide a single place for code that can be applied identically to
+    all InvokeAI diffusion procedures.
+
+    At the moment it includes the following features:
+    * Cross Attention Control ("prompt2prompt")
+    '''
+
+    def __init__(self, model, model_forward_callback: Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]):
+        """
+        :param model: the unet model to pass through to cross attention control
+        :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
+        """
+        self.model = model
+        self.model_forward_callback = model_forward_callback
+
+
+    def setup_cross_attention_control(self, edited_conditioning, edit_opcodes):
         self.edited_conditioning = edited_conditioning
+        CrossAttentionControl.setup_attention_editing(self.model, edited_conditioning, edit_opcodes)
 
-        if edited_conditioning is not None:
-            # <start> a cat sitting on a car <end>
-            CrossAttentionControl.setup_attention_editing(model, edited_conditioning, edit_opcodes)
-        else:
-            # pass through the attention func but don't act on it
-            CrossAttentionControl.clear_attention_editing(model)
+    def cleanup_cross_attention_control(self):
+        self.edited_conditioning = None
+        CrossAttentionControl.clear_attention_editing(self.model)
 
-    def cleanup_cross_attention_control(self, model):
-        CrossAttentionControl.clear_attention_editing(model)
 
-    def do_cross_attention_controllable_diffusion_step(self, x, sigma, unconditioning, conditioning, model, model_forward_callback):
+    def do_diffusion_step(self, x: torch.Tensor, sigma: torch.Tensor,
+                                   unconditioning: torch.Tensor, conditioning: torch.Tensor,
+                                   unconditional_guidance_scale: float):
+        """
+        :param x: Current latents
+        :param sigma: aka t, passed to the internal model to control how much denoising will occur
+        :param unconditioning: [B x 77 x 768] embeddings for unconditioned output
+        :param conditioning: [B x 77 x 768] embeddings for conditioned output
+        :param unconditional_guidance_scale: aka CFG scale, controls how much effect the conditioning tensor has
+        :param model: the unet model to pass through to cross attention control
+        :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
+        :return: the new latents after applying the model to x using unconditioning and CFG-scaled conditioning.
+        """
 
-        CrossAttentionControl.clear_requests(model)
+        CrossAttentionControl.clear_requests(self.model)
 
         if self.edited_conditioning is None:
             # faster batched path
             x_twice = torch.cat([x]*2)
             sigma_twice = torch.cat([sigma]*2)
             both_conditionings = torch.cat([unconditioning, conditioning])
-            unconditioned_next_x, conditioned_next_x = model_forward_callback(x_twice, sigma_twice, both_conditionings).chunk(2)
+            unconditioned_next_x, conditioned_next_x = self.model_forward_callback(x_twice, sigma_twice, both_conditionings).chunk(2)
         else:
             # slower non-batched path (20% slower on mac MPS)
             # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of
@@ -37,19 +74,24 @@ class CrossAttentionControllableDiffusionMixin:
             # representing batched uncond + cond, but then when it comes to applying the saved attention, the
             # wrangler gets an attention tensor which only has shape[0]=8, representing just self.edited_conditionings.)
             # todo: give CrossAttentionControl's `wrangler` function more info so it can work with a batched call as well.
-            unconditioned_next_x = model_forward_callback(x, sigma, unconditioning)
+            unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning)
 
             # process x using the original prompt, saving the attention maps
-            CrossAttentionControl.request_save_attention_maps(model)
-            _ = model_forward_callback(x, sigma, cond=conditioning)
-            CrossAttentionControl.clear_requests(model)
+            CrossAttentionControl.request_save_attention_maps(self.model)
+            _ = self.model_forward_callback(x, sigma, cond=conditioning)
+            CrossAttentionControl.clear_requests(self.model)
 
             # process x again, using the saved attention maps to control where self.edited_conditioning will be applied
-            CrossAttentionControl.request_apply_saved_attention_maps(model)
-            conditioned_next_x = model_forward_callback(x, sigma, self.edited_conditioning)
+            CrossAttentionControl.request_apply_saved_attention_maps(self.model)
+            conditioned_next_x = self.model_forward_callback(x, sigma, self.edited_conditioning)
             CrossAttentionControl.clear_requests(model)
 
-        return unconditioned_next_x, conditioned_next_x
+
+        # to scale how much effect conditioning has, calculate the changes it does and then scale that
+        scaled_delta = (conditioned_next_x - unconditioned_next_x) * unconditional_guidance_scale
+        combined_next_x = unconditioned_next_x + scaled_delta
+
+        return combined_next_x
 
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl

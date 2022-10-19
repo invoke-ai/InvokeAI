@@ -1,25 +1,32 @@
 """SAMPLING ONLY."""
+from typing import Union
 
 import torch
 import numpy as np
 from tqdm import tqdm
 from functools import partial
 from ldm.invoke.devices import choose_torch_device
-from ldm.models.diffusion.cross_attention import CrossAttentionControllableDiffusionMixin
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.models.diffusion.sampler import Sampler
 from ldm.modules.diffusionmodules.util import  noise_like
 
-class DDIMSampler(Sampler, CrossAttentionControllableDiffusionMixin):
+class DDIMSampler(Sampler):
     def __init__(self, model, schedule='linear', device=None, **kwargs):
         super().__init__(model,schedule,model.num_timesteps,device)
+
+        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.model,
+                                                           model_forward_callback = lambda x, sigma, cond: self.model.apply_model(x, sigma, cond))
 
     def prepare_to_sample(self, t_enc, **kwargs):
         super().prepare_to_sample(t_enc, **kwargs)
 
         edited_conditioning = kwargs.get('edited_conditioning', None)
-        edit_opcodes = kwargs.get('conditioning_edit_opcodes', None)
 
-        self.setup_cross_attention_control_if_appropriate(self.model, edited_conditioning, edit_opcodes)
+        if edited_conditioning is not None:
+            edit_opcodes = kwargs.get('conditioning_edit_opcodes', None)
+            self.invokeai_diffuser.setup_cross_attention_control(edited_conditioning, edit_opcodes)
+        else:
+            self.invokeai_diffuser.cleanup_cross_attention_control()
 
 
     # This is the central routine
@@ -27,7 +34,7 @@ class DDIMSampler(Sampler, CrossAttentionControllableDiffusionMixin):
     def p_sample(
             self,
             x,
-            c,
+            c: Union[torch.Tensor, list],
             t,
             index,
             repeat_noise=False,
@@ -51,12 +58,7 @@ class DDIMSampler(Sampler, CrossAttentionControllableDiffusionMixin):
             e_t = self.model.apply_model(x, t, c)
         else:
 
-            e_t_uncond, e_t = self.do_cross_attention_controllable_diffusion_step(x, t, unconditional_conditioning, c, self.model,
-                model_forward_callback=lambda x, sigma, cond: self.model.apply_model(x, sigma, cond))
-
-            e_t = e_t_uncond + unconditional_guidance_scale * (
-                e_t - e_t_uncond
-            )
+            e_t = self.invokeai_diffuser.do_diffusion_step(x, t, unconditional_conditioning, c, unconditional_guidance_scale)
 
         if score_corrector is not None:
             assert self.model.parameterization == 'eps'
