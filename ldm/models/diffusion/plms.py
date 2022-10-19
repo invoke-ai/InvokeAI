@@ -20,13 +20,12 @@ class PLMSSampler(Sampler):
     def prepare_to_sample(self, t_enc, **kwargs):
         super().prepare_to_sample(t_enc, **kwargs)
 
-        edited_conditioning = kwargs.get('edited_conditioning', None)
+        structured_conditioning = kwargs.get('structured_conditioning', None)
 
-        if edited_conditioning is not None:
-            edit_opcodes = kwargs.get('conditioning_edit_opcodes', None)
-            self.invokeai_diffuser.setup_cross_attention_control(edited_conditioning, edit_opcodes)
+        if structured_conditioning is not None and structured_conditioning.wants_cross_attention_control:
+            self.invokeai_diffuser.setup_cross_attention_control(structured_conditioning)
         else:
-            self.invokeai_diffuser.cleanup_cross_attention_control()
+            self.invokeai_diffuser.remove_cross_attention_control()
 
 
     # this is the essential routine
@@ -57,10 +56,9 @@ class PLMSSampler(Sampler):
                 unconditional_conditioning is None
                 or unconditional_guidance_scale == 1.0
             ):
-                # damian0815 does not know if this code path is ever used
+                # damian0815 would like to know when/if this code path is used
                 e_t = self.model.apply_model(x, t, c)
             else:
-
                 e_t = self.invokeai_diffuser.do_diffusion_step(x, t, unconditional_conditioning, c, unconditional_guidance_scale)
 
             if score_corrector is not None:

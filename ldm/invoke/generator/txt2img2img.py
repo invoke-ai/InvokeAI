@@ -7,6 +7,7 @@ import numpy as  np
 import math
 from ldm.invoke.generator.base  import Generator
 from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 
 class Txt2Img2Img(Generator):
@@ -23,6 +24,7 @@ class Txt2Img2Img(Generator):
         kwargs are 'width' and 'height'
         """
         uc, c, ec, edit_opcodes = conditioning
+        structured_conditioning = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
 
         @torch.no_grad()
         def make_image(x_T):           
@@ -61,8 +63,7 @@ class Txt2Img2Img(Generator):
                 unconditional_conditioning   = uc,
                 eta                          = ddim_eta,
                 img_callback                 = step_callback,
-                edited_conditioning          = ec,
-                conditioning_edit_opcodes    = edit_opcodes
+                structured_conditioning      = structured_conditioning
             )
             
             print(
@@ -96,8 +97,7 @@ class Txt2Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
-                edited_conditioning = ec,
-                conditioning_edit_opcodes = edit_opcodes
+                structured_conditioning      = structured_conditioning
             )
 
             if self.free_gpu_mem:

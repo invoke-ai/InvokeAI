@@ -6,16 +6,21 @@ import torch
 
 class InvokeAIDiffuserComponent:
 
-    class Conditioning:
+    class StructuredConditioning:
         def __init__(self, edited_conditioning: torch.Tensor = None, edit_opcodes: list[tuple] = None):
             """
             :param edited_conditioning: if doing cross-attention control, the edited conditioning (1 x 77 x 768)
             :param edit_opcodes: if doing cross-attention control, opcodes from a SequenceMatcher describing how to map original conditioning tokens to edited conditioning tokens
             """
+            # TODO migrate conditioning and unconditioning here, too
             #self.conditioning = conditioning
             #self.unconditioning = unconditioning
             self.edited_conditioning = edited_conditioning
             self.edit_opcodes = edit_opcodes
+
+        @property
+        def wants_cross_attention_control(self):
+            return self.edited_conditioning is not None
 
     '''
     The aim of this component is to provide a single place for code that can be applied identically to
@@ -34,14 +39,20 @@ class InvokeAIDiffuserComponent:
         self.model_forward_callback = model_forward_callback
 
 
-    def setup_cross_attention_control(self, edited_conditioning, edit_opcodes):
-        self.edited_conditioning = edited_conditioning
-        CrossAttentionControl.setup_attention_editing(self.model, edited_conditioning, edit_opcodes)
+    def setup_cross_attention_control(self, conditioning: StructuredConditioning):
+        self.conditioning = conditioning
+        CrossAttentionControl.setup_cross_attention_control(self.model, conditioning.edited_conditioning, conditioning.edit_opcodes)
 
-    def cleanup_cross_attention_control(self):
-        self.edited_conditioning = None
-        CrossAttentionControl.clear_attention_editing(self.model)
+    def remove_cross_attention_control(self):
+        self.conditioning = None
+        CrossAttentionControl.remove_cross_attention_control(self.model)
 
+    @property
+    def edited_conditioning(self):
+        if self.conditioning is None:
+            return None
+        else:
+            return self.conditioning.edited_conditioning
 
     def do_diffusion_step(self, x: torch.Tensor, sigma: torch.Tensor,
                                    unconditioning: torch.Tensor, conditioning: torch.Tensor,
@@ -78,13 +89,13 @@ class InvokeAIDiffuserComponent:
 
             # process x using the original prompt, saving the attention maps
             CrossAttentionControl.request_save_attention_maps(self.model)
-            _ = self.model_forward_callback(x, sigma, cond=conditioning)
+            _ = self.model_forward_callback(x, sigma, conditioning)
             CrossAttentionControl.clear_requests(self.model)
 
             # process x again, using the saved attention maps to control where self.edited_conditioning will be applied
             CrossAttentionControl.request_apply_saved_attention_maps(self.model)
             conditioned_next_x = self.model_forward_callback(x, sigma, self.edited_conditioning)
-            CrossAttentionControl.clear_requests(model)
+            CrossAttentionControl.clear_requests(self.model)
 
 
         # to scale how much effect conditioning has, calculate the changes it does and then scale that
@@ -100,14 +111,16 @@ class CrossAttentionControl:
 
 
     @classmethod
-    def clear_attention_editing(cls, model):
+    def remove_cross_attention_control(cls, model):
         cls.remove_attention_function(model)
 
     @classmethod
-    def setup_attention_editing(cls, model,
-                                substitute_conditioning: torch.Tensor,
-                                edit_opcodes: list):
+    def setup_cross_attention_control(cls, model,
+                                      substitute_conditioning: torch.Tensor,
+                                      edit_opcodes: list):
         """
+        Inject attention parameters and functions into the passed in model to enable cross attention editing.
+
         :param model: The unet model to inject into.
         :param substitute_conditioning: The "edited" conditioning vector, [Bx77x768]
         :param edit_opcodes: Opcodes from difflib.SequenceMatcher describing how the base

@@ -7,6 +7,7 @@ import numpy as  np
 from ldm.invoke.devices             import choose_autocast
 from ldm.invoke.generator.base      import Generator
 from ldm.models.diffusion.ddim     import DDIMSampler
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 class Img2Img(Generator):
     def __init__(self, model, precision):
@@ -33,6 +34,7 @@ class Img2Img(Generator):
 
         t_enc = int(strength * steps)
         uc, c, ec, edit_opcodes   = conditioning
+        structured_conditioning = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
 
         def make_image(x_T):
             # encode (scaled latent)
@@ -50,8 +52,7 @@ class Img2Img(Generator):
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
                 init_latent = self.init_latent,
-                edited_conditioning = ec,
-                conditioning_edit_opcodes = edit_opcodes
+                structured_conditioning = structured_conditioning
                 # changes how noising is performed in ksampler
             )
 
