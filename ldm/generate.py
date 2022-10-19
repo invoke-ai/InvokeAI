@@ -35,7 +35,7 @@ from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.conditioning import get_uc_and_c_and_ec
 from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
-from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
+#from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
     
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():

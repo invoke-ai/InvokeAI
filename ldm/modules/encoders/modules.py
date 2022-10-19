@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 from functools import partial
@@ -449,10 +451,22 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         tokens = batch_encoding['input_ids'].to(self.device)
         z = self.transformer(input_ids=tokens, **kwargs)
 
-        return z, tokens
+        if kwargs.get('return_tokens', False):
+            return z, tokens
+        else:
+            return z
 
     def encode(self, text, **kwargs):
         return self(text, **kwargs)
+
+class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
+    @classmethod
+    def apply_embedding_weights(self, embeddings: torch.Tensor, per_embedding_weights: list[float], normalize:bool) -> torch.Tensor:
+        per_embedding_weights = torch.tensor(per_embedding_weights, dtype=embeddings.dtype, device=embeddings.device)
+        if normalize:
+            per_embedding_weights = per_embedding_weights / torch.sum(per_embedding_weights)
+        reshaped_weights = per_embedding_weights.reshape(per_embedding_weights.shape + (1, 1,))
+        return torch.sum(embeddings * reshaped_weights, dim=1)
 
 
 class FrozenCLIPTextEmbedder(nn.Module):
