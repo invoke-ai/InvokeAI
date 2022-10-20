@@ -2,7 +2,7 @@
 
 # InvokeAI: A Stable Diffusion Toolkit
 
-_Formally known as lstein/stable-diffusion_
+_Formerly known as lstein/stable-diffusion_
 
 ![project logo](docs/assets/logo.png)
 
