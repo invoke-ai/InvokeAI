@@ -32,7 +32,7 @@
     background-color: var(--img2img-img-bg-color);
     border-radius: 0.5rem;
     object-fit: contain;
-    width: auto;
+    // width: auto;
     height: $app-gallery-height;
     max-height: $app-gallery-height;
   }
@@ -41,7 +41,7 @@
     grid-area: painting-image-content;
     border-radius: 0.5rem;
     object-fit: contain;
-    width: auto;
+    // width: auto;
     height: $app-gallery-height;
     max-height: $app-gallery-height;
   }

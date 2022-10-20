@@ -1,4 +1,4 @@
-import React, { MutableRefObject, useLayoutEffect, useRef, useState } from "react";
+import React, { MutableRefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createSelector } from "@reduxjs/toolkit";
 import { isEqual } from "lodash";
 import { RootState, useAppSelector } from "../../../app/store";
@@ -18,7 +18,6 @@ export interface CanvasElementProps {
   unsetOnDraw?: () => void;
 }
 
-export let maskCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
 export let canvasRef: MutableRefObject<HTMLCanvasElement | null>;
 
 interface PaintingCanvasProps {
@@ -53,20 +52,34 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
   );
 
   canvasRef = useRef<HTMLCanvasElement>(null);
-  maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-
+  
   // holds the requestAnimationFrame() ID value so we can cancel requests on component unmount
   const animationFrameID = useRef<number>(0);
   const childrenOnDraw = useRef<Map<React.ReactElement, (ctx: CanvasRenderingContext2D) => void>>(new Map());
-
+  
   const [cameraOffset, setCameraOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [effectTrigger, setEffectTrigger] = useState<boolean>(false);
+  const [maskCanvas, setMaskCanvas] = useState<HTMLCanvasElement | null>(null);
   const [maskContext, setMaskContext] = useState<CanvasRenderingContext2D | null>(null);
+
+  const applyTransform = (x: number, y: number) => {
+    if (!wrapperRef.current)
+      return { x, y }
+
+    return {
+      x: (x - wrapperRef.current.offsetWidth / 2.0) / zoomLevel - cameraOffset.x + wrapperRef.current.offsetWidth / 2.0,
+      y: (y - wrapperRef.current.offsetHeight / 2.0) / zoomLevel - cameraOffset.y + wrapperRef.current.offsetHeight / 2.0,
+    }
+  }
+
+  useEffect(() => {
+    setMaskCanvas(document.createElement("canvas"));
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
     if (e.button === 1) {
@@ -74,14 +87,29 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
       setDragStart({ x: e.clientX / zoomLevel - cameraOffset.x, y: e.clientY / zoomLevel - cameraOffset.y });
     }
     if (e.button === 0) {
+      if (!maskCanvas || !wrapperRef.current) return;
+
+      if (!maskContext) {
+        const { width, height } = wrapperRef.current.getBoundingClientRect();
+
+        maskCanvas.width = width;
+        maskCanvas.height = height;
+        setMaskContext(maskCanvas.getContext("2d"));
+      }
+
       if (!maskContext) return;
       
       setIsDrawing(true);
-      maskContext.strokeStyle = "black";
-      maskContext.lineWidth = inpaintingBrushSize;
+      maskContext.fillStyle = "#000000";
 
-      maskContext.beginPath();
-      maskContext.moveTo(e.clientX, e.clientY);
+      const { x, y } = applyTransform(e.clientX - wrapperRef.current.offsetLeft, e.clientY - wrapperRef.current.offsetTop);
+      if (inpaintingBrushShape === "circle") {
+        maskContext.arc(x, y, inpaintingBrushSize / 2, 0, 2 * Math.PI, true);
+        maskContext.fill();
+      }
+      else {
+        maskContext.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
+      }
     }
   };
 
@@ -95,9 +123,18 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (!maskCanvas || !wrapperRef.current) return;
+
     if (isDrawing && maskContext) {
-      maskContext.lineTo(e.clientX, e.clientY);
-      maskContext.stroke();
+      const { x, y } = applyTransform(e.clientX - wrapperRef.current.offsetLeft, e.clientY - wrapperRef.current.offsetTop);
+
+      if (inpaintingBrushShape === "circle") {
+        maskContext.arc(x, y, inpaintingBrushSize / 2, 0, 2 * Math.PI, true);
+        maskContext.fill();
+      }
+      else {
+        maskContext.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
+      }
     }
 
     if (!isDragging)
@@ -120,13 +157,11 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
   };
 
   const draw = () => {
-    if (!canvasRef.current || !maskCanvasRef.current) return;
+    if (!canvasRef.current) return;
     const canvasContext = canvasRef.current.getContext("2d");
-    setMaskContext(maskCanvasRef.current.getContext("2d"));
 
     if (
       !canvasContext ||
-      !maskContext ||
       !wrapperRef.current
     ) return;
 
@@ -135,25 +170,17 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
     canvasRef.current.width = width;
     canvasRef.current.height = height;
 
-    maskCanvasRef.current.width = width;
-    maskCanvasRef.current.height = height;
-
     canvasContext.translate(width / 2, height / 2);
     canvasContext.scale(zoomLevel, zoomLevel);
     canvasContext.translate(-width / 2 + cameraOffset.x, -height / 2 + cameraOffset.y);
     canvasContext.clearRect(0, 0, width, height);
 
-    // if (inpaintingTool === "eraser") {
-    //   maskCanvasContext.globalCompositeOperation = 'source-over';
-    // } else if (inpaintingTool === "uneraser") {
-    //   maskCanvasContext.globalCompositeOperation = 'destination-out';
-    // }
-
-    // canvasContext.drawImage(maskCanvasRef.current, 0, 0);
-
     childrenOnDraw.current.forEach((onDraw) => {
       onDraw(canvasContext);
     });
+    
+    if (maskCanvas)
+      canvasContext.drawImage(maskCanvas, 0, 0);
   }
 
   useLayoutEffect(() => {
@@ -167,11 +194,6 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
     <div className="painting-canvas" ref={wrapperRef}>
       <canvas className="main-canvas"
         ref={canvasRef}
-        
-      />
-      <canvas className="mask-canvas"
-        ref={maskCanvasRef} 
-        style={{ opacity: 0.5 }}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
