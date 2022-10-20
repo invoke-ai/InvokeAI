@@ -80,7 +80,7 @@ an issue on Github and we will do our best to help.
 
 !!! todo "Clone the Invoke AI repo"
 
-```bash 
+    ```bash
     git clone https://github.com/invoke-ai/InvokeAI.git
     cd InvokeAI
     ```
