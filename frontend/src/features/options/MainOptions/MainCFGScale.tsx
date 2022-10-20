@@ -15,7 +15,7 @@ export default function MainCFGScale() {
       label="CFG Scale"
       step={0.5}
       min={1}
-      max={200}
+      max={30}
       onChange={handleChangeCfgScale}
       value={cfgScale}
       width={inputWidth}
