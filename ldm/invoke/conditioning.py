@@ -66,10 +66,10 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
             edited_prompt = FlattenedPrompt()
             for fragment in flattened_prompt.children:
                 if type(fragment) is CrossAttentionControlSubstitute:
-                    original_prompt.append(fragment.original_fragment)
-                    edited_prompt.append(fragment.edited_fragment)
-                elif type(fragment) is CrossAttentionControlAppend:
-                    edited_prompt.append(fragment.fragment)
+                    original_prompt.append(fragment.original)
+                    edited_prompt.append(fragment.edited)
+                #elif type(fragment) is CrossAttentionControlAppend:
+                #    edited_prompt.append(fragment.fragment)
                 else:
                     # regular fragment
                     original_prompt.append(fragment)

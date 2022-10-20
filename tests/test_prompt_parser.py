@@ -156,6 +156,18 @@ class PromptParserTestCase(unittest.TestCase):
                          parse_prompt('("fire ++(flames)", "mountain 2(man)").blend(1,1)'))
 
     def test_cross_attention_control(self):
+
+        self.assertEqual(Conjunction([
+            FlattenedPrompt([Fragment('a', 1),
+                             CrossAttentionControlSubstitute([Fragment('cat', 1)], [Fragment('dog', 1)]),
+                             Fragment('eating a hotdog', 1)])]), parse_prompt("a \"cat\".swap(dog) eating a hotdog"))
+
+        self.assertEqual(Conjunction([
+            FlattenedPrompt([Fragment('a', 1),
+                             CrossAttentionControlSubstitute([Fragment('cat', 1)], [Fragment('dog', 1)]),
+                             Fragment('eating a hotdog', 1)])]), parse_prompt("a cat.swap(dog) eating a hotdog"))
+
+
         fire_flames_to_trees = Conjunction([FlattenedPrompt([('fire', 1.0), \
                                                        CrossAttentionControlSubstitute([Fragment('flames', 1)], [Fragment('trees', 1)])])])
         self.assertEqual(fire_flames_to_trees, parse_prompt('fire "flames".swap(trees)'))

@@ -1,4 +1,5 @@
 import string
+from typing import Union
 
 import pyparsing
 import pyparsing as pp
@@ -17,24 +18,31 @@ class Prompt():
     def __eq__(self, other):
         return type(other) is Prompt and other.children == self.children
 
+class BaseFragment:
+    pass
+
 class FlattenedPrompt():
-    def __init__(self, parts: list):
+    def __init__(self, parts: list=[]):
         # verify type correctness
-        parts_converted = []
+        self.children = []
         for part in parts:
-            if issubclass(type(part), BaseFragment):
-                parts_converted.append(part)
-            elif type(part) is tuple:
-                # upgrade tuples to Fragments
-                if type(part[0]) is not str or (type(part[1]) is not float and type(part[1]) is not int):
-                    raise PromptParser.ParsingException(
-                        f"FlattenedPrompt cannot contain {part}, only Fragments or (str, float) tuples are allowed")
-                parts_converted.append(Fragment(part[0], part[1]))
-            else:
+            self.append(part)
+
+    def append(self, fragment: Union[list, BaseFragment, tuple]):
+        if type(fragment) is list:
+            for x in fragment:
+                self.append(x)
+        elif issubclass(type(fragment), BaseFragment):
+            self.children.append(fragment)
+        elif type(fragment) is tuple:
+            # upgrade tuples to Fragments
+            if type(fragment[0]) is not str or (type(fragment[1]) is not float and type(fragment[1]) is not int):
                 raise PromptParser.ParsingException(
-                    f"FlattenedPrompt cannot contain {part}, only Fragments or (str, float) tuples are allowed")
-        # all looks good
-        self.children = parts_converted
+                    f"FlattenedPrompt cannot contain {fragment}, only Fragments or (str, float) tuples are allowed")
+            self.children.append(Fragment(fragment[0], fragment[1]))
+        else:
+            raise PromptParser.ParsingException(
+                f"FlattenedPrompt cannot contain {fragment}, only Fragments or (str, float) tuples are allowed")
 
     def __repr__(self):
         return f"FlattenedPrompt:{self.children}"
@@ -42,9 +50,6 @@ class FlattenedPrompt():
         return type(other) is FlattenedPrompt and other.children == self.children
 
 # abstract base class for Fragments
-class BaseFragment:
-    pass
-
 class Fragment(BaseFragment):
     def __init__(self, text: str, weight: float=1):
         assert(type(text) is str)
