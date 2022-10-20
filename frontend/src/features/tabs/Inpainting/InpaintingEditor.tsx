@@ -16,6 +16,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEraser, FaPaintBrush, FaTrash } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from '../../../app/store';
 import IAIIconButton from '../../../common/components/IAIIconButton';
+import PaintingCanvas from '../../gallery/PaintingCanvas';
 import {
   setInpaintingBrushSize,
   setInpaintingTool,
@@ -179,7 +180,7 @@ const InpaintingEditor = () => {
           </FormControl>
         </Flex>
       </Flex>
-      <InpaintingCanvas />
+      <PaintingCanvas />
     </div>
   );
 };

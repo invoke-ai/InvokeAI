@@ -1,7 +1,7 @@
 import React from 'react';
 import { RootState, useAppSelector } from '../../../app/store';
 import ImageGallery from '../../gallery/ImageGallery';
-import OutpaintingImageDisplay from '../../gallery/OutpaintingImageDisplay';
+import PaintingImageDisplay from '../../gallery/PaintingImageDisplay';
 import OutpaintingPanel from './OutpaintingPanel';
 
 export default function Outpainting() {
@@ -17,7 +17,7 @@ export default function Outpainting() {
           ? { gridTemplateColumns: 'auto max-content' }
           : { gridTemplateColumns: 'auto' }
       }>
-        <OutpaintingImageDisplay />
+        <PaintingImageDisplay />
         <ImageGallery />
       </div>
     </div>

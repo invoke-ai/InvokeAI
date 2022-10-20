@@ -3,7 +3,7 @@ import ImageGallery from '../../gallery/ImageGallery';
 
 import { RootState, useAppSelector } from '../../../app/store';
 import ImageToImagePanel from '../ImageToImage/ImageToImagePanel';
-import InpaintingEditor from './InpaintingEditor';
+import PaintingImageDisplay from '../../gallery/PaintingImageDisplay';
 
 export default function Inpainting() {
   const shouldShowGallery = useAppSelector(
@@ -11,17 +11,17 @@ export default function Inpainting() {
   );
 
   return (
-    <div className="image-to-image-workarea">
+    <div className="outpainting-workarea">
       <ImageToImagePanel />
       <div
-        className="image-to-image-display-area"
+        className="outpainting-display"
         style={
           shouldShowGallery
             ? { gridTemplateColumns: 'auto max-content' }
             : { gridTemplateColumns: 'auto' }
         }
       >
-        <InpaintingEditor />
+        <PaintingImageDisplay />
         <ImageGallery />
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { IconButton } from '@chakra-ui/react';
 import React, { useState } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import * as InvokeAI from '../../app/invokeai';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import * as InvokeAI from '../../../app/invokeai';
 import _ from 'lodash';
 
 interface OutpaintingImagePreviewProps {
@@ -41,7 +41,6 @@ export default function OutpaintingImagePreview(props: OutpaintingImagePreviewPr
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [canvasElementSize, setCanvasElementSize] = useState<{ width: number; height: number }>({ width: 512, height: 512 });
 
   const outpaintingCanvasRef = React.useRef<HTMLCanvasElement>(null);
   const imagePreviewRef = React.useRef<HTMLDivElement>(null);
@@ -123,8 +122,6 @@ export default function OutpaintingImagePreview(props: OutpaintingImagePreviewPr
     <div className="outpainting-image-preview" ref={imagePreviewRef}>
       <canvas
         className="outpainting-canvas"
-        width={canvasElementSize.width}
-        height={canvasElementSize.height}
         ref={outpaintingCanvasRef}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}

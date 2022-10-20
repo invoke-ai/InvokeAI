@@ -13,6 +13,8 @@ const drawBrush = (
     lineWidth: number;
   }
 ) => {
+  console.log('brush: ', brush)
+
   switch (brush) {
     case 'circle': {
       context.beginPath();
