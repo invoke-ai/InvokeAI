@@ -60,14 +60,18 @@ class ESRGAN():
             print(
                 f'>> Real-ESRGAN Upscaling seed:{seed} : scale:{upsampler_scale}x'
             )
+            
+        # REALSRGAN expects a BGR np array; make array and flip channels
+        bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
         
         output, _ = upsampler.enhance(
-            np.array(image, dtype=np.uint8),
+            bgr_image_array,
             outscale=upsampler_scale,
             alpha_upsampler='realesrgan',
         )
 
-        res = Image.fromarray(output)
+        # Flip the channels back to RGB
+        res = Image.fromarray(output[...,::-1])
 
         if strength < 1.0:
             # Resize the image to the new image if the sizes have changed
