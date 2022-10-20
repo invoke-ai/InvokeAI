@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import warnings
 import sys
-import cv2
 
 pretrained_model_url = 'https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
 
@@ -41,12 +40,13 @@ class CodeFormerRestoration():
             cf.load_state_dict(checkpoint)
             cf.eval()
 
-            # Codeformer expects BGR image data
-            bgrImage = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            image = image.convert('RGB')
+            # Codeformer expects a BGR np array; make array and flip channels
+            bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
 
             face_helper = FaceRestoreHelper(upscale_factor=1, use_parse=True, device=device)
             face_helper.clean_all()
-            face_helper.read_image(bgrImage)
+            face_helper.read_image(bgr_image_array)
             face_helper.get_face_landmarks_5(resize=640, eye_dist_threshold=5)
             face_helper.align_warp_face()
 
@@ -73,8 +73,8 @@ class CodeFormerRestoration():
 
             restored_img = face_helper.paste_faces_to_input_image()
 
-            # Convert back to RGB for PIL
-            res = Image.fromarray(cv2.cvtColor(restored_img, cv2.COLOR_BGR2RGB))
+            # Flip the channels back to RGB
+            res = Image.fromarray(restored_img[...,::-1])
 
             if strength < 1.0:
                 # Resize the image to the new image if the sizes have changed
