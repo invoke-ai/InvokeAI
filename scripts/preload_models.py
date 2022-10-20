@@ -42,13 +42,13 @@ print('...success')
 
 
 print('preloading Stable Diffusion model file...', end='')
-# sd1_4 = Path(hf_hub_download("CompVis/stable-diffusion-v-1-4-original", "sd-v1-4.ckpt"))
+sd1_4 = Path(hf_hub_download("CompVis/stable-diffusion-v-1-4-original", "sd-v1-4.ckpt"))
 # inpainting = Path(hf_hub_download("runwayml/stable-diffusion-inpainting", "sd-v1-5-inpainting.ckpt"))
-sd1_5 = Path(hf_hub_download("runwayml/stable-diffusion-v1-5", "v1-5-pruned.ckpt"))
+# sd1_5 = Path(hf_hub_download("runwayml/stable-diffusion-v1-5", "v1-5-pruned.ckpt"))
 
 model_dest = Path('models/ldm/stable-diffusion-v1/model.ckpt')
 model_dest.parent.mkdir(parents=True, exist_ok=True)
-sd1_5.resolve(strict=True).link_to(model_dest)
+sd1_4.resolve(strict=True).link_to(model_dest)
 
 print('...success')
 
