@@ -89,7 +89,7 @@ While that is downloading, open Terminal and run the following commands one at a
 
 !!! todo "Clone the Invoke AI repo"
 
-```bash 
+    ```bash
     git clone https://github.com/invoke-ai/InvokeAI.git
     cd InvokeAI
     ```
