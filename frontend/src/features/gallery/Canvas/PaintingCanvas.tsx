@@ -59,6 +59,10 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
   canvasRef = useRef<HTMLCanvasElement>(null);
   canvasContext = useRef<CanvasRenderingContext2D>(null);
+
+  const elementCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [elementCanvasContext, setElementCanvasContext] = useState<CanvasRenderingContext2D | null>(null);
+
   maskCanvasRef = useRef<HTMLCanvasElement>(null);
   maskCanvasContext = useRef<CanvasRenderingContext2D>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -73,7 +77,6 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [effectTrigger, setEffectTrigger] = useState<boolean>(false);
-  const [dark, setDark] = useState<boolean>(true);
 
   const applyTransform = (x: number, y: number) => {
     if (!wrapperRef.current)
@@ -86,8 +89,14 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   }
 
   useEffect(() => {
+    if (!canvasRef.current)
+      canvasRef.current = document.createElement("canvas");
+
     if (!canvasContext.current && canvasRef.current)
       canvasContext.current = canvasRef.current.getContext("2d");
+
+    if (!elementCanvasContext && elementCanvasRef.current)
+      setElementCanvasContext(elementCanvasRef.current.getContext("2d"));
 
     if (!maskCanvasRef.current)
       maskCanvasRef.current = document.createElement("canvas");
@@ -95,8 +104,6 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     if (!maskCanvasContext.current && maskCanvasRef.current)
       maskCanvasContext.current = maskCanvasRef.current.getContext("2d");
 
-    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
-    setDark(prefersDarkScheme.matches);
   }, [maskCanvasRef, canvasRef.current]);
 
   useEffect(() => {
@@ -207,6 +214,8 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     if (
       !canvasRef.current ||
       !canvasContext.current ||
+      !elementCanvasRef.current ||
+      !elementCanvasContext ||
       !maskCanvasRef.current ||
       !wrapperRef.current
     ) return;
@@ -216,18 +225,22 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     canvasRef.current.width = width;
     canvasRef.current.height = height;
 
-    canvasContext.current.translate(width / 2, height / 2);
-    canvasContext.current.scale(zoomLevel, zoomLevel);
-    canvasContext.current.translate(-width / 2 + cameraOffset.x, -height / 2 + cameraOffset.y);
-    canvasContext.current.clearRect(0, 0, width, height);
-
+    elementCanvasRef.current.width = width;
+    elementCanvasRef.current.height = height;
+   
     canvasContext.current.globalCompositeOperation = "source-over";
     childrenOnDraw.current.forEach((onDraw) => {
       onDraw(canvasContext.current!);
     });
-
+    
     canvasContext.current.globalCompositeOperation = "destination-out";
     canvasContext.current.drawImage(maskCanvasRef.current, 0, 0);
+    
+    elementCanvasContext.translate(width / 2, height / 2);
+    elementCanvasContext.scale(zoomLevel, zoomLevel);
+    elementCanvasContext.translate(-width / 2 + cameraOffset.x, -height / 2 + cameraOffset.y);
+    elementCanvasContext.clearRect(0, 0, width, height);
+    elementCanvasContext.drawImage(canvasRef.current, 0, 0);
   }
 
   useLayoutEffect(() => {
@@ -240,7 +253,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   return (
     <div className="painting-canvas" ref={wrapperRef}>
       <canvas className="main-canvas"
-        ref={canvasRef}
+        ref={elementCanvasRef}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}

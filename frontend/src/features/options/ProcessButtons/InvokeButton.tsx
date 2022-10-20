@@ -4,7 +4,7 @@ import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import IAIButton from '../../../common/components/IAIButton';
 import { tabMap, tab_dict } from '../../tabs/InvokeTabs';
 import useCheckParameters from '../../../common/hooks/useCheckParameters';
-import { canvasContext } from '../../gallery/Canvas/PaintingCanvas';
+import { canvasRef } from '../../gallery/Canvas/PaintingCanvas';
 
 export default function InvokeButton() {
   const { activeTab, width, height } = useAppSelector(
@@ -15,15 +15,14 @@ export default function InvokeButton() {
   const isReady = useCheckParameters();
 
   const handleClickGenerate = () => {
-    if (!canvasContext.current) return;
-    const maskData = canvasContext.current.getImageData(0, 0, width, height);
+    if (!canvasRef.current) return;
 
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (tempCtx) {
-      tempCtx.putImageData(maskData, 0, 0);
+      tempCtx.drawImage(canvasRef.current, 0, 0);
     }
     const maskDataURLString = tempCanvas.toDataURL();
 
