@@ -74,7 +74,7 @@ const makeSocketIOEmitters = (
       const options = { ...getState().options };
       const imageToProcess = intermediateImage || currentImage;
       const { generationParameters, esrganParameters, gfpganParameters } =
-        frontendToBackendParameters(options, getState().system);
+        frontendToBackendParameters(options, getState().system, 'outpainting');
 
       socketio.emit('outpaintImage', imageToProcess, {
         type: 'outpaint',

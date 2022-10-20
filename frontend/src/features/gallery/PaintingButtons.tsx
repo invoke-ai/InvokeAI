@@ -13,20 +13,19 @@ import {
 
 import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { FaEraser, FaPaintBrush, FaTrash } from 'react-icons/fa';
+import { FaEraser, FaPaintBrush, FaTrash, FaCircle, FaSquare } from 'react-icons/fa';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
 import PaintingCanvas from './Canvas/PaintingCanvas';
 import {
   OptionsState,
+  setInpaintingBrushShape,
   setInpaintingBrushSize,
   setInpaintingTool,
 } from '../options/optionsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import { tabMap } from '../tabs/InvokeTabs';
 import { isEqual } from 'lodash';
-
-import { canvasRef } from './Canvas/PaintingCanvas';
 
 export const inpaintingOptionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -49,8 +48,9 @@ export const inpaintingOptionsSelector = createSelector(
   }
 );
 
-const PaintingButtons = () => {
-  const { tool, brushSize, activeTab } = useAppSelector(
+const PaintingButtons = (props: { onBrushClear?: () => void }) => {
+  const { onBrushClear } = props;
+  const { tool, brushSize, brushShape, activeTab } = useAppSelector(
     inpaintingOptionsSelector
   );
 
@@ -116,10 +116,25 @@ const PaintingButtons = () => {
           onClick={() => dispatch(setInpaintingTool('uneraser'))}
         />
         <IAIIconButton
+          aria-label="Circle"
+          tooltip="Circle Shape Brush"
+          icon={<FaCircle />}
+          colorScheme={brushShape === 'circle' ? 'orange' : undefined}
+          onClick={() => dispatch(setInpaintingBrushShape('circle'))}
+        />
+        <IAIIconButton
+          aria-label="Square"
+          tooltip="Square Shape Brush"
+          icon={<FaSquare />}
+          colorScheme={brushShape === 'square' ? 'orange' : undefined}
+          onClick={() => dispatch(setInpaintingBrushShape('square'))}
+        />
+        <IAIIconButton
           aria-label="Clear mask"
           tooltip="Clear mask"
           icon={<FaTrash />}
           colorScheme={'red'}
+          onClick={onBrushClear}
         />
       </Flex>
       <Flex gap={4}>

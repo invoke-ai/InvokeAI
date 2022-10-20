@@ -4,10 +4,10 @@ import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import IAIButton from '../../../common/components/IAIButton';
 import { tabMap, tab_dict } from '../../tabs/InvokeTabs';
 import useCheckParameters from '../../../common/hooks/useCheckParameters';
-import { canvasRef } from '../../tabs/Inpainting/InpaintingCanvas';
+import { canvasContext } from '../../gallery/Canvas/PaintingCanvas';
 
 export default function InvokeButton() {
-  const { activeTab } = useAppSelector(
+  const { activeTab, width, height } = useAppSelector(
     (state: RootState) => state.options
   );
 
@@ -15,21 +15,33 @@ export default function InvokeButton() {
   const isReady = useCheckParameters();
 
   const handleClickGenerate = () => {
-    // get dataURL of inpainting canvas
-    const maskDataURL = canvasRef?.current?.toDataURL();
-    if (maskDataURL) {
+    if (!canvasContext.current) return;
+    const maskData = canvasContext.current.getImageData(0, 0, width, height);
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (tempCtx) {
+      tempCtx.putImageData(maskData, 0, 0);
+    }
+    const maskDataURLString = tempCanvas.toDataURL();
+
+    if (maskDataURLString) {
+      console.log('maskDataURLString', maskDataURLString);
+    
       dispatch(
         generateImage({
-          inpaintingMask: maskDataURL.split('data:image/png;base64,')[1],
+          inpaintingMask: maskDataURLString.split('data:image/png;base64,')[1],
         })
       );
     } else {
-       if (tabMap[activeTab] === 'outpainting') {
-         dispatch(outpaintImage());
-       }
-       else {
-         dispatch(generateImage());
-       }
+      if (tabMap[activeTab] === 'outpainting') {
+        dispatch(outpaintImage());
+      }
+      else {
+        dispatch(generateImage());
+      }
     }
   };
 

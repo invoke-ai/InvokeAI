@@ -362,7 +362,8 @@ export const {
   setCanvasWidth,
   setCanvasHeight,
   setInpaintingTool,
-  setInpaintingBrushSize
+  setInpaintingBrushSize,
+  setInpaintingBrushShape,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

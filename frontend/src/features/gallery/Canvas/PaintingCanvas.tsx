@@ -18,11 +18,16 @@ export interface CanvasElementProps {
   unsetOnDraw?: () => void;
 }
 
-export let canvasRef: MutableRefObject<HTMLCanvasElement | null>;
-
 interface PaintingCanvasProps {
   children?: React.ReactNode;
+  setOnBrushClear: (onBrushClear: () => void) => void;
 }
+
+export let canvasRef: MutableRefObject<HTMLCanvasElement | null>;
+export let canvasContext: MutableRefObject<CanvasRenderingContext2D | null>;
+
+export let maskCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
+export let maskCanvasContext: MutableRefObject<CanvasRenderingContext2D | null>;
 
 const paintingOptionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -46,27 +51,28 @@ const paintingOptionsSelector = createSelector(
   }
 );
 
-const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
+const PaintingCanvas = (props: PaintingCanvasProps) => {
+  const { children, setOnBrushClear } = props;
   const { shouldShowGallery, activeTab, inpaintingTool, inpaintingBrushSize, inpaintingBrushShape } = useAppSelector(
     (state: RootState) => state.options
   );
 
   canvasRef = useRef<HTMLCanvasElement>(null);
+  canvasContext = useRef<CanvasRenderingContext2D>(null);
+  maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  maskCanvasContext = useRef<CanvasRenderingContext2D>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  
+
   // holds the requestAnimationFrame() ID value so we can cancel requests on component unmount
   const animationFrameID = useRef<number>(0);
   const childrenOnDraw = useRef<Map<React.ReactElement, (ctx: CanvasRenderingContext2D) => void>>(new Map());
-  
+
   const [cameraOffset, setCameraOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [effectTrigger, setEffectTrigger] = useState<boolean>(false);
-  const [maskCanvas, setMaskCanvas] = useState<HTMLCanvasElement | null>(null);
-  const [maskContext, setMaskContext] = useState<CanvasRenderingContext2D | null>(null);
-
   const [dark, setDark] = useState<boolean>(true);
 
   const applyTransform = (x: number, y: number) => {
@@ -80,10 +86,37 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
   }
 
   useEffect(() => {
-    setMaskCanvas(document.createElement("canvas"));
+    if (!canvasContext.current && canvasRef.current)
+      canvasContext.current = canvasRef.current.getContext("2d");
+
+    if (!maskCanvasRef.current)
+      maskCanvasRef.current = document.createElement("canvas");
+
+    if (!maskCanvasContext.current && maskCanvasRef.current)
+      maskCanvasContext.current = maskCanvasRef.current.getContext("2d");
+
     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
     setDark(prefersDarkScheme.matches);
-  }, []);
+  }, [maskCanvasRef, canvasRef.current]);
+
+  useEffect(() => {
+    if (!maskCanvasRef.current || !maskCanvasContext.current)
+      return;
+
+    setOnBrushClear(() => {
+      return () => {
+        maskCanvasContext.current!.clearRect(0, 0, maskCanvasRef.current!.width, maskCanvasRef.current!.height);
+        setEffectTrigger(!effectTrigger);
+      }
+    });
+  }, [maskCanvasRef, maskCanvasRef, setOnBrushClear, setEffectTrigger]);
+
+  useEffect(() => {
+    if (!maskCanvasRef.current) return;
+
+    maskCanvasRef.current.width = 2048;
+    maskCanvasRef.current.height = 2048;
+  }, [maskCanvasRef, wrapperRef.current, shouldShowGallery, canvasRef.current]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
     if (e.button === 1) {
@@ -92,40 +125,34 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
     }
     if (e.button === 0) {
       if (
-        !maskCanvas || 
-        !wrapperRef.current || 
-        !canvasRef.current
+        !maskCanvasRef.current ||
+        !maskCanvasContext.current ||
+        !wrapperRef.current
       ) return;
 
-      if (!maskContext) {
-        const { width, height } = wrapperRef.current.getBoundingClientRect();
-
-        maskCanvas.width = width;
-        maskCanvas.height = height;
-        setMaskContext(maskCanvas.getContext("2d"));
-      }
-
-      if (!maskContext) return;
-      
       setIsDrawing(true);
 
-      maskContext.fillStyle = dark ? "rgb(30, 32, 42)" : "rgb(180, 182, 184)";
+      maskCanvasContext.current.fillStyle = "rgba(0, 0, 0, 1)";
+      // maskCanvasContext.current.fillStyle = "#000000";
 
       if (inpaintingTool === "eraser") {
-        maskContext.globalCompositeOperation = "destination-out";
+        maskCanvasContext.current.globalCompositeOperation = "destination-out";
       }
       else {
-        maskContext.globalCompositeOperation = "source-over";
+        maskCanvasContext.current.globalCompositeOperation = "source-over";
       }
 
       const { x, y } = applyTransform(e.clientX - wrapperRef.current.offsetLeft, e.clientY - wrapperRef.current.offsetTop);
       if (inpaintingBrushShape === "circle") {
-        maskContext.arc(x, y, inpaintingBrushSize / 2, 0, 2 * Math.PI, true);
-        maskContext.fill();
+        maskCanvasContext.current.moveTo(x, y);
+        maskCanvasContext.current.arc(x, y, inpaintingBrushSize / 2, 0, 2 * Math.PI, true);
+        maskCanvasContext.current.fill();
       }
-      else {
-        maskContext.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
+      else if (inpaintingBrushShape === "square") {
+        maskCanvasContext.current.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
       }
+
+      setEffectTrigger(!effectTrigger);
     }
   };
 
@@ -139,27 +166,31 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    if (!maskCanvas || !wrapperRef.current) return;
+    if (!wrapperRef.current) return;
 
-    if (isDrawing && maskContext) {
+    if (isDragging) {
+      setCameraOffset({
+        x: e.clientX / zoomLevel - dragStart.x,
+        y: e.clientY / zoomLevel - dragStart.y,
+      });
+    }
+
+    if (!maskCanvasRef) return;
+
+    if (isDrawing && maskCanvasContext.current) {
       const { x, y } = applyTransform(e.clientX - wrapperRef.current.offsetLeft, e.clientY - wrapperRef.current.offsetTop);
 
       if (inpaintingBrushShape === "circle") {
-        maskContext.arc(x, y, inpaintingBrushSize / 2, 0, 2 * Math.PI, true);
-        maskContext.fill();
+        maskCanvasContext.current.moveTo(x, y);
+        maskCanvasContext.current.arc(x, y, inpaintingBrushSize / 2, 0, 2 * Math.PI, true);
+        maskCanvasContext.current.fill();
       }
-      else {
-        maskContext.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
+      else if (inpaintingBrushShape === "square") {
+        maskCanvasContext.current.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
       }
+
+      setEffectTrigger(!effectTrigger);
     }
-
-    if (!isDragging)
-      return;
-
-    setCameraOffset({
-      x: e.clientX / zoomLevel - dragStart.x,
-      y: e.clientY / zoomLevel - dragStart.y,
-    });
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -173,11 +204,10 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
   };
 
   const draw = () => {
-    if (!canvasRef.current) return;
-    const canvasContext = canvasRef.current.getContext("2d");
-
     if (
-      !canvasContext ||
+      !canvasRef.current ||
+      !canvasContext.current ||
+      !maskCanvasRef.current ||
       !wrapperRef.current
     ) return;
 
@@ -186,17 +216,18 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
     canvasRef.current.width = width;
     canvasRef.current.height = height;
 
-    canvasContext.translate(width / 2, height / 2);
-    canvasContext.scale(zoomLevel, zoomLevel);
-    canvasContext.translate(-width / 2 + cameraOffset.x, -height / 2 + cameraOffset.y);
-    canvasContext.clearRect(0, 0, width, height);
+    canvasContext.current.translate(width / 2, height / 2);
+    canvasContext.current.scale(zoomLevel, zoomLevel);
+    canvasContext.current.translate(-width / 2 + cameraOffset.x, -height / 2 + cameraOffset.y);
+    canvasContext.current.clearRect(0, 0, width, height);
 
+    canvasContext.current.globalCompositeOperation = "source-over";
     childrenOnDraw.current.forEach((onDraw) => {
-      onDraw(canvasContext);
+      onDraw(canvasContext.current!);
     });
-    
-    if (maskCanvas)
-      canvasContext.drawImage(maskCanvas, 0, 0);
+
+    canvasContext.current.globalCompositeOperation = "destination-out";
+    canvasContext.current.drawImage(maskCanvasRef.current, 0, 0);
   }
 
   useLayoutEffect(() => {
@@ -220,9 +251,11 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
           return React.cloneElement<CanvasElementProps>(child as React.FunctionComponentElement<CanvasElementProps>, {
             setOnDraw: (onDraw: (ctx: CanvasRenderingContext2D) => void) => {
               childrenOnDraw.current.set(child, (ctx) => {
-                setEffectTrigger(!effectTrigger);
                 onDraw(ctx);
+                setEffectTrigger(!effectTrigger);
               });
+
+              setEffectTrigger(!effectTrigger);
             },
             unsetOnDraw: () => {
               childrenOnDraw.current.delete(child);
