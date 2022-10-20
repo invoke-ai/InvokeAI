@@ -36,13 +36,4 @@
     height: $app-gallery-height;
     max-height: $app-gallery-height;
   }
-
-  .mask-canvas {
-    grid-area: painting-image-content;
-    border-radius: 0.5rem;
-    object-fit: contain;
-    // width: auto;
-    height: $app-gallery-height;
-    max-height: $app-gallery-height;
-  }
 }

@@ -67,6 +67,8 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
   const [maskCanvas, setMaskCanvas] = useState<HTMLCanvasElement | null>(null);
   const [maskContext, setMaskContext] = useState<CanvasRenderingContext2D | null>(null);
 
+  const [dark, setDark] = useState<boolean>(true);
+
   const applyTransform = (x: number, y: number) => {
     if (!wrapperRef.current)
       return { x, y }
@@ -79,6 +81,8 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
 
   useEffect(() => {
     setMaskCanvas(document.createElement("canvas"));
+    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
+    setDark(prefersDarkScheme.matches);
   }, []);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
@@ -87,7 +91,11 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
       setDragStart({ x: e.clientX / zoomLevel - cameraOffset.x, y: e.clientY / zoomLevel - cameraOffset.y });
     }
     if (e.button === 0) {
-      if (!maskCanvas || !wrapperRef.current) return;
+      if (
+        !maskCanvas || 
+        !wrapperRef.current || 
+        !canvasRef.current
+      ) return;
 
       if (!maskContext) {
         const { width, height } = wrapperRef.current.getBoundingClientRect();
@@ -100,7 +108,15 @@ const PaintingCanvas = ({ children }: PaintingCanvasProps) => {
       if (!maskContext) return;
       
       setIsDrawing(true);
-      maskContext.fillStyle = "#000000";
+
+      maskContext.fillStyle = dark ? "rgb(30, 32, 42)" : "rgb(180, 182, 184)";
+
+      if (inpaintingTool === "eraser") {
+        maskContext.globalCompositeOperation = "destination-out";
+      }
+      else {
+        maskContext.globalCompositeOperation = "source-over";
+      }
 
       const { x, y } = applyTransform(e.clientX - wrapperRef.current.offsetLeft, e.clientY - wrapperRef.current.offsetTop);
       if (inpaintingBrushShape === "circle") {
