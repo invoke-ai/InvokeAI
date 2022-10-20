@@ -3,7 +3,6 @@ import warnings
 import os
 import sys
 import numpy as np
-import cv2
 
 from PIL import Image
 
@@ -54,18 +53,20 @@ class GFPGAN():
                 f'>> Download https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth to {self.model_path}, \nor change GFPGAN directory with --gfpgan_dir.'
             )
 
-        # GFPGAN expects BGR image data
-        bgrImage = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        image = image.convert('RGB')
+
+        # GFPGAN expects a BGR np array; make array and flip channels
+        bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
 
         _, _, restored_img = self.gfpgan.enhance(
-            bgrImage,
+            bgr_image_array,
             has_aligned=False,
             only_center_face=False,
             paste_back=True,
         )
 
-        # Convert back to RGB for PIL
-        res = Image.fromarray(cv2.cvtColor(restored_img, cv2.COLOR_BGR2RGB))
+        # Flip the channels back to RGB
+        res = Image.fromarray(restored_img[...,::-1])
 
         if strength < 1.0:
             # Resize the image to the new image if the sizes have changed
