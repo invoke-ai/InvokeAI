@@ -107,7 +107,7 @@ except Exception:
     print(traceback.format_exc())
 print('...success')
 
-print('Loading clipseq model for text-based masking...',end='')
+print('Loading clipseg model for text-based masking...',end='')
 try:
     model_url  = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
     model_dest = 'src/clipseg/clipseg_weights.zip'
