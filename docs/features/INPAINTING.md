@@ -127,7 +127,7 @@ Outputs:
 [946] outputs/img-samples/000024.801380492.png: "medusa with cobras" -s 50 -S 801380492 -W 512 -H 512 -C 20.0 -I ./test-pictures/curly.png -A k_lms -f 0.75
 ```
 
-<img src="../assets/000024.801380492.png">
+<img src="../assets/inpainting/000024.801380492.png">
 
 ### Inpainting is not changing the masked region enough!
 
