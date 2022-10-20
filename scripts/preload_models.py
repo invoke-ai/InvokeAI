@@ -3,6 +3,9 @@
 # Before running stable-diffusion on an internet-isolated machine,
 # run this script from one with internet connectivity. The
 # two machines must share a common .cache directory.
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
 from transformers import CLIPTokenizer, CLIPTextModel
 import clip
 from transformers import BertTokenizerFast
@@ -14,7 +17,7 @@ import urllib.request
 
 transformers.logging.set_verbosity_error()
 
-# this will preload the Bert tokenizer fles
+# this will preload the Bert tokenizer files
 print('preloading bert tokenizer...', end='')
 
 tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
@@ -24,6 +27,7 @@ print('...success')
 print('preloading Kornia requirements...', end='')
 with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category=DeprecationWarning)
+    # noinspection PyUnresolvedReferences
     import kornia
 print('...success')
 
@@ -35,6 +39,19 @@ sys.stdout.flush()
 tokenizer = CLIPTokenizer.from_pretrained(version)
 transformer = CLIPTextModel.from_pretrained(version)
 print('...success')
+
+
+print('preloading Stable Diffusion model file...', end='')
+# sd1_4 = Path(hf_hub_download("CompVis/stable-diffusion-v-1-4-original", "sd-v1-4.ckpt"))
+# inpainting = Path(hf_hub_download("runwayml/stable-diffusion-inpainting", "sd-v1-5-inpainting.ckpt"))
+sd1_5 = Path(hf_hub_download("runwayml/stable-diffusion-v1-5", "v1-5-pruned.ckpt"))
+
+model_dest = Path('models/ldm/stable-diffusion-v1/model.ckpt')
+model_dest.parent.mkdir(parents=True, exist_ok=True)
+sd1_5.resolve(strict=True).link_to(model_dest)
+
+print('...success')
+
 
 # In the event that the user has installed GFPGAN and also elected to use
 # RealESRGAN, this will attempt to download the model needed by RealESRGANer
