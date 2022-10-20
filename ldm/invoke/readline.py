@@ -56,6 +56,7 @@ COMMANDS = (
     '--png_compression','-z',
     '--text_mask','-tm',
     '!fix','!fetch','!history','!search','!clear',
+    '!mask',
     '!models','!switch','!import_model','!edit_model'
     )
 MODEL_COMMANDS = (
@@ -71,6 +72,7 @@ IMG_PATH_COMMANDS = (
 IMG_FILE_COMMANDS=(
     '!fix',
     '!fetch',
+    '!mask',
     '--init_img[=\s]','-I',
     '--init_mask[=\s]','-M',
     '--init_color[=\s]',

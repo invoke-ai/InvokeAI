@@ -805,6 +805,23 @@ class Generate:
             else:
                 r[0] = image
 
+    def apply_textmask(self, image_path:str, prompt:str, callback, threshold:float=0.5):
+        assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+        basename,_ = os.path.splitext(os.path.basename(image_path))
+        if self.txt2mask is None:
+            self.txt2mask  = Txt2Mask(device = self.device)
+        segmented  = self.txt2mask.segment(image_path,prompt)
+        trans = segmented.to_transparent()
+        inverse = segmented.to_transparent(invert=True)
+        mask = segmented.to_mask(threshold)
+
+        path_filter = re.compile(r'[<>:"/\\|?*]')
+        safe_prompt = path_filter.sub('_', prompt)[:50].rstrip(' .')
+
+        callback(trans,f'{safe_prompt}.deselected',use_prefix=basename)
+        callback(inverse,f'{safe_prompt}.selected',use_prefix=basename)
+        callback(mask,f'{safe_prompt}.masked',use_prefix=basename)
+
     # to help WebGUI - front end to generator util function
     def sample_to_image(self, samples):
         return self._make_base().sample_to_image(samples)
