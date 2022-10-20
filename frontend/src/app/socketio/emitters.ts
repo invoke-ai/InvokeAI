@@ -68,11 +68,10 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitOutpaintImage: () =>  {
+    emitOutpaintImage: (args: GenerateImageProps) =>  {
       dispatch(setIsProcessing(true));
-      const { currentImage, intermediateImage } = getState().gallery;
       const options = { ...getState().options };
-      const imageToProcess = intermediateImage || currentImage;
+      const imageToProcess = args.inpaintingMask;
       const { generationParameters, esrganParameters, gfpganParameters } =
         frontendToBackendParameters(options, getState().system, 'outpainting');
 
@@ -84,7 +83,6 @@ const makeSocketIOEmitters = (
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
           message: `Outpaint requested: ${JSON.stringify({
-            file: imageToProcess.url,
             ...generationParameters,
           })}`,
         })

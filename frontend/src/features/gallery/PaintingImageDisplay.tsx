@@ -5,10 +5,16 @@ import PaintingCanvas from "./Canvas/PaintingCanvas";
 import PaintingButtons from "./PaintingButtons";
 
 import CurrentCanvasImage from "./Canvas/CurrentCanvasImage";
+import { tabMap } from "../tabs/InvokeTabs";
+import OutpaintingOutline from "./Canvas/OutpaintingOutline";
+import OutpaintingHighlight from "./Canvas/OutpaintingHighlight";
 
 const PaintingImageDisplay = () => {
   const { currentImage, intermediateImage } = useAppSelector(
     (state: RootState) => state.gallery
+  );
+  const activeTab = useAppSelector(
+    (state: RootState) => tabMap[state.options.activeTab]
   );
 
   // To improve: not to use useState
@@ -23,6 +29,8 @@ const PaintingImageDisplay = () => {
       </div>
       <PaintingCanvas setOnBrushClear={setOnBrushClear} >
         <CurrentCanvasImage x={0} y={0} />
+        {activeTab === "outpainting" && <OutpaintingOutline />}
+        {activeTab === "outpainting" && <OutpaintingHighlight />}
       </PaintingCanvas>
     </div>
   ) : (

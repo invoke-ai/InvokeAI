@@ -11,12 +11,20 @@ export interface GalleryState {
   areMoreImagesAvailable: boolean;
   latest_mtime?: number;
   earliest_mtime?: number;
+  paintingElementWidth: number;
+  paintingElementHeight: number;
+  paintingCameraX: number;
+  paintingCameraY: number;
 }
 
 const initialState: GalleryState = {
   currentImageUuid: '',
   images: [],
   areMoreImagesAvailable: true,
+  paintingElementWidth: 1024,
+  paintingElementHeight: 1024,
+  paintingCameraX: 0,
+  paintingCameraY: 0,
 };
 
 export const gallerySlice = createSlice({
@@ -138,6 +146,18 @@ export const gallerySlice = createSlice({
         state.areMoreImagesAvailable = areMoreImagesAvailable;
       }
     },
+    setPaintingElementWidth: (state, action: PayloadAction<number>) => {
+      state.paintingElementWidth = action.payload;
+    },
+    setPaintingElementHeight: (state, action: PayloadAction<number>) => {
+      state.paintingElementHeight = action.payload;
+    },
+    setPaintingCameraX: (state, action: PayloadAction<number>) => {
+      state.paintingCameraX = action.payload;
+    },
+    setPaintingCameraY: (state, action: PayloadAction<number>) => {
+      state.paintingCameraY = action.payload;
+    },
   },
 });
 
@@ -150,6 +170,10 @@ export const {
   setIntermediateImage,
   selectNextImage,
   selectPrevImage,
+  setPaintingElementWidth,
+  setPaintingElementHeight,
+  setPaintingCameraX,
+  setPaintingCameraY,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

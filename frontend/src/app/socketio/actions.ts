@@ -12,7 +12,7 @@ export type GenerateImageProps = { inpaintingMask: string };
 export const generateImage = createAction<GenerateImageProps | undefined>(
   'socketio/generateImage'
 );
-export const outpaintImage = createAction<undefined>('socketio/outpaintImage');
+export const outpaintImage = createAction<GenerateImageProps>('socketio/outpaintImage');
 export const runESRGAN = createAction<InvokeAI.Image>('socketio/runESRGAN');
 export const runGFPGAN = createAction<InvokeAI.Image>('socketio/runGFPGAN');
 export const deleteImage = createAction<InvokeAI.Image>('socketio/deleteImage');

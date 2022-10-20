@@ -126,7 +126,7 @@ export const socketioMiddleware = () => {
       }
 
       case 'socketio/outpaintImage': {
-        emitOutpaintImage();
+        emitOutpaintImage(action.payload);
         break;
       }
 

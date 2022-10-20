@@ -29,7 +29,7 @@ function CurrentCanvasImage(props: CanvasElementProps & { x?: number, y?: number
 
   useEffect(() => {
     if (setOnDraw && unsetOnDraw) {
-      setOnDraw((ctx) => {
+      setOnDraw(({ ctx }) => {
         if (image) {
           ctx.drawImage(image, props.x || 0, props.y || 0);
         }

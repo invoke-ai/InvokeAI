@@ -1,12 +1,13 @@
 import React, { MutableRefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createSelector } from "@reduxjs/toolkit";
 import { isEqual } from "lodash";
-import { RootState, useAppSelector } from "../../../app/store";
+import { RootState, useAppDispatch, useAppSelector } from "../../../app/store";
 import { OptionsState } from "../../options/optionsSlice";
 import { tabMap } from "../../tabs/InvokeTabs";
 
 import InvokeAI from "../../../app/invokeai";
 import drawBrush from "../../tabs/Inpainting/drawBrush";
+import { setPaintingCameraX, setPaintingCameraY, setPaintingElementHeight, setPaintingElementWidth } from "../gallerySlice";
 
 interface Point {
   x: number;
@@ -14,13 +15,21 @@ interface Point {
 }
 
 export interface CanvasElementProps {
-  setOnDraw?: (onDraw: (ctx: CanvasRenderingContext2D) => void) => void;
+  setOnDraw?: (onDraw: (ctx: DrawProps) => void) => void;
   unsetOnDraw?: () => void;
 }
 
 interface PaintingCanvasProps {
   children?: React.ReactNode;
   setOnBrushClear: (onBrushClear: () => void) => void;
+}
+
+export interface DrawProps {
+  ctx: CanvasRenderingContext2D;
+  cameraOffset: Point;
+  zoomLevel: number;
+  elementWidth: number;
+  elementHeight: number;
 }
 
 export let canvasRef: MutableRefObject<HTMLCanvasElement | null>;
@@ -57,6 +66,8 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     (state: RootState) => state.options
   );
 
+  const dispatch = useAppDispatch();
+
   canvasRef = useRef<HTMLCanvasElement>(null);
   canvasContext = useRef<CanvasRenderingContext2D>(null);
 
@@ -69,7 +80,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
   // holds the requestAnimationFrame() ID value so we can cancel requests on component unmount
   const animationFrameID = useRef<number>(0);
-  const childrenOnDraw = useRef<Map<React.ReactElement, (ctx: CanvasRenderingContext2D) => void>>(new Map());
+  const childrenOnDraw = useRef<Map<React.ReactElement, (ctx: DrawProps) => void>>(new Map());
 
   const [cameraOffset, setCameraOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -222,15 +233,21 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
     const { width, height } = wrapperRef.current.getBoundingClientRect();
 
-    canvasRef.current.width = width;
-    canvasRef.current.height = height;
+    canvasRef.current.width = 4096;
+    canvasRef.current.height = 4096;
 
     elementCanvasRef.current.width = width;
     elementCanvasRef.current.height = height;
    
     canvasContext.current.globalCompositeOperation = "source-over";
     childrenOnDraw.current.forEach((onDraw) => {
-      onDraw(canvasContext.current!);
+      onDraw({
+        ctx: canvasContext.current!,
+        cameraOffset,
+        zoomLevel,
+        elementWidth: width,
+        elementHeight: height,
+      });
     });
     
     canvasContext.current.globalCompositeOperation = "destination-out";
@@ -241,6 +258,11 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     elementCanvasContext.translate(-width / 2 + cameraOffset.x, -height / 2 + cameraOffset.y);
     elementCanvasContext.clearRect(0, 0, width, height);
     elementCanvasContext.drawImage(canvasRef.current, 0, 0);
+
+    dispatch(setPaintingCameraX(cameraOffset.x));
+    dispatch(setPaintingCameraY(cameraOffset.y));
+    dispatch(setPaintingElementWidth(width));
+    dispatch(setPaintingElementHeight(height));
   }
 
   useLayoutEffect(() => {
@@ -262,9 +284,9 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
           return React.cloneElement<CanvasElementProps>(child as React.FunctionComponentElement<CanvasElementProps>, {
-            setOnDraw: (onDraw: (ctx: CanvasRenderingContext2D) => void) => {
-              childrenOnDraw.current.set(child, (ctx) => {
-                onDraw(ctx);
+            setOnDraw: (onDraw: (props: DrawProps) => void) => {
+              childrenOnDraw.current.set(child, (drawProps) => {
+                onDraw(drawProps);
                 setEffectTrigger(!effectTrigger);
               });
 

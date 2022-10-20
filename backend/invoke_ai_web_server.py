@@ -746,27 +746,6 @@ class InvokeAIWebServer:
                 else []
             )
 
-            args   = metadata_from_png(original_image['url'])
-
-            init_img_url = None
-            mask_img_url = None
-
-            if 'init_img' in outpaint_parameters:
-                init_img_url = outpaint_parameters['init_img']
-                outpaint_parameters[
-                    'init_img'
-                ] = self.get_image_path_from_url(
-                    outpaint_parameters['init_img']
-                )
-
-            if 'init_mask' in outpaint_parameters:
-                mask_img_url = outpaint_parameters['init_mask']
-                outpaint_parameters[
-                    'init_mask'
-                ] = self.get_image_path_from_url(
-                    outpaint_parameters['init_mask']
-                )
-
             totalSteps = self.calculate_real_steps(
                 steps=outpaint_parameters['steps'],
                 strength=outpaint_parameters['strength']
@@ -774,6 +753,10 @@ class InvokeAIWebServer:
                 else None,
                 has_init_image='init_img' in outpaint_parameters,
             )
+
+            # original image is base64 encoded
+            image = Image.open(io.BytesIO(base64.decodebytes(bytes(original_image, "utf-8"))))
+            image.save(os.path.join(self.init_image_path, 'original.png'))
 
             progress = Progress(generation_parameters=outpaint_parameters)
 
@@ -875,13 +858,6 @@ class InvokeAIWebServer:
                 )
                 eventlet.sleep(0)
 
-                # restore the stashed URLS and discard the paths, we are about to send the result to client
-                if 'init_img' in all_parameters:
-                    all_parameters['init_img'] = init_img_url
-
-                if 'init_mask' in all_parameters:
-                    all_parameters['init_mask'] = mask_img_url
-
                 metadata = self.parameters_to_generated_image_metadata(
                     all_parameters
                 )
@@ -925,14 +901,14 @@ class InvokeAIWebServer:
 
             self.generate.prompt2image(
                 prompt         = outpaint_parameters['prompt'],
-                seed           = args.seed,
+                seed           = outpaint_parameters['seed'],
                 sampler        = self.generate.sampler,
                 steps          = opt.steps,
                 cfg_scale      = opt.cfg_scale,
                 ddim_eta       = self.generate.ddim_eta,
                 width          = opt.width,
                 height         = opt.height,
-                init_img       = original_image['url'],
+                init_img       = image,
                 strength       = 0.83,
                 step_callback  = image_progress,
                 image_callback = image_done,

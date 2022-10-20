@@ -10,37 +10,50 @@ export default function InvokeButton() {
   const { activeTab, width, height } = useAppSelector(
     (state: RootState) => state.options
   );
+  const { paintingCameraX, paintingCameraY, paintingElementWidth, paintingElementHeight } = useAppSelector(
+    (state: RootState) => state.gallery
+  );
 
   const dispatch = useAppDispatch();
   const isReady = useCheckParameters();
 
   const handleClickGenerate = () => {
-    if (!canvasRef.current) return;
+    if (tabMap[activeTab] === 'inpainting') {
+      if (!canvasRef.current) return;
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(canvasRef.current, 0, 0);
+      }
+      const maskDataURLString = tempCanvas.toDataURL();
 
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    const tempCtx = tempCanvas.getContext('2d');
-    if (tempCtx) {
-      tempCtx.drawImage(canvasRef.current, 0, 0);
-    }
-    const maskDataURLString = tempCanvas.toDataURL();
-
-    if (maskDataURLString) {
-      console.log('maskDataURLString', maskDataURLString);
-    
       dispatch(
         generateImage({
           inpaintingMask: maskDataURLString.split('data:image/png;base64,')[1],
         })
       );
-    } else {
-      if (tabMap[activeTab] === 'outpainting') {
-        dispatch(outpaintImage());
+    }
+    else if (tabMap[activeTab] === 'outpainting') {
+      if (!canvasRef.current) return;
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(canvasRef.current, (paintingElementWidth - width) / 2 - paintingCameraX, (paintingElementHeight - height) / 2 - paintingCameraY, width, height, 0, 0, width, height);
       }
-      else {
-        dispatch(generateImage());
-      }
+      const maskDataURLString = tempCanvas.toDataURL();
+
+      dispatch(
+        outpaintImage({
+          inpaintingMask: maskDataURLString.split('data:image/png;base64,')[1]
+        })
+      );
+    }
+    else {
+      dispatch(generateImage());
     }
   };
 
