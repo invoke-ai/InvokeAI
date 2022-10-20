@@ -117,7 +117,7 @@ try:
         with zipfile.ZipFile(model_dest,'r') as zip:
             zip.extractall('src/clipseg')
             os.rename('src/clipseg/clipseg_weights','src/clipseg/weights')
-        from models.clipseg import CLIPDensePredT
+        from clipseg_models.clipseg import CLIPDensePredT
         model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
         model.eval()
         model.load_state_dict(
