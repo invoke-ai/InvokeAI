@@ -26,6 +26,7 @@ export const socketioMiddleware = () => {
 
   const socketio = io(origin, {
     timeout: 60000,
+    path: window.location.pathname + 'socket.io',
   });
 
   let areListenersSet = false;
