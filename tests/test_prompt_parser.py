@@ -201,6 +201,9 @@ class PromptParserTestCase(unittest.TestCase):
                                                         Fragment(',', 1), Fragment('fire', 2.0)])])
         self.assertEqual(flames_to_trees_fire, parse_prompt('"0.5(fire 0.5(flames))".swap("0.7(trees) houses"), 2.0(fire)'))
 
+    def test_single(self):
+        print(parse_prompt('fire (trees and houses).swap("flames")'))
+
 
 if __name__ == '__main__':
     unittest.main()
