@@ -22,7 +22,7 @@ class Txt2Img(Generator):
         """
         self.perlin = perlin
         uc, c, ec, edit_opcodes   = conditioning
-        structured_conditioning = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
+        extra_conditioning_info = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
 
         @torch.no_grad()
         def make_image(x_T):
@@ -46,7 +46,7 @@ class Txt2Img(Generator):
                 verbose                      = False,
                 unconditional_guidance_scale = cfg_scale,
                 unconditional_conditioning   = uc,
-                structured_conditioning      = structured_conditioning,
+                extra_conditioning_info      = extra_conditioning_info,
                 eta                          = ddim_eta,
                 img_callback                 = step_callback,
                 threshold                    = threshold,

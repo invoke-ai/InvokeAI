@@ -24,7 +24,7 @@ class Txt2Img2Img(Generator):
         kwargs are 'width' and 'height'
         """
         uc, c, ec, edit_opcodes = conditioning
-        structured_conditioning = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
+        extra_conditioning_info = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
 
         @torch.no_grad()
         def make_image(x_T):           
@@ -63,7 +63,7 @@ class Txt2Img2Img(Generator):
                 unconditional_conditioning   = uc,
                 eta                          = ddim_eta,
                 img_callback                 = step_callback,
-                structured_conditioning      = structured_conditioning
+                extra_conditioning_info      = extra_conditioning_info
             )
             
             print(
@@ -97,7 +97,7 @@ class Txt2Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
-                structured_conditioning      = structured_conditioning
+                extra_conditioning_info      = extra_conditioning_info
             )
 
             if self.free_gpu_mem:

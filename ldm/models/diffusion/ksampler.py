@@ -34,10 +34,10 @@ class CFGDenoiser(nn.Module):
 
     def prepare_to_sample(self, t_enc, **kwargs):
 
-        structured_conditioning = kwargs.get('structured_conditioning', None)
+        extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
 
-        if structured_conditioning is not None and structured_conditioning.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(structured_conditioning)
+        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info)
         else:
             self.invokeai_diffuser.remove_cross_attention_control()
 
@@ -164,7 +164,7 @@ class KSampler(Sampler):
         log_every_t=100,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
-        structured_conditioning=None,
+        extra_conditioning_info=None,
         threshold = 0,
         perlin = 0,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
@@ -197,7 +197,7 @@ class KSampler(Sampler):
             x = torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
 
         model_wrap_cfg = CFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
-        model_wrap_cfg.prepare_to_sample(S, structured_conditioning=structured_conditioning)
+        model_wrap_cfg.prepare_to_sample(S, extra_conditioning_info=extra_conditioning_info)
         extra_args = {
             'cond': conditioning,
             'uncond': unconditional_conditioning,
@@ -224,7 +224,7 @@ class KSampler(Sampler):
             index,
             unconditional_guidance_scale=1.0,
             unconditional_conditioning=None,
-            structured_conditioning=None,
+            extra_conditioning_info=None,
             **kwargs,
     ):
         if self.model_wrap is None:
@@ -250,7 +250,7 @@ class KSampler(Sampler):
         # so the actual formula for indexing into sigmas:
         # sigma_index = (steps-index)
         s_index = t_enc - index - 1
-        self.model_wrap.prepare_to_sample(s_index, structured_conditioning=structured_conditioning)
+        self.model_wrap.prepare_to_sample(s_index, extra_conditioning_info=extra_conditioning_info)
         img =  K.sampling.__dict__[f'_{self.schedule}'](
             self.model_wrap,
             img,

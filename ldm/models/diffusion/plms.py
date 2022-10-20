@@ -20,10 +20,10 @@ class PLMSSampler(Sampler):
     def prepare_to_sample(self, t_enc, **kwargs):
         super().prepare_to_sample(t_enc, **kwargs)
 
-        structured_conditioning = kwargs.get('structured_conditioning', None)
+        extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
 
-        if structured_conditioning is not None and structured_conditioning.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(structured_conditioning)
+        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info)
         else:
             self.invokeai_diffuser.remove_cross_attention_control()
 

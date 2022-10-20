@@ -4,7 +4,7 @@ weighted subprompts.
 
 Useful function exports:
 
-get_uc_and_c()                  get the conditioned and unconditioned latent
+get_uc_and_c_and_ec()           get the conditioned and unconditioned latent, and edited conditioning if we're doing cross-attention control
 split_weighted_subpromopts()    split subprompts, normalize and weight them
 log_tokenization()              print out colour-coded tokens and warn if truncated
 
@@ -39,8 +39,10 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
 
     pp = PromptParser()
 
-    parsed_prompt: Union[FlattenedPrompt, Blend] = pp.parse(prompt_string_cleaned)
-    parsed_negative_prompt: FlattenedPrompt = pp.parse(unconditioned_words)
+    # we don't support conjunctions for now
+    parsed_prompt: Union[FlattenedPrompt, Blend] = pp.parse(prompt_string_cleaned).prompts[0]
+    parsed_negative_prompt: FlattenedPrompt = pp.parse(unconditioned_words).prompts[0]
+    print("parsed prompt to", parsed_prompt)
 
     conditioning = None
     edited_conditioning = None
@@ -50,7 +52,7 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
         blend: Blend = parsed_prompt
         embeddings_to_blend = None
         for flattened_prompt in blend.prompts:
-            this_embedding = make_embeddings_for_flattened_prompt(model, flattened_prompt)
+            this_embedding = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt)
             embeddings_to_blend = this_embedding if embeddings_to_blend is None else torch.cat(
                 (embeddings_to_blend, this_embedding))
         conditioning, _ = WeightedFrozenCLIPEmbedder.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
@@ -72,16 +74,16 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
                     # regular fragment
                     original_prompt.append(fragment)
                     edited_prompt.append(fragment)
-            original_embeddings, original_tokens = make_embeddings_for_flattened_prompt(model, original_prompt)
-            edited_embeddings, edited_tokens = make_embeddings_for_flattened_prompt(model, edited_prompt)
+            original_embeddings, original_tokens = build_embeddings_and_tokens_for_flattened_prompt(model, original_prompt)
+            edited_embeddings, edited_tokens = build_embeddings_and_tokens_for_flattened_prompt(model, edited_prompt)
 
             conditioning = original_embeddings
             edited_conditioning = edited_embeddings
             edit_opcodes = build_token_edit_opcodes(original_tokens, edited_tokens)
         else:
-            conditioning, _ = make_embeddings_for_flattened_prompt(model, flattened_prompt)
+            conditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt)
 
-    unconditioning = make_embeddings_for_flattened_prompt(parsed_negative_prompt)
+    unconditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, parsed_negative_prompt)
     return (unconditioning, conditioning, edited_conditioning, edit_opcodes)
 
 
@@ -91,11 +93,11 @@ def build_token_edit_opcodes(original_tokens, edited_tokens):
 
     return SequenceMatcher(None, original_tokens, edited_tokens).get_opcodes()
 
-def make_embeddings_for_flattened_prompt(model, flattened_prompt: FlattenedPrompt):
+def build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt: FlattenedPrompt):
     if type(flattened_prompt) is not FlattenedPrompt:
         raise f"embeddings can only be made from FlattenedPrompts, got {type(flattened_prompt)} instead"
-    fragments = [x[0] for x in flattened_prompt.children]
-    embeddings, tokens = model.get_learned_conditioning([fragments], return_tokens=True)
+    fragments = [x.text for x in flattened_prompt.children]
+    embeddings, tokens = model.get_learned_conditioning([' '.join(fragments)], return_tokens=True)
     return embeddings, tokens
 
 

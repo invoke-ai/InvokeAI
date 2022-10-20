@@ -439,6 +439,13 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             param.requires_grad = False
 
     def forward(self, text, **kwargs):
+
+        should_return_tokens = False
+        if 'return_tokens' in kwargs:
+            should_return_tokens = kwargs.get('return_tokens', False)
+            # self.transformer doesn't like having extra kwargs
+            kwargs.pop('return_tokens')
+
         batch_encoding = self.tokenizer(
             text,
             truncation=True,
@@ -451,7 +458,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         tokens = batch_encoding['input_ids'].to(self.device)
         z = self.transformer(input_ids=tokens, **kwargs)
 
-        if kwargs.get('return_tokens', False):
+        if should_return_tokens:
             return z, tokens
         else:
             return z

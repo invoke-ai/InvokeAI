@@ -34,7 +34,7 @@ class Img2Img(Generator):
 
         t_enc = int(strength * steps)
         uc, c, ec, edit_opcodes   = conditioning
-        structured_conditioning = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
+        extra_conditioning_info = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
 
         def make_image(x_T):
             # encode (scaled latent)
@@ -52,7 +52,7 @@ class Img2Img(Generator):
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
                 init_latent = self.init_latent,
-                structured_conditioning = structured_conditioning
+                extra_conditioning_info = extra_conditioning_info
                 # changes how noising is performed in ksampler
             )
 
