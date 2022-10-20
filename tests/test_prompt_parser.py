@@ -104,8 +104,6 @@ class PromptParserTestCase(unittest.TestCase):
             parse_prompt('(a (ba)dly (f)ormed test+ +prompt')
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('("((a badly (formed test+ ").blend(1.0)')
-        with self.assertRaises(pyparsing.ParseException):
-            parse_prompt('mountain (\\"man").swap("monkey")')
 
 
     def test_blend(self):

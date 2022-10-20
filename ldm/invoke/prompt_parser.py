@@ -270,7 +270,6 @@ class PromptParser():
             else:
                 raise PromptParser.ParsingException("Cannot make fragment from " + str(x))
 
-        unquoted_fragment = pp.Forward()
         quoted_fragment = pp.Forward()
         parenthesized_fragment = pp.Forward()
 
@@ -281,7 +280,7 @@ class PromptParser():
             fragment_parser = pp.Group(pp.OneOrMore(attention | (greedy_word.set_parse_action(make_fragment))))
             fragment_parser.set_name('word_or_attention')
             result = fragment_parser.parse_string(x[0])
-            #result = (pp.OneOrMore(attention | unquoted_fragment) + pp.StringEnd()).parse_string(x[0])
+            #result = (pp.OneOrMore(attention | unquoted_word) + pp.StringEnd()).parse_string(x[0])
             #print("parsed to", result)
             return result
 
@@ -292,11 +291,15 @@ class PromptParser():
         self_unescaping_escaped_lparen = pp.Literal('\\(').set_parse_action(lambda x: '(')
         self_unescaping_escaped_rparen = pp.Literal('\\)').set_parse_action(lambda x: ')')
 
-        unquoted_fragment << pp.Combine(pp.OneOrMore(
-            self_unescaping_escaped_rparen | self_unescaping_escaped_lparen | self_unescaping_escaped_quote |
-            pp.Word(pp.printables, exclude_chars=string.whitespace + '\\"()')
-        ))
-        unquoted_fragment.set_parse_action(make_fragment).set_name('unquoted_fragment')
+        def not_ends_with_swap(x):
+            #print("trying to match:", x)
+            return not x[0].endswith('.swap')
+
+        unquoted_fragment = pp.Combine(pp.OneOrMore(
+                self_unescaping_escaped_rparen | self_unescaping_escaped_lparen | self_unescaping_escaped_quote |
+                pp.Word(pp.printables, exclude_chars=string.whitespace + '\\"()')))
+        unquoted_fragment.set_parse_action(make_fragment).set_name('unquoted_fragment').set_debug(True)
+        #print(unquoted_fragment.parse_string("cat.swap(dog)"))
 
         parenthesized_fragment << pp.MatchFirst([
             (lparen + quoted_fragment.copy().set_parse_action(parse_fragment_str).set_debug(False) + rparen).set_name('-quoted_paren_internal').set_debug(False),
@@ -367,13 +370,13 @@ class PromptParser():
                         ).set_parse_action(lambda x: Fragment(""))
         empty_string.set_name('empty_string')
 
-
         # cross attention control
         debug_cross_attention_control = False
         original_fragment = pp.Or([empty_string.set_debug(debug_cross_attention_control),
                             quoted_fragment.set_debug(debug_cross_attention_control),
                             parenthesized_fragment.set_debug(debug_cross_attention_control),
-                            unquoted_fragment.set_debug(debug_cross_attention_control)])
+                            pp.Word(pp.printables, exclude_chars=string.whitespace + '.').set_parse_action(make_fragment) + pp.FollowedBy(".swap")
+                   ])
         edited_fragment = parenthesized_fragment
         cross_attention_substitute = original_fragment + pp.Literal(".swap").suppress() + edited_fragment
 
