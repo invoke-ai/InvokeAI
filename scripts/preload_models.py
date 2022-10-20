@@ -121,11 +121,11 @@ try:
         model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
         model.eval()
         model.load_state_dict(
-            torch.load('src/clipseg/weights/rd64-uni-refined.pth'),
-            model.load_state_dict(torch.load('src/clipseg/weights/rd64-uni-refined.pth'),
-                                  map_location=torch.device('cpu'),
-                                  strict=False,
-            )
+            torch.load(
+                'src/clipseg/weights/rd64-uni-refined.pth',
+                map_location=torch.device('cpu')
+                ),
+            strict=False,
         )
 except Exception:
     print('Error installing clipseg model:')
