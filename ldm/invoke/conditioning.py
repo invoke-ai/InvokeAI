@@ -52,10 +52,10 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
         blend: Blend = parsed_prompt
         embeddings_to_blend = None
         for flattened_prompt in blend.prompts:
-            this_embedding = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt)
+            this_embedding, _ = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt)
             embeddings_to_blend = this_embedding if embeddings_to_blend is None else torch.cat(
                 (embeddings_to_blend, this_embedding))
-        conditioning, _ = WeightedFrozenCLIPEmbedder.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
+        conditioning = WeightedFrozenCLIPEmbedder.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
                                                                                 blend.weights,
                                                                                 normalize=blend.normalize_weights)
     else:
