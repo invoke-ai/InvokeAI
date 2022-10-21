@@ -800,19 +800,33 @@ def retrieve_dream_command(opt,command,completer):
     will retrieve and format the dream command used to generate the image,
     and pop it into the readline buffer (linux, Mac), or print out a comment
     for cut-and-paste (windows)
+
     Given a wildcard path to a folder with image png files, 
     will retrieve and format the dream command used to generate the images,
     and save them to a file commands.txt for further processing
     '''
     if len(command) == 0:
         return
+
     tokens = command.split()
     if len(tokens) > 1:
-        outfilepath = tokens[1]
-    else:
-        outfilepath = "commands.txt"
-        
+        return write_commands(opt,tokens)
+
+    try:
+        cmd = dream_cmd_from_png(tokens[0])
+    except OSError:
+        print(f'## {path}: file could not be read')
+    except (KeyError, AttributeError, IndexError):
+        print(f'## {path}: file has no metadata')
+    except:
+        print(f'## {path}: file could not be processed')
+    if len(cmd)>0:
+        completer.set_line(cmd)
+
+def write_commands(opt, tokens:list):
     file_path = tokens[0]    
+    outfilepath = tokens[1]
+        
     dir,basename = os.path.split(file_path)
     if len(dir) == 0:
         dir = opt.outdir
@@ -827,28 +841,23 @@ def retrieve_dream_command(opt,command,completer):
         return
  
     commands = []
+    cmd = None
     for path in paths:
         try:
             cmd = dream_cmd_from_png(path)
         except OSError:
             print(f'## {path}: file could not be read')
-            continue
         except (KeyError, AttributeError, IndexError):
             print(f'## {path}: file has no metadata')
-            continue
         except:
             print(f'## {path}: file could not be processed')
-            continue
-            
-        commands.append(f'# {path}')
-        commands.append(cmd)
- 
-    with open(outfilepath, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(commands))
-    print(f'>> File {outfilepath} with commands created')
-
-    if len(commands) == 2:
-       completer.set_line(commands[1])
+        if cmd:
+            commands.append(f'# {path}')
+            commands.append(cmd)
+    if len(commands)>0:
+        with open(outfilepath, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(commands))
+        print(f'>> File {outfilepath} with commands created')
 
 ######################################
 
