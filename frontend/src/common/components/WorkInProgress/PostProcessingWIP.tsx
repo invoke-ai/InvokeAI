@@ -7,12 +7,17 @@ export const PostProcessingWIP = () => {
       <p>
         Invoke AI offers a wide variety of post processing features. Image
         Upscaling and Face Restoration are already available in the WebUI. You
-        can access them from the Advanced Options menu of the Text To Image tab.
-        A dedicated UI will be released soon.
+        can access them from the Advanced Options menu of the Text To Image and
+        Image To Image tabs. You can also process images directly, using the
+        image action buttons above the main image display.
+      </p>
+      <p>
+        A dedicated UI will be released soon to facilitate more advanced post
+        processing workflows.
       </p>
       <p>
         The Invoke AI Command Line Interface offers various other features
-        including Embiggen, High Resolution Fixing and more.
+        including Embiggen.
       </p>
     </div>
   );
