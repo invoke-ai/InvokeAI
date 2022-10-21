@@ -22,6 +22,7 @@ except (ImportError,ModuleNotFoundError):
 
 IMG_EXTENSIONS     = ('.png','.jpg','.jpeg','.PNG','.JPG','.JPEG','.gif','.GIF')
 WEIGHT_EXTENSIONS  = ('.ckpt','.bae')
+TEXT_EXTENSIONS  = ('.txt','.TXT')
 CONFIG_EXTENSIONS  = ('.yaml','.yml')
 COMMANDS = (
     '--steps','-s',
@@ -69,6 +70,9 @@ WEIGHT_COMMANDS = (
 IMG_PATH_COMMANDS = (
     '--outdir[=\s]',
     )
+TEXT_PATH_COMMANDS=(
+    '!replay',
+    )
 IMG_FILE_COMMANDS=(
     '!fix',
     '!fetch',
@@ -78,8 +82,9 @@ IMG_FILE_COMMANDS=(
     '--init_color[=\s]',
     '--embedding_path[=\s]',
     )
-path_regexp   = '('+'|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
-weight_regexp = '('+'|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
+path_regexp   = '(' + '|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
+weight_regexp = '(' + '|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
+text_regexp = '(' + '|'.join(TEXT_PATH_COMMANDS) + ')\s*\S*$'
 
 class Completer(object):
     def __init__(self, options, models=[]):
@@ -121,6 +126,9 @@ class Completer(object):
 
             elif re.search(weight_regexp,buffer):
                 self.matches = self._path_completions(text, state, WEIGHT_EXTENSIONS)
+
+            elif re.search(text_regexp,buffer):
+                self.matches = self._path_completions(text, state, TEXT_EXTENSIONS)
 
             # This is the first time for this text, so build a match list.
             elif text:
