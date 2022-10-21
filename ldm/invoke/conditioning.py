@@ -97,7 +97,8 @@ def build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt: Fl
     if type(flattened_prompt) is not FlattenedPrompt:
         raise f"embeddings can only be made from FlattenedPrompts, got {type(flattened_prompt)} instead"
     fragments = [x.text for x in flattened_prompt.children]
-    embeddings, tokens = model.get_learned_conditioning([' '.join(fragments)], return_tokens=True)
+    weights = [x.weight for x in flattened_prompt.children]
+    embeddings, tokens = model.get_learned_conditioning([fragments], return_tokens=True, fragment_weights=[weights])
     return embeddings, tokens
 
 

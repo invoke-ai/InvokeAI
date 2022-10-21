@@ -183,7 +183,6 @@ class KSampler(Sampler):
             )
 
         # sigmas are set up in make_schedule - we take the last steps items
-        total_steps = len(self.sigmas)
         sigmas = self.sigmas[-S-1:]
 
         # x_T is variation noise. When an init image is provided (in x0) we need to add

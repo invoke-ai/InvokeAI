@@ -4,7 +4,7 @@ ldm.models.diffusion.sampler
 Base class for ldm.models.diffusion.ddim, ldm.models.diffusion.ksampler, etc
 
 '''
-from enum import Enum
+from math import ceil
 
 import torch
 import numpy as np

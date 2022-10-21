@@ -329,7 +329,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
 
     def parse_fragment_str(x, in_quotes: bool=False, in_parens: bool=False):
         fragment_string = x[0]
-        print(f"parsing fragment string \"{fragment_string}\"")
+        #print(f"parsing fragment string \"{fragment_string}\"")
         if len(fragment_string.strip()) == 0:
             return Fragment('')
 
