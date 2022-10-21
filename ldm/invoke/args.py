@@ -113,8 +113,8 @@ PRECISION_CHOICES = [
 ]
 
 # is there a way to pick this up during git commits?
-APP_ID      = 'lstein/stable-diffusion'
-APP_VERSION = 'v1.15'
+APP_ID      = 'invoke-ai/InvokeAI'
+APP_VERSION = 'v2.02'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -841,7 +841,7 @@ def metadata_dumps(opt,
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
                          'cfg_scale','threshold','perlin','step_number','width','height','extra','strength',
-                         'init_img','init_mask']
+                         'init_img','init_mask','facetool','facetool_strength','upscale']
 
     rfc_dict ={}
 
