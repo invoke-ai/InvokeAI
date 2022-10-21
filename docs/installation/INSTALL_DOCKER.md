@@ -1,4 +1,10 @@
-# Before you begin
+---
+title: Docker
+---
+
+# :fontawesome-brands-docker: Docker
+
+## Before you begin
 
 - For end users: Install Stable Diffusion locally using the instructions for
   your OS.
@@ -6,7 +12,7 @@
   deployment to other environments (on-premises or cloud), follow these
   instructions. For general use, install locally to leverage your machine's GPU.
 
-# Why containers?
+## Why containers?
 
 They provide a flexible, reliable way to build and deploy Stable Diffusion.
 You'll also use a Docker volume to store the largest model files and image
@@ -26,11 +32,11 @@ development purposes it's fine. Once you're done with development tasks on your
 laptop you can build for the target platform and architecture and deploy to
 another environment with NVIDIA GPUs on-premises or in the cloud.
 
-# Installation on a Linux container
+## Installation on a Linux container
 
-## Prerequisites
+### Prerequisites
 
-### Get the data files
+#### Get the data files
 
 Go to
 [Hugging Face](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original),
@@ -44,14 +50,14 @@ cd ~/Downloads
 wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth
 ```
 
-### Install [Docker](https://github.com/santisbon/guides#docker)
+#### Install [Docker](https://github.com/santisbon/guides#docker)
 
 On the Docker Desktop app, go to Preferences, Resources, Advanced. Increase the
 CPUs and Memory to avoid this
 [Issue](https://github.com/invoke-ai/InvokeAI/issues/342). You may need to
 increase Swap and Disk image size too.
 
-## Setup
+### Setup
 
 Set the fork you want to use and other variables.
 
@@ -132,11 +138,11 @@ docker run -it \
 $TAG_STABLE_DIFFUSION
 ```
 
-# Usage (time to have fun)
+## Usage (time to have fun)
 
-## Startup
+### Startup
 
-If you're on a **Linux container** the `dream` script is **automatically
+If you're on a **Linux container** the `invoke` script is **automatically
 started** and the output dir set to the Docker volume you created earlier.
 
 If you're **directly on macOS follow these startup instructions**.  
@@ -148,17 +154,17 @@ half-precision requires autocast and won't work.
 By default the images are saved in `outputs/img-samples/`.
 
 ```Shell
-python3 scripts/dream.py --full_precision
+python3 scripts/invoke.py --full_precision
 ```
 
 You'll get the script's prompt. You can see available options or quit.
 
 ```Shell
-dream> -h
-dream> q
+invoke> -h
+invoke> q
 ```
 
-## Text to Image
+### Text to Image
 
 For quick (but bad) image results test with 5 steps (default 50) and 1 sample
 image. This will let you know that everything is set up correctly.  
@@ -166,10 +172,10 @@ Then increase steps to 100 or more for good (but slower) results.
 The prompt can be in quotes or not.
 
 ```Shell
-dream> The hulk fighting with sheldon cooper -s5 -n1
-dream> "woman closeup highly detailed"  -s 150
+invoke> The hulk fighting with sheldon cooper -s5 -n1
+invoke> "woman closeup highly detailed"  -s 150
 # Reuse previous seed and apply face restoration
-dream> "woman closeup highly detailed"  --steps 150 --seed -1 -G 0.75
+invoke> "woman closeup highly detailed"  --steps 150 --seed -1 -G 0.75
 ```
 
 You'll need to experiment to see if face restoration is making it better or
@@ -188,7 +194,7 @@ volume):
 docker cp dummy:/data/000001.928403745.png /Users/<your-user>/Pictures
 ```
 
-## Image to Image
+### Image to Image
 
 You can also do text-guided image-to-image translation. For example, turning a
 sketch into a detailed drawing.
@@ -210,35 +216,35 @@ If you're on a Docker container, copy your input image into the Docker volume
 docker cp /Users/<your-user>/Pictures/sketch-mountains-input.jpg dummy:/data/
 ```
 
-Try it out generating an image (or more). The `dream` script needs absolute
+Try it out generating an image (or more). The `invoke` script needs absolute
 paths to find the image so don't use `~`.
 
 If you're on your Mac
 
 ```Shell
-dream> "A fantasy landscape, trending on artstation" -I /Users/<your-user>/Pictures/sketch-mountains-input.jpg --strength 0.75  --steps 100 -n4
+invoke> "A fantasy landscape, trending on artstation" -I /Users/<your-user>/Pictures/sketch-mountains-input.jpg --strength 0.75  --steps 100 -n4
 ```
 
 If you're on a Linux container on your Mac
 
 ```Shell
-dream> "A fantasy landscape, trending on artstation" -I /data/sketch-mountains-input.jpg --strength 0.75  --steps 50 -n1
+invoke> "A fantasy landscape, trending on artstation" -I /data/sketch-mountains-input.jpg --strength 0.75  --steps 50 -n1
 ```
 
-## Web Interface
+### Web Interface
 
-You can use the `dream` script with a graphical web interface. Start the web
+You can use the `invoke` script with a graphical web interface. Start the web
 server with:
 
 ```Shell
-python3 scripts/dream.py --full_precision --web
+python3 scripts/invoke.py --full_precision --web
 ```
 
 If it's running on your Mac point your Mac web browser to http://127.0.0.1:9090
 
 Press Control-C at the command line to stop the web server.
 
-## Notes
+### Notes
 
 Some text you can add at the end of the prompt to make it very pretty:
 

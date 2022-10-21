@@ -19,7 +19,7 @@ import cv2
 import skimage
 
 from omegaconf import OmegaConf
-from ldm.dream.generator.base import downsampling
+from ldm.invoke.generator.base import downsampling
 from PIL import Image, ImageOps
 from torch import nn
 from pytorch_lightning import seed_everything, logging
@@ -28,30 +28,15 @@ from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
-from ldm.dream.pngwriter import PngWriter
-from ldm.dream.args import metadata_from_png
-from ldm.dream.image_util import InitImageResizer
-from ldm.dream.devices import choose_torch_device, choose_precision
-from ldm.dream.conditioning import get_uc_and_c
-
-def fix_func(orig):
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        def new_func(*args, **kw):
-            device = kw.get("device", "mps")
-            kw["device"]="cpu"
-            return orig(*args, **kw).to(device)
-        return new_func
-    return orig
-
-torch.rand = fix_func(torch.rand)
-torch.rand_like = fix_func(torch.rand_like)
-torch.randn = fix_func(torch.randn)
-torch.randn_like = fix_func(torch.randn_like)
-torch.randint = fix_func(torch.randint)
-torch.randint_like = fix_func(torch.randint_like)
-torch.bernoulli = fix_func(torch.bernoulli)
-torch.multinomial = fix_func(torch.multinomial)
-
+from ldm.invoke.pngwriter import PngWriter
+from ldm.invoke.args import metadata_from_png
+from ldm.invoke.image_util import InitImageResizer
+from ldm.invoke.devices import choose_torch_device, choose_precision
+from ldm.invoke.conditioning import get_uc_and_c
+from ldm.invoke.model_cache import ModelCache
+from ldm.invoke.seamless import configure_model_padding
+from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
+    
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         def new_func(*args, **kw):
@@ -174,14 +159,14 @@ class Generate:
             config                = None,
             gfpgan=None,
             codeformer=None,
-            esrgan=None
+            esrgan=None,
+            free_gpu_mem=False,
     ):
-        models              = OmegaConf.load(conf)
-        mconfig             = models[model]
-        self.weights        = mconfig.weights if weights is None else weights
-        self.config         = mconfig.config  if config  is None else config
-        self.height         = mconfig.height
-        self.width          = mconfig.width
+        mconfig             = OmegaConf.load(conf)
+        self.model_name     = model
+        self.height         = None
+        self.width          = None
+        self.model_cache    = None
         self.iterations     = 1
         self.steps          = 50
         self.cfg_scale      = 7.5
@@ -190,8 +175,11 @@ class Generate:
         self.precision      = precision
         self.strength       = 0.75
         self.seamless       = False
+        self.seamless_axes  = {'x','y'}
+        self.hires_fix      = False
         self.embedding_path = embedding_path
         self.model          = None     # empty for now
+        self.model_hash     = None
         self.sampler        = None
         self.device         = None
         self.session_peakmem = None
@@ -201,11 +189,15 @@ class Generate:
         self.gfpgan = gfpgan
         self.codeformer = codeformer
         self.esrgan = esrgan
+        self.free_gpu_mem = free_gpu_mem
+        self.size_matters = True  # used to warn once about large image sizes and VRAM
+        self.txt2mask = None
 
         # Note that in previous versions, there was an option to pass the
         # device to Generate(). However the device was then ignored, so
         # it wasn't actually doing anything. This logic could be reinstated.
         device_type = choose_torch_device()
+        print(f'>> Using device_type {device_type}')
         self.device = torch.device(device_type)
         if full_precision:
             if self.precision != 'auto':
@@ -215,6 +207,9 @@ class Generate:
             self.precision = 'float32'
         if self.precision == 'auto':
             self.precision = choose_precision(self.device)
+
+        # model caching system for fast switching
+        self.model_cache = ModelCache(mconfig,self.device,self.precision)
 
         # for VRAM usage statistics
         self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None
@@ -267,6 +262,7 @@ class Generate:
             height           = None,
             sampler_name     = None,
             seamless         = False,
+            seamless_axes    = {'x','y'},
             log_tokenization = False,
             with_variations  = None,
             variation_amount = 0.0,
@@ -275,6 +271,7 @@ class Generate:
             # these are specific to img2img and inpaint
             init_img         = None,
             init_mask        = None,
+            text_mask        = None,
             fit              = False,
             strength         = None,
             init_color       = None,
@@ -283,10 +280,12 @@ class Generate:
             embiggen_tiles =    None,
             # these are specific to GFPGAN/ESRGAN
             facetool         = None,
-            gfpgan_strength  = 0,
+            facetool_strength  = 0,
             codeformer_fidelity = None,
             save_original    = False,
             upscale          = None,
+            # this is specific to inpainting and causes more extreme inpainting
+            inpaint_replace  = 0.0,
             # Set this True to handle KeyboardInterrupt internally
             catch_interrupts = False,
             hires_fix        = False,
@@ -303,9 +302,12 @@ class Generate:
            height                          // height of image, in multiples of 64 (512)
            cfg_scale                       // how strongly the prompt influences the image (7.5) (must be >1)
            seamless                        // whether the generated image should tile
+           hires_fix                        // whether the Hires Fix should be applied during generation
            init_img                        // path to an initial image
+           init_mask                       // path to a mask for the initial image
+           text_mask                       // a text string that will be used to guide clipseg generation of the init_mask
            strength                        // strength for noising/unnoising init_img. 0.0 preserves image exactly, 1.0 replaces it completely
-           gfpgan_strength                 // strength for GFPGAN. 0.0 preserves image exactly, 1.0 replaces it completely
+           facetool_strength               // strength for GFPGAN/CodeFormer. 0.0 preserves image exactly, 1.0 replaces it completely
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
            step_callback                   // a function or method that will be called each step
            image_callback                  // a function or method that will be called each time an image is generated
@@ -327,15 +329,17 @@ class Generate:
             def process_image(image,seed):
                 image.save(f{'images/seed.png'})
 
-        The callback used by the prompt2png() can be found in ldm/dream_util.py. It contains code
-        to create the requested output directory, select a unique informative name for each image, and
-        write the prompt into the PNG metadata.
+        The code used to save images to a directory can be found in ldm/invoke/pngwriter.py. 
+        It contains code to create the requested output directory, select a unique informative
+        name for each image, and write the prompt into the PNG metadata.
         """
         # TODO: convert this into a getattr() loop
         steps = steps or self.steps
         width = width or self.width
         height = height or self.height
         seamless = seamless or self.seamless
+        seamless_axes = seamless_axes or self.seamless_axes
+        hires_fix = hires_fix or self.hires_fix
         cfg_scale = cfg_scale or self.cfg_scale
         ddim_eta = ddim_eta or self.ddim_eta
         iterations = iterations or self.iterations
@@ -346,11 +350,14 @@ class Generate:
         with_variations = [] if with_variations is None else with_variations
 
         # will instantiate the model or return it from cache
-        model = self.load_model()
-        
-        for m in model.modules():
-            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                m.padding_mode = 'circular' if seamless else m._orig_padding_mode
+        model = self.set_model(self.model_name)
+
+        # self.width and self.height are set by set_model()
+        # to the width and height of the image training set
+        width = width or self.width
+        height = height or self.height
+
+        configure_model_padding(model, seamless, seamless_axes)
 
         assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert threshold >= 0.0, '--threshold must be >=0.0'
@@ -378,6 +385,7 @@ class Generate:
                 f'variation weights must be in [0.0, 1.0]: got {[weight for _, weight in with_variations]}'
 
         width, height, _ = self._resolution_check(width, height, log=True)
+        assert inpaint_replace >=0.0 and inpaint_replace <= 1.0,'inpaint_replace must be between 0.0 and 1.0'
 
         if sampler_name and (sampler_name != self.sampler_name):
             self.sampler_name = sampler_name
@@ -404,7 +412,10 @@ class Generate:
                 width,
                 height,
                 fit=fit,
+                text_mask=text_mask,
             )
+
+            # TODO: Hacky selection of operation to perform. Needs to be refactored.
             if (init_image is not None) and (mask_image is not None):
                 generator = self._make_inpaint()
             elif (embiggen != None or embiggen_tiles != None):
@@ -417,7 +428,9 @@ class Generate:
                 generator = self._make_txt2img()
 
             generator.set_variation(
-                self.seed, variation_amount, with_variations)
+                self.seed, variation_amount, with_variations
+            )
+
             results = generator.generate(
                 prompt,
                 iterations=iterations,
@@ -439,6 +452,7 @@ class Generate:
                 perlin=perlin,
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
+                inpaint_replace=inpaint_replace,
             )
 
             if init_color:
@@ -446,11 +460,11 @@ class Generate:
                                     reference_image_path = init_color,
                                     image_callback       = image_callback)
 
-            if upscale is not None or gfpgan_strength > 0:
+            if upscale is not None or facetool_strength > 0:
                 self.upscale_and_reconstruct(results,
                                              upscale        = upscale,
                                              facetool       = facetool,
-                                             strength       = gfpgan_strength,
+                                             strength       = facetool_strength,
                                              codeformer_fidelity = codeformer_fidelity,
                                              save_original  = save_original,
                                              image_callback = image_callback)
@@ -493,7 +507,7 @@ class Generate:
             self,
             image_path,
             tool                = 'gfpgan',  # one of 'upscale', 'gfpgan', 'codeformer', 'outpaint', or 'embiggen'
-            gfpgan_strength     = 0.0,
+            facetool_strength   = 0.0,
             codeformer_fidelity = 0.75,
             upscale             = None,
             out_direction       = None,
@@ -540,11 +554,11 @@ class Generate:
                 facetool = 'codeformer'
             elif tool == 'upscale':
                 facetool = 'gfpgan'   # but won't be run
-                gfpgan_strength = 0
+                facetool_strength = 0
             return self.upscale_and_reconstruct(
                 [[image,seed]],
                 facetool = facetool,
-                strength = gfpgan_strength,
+                strength = facetool_strength,
                 codeformer_fidelity = codeformer_fidelity,
                 save_original = save_original,
                 upscale = upscale,
@@ -553,7 +567,7 @@ class Generate:
             )
 
         elif tool == 'outcrop':
-            from ldm.dream.restoration.outcrop import Outcrop
+            from ldm.invoke.restoration.outcrop import Outcrop
             extend_instructions = {}
             for direction,pixels in _pairwise(opt.outcrop):
                 extend_instructions[direction]=int(pixels)
@@ -590,7 +604,7 @@ class Generate:
                 image_callback = callback,
             )
         elif tool == 'outpaint':
-            from ldm.dream.restoration.outpaint import Outpaint
+            from ldm.invoke.restoration.outpaint import Outpaint
             restorer = Outpaint(image,self)
             return restorer.process(
                 opt,
@@ -614,105 +628,112 @@ class Generate:
             width,
             height,
             fit=False,
+            text_mask=None,
     ):
         init_image      = None
         init_mask       = None
         if not img:
             return None, None
 
-        image = self._load_img(
-            img,
-            width,
-            height,
-        )
+        image = self._load_img(img)
+
+        if image.width < self.width and image.height < self.height:
+            print(f'>> WARNING: img2img and inpainting may produce unexpected results with initial images smaller than {self.width}x{self.height} in both dimensions')
 
         # if image has a transparent area and no mask was provided, then try to generate mask
-        if self._has_transparency(image) and not mask:
-            print(
-                '>> Initial image has transparent areas. Will inpaint in these regions.')
-            if self._check_for_erasure(image):
-                print(
-                    '>> WARNING: Colors underneath the transparent region seem to have been erased.\n',
-                    '>>          Inpainting will be suboptimal. Please preserve the colors when making\n',
-                    '>>          a transparency mask, or provide mask explicitly using --init_mask (-M).'
-                )
+        if self._has_transparency(image):
+            self._transparency_check_and_warning(image, mask)
             # this returns a torch tensor
-            init_mask = self._create_init_mask(image,width,height,fit=fit)
+            init_mask = self._create_init_mask(image, width, height, fit=fit)
             
-        if (image.width * image.height) > (self.width * self.height):
+        if (image.width * image.height) > (self.width * self.height) and self.size_matters:
             print(">> This input is larger than your defaults. If you run out of memory, please use a smaller image.")
+            self.size_matters = False
 
         init_image   = self._create_init_image(image,width,height,fit=fit)                   # this returns a torch tensor
 
         if mask:
-            mask_image = self._load_img(
-                mask, width, height)  # this returns an Image
+            mask_image = self._load_img(mask)  # this returns an Image
             init_mask = self._create_init_mask(mask_image,width,height,fit=fit)
+
+        elif text_mask:
+            init_mask = self._txt2mask(image, text_mask, width, height, fit=fit)
 
         return init_image, init_mask
 
     def _make_base(self):
         if not self.generators.get('base'):
-            from ldm.dream.generator import Generator
+            from ldm.invoke.generator import Generator
             self.generators['base'] = Generator(self.model, self.precision)
         return self.generators['base']
 
     def _make_img2img(self):
         if not self.generators.get('img2img'):
-            from ldm.dream.generator.img2img import Img2Img
+            from ldm.invoke.generator.img2img import Img2Img
             self.generators['img2img'] = Img2Img(self.model, self.precision)
         return self.generators['img2img']
 
     def _make_embiggen(self):
         if not self.generators.get('embiggen'):
-            from ldm.dream.generator.embiggen import Embiggen
+            from ldm.invoke.generator.embiggen import Embiggen
             self.generators['embiggen'] = Embiggen(self.model, self.precision)
         return self.generators['embiggen']
 
     def _make_txt2img(self):
         if not self.generators.get('txt2img'):
-            from ldm.dream.generator.txt2img import Txt2Img
+            from ldm.invoke.generator.txt2img import Txt2Img
             self.generators['txt2img'] = Txt2Img(self.model, self.precision)
             self.generators['txt2img'].free_gpu_mem = self.free_gpu_mem
         return self.generators['txt2img']
 
     def _make_txt2img2img(self):
         if not self.generators.get('txt2img2'):
-            from ldm.dream.generator.txt2img2img import Txt2Img2Img
+            from ldm.invoke.generator.txt2img2img import Txt2Img2Img
             self.generators['txt2img2'] = Txt2Img2Img(self.model, self.precision)
             self.generators['txt2img2'].free_gpu_mem = self.free_gpu_mem
         return self.generators['txt2img2']
 
     def _make_inpaint(self):
         if not self.generators.get('inpaint'):
-            from ldm.dream.generator.inpaint import Inpaint
+            from ldm.invoke.generator.inpaint import Inpaint
             self.generators['inpaint'] = Inpaint(self.model, self.precision)
         return self.generators['inpaint']
 
     def load_model(self):
-        """Load and initialize the model from configuration variables passed at object creation time"""
-        if self.model is None:
-            seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
-            try:
-                model = self._load_model_from_config(self.config, self.weights)
-                if self.embedding_path is not None:
-                    model.embedding_manager.load(
-                        self.embedding_path, self.precision == 'float32' or self.precision == 'autocast'
-                    )
-                self.model = model.to(self.device)
-                # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
-                self.model.cond_stage_model.device = self.device
-            except AttributeError as e:
-                print(f'>> Error loading model. {str(e)}', file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
-                raise SystemExit from e
+        '''
+        preload model identified in self.model_name
+        '''
+        self.set_model(self.model_name)
 
-            self._set_sampler()
+    def set_model(self,model_name):
+        """ 
+        Given the name of a model defined in models.yaml, will load and initialize it
+        and return the model object. Previously-used models will be cached.
+        """
+        if self.model_name == model_name and self.model is not None:
+            return self.model
 
-            for m in self.model.modules():
-                if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                    m._orig_padding_mode = m.padding_mode
+        model_data = self.model_cache.get_model(model_name)
+        if model_data is None or len(model_data) == 0:
+            print(f'** Model switch failed **')
+            return self.model
 
+        self.model = model_data['model']
+        self.width = model_data['width']
+        self.height= model_data['height']
+        self.model_hash = model_data['hash']
+
+        # uncache generators so they pick up new models
+        self.generators = {}
+        
+        seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
+        if self.embedding_path is not None:
+            self.model.embedding_manager.load(
+                self.embedding_path, self.precision == 'float32' or self.precision == 'autocast'
+            )
+
+        self._set_sampler()
+        self.model_name = model_name
         return self.model
 
     def correct_colors(self,
@@ -784,6 +805,23 @@ class Generate:
             else:
                 r[0] = image
 
+    def apply_textmask(self, image_path:str, prompt:str, callback, threshold:float=0.5):
+        assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+        basename,_ = os.path.splitext(os.path.basename(image_path))
+        if self.txt2mask is None:
+            self.txt2mask  = Txt2Mask(device = self.device)
+        segmented  = self.txt2mask.segment(image_path,prompt)
+        trans = segmented.to_transparent()
+        inverse = segmented.to_transparent(invert=True)
+        mask = segmented.to_mask(threshold)
+
+        path_filter = re.compile(r'[<>:"/\\|?*]')
+        safe_prompt = path_filter.sub('_', prompt)[:50].rstrip(' .')
+
+        callback(trans,f'{safe_prompt}.deselected',use_prefix=basename)
+        callback(inverse,f'{safe_prompt}.selected',use_prefix=basename)
+        callback(mask,f'{safe_prompt}.masked',use_prefix=basename)
+
     # to help WebGUI - front end to generator util function
     def sample_to_image(self, samples):
         return self._make_base().sample_to_image(samples)
@@ -816,54 +854,7 @@ class Generate:
 
         print(msg)
 
-    # Be warned: config is the path to the model config file, not the dream conf file!
-    # Also note that we can get config and weights from self, so why do we need to
-    # pass them as args?
-    def _load_model_from_config(self, config, weights):
-        print(f'>> Loading model from {weights}')
-
-        # for usage statistics
-        device_type = choose_torch_device()
-        if device_type == 'cuda':
-            torch.cuda.reset_peak_memory_stats()
-        tic = time.time()
-
-        # this does the work
-        c     = OmegaConf.load(config)
-        with open(weights,'rb') as f:
-            weight_bytes = f.read()
-        self.model_hash  = self._cached_sha256(weights,weight_bytes)
-        pl_sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
-        del weight_bytes
-        sd    = pl_sd['state_dict']
-        model = instantiate_from_config(c.model)
-        m, u  = model.load_state_dict(sd, strict=False)
-
-        if self.precision == 'float16':
-            print('>> Using faster float16 precision')
-            model.to(torch.float16)
-        else:
-            print('>> Using more accurate float32 precision')
-
-        model.to(self.device)
-        model.eval()
-
-        # usage statistics
-        toc = time.time()
-        print(
-            f'>> Model loaded in', '%4.2fs' % (toc - tic)
-        )
-        if self._has_cuda():
-            print(
-                '>> Max VRAM used to load the model:',
-                '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
-                '\n>> Current VRAM usage:'
-                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
-            )
-
-        return model
-
-    def _load_img(self, img, width, height)->Image:
+    def _load_img(self, img)->Image:
         if isinstance(img, Image.Image):
             image = img
             print(
@@ -881,6 +872,7 @@ class Generate:
             print(
                 f'>> loaded input image of size {image.width}x{image.height}'
             )
+        image = ImageOps.exif_transpose(image)
         return image
 
     def _create_init_image(self, image, width, height, fit=True):
@@ -889,7 +881,6 @@ class Generate:
             image = self._fit_image(image, (width, height))
         else:
             image = self._squeeze_image(image)
-
         image = np.array(image).astype(np.float32) / 255.0
         image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
@@ -906,7 +897,6 @@ class Generate:
             image = self._fit_image(image, (width, height))
         else:
             image = self._squeeze_image(image)
-
         image = image.resize((image.width//downsampling, image.height //
                               downsampling), resample=Image.Resampling.NEAREST)
         image = np.array(image)
@@ -925,6 +915,29 @@ class Generate:
         if invert:
             mask = ImageOps.invert(mask)
         return mask
+
+    # TODO: The latter part of this method repeats code from _create_init_mask()
+    def _txt2mask(self, image:Image, text_mask:list, width, height, fit=True) -> Image:
+        prompt = text_mask[0]
+        confidence_level = text_mask[1] if len(text_mask)>1 else 0.5
+        if self.txt2mask is None:
+            self.txt2mask = Txt2Mask(device = self.device)
+
+        segmented = self.txt2mask.segment(image, prompt)
+        mask = segmented.to_mask(float(confidence_level))
+        mask = mask.convert('RGB')
+        # now we adjust the size
+        if fit:
+            mask = self._fit_image(mask, (width, height))
+        else:
+            mask = self._squeeze_image(mask)
+        mask = mask.resize((mask.width//downsampling, mask.height //
+                              downsampling), resample=Image.Resampling.NEAREST)
+        mask = np.array(mask)
+        mask = mask.astype(np.float32) / 255.0
+        mask = mask[None].transpose(0, 3, 1, 2)
+        mask = torch.from_numpy(mask)
+        return mask.to(self.device)
 
     def _has_transparency(self, image):
         if image.info.get("transparency", None) is not None:
@@ -952,6 +965,17 @@ class Generate:
                        (r, g, b) != (255, 255, 255):
                         colored += 1
         return colored == 0
+
+    def _transparency_check_and_warning(self,image, mask):
+        if not mask:
+            print(
+                '>> Initial image has transparent areas. Will inpaint in these regions.')
+            if self._check_for_erasure(image):
+                print(
+                    '>> WARNING: Colors underneath the transparent region seem to have been erased.\n',
+                    '>>          Inpainting will be suboptimal. Please preserve the colors when making\n',
+                    '>>          a transparency mask, or provide mask explicitly using --init_mask (-M).'
+                )
 
     def _squeeze_image(self, image):
         x, y, resize_needed = self._resolution_check(image.width, image.height)
@@ -995,26 +1019,6 @@ class Generate:
 
     def _has_cuda(self):
         return self.device.type == 'cuda'
-
-    def _cached_sha256(self,path,data):
-        dirname    = os.path.dirname(path)
-        basename   = os.path.basename(path)
-        base, _    = os.path.splitext(basename)
-        hashpath   = os.path.join(dirname,base+'.sha256')
-        if os.path.exists(hashpath) and os.path.getmtime(path) <= os.path.getmtime(hashpath):
-            with open(hashpath) as f:
-                hash = f.read()
-            return hash
-        print(f'>> Calculating sha256 hash of weights file')
-        tic = time.time()
-        sha = hashlib.sha256()
-        sha.update(data)
-        hash = sha.hexdigest()
-        toc = time.time()
-        print(f'>> sha256 = {hash}','(%4.2fs)' % (toc - tic))
-        with open(hashpath,'w') as f:
-            f.write(hash)
-        return hash
 
     def write_intermediate_images(self,modulus,path):
         counter = -1

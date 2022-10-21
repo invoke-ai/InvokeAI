@@ -7,6 +7,7 @@ import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { Resizable } from 're-resizable';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 const logSelector = createSelector(
   (state: RootState) => state.system,
@@ -66,6 +67,14 @@ const Console = () => {
     dispatch(setShouldShowLogViewer(!shouldShowLogViewer));
   };
 
+  useHotkeys(
+    '`',
+    () => {
+      dispatch(setShouldShowLogViewer(!shouldShowLogViewer));
+    },
+    [shouldShowLogViewer]
+  );
+
   return (
     <>
       {shouldShowLogViewer && (
@@ -91,7 +100,7 @@ const Console = () => {
         </Resizable>
       )}
       {shouldShowLogViewer && (
-        <Tooltip label={shouldAutoscroll ? 'Autoscroll On' : 'Autoscroll Off'}>
+        <Tooltip hasArrow label={shouldAutoscroll ? 'Autoscroll On' : 'Autoscroll Off'}>
           <IconButton
             className={`console-autoscroll-icon-button ${
               shouldAutoscroll && 'autoscroll-enabled'
@@ -104,7 +113,7 @@ const Console = () => {
           />
         </Tooltip>
       )}
-      <Tooltip label={shouldShowLogViewer ? 'Hide Console' : 'Show Console'}>
+      <Tooltip hasArrow label={shouldShowLogViewer ? 'Hide Console' : 'Show Console'}>
         <IconButton
           className={`console-toggle-icon-button ${
             (hasError || !wasErrorSeen) && 'error-seen'

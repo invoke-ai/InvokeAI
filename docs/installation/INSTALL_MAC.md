@@ -4,65 +4,62 @@ title: macOS
 
 # :fontawesome-brands-apple: macOS
 
+Invoke AI runs quite well on M1 Macs and we have a number of M1 users
+in the community.
+
+While the repo does run on Intel Macs, we only have a couple
+reports. If you have an Intel Mac and run into issues, please create
+an issue on Github and we will do our best to help.
+
 ## Requirements
 
 - macOS 12.3 Monterey or later
-- Python
-- Patience
-- Apple Silicon or Intel Mac
+- About 10GB of storage (and 10GB of data if your internet connection has data caps)
+- Any M1 Macs or an Intel Macs with 4GB+ of VRAM (ideally more)
 
-Things have moved really fast and so these instructions change often which makes
-them outdated pretty fast. One of the problems is that there are so many
-different ways to run this.
+## Installation
 
-We are trying to build a testing setup so that when we make changes it doesn't
-always break.
+First you need to download a large checkpoint file.
 
-## How to
+1. Sign up at https://huggingface.co
+2. Go to the [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
+3. Accept the terms and click Access Repository
+4. Download [sd-v1-4.ckpt (4.27 GB)](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/blob/main/sd-v1-4.ckpt) and note where you have saved it (probably the Downloads folder). You may want to move it somewhere else for longer term storage - SD needs this file to run.
 
-(this hasn't been 100% tested yet)
-
-First get the weights checkpoint download started since it's big and will take
-some time:
-
-1. Sign up at [huggingface.co](https://huggingface.co)
-2. Go to the
-   [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
-3. Accept the terms and click Access Repository:
-4. Download
-   [sd-v1-4.ckpt (4.27 GB)](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/blob/main/sd-v1-4.ckpt)
-   and note where you have saved it (probably the Downloads folder)
-
-While that is downloading, open a Terminal and run the following commands:
+While that is downloading, open Terminal and run the following commands one at a time, reading the comments and taking care to run the appropriate command for your Mac's architecture (Intel or M1).
 
 !!! todo "Homebrew"
 
-    === "no brew installation yet"
+    If you have no brew installation yet (otherwise skip):
 
-        ```bash title="install brew (and Xcode command line tools)"
-        /bin/bash -c \
-          "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        ```
-
-    === "brew is already installed"
-    
-        Only if you installed protobuf in a previous version of this tutorial, otherwise skip
-
-        `#!bash brew uninstall protobuf`
+    ```bash title="install brew (and Xcode command line tools)"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    ```
 
 !!! todo "Conda Installation"
 
     Now there are two different ways to set up the Python (miniconda) environment:
-    1. Standalone
-    2. with pyenv
-    If you don't know what we are talking about, choose Standalone
+
+       1. Standalone
+       2. with pyenv
+
+    If you don't know what we are talking about, choose Standalone. If you are familiar with python environments, choose "with pyenv"
 
     === "Standalone"
 
-        ```bash
-        # install cmake and rust:
-        brew install cmake rust
+        ```bash title="Install cmake, protobuf, and rust"
+        brew install cmake protobuf rust
         ```
+
+        Then clone the InvokeAI repository:
+        
+        ```bash title="Clone the InvokeAI repository:
+         # Clone the Invoke AI repo
+         git clone https://github.com/invoke-ai/InvokeAI.git
+         cd InvokeAI
+         ```
+  
+      Choose the appropriate architecture for your system and install miniconda:
 
         === "M1 arm64"
 
@@ -82,80 +79,82 @@ While that is downloading, open a Terminal and run the following commands:
 
     === "with pyenv"
 
-        ```{.bash .annotate}
-        brew install rust pyenv-virtualenv # (1)!
+        ```bash
+        brew install pyenv-virtualenv
         pyenv install anaconda3-2022.05
         pyenv virtualenv anaconda3-2022.05
         eval "$(pyenv init -)"
         pyenv activate anaconda3-2022.05
         ```
-        
-        1. You might already have this installed, if that is the case just continue.
 
-```{.bash .annotate title="local repo setup"}
-# clone the repo
-git clone https://github.com/invoke-ai/InvokeAI.git
+!!! todo "Clone the Invoke AI repo"
 
-cd InvokeAI
+```bash 
+    git clone https://github.com/invoke-ai/InvokeAI.git
+    cd InvokeAI
+    ```
 
-# wait until the checkpoint file has downloaded, then proceed
+!!! todo "Wait until the checkpoint-file download finished, then proceed"
 
-# create symlink to checkpoint
-mkdir -p models/ldm/stable-diffusion-v1/
+    We will leave the big checkpoint wherever you stashed it for long-term storage,
+    and make a link to it from the repo's folder. This allows you to use it for
+    other repos, or if you need to delete Invoke AI, you won't have to download it again.
 
-PATH_TO_CKPT="$HOME/Downloads" # (1)!
+    ```{.bash .annotate}
+    # Make the directory in the repo for the symlink
+    mkdir -p models/ldm/stable-diffusion-v1/
 
-ln -s "$PATH_TO_CKPT/sd-v1-4.ckpt" \
-  models/ldm/stable-diffusion-v1/model.ckpt
-```
+    # This is the folder where you put the checkpoint file `sd-v1-4.ckpt`
+    PATH_TO_CKPT="$HOME/Downloads" # (1)!
 
-1. or wherever you saved sd-v1-4.ckpt
+    # Create a link to the checkpoint
+    ln -s "$PATH_TO_CKPT/sd-v1-4.ckpt" models/ldm/stable-diffusion-v1/model.ckpt
+    ```
 
-!!! todo "create Conda Environment"
+    1. replace `$HOME/Downloads` with the Location where you actually stored the Checkppoint (`sd-v1-4.ckpt`)
 
-    === "M1 arm64"
+!!! todo "Create the environment & install packages"
 
-        ```bash
-        PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 \
-          conda env create \
-          -f environment-mac.yml \
-          && conda activate ldm
-        ```
-
-
-    === "Intel x86_64"
+    === "M1 Mac"
 
         ```bash
-        PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 \
-          conda env create \
-          -f environment-mac.yml \
-          && conda activate ldm
+        PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac.yml
         ```
 
-```{.bash .annotate title="preload models and run script"}
-# only need to do this once
-python scripts/preload_models.py
+    === "Intel x86_64 Mac"
 
-# now you can run SD in CLI mode
-python scripts/dream.py --full_precision  # (1)!
+        ```bash
+        PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-64 conda env create -f environment-mac.yml
+        ```
 
-# or run the web interface!
-python scripts/dream.py --web
+    ```bash
+    # Activate the environment (you need to do this every time you want to run SD)
+    conda activate invokeai
 
-# The original scripts should work as well.
-python scripts/orig_scripts/txt2img.py \
-  --prompt "a photograph of an astronaut riding a horse" \
-  --plms
-```
+    # This will download some bits and pieces and make take a while
+    (invokeai) python scripts/preload_models.py
 
-Note, `export PIP_EXISTS_ACTION=w` is a precaution to fix `conda env
-create -f environment-mac.yml` never finishing in some situations. So
-it isn't required but wont hurt.
+    # Run SD!
+    (invokeai) python scripts/dream.py
+
+    # or run the web interface!
+    (invokeai) python scripts/invoke.py --web
+
+    # The original scripts should work as well.
+    (invokeai) python scripts/orig_scripts/txt2img.py \
+        --prompt "a photograph of an astronaut riding a horse" \
+        --plms
+    ```
+    !!! info
+
+        `export PIP_EXISTS_ACTION=w` is a precaution to fix `conda env
+        create -f environment-mac.yml` never finishing in some situations. So
+        it isn't required but wont hurt.
 ---
 
 ## Common problems
 
-After you followed all the instructions and try to run dream.py, you might
+After you followed all the instructions and try to run invoke.py, you might
 get several errors. Here's the errors I've seen and found solutions for.
 
 ### Is it slow?
@@ -172,13 +171,13 @@ python ./scripts/orig_scripts/txt2img.py \
 
 ### Doesn't work anymore?
 
-PyTorch nightly includes support for MPS. Because of this, this setup is
-inherently unstable. One morning I woke up and it no longer worked no matter
-what I did until I switched to miniforge. However, I have another Mac that works
-just fine with Anaconda. If you can't get it to work, please search a little
-first because many of the errors will get posted and solved. If you can't find a
-solution please
-[create an issue](https://github.com/invoke-ai/InvokeAI/issues).
+PyTorch nightly includes support for MPS. Because of this, this setup
+is inherently unstable. One morning I woke up and it no longer worked
+no matter what I did until I switched to miniforge. However, I have
+another Mac that works just fine with Anaconda. If you can't get it to
+work, please search a little first because many of the errors will get
+posted and solved. If you can't find a solution please [create an
+issue](https://github.com/invoke-ai/InvokeAI/issues).
 
 One debugging step is to update to the latest version of PyTorch nightly.
 
@@ -187,9 +186,8 @@ conda install \
   pytorch \
   torchvision \
   -c pytorch-nightly \
-  -n ldm
+  -n invokeai
 ```
-
 
 If it takes forever to run `conda env create -f environment-mac.yml`, try this:
 
@@ -202,27 +200,27 @@ conda clean \
 
 Or you could try to completley reset Anaconda:
 
-    ```bash
-    conda update \
-      --force-reinstall \
-      -y \
-      -n base \
-     -c defaults conda
+```bash
+conda update \
+  --force-reinstall \
+  -y \
+  -n base \
+  -c defaults conda
 ```
 
 ---
 
-### "No module named cv2", torch, 'ldm', 'transformers', 'taming', etc
+### "No module named cv2", torch, 'invokeai', 'transformers', 'taming', etc
 
 There are several causes of these errors:
 
-1. Did you remember to `conda activate ldm`? If your terminal prompt begins with
-   "(ldm)" then you activated it. If it begins with "(base)" or something else
+1. Did you remember to `conda activate invokeai`? If your terminal prompt begins with
+   "(invokeai)" then you activated it. If it begins with "(base)" or something else
    you haven't.
 
-2. You might've run `./scripts/preload_models.py` or `./scripts/dream.py`
+2. You might've run `./scripts/preload_models.py` or `./scripts/invoke.py`
    instead of `python ./scripts/preload_models.py` or
-   `python ./scripts/dream.py`. The cause of this error is long so it's below.
+   `python ./scripts/invoke.py`. The cause of this error is long so it's below.
 
     <!-- I could not find out where the error is, otherwise would have marked it as a footnote -->
 
@@ -231,17 +229,17 @@ There are several causes of these errors:
 
     ```bash
     conda deactivate
-    conda env remove -n ldm
+    conda env remove -n invokeai
     conda env create -f environment-mac.yml
     ```
     
-4. If you have activated the ldm virtual environment and tried rebuilding it,
+4. If you have activated the invokeai virtual environment and tried rebuilding it,
    maybe the problem could be that I have something installed that you don't and
    you'll just need to manually install it. Make sure you activate the virtual
    environment so it installs there instead of globally.
 
     ```bash
-    conda activate ldm
+    conda activate invokeai
     pip install <package name>
     ```
 
@@ -299,12 +297,12 @@ should actually be the _same python_, which you can verify by comparing the
 output of `python3 -V` and `python -V`.
 
 ```bash
-(ldm) % which python
-/Users/name/miniforge3/envs/ldm/bin/python
+(invokeai) % which python
+/Users/name/miniforge3/envs/invokeai/bin/python
 ```
 
 The above is what you'll see if you have miniforge and correctly activated the
-ldm environment, while usingd the standalone setup instructions above.
+invokeai environment, while usingd the standalone setup instructions above.
 
 If you otherwise installed via pyenv, you will get this result:
 
@@ -378,7 +376,7 @@ python scripts/preload_models.py
     WARNING: this will be slower than running natively on MPS.
     ```
 
-This fork already includes a fix for this in
+The InvokeAI version includes this fix in
 [environment-mac.yml](https://github.com/invoke-ai/InvokeAI/blob/main/environment-mac.yml).
 
 ### "Could not build wheels for tokenizers"
@@ -463,13 +461,10 @@ C.
 
 You don't have a virus. It's part of the project. Here's
 [Rick](https://github.com/invoke-ai/InvokeAI/blob/main/assets/rick.jpeg)
-and here's
-[the code](https://github.com/invoke-ai/InvokeAI/blob/69ae4b35e0a0f6ee1af8bb9a5d0016ccb27e36dc/scripts/txt2img.py#L79)
-that swaps him in. It's a NSFW filter, which IMO, doesn't work very good (and we
-call this "computer vision", sheesh).
-
-Actually, this could be happening because there's not enough RAM. You could try
-the `model.half()` suggestion or specify smaller output images.
+and here's [the
+code](https://github.com/invoke-ai/InvokeAI/blob/69ae4b35e0a0f6ee1af8bb9a5d0016ccb27e36dc/scripts/txt2img.py#L79)
+that swaps him in. It's a NSFW filter, which IMO, doesn't work very
+good (and we call this "computer vision", sheesh).
 
 ---
 
@@ -487,16 +482,14 @@ this issue too. I should probably test it.
 ### "view size is not compatible with input tensor's size and stride"
 
 ```bash
-File "/opt/anaconda3/envs/ldm/lib/python3.10/site-packages/torch/nn/functional.py", line 2511, in layer_norm
+File "/opt/anaconda3/envs/invokeai/lib/python3.10/site-packages/torch/nn/functional.py", line 2511, in layer_norm
 return torch.layer_norm(input, normalized_shape, weight, bias, eps, torch.backends.cudnn.enabled)
 RuntimeError: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Use .reshape(...) instead.
 ```
 
-Update to the latest version of invoke-ai/InvokeAI. We were patching
-pytorch but we found a file in stable-diffusion that we could change instead.
-This is a 32-bit vs 16-bit problem.
-
----
+Update to the latest version of invoke-ai/InvokeAI. We were
+patching pytorch but we found a file in stable-diffusion that we could
+change instead. This is a 32-bit vs 16-bit problem.
 
 ### The processor must support the Intel bla bla bla
 
@@ -519,13 +512,13 @@ use ARM packages, and use `nomkl` as described above.
 May appear when just starting to generate, e.g.:
 
 ```bash
-dream> clouds
+invoke> clouds
 Generating:   0%|                                                              | 0/1 [00:00<?, ?it/s]/Users/[...]/dev/stable-diffusion/ldm/modules/embedding_manager.py:152: UserWarning: The operator 'aten::nonzero' is not currently supported on the MPS backend and will fall back to run on the CPU. This may have performance implications. (Triggered internally at /Users/runner/work/_temp/anaconda/conda-bld/pytorch_1662016319283/work/aten/src/ATen/mps/MPSFallback.mm:11.)
   placeholder_idx = torch.where(
                                                                                                     loc("mps_add"("(mpsFileLoc): /AppleInternal/Library/BuildRoots/20d6c351-ee94-11ec-bcaf-7247572f23b4/Library/Caches/com.apple.xbs/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":219:0)): error: input types 'tensor<2x1280xf32>' and 'tensor<*xf16>' are not broadcast compatible
 LLVM ERROR: Failed to infer result type(s).
 Abort trap: 6
-/Users/[...]/opt/anaconda3/envs/ldm/lib/python3.9/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+/Users/[...]/opt/anaconda3/envs/invokeai/lib/python3.9/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
   warnings.warn('resource_tracker: There appear to be %d '
 ```
 

@@ -1,8 +1,8 @@
 ---
-title: TEXTUAL_INVERSION
+title: Textual-Inversion
 ---
 
-# :material-file-document-plus-outline: TEXTUAL_INVERSION
+# :material-file-document: Textual Inversion
 
 ## **Personalizing Text-to-Image Generation**
 
@@ -23,13 +23,13 @@ As the default backend is not available on Windows, if you're using that
 platform, set the environment variable `PL_TORCH_DISTRIBUTED_BACKEND` to `gloo`
 
 ```bash
-python3 ./main.py --base ./configs/stable-diffusion/v1-finetune.yaml \
-                  --actual_resume ./models/ldm/stable-diffusion-v1/model.ckpt \
-                  -t \
-                  -n my_cat \
-                  --gpus 0 \
-                  --data_root D:/textual-inversion/my_cat \
-                  --init_word 'cat'
+python3 ./main.py -t \
+    --base ./configs/stable-diffusion/v1-finetune.yaml \
+    --actual_resume ./models/ldm/stable-diffusion-v1/model.ckpt \
+    -n my_cat \
+    --gpus 0 \
+    --data_root D:/textual-inversion/my_cat \
+    --init_word 'cat'
 ```
 
 During the training process, files will be created in
@@ -56,22 +56,23 @@ configs/stable_diffusion/v1-finetune.yaml (currently set to 4000000)
 ## **Run the Model**
 
 Once the model is trained, specify the trained .pt or .bin file when starting
-dream using
+invoke using
 
 ```bash
-python3 ./scripts/dream.py --embedding_path /path/to/embedding.pt
+python3 ./scripts/invoke.py \
+    --embedding_path /path/to/embedding.pt
 ```
 
-Then, to utilize your subject at the dream prompt
+Then, to utilize your subject at the invoke prompt
 
 ```bash
-dream> "a photo of *"
+invoke> "a photo of *"
 ```
 
 This also works with image2image
 
 ```bash
-dream> "waterfall and rainbow in the style of *" --init_img=./init-images/crude_drawing.png --strength=0.5 -s100 -n4
+invoke> "waterfall and rainbow in the style of *" --init_img=./init-images/crude_drawing.png --strength=0.5 -s100 -n4
 ```
 
 For .pt files it's also possible to train multiple tokens (modify the
@@ -80,9 +81,9 @@ LDM checkpoints using:
 
 ```bash
 python3 ./scripts/merge_embeddings.py \
-        --manager_ckpts /path/to/first/embedding.pt \
-        [</path/to/second/embedding.pt>,[...]] \
-        --output_path /path/to/output/embedding.pt
+    --manager_ckpts /path/to/first/embedding.pt \
+    [</path/to/second/embedding.pt>,[...]] \
+    --output_path /path/to/output/embedding.pt
 ```
 
 Credit goes to rinongal and the repository

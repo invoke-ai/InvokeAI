@@ -32,26 +32,8 @@ export const UPSCALING_LEVELS: Array<{ key: string; value: number }> = [
   { key: '4x', value: 4 },
 ];
 
-// Internal to human-readable parameters
-export const PARAMETERS: { [key: string]: string } = {
-  prompt: 'Prompt',
-  iterations: 'Iterations',
-  steps: 'Steps',
-  cfgScale: 'CFG Scale',
-  height: 'Height',
-  width: 'Width',
-  sampler: 'Sampler',
-  seed: 'Seed',
-  img2imgStrength: 'img2img Strength',
-  gfpganStrength: 'GFPGAN Strength',
-  upscalingLevel: 'Upscaling Level',
-  upscalingStrength: 'Upscaling Strength',
-  initialImagePath: 'Initial Image',
-  maskPath: 'Initial Image Mask',
-  shouldFitToWidthHeight: 'Fit Initial Image',
-  seamless: 'Seamless Tiling',
-};
-
 export const NUMPY_RAND_MIN = 0;
 
 export const NUMPY_RAND_MAX = 4294967295;
+
+export const FACETOOL_TYPES = ['gfpgan', 'codeformer'] as const;

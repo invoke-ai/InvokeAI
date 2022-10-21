@@ -1,9 +1,12 @@
-import { IconButton, Link, useColorMode } from '@chakra-ui/react';
+import { IconButton, Link, Tooltip, useColorMode } from '@chakra-ui/react';
+import { useHotkeys } from 'react-hotkeys-hook';
 
-import { FaSun, FaMoon, FaGithub } from 'react-icons/fa';
-import { MdHelp, MdSettings } from 'react-icons/md';
+import { FaSun, FaMoon, FaGithub, FaDiscord } from 'react-icons/fa';
+import { MdHelp, MdKeyboard, MdSettings } from 'react-icons/md';
 
 import InvokeAILogo from '../../assets/images/logo.png';
+import HotkeysModal from './HotkeysModal/HotkeysModal';
+
 import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 
@@ -12,6 +15,14 @@ import StatusIndicator from './StatusIndicator';
  */
 const SiteHeader = () => {
   const { colorMode, toggleColorMode } = useColorMode();
+
+  useHotkeys(
+    'shift+d',
+    () => {
+      toggleColorMode();
+    },
+    [colorMode, toggleColorMode]
+  );
 
   const colorModeIcon = colorMode == 'light' ? <FaMoon /> : <FaSun />;
 
@@ -40,41 +51,71 @@ const SiteHeader = () => {
           />
         </SettingsModal>
 
-        <IconButton
-          aria-label="Link to Github Issues"
-          variant="link"
-          fontSize={23}
-          size={'sm'}
-          icon={
-            <Link
-              isExternal
-              href="http://github.com/lstein/stable-diffusion/issues"
-            >
-              <MdHelp />
-            </Link>
-          }
-        />
+        <HotkeysModal>
+          <IconButton
+            aria-label="Hotkeys"
+            variant="link"
+            fontSize={24}
+            size={'sm'}
+            icon={<MdKeyboard />}
+          />
+        </HotkeysModal>
 
-        <IconButton
-          aria-label="Link to Github Repo"
-          variant="link"
-          fontSize={20}
-          size={'sm'}
-          icon={
-            <Link isExternal href="http://github.com/lstein/stable-diffusion">
-              <FaGithub />
-            </Link>
-          }
-        />
+        <Tooltip hasArrow label="Report Bug" placement={'bottom'}>
+          <IconButton
+            aria-label="Link to Github Issues"
+            variant="link"
+            fontSize={23}
+            size={'sm'}
+            icon={
+              <Link
+                isExternal
+                href="http://github.com/invoke-ai/InvokeAI/issues"
+              >
+                <MdHelp />
+              </Link>
+            }
+          />
+        </Tooltip>
 
-        <IconButton
-          aria-label="Toggle Dark Mode"
-          onClick={toggleColorMode}
-          variant="link"
-          size={'sm'}
-          fontSize={colorModeIconFontSize}
-          icon={colorModeIcon}
-        />
+        <Tooltip hasArrow label="Github" placement={'bottom'}>
+          <IconButton
+            aria-label="Link to Github Repo"
+            variant="link"
+            fontSize={20}
+            size={'sm'}
+            icon={
+              <Link isExternal href="http://github.com/invoke-ai/InvokeAI">
+                <FaGithub />
+              </Link>
+            }
+          />
+        </Tooltip>
+
+        <Tooltip hasArrow label="Discord" placement={'bottom'}>
+          <IconButton
+            aria-label="Link to Discord Server"
+            variant="link"
+            fontSize={20}
+            size={'sm'}
+            icon={
+              <Link isExternal href="https://discord.gg/ZmtBAhwWhy">
+                <FaDiscord />
+              </Link>
+            }
+          />
+        </Tooltip>
+
+        <Tooltip hasArrow label="Theme" placement={'bottom'}>
+          <IconButton
+            aria-label="Toggle Dark Mode"
+            onClick={toggleColorMode}
+            variant="link"
+            size={'sm'}
+            fontSize={colorModeIconFontSize}
+            icon={colorModeIcon}
+          />
+        </Tooltip>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 @use 'Colors_Dark';
 @use 'Colors_Light';
 @use 'Fonts';
+@use 'Animations';
 
 // Component Styles
 //app
@@ -11,6 +12,7 @@
 @use '../features/system/SiteHeader.scss';
 @use '../features/system/StatusIndicator.scss';
 @use '../features/system/SettingsModal/SettingsModal.scss';
+@use '../features/system/HotkeysModal/HotkeysModal.scss';
 @use '../features/system/Console.scss';
 
 // options
@@ -24,11 +26,14 @@
 // gallery
 @use '../features/gallery/CurrentImageDisplay.scss';
 @use '../features/gallery/ImageGallery.scss';
+@use '../features/gallery/HoverableImage.scss';
 @use '../features/gallery/InvokePopover.scss';
+@use '../features/gallery/ImageMetaDataViewer/ImageMetadataViewer.scss';
 
 // Tabs
 @use '../features/tabs/InvokeTabs.scss';
 @use '../features/tabs/TextToImage/TextToImage.scss';
+@use '../features/tabs/ImageToImage/ImageToImage.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';

@@ -12,9 +12,9 @@ from PIL import Image
 from uuid import uuid4
 from threading import Event
 
-from ldm.dream.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.dream.pngwriter import PngWriter, retrieve_metadata
-from ldm.dream.conditioning import split_weighted_subprompts
+from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
+from ldm.invoke.conditioning import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
 
@@ -49,24 +49,16 @@ class InvokeAIWebServer:
         engineio_logger = True if args.web_verbose else False
         max_http_buffer_size = 10000000
 
-        # CORS Allowed Setup
-        cors_allowed_origins = [
-            'http://127.0.0.1:5173',
-            'http://localhost:5173',
-        ]
-        additional_allowed_origins = (
-            opt.cors if opt.cors else []
-        )  # additional CORS allowed origins
-        if self.host == '127.0.0.1':
-            cors_allowed_origins.extend(
-                [
-                    f'http://{self.host}:{self.port}',
-                    f'http://localhost:{self.port}',
-                ]
-            )
-        cors_allowed_origins = (
-            cors_allowed_origins + additional_allowed_origins
-        )
+        socketio_args = {
+            'logger': logger,
+            'engineio_logger': engineio_logger,
+            'max_http_buffer_size': max_http_buffer_size,
+            'ping_interval': (50, 50),
+            'ping_timeout': 60,
+        }
+
+        if opt.cors:
+            socketio_args['cors_allowed_origins'] = opt.cors
 
         self.app = Flask(
             __name__, static_url_path='', static_folder='../frontend/dist/'
@@ -74,12 +66,7 @@ class InvokeAIWebServer:
 
         self.socketio = SocketIO(
             self.app,
-            logger=logger,
-            engineio_logger=engineio_logger,
-            max_http_buffer_size=max_http_buffer_size,
-            cors_allowed_origins=cors_allowed_origins,
-            ping_interval=(50, 50),
-            ping_timeout=60,
+            **socketio_args
         )
 
         # Keep Server Alive Route
@@ -160,7 +147,7 @@ class InvokeAIWebServer:
         self.init_image_path = os.path.join(self.result_path, 'init-images/')
         self.mask_image_path = os.path.join(self.result_path, 'mask-images/')
         # txt log
-        self.log_path = os.path.join(self.result_path, 'dream_log.txt')
+        self.log_path = os.path.join(self.result_path, 'invoke_log.txt')
         # make all output paths
         [
             os.makedirs(path, exist_ok=True)
@@ -270,14 +257,14 @@ class InvokeAIWebServer:
 
         @socketio.on('generateImage')
         def handle_generate_image_event(
-            generation_parameters, esrgan_parameters, gfpgan_parameters
+            generation_parameters, esrgan_parameters, facetool_parameters
         ):
             try:
                 print(
-                    f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nGFPGAN parameters: {gfpgan_parameters}'
+                    f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}'
                 )
                 self.generate_images(
-                    generation_parameters, esrgan_parameters, gfpgan_parameters
+                    generation_parameters, esrgan_parameters, facetool_parameters
                 )
             except Exception as e:
                 self.socketio.emit('error', {'message': (str(e))})
@@ -313,9 +300,11 @@ class InvokeAIWebServer:
                 )
 
                 if postprocessing_parameters['type'] == 'esrgan':
-                    progress.set_current_status('Upscaling')
+                    progress.set_current_status('Upscaling (ESRGAN)')
                 elif postprocessing_parameters['type'] == 'gfpgan':
-                    progress.set_current_status('Restoring Faces')
+                    progress.set_current_status('Restoring Faces (GFPGAN)')
+                elif postprocessing_parameters['type'] == 'codeformer':
+                    progress.set_current_status('Restoring Faces (Codeformer)')
 
                 socketio.emit('progressUpdate', progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -332,8 +321,16 @@ class InvokeAIWebServer:
                 elif postprocessing_parameters['type'] == 'gfpgan':
                     image = self.gfpgan.process(
                         image=image,
-                        strength=postprocessing_parameters['gfpgan_strength'],
+                        strength=postprocessing_parameters['facetool_strength'],
                         seed=seed,
+                    )
+                elif postprocessing_parameters['type'] == 'codeformer':
+                    image = self.codeformer.process(
+                        image=image,
+                        strength=postprocessing_parameters['facetool_strength'],
+                        fidelity=postprocessing_parameters['codeformer_fidelity'],
+                        seed=seed,
+                        device='cpu' if str(self.generate.device) == 'mps' else self.generate.device
                     )
                 else:
                     raise TypeError(
@@ -461,7 +458,7 @@ class InvokeAIWebServer:
         }
 
     def generate_images(
-        self, generation_parameters, esrgan_parameters, gfpgan_parameters
+        self, generation_parameters, esrgan_parameters, facetool_parameters
     ):
         try:
             self.canceled.clear()
@@ -564,7 +561,7 @@ class InvokeAIWebServer:
 
                 nonlocal generation_parameters
                 nonlocal esrgan_parameters
-                nonlocal gfpgan_parameters
+                nonlocal facetool_parameters
                 nonlocal progress
 
                 step_index = 1
@@ -624,22 +621,40 @@ class InvokeAIWebServer:
                 if self.canceled.is_set():
                     raise CanceledException
 
-                if gfpgan_parameters:
-                    progress.set_current_status('Restoring Faces')
+                if facetool_parameters:
+                    if facetool_parameters['type'] == 'gfpgan':
+                        progress.set_current_status('Restoring Faces (GFPGAN)')
+                    elif facetool_parameters['type'] == 'codeformer':
+                        progress.set_current_status('Restoring Faces (Codeformer)')
+
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit(
                         'progressUpdate', progress.to_formatted_dict()
                     )
                     eventlet.sleep(0)
 
-                    image = self.gfpgan.process(
-                        image=image,
-                        strength=gfpgan_parameters['strength'],
-                        seed=seed,
-                    )
+                    if facetool_parameters['type'] == 'gfpgan':
+                        image = self.gfpgan.process(
+                            image=image,
+                            strength=facetool_parameters['strength'],
+                            seed=seed,
+                        )
+                    elif facetool_parameters['type'] == 'codeformer':
+                        image = self.codeformer.process(
+                            image=image,
+                            strength=facetool_parameters['strength'],
+                            fidelity=facetool_parameters['codeformer_fidelity'],
+                            seed=seed,
+                            device='cpu' if str(self.generate.device) == 'mps' else self.generate.device,
+                        )
+                        all_parameters['codeformer_fidelity'] = facetool_parameters['codeformer_fidelity']
+
                     postprocessing = True
-                    all_parameters['gfpgan_strength'] = gfpgan_parameters[
+                    all_parameters['facetool_strength'] = facetool_parameters[
                         'strength'
+                    ]
+                    all_parameters['facetool_type'] = facetool_parameters[
+                        'type'
                     ]
 
                 progress.set_current_status('Saving Image')
@@ -736,6 +751,7 @@ class InvokeAIWebServer:
                 'height',
                 'extra',
                 'seamless',
+                'hires_fix',
             ]
 
             rfc_dict = {}
@@ -748,14 +764,16 @@ class InvokeAIWebServer:
             postprocessing = []
 
             # 'postprocessing' is either null or an
-            if 'gfpgan_strength' in parameters:
-
-                postprocessing.append(
-                    {
-                        'type': 'gfpgan',
-                        'strength': float(parameters['gfpgan_strength']),
+            if 'facetool_strength' in parameters:
+                facetool_parameters = {
+                        'type': str(parameters['facetool_type']),
+                        'strength': float(parameters['facetool_strength']),
                     }
-                )
+
+                if parameters['facetool_type'] == 'codeformer':
+                    facetool_parameters['fidelity'] = float(parameters['codeformer_fidelity'])
+
+                postprocessing.append(facetool_parameters)
 
             if 'upscale' in parameters:
                 postprocessing.append(
@@ -774,7 +792,7 @@ class InvokeAIWebServer:
             rfc_dict['sampler'] = parameters['sampler_name']
 
             # display weighted subprompts (liable to change)
-            subprompts = split_weighted_subprompts(parameters['prompt'])
+            subprompts = split_weighted_subprompts(parameters['prompt'], skip_normalize=True)
             subprompts = [{'prompt': x[0], 'weight': x[1]} for x in subprompts]
             rfc_dict['prompt'] = subprompts
 
@@ -850,8 +868,15 @@ class InvokeAIWebServer:
             elif parameters['type'] == 'gfpgan':
                 postprocessing_metadata['type'] = 'gfpgan'
                 postprocessing_metadata['strength'] = parameters[
-                    'gfpgan_strength'
+                    'facetool_strength'
                 ]
+            elif parameters['type'] == 'codeformer':
+                postprocessing_metadata['type'] = 'codeformer'
+                postprocessing_metadata['strength'] = parameters[
+                    'facetool_strength'
+                ]
+                postprocessing_metadata['fidelity'] = parameters['codeformer_fidelity']
+
             else:
                 raise TypeError(f"Invalid type: {parameters['type']}")
 

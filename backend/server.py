@@ -30,10 +30,10 @@ from send2trash import send2trash
 
 
 from ldm.generate import Generate
-from ldm.dream.restoration import Restoration
-from ldm.dream.pngwriter import PngWriter, retrieve_metadata
-from ldm.dream.args import APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.dream.conditioning import split_weighted_subprompts
+from ldm.invoke.restoration import Restoration
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
+from ldm.invoke.args import APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.conditioning import split_weighted_subprompts
 
 from modules.parameters import parameters_to_command
 
@@ -125,7 +125,7 @@ class CanceledException(Exception):
 
 try:
     gfpgan, codeformer, esrgan = None, None, None
-    from ldm.dream.restoration.base import Restoration
+    from ldm.invoke.restoration.base import Restoration
 
     restoration = Restoration()
     gfpgan, codeformer = restoration.load_face_restore_models()
@@ -164,7 +164,7 @@ init_image_path = os.path.join(result_path, "init-images/")
 mask_image_path = os.path.join(result_path, "mask-images/")
 
 # txt log
-log_path = os.path.join(result_path, "dream_log.txt")
+log_path = os.path.join(result_path, "invoke_log.txt")
 
 # make all output paths
 [
@@ -349,7 +349,7 @@ def handle_run_gfpgan_event(original_image, gfpgan_parameters):
     eventlet.sleep(0)
 
     image = gfpgan.process(
-        image=image, strength=gfpgan_parameters["gfpgan_strength"], seed=seed
+        image=image, strength=gfpgan_parameters["facetool_strength"], seed=seed
     )
 
     progress["currentStatus"] = "Saving image"
@@ -464,7 +464,7 @@ def parameters_to_post_processed_image_metadata(parameters, original_image_path,
         image["strength"] = parameters["upscale"][1]
     elif type == "gfpgan":
         image["type"] = "gfpgan"
-        image["strength"] = parameters["gfpgan_strength"]
+        image["strength"] = parameters["facetool_strength"]
     else:
         raise TypeError(f"Invalid type: {type}")
 
@@ -493,6 +493,7 @@ def parameters_to_generated_image_metadata(parameters):
         "height",
         "extra",
         "seamless",
+        "hires_fix",
     ]
 
     rfc_dict = {}
@@ -505,10 +506,10 @@ def parameters_to_generated_image_metadata(parameters):
     postprocessing = []
 
     # 'postprocessing' is either null or an
-    if "gfpgan_strength" in parameters:
+    if "facetool_strength" in parameters:
 
         postprocessing.append(
-            {"type": "gfpgan", "strength": float(parameters["gfpgan_strength"])}
+            {"type": "gfpgan", "strength": float(parameters["facetool_strength"])}
         )
 
     if "upscale" in parameters:
@@ -751,7 +752,7 @@ def generate_images(generation_parameters, esrgan_parameters, gfpgan_parameters)
                 image=image, strength=gfpgan_parameters["strength"], seed=seed
             )
             postprocessing = True
-            all_parameters["gfpgan_strength"] = gfpgan_parameters["strength"]
+            all_parameters["facetool_strength"] = gfpgan_parameters["strength"]
 
         progress["currentStatus"] = "Saving image"
         socketio.emit("progressUpdate", progress)

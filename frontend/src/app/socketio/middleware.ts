@@ -22,9 +22,9 @@ import * as InvokeAI from '../invokeai';
  * some new action to handle whatever data was sent from the server.
  */
 export const socketioMiddleware = () => {
-  const { hostname, port } = new URL(window.location.href);
+  const { origin } = new URL(window.location.href);
 
-  const socketio = io(`http://${hostname}:${port}`, {
+  const socketio = io(origin, {
     timeout: 60000,
   });
 
@@ -50,7 +50,7 @@ export const socketioMiddleware = () => {
     const {
       emitGenerateImage,
       emitRunESRGAN,
-      emitRunGFPGAN,
+      emitRunFacetool,
       emitDeleteImage,
       emitRequestImages,
       emitRequestNewImages,
@@ -129,8 +129,8 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/runGFPGAN': {
-        emitRunGFPGAN(action.payload);
+      case 'socketio/runFacetool': {
+        emitRunFacetool(action.payload);
         break;
       }
 

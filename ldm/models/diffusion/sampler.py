@@ -8,7 +8,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from functools import partial
-from ldm.dream.devices import choose_torch_device
+from ldm.invoke.devices import choose_torch_device
 
 from ldm.modules.diffusionmodules.util import (
     make_ddim_sampling_parameters,
@@ -20,6 +20,7 @@ from ldm.modules.diffusionmodules.util import (
 class Sampler(object):
     def __init__(self, model, schedule='linear', steps=None, device=None, **kwargs):
         self.model = model
+        self.ddim_timesteps = None
         self.ddpm_num_timesteps = steps
         self.schedule = schedule
         self.device   = device or choose_torch_device()
@@ -39,6 +40,7 @@ class Sampler(object):
             ddim_eta=0.0,
             verbose=False,
     ):
+        self.total_steps = ddim_num_steps
         self.ddim_timesteps = make_ddim_timesteps(
             ddim_discr_method=ddim_discretize,
             num_ddim_timesteps=ddim_num_steps,
@@ -138,7 +140,7 @@ class Sampler(object):
         conditioning=None,
         callback=None,
         normals_sequence=None,
-        img_callback=None,
+        img_callback=None,   # TODO: this is very confusing because it is called "step_callback" elsewhere. Change.
         quantize_x0=False,
         eta=0.0,
         mask=None,
@@ -155,6 +157,14 @@ class Sampler(object):
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs,
     ):
+
+        # check to see if make_schedule() has run, and if not, run it
+        if self.ddim_timesteps is None:
+            self.make_schedule(
+                ddim_num_steps=S,
+                ddim_eta = eta,
+                verbose = False,
+            )
 
         ts = self.get_timesteps(S)
 
@@ -211,6 +221,7 @@ class Sampler(object):
             if ddim_use_original_steps
             else np.flip(timesteps)
         )
+
         total_steps=steps
 
         iterator = tqdm(
@@ -305,7 +316,7 @@ class Sampler(object):
 
         time_range = np.flip(timesteps)
         total_steps = timesteps.shape[0]
-        print(f'>> Running {self.__class__.__name__} Sampling with {total_steps} timesteps')
+        print(f'>> Running {self.__class__.__name__} sampling starting at step {self.total_steps - t_start} of {self.total_steps} ({total_steps} new sampling steps)')
 
         iterator = tqdm(time_range, desc='Decoding image', total=total_steps)
         x_dec    = x_latent

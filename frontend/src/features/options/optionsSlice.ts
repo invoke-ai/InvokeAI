@@ -3,8 +3,11 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import * as InvokeAI from '../../app/invokeai';
 import promptToString from '../../common/util/promptToString';
 import { seedWeightsToString } from '../../common/util/seedWeightPairs';
+import { FACETOOL_TYPES } from '../../app/constants';
 
 export type UpscalingLevel = 2 | 4;
+
+export type FacetoolType = typeof FACETOOL_TYPES[number];
 
 export interface OptionsState {
   prompt: string;
@@ -18,21 +21,27 @@ export interface OptionsState {
   perlin: number;
   seed: number;
   img2imgStrength: number;
-  gfpganStrength: number;
+  facetoolType: FacetoolType;
+  facetoolStrength: number;
+  codeformerFidelity: number;
   upscalingLevel: UpscalingLevel;
   upscalingStrength: number;
   shouldUseInitImage: boolean;
-  initialImagePath: string;
+  initialImagePath: string | null;
   maskPath: string;
   seamless: boolean;
+  hiresFix: boolean;
   shouldFitToWidthHeight: boolean;
   shouldGenerateVariations: boolean;
   variationAmount: number;
   seedWeights: string;
   shouldRunESRGAN: boolean;
-  shouldRunGFPGAN: boolean;
+  shouldRunFacetool: boolean;
   shouldRandomizeSeed: boolean;
   showAdvancedOptions: boolean;
+  activeTab: number;
+  shouldShowImageDetails: boolean;
+  shouldShowGallery: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -47,9 +56,10 @@ const initialOptionsState: OptionsState = {
   perlin: 0,
   seed: 0,
   seamless: false,
+  hiresFix: false,
   shouldUseInitImage: false,
   img2imgStrength: 0.75,
-  initialImagePath: '',
+  initialImagePath: null,
   maskPath: '',
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
@@ -58,10 +68,15 @@ const initialOptionsState: OptionsState = {
   shouldRunESRGAN: false,
   upscalingLevel: 4,
   upscalingStrength: 0.75,
-  shouldRunGFPGAN: false,
-  gfpganStrength: 0.8,
+  shouldRunFacetool: false,
+  facetoolStrength: 0.8,
+  facetoolType: 'gfpgan',
+  codeformerFidelity: 0.75,
   shouldRandomizeSeed: true,
   showAdvancedOptions: true,
+  activeTab: 0,
+  shouldShowImageDetails: false,
+  shouldShowGallery: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -109,8 +124,11 @@ export const optionsSlice = createSlice({
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
     },
-    setGfpganStrength: (state, action: PayloadAction<number>) => {
-      state.gfpganStrength = action.payload;
+    setFacetoolStrength: (state, action: PayloadAction<number>) => {
+      state.facetoolStrength = action.payload;
+    },
+    setCodeformerFidelity: (state, action: PayloadAction<number>) => {
+      state.codeformerFidelity = action.payload;
     },
     setUpscalingLevel: (state, action: PayloadAction<UpscalingLevel>) => {
       state.upscalingLevel = action.payload;
@@ -121,7 +139,7 @@ export const optionsSlice = createSlice({
     setShouldUseInitImage: (state, action: PayloadAction<boolean>) => {
       state.shouldUseInitImage = action.payload;
     },
-    setInitialImagePath: (state, action: PayloadAction<string>) => {
+    setInitialImagePath: (state, action: PayloadAction<string | null>) => {
       const newInitialImagePath = action.payload;
       state.shouldUseInitImage = newInitialImagePath ? true : false;
       state.initialImagePath = newInitialImagePath;
@@ -131,6 +149,9 @@ export const optionsSlice = createSlice({
     },
     setSeamless: (state, action: PayloadAction<boolean>) => {
       state.seamless = action.payload;
+    },
+    setHiresFix: (state, action: PayloadAction<boolean>) => {
+      state.hiresFix = action.payload;
     },
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
@@ -174,6 +195,7 @@ export const optionsSlice = createSlice({
         threshold,
         perlin,
         seamless,
+        hires_fix,
         width,
         height,
         strength,
@@ -217,8 +239,8 @@ export const optionsSlice = createSlice({
       //     (postprocess: InvokeAI.PostProcessedImageMetadata) => {
       //       if (postprocess.type === 'gfpgan') {
       //         const { strength } = postprocess;
-      //         if (strength) state.gfpganStrength = strength;
-      //         state.shouldRunGFPGAN = true;
+      //         if (strength) state.facetoolStrength = strength;
+      //         state.shouldRunFacetool = true;
       //         postprocessingNotDone = postprocessingNotDone.filter(
       //           (p) => p !== 'gfpgan'
       //         );
@@ -238,7 +260,7 @@ export const optionsSlice = createSlice({
 
       // postprocessingNotDone.forEach((p) => {
       //   if (p === 'esrgan') state.shouldRunESRGAN = false;
-      //   if (p === 'gfpgan') state.shouldRunGFPGAN = false;
+      //   if (p === 'gfpgan') state.shouldRunFacetool = false;
       // });
 
       if (prompt) state.prompt = promptToString(prompt);
@@ -246,8 +268,11 @@ export const optionsSlice = createSlice({
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
       if (threshold) state.threshold = threshold;
+      if (typeof threshold === 'undefined') state.threshold = 0;
       if (perlin) state.perlin = perlin;
+      if (typeof perlin === 'undefined') state.perlin = 0;
       if (typeof seamless === 'boolean') state.seamless = seamless;
+      if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix;
       if (width) state.width = width;
       if (height) state.height = height;
     },
@@ -257,8 +282,11 @@ export const optionsSlice = createSlice({
         ...initialOptionsState,
       };
     },
-    setShouldRunGFPGAN: (state, action: PayloadAction<boolean>) => {
-      state.shouldRunGFPGAN = action.payload;
+    setShouldRunFacetool: (state, action: PayloadAction<boolean>) => {
+      state.shouldRunFacetool = action.payload;
+    },
+    setFacetoolType: (state, action: PayloadAction<FacetoolType>) => {
+      state.facetoolType = action.payload;
     },
     setShouldRunESRGAN: (state, action: PayloadAction<boolean>) => {
       state.shouldRunESRGAN = action.payload;
@@ -268,6 +296,15 @@ export const optionsSlice = createSlice({
     },
     setShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
       state.showAdvancedOptions = action.payload;
+    },
+    setActiveTab: (state, action: PayloadAction<number>) => {
+      state.activeTab = action.payload;
+    },
+    setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowImageDetails = action.payload;
+    },
+    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowGallery = action.payload;
     },
   },
 });
@@ -284,8 +321,11 @@ export const {
   setSampler,
   setSeed,
   setSeamless,
+  setHiresFix,
   setImg2imgStrength,
-  setGfpganStrength,
+  setFacetoolStrength,
+  setFacetoolType,
+  setCodeformerFidelity,
   setUpscalingLevel,
   setUpscalingStrength,
   setShouldUseInitImage,
@@ -299,10 +339,13 @@ export const {
   setSeedWeights,
   setVariationAmount,
   setAllParameters,
-  setShouldRunGFPGAN,
+  setShouldRunFacetool,
   setShouldRunESRGAN,
   setShouldRandomizeSeed,
   setShowAdvancedOptions,
+  setActiveTab,
+  setShouldShowImageDetails,
+  setShouldShowGallery,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

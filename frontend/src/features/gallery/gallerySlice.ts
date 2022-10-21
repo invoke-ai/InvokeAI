@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { clamp } from 'lodash';
+import _, { clamp } from 'lodash';
 import * as InvokeAI from '../../app/invokeai';
 
 export interface GalleryState {
@@ -72,7 +72,13 @@ export const gallerySlice = createSlice({
     },
     addImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       const newImage = action.payload;
-      const { uuid, mtime } = newImage;
+      const { uuid, url, mtime } = newImage;
+
+      // Do not add duplicate images
+      if (state.images.find((i) => i.url === url && i.mtime === mtime)) {
+        return;
+      }
+
       state.images.unshift(newImage);
       state.currentImageUuid = uuid;
       state.intermediateImage = undefined;
@@ -85,6 +91,32 @@ export const gallerySlice = createSlice({
     clearIntermediateImage: (state) => {
       state.intermediateImage = undefined;
     },
+    selectNextImage: (state) => {
+      const { images, currentImage } = state;
+      if (currentImage) {
+        const currentImageIndex = images.findIndex(
+          (i) => i.uuid === currentImage.uuid
+        );
+        if (_.inRange(currentImageIndex, 0, images.length)) {
+          const newCurrentImage = images[currentImageIndex + 1];
+          state.currentImage = newCurrentImage;
+          state.currentImageUuid = newCurrentImage.uuid;
+        }
+      }
+    },
+    selectPrevImage: (state) => {
+      const { images, currentImage } = state;
+      if (currentImage) {
+        const currentImageIndex = images.findIndex(
+          (i) => i.uuid === currentImage.uuid
+        );
+        if (_.inRange(currentImageIndex, 1, images.length + 1)) {
+          const newCurrentImage = images[currentImageIndex - 1];
+          state.currentImage = newCurrentImage;
+          state.currentImageUuid = newCurrentImage.uuid;
+        }
+      }
+    },
     addGalleryImages: (
       state,
       action: PayloadAction<{
@@ -94,8 +126,15 @@ export const gallerySlice = createSlice({
     ) => {
       const { images, areMoreImagesAvailable } = action.payload;
       if (images.length > 0) {
+        // Filter images that already exist in the gallery
+        const newImages = images.filter(
+          (newImage) =>
+            !state.images.find(
+              (i) => i.url === newImage.url && i.mtime === newImage.mtime
+            )
+        );
         state.images = state.images
-          .concat(images)
+          .concat(newImages)
           .sort((a, b) => b.mtime - a.mtime);
 
         if (!state.currentImage) {
@@ -122,6 +161,8 @@ export const {
   setCurrentImage,
   addGalleryImages,
   setIntermediateImage,
+  selectNextImage,
+  selectPrevImage,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
