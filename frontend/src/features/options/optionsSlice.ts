@@ -183,6 +183,67 @@ export const optionsSlice = createSlice({
     setSeedWeights: (state, action: PayloadAction<string>) => {
       state.seedWeights = action.payload;
     },
+    setAllTextToImageParameters: (
+      state,
+      action: PayloadAction<InvokeAI.Metadata>
+    ) => {
+      const {
+        sampler,
+        prompt,
+        seed,
+        variations,
+        steps,
+        cfg_scale,
+        threshold,
+        perlin,
+        seamless,
+        hires_fix,
+        width,
+        height,
+      } = action.payload.image;
+
+      if (variations && variations.length > 0) {
+        state.seedWeights = seedWeightsToString(variations);
+        state.shouldGenerateVariations = true;
+      } else {
+        state.shouldGenerateVariations = false;
+      }
+
+      if (seed) {
+        state.seed = seed;
+        state.shouldRandomizeSeed = false;
+      }
+
+      if (prompt) state.prompt = promptToString(prompt);
+      if (sampler) state.sampler = sampler;
+      if (steps) state.steps = steps;
+      if (cfg_scale) state.cfgScale = cfg_scale;
+      if (threshold) state.threshold = threshold;
+      if (typeof threshold === 'undefined') state.threshold = 0;
+      if (perlin) state.perlin = perlin;
+      if (typeof perlin === 'undefined') state.perlin = 0;
+      if (typeof seamless === 'boolean') state.seamless = seamless;
+      if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix;
+      if (width) state.width = width;
+      if (height) state.height = height;
+    },
+    setAllImageToImageParameters: (
+      state,
+      action: PayloadAction<InvokeAI.Metadata>
+    ) => {
+      const { type, strength, fit, init_image_path, mask_image_path } =
+        action.payload.image;
+
+      if (type === 'img2img') {
+        if (init_image_path) state.initialImagePath = init_image_path;
+        if (mask_image_path) state.maskPath = mask_image_path;
+        if (strength) state.img2imgStrength = strength;
+        if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
+        state.shouldUseInitImage = true;
+      } else {
+        state.shouldUseInitImage = false;
+      }
+    },
     setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
       const {
         type,
@@ -225,43 +286,6 @@ export const optionsSlice = createSlice({
         state.seed = seed;
         state.shouldRandomizeSeed = false;
       }
-
-      /**
-       * We support arbitrary numbers of postprocessing steps, so it
-       * doesnt make sense to be include postprocessing metadata when
-       * we use all parameters. Because this code needed a bit of braining
-       * to figure out, I am leaving it, in case it is needed again.
-       */
-
-      // let postprocessingNotDone = ['gfpgan', 'esrgan'];
-      // if (postprocessing && postprocessing.length > 0) {
-      //   postprocessing.forEach(
-      //     (postprocess: InvokeAI.PostProcessedImageMetadata) => {
-      //       if (postprocess.type === 'gfpgan') {
-      //         const { strength } = postprocess;
-      //         if (strength) state.facetoolStrength = strength;
-      //         state.shouldRunFacetool = true;
-      //         postprocessingNotDone = postprocessingNotDone.filter(
-      //           (p) => p !== 'gfpgan'
-      //         );
-      //       }
-      //       if (postprocess.type === 'esrgan') {
-      //         const { scale, strength } = postprocess;
-      //         if (scale) state.upscalingLevel = scale;
-      //         if (strength) state.upscalingStrength = strength;
-      //         state.shouldRunESRGAN = true;
-      //         postprocessingNotDone = postprocessingNotDone.filter(
-      //           (p) => p !== 'esrgan'
-      //         );
-      //       }
-      //     }
-      //   );
-      // }
-
-      // postprocessingNotDone.forEach((p) => {
-      //   if (p === 'esrgan') state.shouldRunESRGAN = false;
-      //   if (p === 'gfpgan') state.shouldRunFacetool = false;
-      // });
 
       if (prompt) state.prompt = promptToString(prompt);
       if (sampler) state.sampler = sampler;
@@ -346,6 +370,8 @@ export const {
   setActiveTab,
   setShouldShowImageDetails,
   setShouldShowGallery,
+  setAllTextToImageParameters,
+  setAllImageToImageParameters,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
