@@ -1,10 +1,9 @@
 import { Button, IconButton } from '@chakra-ui/button';
 import { Resizable } from 're-resizable';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdClear, MdPhotoLibrary } from 'react-icons/md';
-import Masonry from 'react-masonry-css';
 import { requestImages } from '../../app/socketio/actions';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
@@ -26,12 +25,6 @@ export default function ImageGallery() {
   );
 
   const dispatch = useAppDispatch();
-
-  const [column, setColumn] = useState<number | undefined>();
-
-  const handleResize = (event: MouseEvent | TouchEvent | any) => {
-    setColumn(Math.floor((window.innerWidth - event.x) / 120));
-  };
 
   const handleShowGalleryToggle = () => {
     dispatch(setShouldShowGallery(!shouldShowGallery));
@@ -89,9 +82,7 @@ export default function ImageGallery() {
           minWidth={'300'}
           maxWidth={activeTab == 1 ? '300' : '600'}
           className="image-gallery-popup"
-          onResize={handleResize}
         >
-          {/* <div className="image-gallery-popup"></div> */}
           <div className="image-gallery-header">
             <h1>Your Invocations</h1>
             <IconButton
@@ -104,12 +95,7 @@ export default function ImageGallery() {
           </div>
           <div className="image-gallery-container">
             {images.length ? (
-              <Masonry
-                className="masonry-grid"
-                columnClassName="masonry-grid_column"
-                breakpointCols={column}
-              >
-                {/* <div className="image-gallery"> */}
+              <div className="image-gallery">
                 {images.map((image) => {
                   const { uuid } = image;
                   const isSelected = currentImageUuid === uuid;
@@ -121,8 +107,7 @@ export default function ImageGallery() {
                     />
                   );
                 })}
-                {/* </div> */}
-              </Masonry>
+              </div>
             ) : (
               <div className="image-gallery-container-placeholder">
                 <MdPhotoLibrary />

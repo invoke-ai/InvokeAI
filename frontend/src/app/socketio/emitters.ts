@@ -26,7 +26,7 @@ const makeSocketIOEmitters = (
 
       const options = { ...getState().options };
 
-      if (tabMap[options.activeTab] === 'txt2img') {
+      if (tabMap[options.activeTab] !== 'img2img') {
         options.shouldUseInitImage = false;
       }
 
