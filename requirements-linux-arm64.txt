@@ -22,5 +22,5 @@ transformers==4.21.3
 -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
 -e git+https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion
 -e git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
--3 git+https://github.com/invoke-ai/clipseg.git#egg=clipseg
+-e git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
 -e .

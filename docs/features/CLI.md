@@ -503,6 +503,16 @@ invoke> !search surreal
 This clears the search history from memory and disk. Be advised that
 this operation is irreversible and does not issue any warnings!
 
+Other ! Commands
+
+### !mask
+
+This command takes an image, a text prompt, and uses the `clipseg`
+algorithm to automatically generate a mask of the area that matches
+the text prompt. It is useful for debugging the text masking process
+prior to inpainting with the `--text_mask` argument. See
+[INPAINTING.md] for details.
+
 ## Command-line editing and completion
 
 The command-line offers convenient history tracking, editing, and

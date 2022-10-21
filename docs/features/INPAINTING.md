@@ -74,6 +74,60 @@ up at all!
 invoke> a baseball -I /path/to/breakfast.png -tm orange 0.6
 ~~~
 
+The `!mask` command may be useful for debugging problems with the
+text2mask feature. The syntax is `!mask /path/to/image.png -tm <text>
+<threshold>`
+
+It will generate three files:
+
+- The image with the selected area highlighted.
+- The image with the un-selected area highlighted.
+- The image with the selected area converted into a black and white
+  image according to the threshold level.
+
+Note that none of these images are intended to be used as the mask
+passed to invoke via `-M` and may give unexpected results if you try
+to use them this way. Instead, use `!mask` for testing that you are
+selecting the right mask area, and then do inpainting using the
+best selection term and threshold.
+
+Here is an example of how `!mask` works:
+
+```
+invoke> !mask ./test-pictures/curly.png -tm hair 0.5
+>> generating masks from ./test-pictures/curly.png
+>> Initializing clipseg model for text to mask inference
+Outputs:
+[941.1] outputs/img-samples/000019.curly.hair.deselected.png: !mask ./test-pictures/curly.png -tm hair 0.5
+[941.2] outputs/img-samples/000019.curly.hair.selected.png: !mask ./test-pictures/curly.png -tm hair 0.5
+[941.3] outputs/img-samples/000019.curly.hair.masked.png: !mask ./test-pictures/curly.png -tm hair 0.5
+```
+
+**Original image "curly.png"**
+<img src="../assets/outpainting/curly.png">
+
+**000019.curly.hair.selected.png**
+<img src="../assets/inpainting/000019.curly.hair.selected.png">
+
+**000019.curly.hair.deselected.png**
+<img src="../assets/inpainting/000019.curly.hair.deselected.png">
+
+**000019.curly.hair.masked.png**
+<img src="../assets/inpainting/000019.curly.hair.masked.png">
+
+It looks like we selected the hair pretty well at the 0.5 threshold
+(which is the default, so we didn't actually have to specify it), so
+let's have some fun:
+
+```
+invoke> medusa with cobras -I ./test-pictures/curly.png -tm hair 0.5 -C20
+>> loaded input image of size 512x512 from ./test-pictures/curly.png
+...
+Outputs:
+[946] outputs/img-samples/000024.801380492.png: "medusa with cobras" -s 50 -S 801380492 -W 512 -H 512 -C 20.0 -I ./test-pictures/curly.png -A k_lms -f 0.75
+```
+
+<img src="../assets/inpainting/000024.801380492.png">
 
 ### Inpainting is not changing the masked region enough!
 

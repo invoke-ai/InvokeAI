@@ -107,25 +107,27 @@ except Exception:
     print(traceback.format_exc())
 print('...success')
 
-print('Loading clipseq model for text-based masking...',end='')
+print('Loading clipseg model for text-based masking...',end='')
 try:
     model_url  = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
     model_dest = 'src/clipseg/clipseg_weights.zip'
-    if not os.path.exists(model_dest):
+    weights_dir = 'src/clipseg/weights'
+    if not os.path.exists(weights_dir):
         os.makedirs(os.path.dirname(model_dest), exist_ok=True)
         urllib.request.urlretrieve(model_url,model_dest)
         with zipfile.ZipFile(model_dest,'r') as zip:
             zip.extractall('src/clipseg')
             os.rename('src/clipseg/clipseg_weights','src/clipseg/weights')
-        from models.clipseg import CLIPDensePredT
+        os.remove(model_dest)
+        from clipseg_models.clipseg import CLIPDensePredT
         model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
         model.eval()
         model.load_state_dict(
-            torch.load('src/clipseg/weights/rd64-uni-refined.pth'),
-            model.load_state_dict(torch.load('src/clipseg/weights/rd64-uni-refined.pth'),
-                                  map_location=torch.device('cpu'),
-                                  strict=False,
-            )
+            torch.load(
+                'src/clipseg/weights/rd64-uni-refined.pth',
+                map_location=torch.device('cpu')
+                ),
+            strict=False,
         )
 except Exception:
     print('Error installing clipseg model:')
