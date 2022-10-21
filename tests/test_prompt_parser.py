@@ -153,6 +153,12 @@ class PromptParserTestCase(unittest.TestCase):
             parse_prompt("(\"fire\", \"  ,  \").blend(0.7, 1)")
             )
 
+        self.assertEqual(
+            Conjunction([Blend([FlattenedPrompt([('mountain, man, hairy', 1)]),
+                                FlattenedPrompt([('face, teeth,', 1), ('eyes', 0.9*0.9)])], weights=[1.0,-1.0])]),
+            parse_prompt('("mountain, man, hairy", "face, teeth, --eyes").blend(1,-1)')
+        )
+
 
     def test_nested(self):
         self.assertEqual(make_weighted_conjunction([('fire', 1.0), ('flames', 2.0), ('trees', 3.0)]),

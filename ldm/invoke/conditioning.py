@@ -48,7 +48,7 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
     edited_conditioning = None
     edit_opcodes = None
 
-    if parsed_prompt is Blend:
+    if type(parsed_prompt) is Blend:
         blend: Blend = parsed_prompt
         embeddings_to_blend = None
         for flattened_prompt in blend.prompts:
@@ -60,7 +60,8 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
                                                                                 normalize=blend.normalize_weights)
     else:
         flattened_prompt: FlattenedPrompt = parsed_prompt
-        wants_cross_attention_control = any([issubclass(type(x), CrossAttentionControlledFragment) for x in flattened_prompt.children])
+        wants_cross_attention_control = type(flattened_prompt) is not Blend \
+                                        and any([issubclass(type(x), CrossAttentionControlledFragment) for x in flattened_prompt.children])
         if wants_cross_attention_control:
             original_prompt = FlattenedPrompt()
             edited_prompt = FlattenedPrompt()
@@ -95,7 +96,7 @@ def build_token_edit_opcodes(original_tokens, edited_tokens):
 
 def build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt: FlattenedPrompt):
     if type(flattened_prompt) is not FlattenedPrompt:
-        raise f"embeddings can only be made from FlattenedPrompts, got {type(flattened_prompt)} instead"
+        raise Exception(f"embeddings can only be made from FlattenedPrompts, got {type(flattened_prompt)} instead")
     fragments = [x.text for x in flattened_prompt.children]
     weights = [x.weight for x in flattened_prompt.children]
     embeddings, tokens = model.get_learned_conditioning([fragments], return_tokens=True, fragment_weights=[weights])

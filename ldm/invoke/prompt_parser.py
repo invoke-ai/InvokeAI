@@ -308,7 +308,8 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     quotes = pp.Literal('"').suppress()
 
     # accepts int or float notation, always maps to float
-    number = pp.pyparsing_common.real | pp.Word(pp.nums).set_parse_action(pp.token_map(float))
+    number = pp.pyparsing_common.real | \
+             pp.Combine(pp.Optional("-")+pp.Word(pp.nums)).set_parse_action(pp.token_map(float))
     greedy_word = pp.Word(pp.printables, exclude_chars=string.whitespace).set_name('greedy_word')
 
     attention = pp.Forward()
@@ -498,12 +499,13 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     quoted_prompt = pp.dbl_quoted_string.set_parse_action(make_prompt_from_quoted_string)
     quoted_prompt.set_name('quoted_prompt')
 
-    blend_terms = pp.delimited_list(quoted_prompt).set_name('blend_terms')
-    blend_weights = pp.delimited_list(number).set_name('blend_weights')
+    debug_blend=True
+    blend_terms = pp.delimited_list(quoted_prompt).set_name('blend_terms').set_debug(debug_blend)
+    blend_weights = pp.delimited_list(number).set_name('blend_weights').set_debug(debug_blend)
     blend = pp.Group(lparen + pp.Group(blend_terms) + rparen
                      + pp.Literal(".blend").suppress()
                      + lparen + pp.Group(blend_weights) + rparen).set_name('blend')
-    blend.set_debug(False)
+    blend.set_debug(debug_blend)
 
 
     blend.set_parse_action(lambda x: Blend(prompts=x[0][0], weights=x[0][1]))
