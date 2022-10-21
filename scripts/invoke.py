@@ -809,31 +809,29 @@ def retrieve_dream_command(opt,command,completer):
         return
 
     tokens = command.split()
-    if len(tokens) > 1:
-        return write_commands(opt,tokens)
+    dir,basename = os.path.split(tokens[0])
+    if len(dir) == 0:
+        path = os.path.join(opt.outdir,basename)
+    else:
+        path = tokens[0]
 
+    if len(tokens) > 1:
+        return write_commands(opt, path, tokens[1])
+
+    cmd = ''
     try:
-        cmd = dream_cmd_from_png(tokens[0])
+        cmd = dream_cmd_from_png(path)
     except OSError:
-        print(f'## {path}: file could not be read')
+        print(f'## {tokens[0]}: file could not be read')
     except (KeyError, AttributeError, IndexError):
-        print(f'## {path}: file has no metadata')
+        print(f'## {tokens[0]}: file has no metadata')
     except:
-        print(f'## {path}: file could not be processed')
+        print(f'## {tokens[0]}: file could not be processed')
     if len(cmd)>0:
         completer.set_line(cmd)
 
-def write_commands(opt, tokens:list):
-    file_path = tokens[0]    
-    outfilepath = tokens[1]
-        
+def write_commands(opt, file_path:str, outfilepath:str):
     dir,basename = os.path.split(file_path)
-    if len(dir) == 0:
-        dir = opt.outdir
-        
-    outdir,outname = os.path.split(outfilepath)    
-    if len(outdir) == 0:
-        outfilepath = os.path.join(dir,outname)
     try:
         paths = list(Path(dir).glob(basename))
     except ValueError:
@@ -845,8 +843,6 @@ def write_commands(opt, tokens:list):
     for path in paths:
         try:
             cmd = dream_cmd_from_png(path)
-        except OSError:
-            print(f'## {path}: file could not be read')
         except (KeyError, AttributeError, IndexError):
             print(f'## {path}: file has no metadata')
         except:
@@ -855,6 +851,9 @@ def write_commands(opt, tokens:list):
             commands.append(f'# {path}')
             commands.append(cmd)
     if len(commands)>0:
+        dir,basename = os.path.split(outfilepath)
+        if len(dir)==0:
+            outfilepath = os.path.join(opt.outdir,basename)
         with open(outfilepath, 'w', encoding='utf-8') as f:
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
