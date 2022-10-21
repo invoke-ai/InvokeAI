@@ -8,7 +8,7 @@ import numpy as np
 from einops import rearrange
 
 from ldm.util import instantiate_from_config
-#from ldm.modules.attention import LinearAttention
+from ldm.modules.attention import LinearAttention
 
 import psutil
 
@@ -151,10 +151,10 @@ class ResnetBlock(nn.Module):
 
         return x + h
 
-#class LinAttnBlock(LinearAttention):
-#    """to match AttnBlock usage"""
-#    def __init__(self, in_channels):
-#        super().__init__(dim=in_channels, heads=1, dim_head=in_channels)
+class LinAttnBlock(LinearAttention):
+    """to match AttnBlock usage"""
+    def __init__(self, in_channels):
+        super().__init__(dim=in_channels, heads=1, dim_head=in_channels)
 
 
 class AttnBlock(nn.Module):

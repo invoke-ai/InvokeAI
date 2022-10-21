@@ -1,5 +1,4 @@
 """SAMPLING ONLY."""
-from typing import Union
 
 import torch
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
@@ -29,7 +28,7 @@ class DDIMSampler(Sampler):
     def p_sample(
             self,
             x,
-            c: Union[torch.Tensor, list],
+            c,
             t,
             index,
             repeat_noise=False,

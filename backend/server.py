@@ -527,7 +527,7 @@ def parameters_to_generated_image_metadata(parameters):
     rfc_dict["sampler"] = parameters["sampler_name"]
 
     # display weighted subprompts (liable to change)
-    subprompts = split_weighted_subprompts(parameters["prompt"], skip_normalize=True)
+    subprompts = split_weighted_subprompts(parameters["prompt"])
     subprompts = [{"prompt": x[0], "weight": x[1]} for x in subprompts]
     rfc_dict["prompt"] = subprompts
 
