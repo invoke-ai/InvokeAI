@@ -39,7 +39,7 @@ function CurrentCanvasImage(props: CanvasElementProps & { x?: number, y?: number
         unsetOnDraw();
       };
     }
-  }, [image, setOnDraw, unsetOnDraw, props.x, props.y]);
+  }, [setOnDraw, unsetOnDraw, props.x, props.y]);
 
   return <></>;
 }

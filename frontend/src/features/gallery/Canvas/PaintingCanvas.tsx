@@ -4,9 +4,6 @@ import { isEqual } from "lodash";
 import { RootState, useAppDispatch, useAppSelector } from "../../../app/store";
 import { OptionsState } from "../../options/optionsSlice";
 import { tabMap } from "../../tabs/InvokeTabs";
-
-import InvokeAI from "../../../app/invokeai";
-import drawBrush from "../../tabs/Inpainting/drawBrush";
 import { setPaintingCameraX, setPaintingCameraY, setPaintingElementHeight, setPaintingElementWidth } from "../gallerySlice";
 
 interface Point {
@@ -87,7 +84,6 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [effectTrigger, setEffectTrigger] = useState<boolean>(false);
 
   const applyTransform = (x: number, y: number) => {
     if (!wrapperRef.current)
@@ -124,10 +120,9 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     setOnBrushClear(() => {
       return () => {
         maskCanvasContext.current!.clearRect(0, 0, maskCanvasRef.current!.width, maskCanvasRef.current!.height);
-        setEffectTrigger(!effectTrigger);
       }
     });
-  }, [maskCanvasRef, maskCanvasRef, setOnBrushClear, setEffectTrigger]);
+  }, [maskCanvasRef, maskCanvasRef, setOnBrushClear]);
 
   useEffect(() => {
     if (!maskCanvasRef.current) return;
@@ -140,6 +135,8 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     if (e.button === 1) {
       setIsDragging(true);
       setDragStart({ x: e.clientX / zoomLevel - cameraOffset.x, y: e.clientY / zoomLevel - cameraOffset.y });
+
+      return;
     }
     if (e.button === 0) {
       if (
@@ -170,7 +167,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
         maskCanvasContext.current.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
       }
 
-      setEffectTrigger(!effectTrigger);
+      draw();
     }
   };
 
@@ -191,6 +188,8 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
         x: e.clientX / zoomLevel - dragStart.x,
         y: e.clientY / zoomLevel - dragStart.y,
       });
+
+      return;
     }
 
     if (!maskCanvasRef) return;
@@ -207,7 +206,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
         maskCanvasContext.current.fillRect(x - inpaintingBrushSize / 2, y - inpaintingBrushSize / 2, inpaintingBrushSize, inpaintingBrushSize);
       }
 
-      setEffectTrigger(!effectTrigger);
+      draw();
     }
   };
 
@@ -230,7 +229,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
       !maskCanvasRef.current ||
       !wrapperRef.current
     ) return;
-
+    
     const { width, height } = wrapperRef.current.getBoundingClientRect();
 
     canvasRef.current.width = 4096;
@@ -270,7 +269,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
     animationFrameID.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animationFrameID.current);
-  }, [cameraOffset, zoomLevel, shouldShowGallery, effectTrigger]);
+  }, [cameraOffset, zoomLevel, shouldShowGallery]);
 
   return (
     <div className="painting-canvas" ref={wrapperRef}>
@@ -287,10 +286,9 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
             setOnDraw: (onDraw: (props: DrawProps) => void) => {
               childrenOnDraw.current.set(child, (drawProps) => {
                 onDraw(drawProps);
-                setEffectTrigger(!effectTrigger);
               });
 
-              setEffectTrigger(!effectTrigger);
+              draw();
             },
             unsetOnDraw: () => {
               childrenOnDraw.current.delete(child);
