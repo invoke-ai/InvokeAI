@@ -172,6 +172,7 @@ class Args(object):
         command = cmd_string.replace("'", "\\'")
         try:
             elements = shlex.split(command)
+            elements = [x.replace("\\'","'") for x in elements]
         except ValueError:
             import sys, traceback
             print(traceback.format_exc(), file=sys.stderr)
@@ -930,7 +931,7 @@ def metadata_loads(metadata) -> list:
         for image in images:
             # repack the prompt and variations
             if 'prompt' in image:
-                image['prompt']     = ','.join([':'.join([x['prompt'],   str(x['weight'])]) for x in image['prompt']])
+                image['prompt']     = repack_prompt(image['prompt'])
             if 'variations' in image:
                 image['variations'] = ','.join([':'.join([str(x['seed']),str(x['weight'])]) for x in image['variations']])
             # fix a bit of semantic drift here
@@ -938,11 +939,18 @@ def metadata_loads(metadata) -> list:
             opt = Args()
             opt._cmd_switches = Namespace(**image)
             results.append(opt)
-    except KeyError as e:
+    except Exception as e:
         import sys, traceback
-        print('>> badly-formatted metadata',file=sys.stderr)
+        print('>> could not read metadata',file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
     return results
+
+def repack_prompt(prompt_list:list)->str:
+    # in the common case of no weighting syntax, just return the prompt as is
+    if len(prompt_list) > 1:
+        return ','.join([':'.join([x['prompt'], str(x['weight'])]) for x in prompt_list])
+    else:
+        return prompt_list[0]['prompt']
 
 # image can either be a file path on disk or a base64-encoded
 # representation of the file's contents
