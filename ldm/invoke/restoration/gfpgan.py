@@ -55,13 +55,18 @@ class GFPGAN():
 
         image = image.convert('RGB')
 
+        # GFPGAN expects a BGR np array; make array and flip channels
+        bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
+
         _, _, restored_img = self.gfpgan.enhance(
-            np.array(image, dtype=np.uint8),
+            bgr_image_array,
             has_aligned=False,
             only_center_face=False,
             paste_back=True,
         )
-        res = Image.fromarray(restored_img)
+
+        # Flip the channels back to RGB
+        res = Image.fromarray(restored_img[...,::-1])
 
         if strength < 1.0:
             # Resize the image to the new image if the sizes have changed

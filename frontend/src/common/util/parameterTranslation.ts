@@ -41,8 +41,10 @@ export const frontendToBackendParameters = (
     shouldRunESRGAN,
     upscalingLevel,
     upscalingStrength,
-    shouldRunGFPGAN,
-    gfpganStrength,
+    shouldRunFacetool,
+    facetoolStrength,
+    codeformerFidelity,
+    facetoolType,
     shouldRandomizeSeed,
   } = optionsState;
 
@@ -88,7 +90,7 @@ export const frontendToBackendParameters = (
   }
 
   let esrganParameters: false | { [k: string]: any } = false;
-  let gfpganParameters: false | { [k: string]: any } = false;
+  let facetoolParameters: false | { [k: string]: any } = false;
 
   if (shouldRunESRGAN) {
     esrganParameters = {
@@ -97,99 +99,19 @@ export const frontendToBackendParameters = (
     };
   }
 
-  if (shouldRunGFPGAN) {
-    gfpganParameters = {
-      strength: gfpganStrength,
+  if (shouldRunFacetool) {
+    facetoolParameters = {
+      type: facetoolType,
+      strength: facetoolStrength,
     };
+    if (facetoolType === 'codeformer') {
+      facetoolParameters.codeformer_fidelity = codeformerFidelity
+    }
   }
 
   return {
     generationParameters,
     esrganParameters,
-    gfpganParameters,
+    facetoolParameters,
   };
-};
-
-export const backendToFrontendParameters = (parameters: {
-  [key: string]: any;
-}) => {
-  const {
-    prompt,
-    iterations,
-    steps,
-    cfg_scale,
-    threshold,
-    perlin,
-    height,
-    width,
-    sampler_name,
-    seed,
-    seamless,
-    hires_fix,
-    progress_images,
-    variation_amount,
-    with_variations,
-    facetool_strength,
-    upscale,
-    init_img,
-    init_mask,
-    strength,
-  } = parameters;
-
-  const options: { [key: string]: any } = {
-    shouldDisplayInProgress: progress_images,
-    // init
-    shouldGenerateVariations: false,
-    shouldRunESRGAN: false,
-    shouldRunGFPGAN: false,
-    initialImagePath: '',
-    maskPath: '',
-  };
-
-  if (variation_amount > 0) {
-    options.shouldGenerateVariations = true;
-    options.variationAmount = variation_amount;
-    if (with_variations) {
-      options.seedWeights = seedWeightsToString(with_variations);
-    }
-  }
-
-  if (facetool_strength > 0) {
-    options.shouldRunGFPGAN = true;
-    options.gfpganStrength = facetool_strength;
-  }
-
-  if (upscale) {
-    options.shouldRunESRGAN = true;
-    options.upscalingLevel = upscale[0];
-    options.upscalingStrength = upscale[1];
-  }
-
-  if (init_img) {
-    options.shouldUseInitImage = true;
-    options.initialImagePath = init_img;
-    options.strength = strength;
-    if (init_mask) {
-      options.maskPath = init_mask;
-    }
-  }
-
-  // if we had a prompt, add all the metadata, but if we don't have a prompt,
-  // we must have only done ESRGAN or GFPGAN so do not add that metadata
-  if (prompt) {
-    options.prompt = prompt;
-    options.iterations = iterations;
-    options.steps = steps;
-    options.cfgScale = cfg_scale;
-    options.threshold = threshold;
-    options.perlin = perlin;
-    options.height = height;
-    options.width = width;
-    options.sampler = sampler_name;
-    options.seed = seed;
-    options.seamless = seamless;
-    options.hiresFix = hires_fix;
-  }
-
-  return options;
 };

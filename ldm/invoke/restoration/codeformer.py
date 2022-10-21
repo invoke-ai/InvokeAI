@@ -41,10 +41,12 @@ class CodeFormerRestoration():
             cf.eval()
 
             image = image.convert('RGB')
+            # Codeformer expects a BGR np array; make array and flip channels
+            bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
 
             face_helper = FaceRestoreHelper(upscale_factor=1, use_parse=True, device=device)
             face_helper.clean_all()
-            face_helper.read_image(np.array(image, dtype=np.uint8))
+            face_helper.read_image(bgr_image_array)
             face_helper.get_face_landmarks_5(resize=640, eye_dist_threshold=5)
             face_helper.align_warp_face()
 
@@ -71,7 +73,8 @@ class CodeFormerRestoration():
 
             restored_img = face_helper.paste_faces_to_input_image()
 
-            res = Image.fromarray(restored_img)
+            # Flip the channels back to RGB
+            res = Image.fromarray(restored_img[...,::-1])
 
             if strength < 1.0:
                 # Resize the image to the new image if the sizes have changed

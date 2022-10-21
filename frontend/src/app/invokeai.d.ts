@@ -89,15 +89,16 @@ export declare type ESRGANMetadata = CommonPostProcessedImageMetadata & {
   strength: number;
 };
 
-export declare type GFPGANMetadata = CommonPostProcessedImageMetadata & {
-  type: 'gfpgan';
+export declare type FacetoolMetadata = CommonPostProcessedImageMetadata & {
+  type: 'gfpgan' | 'codeformer';
   strength: number;
+  fidelity?: number;
 };
 
 // Superset of all postprocessed image metadata types..
 export declare type PostProcessedImageMetadata =
   | ESRGANMetadata
-  | GFPGANMetadata;
+  | FacetoolMetadata;
 
 // Metadata includes the system config and image metadata.
 export declare type Metadata = SystemConfig & {

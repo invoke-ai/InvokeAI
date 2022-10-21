@@ -95,7 +95,10 @@ def main():
             "\n* Initialization done! Awaiting your command (-h for help, 'q' to quit)"
         )
 
-    main_loop(gen, opt, infile)
+    try:
+        main_loop(gen, opt, infile)
+    except KeyboardInterrupt:
+        print("\ngoodbye!")
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt, infile):
@@ -222,9 +225,13 @@ def main_loop(gen, opt, infile):
                 os.makedirs(opt.outdir)
             current_outdir = opt.outdir
 
-        # write out the history at this point
+        # Write out the history at this point.
+        # TODO: Fix the parsing of command-line parameters
+        # so that !operations don't need to be stripped and readded
         if operation == 'postprocess':
             completer.add_history(f'!fix {command}')
+        elif operation == 'mask':
+            completer.add_history(f'!mask {command}')
         else:
             completer.add_history(command)
 
@@ -244,13 +251,28 @@ def main_loop(gen, opt, infile):
                 # when the -v switch is used to generate variations
                 nonlocal prior_variations
                 nonlocal prefix
-                if use_prefix is not None:
-                    prefix = use_prefix
 
                 path = None
                 if opt.grid:
                     grid_images[seed] = image
+
+                elif operation == 'mask':
+                    filename = f'{prefix}.{use_prefix}.{seed}.png'
+                    tm = opt.text_mask[0]
+                    th = opt.text_mask[1] if len(opt.text_mask)>1 else 0.5
+                    formatted_dream_prompt = f'!mask {opt.prompt} -tm {tm} {th}'
+                    path = file_writer.save_image_and_prompt_to_png(
+                        image           = image,
+                        dream_prompt    = formatted_dream_prompt,
+                        metadata        = {},
+                        name      = filename,
+                        compress_level = opt.png_compression,
+                    )
+                    results.append([path, formatted_dream_prompt])
+
                 else:
+                    if use_prefix is not None:
+                        prefix = use_prefix
                     postprocessed = upscaled if upscaled else operation=='postprocess'
                     filename, formatted_dream_prompt = prepare_image_metadata(
                         opt,
@@ -270,6 +292,7 @@ def main_loop(gen, opt, infile):
                             model_hash = gen.model_hash,
                         ),
                         name      = filename,
+                        compress_level = opt.png_compression,
                     )
 
                     # update rfc metadata
@@ -288,7 +311,7 @@ def main_loop(gen, opt, infile):
                         results.append([path, formatted_dream_prompt])
 
                 # so that the seed autocompletes (on linux|mac when -S or --seed specified
-                if completer:
+                if completer and operation == 'generate':
                     completer.add_seed(seed)
                     completer.add_seed(first_seed)
                 last_results.append([path, seed])
@@ -305,6 +328,10 @@ def main_loop(gen, opt, infile):
             elif operation == 'postprocess':
                 print(f'>> fixing {opt.prompt}')
                 opt.last_operation = do_postprocess(gen,opt,image_writer)
+
+            elif operation == 'mask':
+                print(f'>> generating masks from {opt.prompt}')
+                do_textmask(gen, opt, image_writer)
 
             if opt.grid and len(grid_images) > 0:
                 grid_img   = make_grid(list(grid_images.values()))
@@ -352,6 +379,10 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         command = command.replace('!fix ','',1)
         operation = 'postprocess'
 
+    elif command.startswith('!mask'):
+        command = command.replace('!mask ','',1)
+        operation = 'mask'
+
     elif command.startswith('!switch'):
         model_name = command.replace('!switch ','',1)
         gen.set_model(model_name)
@@ -360,6 +391,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         
     elif command.startswith('!models'):
         gen.model_cache.print_models()
+        completer.add_history(command)
         operation = None
 
     elif command.startswith('!import'):
@@ -528,6 +560,19 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
     else:
         gen.set_model(current_model)
     return True
+
+def do_textmask(gen, opt, callback):
+    image_path = opt.prompt
+    assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+    assert opt.text_mask is not None and len(opt.text_mask) >= 1, '** Please provide a text mask with -tm **'
+    tm = opt.text_mask[0]
+    threshold = float(opt.text_mask[1]) if len(opt.text_mask) > 1  else 0.5
+    gen.apply_textmask(
+        image_path = image_path,
+        prompt = tm,
+        threshold = threshold,
+        callback = callback,
+    )
 
 def do_postprocess (gen, opt, callback):
     file_path = opt.prompt     # treat the prompt as the file pathname
@@ -705,7 +750,6 @@ def load_face_restoration(opt):
         print(traceback.format_exc(), file=sys.stderr)
         print('>> You may need to install the ESRGAN and/or GFPGAN modules')
     return gfpgan,codeformer,esrgan
-    
 
 def make_step_callback(gen, opt, prefix):
     destination = os.path.join(opt.outdir,'intermediates',prefix)

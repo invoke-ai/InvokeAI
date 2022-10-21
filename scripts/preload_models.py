@@ -10,28 +10,31 @@ import sys
 import transformers
 import os
 import warnings
+import torch
 import urllib.request
+import zipfile
+import traceback
 
 transformers.logging.set_verbosity_error()
 
 # this will preload the Bert tokenizer fles
-print('preloading bert tokenizer...', end='')
-
-tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
+print('Loading bert tokenizer (ignore deprecation errors)...', end='')
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
+    tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
 print('...success')
+sys.stdout.flush()
 
 # this will download requirements for Kornia
-print('preloading Kornia requirements...', end='')
+print('Loading Kornia requirements...', end='')
 with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category=DeprecationWarning)
     import kornia
 print('...success')
 
 version = 'openai/clip-vit-large-patch14'
-
-print('preloading CLIP model...',end='')
 sys.stdout.flush()
-
+print('Loading CLIP model...',end='')
 tokenizer = CLIPTokenizer.from_pretrained(version)
 transformer = CLIPTextModel.from_pretrained(version)
 print('...success')
@@ -61,7 +64,6 @@ if gfpgan:
         FaceRestoreHelper(1, det_model='retinaface_resnet50')
         print('...success')
     except Exception:
-        import traceback
         print('Error loading ESRGAN:')
         print(traceback.format_exc())
 
@@ -89,13 +91,11 @@ if gfpgan:
                 urllib.request.urlretrieve(model_url,model_dest)
                 print('...success')
         except Exception:
-            import traceback
             print('Error loading GFPGAN:')
             print(traceback.format_exc())
 
 print('preloading CodeFormer model file...',end='')
 try:
-        import urllib.request
         model_url  = 'https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
         model_dest = 'ldm/invoke/restoration/codeformer/weights/codeformer.pth'
         if not os.path.exists(model_dest):
@@ -103,7 +103,35 @@ try:
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
             urllib.request.urlretrieve(model_url,model_dest)
 except Exception:
-    import traceback
     print('Error loading CodeFormer:')
     print(traceback.format_exc())
 print('...success')
+
+print('Loading clipseg model for text-based masking...',end='')
+try:
+    model_url  = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
+    model_dest = 'src/clipseg/clipseg_weights.zip'
+    weights_dir = 'src/clipseg/weights'
+    if not os.path.exists(weights_dir):
+        os.makedirs(os.path.dirname(model_dest), exist_ok=True)
+        urllib.request.urlretrieve(model_url,model_dest)
+        with zipfile.ZipFile(model_dest,'r') as zip:
+            zip.extractall('src/clipseg')
+            os.rename('src/clipseg/clipseg_weights','src/clipseg/weights')
+        os.remove(model_dest)
+        from clipseg_models.clipseg import CLIPDensePredT
+        model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
+        model.eval()
+        model.load_state_dict(
+            torch.load(
+                'src/clipseg/weights/rd64-uni-refined.pth',
+                map_location=torch.device('cpu')
+                ),
+            strict=False,
+        )
+except Exception:
+    print('Error installing clipseg model:')
+    print(traceback.format_exc())
+print('...success')
+
+      
