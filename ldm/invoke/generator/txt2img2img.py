@@ -24,7 +24,7 @@ class Txt2Img2Img(Generator):
         kwargs are 'width' and 'height'
         """
         uc, c, ec, edit_opcodes = conditioning
-        extra_conditioning_info = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
+        extra_conditioning_info = InvokeAIDiffuserComponent.ExtraConditioningInfo(edited_conditioning=ec, edit_opcodes=edit_opcodes)
 
         @torch.no_grad()
         def make_image(x_T):           

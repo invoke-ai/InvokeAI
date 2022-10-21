@@ -34,7 +34,7 @@ class Img2Img(Generator):
 
         t_enc = int(strength * steps)
         uc, c, ec, edit_opcodes   = conditioning
-        extra_conditioning_info = InvokeAIDiffuserComponent.StructuredConditioning(edited_conditioning=ec, edit_opcodes=edit_opcodes)
+        extra_conditioning_info = InvokeAIDiffuserComponent.ExtraConditioningInfo(edited_conditioning=ec, edit_opcodes=edit_opcodes)
 
         def make_image(x_T):
             # encode (scaled latent)

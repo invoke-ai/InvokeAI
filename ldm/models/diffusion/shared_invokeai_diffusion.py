@@ -6,23 +6,6 @@ import torch
 
 
 class InvokeAIDiffuserComponent:
-
-    class StructuredConditioning:
-        def __init__(self, edited_conditioning: torch.Tensor = None, edit_opcodes: list[tuple] = None):
-            """
-            :param edited_conditioning: if doing cross-attention control, the edited conditioning (1 x 77 x 768)
-            :param edit_opcodes: if doing cross-attention control, opcodes from a SequenceMatcher describing how to map original conditioning tokens to edited conditioning tokens
-            """
-            # TODO migrate conditioning and unconditioning here, too
-            #self.conditioning = conditioning
-            #self.unconditioning = unconditioning
-            self.edited_conditioning = edited_conditioning
-            self.edit_opcodes = edit_opcodes
-
-        @property
-        def wants_cross_attention_control(self):
-            return self.edited_conditioning is not None
-
     '''
     The aim of this component is to provide a single place for code that can be applied identically to
     all InvokeAI diffusion procedures.
@@ -30,6 +13,20 @@ class InvokeAIDiffuserComponent:
     At the moment it includes the following features:
     * Cross Attention Control ("prompt2prompt")
     '''
+
+
+    class ExtraConditioningInfo:
+        def __init__(self, edited_conditioning: torch.Tensor = None, edit_opcodes: list[tuple] = None):
+            """
+            :param edited_conditioning: if doing cross-attention control, the edited conditioning (1 x 77 x 768)
+            :param edit_opcodes: if doing cross-attention control, opcodes from a SequenceMatcher describing how to map original conditioning tokens to edited conditioning tokens
+            """
+            self.edited_conditioning = edited_conditioning
+            self.edit_opcodes = edit_opcodes
+
+        @property
+        def wants_cross_attention_control(self):
+            return self.edited_conditioning is not None
 
     def __init__(self, model, model_forward_callback: Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]):
         """
@@ -40,7 +37,7 @@ class InvokeAIDiffuserComponent:
         self.model_forward_callback = model_forward_callback
 
 
-    def setup_cross_attention_control(self, conditioning: StructuredConditioning):
+    def setup_cross_attention_control(self, conditioning: ExtraConditioningInfo):
         self.conditioning = conditioning
         CrossAttentionControl.setup_cross_attention_control(self.model, conditioning.edited_conditioning, conditioning.edit_opcodes)
 
