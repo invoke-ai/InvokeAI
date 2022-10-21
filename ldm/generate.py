@@ -35,6 +35,9 @@ from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.conditioning import get_uc_and_c
 from ldm.invoke.model_cache import ModelCache
 
+# this is fallback model in case no default is defined
+FALLBACK_MODEL_NAME='stable-diffusion-1.4'
+
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         def new_func(*args, **kw):
@@ -127,7 +130,7 @@ class Generate:
 
     def __init__(
             self,
-            model                 = 'stable-diffusion-1.4',
+            model                 = None,
             conf                  = 'configs/models.yaml',
             embedding_path        = None,
             sampler_name          = 'k_lms',
@@ -143,7 +146,6 @@ class Generate:
             free_gpu_mem=False,
     ):
         mconfig             = OmegaConf.load(conf)
-        self.model_name     = model
         self.height         = None
         self.width          = None
         self.model_cache    = None
@@ -188,6 +190,8 @@ class Generate:
 
         # model caching system for fast switching
         self.model_cache = ModelCache(mconfig,self.device,self.precision)
+        print(f'DEBUG: model={model}, default_model={self.model_cache.default_model()}')
+        self.model_name  = model or self.model_cache.default_model() or FALLBACK_MODEL_NAME
 
         # for VRAM usage statistics
         self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None

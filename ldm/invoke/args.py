@@ -364,17 +364,16 @@ class Args(object):
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
         model_group.add_argument(
-            '--conf',
+            '--config',
             '-c',
-            '-conf',
+            '-config',
             dest='conf',
             default='./configs/models.yaml',
             help='Path to configuration file for alternate models.',
         )
         model_group.add_argument(
             '--model',
-            default='stable-diffusion-1.4',
-            help='Indicates which diffusion model to load. (currently "stable-diffusion-1.4" (default) or "laion400m")',
+            help='Indicates which diffusion model to load (defaults to "default" stanza in configs/models.yaml)',
         )
         model_group.add_argument(
             '--sampler',
