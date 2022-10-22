@@ -967,17 +967,17 @@ def sha256(path):
     return sha.hexdigest()
 
 def legacy_metadata_load(meta,pathname) -> Args:
+    opt = Args()
     if 'Dream' in meta and len(meta['Dream']) > 0:
         dream_prompt = meta['Dream']
-        opt = Args()
         opt.parse_cmd(dream_prompt)
-        return opt
     else:               # if nothing else, we can get the seed
         match = re.search('\d+\.(\d+)',pathname)
         if match:
             seed = match.groups()[0]
-            opt = Args()
             opt.seed = seed
-            return opt
-    return None
+        else:
+            opt.prompt = ''
+            opt.seed = 0
+    return opt
             
