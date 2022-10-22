@@ -247,7 +247,22 @@ class PromptParserTestCase(unittest.TestCase):
                                                         Fragment(',', 1), Fragment('fire', 2.0)])])
         self.assertEqual(flames_to_trees_fire, parse_prompt('"0.5(fire 0.5(flames))".swap("0.7(trees) houses"), 2.0(fire)'))
 
-
+    def test_cross_attention_control_options(self):
+        self.assertEqual(Conjunction([
+            FlattenedPrompt([Fragment('a', 1),
+                             CrossAttentionControlSubstitute([Fragment('cat', 1)], [Fragment('dog', 1)], options={'s_start':0.1}),
+                             Fragment('eating a hotdog', 1)])]),
+            parse_prompt("a \"cat\".swap(dog, s_start=0.1) eating a hotdog"))
+        self.assertEqual(Conjunction([
+            FlattenedPrompt([Fragment('a', 1),
+                             CrossAttentionControlSubstitute([Fragment('cat', 1)], [Fragment('dog', 1)], options={'t_start':0.1}),
+                             Fragment('eating a hotdog', 1)])]),
+            parse_prompt("a \"cat\".swap(dog, t_start=0.1) eating a hotdog"))
+        self.assertEqual(Conjunction([
+            FlattenedPrompt([Fragment('a', 1),
+                             CrossAttentionControlSubstitute([Fragment('cat', 1)], [Fragment('dog', 1)], options={'s_start': 20.0, 't_start':0.1}),
+                             Fragment('eating a hotdog', 1)])]),
+            parse_prompt("a \"cat\".swap(dog, t_start=0.1, s_start=20) eating a hotdog"))
 
     def test_escaping(self):
 
