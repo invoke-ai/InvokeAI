@@ -8,7 +8,7 @@ hide:
 
 ## **Interactive Command Line Interface**
 
-The `invoke.py` script, located in `scripts/dream.py`, provides an interactive
+The `invoke.py` script, located in `scripts/`, provides an interactive
 interface to image generation similar to the "invoke mothership" bot that Stable
 AI provided on its Discord server.
 

@@ -55,6 +55,9 @@ torch.randint_like = fix_func(torch.randint_like)
 torch.bernoulli = fix_func(torch.bernoulli)
 torch.multinomial = fix_func(torch.multinomial)
 
+# this is fallback model in case no default is defined
+FALLBACK_MODEL_NAME='stable-diffusion-1.4'
+
 """Simplified text to image API for stable diffusion/latent diffusion
 
 Example Usage:
@@ -129,7 +132,7 @@ class Generate:
 
     def __init__(
             self,
-            model                 = 'stable-diffusion-1.4',
+            model                 = None,
             conf                  = 'configs/models.yaml',
             embedding_path        = None,
             sampler_name          = 'k_lms',
@@ -145,7 +148,6 @@ class Generate:
             free_gpu_mem=False,
     ):
         mconfig             = OmegaConf.load(conf)
-        self.model_name     = model
         self.height         = None
         self.width          = None
         self.model_cache    = None
@@ -192,6 +194,7 @@ class Generate:
 
         # model caching system for fast switching
         self.model_cache = ModelCache(mconfig,self.device,self.precision)
+        self.model_name  = model or self.model_cache.default_model() or FALLBACK_MODEL_NAME
 
         # for VRAM usage statistics
         self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None
@@ -552,16 +555,19 @@ class Generate:
             from ldm.invoke.restoration.outcrop import Outcrop
             extend_instructions = {}
             for direction,pixels in _pairwise(opt.outcrop):
-                extend_instructions[direction]=int(pixels)
-
-            restorer = Outcrop(image,self,)
-            return restorer.process (
-                extend_instructions,
-                opt            = opt,
-                orig_opt       = args,
-                image_callback = callback,
-                prefix = prefix,
-            )
+                try:
+                    extend_instructions[direction]=int(pixels)
+                except ValueError:
+                    print(f'** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
+            if len(extend_instructions)>0:
+                restorer = Outcrop(image,self,)
+                return restorer.process (
+                    extend_instructions,
+                    opt            = opt,
+                    orig_opt       = args,
+                    image_callback = callback,
+                    prefix = prefix,
+                )
 
         elif tool == 'embiggen':
             # fetch the metadata from the image
@@ -697,8 +703,7 @@ class Generate:
 
         model_data = self.model_cache.get_model(model_name)
         if model_data is None or len(model_data) == 0:
-            print(f'** Model switch failed **')
-            return self.model
+            return None
 
         self.model = model_data['model']
         self.width = model_data['width']

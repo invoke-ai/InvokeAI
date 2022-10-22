@@ -13,6 +13,7 @@ import gc
 import hashlib
 import psutil
 import transformers
+import os
 from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
@@ -73,7 +74,8 @@ class ModelCache(object):
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
                 print(f'** restoring {self.current_model}')
-                return self.get_model(self.current_model)
+                self.get_model(self.current_model)
+                return None
         
         self.current_model = model_name
         self._push_newest_model(model_name)
@@ -83,6 +85,26 @@ class ModelCache(object):
             'height':height,
             'hash': hash
         }
+
+    def default_model(self) -> str:
+        '''
+        Returns the name of the default model, or None
+        if none is defined.
+        '''
+        for model_name in self.config:
+            if self.config[model_name].get('default',False):
+                return model_name
+        return None
+
+    def set_default_model(self,model_name:str):
+        '''
+        Set the default model. The change will not take
+        effect until you call model_cache.commit()
+        '''
+        assert model_name in self.models,f"unknown model '{model_name}'"
+        for model in self.models:
+            self.models[model].pop('default',None)
+        self.models[model_name]['default'] = True
 
     def list_models(self) -> dict:
         '''
@@ -121,12 +143,23 @@ class ModelCache(object):
             else:
                 print(line)
 
-    def add_model(self, model_name:str, model_attributes:dict, clobber=False) ->str:
+    def del_model(self, model_name:str) ->bool:
+        '''
+        Delete the named model.
+        '''
+        omega = self.config
+        del omega[model_name]
+        if model_name in self.stack:
+            self.stack.remove(model_name)
+        return True
+
+    def add_model(self, model_name:str, model_attributes:dict, clobber=False) ->True:
         '''
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
-        On a successful update, the config will be changed in memory and a YAML
-        string will be returned.
+        On a successful update, the config will be changed in memory and the
+        method will return True. Will fail with an assertion error if provided
+        attributes are incorrect or the model name is missing.
         '''
         omega = self.config
         # check that all the required fields are present
@@ -139,7 +172,9 @@ class ModelCache(object):
             config[field] = model_attributes[field]
 
         omega[model_name] = config
-        return OmegaConf.to_yaml(omega)
+        if clobber:
+            self._invalidate_cached_model(model_name)
+        return True
     
     def _check_memory(self):
         avail_memory = psutil.virtual_memory()[1]
@@ -159,6 +194,7 @@ class ModelCache(object):
         mconfig = self.config[model_name]
         config = mconfig.config
         weights = mconfig.weights
+        vae = mconfig.get('vae',None)
         width = mconfig.width
         height = mconfig.height
 
@@ -188,9 +224,17 @@ class ModelCache(object):
         else:
             print('   | Using more accurate float32 precision')
 
+        # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
+        if vae and os.path.exists(vae):
+            print(f'   | Loading VAE weights from: {vae}')
+            vae_ckpt = torch.load(vae, map_location="cpu")
+            vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
+            model.first_stage_model.load_state_dict(vae_dict, strict=False)
+
         model.to(self.device)
         # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
         model.cond_stage_model.device = self.device
+        
         model.eval()
 
         for m in model.modules():
@@ -219,6 +263,36 @@ class ModelCache(object):
         if self._has_cuda():
             torch.cuda.empty_cache()
 
+    def commit(self,config_file_path:str):
+        '''
+        Write current configuration out to the indicated file.
+        '''
+        yaml_str = OmegaConf.to_yaml(self.config)
+        tmpfile = os.path.join(os.path.dirname(config_file_path),'new_config.tmp')
+        with open(tmpfile, 'w') as outfile:
+            outfile.write(self.preamble())
+            outfile.write(yaml_str)
+        os.rename(tmpfile,config_file_path)
+
+    def preamble(self):
+        '''
+        Returns the preamble for the config file.
+        '''
+        return '''# This file describes the alternative machine learning models
+# available to the dream script.
+#
+# To add a new model, follow the examples below. Each
+# model requires a model config file, a weights file,
+# and the width and height of the images it
+# was trained on.
+'''
+
+    def _invalidate_cached_model(self,model_name:str):
+        self.unload_model(model_name)
+        if model_name in self.stack:
+            self.stack.remove(model_name)
+        self.models.pop(model_name,None)
+        
     def _model_to_cpu(self,model):
         if self.device != 'cpu':
             model.cond_stage_model.device = 'cpu'
