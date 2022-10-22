@@ -12,6 +12,7 @@ import {
   FormControl,
   FormLabel,
   Flex,
+  useToast,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
@@ -57,6 +58,7 @@ const DeleteImageModal = forwardRef(
     const dispatch = useAppDispatch();
     const shouldConfirmOnDelete = useAppSelector(systemSelector);
     const cancelRef = useRef<HTMLButtonElement>(null);
+    const toast = useToast();
 
     const handleClickDelete = (e: SyntheticEvent) => {
       e.stopPropagation();
@@ -65,6 +67,12 @@ const DeleteImageModal = forwardRef(
 
     const handleDelete = () => {
       dispatch(deleteImage(image));
+      toast({
+        title: 'Image Deleted',
+        status: 'success',
+        duration: 2500,
+        isClosable: true,
+      });
       onClose();
     };
 

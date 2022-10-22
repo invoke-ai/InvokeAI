@@ -17,9 +17,15 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from omegaconf import OmegaConf
+from pathlib import Path
+
+# global used in multiple functions (fix)
+infile = None
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
+    global infile
+    
     opt  = Args()
     args = opt.parse_args()
     if not args:
@@ -48,7 +54,6 @@ def main():
         os.makedirs(opt.outdir)
 
     # load the infile as a list of lines
-    infile = None
     if opt.infile:
         try:
             if os.path.isfile(opt.infile):
@@ -96,14 +101,16 @@ def main():
         )
 
     try:
-        main_loop(gen, opt, infile)
+        main_loop(gen, opt)
     except KeyboardInterrupt:
         print("\ngoodbye!")
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
-def main_loop(gen, opt, infile):
+def main_loop(gen, opt):
     """prompt/read/execute loop"""
+    global infile
     done = False
+    doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
     model_config = OmegaConf.load(opt.conf)
@@ -130,7 +137,8 @@ def main_loop(gen, opt, infile):
         try:
             command = get_next_command(infile)
         except EOFError:
-            done = True
+            done = infile is None or doneAfterInFile
+            infile = None
             continue
 
         # skip empty lines
@@ -368,8 +376,10 @@ def main_loop(gen, opt, infile):
 
     print('goodbye!')
 
-    # to do: this is ugly, fix
+# TO DO: remove repetitive code and the awkward command.replace() trope
+# Just do a simple parse of the command!
 def do_command(command:str, gen, opt:Args, completer) -> tuple:
+    global infile
     operation = 'generate'   # default operation, alternative is 'postprocess'
 
     if command.startswith('!dream'):   # in case a stored prompt still contains the !dream command
@@ -424,8 +434,16 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         operation = None
 
     elif command.startswith('!fetch'):
-        file_path = command.replace('!fetch ','',1)
+        file_path = command.replace('!fetch','',1).strip()
         retrieve_dream_command(opt,file_path,completer)
+        completer.add_history(command)
+        operation = None
+
+    elif command.startswith('!replay'):
+        file_path = command.replace('!replay','',1).strip()
+        if infile is None and os.path.isfile(file_path):
+            infile = open(file_path, 'r', encoding='utf-8')
+        completer.add_history(command)
         operation = None
 
     elif command.startswith('!history'):
@@ -433,7 +451,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         operation = None
 
     elif command.startswith('!search'):
-        search_str = command.replace('!search ','',1)
+        search_str = command.replace('!search','',1).strip()
         completer.show_history(search_str)
         operation = None
 
@@ -762,27 +780,63 @@ def make_step_callback(gen, opt, prefix):
             image.save(filename,'PNG')
     return callback
     
-def retrieve_dream_command(opt,file_path,completer):
+def retrieve_dream_command(opt,command,completer):
     '''
     Given a full or partial path to a previously-generated image file,
     will retrieve and format the dream command used to generate the image,
     and pop it into the readline buffer (linux, Mac), or print out a comment
     for cut-and-paste (windows)
+    Given a wildcard path to a folder with image png files, 
+    will retrieve and format the dream command used to generate the images,
+    and save them to a file commands.txt for further processing
     '''
+    if len(command) == 0:
+        return
+    tokens = command.split()
+    if len(tokens) > 1:
+        outfilepath = tokens[1]
+    else:
+        outfilepath = "commands.txt"
+        
+    file_path = tokens[0]    
     dir,basename = os.path.split(file_path)
     if len(dir) == 0:
-        path = os.path.join(opt.outdir,basename)
-    else:
-        path = file_path
+        dir = opt.outdir
+        
+    outdir,outname = os.path.split(outfilepath)    
+    if len(outdir) == 0:
+        outfilepath = os.path.join(dir,outname)
     try:
-        cmd = dream_cmd_from_png(path)
-    except OSError:
-        print(f'** {path}: file could not be read')
+        paths = list(Path(dir).glob(basename))
+    except ValueError:
+        print(f'## "{basename}": unacceptable pattern')
         return
-    except (KeyError, AttributeError):
-        print(f'** {path}: file has no metadata')
-        return
-    completer.set_line(cmd)
+ 
+    commands = []
+    for path in paths:
+        try:
+            cmd = dream_cmd_from_png(path)
+        except OSError:
+            print(f'## {path}: file could not be read')
+            continue
+        except (KeyError, AttributeError, IndexError):
+            print(f'## {path}: file has no metadata')
+            continue
+        except:
+            print(f'## {path}: file could not be processed')
+            continue
+            
+        commands.append(f'# {path}')
+        commands.append(cmd)
+ 
+    with open(outfilepath, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(commands))
+    print(f'>> File {outfilepath} with commands created')
+
+    if len(commands) == 2:
+       completer.set_line(commands[1])
+
+######################################
 
 if __name__ == '__main__':
     main()
