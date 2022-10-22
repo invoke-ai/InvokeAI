@@ -212,7 +212,6 @@ class Generate:
 
         # model caching system for fast switching
         self.model_cache = ModelCache(mconfig,self.device,self.precision)
-        print(f'DEBUG: model={model}, default_model={self.model_cache.default_model()}')
         self.model_name  = model or self.model_cache.default_model() or FALLBACK_MODEL_NAME
 
         # for VRAM usage statistics
