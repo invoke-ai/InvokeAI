@@ -14,12 +14,14 @@ function OutpaintingHighlight(props: CanvasElementProps) {
   useEffect(() => {
     if (setOnDraw && unsetOnDraw) {
       setOnDraw(({ ctx, cameraOffset, zoomLevel, elementWidth, elementHeight }) => {
+        ctx.globalCompositeOperation = "source-over";
+
         ctx.fillStyle = "#FF0000";
         ctx.fillRect((elementWidth - width) / 2 - cameraOffset.x, (elementHeight - height) / 2 - cameraOffset.y, width, 2);
         ctx.fillRect((elementWidth - width) / 2 - cameraOffset.x, (elementHeight - height) / 2 - cameraOffset.y, 2, height);
         ctx.fillRect((elementWidth + width) / 2 - cameraOffset.x, (elementHeight - height) / 2 - cameraOffset.y, 2, height);
         ctx.fillRect((elementWidth - width) / 2 - cameraOffset.x, (elementHeight + height) / 2 - cameraOffset.y, width, 2);
-      });
+      }, -1);
 
       return () => {
         unsetOnDraw();

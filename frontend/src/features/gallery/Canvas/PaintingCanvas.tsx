@@ -12,7 +12,7 @@ interface Point {
 }
 
 export interface CanvasElementProps {
-  setOnDraw?: (onDraw: (ctx: DrawProps) => void) => void;
+  setOnDraw?: (onDraw: (ctx: DrawProps) => void, zIndex: number) => void;
   unsetOnDraw?: () => void;
 }
 
@@ -77,7 +77,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
   // holds the requestAnimationFrame() ID value so we can cancel requests on component unmount
   const animationFrameID = useRef<number>(0);
-  const childrenOnDraw = useRef<Map<React.ReactElement, (ctx: DrawProps) => void>>(new Map());
+  const childrenOnDraw = useRef<Map<React.ReactElement, { zIndex: number, onDraw: (ctx: DrawProps) => void }>>(new Map());
 
   const [cameraOffset, setCameraOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -120,6 +120,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     setOnBrushClear(() => {
       return () => {
         maskCanvasContext.current!.clearRect(0, 0, maskCanvasRef.current!.width, maskCanvasRef.current!.height);
+        draw();
       }
     });
   }, [maskCanvasRef, maskCanvasRef, setOnBrushClear]);
@@ -189,6 +190,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
         y: e.clientY / zoomLevel - dragStart.y,
       });
 
+      draw();
       return;
     }
 
@@ -207,6 +209,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
       }
 
       draw();
+      return;
     }
   };
 
@@ -214,8 +217,11 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     if (isDragging)
       return;
 
-    const zoomFactor = 1.1;
-    const newZoomLevel = e.deltaY < 0 ? zoomLevel * zoomFactor : zoomLevel / zoomFactor;
+    const zoomIncrement = 0.1;
+    const newZoomLevel = e.deltaY < 0 ? zoomLevel + zoomIncrement : zoomLevel - zoomIncrement;
+
+    if (newZoomLevel < 0.1 || newZoomLevel > 10)
+      return;
 
     setZoomLevel(newZoomLevel);
   };
@@ -229,7 +235,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
       !maskCanvasRef.current ||
       !wrapperRef.current
     ) return;
-    
+
     const { width, height } = wrapperRef.current.getBoundingClientRect();
 
     canvasRef.current.width = 4096;
@@ -237,21 +243,29 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
     elementCanvasRef.current.width = width;
     elementCanvasRef.current.height = height;
-   
+
     canvasContext.current.globalCompositeOperation = "source-over";
-    childrenOnDraw.current.forEach((onDraw) => {
+    const childrenDraw = Array
+      .from(childrenOnDraw.current.values())
+      .concat({
+        onDraw: (props) => {
+          props.ctx.globalCompositeOperation = "destination-out";
+          props.ctx.drawImage(maskCanvasRef.current!, 0, 0);
+        }, 
+        zIndex: 0
+      })
+      .sort((a, b) => b.zIndex - a.zIndex)
+      .map((child) => child.onDraw);
+
+    childrenDraw.forEach((onDraw) => {
       onDraw({
         ctx: canvasContext.current!,
-        cameraOffset,
-        zoomLevel,
         elementWidth: width,
         elementHeight: height,
+        cameraOffset, zoomLevel
       });
     });
-    
-    canvasContext.current.globalCompositeOperation = "destination-out";
-    canvasContext.current.drawImage(maskCanvasRef.current, 0, 0);
-    
+
     elementCanvasContext.translate(width / 2, height / 2);
     elementCanvasContext.scale(zoomLevel, zoomLevel);
     elementCanvasContext.translate(-width / 2 + cameraOffset.x, -height / 2 + cameraOffset.y);
@@ -269,7 +283,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
     animationFrameID.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animationFrameID.current);
-  }, [cameraOffset, zoomLevel, shouldShowGallery]);
+  }, [cameraOffset, zoomLevel, shouldShowGallery, wrapperRef.current]);
 
   return (
     <div className="painting-canvas" ref={wrapperRef}>
@@ -283,9 +297,12 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
           return React.cloneElement<CanvasElementProps>(child as React.FunctionComponentElement<CanvasElementProps>, {
-            setOnDraw: (onDraw: (props: DrawProps) => void) => {
-              childrenOnDraw.current.set(child, (drawProps) => {
-                onDraw(drawProps);
+            setOnDraw: (onDraw: (props: DrawProps) => void, zIndex: number) => {
+              childrenOnDraw.current.set(child, {
+                onDraw: (drawProps) => {
+                  onDraw(drawProps);
+                },
+                zIndex,
               });
 
               draw();
