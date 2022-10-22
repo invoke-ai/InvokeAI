@@ -13,6 +13,7 @@ import gc
 import hashlib
 import psutil
 import transformers
+import os
 from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
@@ -193,6 +194,7 @@ class ModelCache(object):
         mconfig = self.config[model_name]
         config = mconfig.config
         weights = mconfig.weights
+        vae = mconfig.get('vae',None)
         width = mconfig.width
         height = mconfig.height
 
@@ -222,9 +224,17 @@ class ModelCache(object):
         else:
             print('   | Using more accurate float32 precision')
 
+        # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
+        if vae and os.path.exists(vae):
+            print(f'   | Loading VAE weights from: {vae}')
+            vae_ckpt = torch.load(vae, map_location="cpu")
+            vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
+            model.first_stage_model.load_state_dict(vae_dict, strict=False)
+
         model.to(self.device)
         # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
         model.cond_stage_model.device = self.device
+        
         model.eval()
 
         for m in model.modules():
