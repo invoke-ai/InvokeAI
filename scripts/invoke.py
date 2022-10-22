@@ -636,7 +636,10 @@ def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
     original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir,original_file)
     new_file       = new_file     if os.path.exists(new_file)      else os.path.join(opt.outdir,new_file)
     meta = retrieve_metadata(original_file)['sd-metadata']
-    img_data = meta['image']
+    if 'image' not in meta:
+        meta = metadata_dumps(opt,seeds=[opt.seed])['image']
+        meta['image'] = {}
+    img_data = meta.get('image')
     pp = img_data.get('postprocessing',[]) or []
     pp.append(
         {

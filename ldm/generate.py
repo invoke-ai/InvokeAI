@@ -573,16 +573,19 @@ class Generate:
             from ldm.invoke.restoration.outcrop import Outcrop
             extend_instructions = {}
             for direction,pixels in _pairwise(opt.outcrop):
-                extend_instructions[direction]=int(pixels)
-
-            restorer = Outcrop(image,self,)
-            return restorer.process (
-                extend_instructions,
-                opt            = opt,
-                orig_opt       = args,
-                image_callback = callback,
-                prefix = prefix,
-            )
+                try:
+                    extend_instructions[direction]=int(pixels)
+                except ValueError:
+                    print(f'** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
+            if len(extend_instructions)>0:
+                restorer = Outcrop(image,self,)
+                return restorer.process (
+                    extend_instructions,
+                    opt            = opt,
+                    orig_opt       = args,
+                    image_callback = callback,
+                    prefix = prefix,
+                )
 
         elif tool == 'embiggen':
             # fetch the metadata from the image
