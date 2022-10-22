@@ -557,6 +557,21 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         else:
             return batch_z
 
+    def get_tokens(self, fragments: list[str], include_start_and_end_markers: bool = True) -> list[list[int]]:
+        tokens = self.tokenizer(
+            fragments,
+            truncation=True,
+            max_length=self.max_length,
+            return_overflowing_tokens=False,
+            padding='do_not_pad',
+            return_tensors=None,  # just give me a list of ints
+        )['input_ids']
+        if include_start_and_end_markers:
+            return tokens
+        else:
+            return [x[1:-1] for x in tokens]
+
+
     @classmethod
     def apply_embedding_weights(self, embeddings: torch.Tensor, per_embedding_weights: list[float], normalize:bool) -> torch.Tensor:
         per_embedding_weights = torch.tensor(per_embedding_weights, dtype=embeddings.dtype, device=embeddings.device)
