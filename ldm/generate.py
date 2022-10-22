@@ -21,7 +21,7 @@ import skimage
 from omegaconf import OmegaConf
 from ldm.invoke.generator.base import downsampling
 from PIL import Image, ImageOps
-from torch import nn
+from torch import nn, Tensor
 from pytorch_lightning import seed_everything, logging
 
 from ldm.util import instantiate_from_config
@@ -409,7 +409,7 @@ class Generate:
                 log_tokens    =self.log_tokenization
             )
 
-            init_image,mask_image = self._make_images(
+            init_image, init_mask = self._make_images(
                 init_img,
                 init_mask,
                 width,
@@ -419,7 +419,7 @@ class Generate:
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            if (init_image is not None) and (mask_image is not None):
+            if (init_image is not None) and (init_mask is not None):
                 generator = self._make_inpaint()
             elif (embiggen != None or embiggen_tiles != None):
                 generator = self._make_embiggen()
@@ -447,9 +447,9 @@ class Generate:
                 step_callback=step_callback,   # called after each intermediate image is generated
                 width=width,
                 height=height,
-                init_img=init_img,        # embiggen needs to manipulate from the unmodified init_img
-                init_image=init_image,      # notice that init_image is different from init_img
-                mask_image=mask_image,
+                init_img=init_img,        # embiggen needs to manipulate from the unmodified init_img path
+                init_image=init_image,    # notice that init_image is different from init_img
+                mask_image=init_mask,
                 strength=strength,
                 threshold=threshold,
                 perlin=perlin,
@@ -646,14 +646,14 @@ class Generate:
         # if image has a transparent area and no mask was provided, then try to generate mask
         if self._has_transparency(image):
             self._transparency_check_and_warning(image, mask)
-            # this returns a torch tensor
+            # this returns an Image!
             init_mask = self._create_init_mask(image, width, height, fit=fit)
             
         if (image.width * image.height) > (self.width * self.height) and self.size_matters:
             print(">> This input is larger than your defaults. If you run out of memory, please use a smaller image.")
             self.size_matters = False
 
-        init_image   = self._create_init_image(image,width,height,fit=fit)                   # this returns a torch tensor
+        init_image   = self._create_init_image(image,width,height,fit=fit)
 
         if mask:
             mask_image = self._load_img(mask)  # this returns an Image
@@ -879,15 +879,8 @@ class Generate:
 
     def _create_init_image(self, image, width, height, fit=True):
         image = image.convert('RGB')
-        if fit:
-            image = self._fit_image(image, (width, height))
-        else:
-            image = self._squeeze_image(image)
-        image = np.array(image).astype(np.float32) / 255.0
-        image = image[None].transpose(0, 3, 1, 2)
-        image = torch.from_numpy(image)
-        image = 2.0 * image - 1.0
-        return image.to(self.device)
+        image = self._fit_image(image, (width, height)) if fit else self._squeeze_image(image)
+        return image
 
     def _create_init_mask(self, image, width, height, fit=True):
         # convert into a black/white mask
@@ -895,17 +888,8 @@ class Generate:
         image = image.convert('RGB')
 
         # now we adjust the size
-        if fit:
-            image = self._fit_image(image, (width, height))
-        else:
-            image = self._squeeze_image(image)
-        image = image.resize((image.width//downsampling, image.height //
-                              downsampling), resample=Image.Resampling.NEAREST)
-        image = np.array(image)
-        image = image.astype(np.float32) / 255.0
-        image = image[None].transpose(0, 3, 1, 2)
-        image = torch.from_numpy(image)
-        return image.to(self.device)
+        image = self._fit_image(image, (width, height)) if fit else self._squeeze_image(image)
+        return image
 
     # The mask is expected to have the region to be inpainted
     # with alpha transparency. It converts it into a black/white
@@ -929,17 +913,8 @@ class Generate:
         mask = segmented.to_mask(float(confidence_level))
         mask = mask.convert('RGB')
         # now we adjust the size
-        if fit:
-            mask = self._fit_image(mask, (width, height))
-        else:
-            mask = self._squeeze_image(mask)
-        mask = mask.resize((mask.width//downsampling, mask.height //
-                              downsampling), resample=Image.Resampling.NEAREST)
-        mask = np.array(mask)
-        mask = mask.astype(np.float32) / 255.0
-        mask = mask[None].transpose(0, 3, 1, 2)
-        mask = torch.from_numpy(mask)
-        return mask.to(self.device)
+        mask = self._fit_image(mask, (width, height)) if fit else self._squeeze_image(mask)
+        return mask
 
     def _has_transparency(self, image):
         if image.info.get("transparency", None) is not None:
