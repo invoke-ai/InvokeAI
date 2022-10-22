@@ -289,6 +289,8 @@ class Generate:
             upscale          = None,
             # this is specific to inpainting and causes more extreme inpainting
             inpaint_replace  = 0.0,
+            # This will help match inpainted areas to the original image more smoothly
+            mask_blur_radius: int = 8,
             # Set this True to handle KeyboardInterrupt internally
             catch_interrupts = False,
             hires_fix        = False,
@@ -409,7 +411,7 @@ class Generate:
                 log_tokens    =self.log_tokenization
             )
 
-            init_image,mask_image = self._make_images(
+            init_image,mask_image,pil_image,pil_mask = self._make_images(
                 init_img,
                 init_mask,
                 width,
@@ -449,6 +451,8 @@ class Generate:
                 height=height,
                 init_img=init_img,        # embiggen needs to manipulate from the unmodified init_img
                 init_image=init_image,      # notice that init_image is different from init_img
+                pil_image=pil_image,
+                pil_mask=pil_mask,
                 mask_image=mask_image,
                 strength=strength,
                 threshold=threshold,
@@ -456,6 +460,7 @@ class Generate:
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
                 inpaint_replace=inpaint_replace,
+                mask_blur_radius=mask_blur_radius
             )
 
             if init_color:
@@ -639,7 +644,7 @@ class Generate:
         init_image      = None
         init_mask       = None
         if not img:
-            return None, None
+            return None, None, None, None
 
         image = self._load_img(img)
 
@@ -665,7 +670,7 @@ class Generate:
         elif text_mask:
             init_mask = self._txt2mask(image, text_mask, width, height, fit=fit)
 
-        return init_image, init_mask
+        return init_image, init_mask, image, mask_image
 
     def _make_base(self):
         if not self.generators.get('base'):
@@ -913,10 +918,14 @@ class Generate:
     # The mask is expected to have the region to be inpainted
     # with alpha transparency. It converts it into a black/white
     # image with the transparent part black.
-    def _image_to_mask(self, mask_image, invert=False) -> Image:
+    def _image_to_mask(self, mask_image: Image.Image, invert=False) -> Image:
         # Obtain the mask from the transparency channel
-        mask = Image.new(mode="L", size=mask_image.size, color=255)
-        mask.putdata(mask_image.getdata(band=3))
+        if mask_image.mode == 'L':
+            mask = mask_image
+        else:
+            # Obtain the mask from the transparency channel
+            mask = Image.new(mode="L", size=mask_image.size, color=255)
+            mask.putdata(mask_image.getdata(band=3))
         if invert:
             mask = ImageOps.invert(mask)
         return mask
