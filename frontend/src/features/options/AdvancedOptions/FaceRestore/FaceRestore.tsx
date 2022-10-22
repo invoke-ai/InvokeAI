@@ -6,21 +6,21 @@ import {
   useAppSelector,
 } from '../../../../app/store';
 import IAISwitch from '../../../../common/components/IAISwitch';
-import { setShouldRunGFPGAN } from '../../optionsSlice';
+import { setShouldRunFacetool } from '../../optionsSlice';
 
 export default function FaceRestore() {
   const isGFPGANAvailable = useAppSelector(
     (state: RootState) => state.system.isGFPGANAvailable
   );
 
-  const shouldRunGFPGAN = useAppSelector(
-    (state: RootState) => state.options.shouldRunGFPGAN
+  const shouldRunFacetool = useAppSelector(
+    (state: RootState) => state.options.shouldRunFacetool
   );
 
   const dispatch = useAppDispatch();
 
-  const handleChangeShouldRunGFPGAN = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldRunGFPGAN(e.target.checked));
+  const handleChangeShouldRunFacetool = (e: ChangeEvent<HTMLInputElement>) =>
+    dispatch(setShouldRunFacetool(e.target.checked));
 
   return (
     <Flex
@@ -32,8 +32,8 @@ export default function FaceRestore() {
       <p>Restore Face</p>
       <IAISwitch
         isDisabled={!isGFPGANAvailable}
-        isChecked={shouldRunGFPGAN}
-        onChange={handleChangeShouldRunGFPGAN}
+        isChecked={shouldRunFacetool}
+        onChange={handleChangeShouldRunFacetool}
       />
     </Flex>
   );

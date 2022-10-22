@@ -26,6 +26,12 @@ for each `invoke>` prompt as shown here:
 invoke> "pond garden with lotus by claude monet" --seamless -s100 -n4
 ```
 
+By default this will tile on both the X and Y axes. However, you can also specify specific axes to tile on with `--seamless_axes`.
+Possible values are `x`, `y`, and `x,y`:
+```python
+invoke> "pond garden with lotus by claude monet" --seamless --seamless_axes=x -s100 -n4
+```
+
 ---
 
 ## **Shortcuts: Reusing Seeds**

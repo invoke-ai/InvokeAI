@@ -366,17 +366,16 @@ class Args(object):
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
         model_group.add_argument(
-            '--conf',
+            '--config',
             '-c',
-            '-conf',
+            '-config',
             dest='conf',
             default='./configs/models.yaml',
             help='Path to configuration file for alternate models.',
         )
         model_group.add_argument(
             '--model',
-            default='stable-diffusion-1.4',
-            help='Indicates which diffusion model to load. (currently "stable-diffusion-1.4" (default) or "laion400m")',
+            help='Indicates which diffusion model to load (defaults to "default" stanza in configs/models.yaml)',
         )
         model_group.add_argument(
             '--png_compression','-z',
@@ -529,7 +528,7 @@ class Args(object):
             formatter_class=ArgFormatter,
             description=
             """
-            *Image generation:*
+            *Image generation*
                  invoke> a fantastic alien landscape -W576 -H512 -s60 -n4
 
             *postprocessing*
@@ -544,6 +543,13 @@ class Args(object):
             !history lists all the commands issued during the current session.
 
             !NN retrieves the NNth command from the history
+
+            *Model manipulation*
+            !models                                 -- list models in configs/models.yaml
+            !switch <model_name>                    -- switch to model named <model_name>
+            !import_model path/to/weights/file.ckpt -- adds a model to your config
+            !edit_model <model_name>                -- edit a model's description
+            !del_model <model_name>                 -- delete a model
             """
         )
         render_group     = parser.add_argument_group('General rendering')
@@ -678,6 +684,14 @@ class Args(object):
             help='Path to input mask for inpainting mode (supersedes width and height)',
         )
         img2img_group.add_argument(
+            '-tm',
+            '--text_mask',
+            nargs='+',
+            type=str,
+            help='Use the clipseg classifier to generate the mask area for inpainting. Provide a description of the area to mask ("a mug"), optionally followed by the confidence level threshold (0-1.0; defaults to 0.5).',
+            default=None,
+        )
+        img2img_group.add_argument(
             '--init_color',
             type=str,
             help='Path to reference image for color correction (used for repeated img2img and inpainting)'
@@ -775,6 +789,12 @@ class Args(object):
             '--seamless',
             action='store_true',
             help='Change the model to seamless tiling (circular) mode',
+        )
+        special_effects_group.add_argument(
+            '--seamless_axes',
+            default=['x', 'y'],
+            type=list[str],
+            help='Specify which axes to use circular convolution on.',
         )
         variation_group.add_argument(
             '-v',

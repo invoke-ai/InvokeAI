@@ -29,11 +29,15 @@ const makeSocketIOEmitters = (
 
       const options = getState().options;
 
+      if (tabMap[options.activeTab] !== 'img2img') {
+        options.shouldUseInitImage = false;
+      }
+
       const {
         currentImage: { url: currentImageUrl },
       } = getState().gallery;
 
-      const { generationParameters, esrganParameters, gfpganParameters } =
+      const { generationParameters, esrganParameters, facetoolParameters } =
         frontendToBackendParameters(
           options,
           getState().system,
@@ -46,7 +50,7 @@ const makeSocketIOEmitters = (
         'generateImage',
         generationParameters,
         esrganParameters,
-        gfpganParameters
+        facetoolParameters
       );
 
       // we need to truncate the init_mask base64 else it takes up the whole log
@@ -63,7 +67,7 @@ const makeSocketIOEmitters = (
           message: `Image generation requested: ${JSON.stringify({
             ...generationParameters,
             ...esrganParameters,
-            ...gfpganParameters,
+            ...facetoolParameters,
           })}`,
         })
       );
@@ -108,24 +112,32 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitRunGFPGAN: (imageToProcess: InvokeAI.Image) => {
+    emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const { gfpganStrength } = getState().options;
+      const { facetoolType, facetoolStrength, codeformerFidelity } =
+        getState().options;
 
-      const gfpganParameters = {
-        facetool_strength: gfpganStrength,
+      const facetoolParameters: Record<string, any> = {
+        facetool_strength: facetoolStrength,
       };
+
+      if (facetoolType === 'codeformer') {
+        facetoolParameters.codeformer_fidelity = codeformerFidelity;
+      }
+
       socketio.emit('runPostprocessing', imageToProcess, {
-        type: 'gfpgan',
-        ...gfpganParameters,
+        type: facetoolType,
+        ...facetoolParameters,
       });
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
-          message: `GFPGAN fix faces requested: ${JSON.stringify({
-            file: imageToProcess.url,
-            ...gfpganParameters,
-          })}`,
+          message: `Face restoration (${facetoolType}) requested: ${JSON.stringify(
+            {
+              file: imageToProcess.url,
+              ...facetoolParameters,
+            }
+          )}`,
         })
       );
     },

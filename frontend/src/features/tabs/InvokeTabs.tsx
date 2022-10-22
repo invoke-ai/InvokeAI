@@ -50,7 +50,12 @@ export const tab_dict = {
   },
 };
 
+// Array where index maps to the key of tab_dict
 export const tabMap = _.map(tab_dict, (tab, key) => key);
+
+// Use tabMap to generate a union type of tab names
+const tabMapTypes = [...tabMap] as const;
+export type InvokeTabName = typeof tabMapTypes[number];
 
 export default function InvokeTabs() {
   const activeTab = useAppSelector(

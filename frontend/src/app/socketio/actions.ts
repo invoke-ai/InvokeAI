@@ -14,7 +14,7 @@ export const generateImage = createAction<GenerateImageProps | undefined>(
 );
 export const outpaintImage = createAction<GenerateImageProps>('socketio/outpaintImage');
 export const runESRGAN = createAction<InvokeAI.Image>('socketio/runESRGAN');
-export const runGFPGAN = createAction<InvokeAI.Image>('socketio/runGFPGAN');
+export const runFacetool = createAction<InvokeAI.Image>('socketio/runFacetool');
 export const deleteImage = createAction<InvokeAI.Image>('socketio/deleteImage');
 export const requestImages = createAction<undefined>('socketio/requestImages');
 export const requestNewImages = createAction<undefined>(
