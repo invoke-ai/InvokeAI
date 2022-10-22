@@ -911,9 +911,12 @@ class Generate:
     # with alpha transparency. It converts it into a black/white
     # image with the transparent part black.
     def _image_to_mask(self, mask_image, invert=False) -> Image:
-        # Obtain the mask from the transparency channel
-        mask = Image.new(mode="L", size=mask_image.size, color=255)
-        mask.putdata(mask_image.getdata(band=3))
+        if mask_image.mode in ('L','RGB'):
+            mask = mask_image
+        else:
+            # Obtain the mask from the transparency channel
+            mask = Image.new(mode="L", size=mask_image.size, color=255)
+            mask.putdata(mask_image.getdata(band=3))
         if invert:
             mask = ImageOps.invert(mask)
         return mask
