@@ -58,24 +58,6 @@ torch.multinomial = fix_func(torch.multinomial)
 # this is fallback model in case no default is defined
 FALLBACK_MODEL_NAME='stable-diffusion-1.4'
 
-def fix_func(orig):
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        def new_func(*args, **kw):
-            device = kw.get("device", "mps")
-            kw["device"]="cpu"
-            return orig(*args, **kw).to(device)
-        return new_func
-    return orig
-
-torch.rand = fix_func(torch.rand)
-torch.rand_like = fix_func(torch.rand_like)
-torch.randn = fix_func(torch.randn)
-torch.randn_like = fix_func(torch.randn_like)
-torch.randint = fix_func(torch.randint)
-torch.randint_like = fix_func(torch.randint_like)
-torch.bernoulli = fix_func(torch.bernoulli)
-torch.multinomial = fix_func(torch.multinomial)
-
 """Simplified text to image API for stable diffusion/latent diffusion
 
 Example Usage:
@@ -411,7 +393,7 @@ class Generate:
                 log_tokens    =self.log_tokenization
             )
 
-            init_image,mask_image,pil_image,pil_mask = self._make_images(
+            init_image, mask_image = self._make_images(
                 init_img,
                 init_mask,
                 width,
@@ -451,8 +433,6 @@ class Generate:
                 height=height,
                 init_img=init_img,        # embiggen needs to manipulate from the unmodified init_img
                 init_image=init_image,      # notice that init_image is different from init_img
-                pil_image=pil_image,
-                pil_mask=pil_mask,
                 mask_image=mask_image,
                 strength=strength,
                 threshold=threshold,
@@ -644,7 +624,7 @@ class Generate:
         init_image      = None
         init_mask       = None
         if not img:
-            return None, None, None, None
+            return None, None
 
         image = self._load_img(img)
 
@@ -654,23 +634,22 @@ class Generate:
         # if image has a transparent area and no mask was provided, then try to generate mask
         if self._has_transparency(image):
             self._transparency_check_and_warning(image, mask)
-            # this returns a torch tensor
             init_mask = self._create_init_mask(image, width, height, fit=fit)
             
         if (image.width * image.height) > (self.width * self.height) and self.size_matters:
             print(">> This input is larger than your defaults. If you run out of memory, please use a smaller image.")
             self.size_matters = False
 
-        init_image   = self._create_init_image(image,width,height,fit=fit)                   # this returns a torch tensor
+        init_image   = self._create_init_image(image,width,height,fit=fit)
 
         if mask:
-            mask_image = self._load_img(mask)  # this returns an Image
+            mask_image = self._load_img(mask)
             init_mask = self._create_init_mask(mask_image,width,height,fit=fit)
 
         elif text_mask:
             init_mask = self._txt2mask(image, text_mask, width, height, fit=fit)
 
-        return init_image, init_mask, image, mask_image
+        return init_image,init_mask
 
     def _make_base(self):
         if not self.generators.get('base'):
@@ -887,33 +866,15 @@ class Generate:
 
     def _create_init_image(self, image, width, height, fit=True):
         image = image.convert('RGB')
-        if fit:
-            image = self._fit_image(image, (width, height))
-        else:
-            image = self._squeeze_image(image)
-        image = np.array(image).astype(np.float32) / 255.0
-        image = image[None].transpose(0, 3, 1, 2)
-        image = torch.from_numpy(image)
-        image = 2.0 * image - 1.0
-        return image.to(self.device)
+        image = self._fit_image(image, (width, height)) if fit else self._squeeze_image(image)
+        return image
 
     def _create_init_mask(self, image, width, height, fit=True):
         # convert into a black/white mask
         image = self._image_to_mask(image)
         image = image.convert('RGB')
-
-        # now we adjust the size
-        if fit:
-            image = self._fit_image(image, (width, height))
-        else:
-            image = self._squeeze_image(image)
-        image = image.resize((image.width//downsampling, image.height //
-                              downsampling), resample=Image.Resampling.NEAREST)
-        image = np.array(image)
-        image = image.astype(np.float32) / 255.0
-        image = image[None].transpose(0, 3, 1, 2)
-        image = torch.from_numpy(image)
-        return image.to(self.device)
+        image = self._fit_image(image, (width, height)) if fit else self._squeeze_image(image)
+        return image
 
     # The mask is expected to have the region to be inpainted
     # with alpha transparency. It converts it into a black/white
@@ -930,7 +891,6 @@ class Generate:
             mask = ImageOps.invert(mask)
         return mask
 
-    # TODO: The latter part of this method repeats code from _create_init_mask()
     def _txt2mask(self, image:Image, text_mask:list, width, height, fit=True) -> Image:
         prompt = text_mask[0]
         confidence_level = text_mask[1] if len(text_mask)>1 else 0.5
@@ -940,18 +900,8 @@ class Generate:
         segmented = self.txt2mask.segment(image, prompt)
         mask = segmented.to_mask(float(confidence_level))
         mask = mask.convert('RGB')
-        # now we adjust the size
-        if fit:
-            mask = self._fit_image(mask, (width, height))
-        else:
-            mask = self._squeeze_image(mask)
-        mask = mask.resize((mask.width//downsampling, mask.height //
-                              downsampling), resample=Image.Resampling.NEAREST)
-        mask = np.array(mask)
-        mask = mask.astype(np.float32) / 255.0
-        mask = mask[None].transpose(0, 3, 1, 2)
-        mask = torch.from_numpy(mask)
-        return mask.to(self.device)
+        mask = self._fit_image(mask, (width, height)) if fit else self._squeeze_image(mask)
+        return mask
 
     def _has_transparency(self, image):
         if image.info.get("transparency", None) is not None:
