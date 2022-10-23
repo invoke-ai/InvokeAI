@@ -278,6 +278,7 @@ class Sampler(object):
                 unconditional_conditioning=unconditional_conditioning,
                 old_eps=old_eps,
                 t_next=ts_next,
+                step_count=steps
             )
             img, pred_x0, e_t = outs
 

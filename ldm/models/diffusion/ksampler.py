@@ -37,14 +37,14 @@ class CFGDenoiser(nn.Module):
         extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
 
         if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info)
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = t_enc)
         else:
             self.invokeai_diffuser.remove_cross_attention_control()
 
 
-    def forward(self, x, sigma, uncond, cond, cond_scale):
+    def forward(self, x, sigma, uncond, cond, cond_scale, step_index):
 
-        next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale)
+        next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale, step_index)
 
         # apply threshold
         if self.warmup < self.warmup_max:

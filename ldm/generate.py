@@ -400,7 +400,7 @@ class Generate:
         mask_image = None
 
         try:
-            uc, c, ec, ec_index_map = get_uc_and_c_and_ec(
+            uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
                 prompt, model =self.model,
                 skip_normalize=skip_normalize,
                 log_tokens    =self.log_tokenization
@@ -438,7 +438,7 @@ class Generate:
                 sampler=self.sampler,
                 steps=steps,
                 cfg_scale=cfg_scale,
-                conditioning=(uc, c, ec, ec_index_map),
+                conditioning=(uc, c, extra_conditioning_info),
                 ddim_eta=ddim_eta,
                 image_callback=image_callback,  # called after the final image is generated
                 step_callback=step_callback,   # called after each intermediate image is generated
@@ -541,8 +541,8 @@ class Generate:
         image = Image.open(image_path)
 
         # used by multiple postfixers
-        # todo: cross-attention
-        uc, c, _, _ = get_uc_and_c_and_ec(
+        # todo: cross-attention control
+        uc, c, _ = get_uc_and_c_and_ec(
             prompt, model =self.model,
             skip_normalize=opt.skip_normalize,
             log_tokens    =opt.log_tokenization

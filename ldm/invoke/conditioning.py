@@ -17,6 +17,7 @@ import torch
 
 from .prompt_parser import PromptParser, Blend, FlattenedPrompt, \
     CrossAttentionControlledFragment, CrossAttentionControlSubstitute, CrossAttentionControlAppend, Fragment
+from ..models.diffusion.cross_attention_control import CrossAttentionControl
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
 
@@ -46,8 +47,7 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
     print("parsed prompt to", parsed_prompt)
 
     conditioning = None
-    edited_conditioning = None
-    edit_opcodes = None
+    cac_args:CrossAttentionControl.Arguments = None
 
     if type(parsed_prompt) is Blend:
         blend: Blend = parsed_prompt
@@ -98,21 +98,31 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
                     original_token_count += count
                     edited_token_count += count
             original_embeddings, original_tokens = build_embeddings_and_tokens_for_flattened_prompt(model, original_prompt)
+            # naïvely building a single edited_embeddings like this disregards the effects of changing the absolute location of
+            # subsequent tokens when there is >1 edit and earlier edits change the total token count.
+            # eg "a cat.swap(smiling dog, s_start=0.5) eating a hotdog.swap(pizza)" - when the 'pizza' edit is active but the
+            # 'cat' edit is not, the 'pizza' feature vector will nevertheless be affected by the introduction of the extra
+            # token 'smiling' in the inactive 'cat' edit.
+            # todo: build multiple edited_embeddings, one for each edit, and pass just the edited fragments through to the CrossAttentionControl functions
             edited_embeddings, edited_tokens = build_embeddings_and_tokens_for_flattened_prompt(model, edited_prompt)
 
             conditioning = original_embeddings
             edited_conditioning = edited_embeddings
             print('got edit_opcodes', edit_opcodes, 'options', edit_options)
+            cac_args = CrossAttentionControl.Arguments(
+                edited_conditioning = edited_conditioning,
+                edit_opcodes = edit_opcodes,
+                edit_options = edit_options
+            )
         else:
             conditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt)
 
 
     unconditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, parsed_negative_prompt)
     return (
-        unconditioning, conditioning, edited_conditioning, edit_opcodes
-        #InvokeAIDiffuserComponent.ExtraConditioningInfo(edited_conditioning=edited_conditioning,
-        #                                                edit_opcodes=edit_opcodes,
-        #                                                edit_options=edit_options)
+        unconditioning, conditioning, InvokeAIDiffuserComponent.ExtraConditioningInfo(
+            cross_attention_control_args=cac_args
+        )
     )
 
 

@@ -46,7 +46,7 @@ class Inpaint(Img2Img):
 
         t_enc   = int(strength * steps)
         # todo: support cross-attention control
-        uc, c, _, _ = conditioning
+        uc, c, _ = conditioning
 
         print(f">> target t_enc is {t_enc} steps")
 

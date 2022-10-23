@@ -23,8 +23,7 @@ class Txt2Img2Img(Generator):
         Return value depends on the seed at the time you call it
         kwargs are 'width' and 'height'
         """
-        uc, c, ec, edit_opcodes = conditioning
-        extra_conditioning_info = InvokeAIDiffuserComponent.ExtraConditioningInfo(edited_conditioning=ec, edit_opcodes=edit_opcodes)
+        uc, c, extra_conditioing_info = conditioning
 
         @torch.no_grad()
         def make_image(x_T):           

@@ -21,8 +21,7 @@ class Txt2Img(Generator):
         kwargs are 'width' and 'height'
         """
         self.perlin = perlin
-        uc, c, ec, edit_opcodes   = conditioning
-        extra_conditioning_info = InvokeAIDiffuserComponent.ExtraConditioningInfo(edited_conditioning=ec, edit_opcodes=edit_opcodes)
+        uc, c, extra_conditioning_info   = conditioning
 
         @torch.no_grad()
         def make_image(x_T):

@@ -23,7 +23,7 @@ class PLMSSampler(Sampler):
         extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
 
         if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info)
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = t_enc)
         else:
             self.invokeai_diffuser.remove_cross_attention_control()
 
@@ -47,6 +47,7 @@ class PLMSSampler(Sampler):
             unconditional_conditioning=None,
             old_eps=[],
             t_next=None,
+            step_count:int=1000, # total number of steps
             **kwargs,
     ):
         b, *_, device = *x.shape, x.device
@@ -59,7 +60,13 @@ class PLMSSampler(Sampler):
                 # damian0815 would like to know when/if this code path is used
                 e_t = self.model.apply_model(x, t, c)
             else:
-                e_t = self.invokeai_diffuser.do_diffusion_step(x, t, unconditional_conditioning, c, unconditional_guidance_scale)
+                # step_index is expected to count up while index counts down
+                step_index = step_count-(index+1)
+                # note that step_index == 0 is evaluated twice with different x
+                e_t = self.invokeai_diffuser.do_diffusion_step(x, t,
+                                                               unconditional_conditioning, c,
+                                                               unconditional_guidance_scale,
+                                                               step_index=step_index)
 
             if score_corrector is not None:
                 assert self.model.parameterization == 'eps'

@@ -18,7 +18,7 @@ class DDIMSampler(Sampler):
         extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
 
         if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info)
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = t_enc)
         else:
             self.invokeai_diffuser.remove_cross_attention_control()
 
@@ -40,6 +40,7 @@ class DDIMSampler(Sampler):
             corrector_kwargs=None,
             unconditional_guidance_scale=1.0,
             unconditional_conditioning=None,
+            step_count:int=1000, # total number of steps
             **kwargs,
     ):
         b, *_, device = *x.shape, x.device
@@ -51,7 +52,11 @@ class DDIMSampler(Sampler):
             # damian0815 would like to know when/if this code path is used
             e_t = self.model.apply_model(x, t, c)
         else:
-            e_t = self.invokeai_diffuser.do_diffusion_step(x, t, unconditional_conditioning, c, unconditional_guidance_scale)
+            step_index = step_count-(index+1)
+            e_t = self.invokeai_diffuser.do_diffusion_step(x, t,
+                                                           unconditional_conditioning, c,
+                                                           unconditional_guidance_scale,
+                                                           step_index=step_index)
 
         if score_corrector is not None:
             assert self.model.parameterization == 'eps'
