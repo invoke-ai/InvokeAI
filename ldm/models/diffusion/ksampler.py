@@ -8,6 +8,10 @@ from .sampler import Sampler
 from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 
+# at this threshold, the scheduler will stop using the Karras
+# noise schedule and start using the model's schedule
+STEP_THRESHOLD = 30
+
 def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
     if threshold <= 0.0:
         return result
@@ -92,8 +96,13 @@ class KSampler(Sampler):
             rho=7.,
             device=self.device,
         )
-        self.sigmas = self.model_sigmas
-        #self.sigmas = self.karras_sigmas
+
+        if ddim_num_steps >= STEP_THRESHOLD:
+            print(f'>> number of steps ({ddim_num_steps}) >= {STEP_THRESHOLD}: using model sigmas')
+            self.sigmas = self.model_sigmas
+        else:
+            print(f'>> number of steps ({ddim_num_steps}) < {STEP_THRESHOLD}: using karras sigmas')
+            self.sigmas = self.karras_sigmas
         
     # ALERT: We are completely overriding the sample() method in the base class, which
     # means that inpainting will not work. To get this to work we need to be able to
