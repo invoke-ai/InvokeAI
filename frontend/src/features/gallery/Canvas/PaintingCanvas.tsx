@@ -5,6 +5,7 @@ import { RootState, useAppDispatch, useAppSelector } from "../../../app/store";
 import { OptionsState } from "../../options/optionsSlice";
 import { tabMap } from "../../tabs/InvokeTabs";
 import { setPaintingCameraX, setPaintingCameraY, setPaintingElementHeight, setPaintingElementWidth } from "../gallerySlice";
+import { isHotkeyPressed } from "react-hotkeys-hook";
 
 interface Point {
   x: number;
@@ -80,9 +81,9 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   const childrenOnDraw = useRef<Map<React.ReactElement, { zIndex: number, onDraw: (ctx: DrawProps) => void }>>(new Map());
 
   const [cameraOffset, setCameraOffset] = useState<Point>({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   const applyTransform = (x: number, y: number) => {
@@ -133,10 +134,9 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   }, [maskCanvasRef, wrapperRef.current, shouldShowGallery, canvasRef.current]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    if (e.button === 1) {
-      setIsDragging(true);
+    if (isHotkeyPressed(" ")) {
       setDragStart({ x: e.clientX / zoomLevel - cameraOffset.x, y: e.clientY / zoomLevel - cameraOffset.y });
-
+      setIsDragging(true);
       return;
     }
     if (e.button === 0) {
@@ -173,18 +173,16 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    if (e.button === 1) {
-      setIsDragging(false);
-    }
     if (e.button === 0) {
       setIsDrawing(false);
+      setIsDragging(false);
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
     if (!wrapperRef.current) return;
 
-    if (isDragging) {
+    if (isHotkeyPressed(" ") && isDragging) {
       setCameraOffset({
         x: e.clientX / zoomLevel - dragStart.x,
         y: e.clientY / zoomLevel - dragStart.y,
@@ -214,7 +212,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    if (isDragging)
+    if (isHotkeyPressed(" "))
       return;
 
     if (!wrapperRef.current)
