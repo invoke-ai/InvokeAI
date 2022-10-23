@@ -4,9 +4,12 @@ ldm.invoke.generator.img2img descends from ldm.invoke.generator
 
 import torch
 import numpy as  np
-from ldm.invoke.devices             import choose_autocast
-from ldm.invoke.generator.base      import Generator
-from ldm.models.diffusion.ddim     import DDIMSampler
+import PIL
+from torch import Tensor
+from PIL import Image
+from ldm.invoke.devices import choose_autocast
+from ldm.invoke.generator.base import Generator
+from ldm.models.diffusion.ddim import DDIMSampler
 
 class Img2Img(Generator):
     def __init__(self, model, precision):
@@ -24,6 +27,9 @@ class Img2Img(Generator):
         sampler.make_schedule(
             ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
         )
+
+        if isinstance(init_image, PIL.Image.Image):
+            init_image = self._image_to_tensor(init_image)
 
         scope = choose_autocast(self.precision)
         with scope(self.model.device.type):
@@ -68,3 +74,11 @@ class Img2Img(Generator):
             shape = init_latent.shape
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(shape[3], shape[2])
         return x
+
+    def _image_to_tensor(self, image:Image, normalize:bool=True)->Tensor:
+        image = np.array(image).astype(np.float32) / 255.0
+        image = image[None].transpose(0, 3, 1, 2)
+        image = torch.from_numpy(image)
+        if normalize:
+            image = 2.0 * image - 1.0
+        return image.to(self.model.device)    
