@@ -359,6 +359,7 @@ class Sampler(object):
                 unconditional_guidance_scale=unconditional_guidance_scale,
                 unconditional_conditioning=unconditional_conditioning,
                 t_next = ts_next,
+                step_count=total_steps
             )
             
             x_dec, pred_x0, e_t = outs
