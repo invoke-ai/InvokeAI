@@ -493,6 +493,16 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
         new_config['config'] = input('Configuration file for this model: ')
         done = os.path.exists(new_config['config'])
 
+    done = False
+    completer.complete_extensions(('.vae.pt','.vae','.ckpt'))
+    while not done:
+        vae = input('VAE autoencoder file for this model [None]: ')
+        if os.path.exists(vae):
+            new_config['vae'] = vae
+            done = True
+        else:
+            done = len(vae)==0
+
     completer.complete_extensions(None)
 
     for field in ('width','height'):
@@ -537,8 +547,8 @@ def edit_config(model_name:str, gen, opt, completer):
 
     conf = config[model_name]
     new_config = {}
-    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae'))
-    for field in ('description', 'weights', 'config', 'width','height'):
+    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
+    for field in ('description', 'weights', 'vae', 'config', 'width','height'):
         completer.linebuffer = str(conf[field]) if field in conf else ''
         new_value = input(f'{field}: ')
         new_config[field] = int(new_value) if field in ('width','height') else new_value
@@ -636,7 +646,10 @@ def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
     original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir,original_file)
     new_file       = new_file     if os.path.exists(new_file)      else os.path.join(opt.outdir,new_file)
     meta = retrieve_metadata(original_file)['sd-metadata']
-    img_data = meta['image']
+    if 'image' not in meta:
+        meta = metadata_dumps(opt,seeds=[opt.seed])['image']
+        meta['image'] = {}
+    img_data = meta.get('image')
     pp = img_data.get('postprocessing',[]) or []
     pp.append(
         {
