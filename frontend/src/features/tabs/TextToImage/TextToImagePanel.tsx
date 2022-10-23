@@ -59,7 +59,7 @@ export default function TextToImagePanel() {
           Other
         </Box>
       ),
-      feature: Feature.OTHER,
+      // feature: Feature.OTHER,
       options: <OutputOptions />,
     },
   };

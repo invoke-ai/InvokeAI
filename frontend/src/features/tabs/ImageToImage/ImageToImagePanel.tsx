@@ -54,7 +54,7 @@ export default function ImageToImagePanel() {
           Other
         </Box>
       ),
-      feature: Feature.OTHER,
+      // feature: Feature.OTHER,
       options: <OutputOptions />,
     },
   };

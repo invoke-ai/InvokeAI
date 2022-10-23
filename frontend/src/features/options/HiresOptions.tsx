@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../app/store';
 import { setHiresFix } from './optionsSlice';
 import { ChangeEvent } from 'react';
 import IAISwitch from '../../common/components/IAISwitch';
+import { Feature } from '../../app/features';
 
 /**
  * Image output options. Includes width, height, seamless tiling.
@@ -21,6 +22,7 @@ const HiresOptions = () => {
     <Flex gap={2} direction={'column'}>
       <IAISwitch
         label="High Res Optimization"
+        feature={Feature.HIGH_RESOLUTION_OPTIMIZATION}
         fontSize={'md'}
         isChecked={hiresFix}
         onChange={handleChangeHiresFix}

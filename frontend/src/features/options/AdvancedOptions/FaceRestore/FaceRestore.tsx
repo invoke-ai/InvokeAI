@@ -27,7 +27,6 @@ export default function FaceRestore() {
       justifyContent={'space-between'}
       alignItems={'center'}
       width={'100%'}
-      mr={2}
     >
       <p>Restore Face</p>
       <IAISwitch

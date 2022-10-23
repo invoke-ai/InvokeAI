@@ -26,7 +26,6 @@ export default function ImageToImageAccordion() {
       justifyContent={'space-between'}
       alignItems={'center'}
       width={'100%'}
-      mr={2}
     >
       <p>Image to Image</p>
       <IAISwitch

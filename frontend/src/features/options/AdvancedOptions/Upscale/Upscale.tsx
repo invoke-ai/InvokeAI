@@ -25,7 +25,6 @@ export default function Upscale() {
       justifyContent={'space-between'}
       alignItems={'center'}
       width={'100%'}
-      mr={2}
     >
       <p>Upscale</p>
       <IAISwitch

@@ -8,7 +8,6 @@ export default function Variations() {
       justifyContent={'space-between'}
       alignItems={'center'}
       width={'100%'}
-      mr={2}
     >
       <p>Variations</p>
       <GenerateVariations />

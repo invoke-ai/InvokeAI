@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../app/store';
 import { setSeamless } from './optionsSlice';
 import { ChangeEvent } from 'react';
 import IAISwitch from '../../common/components/IAISwitch';
+import { Feature } from '../../app/features';
 
 const SeamlessOptions = () => {
   const dispatch = useAppDispatch();
@@ -17,6 +18,7 @@ const SeamlessOptions = () => {
     <Flex gap={2} direction={'column'}>
       <IAISwitch
         label="Seamless tiling"
+        feature={Feature.SEAMLESS_TILING}
         fontSize={'md'}
         isChecked={seamless}
         onChange={handleChangeSeamless}

@@ -22,7 +22,9 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
       <h2>
         <AccordionButton className="advanced-settings-header">
           {header}
-          <GuideIcon feature={feature} />
+          {feature && (
+            <GuideIcon feature={feature} />
+          )}
           <AccordionIcon />
         </AccordionButton>
       </h2>

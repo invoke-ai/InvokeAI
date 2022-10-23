@@ -8,6 +8,8 @@ export enum Feature {
   PROMPT,
   GALLERY,
   OTHER,
+  SEAMLESS_TILING,
+  HIGH_RESOLUTION_OPTIMIZATION,
   SEED,
   VARIATIONS,
   UPSCALE,
@@ -30,7 +32,17 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     guideImage: 'asset/path.gif',
   },
   [Feature.OTHER]: {
-    text: 'These options will enable alternative processing modes for Invoke. Seamless tiling will work to generate repeating patterns in the output. High Resolution Optimization performs a two-step generation cycle, and should be used at higher resolutions when you desire a more coherent image/composition. ',
+    text: 'These options will enable alternative processing modes for Invoke.',
+    href: 'link/to/docs/feature3.html',
+    guideImage: 'asset/path.gif',
+  },
+  [Feature.SEAMLESS_TILING]: {
+    text: 'Seamless tiling will work to generate repeating patterns in the output.',
+    href: 'link/to/docs/feature3.html',
+    guideImage: 'asset/path.gif',
+  },
+  [Feature.HIGH_RESOLUTION_OPTIMIZATION]: {
+    text: 'High Resolution Optimization performs a two-step generation cycle, and should be used at higher resolutions when you desire a more coherent image/composition.',
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },

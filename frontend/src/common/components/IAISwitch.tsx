@@ -5,10 +5,13 @@ import {
   Switch,
   SwitchProps,
 } from '@chakra-ui/react';
+import { Feature } from '../../app/features';
+import GuideIcon from '../../common/components/GuideIcon';
 
 interface Props extends SwitchProps {
   label?: string;
   width?: string | number;
+  feature?: Feature
 }
 
 /**
@@ -21,6 +24,7 @@ const IAISwitch = (props: Props) => {
     fontSize = 'md',
     size = 'md',
     width = 'auto',
+    feature,
     ...rest
   } = props;
   return (
@@ -37,6 +41,9 @@ const IAISwitch = (props: Props) => {
           </FormLabel>
         )}
         <Switch size={size} className="switch-button" {...rest} />
+        {feature && (
+          <GuideIcon feature={feature} />
+        )}
       </Flex>
     </FormControl>
   );

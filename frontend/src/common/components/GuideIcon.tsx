@@ -12,7 +12,7 @@ type GuideIconProps = {
 const GuideIcon = forwardRef(
   ({ feature, icon = MdHelp }: GuideIconProps, ref) => (
     <GuidePopover feature={feature}>
-      <Box ref={ref}>
+      <Box ref={ref} ml={2}>
         <Icon as={icon} />
       </Box>
     </GuidePopover>
