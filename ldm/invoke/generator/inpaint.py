@@ -49,6 +49,7 @@ class Inpaint(Img2Img):
                 resample=Image.Resampling.NEAREST
             )
             mask_image = self._image_to_tensor(mask_image,normalize=False)
+
         self.mask_blur_radius = mask_blur_radius
 
         # klms samplers not supported yet, so ignore previous sampler
@@ -110,13 +111,17 @@ class Inpaint(Img2Img):
 
     def sample_to_image(self, samples)->Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
+
+        if self.pil_image is None or self.pil_mask is None:
+            return gen_result
         
         pil_mask = self.pil_mask
         pil_image = self.pil_image
         mask_blur_radius = self.mask_blur_radius
 
-        # Get the original alpha channel of the mask
-        pil_init_mask = pil_mask.convert('L')
+        # Get the original alpha channel of the mask if there is one.
+        # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
+        pil_init_mask = pil_mask.getchannel('A') if pil_mask.mode == 'RGBA' else pil_mask.convert('L')
         pil_init_image = pil_image.convert('RGBA') # Add an alpha channel if one doesn't exist
 
         # Build an image with only visible pixels from source to use as reference for color-matching.
