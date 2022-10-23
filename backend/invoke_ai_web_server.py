@@ -589,7 +589,7 @@ class InvokeAIWebServer:
                         prior_variations + this_variation
                     )
                     all_parameters['seed'] = first_seed
-                elif 'with_variations' in all_parameters:
+                elif 'with_variations' in all_parameters and 'variation_amount' in all_parameters and all_parameters['variation_amount'] > 0:
                     all_parameters['seed'] = first_seed
                 else:
                     all_parameters['seed'] = seed
