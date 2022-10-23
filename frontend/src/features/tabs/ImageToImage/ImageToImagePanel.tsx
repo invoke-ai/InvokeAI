@@ -1,5 +1,6 @@
 import { Box } from '@chakra-ui/react';
 import React from 'react';
+import { Resizable } from 're-resizable';
 import { Feature } from '../../../app/features';
 import { RootState, useAppSelector } from '../../../app/store';
 import FaceRestore from '../../options/AdvancedOptions/FaceRestore/FaceRestore';
@@ -22,6 +23,11 @@ export default function ImageToImagePanel() {
   const showAdvancedOptions = useAppSelector(
     (state: RootState) => state.options.showAdvancedOptions
   );
+
+  const handleResize = (event: MouseEvent | TouchEvent | any, direction, elementRef: HTMLElement) => {
+    const upscaleOptions = elementRef.querySelector('.upscale-options');
+    upscaleOptions.style.gridTemplateColumns = (upscaleOptions.clientWidth >= 318) ? 'auto 1fr' : '1fr';
+  };
 
   const imageToImageAccordions = {
     seed: {
@@ -60,19 +66,29 @@ export default function ImageToImagePanel() {
   };
 
   return (
-    <div className="image-to-image-panel">
-      <PromptInput />
-      <ProcessButtons />
-      <MainOptions />
-      <ImageToImageStrength
-        label="Image To Image Strength"
-        styleClass="main-option-block image-to-image-strength-main-option"
-      />
-      <ImageFit />
-      <MainAdvancedOptions />
-      {showAdvancedOptions ? (
-        <OptionsAccordion accordionInfo={imageToImageAccordions} />
-      ) : null}
-    </div>
+    <Resizable
+      enable={{ right: true }}
+      defaultSize={{ width: '370', height: '100%' }}
+      minWidth={'370'}
+      maxWidth={'800'}
+      onResize={handleResize}
+    >
+      <div className="image-to-image-panel">
+        <PromptInput />
+        <ProcessButtons />
+        <MainOptions />
+        <div class="image-settings">
+          <ImageToImageStrength
+            label="Image To Image Strength"
+            styleClass="main-option-block image-to-image-strength-main-option"
+          />
+          <ImageFit />
+        </div>
+        <MainAdvancedOptions />
+        {showAdvancedOptions ? (
+          <OptionsAccordion accordionInfo={imageToImageAccordions} />
+        ) : null}
+      </div>
+    </Resizable>
   );
 }
