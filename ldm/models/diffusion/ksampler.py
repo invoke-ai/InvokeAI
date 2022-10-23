@@ -42,9 +42,9 @@ class CFGDenoiser(nn.Module):
             self.invokeai_diffuser.remove_cross_attention_control()
 
 
-    def forward(self, x, sigma, uncond, cond, cond_scale, step_index):
+    def forward(self, x, sigma, uncond, cond, cond_scale):
 
-        next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale, step_index)
+        next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale)
 
         # apply threshold
         if self.warmup < self.warmup_max:

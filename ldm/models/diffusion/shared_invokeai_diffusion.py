@@ -57,7 +57,8 @@ class InvokeAIDiffuserComponent:
     def do_diffusion_step(self, x: torch.Tensor, sigma: torch.Tensor,
                                    unconditioning: torch.Tensor, conditioning: torch.Tensor,
                                    unconditional_guidance_scale: float,
-                                   step_index: int=None):
+                                   step_index: int=None
+                          ):
         """
         :param x: Current latents
         :param sigma: aka t, passed to the internal model to control how much denoising will occur
@@ -72,7 +73,17 @@ class InvokeAIDiffuserComponent:
         cross_attention_control_types_to_do = []
 
         if self.cross_attention_control_context is not None:
-            cross_attention_control_types_to_do = CrossAttentionControl.get_active_cross_attention_control_types_for_step(self.cross_attention_control_context, step_index)
+            if step_index is not None:
+                # percent_through will never reach 1.0 (but this is intended)
+                percent_through = float(step_index) / float(self.cross_attention_control_context.step_count)
+            else:
+                # find the current sigma in the sigma sequence
+                sigma_index = torch.nonzero(self.model.sigmas <= sigma)[-1]
+                # flip because sigmas[0] is for the fully denoised image
+                # percent_through must be <1
+                percent_through = 1.0 - float(sigma_index.item() + 1) / float(self.model.sigmas.shape[0])
+                print('estimated percent_through', percent_through, 'from sigma', sigma)
+            cross_attention_control_types_to_do = CrossAttentionControl.get_active_cross_attention_control_types_for_step(self.cross_attention_control_context, percent_through)
 
         if len(cross_attention_control_types_to_do)==0:
             print('step', step_index, ': not doing cross attention control')

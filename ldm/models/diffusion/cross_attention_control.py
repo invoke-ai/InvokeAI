@@ -80,19 +80,17 @@ class CrossAttentionControl:
         TOKENS = 2
 
     @classmethod
-    def get_active_cross_attention_control_types_for_step(cls, context: 'CrossAttentionControl.Context', step_index:int=None)\
+    def get_active_cross_attention_control_types_for_step(cls, context: 'CrossAttentionControl.Context', percent_through:float=None)\
             -> list['CrossAttentionControl.CrossAttentionType']:
         """
         Should cross-attention control be applied on the given step?
-        :param step_index: The step index (counts upwards from 0), or None if unknown.
+        :param percent_through: How far through the step sequence are we (0.0=pure noise, 1.0=completely denoised image). Expected range 0.0..<1.0.
         :return: A list of attention types that cross-attention control should be performed for on the given step. May be [].
         """
-        if step_index is None:
+        if percent_through is None:
             return [cls.CrossAttentionType.SELF, cls.CrossAttentionType.TOKENS]
 
         opts = context.arguments.edit_options
-        # percent_through will never reach 1.0 (but this is intended)
-        percent_through = float(step_index)/float(context.step_count)
         to_control = []
         if opts['s_start'] <= percent_through and percent_through < opts['s_end']:
             to_control.append(cls.CrossAttentionType.SELF)

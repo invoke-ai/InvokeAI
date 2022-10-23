@@ -60,9 +60,8 @@ class PLMSSampler(Sampler):
                 # damian0815 would like to know when/if this code path is used
                 e_t = self.model.apply_model(x, t, c)
             else:
-                # step_index is expected to count up while index counts down
+                # step_index counts in the opposite direction to index
                 step_index = step_count-(index+1)
-                # note that step_index == 0 is evaluated twice with different x
                 e_t = self.invokeai_diffuser.do_diffusion_step(x, t,
                                                                unconditional_conditioning, c,
                                                                unconditional_guidance_scale,
