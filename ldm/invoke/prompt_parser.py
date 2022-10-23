@@ -495,7 +495,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     edited_fragment = pp.MatchFirst([
         lparen +
             (quoted_fragment |
-                pp.Group(pp.Word(pp.printables, exclude_chars=string.whitespace + ',').set_parse_action(make_text_fragment))
+                pp.Group(pp.OneOrMore(pp.Word(pp.printables, exclude_chars=string.whitespace + ',').set_parse_action(make_text_fragment)))
             ) +
             pp.Dict(pp.OneOrMore(comma + cross_attention_option)) +
         rparen,

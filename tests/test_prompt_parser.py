@@ -269,6 +269,14 @@ class PromptParserTestCase(unittest.TestCase):
                              Fragment('eating a hotdog', 1)])]),
             parse_prompt("a \"cat\".swap(dog, t_start=0.1, s_start=20) eating a hotdog"))
 
+        self.assertEqual(
+            Conjunction([
+                FlattenedPrompt([Fragment('a fantasy forest landscape', 1),
+                                 CrossAttentionControlSubstitute([Fragment('', 1)], [Fragment('with a river', 1)],
+                                                                 options={'s_start': 0.8, 't_start': 0.8})])]),
+            parse_prompt("a fantasy forest landscape \"\".swap(with a river, s_start=0.8, t_start=0.8)"))
+
+
     def test_escaping(self):
 
         # make sure ", ( and ) can be escaped
