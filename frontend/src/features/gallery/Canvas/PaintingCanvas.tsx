@@ -217,6 +217,9 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
     if (isDragging)
       return;
 
+    if (!wrapperRef.current)
+      return;
+
     const zoomIncrement = 0.1;
     const newZoomLevel = e.deltaY < 0 ? zoomLevel + zoomIncrement : zoomLevel - zoomIncrement;
 
@@ -224,6 +227,15 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
       return;
 
     setZoomLevel(newZoomLevel);
+
+    const { x, y } = applyTransform(e.clientX - wrapperRef.current.offsetLeft, e.clientY - wrapperRef.current.offsetTop);
+
+    setCameraOffset({
+      x: cameraOffset.x - (x - wrapperRef.current.offsetWidth / 2.0) * (e.deltaY < 0 ? zoomIncrement : -zoomIncrement),
+      y: cameraOffset.y - (y - wrapperRef.current.offsetHeight / 2.0) * (e.deltaY < 0 ? zoomIncrement : -zoomIncrement),
+    });
+
+    draw();
   };
 
   const draw = () => {
@@ -283,7 +295,7 @@ const PaintingCanvas = (props: PaintingCanvasProps) => {
 
     animationFrameID.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animationFrameID.current);
-  }, [cameraOffset, zoomLevel, shouldShowGallery, wrapperRef.current]);
+  }, [cameraOffset, shouldShowGallery, wrapperRef.current]);
 
   return (
     <div className="painting-canvas" ref={wrapperRef}>
