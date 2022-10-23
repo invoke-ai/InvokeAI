@@ -1,4 +1,3 @@
-import math
 import string
 from typing import Union
 
@@ -140,7 +139,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
                 # and there is very little perceptible difference as s_end increases above 0.5
                 # so for shape_freedom = 0.5 we probably want s_end to be 0.2
                 #  -> cube root and subtract from 1.0
-                merged_options.s_end = 1.0 - math.cbrt(shape_freedom)
+                merged_options['s_end'] = 1.0 - shape_freedom ** (1. / 3.)
                 print('converted shape_freedom argument to', merged_options)
             merged_options.update(options)
 

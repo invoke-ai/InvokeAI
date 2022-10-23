@@ -1,4 +1,3 @@
-from enum import Enum
 from math import ceil
 from typing import Callable, Optional
 
@@ -83,7 +82,7 @@ class InvokeAIDiffuserComponent:
                 # flip because sigmas[0] is for the fully denoised image
                 # percent_through must be <1
                 percent_through = 1.0 - float(sigma_index.item() + 1) / float(self.model.sigmas.shape[0])
-                print('estimated percent_through', percent_through, 'from sigma', sigma)
+                print('estimated percent_through', percent_through, 'from sigma', sigma.item())
             cross_attention_control_types_to_do = CrossAttentionControl.get_active_cross_attention_control_types_for_step(self.cross_attention_control_context, percent_through)
 
         if len(cross_attention_control_types_to_do)==0:
