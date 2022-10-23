@@ -470,7 +470,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
                         pp.Word(pp.printables, exclude_chars=string.whitespace + '.').set_parse_action(make_text_fragment) + pp.FollowedBy(".swap")
                ])
     # support keyword=number arguments
-    cross_attention_option_keyword = pp.Or([pp.Keyword("s_start"), pp.Keyword("s_end"), pp.Keyword("t_start"), pp.Keyword("t_end")])
+    cross_attention_option_keyword = pp.Or([pp.Keyword("s_start"), pp.Keyword("s_end"), pp.Keyword("t_start"), pp.Keyword("t_end"), pp.Keyword("shape_freedom")])
     cross_attention_option = pp.Group(cross_attention_option_keyword + pp.Literal("=").suppress() + number)
     edited_fragment = pp.MatchFirst([
         lparen +
