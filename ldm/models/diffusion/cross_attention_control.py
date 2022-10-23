@@ -29,6 +29,10 @@ class CrossAttentionControl:
 
     class Context:
         def __init__(self, arguments: 'CrossAttentionControl.Arguments', step_count: int):
+            """
+            :param arguments: Arguments for the cross-attention control process
+            :param step_count: The absolute total number of steps of diffusion (for img2img this is likely larger than the number of steps that will actually run)
+            """
             self.arguments = arguments
             self.step_count = step_count
 
