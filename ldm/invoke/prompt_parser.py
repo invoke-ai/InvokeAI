@@ -353,9 +353,34 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
         else:
             raise PromptParser.ParsingException("Cannot make fragment from " + str(x))
 
+    def build_escaped_word_parser(escaped_chars_to_ignore: str):
+        terms = []
+        for c in escaped_chars_to_ignore:
+            terms.append(pp.Literal('\\'+c))
+        terms.append(
+            #pp.CharsNotIn(string.whitespace + escaped_chars_to_ignore, exact=1)
+            pp.Word(pp.printables, exclude_chars=string.whitespace + escaped_chars_to_ignore)
+        )
+        return pp.Combine(pp.OneOrMore(
+            pp.MatchFirst(terms)
+        ))
+
+    def build_escaped_word_parser_charbychar(escaped_chars_to_ignore: str):
+        escapes = []
+        for c in escaped_chars_to_ignore:
+            escapes.append(pp.Literal('\\'+c))
+        return pp.Combine(pp.OneOrMore(
+            pp.MatchFirst(escapes + [pp.CharsNotIn(
+                string.whitespace + escaped_chars_to_ignore,
+                exact=1
+            )])
+        ))
+
+
+
     def parse_fragment_str(x, in_quotes: bool=False, in_parens: bool=False):
+        #print(f"parsing fragment string \"{x}\"")
         fragment_string = x[0]
-        #print(f"parsing fragment string \"{fragment_string}\"")
         if len(fragment_string.strip()) == 0:
             return Fragment('')
 
@@ -401,58 +426,54 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     parenthesized_fragment.set_name('parenthesized_fragment').set_debug(False)
 
     debug_attention = False
-    # attention control of the form +(phrase) / -(phrase) / <weight>(phrase)
+    # attention control of the form (phrase)+ / (phrase)+ / (phrase)<weight>
     # phrase can be multiple words, can have multiple +/- signs to increase the effect or type a floating point or integer weight
-    attention_head = (number | pp.Word('+') | pp.Word('-'))\
-        .set_name("attention_head")\
-        .set_debug(False)
-    word_inside_attention = pp.Combine(pp.OneOrMore(
-        pp.Literal('\\)') | pp.Literal('\\(') | pp.Literal('\\"') |
-        pp.Word(pp.printables, exclude_chars=string.whitespace + '\\()"')
-    )).set_name('word_inside_attention')
     attention_with_parens = pp.Forward()
+    attention_without_parens = pp.Forward()
 
-    attention_with_parens_delimited_list = pp.OneOrMore(pp.Or([
-        quoted_fragment.copy().set_debug(debug_attention),
-        attention.copy().set_debug(debug_attention),
-        cross_attention_substitute,
-        word_inside_attention.set_debug(debug_attention)
-        #pp.White()
-    ]).set_name('delim_inner').set_debug(debug_attention))
-    # have to disable ignore_expr here to prevent pyparsing from stripping off quote marks
-    attention_with_parens_body = pp.nested_expr(content=attention_with_parens_delimited_list,
-                                                ignore_expr=None#((pp.Literal("\\(") | pp.Literal('\\)')))
-                                                )
-    attention_with_parens_body.set_debug(debug_attention)
-    attention_with_parens << (attention_head + attention_with_parens_body)
+    attention_with_parens_foot = (number | pp.Word('+') | pp.Word('-'))\
+        .set_name("attention_foot")\
+        .set_debug(False)
+    attention_with_parens <<= pp.Group(
+        lparen +
+        pp.ZeroOrMore(quoted_fragment | attention_with_parens | parenthesized_fragment | cross_attention_substitute | attention_without_parens |
+                      (pp.Empty() + build_escaped_word_parser_charbychar('()')).set_name('undecorated_word').set_debug(debug_attention)#.set_parse_action(lambda t: t[0])
+                  )
+        + rparen + attention_with_parens_foot)
     attention_with_parens.set_name('attention_with_parens').set_debug(debug_attention)
 
-    attention_without_parens = (pp.Word('+') | pp.Word('-')) + (quoted_fragment | word_inside_attention)
+    attention_without_parens_foot = pp.Or(pp.Word('+') | pp.Word('-')).set_name('attention_without_parens_foots')
+    attention_without_parens <<= pp.Group(
+        (quoted_fragment.copy().set_name('attention_quoted_fragment_without_parens').set_debug(debug_attention) + attention_without_parens_foot) |
+        pp.Combine(build_escaped_word_parser_charbychar('()+-')).set_name('attention_word_without_parens').set_debug(debug_attention)#.set_parse_action(lambda x: print('escapéd', x))
+                                 + attention_without_parens_foot)#.leave_whitespace()
     attention_without_parens.set_name('attention_without_parens').set_debug(debug_attention)
 
-    attention << (attention_with_parens | attention_without_parens)
+
+    attention << pp.MatchFirst([attention_with_parens,
+                  attention_without_parens
+                  ])
     attention.set_name('attention')
 
     def make_attention(x):
-        #print("making Attention from", x)
-        weight = 1
-        # number(str)
-        if type(x[0]) is float or type(x[0]) is int:
-            weight = float(x[0])
-        # +(str) or -(str) or +str or -str
-        elif type(x[0]) is str:
-            base = attention_plus_base if x[0][0] == '+' else attention_minus_base
-            weight = pow(base, len(x[0]))
-        if type(x[1]) is list or type(x[1]) is pp.ParseResults:
-            return Attention(weight=weight, children=[(Fragment(x) if type(x) is str else x) for x in x[1]])
-        elif type(x[1]) is str:
-            return Attention(weight=weight, children=[Fragment(x[1])])
-        elif type(x[1]) is Fragment:
-            return Attention(weight=weight, children=[x[1]])
-        raise PromptParser.ParsingException(f"Don't know how to make attention with children {x[1]}")
+        #print("entered make_attention with", x)
+        children = x[0][:-1]
+        weight_raw = x[0][-1]
+        weight = 1.0
+        if type(weight_raw) is float or type(weight_raw) is int:
+            weight = weight_raw
+        elif type(weight_raw) is str:
+            base = attention_plus_base if weight_raw[0] == '+' else attention_minus_base
+            weight = pow(base, len(weight_raw))
+
+        #print("making Attention from", children, "with weight", weight)
+
+        return Attention(weight=weight, children=[(Fragment(x) if type(x) is str else x) for x in children])
 
     attention_with_parens.set_parse_action(make_attention)
     attention_without_parens.set_parse_action(make_attention)
+
+    #print("parsing test:", attention_with_parens.parse_string("mountain (man)1.1"))
 
     # cross-attention control
     empty_string = ((lparen + rparen) |
@@ -487,10 +508,10 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     cross_attention_substitute.set_name('cross_attention_substitute').set_debug(debug_cross_attention_control)
 
     def make_cross_attention_substitute(x):
-        print("making cacs for", x[0], "->", x[1], "with options", x.as_dict())
+        #print("making cacs for", x[0], "->", x[1], "with options", x.as_dict())
         #if len(x>2):
         cacs = CrossAttentionControlSubstitute(x[0], x[1], options=x.as_dict())
-        print("made", cacs)
+        #print("made", cacs)
         return cacs
     cross_attention_substitute.set_parse_action(make_cross_attention_substitute)
 
@@ -511,10 +532,11 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
             (quotes + pp.ZeroOrMore(pp.Word(string.whitespace)) + quotes)).set_debug(False).set_name('empty')
 
     # root prompt definition
-    prompt = ((pp.OneOrMore(prompt_part | quoted_fragment) | empty) + pp.StringEnd()) \
+    prompt = (pp.OneOrMore(pp.Or([prompt_part, quoted_fragment, empty])) + pp.StringEnd()) \
         .set_parse_action(lambda x: Prompt(x))
 
-
+    #print("parsing test:", prompt.parse_string("spaced eyes--"))
+    #print("parsing test:", prompt.parse_string("eyes--"))
 
     # weighted blend of prompts
     # ("promptA", "promptB").blend(a, b) where "promptA" and "promptB" are valid prompts and a and b are float or
@@ -536,7 +558,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     quoted_prompt = pp.dbl_quoted_string.set_parse_action(make_prompt_from_quoted_string)
     quoted_prompt.set_name('quoted_prompt')
 
-    debug_blend=True
+    debug_blend=False
     blend_terms = pp.delimited_list(quoted_prompt).set_name('blend_terms').set_debug(debug_blend)
     blend_weights = (pp.delimited_list(number) + pp.Optional(pp.Char(",").suppress() + "no_normalize")).set_name('blend_weights').set_debug(debug_blend)
     blend = pp.Group(lparen + pp.Group(blend_terms) + rparen
