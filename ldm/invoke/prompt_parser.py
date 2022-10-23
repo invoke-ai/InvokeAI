@@ -124,7 +124,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
 
         default_options = {
             's_start': 0.0,
-            's_end': 0.3, # gives best results
+            's_end': 0.206, # ~= shape_freedom=0.5
             't_start': 0.0,
             't_end': 1.0
         }
