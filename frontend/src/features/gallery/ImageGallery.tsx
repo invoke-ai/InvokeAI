@@ -78,6 +78,7 @@ export default function ImageGallery() {
 
       {shouldShowGallery && (
         <Resizable
+          enable={{ left: true }}
           defaultSize={{ width: '300', height: '100%' }}
           minWidth={'300'}
           maxWidth={activeTab == 1 ? '300' : '600'}
