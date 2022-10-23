@@ -1,3 +1,4 @@
+import math
 import string
 from typing import Union
 
@@ -121,15 +122,28 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
     def __init__(self, original: Union[Fragment, list], edited: Union[Fragment, list], options: dict=None):
         self.original = original
         self.edited = edited
+
         default_options = {
             's_start': 0.0,
-            's_end': 1.0,
+            's_end': 0.3, # gives best results
             't_start': 0.0,
             't_end': 1.0
         }
         merged_options = default_options
         if options is not None:
+            shape_freedom = options.pop('shape_freedom', None)
+            if shape_freedom is not None:
+                # high shape freedom = SD can do what it wants with the shape of the object
+                # high shape freedom => s_end = 0
+                # low shape freedom => s_end = 1
+                # shape freedom is in a "linear" space, while noticeable changes to s_end are typically closer around 0,
+                # and there is very little perceptible difference as s_end increases above 0.5
+                # so for shape_freedom = 0.5 we probably want s_end to be 0.2
+                #  -> cube root and subtract from 1.0
+                merged_options.s_end = 1.0 - math.cbrt(shape_freedom)
+                print('converted shape_freedom argument to', merged_options)
             merged_options.update(options)
+
         self.options = merged_options
 
     def __repr__(self):

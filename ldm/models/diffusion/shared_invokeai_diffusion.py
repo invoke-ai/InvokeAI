@@ -78,6 +78,7 @@ class InvokeAIDiffuserComponent:
                 percent_through = float(step_index) / float(self.cross_attention_control_context.step_count)
             else:
                 # find the current sigma in the sigma sequence
+                # todo: this doesn't work with k_dpm_2 because the sigma used jumps around in the sequence
                 sigma_index = torch.nonzero(self.model.sigmas <= sigma)[-1]
                 # flip because sigmas[0] is for the fully denoised image
                 # percent_through must be <1
@@ -86,14 +87,14 @@ class InvokeAIDiffuserComponent:
             cross_attention_control_types_to_do = CrossAttentionControl.get_active_cross_attention_control_types_for_step(self.cross_attention_control_context, percent_through)
 
         if len(cross_attention_control_types_to_do)==0:
-            print('step', step_index, ': not doing cross attention control')
+            #print('step', step_index, ': not doing cross attention control')
             # faster batched path
             x_twice = torch.cat([x]*2)
             sigma_twice = torch.cat([sigma]*2)
             both_conditionings = torch.cat([unconditioning, conditioning])
             unconditioned_next_x, conditioned_next_x = self.model_forward_callback(x_twice, sigma_twice, both_conditionings).chunk(2)
         else:
-            print('step', step_index, ': doing cross attention control on', cross_attention_control_types_to_do)
+            #print('step', step_index, ': doing cross attention control on', cross_attention_control_types_to_do)
             # slower non-batched path (20% slower on mac MPS)
             # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of
             # unconditioned_next_x causes attention maps to *also* be saved for the unconditioned_next_x.
