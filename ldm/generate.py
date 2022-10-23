@@ -58,24 +58,6 @@ torch.multinomial = fix_func(torch.multinomial)
 # this is fallback model in case no default is defined
 FALLBACK_MODEL_NAME='stable-diffusion-1.4'
 
-def fix_func(orig):
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        def new_func(*args, **kw):
-            device = kw.get("device", "mps")
-            kw["device"]="cpu"
-            return orig(*args, **kw).to(device)
-        return new_func
-    return orig
-
-torch.rand = fix_func(torch.rand)
-torch.rand_like = fix_func(torch.rand_like)
-torch.randn = fix_func(torch.randn)
-torch.randn_like = fix_func(torch.randn_like)
-torch.randint = fix_func(torch.randint)
-torch.randint_like = fix_func(torch.randint_like)
-torch.bernoulli = fix_func(torch.bernoulli)
-torch.multinomial = fix_func(torch.multinomial)
-
 """Simplified text to image API for stable diffusion/latent diffusion
 
 Example Usage:
@@ -573,16 +555,19 @@ class Generate:
             from ldm.invoke.restoration.outcrop import Outcrop
             extend_instructions = {}
             for direction,pixels in _pairwise(opt.outcrop):
-                extend_instructions[direction]=int(pixels)
-
-            restorer = Outcrop(image,self,)
-            return restorer.process (
-                extend_instructions,
-                opt            = opt,
-                orig_opt       = args,
-                image_callback = callback,
-                prefix = prefix,
-            )
+                try:
+                    extend_instructions[direction]=int(pixels)
+                except ValueError:
+                    print(f'** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
+            if len(extend_instructions)>0:
+                restorer = Outcrop(image,self,)
+                return restorer.process (
+                    extend_instructions,
+                    opt            = opt,
+                    orig_opt       = args,
+                    image_callback = callback,
+                    prefix = prefix,
+                )
 
         elif tool == 'embiggen':
             # fetch the metadata from the image
