@@ -72,7 +72,13 @@ export const gallerySlice = createSlice({
     },
     addImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       const newImage = action.payload;
-      const { uuid, mtime } = newImage;
+      const { uuid, url, mtime } = newImage;
+
+      // Do not add duplicate images
+      if (state.images.find((i) => i.url === url && i.mtime === mtime)) {
+        return;
+      }
+
       state.images.unshift(newImage);
       state.currentImageUuid = uuid;
       state.intermediateImage = undefined;
@@ -120,8 +126,15 @@ export const gallerySlice = createSlice({
     ) => {
       const { images, areMoreImagesAvailable } = action.payload;
       if (images.length > 0) {
+        // Filter images that already exist in the gallery
+        const newImages = images.filter(
+          (newImage) =>
+            !state.images.find(
+              (i) => i.url === newImage.url && i.mtime === newImage.mtime
+            )
+        );
         state.images = state.images
-          .concat(images)
+          .concat(newImages)
           .sort((a, b) => b.mtime - a.mtime);
 
         if (!state.currentImage) {

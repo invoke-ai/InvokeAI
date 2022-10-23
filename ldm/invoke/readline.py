@@ -22,6 +22,7 @@ except (ImportError,ModuleNotFoundError):
 
 IMG_EXTENSIONS     = ('.png','.jpg','.jpeg','.PNG','.JPG','.JPEG','.gif','.GIF')
 WEIGHT_EXTENSIONS  = ('.ckpt','.bae')
+TEXT_EXTENSIONS  = ('.txt','.TXT')
 CONFIG_EXTENSIONS  = ('.yaml','.yml')
 COMMANDS = (
     '--steps','-s',
@@ -55,19 +56,23 @@ COMMANDS = (
     '--inpaint_replace','-r',
     '--png_compression','-z',
     '--text_mask','-tm',
-    '!fix','!fetch','!history','!search','!clear',
+    '!fix','!fetch','!replay','!history','!search','!clear',
+    '!models','!switch','!import_model','!edit_model','!del_model',
     '!mask',
-    '!models','!switch','!import_model','!edit_model'
     )
 MODEL_COMMANDS = (
     '!switch',
     '!edit_model',
+    '!del_model',
     )
 WEIGHT_COMMANDS = (
     '!import_model',
     )
 IMG_PATH_COMMANDS = (
     '--outdir[=\s]',
+    )
+TEXT_PATH_COMMANDS=(
+    '!replay',
     )
 IMG_FILE_COMMANDS=(
     '!fix',
@@ -78,8 +83,9 @@ IMG_FILE_COMMANDS=(
     '--init_color[=\s]',
     '--embedding_path[=\s]',
     )
-path_regexp   = '('+'|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
-weight_regexp = '('+'|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
+path_regexp   = '(' + '|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
+weight_regexp = '(' + '|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
+text_regexp = '(' + '|'.join(TEXT_PATH_COMMANDS) + ')\s*\S*$'
 
 class Completer(object):
     def __init__(self, options, models=[]):
@@ -121,6 +127,9 @@ class Completer(object):
 
             elif re.search(weight_regexp,buffer):
                 self.matches = self._path_completions(text, state, WEIGHT_EXTENSIONS)
+
+            elif re.search(text_regexp,buffer):
+                self.matches = self._path_completions(text, state, TEXT_EXTENSIONS)
 
             # This is the first time for this text, so build a match list.
             elif text:
@@ -210,8 +219,23 @@ class Completer(object):
         pydoc.pager('\n'.join(lines))
 
     def set_line(self,line)->None:
+        '''
+        Set the default string displayed in the next line of input.
+        '''
         self.linebuffer = line
         readline.redisplay()
+
+    def add_model(self,model_name:str)->None:
+        '''
+        add a model name to the completion list
+        '''
+        self.models.append(model_name)
+
+    def del_model(self,model_name:str)->None:
+        '''
+        removes a model name from the completion list
+        '''
+        self.models.remove(model_name)
 
     def _seed_completions(self, text, state):
         m = re.search('(-S\s?|--seed[=\s]?)(\d*)',text)
