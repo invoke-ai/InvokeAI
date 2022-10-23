@@ -1,5 +1,5 @@
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
-
+import pyparsing
 # Derived from source code carrying the following copyrights
 # Copyright (c) 2022 Machine Vision and Learning Group, LMU Munich
 # Copyright (c) 2022 Robin Rombach and Patrick Esser and contributors
@@ -24,6 +24,7 @@ from PIL import Image, ImageOps
 from torch import nn
 from pytorch_lightning import seed_everything, logging
 
+from ldm.invoke.prompt_parser import PromptParser
 from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
@@ -474,7 +475,7 @@ class Generate:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
-        except (RuntimeError, Exception) as e:
+        except RuntimeError as e:
             print(traceback.format_exc(), file=sys.stderr)
             print('>> Could not generate image.')
 
