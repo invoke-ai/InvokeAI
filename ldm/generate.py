@@ -110,12 +110,13 @@ still work.
 The full list of arguments to Generate() are:
 gr = Generate(
           # these values are set once and shouldn't be changed
-          conf        = path to configuration file ('configs/models.yaml')
-          model       = symbolic name of the model in the configuration file
-          precision   = float precision to be used
+          conf:str          = path to configuration file ('configs/models.yaml')
+          model:str         = symbolic name of the model in the configuration file
+          precision:float   = float precision to be used
+          safety_checker:bool = activate safety checker [False]
 
           # this value is sticky and maintained between generation calls
-          sampler_name   = ['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms']  // k_lms
+          sampler_name:str  = ['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms']  // k_lms
 
           # these are deprecated - use conf and model instead
           weights     = path to model weights ('models/ldm/stable-diffusion-v1/model.ckpt')
