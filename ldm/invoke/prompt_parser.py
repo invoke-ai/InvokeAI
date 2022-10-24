@@ -51,6 +51,11 @@ class FlattenedPrompt():
             raise PromptParser.ParsingException(
                 f"FlattenedPrompt cannot contain {fragment}, only Fragments or (str, float) tuples are allowed")
 
+    @property
+    def is_empty(self):
+        return len(self.children) == 0 or \
+               (len(self.children) == 1 and len(self.children[0].text) == 0)
+
     def __repr__(self):
         return f"FlattenedPrompt:{self.children}"
     def __eq__(self, other):
