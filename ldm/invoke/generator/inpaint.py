@@ -142,7 +142,7 @@ class Inpaint(Img2Img):
         # Blur the mask out (into init image) by specified amount
         if mask_blur_radius > 0:
             nm = np.asarray(pil_init_mask, dtype=np.uint8)
-            nmd = cv.dilate(nm, kernel=np.ones((3,3), dtype=np.uint8), iterations=int(mask_blur_radius / 2))
+            nmd = cv.erode(nm, kernel=np.ones((3,3), dtype=np.uint8), iterations=int(mask_blur_radius / 2))
             pmd = Image.fromarray(nmd, mode='L')
             blurred_init_mask = pmd.filter(ImageFilter.BoxBlur(mask_blur_radius))
         else:
