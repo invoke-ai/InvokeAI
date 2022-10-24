@@ -86,7 +86,7 @@ class InvokeAIDiffuserComponent:
             cross_attention_control_types_to_do = CrossAttentionControl.get_active_cross_attention_control_types_for_step(self.cross_attention_control_context, percent_through)
 
         if len(cross_attention_control_types_to_do)==0:
-            print('pct', percent_through, ': not doing cross attention control')
+            print('not doing cross attention control')
             # faster batched path
             x_twice = torch.cat([x]*2)
             sigma_twice = torch.cat([sigma]*2)
