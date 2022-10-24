@@ -109,7 +109,7 @@ class Inpaint(Img2Img):
 
         return make_image
 
-    def sample_to_image(self, samples)->Image:
+    def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
 
         if self.pil_image is None or self.pil_mask is None:
