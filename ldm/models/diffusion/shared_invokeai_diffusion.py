@@ -82,18 +82,18 @@ class InvokeAIDiffuserComponent:
                 # flip because sigmas[0] is for the fully denoised image
                 # percent_through must be <1
                 percent_through = 1.0 - float(sigma_index.item() + 1) / float(self.model.sigmas.shape[0])
-                print('estimated percent_through', percent_through, 'from sigma', sigma.item())
+                #print('estimated percent_through', percent_through, 'from sigma', sigma.item())
             cross_attention_control_types_to_do = CrossAttentionControl.get_active_cross_attention_control_types_for_step(self.cross_attention_control_context, percent_through)
 
         if len(cross_attention_control_types_to_do)==0:
-            print('not doing cross attention control')
+            #print('not doing cross attention control')
             # faster batched path
             x_twice = torch.cat([x]*2)
             sigma_twice = torch.cat([sigma]*2)
             both_conditionings = torch.cat([unconditioning, conditioning])
             unconditioned_next_x, conditioned_next_x = self.model_forward_callback(x_twice, sigma_twice, both_conditionings).chunk(2)
         else:
-            print('pct', percent_through, ': doing cross attention control on', cross_attention_control_types_to_do)
+            #print('pct', percent_through, ': doing cross attention control on', cross_attention_control_types_to_do)
             # slower non-batched path (20% slower on mac MPS)
             # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of
             # unconditioned_next_x causes attention maps to *also* be saved for the unconditioned_next_x.
