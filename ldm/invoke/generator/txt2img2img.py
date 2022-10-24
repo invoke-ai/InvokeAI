@@ -96,8 +96,8 @@ class Txt2Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
-                # cross-attention control is disabled during upscale
-                #extra_conditioning_info      = None
+                extra_conditioning_info=extra_conditioning_info,
+                all_timesteps_count=steps
             )
 
             if self.free_gpu_mem:
