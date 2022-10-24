@@ -1,57 +1,74 @@
-FROM        debian 
+FROM ubuntu AS get_miniconda
 
-ARG         gsd
-ENV         GITHUB_STABLE_DIFFUSION $gsd
+SHELL ["/bin/bash", "-c"]
 
-ARG         rsd
-ENV         REQS $rsd
+# install wget
+RUN apt-get update \
+  && apt-get install -y \
+    wget \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
-ARG         cs
-ENV         CONDA_SUBDIR $cs
+# download and install miniconda
+ARG conda_version=py39_4.12.0-Linux-x86_64
+ARG conda_prefix=/opt/conda
+RUN wget --progress=dot:giga -O /miniconda.sh \
+  https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}.sh \
+  && bash /miniconda.sh -b -p ${conda_prefix} \
+  && rm -f /miniconda.sh
 
-ENV         PIP_EXISTS_ACTION="w"
+FROM ubuntu AS invokeai
 
-# TODO: Optimize image size
+# use bash
+SHELL [ "/bin/bash", "-c" ]
 
-SHELL       ["/bin/bash", "-c"]
+# clean bashrc
+RUN echo "" > ~/.bashrc
 
-WORKDIR     /
-RUN         apt update && apt upgrade -y \
-            && apt install -y \
-            git \
-            libgl1-mesa-glx \
-            libglib2.0-0 \
-            pip \
-            python3 \
-            && git clone $GITHUB_STABLE_DIFFUSION
+# Install necesarry packages
+RUN apt-get update \
+  && apt-get install -y \
+    --no-install-recommends \
+    gcc \
+    git \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    pip \
+    python3 \
+    python3-dev \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
-# Install Anaconda or Miniconda
-COPY        anaconda.sh .
-RUN         bash anaconda.sh -b -u -p /anaconda && /anaconda/bin/conda init bash
+# clone repository and create symlinks
+ARG invokeai_git=https://github.com/invoke-ai/InvokeAI.git
+ARG project_name=invokeai
+RUN git clone ${invokeai_git} /${project_name} \
+  && mkdir /${project_name}/models/ldm/stable-diffusion-v1 \
+  && ln -s /data/models/sd-v1-4.ckpt /${project_name}/models/ldm/stable-diffusion-v1/model.ckpt \
+  && ln -s /data/outputs/ /${project_name}/outputs
 
-# SD 
-WORKDIR     /stable-diffusion 
-RUN         source ~/.bashrc \
-            && conda create -y --name ldm && conda activate ldm \
-            && conda config --env --set subdir $CONDA_SUBDIR \
-            && pip3 install -r $REQS \   
-            && pip3 install basicsr facexlib realesrgan \          
-            && mkdir models/ldm/stable-diffusion-v1 \
-            && ln -s "/data/sd-v1-4.ckpt" models/ldm/stable-diffusion-v1/model.ckpt 
+# set workdir
+WORKDIR /${project_name}
 
-# Face restoreation
-# by default expected in a sibling directory to stable-diffusion
-WORKDIR     /       
-RUN         git clone https://github.com/TencentARC/GFPGAN.git 
+# install conda env and preload models
+ARG conda_prefix=/opt/conda
+ARG conda_env_file=environment.yml
+COPY --from=get_miniconda ${conda_prefix} ${conda_prefix}
+RUN source ${conda_prefix}/etc/profile.d/conda.sh \
+  && conda init bash \
+  && source ~/.bashrc \
+  && conda env create \
+    --name ${project_name} \
+    --file ${conda_env_file} \
+  && rm -Rf ~/.cache \
+  && conda clean -afy \
+  && echo "conda activate ${project_name}" >> ~/.bashrc \
+  && ln -s /data/models/GFPGANv1.4.pth ./src/gfpgan/experiments/pretrained_models/GFPGANv1.4.pth \
+  && conda activate ${project_name} \
+  && python scripts/preload_models.py
 
-WORKDIR     /GFPGAN 
-RUN         pip3 install -r requirements.txt \
-            && python3 setup.py develop \
-            && ln -s "/data/GFPGANv1.4.pth" experiments/pretrained_models/GFPGANv1.4.pth
-
-WORKDIR     /stable-diffusion 
-RUN         python3 scripts/preload_models.py         
-
-WORKDIR     /
-COPY        entrypoint.sh .
-ENTRYPOINT ["/entrypoint.sh"]
+# Copy entrypoint and set env
+ENV CONDA_PREFIX=${conda_prefix}
+ENV PROJECT_NAME=${project_name}
+COPY docker-build/entrypoint.sh /
+ENTRYPOINT [ "/entrypoint.sh" ]
