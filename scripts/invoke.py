@@ -69,16 +69,17 @@ def main():
     # creating a Generate object:
     try:
         gen = Generate(
-            conf           = opt.conf,
-            model          = opt.model,
-            sampler_name   = opt.sampler_name,
+            conf = opt.conf,
+            model = opt.model,
+            sampler_name = opt.sampler_name,
             embedding_path = opt.embedding_path,
             full_precision = opt.full_precision,
-            precision      = opt.precision,
+            precision = opt.precision,
             gfpgan=gfpgan,
             codeformer=codeformer,
             esrgan=esrgan,
             free_gpu_mem=opt.free_gpu_mem,
+            safety_checker=opt.safety_checker,
             )
     except (FileNotFoundError, IOError, KeyError) as e:
         print(f'{e}. Aborting.')

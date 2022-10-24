@@ -1,5 +1,6 @@
 albumentations==0.4.3
 einops==0.3.0
+diffusers==0.6.0
 huggingface-hub==0.8.1
 imageio==2.9.0
 imageio-ffmpeg==0.4.2

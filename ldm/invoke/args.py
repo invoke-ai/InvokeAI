@@ -418,6 +418,11 @@ class Args(object):
             help=f'Set model precision. Defaults to auto selected based on device. Options: {", ".join(PRECISION_CHOICES)}',
             default='auto',
         )
+        model_group.add_argument(
+            '--safety_checker',
+            action='store_true',
+            help='Check for and blur potentially NSFW images',
+        )
         file_group.add_argument(
             '--from_file',
             dest='infile',
