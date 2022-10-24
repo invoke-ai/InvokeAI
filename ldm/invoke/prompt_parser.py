@@ -1,6 +1,6 @@
 import string
-from typing import Union
-
+from typing import Union, Optional
+import re
 import pyparsing as pp
 
 class Prompt():
@@ -223,10 +223,10 @@ class PromptParser():
 
     def __init__(self, attention_plus_base=1.1, attention_minus_base=0.9):
 
-        self.root = build_parser_syntax(attention_plus_base, attention_minus_base)
+        self.conjunction, self.prompt = build_parser_syntax(attention_plus_base, attention_minus_base)
 
 
-    def parse(self, prompt: str) -> Conjunction:
+    def parse_conjunction(self, prompt: str) -> Conjunction:
         '''
         :param prompt: The prompt string to parse
         :return: a Conjunction representing the parsed results.
@@ -236,12 +236,24 @@ class PromptParser():
         if len(prompt.strip()) == 0:
             return Conjunction(prompts=[FlattenedPrompt([('', 1.0)])], weights=[1.0])
 
-        root = self.root.parse_string(prompt)
+        root = self.conjunction.parse_string(prompt)
         #print(f"'{prompt}' parsed to root", root)
         #fused = fuse_fragments(parts)
         #print("fused to", fused)
 
         return self.flatten(root[0])
+
+    def parse_legacy_blend(self, text: str) -> Optional[Blend]:
+        weighted_subprompts = split_weighted_subprompts(text, skip_normalize=False)
+        if len(weighted_subprompts) == 1:
+            return None
+        strings = [x[0] for x in weighted_subprompts]
+        weights = [x[1] for x in weighted_subprompts]
+
+        parsed_conjunctions = [self.parse_conjunction(x) for x in strings]
+        flattened_prompts = [x.prompts[0] for x in parsed_conjunctions]
+
+        return Blend(prompts=flattened_prompts, weights=weights, normalize_weights=True)
 
 
     def flatten(self, root: Conjunction) -> Conjunction:
@@ -596,4 +608,68 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     conjunction.set_debug(False)
 
     # top-level is a conjunction of one or more blends or prompts
-    return conjunction
+    return conjunction, prompt
+
+
+
+def split_weighted_subprompts(text, skip_normalize=False)->list:
+    """
+    Legacy blend parsing.
+
+    grabs all text up to the first occurrence of ':'
+    uses the grabbed text as a sub-prompt, and takes the value following ':' as weight
+    if ':' has no value defined, defaults to 1.0
+    repeats until no text remaining
+    """
+    prompt_parser = re.compile("""
+            (?P<prompt>     # capture group for 'prompt'
+            (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
+            )               # end 'prompt'
+            (?:             # non-capture group
+            :+              # match one or more ':' characters
+            (?P<weight>     # capture group for 'weight'
+            -?\d+(?:\.\d+)? # match positive or negative integer or decimal number
+            )?              # end weight capture group, make optional
+            \s*             # strip spaces after weight
+            |               # OR
+            $               # else, if no ':' then match end of line
+            )               # end non-capture group
+            """, re.VERBOSE)
+    parsed_prompts = [(match.group("prompt").replace("\\:", ":"), float(
+        match.group("weight") or 1)) for match in re.finditer(prompt_parser, text)]
+    if skip_normalize:
+        return parsed_prompts
+    weight_sum = sum(map(lambda x: x[1], parsed_prompts))
+    if weight_sum == 0:
+        print(
+            "Warning: Subprompt weights add up to zero. Discarding and using even weights instead.")
+        equal_weight = 1 / max(len(parsed_prompts), 1)
+        return [(x[0], equal_weight) for x in parsed_prompts]
+    return [(x[0], x[1] / weight_sum) for x in parsed_prompts]
+
+
+# shows how the prompt is tokenized
+# usually tokens have '</w>' to indicate end-of-word,
+# but for readability it has been replaced with ' '
+def log_tokenization(text, model, log=False, weight=1):
+    if not log:
+        return
+    tokens    = model.cond_stage_model.tokenizer._tokenize(text)
+    tokenized = ""
+    discarded = ""
+    usedTokens = 0
+    totalTokens = len(tokens)
+    for i in range(0, totalTokens):
+        token = tokens[i].replace('</w>', 'x` ')
+        # alternate color
+        s = (usedTokens % 6) + 1
+        if i < model.cond_stage_model.max_length:
+            tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
+            usedTokens += 1
+        else:  # over max token length
+            discarded = discarded + f"\x1b[0;3{s};40m{token}"
+    print(f"\n>> Tokens ({usedTokens}), Weight ({weight:.2f}):\n{tokenized}\x1b[0m")
+    if discarded != "":
+        print(
+            f">> Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m"
+        )
