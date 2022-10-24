@@ -1,10 +1,8 @@
 #!/bin/bash
+set -e
 
-cd /stable-diffusion
+source "${CONDA_PREFIX}/etc/profile.d/conda.sh"
+conda activate "${PROJECT_NAME}"
 
-if [ $# -eq 0 ]; then
-    python3 scripts/dream.py --full_precision -o /data
-    # bash
-else
-    python3 scripts/dream.py --full_precision -o /data "$@"
-fi
+python scripts/invoke.py \
+  ${@:---web --host=0.0.0.0}
