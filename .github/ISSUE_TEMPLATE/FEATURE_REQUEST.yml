@@ -1,0 +1,56 @@
+name: Feature Request
+description: Commit a idea or Request a new feature
+title: '[enhancement]: '
+labels: ['enhancement']
+# assignees:
+#   - lstein
+#   - tildebyte
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this Feature request!
+
+  - type: checkboxes
+    attributes:
+      label: Is there an existing issue for this?
+      description: |
+        Please make use of the [search function](https://github.com/invoke-ai/InvokeAI/labels/enhancement)
+        to see if a simmilar issue already exists for the feature you want to request
+      options:
+        - label: I have searched the existing issues
+          required: true
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details
+      description: __OPTIONAL__ How could we get in touch with you if we need more info (besides this issue)?
+      placeholder: ex. email@example.com, discordname, twitter, ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: whatisexpected
+    attributes:
+      label: What should this feature add?
+      description: Please try to explain the functionality this feature should add
+      placeholder: |
+        Instead of one huge textfield, it would be nice to have forms for bug-reports, feature-requests, ...
+        Great benefits with automatic labeling, assigning and other functionalitys not available in that form
+        via old-fashioned markdown-templates. I would also love to see the use of a moderator bot 🤖 like
+        https://github.com/marketplace/actions/issue-moderator-with-commands to auto close old issues and other things
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Alternatives
+      description: Describe alternatives you've considered
+      placeholder: A clear and concise description of any alternative solutions or features you've considered.
+
+  - type: textarea
+    attributes:
+      label: Aditional Content
+      description: Add any other context or screenshots about the feature request here.
+      placeholder: This is a Mockup of the design how I imagine it <screenshot>
