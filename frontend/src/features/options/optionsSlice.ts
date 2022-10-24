@@ -42,6 +42,7 @@ export interface OptionsState {
   activeTab: number;
   shouldShowImageDetails: boolean;
   shouldShowGallery: boolean;
+  panelWidth: number;
 }
 
 const initialOptionsState: OptionsState = {
@@ -77,6 +78,7 @@ const initialOptionsState: OptionsState = {
   activeTab: 0,
   shouldShowImageDetails: false,
   shouldShowGallery: false,
+  panelWidth: 370
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -330,6 +332,9 @@ export const optionsSlice = createSlice({
     setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGallery = action.payload;
     },
+    setPanelWidth: (state, action: PayloadAction<number>) => {
+      state.panelWidth = action.payload;
+    },
   },
 });
 
@@ -372,6 +377,7 @@ export const {
   setShouldShowGallery,
   setAllTextToImageParameters,
   setAllImageToImageParameters,
+  setPanelWidth,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
