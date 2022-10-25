@@ -10,7 +10,6 @@ stable-diffusion-1.4:
   weights: models/ldm/stable-diffusion-v1/model.ckpt
 #  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
   description: Stable Diffusion inference model version 1.4
-  default: true
   width: 512
   height: 512
   default: true

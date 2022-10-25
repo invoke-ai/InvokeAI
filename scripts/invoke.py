@@ -674,7 +674,17 @@ def prepare_image_metadata(
     if postprocessed and opt.save_original:
         filename = choose_postprocess_name(opt,prefix,seed)
     else:
-        filename = f'{prefix}.{seed}.png'
+        wildcards = dict(opt.__dict__)
+        wildcards['prefix'] = prefix
+        wildcards['seed'] = seed
+        try:
+            filename = opt.fnformat.format(**wildcards)
+        except KeyError as e:
+            print(f'** The filename format contains an unknown key \'{e.args[0]}\'. Will use \'{{prefix}}.{{seed}}.png\' instead')
+            filename = f'{prefix}.{seed}.png'
+        except IndexError as e:
+            print(f'** The filename format is broken or complete. Will use \'{{prefix}}.{{seed}}.png\' instead')
+            filename = f'{prefix}.{seed}.png'
 
     if opt.variation_amount > 0:
         first_seed             = first_seed or seed
