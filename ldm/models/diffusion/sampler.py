@@ -439,3 +439,24 @@ class Sampler(object):
 
     def conditioning_key(self)->str:
         return self.model.model.conditioning_key
+
+    def make_cond_in(self, uncond, cond):
+        '''
+        This handles the choice between a conditional conditioning
+        that is a tensor (used by cross attention) vs one that is a dict
+        used by 'hybrid'
+        '''
+        if isinstance(cond, dict):
+            assert isinstance(uncond, dict)
+            cond_in = dict()
+            for k in cond:
+                if isinstance(cond[k], list):
+                    cond_in[k] = [
+                        torch.cat([uncond[k][i], cond[k][i]])
+                        for i in range(len(cond[k]))
+                    ]
+                else:
+                    cond_in[k] = torch.cat([uncond[k], cond[k]])
+        else:
+            cond_in = torch.cat([uncond, cond])
+        return cond_in
