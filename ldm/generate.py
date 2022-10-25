@@ -404,7 +404,10 @@ class Generate:
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            if (init_image is not None) and (mask_image is not None):
+            if self.sampler.conditioning_key() in ('hybrid','concat'):
+                print(f'** Inpainting model detected. Will try it! **')
+                generator = self._make_omnibus()
+            elif (init_image is not None) and (mask_image is not None):
                 generator = self._make_inpaint()
             elif (embiggen != None or embiggen_tiles != None):
                 generator = self._make_embiggen()
@@ -689,6 +692,12 @@ class Generate:
             from ldm.invoke.generator.inpaint import Inpaint
             self.generators['inpaint'] = Inpaint(self.model, self.precision)
         return self.generators['inpaint']
+
+    def _make_omnibus(self):
+        if not self.generators.get('omnibus'):
+            from ldm.invoke.generator.omnibus import Omnibus
+            self.generators['omnibus'] = Omnibus(self.model, self.precision)
+        return self.generators['omnibus']
 
     def load_model(self):
         '''

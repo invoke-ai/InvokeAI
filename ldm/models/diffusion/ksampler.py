@@ -281,3 +281,5 @@ class KSampler(Sampler):
         '''
         return self.model.inner_model.q_sample(x0,ts)
 
+    def conditioning_key(self)->str:
+        return self.model.inner_model.model.conditioning_key

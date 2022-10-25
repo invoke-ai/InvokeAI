@@ -41,7 +41,19 @@ class DDIMSampler(Sampler):
         else:
             x_in = torch.cat([x] * 2)
             t_in = torch.cat([t] * 2)
-            c_in = torch.cat([unconditional_conditioning, c])
+            if isinstance(c, dict):
+                assert isinstance(unconditional_conditioning, dict)
+                c_in = dict()
+                for k in c:
+                    if isinstance(c[k], list):
+                        c_in[k] = [
+                            torch.cat([unconditional_conditioning[k][i], c[k][i]])
+                            for i in range(len(c[k]))
+                        ]
+                    else:
+                        c_in[k] = torch.cat([unconditional_conditioning[k], c[k]])
+            else:
+                c_in = torch.cat([unconditional_conditioning, c])
             e_t_uncond, e_t = self.model.apply_model(x_in, t_in, c_in).chunk(2)
             e_t = e_t_uncond + unconditional_guidance_scale * (
                 e_t - e_t_uncond

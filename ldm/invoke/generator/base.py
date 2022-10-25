@@ -40,12 +40,13 @@ class Generator():
         self.variation_amount = variation_amount
         self.with_variations  = with_variations
 
-    def generate(self,prompt,init_image,width,height,iterations=1,seed=None,
+    def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  **kwargs):
         scope = choose_autocast(self.precision)
-        make_image          = self.get_make_image(
+        make_image = self.get_make_image(
             prompt,
+            sampler = sampler,
             init_image    = init_image,
             width         = width,
             height        = height,
@@ -54,13 +55,16 @@ class Generator():
             perlin        = perlin,
             **kwargs
         )
-
         results             = []
         seed                = seed if seed is not None else self.new_seed()
         first_seed          = seed
         seed, initial_noise = self.generate_initial_noise(seed, width, height)
-        with scope(self.model.device.type), self.model.ema_scope():
+
+        scope = (scope(self.model.device.type), self.model.ema_scope()) if sampler.conditioning_key() not in ('hybrid','concat') else scope(self.model.device.type)
+        
+        with scope:
             for n in trange(iterations, desc='Generating'):
+                print('DEBUG: in iterations loop() called')
                 x_T = None
                 if self.variation_amount > 0:
                     seed_everything(seed)
@@ -75,7 +79,6 @@ class Generator():
                         x_T = self.get_noise(width,height)
                     except:
                         pass
-
                 image = make_image(x_T)
                 results.append([image, seed])
                 if image_callback is not None:
@@ -83,10 +86,10 @@ class Generator():
                 seed = self.new_seed()
         return results
     
-    def sample_to_image(self,samples):
+    def sample_to_image(self,samples)->Image.Image:
         """
-        Returns a function returning an image derived from the prompt and the initial image
-        Return value depends on the seed at the time you call it
+        Given samples returned from a sampler, converts
+        it into a PIL Image
         """
         x_samples = self.model.decode_first_stage(samples)
         x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)

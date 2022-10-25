@@ -158,6 +158,18 @@ class Sampler(object):
         **kwargs,
     ):
 
+        if conditioning is not None:
+            if isinstance(conditioning, dict):
+                ctmp = conditioning[list(conditioning.keys())[0]]
+                while isinstance(ctmp, list):
+                    ctmp = ctmp[0]
+                cbs = ctmp.shape[0]
+                if cbs != batch_size:
+                    print(f"Warning: Got {cbs} conditionings but batch-size is {batch_size}")
+            else:
+                if conditioning.shape[0] != batch_size:
+                    print(f"Warning: Got {conditioning.shape[0]} conditionings but batch-size is {batch_size}")
+
         # check to see if make_schedule() has run, and if not, run it
         if self.ddim_timesteps is None:
             self.make_schedule(
@@ -193,7 +205,7 @@ class Sampler(object):
         )
         return samples, intermediates
 
-    #torch.no_grad()
+    @torch.no_grad()
     def do_sampling(
             self,
             cond,
@@ -307,6 +319,19 @@ class Sampler(object):
             mask              = None,
     ):
 
+        print(f'DEBUG(sampler): cond = {cond}')
+        if cond is not None:
+            if isinstance(cond, dict):
+                ctmp = cond[list(cond.keys())[0]]
+                while isinstance(ctmp, list):
+                    ctmp = ctmp[0]
+                cbs = ctmp.shape[0]
+                if cbs != batch_size:
+                    print(f"Warning: Got {cbs} conds but batch-size is {batch_size}")
+            else:
+                if cond.shape[0] != batch_size:
+                    print(f"Warning: Got {cond.shape[0]} conditionings but batch-size is {batch_size}")
+
         timesteps = (
             np.arange(self.ddpm_num_timesteps)
             if use_original_steps
@@ -411,3 +436,6 @@ class Sampler(object):
         return self.model.inner_model.q_sample(x0,ts)
         '''
         return self.model.q_sample(x0,ts)
+
+    def conditioning_key(self)->str:
+        return self.model.model.conditioning_key
