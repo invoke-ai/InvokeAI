@@ -171,9 +171,9 @@ def main_loop(gen, opt):
             except (OSError, AttributeError, KeyError):
                 pass
 
-        if len(opt.prompt) == 0:
-            print('\nTry again with a prompt!')
-            continue
+#        if len(opt.prompt) == 0:
+#            print('\nTry again with a prompt!')
+#            continue
 
         # width and height are set by model if not specified
         if not opt.width:
