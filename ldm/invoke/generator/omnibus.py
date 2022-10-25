@@ -4,6 +4,7 @@ import torch
 import numpy as  np
 from einops import repeat
 from PIL import Image, ImageOps
+from ldm.invoke.devices import choose_autocast
 from ldm.invoke.generator.base import downsampling
 from ldm.invoke.generator.img2img import Img2Img
 from ldm.invoke.generator.txt2img import Txt2Img
@@ -60,7 +61,7 @@ class Omnibus(Img2Img,Txt2Img):
                 ) # move to latent space
 
             # create a completely black mask  (1s)
-            mask_image = torch.ones(init_image.shape[0], 3, init_image.width, init_image.height, device=self.model.device)
+            mask_image = torch.ones(1, 1, init_image.shape[2], init_image.shape[3], device=self.model.device)
             # and the masked image is just a copy of the original
             masked_image = init_image
             t_enc = int(strength * steps)
@@ -74,7 +75,8 @@ class Omnibus(Img2Img,Txt2Img):
 
         def make_image(x_T):
             with torch.no_grad():
-                with torch.autocast("cuda"):
+                scope = choose_autocast(self.precision)
+                with scope(self.model.device.type):
 
                     batch = self.make_batch_sd(
                         init_image,
@@ -139,15 +141,10 @@ class Omnibus(Img2Img,Txt2Img):
                 "mask": repeat(mask.to(device=device), "1 ... -> n ...", n=num_samples),
                 "masked_image": repeat(masked_image.to(device=device), "1 ... -> n ...", n=num_samples),
                 }
-        print(f'DEBUG: image = {batch["image"]} shape={batch["image"].shape}')
-        print(f'DEBUG: mask = {batch["mask"]} shape={batch["mask"].shape}')
-        print(f'DEBUG: masked_image = {batch["masked_image"]} shape={batch["masked_image"].shape}')
         return batch
 
     def get_noise(self, width:int, height:int):
         if self.init_latent:
-            print('DEBUG: returning Img2Img.getnoise()')
             return super(Img2Img,self).get_noise(width,height)
         else:
-            print('DEBUG: returning Txt2Img.getnoise()')
             return super(Txt2Img,self).get_noise(width,height)

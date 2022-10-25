@@ -12,6 +12,22 @@ from ldm.modules.diffusionmodules.util import (
     extract_into_tensor,
 )
 
+def make_cond_in(uncond, cond):
+    if isinstance(cond, dict):
+        assert isinstance(uncond, dict)
+        cond_in = dict()
+        for k in cond:
+            if isinstance(cond[k], list):
+                cond_in[k] = [
+                    torch.cat([uncond[k][i], cond[k][i]])
+                    for i in range(len(cond[k]))
+                ]
+            else:
+                cond_in[k] = torch.cat([uncond[k], cond[k]])
+    else:
+        cond_in = torch.cat([uncond, cond])
+    return cond_in
+
 def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
     if threshold <= 0.0:
         return result
@@ -37,7 +53,7 @@ class CFGDenoiser(nn.Module):
     def forward(self, x, sigma, uncond, cond, cond_scale):
         x_in = torch.cat([x] * 2)
         sigma_in = torch.cat([sigma] * 2)
-        cond_in = torch.cat([uncond, cond])
+        cond_in = make_cond_in(uncond,cond)
         uncond, cond = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
         if self.warmup < self.warmup_max:
             thresh = max(1, 1 + (self.threshold - 1) * (self.warmup / self.warmup_max))
@@ -64,12 +80,11 @@ class KSampler(Sampler):
         def forward(self, x, sigma, uncond, cond, cond_scale):
             x_in = torch.cat([x] * 2)
             sigma_in = torch.cat([sigma] * 2)
-            cond_in = torch.cat([uncond, cond])
+            cond_in  = make_cond_in(uncond, cond)
             uncond, cond = self.inner_model(
                 x_in, sigma_in, cond=cond_in
             ).chunk(2)
             return uncond + (cond - uncond) * cond_scale
-
 
     def make_schedule(
             self,
@@ -283,3 +298,4 @@ class KSampler(Sampler):
 
     def conditioning_key(self)->str:
         return self.model.inner_model.model.conditioning_key
+
