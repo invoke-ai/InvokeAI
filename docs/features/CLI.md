@@ -8,7 +8,7 @@ hide:
 
 ## **Interactive Command Line Interface**
 
-The `invoke.py` script, located in `scripts/dream.py`, provides an interactive
+The `invoke.py` script, located in `scripts/`, provides an interactive
 interface to image generation similar to the "invoke mothership" bot that Stable
 AI provided on its Discord server.
 
@@ -86,6 +86,7 @@ overridden on a per-prompt basis (see [List of prompt arguments](#list-of-prompt
 | `--model <modelname>`                     |                                           | `stable-diffusion-1.4`                         | Loads model specified in configs/models.yaml. Currently one of "stable-diffusion-1.4" or "laion400m" |
 | `--full_precision`                        | `-F`                                      | `False`                                        | Run in slower full-precision mode. Needed for Macintosh M1/M2 hardware and some older video cards.   |
 | `--png_compression <0-9>`                 | `-z<0-9>`                                 |  6                                             | Select level of compression for output files, from 0 (no compression) to 9 (max compression)         |
+| `--safety-checker`                        |                                           |  False                                         | Activate safety checker for NSFW and other potentially disturbing imagery                            |
 | `--web`                                   |                                           | `False`                                        | Start in web server mode                                                                             |
 | `--host <ip addr>`                        |                                           | `localhost`                                    | Which network interface web server should listen on. Set to 0.0.0.0 to listen on any.                |
 | `--port <port>`                           |                                           | `9090`                                         | Which port web server should listen for requests on.                                                 |
@@ -97,7 +98,6 @@ overridden on a per-prompt basis (see [List of prompt arguments](#list-of-prompt
 | `--embedding_path <path>`                 |                                           | `None`                                         | Path to pre-trained embedding manager checkpoints, for custom models                                 |
 | `--gfpgan_dir`                            |                                           | `src/gfpgan`                                   | Path to where GFPGAN is installed.                                                                   |
 | `--gfpgan_model_path`                     |                                           | `experiments/pretrained_models/GFPGANv1.4.pth` | Path to GFPGAN model file, relative to `--gfpgan_dir`.                                               |
-| `--device <device>`                       | `-d<device>`                              | `torch.cuda.current_device()`                  | Device to run SD on, e.g. "cuda:0"                                                                   |
 | `--free_gpu_mem`                          |                                           | `False`                                        | Free GPU memory after sampling, to allow image decoding and saving in low VRAM conditions            |
 | `--precision`                             |                                           | `auto`                                         | Set model precision, default is selected by device. Options: auto, float32, float16, autocast        |
 
@@ -283,12 +283,20 @@ Some examples:
     Outputs:
     [1] outputs/img-samples/000017.4829112.gfpgan-00.png: !fix "outputs/img-samples/0000045.4829112.png" -s 50 -S  -W 512 -H 512 -C 7.5 -A k_lms -G 0.8
 
-# Model selection and importation
+### !mask
+
+This command takes an image, a text prompt, and uses the `clipseg`
+algorithm to automatically generate a mask of the area that matches
+the text prompt. It is useful for debugging the text masking process
+prior to inpainting with the `--text_mask` argument. See
+[INPAINTING.md] for details.
+
+## Model selection and importation
 
 The CLI allows you to add new models on the fly, as well as to switch
 among them rapidly without leaving the script.
 
-## !models
+### !models
 
 This prints out a list of the models defined in `config/models.yaml'.
 The active model is bold-faced
@@ -300,7 +308,7 @@ laion400m                 not loaded  <no description>
 waifu-diffusion           not loaded  Waifu Diffusion v1.3
 </pre>
 
-## !switch <model>
+### !switch <model>
 
 This quickly switches from one model to another without leaving the 
 CLI script. `invoke.py` uses a memory caching system; once a model
@@ -346,7 +354,7 @@ laion400m                 not loaded  <no description>
 waifu-diffusion               cached  Waifu Diffusion v1.3
 </pre>
 
-## !import_model <path/to/model/weights>
+### !import_model <path/to/model/weights>
 
 This command imports a new model weights file into InvokeAI, makes it
 available for image generation within the script, and writes out the
@@ -398,7 +406,7 @@ OK to import [n]? <b>y</b>
 invoke> 
 </pre>
 
-##!edit_model <name_of_model>
+###!edit_model <name_of_model>
 
 The `!edit_model` command can be used to modify a model that is
 already defined in `config/models.yaml`. Call it with the short
@@ -434,20 +442,12 @@ OK to import [n]? y
     Outputs:
     [2] outputs/img-samples/000018.2273800735.embiggen-00.png: !fix "outputs/img-samples/000017.243781548.gfpgan-00.png" -s 50 -S 2273800735 -W 512 -H 512 -C 7.5 -A k_lms --embiggen 3.0 0.75 0.25
     ```
-# History processing
+## History processing
 
 The CLI provides a series of convenient commands for reviewing previous
 actions, retrieving them, modifying them, and re-running them.
-```bash
-invoke> !fetch 0000015.8929913.png
-# the script returns the next line, ready for editing and running:
-invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
-```
 
-Note that this command may behave unexpectedly if given a PNG file that
-was not generated by InvokeAI.
-
-### `!history`
+### !history
 
 The invoke script keeps track of all the commands you issue during a
 session, allowing you to re-run them. On Mac and Linux systems, it
@@ -472,20 +472,41 @@ invoke> !20
 invoke> watercolor of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
 ```
 
-## !fetch
+### !fetch
 
 This command retrieves the generation parameters from a previously
-generated image and either loads them into the command line.  You may
-provide either the name of a file in the current output directory, or
-a full file path.
+generated image and either loads them into the command line
+(Linux|Mac), or prints them out in a comment for copy-and-paste
+(Windows). You may provide either the name of a file in the current
+output directory, or a full file path.  Specify path to a folder with
+image png files, and wildcard *.png to retrieve the dream command used
+to generate the images, and save them to a file commands.txt for
+further processing.
 
-~~~
+This example loads the generation command for a single png file:
+
+```bash
 invoke> !fetch 0000015.8929913.png
 # the script returns the next line, ready for editing and running:
 invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
+```
+
+This one fetches the generation commands from a batch of files and
+stores them into `selected.txt`:
+
+```bash
+invoke> !fetch outputs\selected-imgs\*.png selected.txt
+```
+
+### !replay
+
+This command replays a text file generated by !fetch or created manually
+
+~~~
+invoke> !replay outputs\selected-imgs\selected.txt
 ~~~
 
-Note that this command may behave unexpectedly if given a PNG file that
+Note that these commands may behave unexpectedly if given a PNG file that
 was not generated by InvokeAI.
 
 ### !search <search string>
@@ -502,16 +523,6 @@ invoke> !search surreal
 
 This clears the search history from memory and disk. Be advised that
 this operation is irreversible and does not issue any warnings!
-
-Other ! Commands
-
-### !mask
-
-This command takes an image, a text prompt, and uses the `clipseg`
-algorithm to automatically generate a mask of the area that matches
-the text prompt. It is useful for debugging the text masking process
-prior to inpainting with the `--text_mask` argument. See
-[INPAINTING.md] for details.
 
 ## Command-line editing and completion
 

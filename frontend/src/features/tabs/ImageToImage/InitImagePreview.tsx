@@ -1,4 +1,4 @@
-import { IconButton, Image } from '@chakra-ui/react';
+import { IconButton, Image, useToast } from '@chakra-ui/react';
 import React, { SyntheticEvent } from 'react';
 import { MdClear } from 'react-icons/md';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
@@ -11,10 +11,23 @@ export default function InitImagePreview() {
 
   const dispatch = useAppDispatch();
 
+  const toast = useToast();
+
   const handleClickResetInitialImage = (e: SyntheticEvent) => {
     e.stopPropagation();
     dispatch(setInitialImagePath(null));
   };
+
+  const alertMissingInitImage = () => {
+    toast({
+      title: 'Problem loading parameters',
+      description: 'Unable to load init image.',
+      status: 'error',
+      isClosable: true,
+    });
+    dispatch(setInitialImagePath(null));
+  };
+
   return (
     <div className="init-image-preview">
       <div className="init-image-preview-header">
@@ -29,7 +42,12 @@ export default function InitImagePreview() {
       </div>
       {initialImagePath && (
         <div className="init-image-image">
-          <Image fit={'contain'} src={initialImagePath} rounded={'md'} />
+          <Image
+            fit={'contain'}
+            src={initialImagePath}
+            rounded={'md'}
+            onError={alertMissingInitImage}
+          />
         </div>
       )}
     </div>

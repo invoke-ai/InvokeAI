@@ -81,15 +81,18 @@ text2mask feature. The syntax is `!mask /path/to/image.png -tm <text>
 It will generate three files:
 
 - The image with the selected area highlighted.
+  - it will be named XXXXX.<imagename>.<prompt>.selected.png
 - The image with the un-selected area highlighted.
+  - it will be named XXXXX.<imagename>.<prompt>.deselected.png
 - The image with the selected area converted into a black and white
-  image according to the threshold level.
+  image according to the threshold level
+  - it will be named XXXXX.<imagename>.<prompt>.masked.png
 
-Note that none of these images are intended to be used as the mask
-passed to invoke via `-M` and may give unexpected results if you try
-to use them this way. Instead, use `!mask` for testing that you are
-selecting the right mask area, and then do inpainting using the
-best selection term and threshold.
+The `.masked.png` file can then be directly passed to the `invoke>`
+prompt in the CLI via the `-M` argument. Do not attempt this with
+the `selected.png` or `deselected.png` files, as they contain some
+transparency throughout the image and will not produce the desired
+results.
 
 Here is an example of how `!mask` works:
 
@@ -120,7 +123,7 @@ It looks like we selected the hair pretty well at the 0.5 threshold
 let's have some fun:
 
 ```
-invoke> medusa with cobras -I ./test-pictures/curly.png -tm hair 0.5 -C20
+invoke> medusa with cobras -I ./test-pictures/curly.png -M 000019.curly.hair.masked.png -C20
 >> loaded input image of size 512x512 from ./test-pictures/curly.png
 ...
 Outputs:
@@ -128,6 +131,13 @@ Outputs:
 ```
 
 <img src="../assets/inpainting/000024.801380492.png">
+
+You can also skip the `!mask` creation step and just select the masked
+
+region directly:
+```
+invoke> medusa with cobras -I ./test-pictures/curly.png -tm hair -C20
+```
 
 ### Inpainting is not changing the masked region enough!
 

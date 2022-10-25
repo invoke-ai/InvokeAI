@@ -38,7 +38,7 @@ class PngWriter:
         info = PngImagePlugin.PngInfo()
         info.add_text('Dream', dream_prompt)
         if metadata:
-          info.add_text('sd-metadata', json.dumps(metadata))
+            info.add_text('sd-metadata', json.dumps(metadata))
         image.save(path, 'PNG', pnginfo=info, compress_level=compress_level)
         return path
 

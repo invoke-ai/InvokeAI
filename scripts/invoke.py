@@ -17,9 +17,15 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from omegaconf import OmegaConf
+from pathlib import Path
+
+# global used in multiple functions (fix)
+infile = None
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
+    global infile
+    
     opt  = Args()
     args = opt.parse_args()
     if not args:
@@ -48,7 +54,6 @@ def main():
         os.makedirs(opt.outdir)
 
     # load the infile as a list of lines
-    infile = None
     if opt.infile:
         try:
             if os.path.isfile(opt.infile):
@@ -64,16 +69,17 @@ def main():
     # creating a Generate object:
     try:
         gen = Generate(
-            conf           = opt.conf,
-            model          = opt.model,
-            sampler_name   = opt.sampler_name,
+            conf = opt.conf,
+            model = opt.model,
+            sampler_name = opt.sampler_name,
             embedding_path = opt.embedding_path,
             full_precision = opt.full_precision,
-            precision      = opt.precision,
+            precision = opt.precision,
             gfpgan=gfpgan,
             codeformer=codeformer,
             esrgan=esrgan,
             free_gpu_mem=opt.free_gpu_mem,
+            safety_checker=opt.safety_checker,
             )
     except (FileNotFoundError, IOError, KeyError) as e:
         print(f'{e}. Aborting.')
@@ -96,14 +102,16 @@ def main():
         )
 
     try:
-        main_loop(gen, opt, infile)
+        main_loop(gen, opt)
     except KeyboardInterrupt:
         print("\ngoodbye!")
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
-def main_loop(gen, opt, infile):
+def main_loop(gen, opt):
     """prompt/read/execute loop"""
+    global infile
     done = False
+    doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
     model_config = OmegaConf.load(opt.conf)
@@ -130,7 +138,8 @@ def main_loop(gen, opt, infile):
         try:
             command = get_next_command(infile)
         except EOFError:
-            done = True
+            done = infile is None or doneAfterInFile
+            infile = None
             continue
 
         # skip empty lines
@@ -368,7 +377,10 @@ def main_loop(gen, opt, infile):
 
     print('goodbye!')
 
+# TO DO: remove repetitive code and the awkward command.replace() trope
+# Just do a simple parse of the command!
 def do_command(command:str, gen, opt:Args, completer) -> tuple:
+    global infile
     operation = 'generate'   # default operation, alternative is 'postprocess'
 
     if command.startswith('!dream'):   # in case a stored prompt still contains the !dream command
@@ -413,9 +425,26 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         completer.add_history(command)
         operation = None
 
+    elif command.startswith('!del'):
+        path = shlex.split(command)
+        if len(path) < 2:
+            print('** please provide the name of a model')
+        else:
+            del_config(path[1], gen, opt, completer)
+        completer.add_history(command)
+        operation = None
+
     elif command.startswith('!fetch'):
-        file_path = command.replace('!fetch ','',1)
+        file_path = command.replace('!fetch','',1).strip()
         retrieve_dream_command(opt,file_path,completer)
+        completer.add_history(command)
+        operation = None
+
+    elif command.startswith('!replay'):
+        file_path = command.replace('!replay','',1).strip()
+        if infile is None and os.path.isfile(file_path):
+            infile = open(file_path, 'r', encoding='utf-8')
+        completer.add_history(command)
         operation = None
 
     elif command.startswith('!history'):
@@ -423,7 +452,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         operation = None
 
     elif command.startswith('!search'):
-        search_str = command.replace('!search ','',1)
+        search_str = command.replace('!search','',1).strip()
         completer.show_history(search_str)
         operation = None
 
@@ -465,6 +494,16 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
         new_config['config'] = input('Configuration file for this model: ')
         done = os.path.exists(new_config['config'])
 
+    done = False
+    completer.complete_extensions(('.vae.pt','.vae','.ckpt'))
+    while not done:
+        vae = input('VAE autoencoder file for this model [None]: ')
+        if os.path.exists(vae):
+            new_config['vae'] = vae
+            done = True
+        else:
+            done = len(vae)==0
+
     completer.complete_extensions(None)
 
     for field in ('width','height'):
@@ -479,9 +518,25 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
             except:
                 print('** Please enter a valid integer between 64 and 2048')
 
-    if write_config_file(opt.conf, gen, model_name, new_config):
-        gen.set_model(model_name)
+    make_default = input('Make this the default model? [n] ') in ('y','Y')
+    
+    if write_config_file(opt.conf, gen, model_name, new_config, make_default=make_default):
+        completer.add_model(model_name)
 
+def del_config(model_name:str, gen, opt, completer):
+    current_model = gen.model_name
+    if model_name == current_model:
+        print("** Can't delete active model. !switch to another model first. **")
+        return
+    yaml_str = gen.model_cache.del_model(model_name)
+    
+    tmpfile = os.path.join(os.path.dirname(opt.conf),'new_config.tmp')
+    with open(tmpfile, 'w') as outfile:
+        outfile.write(yaml_str)
+    os.rename(tmpfile,opt.conf)
+    print(f'** {model_name} deleted')
+    completer.del_model(model_name)
+    
 def edit_config(model_name:str, gen, opt, completer):
     config = gen.model_cache.config
     
@@ -493,33 +548,46 @@ def edit_config(model_name:str, gen, opt, completer):
 
     conf = config[model_name]
     new_config = {}
-    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae'))
-    for field in ('description', 'weights', 'config', 'width','height'):
+    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
+    for field in ('description', 'weights', 'vae', 'config', 'width','height'):
         completer.linebuffer = str(conf[field]) if field in conf else ''
         new_value = input(f'{field}: ')
         new_config[field] = int(new_value) if field in ('width','height') else new_value
+    make_default = input('Make this the default model? [n] ') in ('y','Y')
     completer.complete_extensions(None)
-
-    if write_config_file(opt.conf, gen, model_name, new_config, clobber=True):
-        gen.set_model(model_name)
+    write_config_file(opt.conf, gen, model_name, new_config, clobber=True, make_default=make_default)
     
-def write_config_file(conf_path, gen, model_name, new_config, clobber=False):
+def write_config_file(conf_path, gen, model_name, new_config, clobber=False, make_default=False):
+    current_model = gen.model_name
+    
     op = 'modify' if clobber else 'import'
     print('\n>> New configuration:')
+    if make_default:
+        new_config['default'] = True
     print(yaml.dump({model_name:new_config}))
     if input(f'OK to {op} [n]? ') not in ('y','Y'):
         return False
 
     try:
+        print('>> Verifying that new model loads...')
         yaml_str = gen.model_cache.add_model(model_name, new_config, clobber)
+        assert gen.set_model(model_name) is not None, 'model failed to load'
     except AssertionError as e:
-        print(f'** configuration failed: {str(e)}')
+        print(f'** aborting **')
+        gen.model_cache.del_model(model_name)
         return False
+
+    if make_default:
+        print('making this default')
+        gen.model_cache.set_default_model(model_name)
+
+    gen.model_cache.commit(conf_path)
     
-    tmpfile = os.path.join(os.path.dirname(conf_path),'new_config.tmp')
-    with open(tmpfile, 'w') as outfile:
-        outfile.write(yaml_str)
-    os.rename(tmpfile,conf_path)
+    do_switch = input(f'Keep model loaded? [y]')
+    if len(do_switch)==0 or do_switch[0] in ('y','Y'):
+        pass
+    else:
+        gen.set_model(current_model)
     return True
 
 def do_textmask(gen, opt, callback):
@@ -579,7 +647,10 @@ def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
     original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir,original_file)
     new_file       = new_file     if os.path.exists(new_file)      else os.path.join(opt.outdir,new_file)
     meta = retrieve_metadata(original_file)['sd-metadata']
-    img_data = meta['image']
+    if 'image' not in meta:
+        meta = metadata_dumps(opt,seeds=[opt.seed])['image']
+        meta['image'] = {}
+    img_data = meta.get('image')
     pp = img_data.get('postprocessing',[]) or []
     pp.append(
         {
@@ -723,27 +794,71 @@ def make_step_callback(gen, opt, prefix):
             image.save(filename,'PNG')
     return callback
     
-def retrieve_dream_command(opt,file_path,completer):
+def retrieve_dream_command(opt,command,completer):
     '''
     Given a full or partial path to a previously-generated image file,
     will retrieve and format the dream command used to generate the image,
     and pop it into the readline buffer (linux, Mac), or print out a comment
     for cut-and-paste (windows)
+
+    Given a wildcard path to a folder with image png files, 
+    will retrieve and format the dream command used to generate the images,
+    and save them to a file commands.txt for further processing
     '''
-    dir,basename = os.path.split(file_path)
+    if len(command) == 0:
+        return
+
+    tokens = command.split()
+    dir,basename = os.path.split(tokens[0])
     if len(dir) == 0:
         path = os.path.join(opt.outdir,basename)
     else:
-        path = file_path
+        path = tokens[0]
+
+    if len(tokens) > 1:
+        return write_commands(opt, path, tokens[1])
+
+    cmd = ''
     try:
         cmd = dream_cmd_from_png(path)
     except OSError:
-        print(f'** {path}: file could not be read')
+        print(f'## {tokens[0]}: file could not be read')
+    except (KeyError, AttributeError, IndexError):
+        print(f'## {tokens[0]}: file has no metadata')
+    except:
+        print(f'## {tokens[0]}: file could not be processed')
+    if len(cmd)>0:
+        completer.set_line(cmd)
+
+def write_commands(opt, file_path:str, outfilepath:str):
+    dir,basename = os.path.split(file_path)
+    try:
+        paths = list(Path(dir).glob(basename))
+    except ValueError:
+        print(f'## "{basename}": unacceptable pattern')
         return
-    except (KeyError, AttributeError):
-        print(f'** {path}: file has no metadata')
-        return
-    completer.set_line(cmd)
+ 
+    commands = []
+    cmd = None
+    for path in paths:
+        try:
+            cmd = dream_cmd_from_png(path)
+        except (KeyError, AttributeError, IndexError):
+            print(f'## {path}: file has no metadata')
+        except:
+            print(f'## {path}: file could not be processed')
+        if cmd:
+            commands.append(f'# {path}')
+            commands.append(cmd)
+    if len(commands)>0:
+        dir,basename = os.path.split(outfilepath)
+        if len(dir)==0:
+            outfilepath = os.path.join(opt.outdir,basename)
+        with open(outfilepath, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(commands))
+        print(f'>> File {outfilepath} with commands created')
+
+######################################
 
 if __name__ == '__main__':
     main()
