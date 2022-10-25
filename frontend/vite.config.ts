@@ -5,6 +5,7 @@ import eslint from 'vite-plugin-eslint';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const common = {
+    base: '',
     plugins: [react(), eslint()],
     server: {
       // Proxy HTTP requests to the flask server
