@@ -1,21 +1,23 @@
 # This file describes the alternative machine learning models
-#  available to the dream script.
+# available to the dream script.
 #
 # To add a new model, follow the examples below. Each
 # model requires a model config file, a weights file,
 # and the width and height of the images it
 # was trained on.
-
 stable-diffusion-1.4:
-    config:  configs/stable-diffusion/v1-inference.yaml
-    weights: models/ldm/stable-diffusion-v1/model.ckpt
-    vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
-    description: Stable Diffusion inference model version 1.4
-    width: 512
-    height: 512
+  config: configs/stable-diffusion/v1-inference.yaml
+  weights: models/ldm/stable-diffusion-v1/model.ckpt
+#  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+  description: Stable Diffusion inference model version 1.4
+  default: true
+  width: 512
+  height: 512
+  default: true
 stable-diffusion-1.5:
-    config:  configs/stable-diffusion/v1-inference.yaml
-    weights: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
-    description: Stable Diffusion inference model version 1.5
-    width: 512
-    height: 512
+  config: configs/stable-diffusion/v1-inference.yaml
+  weights: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
+#  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+  description: Stable Diffusion inference model version 1.5
+  width: 512
+  height: 512

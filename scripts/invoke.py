@@ -69,16 +69,17 @@ def main():
     # creating a Generate object:
     try:
         gen = Generate(
-            conf           = opt.conf,
-            model          = opt.model,
-            sampler_name   = opt.sampler_name,
+            conf = opt.conf,
+            model = opt.model,
+            sampler_name = opt.sampler_name,
             embedding_path = opt.embedding_path,
             full_precision = opt.full_precision,
-            precision      = opt.precision,
+            precision = opt.precision,
             gfpgan=gfpgan,
             codeformer=codeformer,
             esrgan=esrgan,
             free_gpu_mem=opt.free_gpu_mem,
+            safety_checker=opt.safety_checker,
             )
     except (FileNotFoundError, IOError, KeyError) as e:
         print(f'{e}. Aborting.')
@@ -799,26 +800,38 @@ def retrieve_dream_command(opt,command,completer):
     will retrieve and format the dream command used to generate the image,
     and pop it into the readline buffer (linux, Mac), or print out a comment
     for cut-and-paste (windows)
+
     Given a wildcard path to a folder with image png files, 
     will retrieve and format the dream command used to generate the images,
     and save them to a file commands.txt for further processing
     '''
     if len(command) == 0:
         return
+
     tokens = command.split()
-    if len(tokens) > 1:
-        outfilepath = tokens[1]
-    else:
-        outfilepath = "commands.txt"
-        
-    file_path = tokens[0]    
-    dir,basename = os.path.split(file_path)
+    dir,basename = os.path.split(tokens[0])
     if len(dir) == 0:
-        dir = opt.outdir
-        
-    outdir,outname = os.path.split(outfilepath)    
-    if len(outdir) == 0:
-        outfilepath = os.path.join(dir,outname)
+        path = os.path.join(opt.outdir,basename)
+    else:
+        path = tokens[0]
+
+    if len(tokens) > 1:
+        return write_commands(opt, path, tokens[1])
+
+    cmd = ''
+    try:
+        cmd = dream_cmd_from_png(path)
+    except OSError:
+        print(f'## {tokens[0]}: file could not be read')
+    except (KeyError, AttributeError, IndexError):
+        print(f'## {tokens[0]}: file has no metadata')
+    except:
+        print(f'## {tokens[0]}: file could not be processed')
+    if len(cmd)>0:
+        completer.set_line(cmd)
+
+def write_commands(opt, file_path:str, outfilepath:str):
+    dir,basename = os.path.split(file_path)
     try:
         paths = list(Path(dir).glob(basename))
     except ValueError:
@@ -826,28 +839,24 @@ def retrieve_dream_command(opt,command,completer):
         return
  
     commands = []
+    cmd = None
     for path in paths:
         try:
             cmd = dream_cmd_from_png(path)
-        except OSError:
-            print(f'## {path}: file could not be read')
-            continue
         except (KeyError, AttributeError, IndexError):
             print(f'## {path}: file has no metadata')
-            continue
         except:
             print(f'## {path}: file could not be processed')
-            continue
-            
-        commands.append(f'# {path}')
-        commands.append(cmd)
- 
-    with open(outfilepath, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(commands))
-    print(f'>> File {outfilepath} with commands created')
-
-    if len(commands) == 2:
-       completer.set_line(commands[1])
+        if cmd:
+            commands.append(f'# {path}')
+            commands.append(cmd)
+    if len(commands)>0:
+        dir,basename = os.path.split(outfilepath)
+        if len(dir)==0:
+            outfilepath = os.path.join(opt.outdir,basename)
+        with open(outfilepath, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(commands))
+        print(f'>> File {outfilepath} with commands created')
 
 ######################################
 

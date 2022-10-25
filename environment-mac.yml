@@ -19,6 +19,7 @@ dependencies:
   # ```
   - albumentations==1.2.1
   - coloredlogs==15.0.1
+  - diffusers==0.6.0
   - einops==0.4.1
   - grpcio==1.46.4
   - humanfriendly==10.0
