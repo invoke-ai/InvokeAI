@@ -181,7 +181,9 @@ class Args(object):
         switches_started = False
 
         for element in elements:
-            if element[0] == '-' and not switches_started:
+            if len(element) == 0:  # empty prompt
+                pass
+            elif element[0] == '-' and not switches_started:
                 switches_started = True
             if switches_started:
                 switches.append(element)
