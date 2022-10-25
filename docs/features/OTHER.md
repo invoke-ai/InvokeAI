@@ -75,6 +75,23 @@ combination of integers and floating point numbers, and they do not need to add 
 
 ---
 
+## **Filename Format**
+
+The argument `--fnformat` allows to specify the filename of the
+ image. Supported wildcards are all arguments what can be set such as
+ `perlin`, `seed`, `threshold`, `height`, `width`, `gfpgan_strength`,
+ `sampler_name`, `steps`, `model`, `upscale`, `prompt`, `cfg_scale`,
+ `prefix`.
+
+The following prompt
+```bash
+dream> a red car --steps 25 -C 9.8 --perlin 0.1 --fnformat {prompt}_steps.{steps}_cfg.{cfg_scale}_perlin.{perlin}.png
+```
+
+generates a file with the name: `outputs/img-samples/a red car_steps.25_cfg.9.8_perlin.0.1.png`
+
+---
+
 ## **Thresholding and Perlin Noise Initialization Options**
 
 Two new options are the thresholding (`--threshold`) and the perlin noise initialization (`--perlin`) options. Thresholding limits the range of the latent values during optimization, which helps combat oversaturation with higher CFG scale values. Perlin noise initialization starts with a percentage (a value ranging from 0 to 1) of perlin noise mixed into the initial noise. Both features allow for more variations and options in the course of generating images.
