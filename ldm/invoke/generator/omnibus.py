@@ -67,8 +67,8 @@ class Omnibus(Img2Img,Txt2Img):
             t_enc = int(strength * steps)
 
         else: # txt2img
-            init_image = torch.zeros(1, 3, width, height, device=self.model.device)
-            mask_image = torch.ones(1, 1, width, height, device=self.model.device)
+            init_image = torch.zeros(1, 3, height, width, device=self.model.device)
+            mask_image = torch.ones(1, 1, height, width, device=self.model.device)
             masked_image = init_image
 
         model = self.model

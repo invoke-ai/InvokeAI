@@ -60,11 +60,10 @@ class Generator():
         first_seed          = seed
         seed, initial_noise = self.generate_initial_noise(seed, width, height)
 
-        scope = (scope(self.model.device.type), self.model.ema_scope()) if sampler.conditioning_key() not in ('hybrid','concat') else scope(self.model.device.type)
-        
-        with scope:
+        # There used to be an additional self.model.ema_scope() here, but it breaks
+        # the inpaint-1.5 model. Not sure what it did.... ?
+        with scope(self.model.device.type):
             for n in trange(iterations, desc='Generating'):
-                print('DEBUG: in iterations loop() called')
                 x_T = None
                 if self.variation_amount > 0:
                     seed_everything(seed)
