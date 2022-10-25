@@ -77,7 +77,10 @@ class Img2Img(Generator):
 
     def _image_to_tensor(self, image:Image, normalize:bool=True)->Tensor:
         image = np.array(image).astype(np.float32) / 255.0
-        image = image[None].transpose(0, 3, 1, 2)
+        if len(image.shape) == 2:  # 'L' image, as in a mask
+            image = image[None,None]
+        else:                      # 'RGB' image
+            image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
         if normalize:
             image = 2.0 * image - 1.0

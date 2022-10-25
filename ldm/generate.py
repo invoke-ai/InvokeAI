@@ -655,6 +655,7 @@ class Generate:
 
         return init_image,init_mask
 
+    # lots o' repeated code here! Turn into a make_func()
     def _make_base(self):
         if not self.generators.get('base'):
             from ldm.invoke.generator import Generator
@@ -665,6 +666,7 @@ class Generate:
         if not self.generators.get('img2img'):
             from ldm.invoke.generator.img2img import Img2Img
             self.generators['img2img'] = Img2Img(self.model, self.precision)
+            self.generators['img2img'].free_gpu_mem = self.free_gpu_mem
         return self.generators['img2img']
 
     def _make_embiggen(self):
@@ -693,10 +695,13 @@ class Generate:
             self.generators['inpaint'] = Inpaint(self.model, self.precision)
         return self.generators['inpaint']
 
+    # "omnibus" supports the runwayML custom inpainting model, which does
+    # txt2img, img2img and inpainting using slight variations on the same code
     def _make_omnibus(self):
         if not self.generators.get('omnibus'):
             from ldm.invoke.generator.omnibus import Omnibus
             self.generators['omnibus'] = Omnibus(self.model, self.precision)
+            self.generators['omnibus'].free_gpu_mem = self.free_gpu_mem
         return self.generators['omnibus']
 
     def load_model(self):
