@@ -265,6 +265,7 @@ class Sampler(object):
             )
 
             if mask is not None:
+                print('DEBUG: in masking routine')
                 assert x0 is not None
                 img_orig = self.model.q_sample(
                     x0, ts
