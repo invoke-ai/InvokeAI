@@ -217,6 +217,7 @@ class Args(object):
         switches.append(f'-W {a["width"]}')
         switches.append(f'-H {a["height"]}')
         switches.append(f'-C {a["cfg_scale"]}')
+        switches.append(f'--fnformat {a["fnformat"]}')
         if a['perlin'] > 0:
             switches.append(f'--perlin {a["perlin"]}')
         if a['threshold'] > 0:
@@ -419,6 +420,11 @@ class Args(object):
             help=f'Set model precision. Defaults to auto selected based on device. Options: {", ".join(PRECISION_CHOICES)}',
             default='auto',
         )
+        model_group.add_argument(
+            '--safety_checker',
+            action='store_true',
+            help='Check for and blur potentially NSFW images',
+        )
         file_group.add_argument(
             '--from_file',
             dest='infile',
@@ -437,6 +443,12 @@ class Args(object):
             '-p',
             action='store_true',
             help='Place images in subdirectories named after the prompt.',
+        )
+        render_group.add_argument(
+            '--fnformat',
+            default='{prefix}.{seed}.png',
+            type=str,
+            help='Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png',
         )
         render_group.add_argument(
             '--grid',
@@ -610,6 +622,12 @@ class Args(object):
             default=0.0,
             type=float,
             help='Perlin noise scale (0.0 - 1.0) - add perlin noise to the initialization instead of the usual gaussian noise.',
+        )
+        render_group.add_argument(
+            '--fnformat',
+            default='{prefix}.{seed}.png',
+            type=str,
+            help='Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png',
         )
         render_group.add_argument(
             '--grid',
@@ -811,6 +829,13 @@ class Args(object):
             type=str,
             help='list of variations to apply, in the format `seed:weight,seed:weight,...'
         )
+        render_group.add_argument(
+            '--use_mps_noise',
+            action='store_true',
+            dest='use_mps_noise',
+            help='Simulate noise on M1 systems to get the same results'
+        )
+
         return parser
 
 def format_metadata(**kwargs):
@@ -846,9 +871,8 @@ def metadata_dumps(opt,
 
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
-                         'cfg_scale','threshold','perlin','step_number','width','height','extra','strength',
+                         'cfg_scale','threshold','perlin','fnformat', 'step_number','width','height','extra','strength',
                          'init_img','init_mask','facetool','facetool_strength','upscale']
-
     rfc_dict ={}
 
     for item in image_dict.items():

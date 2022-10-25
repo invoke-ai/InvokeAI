@@ -118,7 +118,7 @@ class Txt2Img2Img(Generator):
             scaled_height = height
             
         device      = self.model.device
-        if device.type == 'mps':
+        if self.use_mps_noise or device.type == 'mps':
             return torch.randn([1,
                                 self.latent_channels,
                                 scaled_height // self.downsampling_factor,

@@ -10,7 +10,6 @@ stable-diffusion-1.4:
   weights: models/ldm/stable-diffusion-v1/model.ckpt
 #  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
   description: Stable Diffusion inference model version 1.4
-  default: true
   width: 512
   height: 512
 inpainting-1.5:
@@ -20,6 +19,7 @@ inpainting-1.5:
 #  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
   width: 512
   height: 512
+  default: true
 stable-diffusion-1.5:
   config: configs/stable-diffusion/v1-inference.yaml
   weights: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
