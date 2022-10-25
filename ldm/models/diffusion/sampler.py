@@ -319,20 +319,6 @@ class Sampler(object):
             init_latent       = None,
             mask              = None,
     ):
-
-        print(f'DEBUG(sampler): cond = {cond}')
-        if cond is not None:
-            if isinstance(cond, dict):
-                ctmp = cond[list(cond.keys())[0]]
-                while isinstance(ctmp, list):
-                    ctmp = ctmp[0]
-                cbs = ctmp.shape[0]
-                if cbs != batch_size:
-                    print(f"Warning: Got {cbs} conds but batch-size is {batch_size}")
-            else:
-                if cond.shape[0] != batch_size:
-                    print(f"Warning: Got {cond.shape[0]} conditionings but batch-size is {batch_size}")
-
         timesteps = (
             np.arange(self.ddpm_num_timesteps)
             if use_original_steps
