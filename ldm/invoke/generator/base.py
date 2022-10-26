@@ -6,6 +6,7 @@ import torch
 import numpy as  np
 import random
 import os
+import traceback
 from tqdm import tqdm, trange
 from PIL import Image, ImageFilter
 from einops import rearrange, repeat
@@ -82,7 +83,9 @@ class Generator():
                     try:
                         x_T = self.get_noise(width,height)
                     except:
-                        pass
+                        print('** An error occurred while getting initial noise **')
+                        print(traceback.format_exc())
+
                 image = make_image(x_T)
 
                 if self.safety_checker is not None:

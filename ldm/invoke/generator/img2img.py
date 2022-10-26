@@ -14,7 +14,7 @@ from ldm.models.diffusion.ddim import DDIMSampler
 class Img2Img(Generator):
     def __init__(self, model, precision):
         super().__init__(model, precision)
-        self.init_latent         = None    # by get_noise()
+        self.init_latent = None    # by get_noise()
 
     def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
                        conditioning,init_image,strength,step_callback=None,threshold=0.0,perlin=0.0,**kwargs):

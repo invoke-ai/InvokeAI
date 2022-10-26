@@ -70,6 +70,7 @@ class Omnibus(Img2Img,Txt2Img):
             mask_image = torch.ones(1, 1, height, width, device=self.model.device)
             masked_image = init_image
 
+        self.init_latent = init_image
         height = init_image.shape[2]
         width = init_image.shape[3]
         model = self.model
@@ -144,4 +145,7 @@ class Omnibus(Img2Img,Txt2Img):
         return batch
 
     def get_noise(self, width:int, height:int):
-        return super(Txt2Img,self).get_noise(width,height)
+        if self.init_latent is not None:
+            height = self.init_latent.shape[2]
+            width = self.init_latent.shape[3]
+        return Txt2Img.get_noise(self,width,height)
