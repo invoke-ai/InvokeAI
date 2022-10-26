@@ -15,7 +15,7 @@ from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserCompo
 class Img2Img(Generator):
     def __init__(self, model, precision):
         super().__init__(model, precision)
-        self.init_latent         = None    # by get_noise()
+        self.init_latent = None    # by get_noise()
 
     def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
                        conditioning,init_image,strength,step_callback=None,threshold=0.0,perlin=0.0,**kwargs):
@@ -80,7 +80,10 @@ class Img2Img(Generator):
 
     def _image_to_tensor(self, image:Image, normalize:bool=True)->Tensor:
         image = np.array(image).astype(np.float32) / 255.0
-        image = image[None].transpose(0, 3, 1, 2)
+        if len(image.shape) == 2:  # 'L' image, as in a mask
+            image = image[None,None]
+        else:                      # 'RGB' image
+            image = image[None].transpose(0, 3, 1, 2)
         image = torch.from_numpy(image)
         if normalize:
             image = 2.0 * image - 1.0

@@ -14,9 +14,6 @@ class PLMSSampler(Sampler):
     def __init__(self, model, schedule='linear', device=None, **kwargs):
         super().__init__(model,schedule,model.num_timesteps, device)
 
-        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.model,
-                                                           model_forward_callback = lambda x, sigma, cond: self.model.apply_model(x, sigma, cond))
-
     def prepare_to_sample(self, t_enc, **kwargs):
         super().prepare_to_sample(t_enc, **kwargs)
 
@@ -67,7 +64,6 @@ class PLMSSampler(Sampler):
                                                                unconditional_conditioning, c,
                                                                unconditional_guidance_scale,
                                                                step_index=step_index)
-
             if score_corrector is not None:
                 assert self.model.parameterization == 'eps'
                 e_t = score_corrector.modify_score(

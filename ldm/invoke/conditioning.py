@@ -123,8 +123,8 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
         else:
             conditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt, log_tokens=log_tokens)
 
-
     unconditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, parsed_negative_prompt, log_tokens=log_tokens)
+    conditioning = flatten_hybrid_conditioning(unconditioning, conditioning)
     return (
         unconditioning, conditioning, InvokeAIDiffuserComponent.ExtraConditioningInfo(
             cross_attention_control_args=cac_args
@@ -166,4 +166,25 @@ def get_tokens_length(model, fragments: list[Fragment]):
     tokens = model.cond_stage_model.get_tokens(fragment_texts, include_start_and_end_markers=False)
     return sum([len(x) for x in tokens])
 
+def flatten_hybrid_conditioning(uncond, cond):
+    '''
+    This handles the choice between a conditional conditioning
+    that is a tensor (used by cross attention) vs one that has additional
+    dimensions as well, as used by 'hybrid'
+    '''
+    if isinstance(cond, dict):
+        assert isinstance(uncond, dict)
+        cond_in = dict()
+        for k in cond:
+            if isinstance(cond[k], list):
+                cond_in[k] = [
+                    torch.cat([uncond[k][i], cond[k][i]])
+                    for i in range(len(cond[k]))
+                ]
+            else:
+                cond_in[k] = torch.cat([uncond[k], cond[k]])
+        return cond_in
+    else:
+        return cond
 
+            

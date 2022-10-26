@@ -421,7 +421,10 @@ class Generate:
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            if (init_image is not None) and (mask_image is not None):
+            if self.sampler.conditioning_key() in ('hybrid','concat'):
+                print(f'** Inpainting model detected. Will try it! **')
+                generator = self._make_omnibus()
+            elif (init_image is not None) and (mask_image is not None):
                 generator = self._make_inpaint()
             elif (embiggen != None or embiggen_tiles != None):
                 generator = self._make_embiggen()
@@ -677,6 +680,7 @@ class Generate:
 
         return init_image,init_mask
 
+    # lots o' repeated code here! Turn into a make_func()
     def _make_base(self):
         if not self.generators.get('base'):
             from ldm.invoke.generator import Generator
@@ -687,6 +691,7 @@ class Generate:
         if not self.generators.get('img2img'):
             from ldm.invoke.generator.img2img import Img2Img
             self.generators['img2img'] = Img2Img(self.model, self.precision)
+            self.generators['img2img'].free_gpu_mem = self.free_gpu_mem
         return self.generators['img2img']
 
     def _make_embiggen(self):
@@ -714,6 +719,15 @@ class Generate:
             from ldm.invoke.generator.inpaint import Inpaint
             self.generators['inpaint'] = Inpaint(self.model, self.precision)
         return self.generators['inpaint']
+
+    # "omnibus" supports the runwayML custom inpainting model, which does
+    # txt2img, img2img and inpainting using slight variations on the same code
+    def _make_omnibus(self):
+        if not self.generators.get('omnibus'):
+            from ldm.invoke.generator.omnibus import Omnibus
+            self.generators['omnibus'] = Omnibus(self.model, self.precision)
+            self.generators['omnibus'].free_gpu_mem = self.free_gpu_mem
+        return self.generators['omnibus']
 
     def load_model(self):
         '''

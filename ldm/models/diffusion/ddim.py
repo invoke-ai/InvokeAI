@@ -53,12 +53,14 @@ class DDIMSampler(Sampler):
             # damian0815 would like to know when/if this code path is used
             e_t = self.model.apply_model(x, t, c)
         else:
+            # step_index counts in the opposite direction to index
             step_index = step_count-(index+1)
-            e_t = self.invokeai_diffuser.do_diffusion_step(x, t,
-                                                           unconditional_conditioning, c,
-                                                           unconditional_guidance_scale,
-                                                           step_index=step_index)
-
+            e_t = self.invokeai_diffuser.do_diffusion_step(
+                x, t,
+                unconditional_conditioning, c,
+                unconditional_guidance_scale,
+                step_index=step_index
+            )
         if score_corrector is not None:
             assert self.model.parameterization == 'eps'
             e_t = score_corrector.modify_score(
