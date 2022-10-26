@@ -219,7 +219,6 @@ class Args(object):
         switches.append(f'-W {a["width"]}')
         switches.append(f'-H {a["height"]}')
         switches.append(f'-C {a["cfg_scale"]}')
-        switches.append(f'--fnformat {a["fnformat"]}')
         if a['perlin'] > 0:
             switches.append(f'--perlin {a["perlin"]}')
         if a['threshold'] > 0:
@@ -245,6 +244,8 @@ class Args(object):
                 switches.append(f'-f {a["strength"]}')
             if a['inpaint_replace']:
                 switches.append(f'--inpaint_replace')
+            if a['text_mask']:
+                switches.append(f'-tm {" ".join([str(u) for u in a["text_mask"]])}')
         else:
             switches.append(f'-A {a["sampler_name"]}')
 
