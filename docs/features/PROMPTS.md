@@ -101,12 +101,18 @@ The following will be recognised:
 
 ### Blending between prompts
 
-* `("a tall thin man picking apricots", "a tall thin man picking pears").blend(1,1)`
+You can request an equal blend between `a tall thin man picking apricots` and `a tall thin man picking pears` with the following prompt: `("a tall thin man picking apricots", "a tall thin man picking pears").blend(1,1)`. 
 * The existing prompt blending using `:<weight>` will continue to be supported - `("a tall thin man picking apricots", "a tall thin man picking pears").blend(1,1)` is equivalent to `a tall thin man picking apricots:1 a tall thin man picking pears:1` in the old syntax.
 * Attention weights can be nested inside blends.
-* Non-normalized blends are supported by passing `no_normalize` as an additional argument to the blend weights, eg `("a tall thin man picking apricots", "a tall thin man picking pears").blend(1,-1,no_normalize)`. very fun to explore local maxima in the feature space, but also easy to produce garbage output.
+* Non-normalized blends are supported by passing `no_normalize` as an additional argument to the blend weights, eg `("a tall thin man picking apricots", "a tall thin man picking pears").blend(1,-1,no_normalize)`. Very fun to explore local maxima in the feature space, but also easy to produce garbage output.
 
 See the section below on "Prompt Blending" for more information about how this works.
+
+Note that if you're using the `invoke>` command-line UI (not the web UI) you will have to escape the speech marks, eg:
+
+```commandline
+invoke> "(\"a tall thin man picking apricots\", \"a tall thin man picking pears\").blend(1, 1)" -s 10 -A k_euler -W384 -H384
+```
 
 ### Cross-Attention Control ('prompt2prompt')
 
@@ -121,6 +127,8 @@ Denoise with a given prompt and then re-use the attention→pixel maps to substi
     * For img2img, the step sequence does not start at 0 but instead at (1-strength) - so if strength is 0.7, s_start and s_end must both be greater than 0.3 (1-0.7) to have any effect. 
 * Convenience option `shape_freedom` (0-1) to specify how much "freedom" Stable Diffusion should have to change the shape of the subject being swapped. 
   * `a (cat).swap(dog, shape_freedom=0.5) eating a hotdog`.
+
+As with Blending, you'll need to escape the quotes if you're using the command line `invoke>` interface.  
 
 ### Escaping parantheses () and speech marks ""
 
