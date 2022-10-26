@@ -19,17 +19,22 @@ esac
 
 OS_ARCH=$(uname -m)
 case "${OS_ARCH}" in
-    x86_64*)    OS_ARCH="x64";;
+    x86_64*)    OS_ARCH="64";;
     arm64*)     OS_ARCH="arm64";;
     *)          echo "Unknown system architecture: $OS_ARCH! This script runs only on x86_64 or arm64" && exit
 esac
 
+# https://mamba.readthedocs.io/en/latest/installation.html
+if [ "$OS_NAME" == "linux" ] && [ "$OS_ARCH" == "arm64" ]; then OS_ARCH="aarch64"; fi
+
 # config
 export MAMBA_ROOT_PREFIX="$(pwd)/installer_files/mamba"
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
-MICROMAMBA_BINARY_FILE="$(pwd)/installer_files/micromamba_${OS_NAME}_${OS_ARCH}"
+MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${OS_NAME}-${OS_ARCH}/latest"
 
 # figure out whether git and conda needs to be installed
+if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
+
 PACKAGES_TO_INSTALL=""
 
 if ! hash "conda" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL conda"; fi
@@ -37,10 +42,14 @@ if ! hash "git" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL git"
 
 # (if necessary) install git and conda into a contained environment
 if [ "$PACKAGES_TO_INSTALL" != "" ]; then
-    # initialize micromamba
-    if [ ! -e "$MAMBA_ROOT_PREFIX" ]; then
+    # download micromamba
+    if [ ! -e "$MAMBA_ROOT_PREFIX/micromamba" ]; then
+        echo "Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to $MAMBA_ROOT_PREFIX/micromamba"
+
         mkdir -p "$MAMBA_ROOT_PREFIX"
-        cp "$MICROMAMBA_BINARY_FILE" "$MAMBA_ROOT_PREFIX/micromamba"
+        curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvj bin/micromamba -O > "$MAMBA_ROOT_PREFIX/micromamba"
+
+        chmod u+x "$MAMBA_ROOT_PREFIX/micromamba"
 
         # test the mamba binary
         echo "Micromamba version:"
@@ -77,8 +86,9 @@ fi
 CONDA_BASEPATH=$(conda info --base)
 source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains about 'shell not initialized' (needed when running in a script)
 
+conda activate
+
 if [ "$OS_NAME" == "mac" ]; then
-    if [ "$OS_ARCH" == "x64" ]; then OS_ARCH="64"; fi
     PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-${OS_ARCH} conda env create -f environment-mac.yml
 else
     conda env create -f environment.yml
