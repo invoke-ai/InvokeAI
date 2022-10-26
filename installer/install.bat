@@ -60,7 +60,7 @@ if "%PACKAGES_TO_INSTALL%" NEQ "" (
     )
 )
 
-set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scripts;%PATH%
+set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scripts;%INSTALL_ENV_DIR%\Library\usr\bin;%PATH%
 
 @rem get the repo (and load into the current directory)
 if not exist ".git" (
