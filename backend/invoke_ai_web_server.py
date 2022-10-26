@@ -14,7 +14,7 @@ from threading import Event
 
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.conditioning import split_weighted_subprompts
+from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
 

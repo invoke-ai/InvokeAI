@@ -5,6 +5,8 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 import torch
 import numpy as  np
 from ldm.invoke.generator.base import Generator
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+
 
 class Txt2Img(Generator):
     def __init__(self, model, precision):
@@ -19,7 +21,7 @@ class Txt2Img(Generator):
         kwargs are 'width' and 'height'
         """
         self.perlin = perlin
-        uc, c   = conditioning
+        uc, c, extra_conditioning_info   = conditioning
 
         @torch.no_grad()
         def make_image(x_T):
@@ -43,6 +45,7 @@ class Txt2Img(Generator):
                 verbose                      = False,
                 unconditional_guidance_scale = cfg_scale,
                 unconditional_conditioning   = uc,
+                extra_conditioning_info      = extra_conditioning_info,
                 eta                          = ddim_eta,
                 img_callback                 = step_callback,
                 threshold                    = threshold,

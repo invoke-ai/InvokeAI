@@ -7,6 +7,7 @@ import numpy as  np
 import math
 from ldm.invoke.generator.base  import Generator
 from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 
 class Txt2Img2Img(Generator):
@@ -22,7 +23,7 @@ class Txt2Img2Img(Generator):
         Return value depends on the seed at the time you call it
         kwargs are 'width' and 'height'
         """
-        uc, c   = conditioning
+        uc, c, extra_conditioning_info = conditioning
 
         @torch.no_grad()
         def make_image(x_T):           
@@ -60,7 +61,8 @@ class Txt2Img2Img(Generator):
                 unconditional_guidance_scale = cfg_scale,
                 unconditional_conditioning   = uc,
                 eta                          = ddim_eta,
-                img_callback                 = step_callback
+                img_callback                 = step_callback,
+                extra_conditioning_info      = extra_conditioning_info
             )
             
             print(
@@ -94,6 +96,8 @@ class Txt2Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
+                extra_conditioning_info=extra_conditioning_info,
+                all_timesteps_count=steps
             )
 
             if self.free_gpu_mem:

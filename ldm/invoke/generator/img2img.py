@@ -10,6 +10,7 @@ from PIL import Image
 from ldm.invoke.devices import choose_autocast
 from ldm.invoke.generator.base import Generator
 from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 class Img2Img(Generator):
     def __init__(self, model, precision):
@@ -38,7 +39,7 @@ class Img2Img(Generator):
             ) # move to latent space
 
         t_enc = int(strength * steps)
-        uc, c   = conditioning
+        uc, c, extra_conditioning_info   = conditioning
 
         def make_image(x_T):
             # encode (scaled latent)
@@ -55,7 +56,9 @@ class Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
-                init_latent = self.init_latent,  # changes how noising is performed in ksampler
+                init_latent = self.init_latent, # changes how noising is performed in ksampler
+                extra_conditioning_info = extra_conditioning_info,
+                all_timesteps_count = steps
             )
 
             return self.sample_to_image(samples)

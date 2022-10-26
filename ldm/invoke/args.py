@@ -92,7 +92,7 @@ import copy
 import base64
 import functools
 import ldm.invoke.pngwriter
-from ldm.invoke.conditioning import split_weighted_subprompts
+from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
     'ddim',

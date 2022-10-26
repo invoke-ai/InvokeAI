@@ -1,16 +1,12 @@
 """wrapper around part of Katherine Crowson's k-diffusion library, making it call compatible with other Samplers"""
+
 import k_diffusion as K
 import torch
-import torch.nn as nn
-from ldm.invoke.devices import choose_torch_device
-from ldm.models.diffusion.sampler import Sampler
-from ldm.util import rand_perlin_2d
-from ldm.modules.diffusionmodules.util import (
-    make_ddim_sampling_parameters,
-    make_ddim_timesteps,
-    noise_like,
-    extract_into_tensor,
-)
+from torch import nn
+
+from .sampler import Sampler
+from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
+
 
 def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
     if threshold <= 0.0:
@@ -33,12 +29,24 @@ class CFGDenoiser(nn.Module):
         self.threshold = threshold
         self.warmup_max = warmup
         self.warmup = max(warmup / 10, 1)
+        self.invokeai_diffuser = InvokeAIDiffuserComponent(model,
+                                                           model_forward_callback=lambda x, sigma, cond: self.inner_model(x, sigma, cond=cond))
+
+    def prepare_to_sample(self, t_enc, **kwargs):
+
+        extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
+
+        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = t_enc)
+        else:
+            self.invokeai_diffuser.remove_cross_attention_control()
+
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
-        x_in = torch.cat([x] * 2)
-        sigma_in = torch.cat([sigma] * 2)
-        cond_in = torch.cat([uncond, cond])
-        uncond, cond = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
+
+        next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale)
+
+        # apply threshold
         if self.warmup < self.warmup_max:
             thresh = max(1, 1 + (self.threshold - 1) * (self.warmup / self.warmup_max))
             self.warmup += 1
@@ -46,7 +54,8 @@ class CFGDenoiser(nn.Module):
             thresh = self.threshold
         if thresh > self.threshold:
             thresh = self.threshold
-        return cfg_apply_threshold(uncond + (cond - uncond) * cond_scale, thresh)
+        return cfg_apply_threshold(next_x, thresh)
+
 
 
 class KSampler(Sampler):
@@ -60,16 +69,6 @@ class KSampler(Sampler):
         self.sigmas = None
         self.ds     = None
         self.s_in   = None
-
-        def forward(self, x, sigma, uncond, cond, cond_scale):
-            x_in = torch.cat([x] * 2)
-            sigma_in = torch.cat([sigma] * 2)
-            cond_in = torch.cat([uncond, cond])
-            uncond, cond = self.inner_model(
-                x_in, sigma_in, cond=cond_in
-            ).chunk(2)
-            return uncond + (cond - uncond) * cond_scale
-
 
     def make_schedule(
             self,
@@ -118,6 +117,7 @@ class KSampler(Sampler):
             use_original_steps=False,
             init_latent       = None,
             mask              = None,
+            **kwargs
     ):
         samples,_ = self.sample(
             batch_size = 1,
@@ -129,7 +129,8 @@ class KSampler(Sampler):
             unconditional_conditioning = unconditional_conditioning,
             img_callback = img_callback,
             x0           = init_latent,
-            mask         = mask
+            mask         = mask,
+            **kwargs
             )
         return samples
 
@@ -163,6 +164,7 @@ class KSampler(Sampler):
         log_every_t=100,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
+        extra_conditioning_info=None,
         threshold = 0,
         perlin = 0,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
@@ -181,7 +183,6 @@ class KSampler(Sampler):
             )
 
         # sigmas are set up in make_schedule - we take the last steps items
-        total_steps = len(self.sigmas)
         sigmas = self.sigmas[-S-1:]
 
         # x_T is variation noise. When an init image is provided (in x0) we need to add
@@ -195,19 +196,21 @@ class KSampler(Sampler):
             x = torch.randn([batch_size, *shape], device=self.device) * sigmas[0]
 
         model_wrap_cfg = CFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
+        model_wrap_cfg.prepare_to_sample(S, extra_conditioning_info=extra_conditioning_info)
         extra_args = {
             'cond': conditioning,
             'uncond': unconditional_conditioning,
             'cond_scale': unconditional_guidance_scale,
         }
         print(f'>> Sampling with k_{self.schedule} starting at step {len(self.sigmas)-S-1} of {len(self.sigmas)-1} ({S} new sampling steps)')
-        return (
+        sampling_result = (
             K.sampling.__dict__[f'sample_{self.schedule}'](
                 model_wrap_cfg, x, sigmas, extra_args=extra_args,
                 callback=route_callback
             ),
             None,
         )
+        return sampling_result
 
     # this code will support inpainting if and when ksampler API modified or
     # a workaround is found.
@@ -220,6 +223,7 @@ class KSampler(Sampler):
             index,
             unconditional_guidance_scale=1.0,
             unconditional_conditioning=None,
+            extra_conditioning_info=None,
             **kwargs,
     ):
         if self.model_wrap is None:
@@ -245,6 +249,7 @@ class KSampler(Sampler):
         # so the actual formula for indexing into sigmas:
         # sigma_index = (steps-index)
         s_index = t_enc - index - 1
+        self.model_wrap.prepare_to_sample(s_index, extra_conditioning_info=extra_conditioning_info)
         img =  K.sampling.__dict__[f'_{self.schedule}'](
             self.model_wrap,
             img,
@@ -269,7 +274,7 @@ class KSampler(Sampler):
         else:
             return x
         
-    def prepare_to_sample(self,t_enc):
+    def prepare_to_sample(self,t_enc,**kwargs):
         self.t_enc      = t_enc
         self.model_wrap = None
         self.ds         = None
