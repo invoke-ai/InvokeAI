@@ -598,7 +598,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
             fragments,
             truncation=True,
             max_length=self.max_length,
-            return_overflowing_tokens=False,
+            return_overflowing_tokens=True,
             padding='do_not_pad',
             return_tensors=None,  # just give me a list of ints
         )['input_ids']
@@ -616,8 +616,9 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
         if (len(all_tokens) + 2) > self.max_length:
             excess_token_count = (len(all_tokens) + 2) - self.max_length
-            print(f"prompt is {excess_token_count} token(s) too long and has been truncated")
+            print(f">> Prompt is {excess_token_count} token(s) too long and has been truncated")
             all_tokens = all_tokens[:self.max_length - 2]
+            per_token_weights = per_token_weights[:self.max_length - 2]
 
         # pad out to a 77-entry array: [eos_token, <prompt tokens>, eos_token, ..., eos_token]
         # (77 = self.max_length)
