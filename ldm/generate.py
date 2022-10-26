@@ -293,6 +293,13 @@ class Generate:
             catch_interrupts = False,
             hires_fix        = False,
             use_mps_noise    = False,
+            # Seam settings for outpainting
+            seam_size: int   = 0,
+            seam_blur: int   = 0,
+            seam_strength: float = 0.7,
+            seam_steps: int  = 10,
+            tile_size: int   = 32,
+            force_outpaint: bool = False,
             **args,
     ):   # eat up additional cruft
         """
@@ -420,7 +427,7 @@ class Generate:
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            if (init_image is not None) and (mask_image is not None):
+            if ((init_image is not None) and (mask_image is not None)) or force_outpaint:
                 generator = self._make_inpaint()
             elif (embiggen != None or embiggen_tiles != None):
                 generator = self._make_embiggen()
@@ -464,7 +471,13 @@ class Generate:
                 embiggen_tiles=embiggen_tiles,
                 inpaint_replace=inpaint_replace,
                 mask_blur_radius=mask_blur_radius,
-                safety_checker=checker
+                safety_checker=checker,
+                seam_size = seam_size,
+                seam_blur = seam_blur,
+                seam_strength = seam_strength,
+                seam_steps = seam_steps,
+                tile_size = tile_size,
+                force_outpaint = force_outpaint
             )
 
             if init_color:
@@ -888,8 +901,9 @@ class Generate:
         image = ImageOps.exif_transpose(image)
         return image
 
-    def _create_init_image(self, image, width, height, fit=True):
-        image = image.convert('RGB')
+    def _create_init_image(self, image: Image.Image, width, height, fit=True):
+        if image.mode != 'RGBA':
+            image = image.convert('RGB')
         image = self._fit_image(image, (width, height)) if fit else self._squeeze_image(image)
         return image
 
