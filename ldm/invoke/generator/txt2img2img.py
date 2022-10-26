@@ -25,28 +25,27 @@ class Txt2Img2Img(Generator):
         uc, c   = conditioning
 
         @torch.no_grad()
-        def make_image(x_T):           
-            
-            trained_square = 512 * 512
-            actual_square = width * height
-            scale = math.sqrt(trained_square / actual_square)
+        def make_image(x_T):
 
+            scale_dim = min(width, height)
+            scale = 512 / scale_dim
+            
             init_width = math.ceil(scale * width / 64) * 64
             init_height = math.ceil(scale * height / 64) * 64
-            
+
             shape = [
                 self.latent_channels,
                 init_height // self.downsampling_factor,
                 init_width // self.downsampling_factor,
             ]
-            
+
             sampler.make_schedule(
                     ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
             )
-            
+
             #x = self.get_noise(init_width, init_height)
             x = x_T
-            
+
             if self.free_gpu_mem and self.model.model.device != self.model.device:
                 self.model.model.to(self.model.device)
 
@@ -62,15 +61,15 @@ class Txt2Img2Img(Generator):
                 eta                          = ddim_eta,
                 img_callback                 = step_callback
             )
-            
+
             print(
                   f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
                  )
-            
+
             # resizing
             samples = torch.nn.functional.interpolate(
-                samples, 
-                size=(height // self.downsampling_factor, width // self.downsampling_factor), 
+                samples,
+                size=(height // self.downsampling_factor, width // self.downsampling_factor),
                 mode="bilinear"
             )
 
@@ -116,7 +115,7 @@ class Txt2Img2Img(Generator):
         else:
             scaled_width = width
             scaled_height = height
-            
+
         device      = self.model.device
         if self.use_mps_noise or device.type == 'mps':
             return torch.randn([1,
