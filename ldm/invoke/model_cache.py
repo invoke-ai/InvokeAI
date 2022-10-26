@@ -73,10 +73,11 @@ class ModelCache(object):
                 self.models[model_name]['hash'] = hash
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
-                print(traceback.format_exc())
-                print(f'** restoring {self.current_model}')
-                self.get_model(self.current_model)
-                return None
+                if self.current_model:
+                    print(f'** restoring {self.current_model}')
+                    return self.get_model(self.current_model)
+                else:
+                    raise
         
         self.current_model = model_name
         self._push_newest_model(model_name)
