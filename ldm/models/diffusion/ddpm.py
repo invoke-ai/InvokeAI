@@ -827,7 +827,7 @@ class LatentDiffusion(DDPM):
                 self.cond_stage_model.encode
             ):
                 c = self.cond_stage_model.encode(
-                    c, embedding_manager=self.embedding_manager, **kwargs
+                    c, embedding_manager=self.embedding_manager,**kwargs
                 )
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()

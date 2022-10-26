@@ -23,10 +23,9 @@ def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
 
 
 class CFGDenoiser(nn.Module):
-    def __init__(self, sampler, threshold = 0, warmup = 0):
+    def __init__(self, model, threshold = 0, warmup = 0):
         super().__init__()
-        self.inner_model = sampler.model
-        self.sampler = sampler
+        self.inner_model = model
         self.threshold = threshold
         self.warmup_max = warmup
         self.warmup = max(warmup / 10, 1)
