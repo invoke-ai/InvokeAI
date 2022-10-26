@@ -9,6 +9,8 @@
 
 # This enables a user to install this project without manually installing conda and git.
 
+echo "Installing InvokeAI.."
+echo ""
 
 OS_NAME=$(uname -s)
 case "${OS_NAME}" in

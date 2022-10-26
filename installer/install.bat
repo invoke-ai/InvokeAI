@@ -9,6 +9,9 @@
 
 @rem This enables a user to install this project without manually installing conda and git.
 
+echo "Installing InvokeAI.."
+echo.
+
 @rem config
 set MAMBA_ROOT_PREFIX=%cd%\installer_files\mamba
 set INSTALL_ENV_DIR=%cd%\installer_files\env
