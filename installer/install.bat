@@ -12,9 +12,12 @@
 @rem config
 set MAMBA_ROOT_PREFIX=%cd%\installer_files\mamba
 set INSTALL_ENV_DIR=%cd%\installer_files\env
-set MICROMAMBA_BINARY_FILE=%cd%\installer_files\micromamba_win_x64.exe
+set MICROMAMBA_DOWNLOAD_URL=https://github.com/cmdr2/stable-diffusion-ui/releases/download/v1.1/micromamba.exe
+@rem Change the download URL to an InvokeAI repo's release URL
 
 @rem figure out whether git and conda needs to be installed
+if exist "%INSTALL_ENV_DIR%" set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scripts;%INSTALL_ENV_DIR%\Library\usr\bin;%PATH%
+
 set PACKAGES_TO_INSTALL=
 
 call conda --version >.tmp1 2>.tmp2
@@ -25,10 +28,12 @@ if "%ERRORLEVEL%" NEQ "0" set PACKAGES_TO_INSTALL=%PACKAGES_TO_INSTALL% git
 
 @rem (if necessary) install git and conda into a contained environment
 if "%PACKAGES_TO_INSTALL%" NEQ "" (
-    @rem initialize micromamba
-    if not exist "%MAMBA_ROOT_PREFIX%" (
+    @rem download micromamba
+    if not exist "%MAMBA_ROOT_PREFIX%\micromamba.exe" (
+        echo "Downloading micromamba from %MICROMAMBA_DOWNLOAD_URL% to %MAMBA_ROOT_PREFIX%\micromamba.exe"
+
         mkdir "%MAMBA_ROOT_PREFIX%"
-        copy "%MICROMAMBA_BINARY_FILE%" "%MAMBA_ROOT_PREFIX%\micromamba.exe"
+        call curl -L "%MICROMAMBA_DOWNLOAD_URL%" > "%MAMBA_ROOT_PREFIX%\micromamba.exe"
 
         @rem test the mamba binary
         echo Micromamba version:
@@ -43,6 +48,12 @@ if "%PACKAGES_TO_INSTALL%" NEQ "" (
     echo "Packages to install:%PACKAGES_TO_INSTALL%"
 
     call "%MAMBA_ROOT_PREFIX%\micromamba.exe" install -y --prefix "%INSTALL_ENV_DIR%" -c conda-forge %PACKAGES_TO_INSTALL%
+
+    if not exist "%INSTALL_ENV_DIR%" (
+        echo "There was a problem while installing%PACKAGES_TO_INSTALL% using micromamba. Cannot continue."
+        pause
+        exit /b
+    )
 )
 
 set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scripts;%PATH%
@@ -55,6 +66,9 @@ if not exist ".git" (
     call git fetch
     call git checkout origin/main -ft
 )
+
+@rem activate the base env
+call conda activate
 
 @rem create the environment
 call conda env create
