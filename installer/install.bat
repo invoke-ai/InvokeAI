@@ -16,6 +16,7 @@ echo.
 set MAMBA_ROOT_PREFIX=%cd%\installer_files\mamba
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 set MICROMAMBA_DOWNLOAD_URL=https://github.com/cmdr2/stable-diffusion-ui/releases/download/v1.1/micromamba.exe
+set REPO_URL=https://github.com/cmdr2/InvokeAI.git
 @rem Change the download URL to an InvokeAI repo's release URL
 
 @rem figure out whether git and conda needs to be installed
@@ -65,7 +66,7 @@ set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scrip
 if not exist ".git" (
     call git config --global init.defaultBranch main
     call git init
-    call git remote add origin https://github.com/cmdr2/InvokeAI.git
+    call git remote add origin %REPO_URL%
     call git fetch
     call git checkout origin/main -ft
 )
