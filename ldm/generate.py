@@ -464,6 +464,9 @@ class Generate:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
+        except (pyparsing.ParseException, PromptParser.ParsingException) as e:
+            print(f">> There was a problem parsing the prompt you entered: '{e}'")
+
         except RuntimeError as e:
             print(traceback.format_exc(), file=sys.stderr)
             print('>> Could not generate image.')
