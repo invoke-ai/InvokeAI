@@ -164,6 +164,12 @@ class PromptParserTestCase(unittest.TestCase):
             parse_prompt('("mountain, man, hairy", "face, teeth, eyes--").blend(1,-1)')
         )
 
+        self.assertEqual(
+            Conjunction([Blend([FlattenedPrompt([('a tall thin man picking apricots', 1)]),
+                                FlattenedPrompt([('a tall thin man picking pears', 1)])], weights=[1.0,1.0])]),
+            parse_prompt('("a tall thin man picking apricots", "a tall thin man picking pears").blend(1, 1)'))
+
+
 
     def test_nested(self):
         self.assertEqual(make_weighted_conjunction([('fire', 1.0), ('flames', 2.0), ('trees', 3.0)]),
@@ -388,7 +394,6 @@ class PromptParserTestCase(unittest.TestCase):
                                 FlattenedPrompt([('man mountain', 1)])],
                                 weights=[0.8,0.2]),
                          pp.parse_legacy_blend('"mountain man":4 man mountain'))
-
 
     def test_single(self):
         # todo handle this
