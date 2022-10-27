@@ -4,11 +4,14 @@ ldm.models.diffusion.sampler
 Base class for ldm.models.diffusion.ddim, ldm.models.diffusion.ksampler, etc
 
 '''
+from math import ceil
+
 import torch
 import numpy as np
 from tqdm import tqdm
 from functools import partial
 from ldm.invoke.devices import choose_torch_device
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 from ldm.modules.diffusionmodules.util import (
     make_ddim_sampling_parameters,
@@ -24,6 +27,8 @@ class Sampler(object):
         self.ddpm_num_timesteps = steps
         self.schedule = schedule
         self.device   = device or choose_torch_device()
+        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.model,
+                                                           model_forward_callback = lambda x, sigma, cond: self.model.apply_model(x, sigma, cond))
 
     def register_buffer(self, name, attr):
         if type(attr) == torch.Tensor:
@@ -158,6 +163,18 @@ class Sampler(object):
         **kwargs,
     ):
 
+        if conditioning is not None:
+            if isinstance(conditioning, dict):
+                ctmp = conditioning[list(conditioning.keys())[0]]
+                while isinstance(ctmp, list):
+                    ctmp = ctmp[0]
+                cbs = ctmp.shape[0]
+                if cbs != batch_size:
+                    print(f"Warning: Got {cbs} conditionings but batch-size is {batch_size}")
+            else:
+                if conditioning.shape[0] != batch_size:
+                    print(f"Warning: Got {conditioning.shape[0]} conditionings but batch-size is {batch_size}")
+
         # check to see if make_schedule() has run, and if not, run it
         if self.ddim_timesteps is None:
             self.make_schedule(
@@ -190,10 +207,11 @@ class Sampler(object):
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
             steps=S,
+            **kwargs
         )
         return samples, intermediates
 
-    #torch.no_grad()
+    @torch.no_grad()
     def do_sampling(
             self,
             cond,
@@ -214,6 +232,7 @@ class Sampler(object):
             unconditional_guidance_scale=1.0,
             unconditional_conditioning=None,
             steps=None,
+            **kwargs
     ):
         b = shape[0]
         time_range = (
@@ -231,7 +250,7 @@ class Sampler(object):
             dynamic_ncols=True,
         )
         old_eps = []
-        self.prepare_to_sample(t_enc=total_steps)
+        self.prepare_to_sample(t_enc=total_steps,all_timesteps_count=steps,**kwargs)
         img = self.get_initial_image(x_T,shape,total_steps)
 
         # probably don't need this at all
@@ -274,6 +293,7 @@ class Sampler(object):
                 unconditional_conditioning=unconditional_conditioning,
                 old_eps=old_eps,
                 t_next=ts_next,
+                step_count=steps
             )
             img, pred_x0, e_t = outs
 
@@ -305,8 +325,9 @@ class Sampler(object):
             use_original_steps=False,
             init_latent       = None,
             mask              = None,
+            all_timesteps_count = None,
+            **kwargs
     ):
-
         timesteps = (
             np.arange(self.ddpm_num_timesteps)
             if use_original_steps
@@ -321,7 +342,7 @@ class Sampler(object):
         iterator = tqdm(time_range, desc='Decoding image', total=total_steps)
         x_dec    = x_latent
         x0       = init_latent
-        self.prepare_to_sample(t_enc=total_steps)
+        self.prepare_to_sample(t_enc=total_steps, all_timesteps_count=all_timesteps_count, **kwargs)
         
         for i, step in enumerate(iterator):
             index = total_steps - i - 1
@@ -353,6 +374,7 @@ class Sampler(object):
                 unconditional_guidance_scale=unconditional_guidance_scale,
                 unconditional_conditioning=unconditional_conditioning,
                 t_next = ts_next,
+                step_count=len(self.ddim_timesteps)
             )
             
             x_dec, pred_x0, e_t = outs
@@ -411,3 +433,9 @@ class Sampler(object):
         return self.model.inner_model.q_sample(x0,ts)
         '''
         return self.model.q_sample(x0,ts)
+
+    def conditioning_key(self)->str:
+        return self.model.model.conditioning_key
+
+    def uses_inpainting_model(self)->bool:
+        return self.conditioning_key() in ('hybrid','concat')

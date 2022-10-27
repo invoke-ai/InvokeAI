@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 from ldm.invoke.devices import choose_torch_device
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ldm.models.diffusion.sampler import Sampler
 from ldm.modules.diffusionmodules.util import  noise_like
 
@@ -12,6 +13,18 @@ from ldm.modules.diffusionmodules.util import  noise_like
 class PLMSSampler(Sampler):
     def __init__(self, model, schedule='linear', device=None, **kwargs):
         super().__init__(model,schedule,model.num_timesteps, device)
+
+    def prepare_to_sample(self, t_enc, **kwargs):
+        super().prepare_to_sample(t_enc, **kwargs)
+
+        extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
+        all_timesteps_count = kwargs.get('all_timesteps_count', t_enc)
+
+        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = all_timesteps_count)
+        else:
+            self.invokeai_diffuser.remove_cross_attention_control()
+
 
     # this is the essential routine
     @torch.no_grad()
@@ -32,6 +45,7 @@ class PLMSSampler(Sampler):
             unconditional_conditioning=None,
             old_eps=[],
             t_next=None,
+            step_count:int=1000, # total number of steps
             **kwargs,
     ):
         b, *_, device = *x.shape, x.device
@@ -41,18 +55,15 @@ class PLMSSampler(Sampler):
                 unconditional_conditioning is None
                 or unconditional_guidance_scale == 1.0
             ):
+                # damian0815 would like to know when/if this code path is used
                 e_t = self.model.apply_model(x, t, c)
             else:
-                x_in = torch.cat([x] * 2)
-                t_in = torch.cat([t] * 2)
-                c_in = torch.cat([unconditional_conditioning, c])
-                e_t_uncond, e_t = self.model.apply_model(
-                    x_in, t_in, c_in
-                ).chunk(2)
-                e_t = e_t_uncond + unconditional_guidance_scale * (
-                    e_t - e_t_uncond
-                )
-
+                # step_index counts in the opposite direction to index
+                step_index = step_count-(index+1)
+                e_t = self.invokeai_diffuser.do_diffusion_step(x, t,
+                                                               unconditional_conditioning, c,
+                                                               unconditional_guidance_scale,
+                                                               step_index=step_index)
             if score_corrector is not None:
                 assert self.model.parameterization == 'eps'
                 e_t = score_corrector.modify_score(

@@ -13,6 +13,7 @@ import gc
 import hashlib
 import psutil
 import transformers
+import traceback
 import os
 from sys import getrefcount
 from omegaconf import OmegaConf
@@ -73,6 +74,7 @@ class ModelCache(object):
                 self.models[model_name]['hash'] = hash
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
+                print(traceback.format_exc())
                 print(f'** restoring {self.current_model}')
                 self.get_model(self.current_model)
                 return None
