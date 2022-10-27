@@ -244,13 +244,12 @@ class Args(object):
         else:
             switches.append(f'-A {a["sampler_name"]}')
 
-        # facetool-specific parameters
-        if a['facetool']:
-            switches.append(f'-ft {a["facetool"]}')
+        # facetool-specific parameters, only print if running facetool
         if a['facetool_strength']:
             switches.append(f'-G {a["facetool_strength"]}')
-        if a['codeformer_fidelity']:
-            switches.append(f'-cf {a["codeformer_fidelity"]}')
+            switches.append(f'-ft {a["facetool"]}')
+            if a["facetool"] == "codeformer":
+                switches.append(f'-cf {a["codeformer_fidelity"]}')
 
         if a['outcrop']:
             switches.append(f'-c {" ".join([str(u) for u in a["outcrop"]])}')
@@ -378,6 +377,14 @@ class Args(object):
             '--model',
             default='stable-diffusion-1.4',
             help='Indicates which diffusion model to load. (currently "stable-diffusion-1.4" (default) or "laion400m")',
+        )
+        model_group.add_argument(
+            '--png_compression','-z',
+            type=int,
+            default=6,
+            choices=range(0,9),
+            dest='png_compression',
+            help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
         )
         model_group.add_argument(
             '--sampler',
@@ -649,6 +656,14 @@ class Args(object):
             default=0,
             dest='save_intermediates',
             help='Save every nth intermediate image into an "intermediates" directory within the output directory'
+        )
+        render_group.add_argument(
+            '--png_compression','-z',
+            type=int,
+            default=6,
+            choices=range(0,10),
+            dest='png_compression',
+            help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
         )
         img2img_group.add_argument(
             '-I',

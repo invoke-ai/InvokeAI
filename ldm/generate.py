@@ -132,7 +132,7 @@ gr = Generate(
 
           # these are deprecated - use conf and model instead
           weights     = path to model weights ('models/ldm/stable-diffusion-v1/model.ckpt')
-          config      = path to model configuraiton ('configs/stable-diffusion/v1-inference.yaml')
+          config      = path to model configuration ('configs/stable-diffusion/v1-inference.yaml')
           )
 
 """
@@ -721,7 +721,7 @@ class Generate:
         
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
-            model.embedding_manager.load(
+            self.model.embedding_manager.load(
                 self.embedding_path, self.precision == 'float32' or self.precision == 'autocast'
             )
 
