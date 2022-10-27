@@ -102,6 +102,8 @@ export const frontendToBackendParameters = (
       boundingBoxCoordinate: { x, y },
       boundingBoxDimensions: { width, height },
       shouldShowBoundingBox,
+      inpaintReplace,
+      shouldUseInpaintReplace,
     } = inpaintingState;
 
     let bx = x,
@@ -122,6 +124,10 @@ export const frontendToBackendParameters = (
       width: bwidth,
       height: bheight,
     };
+
+    if (shouldUseInpaintReplace) {
+      generationParameters.inpaint_replace = inpaintReplace;
+    }
 
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;

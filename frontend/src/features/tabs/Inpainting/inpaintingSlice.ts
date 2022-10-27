@@ -53,6 +53,8 @@ export interface InpaintingState {
   needsRepaint: boolean;
   stageScale: number;
   isDrawing: boolean;
+  shouldUseInpaintReplace: boolean;
+  inpaintReplace: number;
 }
 
 const initialInpaintingState: InpaintingState = {
@@ -79,6 +81,8 @@ const initialInpaintingState: InpaintingState = {
   needsRepaint: false,
   isDrawing: false,
   stageScale: 1,
+  shouldUseInpaintReplace: false,
+  inpaintReplace: 0.5,
 };
 
 const initialState: InpaintingState = initialInpaintingState;
@@ -251,7 +255,7 @@ export const inpaintingSlice = createSlice({
         64,
         roundedCanvasHeight
       );
-      console.log(overflowX, boundingBoxX, boundingBoxX - overflowX);
+
       const overflowCorrectedX =
         overflowX > 0 ? boundingBoxX - overflowX : boundingBoxX;
 
@@ -319,6 +323,12 @@ export const inpaintingSlice = createSlice({
       state.pastLines = [];
       state.futureLines = [];
     },
+    setShouldUseInpaintReplace: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseInpaintReplace = action.payload;
+    },
+    setInpaintReplace: (state, action: PayloadAction<number>) => {
+      state.inpaintReplace = action.payload;
+    },
   },
 });
 
@@ -352,6 +362,8 @@ export const {
   setShouldShowBrush,
   setShouldShowBoundingBox,
   setClearBrushHistory,
+  setShouldUseInpaintReplace,
+  setInpaintReplace,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;

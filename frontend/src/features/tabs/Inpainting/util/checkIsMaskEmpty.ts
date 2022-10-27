@@ -3,6 +3,8 @@ import { MaskLine } from '../inpaintingSlice';
 
 /**
  * Converts canvas into pixel buffer and checks if it is empty (all pixels full alpha).
+ *
+ * I DON' THINK THIS WORKS ACTUALLY
  */
 const checkIsMaskEmpty = (image: HTMLImageElement, lines: MaskLine[]) => {
   const offscreenContainer = document.createElement('div');
