@@ -8,7 +8,7 @@ import {
 import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldRunFacetool } from '../../optionsSlice';
 
-export default function FaceRestore() {
+export default function FaceRestoreHeader() {
   const isGFPGANAvailable = useAppSelector(
     (state: RootState) => state.system.isGFPGANAvailable
   );

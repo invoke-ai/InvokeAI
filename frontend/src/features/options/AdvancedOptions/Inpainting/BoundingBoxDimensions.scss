@@ -1,0 +1,13 @@
+.inpainting-bounding-box-dimensions {
+  display: flex;
+  flex-direction: column;
+  row-gap: 1rem;
+  max-width: 100%;
+}
+
+.inpainting-bounding-box-dimensions-slider-numberinput {
+  display: flex;
+  flex-direction: row;
+  column-gap: 0.5rem;
+  width: 100%;
+}

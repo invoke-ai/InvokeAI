@@ -79,21 +79,16 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const { url, mtime, metadata } = data;
-        const newUuid = uuidv4();
-
         dispatch(
           addImage({
-            uuid: newUuid,
-            url,
-            mtime,
-            metadata: metadata,
+            uuid: uuidv4(),
+            ...data,
           })
         );
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Image generated: ${url}`,
+            message: `Image generated: ${data.url}`,
           })
         );
       } catch (e) {
@@ -105,20 +100,16 @@ const makeSocketIOListeners = (
      */
     onIntermediateResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const uuid = uuidv4();
-        const { url, metadata, mtime } = data;
         dispatch(
           setIntermediateImage({
-            uuid,
-            url,
-            mtime,
-            metadata,
+            uuid: uuidv4(),
+            ...data,
           })
         );
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Intermediate image generated: ${url}`,
+            message: `Intermediate image generated: ${data.url}`,
           })
         );
       } catch (e) {
@@ -130,21 +121,17 @@ const makeSocketIOListeners = (
      */
     onPostprocessingResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const { url, metadata, mtime } = data;
-
         dispatch(
           addImage({
             uuid: uuidv4(),
-            url,
-            mtime,
-            metadata,
+            ...data,
           })
         );
 
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Postprocessed: ${url}`,
+            message: `Postprocessed: ${data.url}`,
           })
         );
       } catch (e) {
@@ -200,12 +187,14 @@ const makeSocketIOListeners = (
 
       // Generate a UUID for each image
       const preparedImages = images.map((image): InvokeAI.Image => {
-        const { url, metadata, mtime } = image;
+        const { url, metadata, mtime, width, height } = image;
         return {
           uuid: uuidv4(),
           url,
           mtime,
           metadata,
+          width,
+          height,
         };
       });
 

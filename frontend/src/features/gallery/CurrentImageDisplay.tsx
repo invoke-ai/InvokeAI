@@ -23,13 +23,15 @@ const CurrentImageDisplay = () => {
       <div className="current-image-tools">
         <CurrentImageButtons image={imageToDisplay} />
       </div>
-      <CurrentImagePreview imageToDisplay={imageToDisplay} />
-      {shouldShowImageDetails && (
-        <ImageMetadataViewer
-          image={imageToDisplay}
-          styleClass="current-image-metadata"
-        />
-      )}
+      <div className="current-image-viewer">
+        <CurrentImagePreview imageToDisplay={imageToDisplay} />
+        {shouldShowImageDetails && (
+          <ImageMetadataViewer
+            image={imageToDisplay}
+            styleClass="current-image-metadata"
+          />
+        )}
+      </div>
     </div>
   ) : (
     <div className="current-image-display-placeholder">

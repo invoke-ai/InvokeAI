@@ -24,20 +24,24 @@ const IAISwitch = (props: Props) => {
     ...rest
   } = props;
   return (
-    <FormControl isDisabled={isDisabled} width={width}>
-      <Flex justifyContent={'space-between'} alignItems={'center'}>
-        {label && (
-          <FormLabel
-            fontSize={fontSize}
-            marginBottom={1}
-            flexGrow={2}
-            whiteSpace="nowrap"
-          >
-            {label}
-          </FormLabel>
-        )}
-        <Switch size={size} className="switch-button" {...rest} />
-      </Flex>
+    <FormControl
+      isDisabled={isDisabled}
+      width={width}
+      className="invokeai__switch-form-control"
+    >
+      <FormLabel
+        className="invokeai__switch-form-label"
+        fontSize={fontSize}
+        whiteSpace="nowrap"
+      >
+        {label}
+        <Switch
+          className="invokeai__switch-root"
+          size={size}
+          // className="switch-button"
+          {...rest}
+        />
+      </FormLabel>
     </FormControl>
   );
 };

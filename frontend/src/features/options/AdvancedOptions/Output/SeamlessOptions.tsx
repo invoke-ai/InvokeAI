@@ -1,10 +1,16 @@
 import { Flex } from '@chakra-ui/react';
-import { RootState } from '../../app/store';
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import { setSeamless } from './optionsSlice';
 import { ChangeEvent } from 'react';
-import IAISwitch from '../../common/components/IAISwitch';
+import {
+  RootState,
+  useAppDispatch,
+  useAppSelector,
+} from '../../../../app/store';
+import IAISwitch from '../../../../common/components/IAISwitch';
+import { setSeamless } from '../../optionsSlice';
 
+/**
+ * Seamless tiling toggle
+ */
 const SeamlessOptions = () => {
   const dispatch = useAppDispatch();
 

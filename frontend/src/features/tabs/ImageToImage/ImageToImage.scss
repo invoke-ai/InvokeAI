@@ -10,7 +10,6 @@
   display: grid;
   row-gap: 1rem;
   grid-auto-rows: max-content;
-  width: $options-bar-max-width;
   height: $app-content-height;
   overflow-y: scroll;
   @include HideScrollbar;
@@ -140,4 +139,8 @@
       background-color: var(--img2img-img-bg-color);
     }
   }
+}
+
+.image-to-image-current-image-display {
+  position: relative;
 }

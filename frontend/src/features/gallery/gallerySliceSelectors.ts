@@ -1,0 +1,43 @@
+import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from '../../app/store';
+import { OptionsState } from '../options/optionsSlice';
+import { tabMap } from '../tabs/InvokeTabs';
+import { GalleryState } from './gallerySlice';
+
+export const imageGallerySelector = createSelector(
+  [(state: RootState) => state.gallery, (state: RootState) => state.options],
+  (gallery: GalleryState, options: OptionsState) => {
+    const {
+      images,
+      currentImageUuid,
+      areMoreImagesAvailable,
+      shouldPinGallery,
+      shouldShowGallery,
+      galleryScrollPosition,
+      galleryImageMinimumWidth,
+    } = gallery;
+
+    const { activeTab } = options;
+
+    return {
+      images,
+      currentImageUuid,
+      areMoreImagesAvailable,
+      shouldPinGallery,
+      shouldShowGallery,
+      galleryScrollPosition,
+      galleryImageMinimumWidth,
+      galleryGridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
+      activeTabName: tabMap[activeTab],
+    };
+  }
+);
+
+export const hoverableImageSelector = createSelector(
+  (state: RootState) => state.options,
+  (options: OptionsState) => {
+    return {
+      activeTabName: tabMap[options.activeTab],
+    };
+  }
+);

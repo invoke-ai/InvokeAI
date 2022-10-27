@@ -4,6 +4,7 @@ import * as InvokeAI from '../../app/invokeai';
 import promptToString from '../../common/util/promptToString';
 import { seedWeightsToString } from '../../common/util/seedWeightPairs';
 import { FACETOOL_TYPES } from '../../app/constants';
+import { InvokeTabName, tabMap } from '../tabs/InvokeTabs';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -41,7 +42,7 @@ export interface OptionsState {
   showAdvancedOptions: boolean;
   activeTab: number;
   shouldShowImageDetails: boolean;
-  shouldShowGallery: boolean;
+  showDualDisplay: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -76,7 +77,7 @@ const initialOptionsState: OptionsState = {
   showAdvancedOptions: true,
   activeTab: 0,
   shouldShowImageDetails: false,
-  shouldShowGallery: false,
+  showDualDisplay: true,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -321,14 +322,18 @@ export const optionsSlice = createSlice({
     setShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
       state.showAdvancedOptions = action.payload;
     },
-    setActiveTab: (state, action: PayloadAction<number>) => {
-      state.activeTab = action.payload;
+    setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
+      if (typeof action.payload === 'number') {
+        state.activeTab = action.payload;
+      } else {
+        state.activeTab = tabMap.indexOf(action.payload);
+      }
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
     },
-    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowGallery = action.payload;
+    setShowDualDisplay: (state, action: PayloadAction<boolean>) => {
+      state.showDualDisplay = action.payload;
     },
   },
 });
@@ -369,9 +374,9 @@ export const {
   setShowAdvancedOptions,
   setActiveTab,
   setShouldShowImageDetails,
-  setShouldShowGallery,
   setAllTextToImageParameters,
   setAllImageToImageParameters,
+  setShowDualDisplay,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

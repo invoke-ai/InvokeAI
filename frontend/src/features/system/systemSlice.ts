@@ -90,7 +90,7 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Server error';
+      state.currentStatus = 'Error';
       state.wasErrorSeen = false;
     },
     errorSeen: (state) => {

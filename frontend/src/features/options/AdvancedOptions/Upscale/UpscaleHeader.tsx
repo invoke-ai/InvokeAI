@@ -8,7 +8,7 @@ import {
 import IAISwitch from '../../../../common/components/IAISwitch';
 import { setShouldRunESRGAN } from '../../optionsSlice';
 
-export default function Upscale() {
+export default function UpscaleHeader() {
   const isESRGANAvailable = useAppSelector(
     (state: RootState) => state.system.isESRGANAvailable
   );

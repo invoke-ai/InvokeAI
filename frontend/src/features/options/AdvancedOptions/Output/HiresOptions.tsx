@@ -1,12 +1,15 @@
 import { Flex } from '@chakra-ui/react';
-import { RootState } from '../../app/store';
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import { setHiresFix } from './optionsSlice';
 import { ChangeEvent } from 'react';
-import IAISwitch from '../../common/components/IAISwitch';
+import {
+  RootState,
+  useAppDispatch,
+  useAppSelector,
+} from '../../../../app/store';
+import IAISwitch from '../../../../common/components/IAISwitch';
+import { setHiresFix } from '../../optionsSlice';
 
 /**
- * Image output options. Includes width, height, seamless tiling.
+ * Hires Fix Toggle
  */
 const HiresOptions = () => {
   const dispatch = useAppDispatch();
@@ -15,7 +18,6 @@ const HiresOptions = () => {
 
   const handleChangeHiresFix = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setHiresFix(e.target.checked));
-
 
   return (
     <Flex gap={2} direction={'column'}>

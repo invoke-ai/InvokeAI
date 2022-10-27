@@ -1,4 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
+import { InvokeTabName } from '../../features/tabs/InvokeTabs';
 import * as InvokeAI from '../invokeai';
 
 /**
@@ -8,13 +9,13 @@ import * as InvokeAI from '../invokeai';
  * by the middleware.
  */
 
-export const generateImage = createAction<undefined>('socketio/generateImage');
+export const generateImage = createAction<InvokeTabName>(
+  'socketio/generateImage'
+);
 export const runESRGAN = createAction<InvokeAI.Image>('socketio/runESRGAN');
 export const runFacetool = createAction<InvokeAI.Image>('socketio/runFacetool');
 export const deleteImage = createAction<InvokeAI.Image>('socketio/deleteImage');
-export const requestImages = createAction<undefined>(
-  'socketio/requestImages'
-);
+export const requestImages = createAction<undefined>('socketio/requestImages');
 export const requestNewImages = createAction<undefined>(
   'socketio/requestNewImages'
 );

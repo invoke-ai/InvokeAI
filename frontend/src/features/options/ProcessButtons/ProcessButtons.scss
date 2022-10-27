@@ -7,16 +7,16 @@
 
   .invoke-btn {
     @include Button(
-      $btn-color: var(--btn-purple),
-      $btn-color-hover: var(--btn-purple-hover),
+      $btn-color: var(--accent-color),
+      $btn-color-hover: var(--accent-color-hover),
       $btn-width: 5rem
     );
   }
 
   .cancel-btn {
     @include Button(
-      $btn-color: var(--btn-red),
-      $btn-color-hover: var(--btn-red-hover),
+      $btn-color: var(--destructive-color),
+      $btn-color-hover: var(--destructive-color-hover),
       $btn-width: 3rem
     );
   }

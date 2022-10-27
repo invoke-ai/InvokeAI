@@ -34,8 +34,8 @@
 
     button {
       @include Button(
-        $btn-color: var(--btn-red),
-        $btn-color-hover: var(--btn-red-hover)
+        $btn-color: var(--destructive-color),
+        $btn-color-hover: var(--destructive-color-hover)
       );
     }
   }

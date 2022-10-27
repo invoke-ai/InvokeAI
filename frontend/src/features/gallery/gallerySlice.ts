@@ -11,12 +11,20 @@ export interface GalleryState {
   areMoreImagesAvailable: boolean;
   latest_mtime?: number;
   earliest_mtime?: number;
+  shouldPinGallery: boolean;
+  shouldShowGallery: boolean;
+  galleryScrollPosition: number;
+  galleryImageMinimumWidth: number;
 }
 
 const initialState: GalleryState = {
   currentImageUuid: '',
   images: [],
   areMoreImagesAvailable: true,
+  shouldPinGallery: true,
+  shouldShowGallery: true,
+  galleryScrollPosition: 0,
+  galleryImageMinimumWidth: 64,
 };
 
 export const gallerySlice = createSlice({
@@ -151,6 +159,18 @@ export const gallerySlice = createSlice({
         state.areMoreImagesAvailable = areMoreImagesAvailable;
       }
     },
+    setShouldPinGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldPinGallery = action.payload;
+    },
+    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowGallery = action.payload;
+    },
+    setGalleryScrollPosition: (state, action: PayloadAction<number>) => {
+      state.galleryScrollPosition = action.payload;
+    },
+    setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
+      state.galleryImageMinimumWidth = action.payload;
+    },
   },
 });
 
@@ -163,6 +183,10 @@ export const {
   setIntermediateImage,
   selectNextImage,
   selectPrevImage,
+  setShouldPinGallery,
+  setShouldShowGallery,
+  setGalleryScrollPosition,
+  setGalleryImageMinimumWidth,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

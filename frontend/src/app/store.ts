@@ -7,6 +7,7 @@ import storage from 'redux-persist/lib/storage'; // defaults to localStorage for
 
 import optionsReducer from '../features/options/optionsSlice';
 import galleryReducer from '../features/gallery/gallerySlice';
+import inpaintingReducer from '../features/tabs/Inpainting/inpaintingSlice';
 
 import systemReducer from '../features/system/systemSlice';
 import { socketioMiddleware } from './socketio/middleware';
@@ -32,7 +33,7 @@ import { socketioMiddleware } from './socketio/middleware';
 const rootPersistConfig = {
   key: 'root',
   storage,
-  blacklist: ['gallery', 'system'],
+  blacklist: ['gallery', 'system', 'inpainting'],
 };
 
 const systemPersistConfig = {
@@ -53,10 +54,28 @@ const systemPersistConfig = {
   ],
 };
 
+const galleryPersistConfig = {
+  key: 'gallery',
+  storage,
+  whitelist: [
+    'shouldPinGallery',
+    'shouldShowGallery',
+    'galleryScrollPosition',
+    'galleryImageMinimumWidth',
+  ],
+};
+
+const inpaintingPersistConfig = {
+  key: 'inpainting',
+  storage,
+  blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
+};
+
 const reducers = combineReducers({
   options: optionsReducer,
-  gallery: galleryReducer,
+  gallery: persistReducer(galleryPersistConfig, galleryReducer),
   system: persistReducer(systemPersistConfig, systemReducer),
+  inpainting: persistReducer(inpaintingPersistConfig, inpaintingReducer),
 });
 
 const persistedReducer = persistReducer(rootPersistConfig, reducers);
