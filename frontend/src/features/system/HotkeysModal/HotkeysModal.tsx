@@ -181,6 +181,11 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Ctrl+Shift+Z, Ctrl+Y',
     },
     {
+      title: 'Move Bounding Box',
+      desc: 'Hold to move bounding box',
+      hotkey: 'Space',
+    },
+    {
       title: 'Expand Inpainting Area',
       desc: 'Expand your inpainting work area',
       hotkey: 'Shift+J',
