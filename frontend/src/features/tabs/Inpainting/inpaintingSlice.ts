@@ -82,7 +82,7 @@ const initialInpaintingState: InpaintingState = {
   isDrawing: false,
   stageScale: 1,
   shouldUseInpaintReplace: false,
-  inpaintReplace: 0.5,
+  inpaintReplace: 1,
 };
 
 const initialState: InpaintingState = initialInpaintingState;
