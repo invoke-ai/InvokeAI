@@ -10,6 +10,7 @@ import { OptionsState } from '../../../options/optionsSlice';
 import { tabMap } from '../../InvokeTabs';
 import {
   InpaintingState,
+  setIsMovingBoundingBox,
   toggleIsMovingBoundingBox,
   toggleTool,
 } from '../inpaintingSlice';
@@ -17,11 +18,12 @@ import {
 const keyboardEventManagerSelector = createSelector(
   [(state: RootState) => state.options, (state: RootState) => state.inpainting],
   (options: OptionsState, inpainting: InpaintingState) => {
-    const { shouldShowMask, cursorPosition } = inpainting;
+    const { shouldShowMask, cursorPosition, isMovingBoundingBox } = inpainting;
     return {
       activeTabName: tabMap[options.activeTab],
       shouldShowMask,
       isCursorOnCanvas: Boolean(cursorPosition),
+      isMovingBoundingBox,
     };
   },
   {
@@ -33,9 +35,12 @@ const keyboardEventManagerSelector = createSelector(
 
 const KeyboardEventManager = () => {
   const dispatch = useAppDispatch();
-  const { shouldShowMask, activeTabName, isCursorOnCanvas } = useAppSelector(
-    keyboardEventManagerSelector
-  );
+  const {
+    shouldShowMask,
+    activeTabName,
+    isCursorOnCanvas,
+    isMovingBoundingBox,
+  } = useAppSelector(keyboardEventManagerSelector);
 
   const isFirstEvent = useRef<boolean>(true);
   const wasLastEventOverCanvas = useRef<boolean>(false);
@@ -84,7 +89,7 @@ const KeyboardEventManager = () => {
           break;
         }
         case ' ': {
-          dispatch(toggleIsMovingBoundingBox());
+          dispatch(setIsMovingBoundingBox(e.type === 'keydown' ? true : false));
           break;
         }
       }
@@ -100,7 +105,13 @@ const KeyboardEventManager = () => {
       document.removeEventListener('keydown', listener);
       document.removeEventListener('keyup', listener);
     };
-  }, [dispatch, activeTabName, shouldShowMask, isCursorOnCanvas]);
+  }, [
+    dispatch,
+    activeTabName,
+    shouldShowMask,
+    isCursorOnCanvas,
+    isMovingBoundingBox,
+  ]);
 
   return null;
 };

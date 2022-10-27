@@ -46,6 +46,7 @@ export interface InpaintingState {
   shouldShowMask: boolean;
   shouldInvertMask: boolean;
   shouldShowCheckboardTransparency: boolean;
+  shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;
   imageToInpaint?: InvokeAI.Image;
   needsRepaint: boolean;
@@ -70,6 +71,7 @@ const initialInpaintingState: InpaintingState = {
   shouldShowMask: true,
   shouldInvertMask: false,
   shouldShowCheckboardTransparency: false,
+  shouldShowBrush: true,
   shouldShowBrushPreview: false,
   isMovingBoundingBox: false,
   needsRepaint: false,
@@ -143,6 +145,9 @@ export const inpaintingSlice = createSlice({
     },
     setShouldShowBrushPreview: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBrushPreview = action.payload;
+    },
+    setShouldShowBrush: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowBrush = action.payload;
     },
     setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
       state.maskColor = action.payload;
@@ -335,6 +340,7 @@ export const {
   setShouldShowBoundingBoxFill,
   setIsBoundingBoxTransforming,
   setIsDrawing,
+  setShouldShowBrush
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;

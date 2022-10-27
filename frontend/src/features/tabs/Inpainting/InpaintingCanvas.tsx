@@ -18,6 +18,7 @@ import {
   addPointToCurrentLine,
   setBoundingBoxCoordinate,
   setCursorPosition,
+  setIsDrawing,
   setIsMovingBoundingBox,
 } from './inpaintingSlice';
 import { inpaintingCanvasSelector } from './inpaintingSliceSelectors';
@@ -58,6 +59,8 @@ const InpaintingCanvas = () => {
     boundingBoxCoordinate,
     stageScale,
     shouldShowBoundingBoxFill,
+    isDrawing,
+    isBoundingBoxTransforming,
   } = useAppSelector(inpaintingCanvasSelector);
 
   // set the closure'd refs
@@ -69,7 +72,6 @@ const InpaintingCanvas = () => {
 
   // Use refs for values that do not affect rendering, other values in redux
   const didMouseMoveRef = useRef<boolean>(false);
-  const isDrawing = useRef<boolean>(false);
 
   // Load the image into this
   const [canvasBgImage, setCanvasBgImage] = useState<HTMLImageElement | null>(
@@ -95,7 +97,7 @@ const InpaintingCanvas = () => {
 
     if (!scaledCursorPosition || !maskLayerRef.current) return;
 
-    isDrawing.current = true;
+    dispatch(setIsDrawing(true));
 
     // Add a new line starting from the current cursor position.
     dispatch(
@@ -147,8 +149,7 @@ const InpaintingCanvas = () => {
 
       return;
     }
-
-    if (!isDrawing.current) return;
+    if (!isDrawing) return;
 
     didMouseMoveRef.current = true;
     // Extend the current line
@@ -161,10 +162,11 @@ const InpaintingCanvas = () => {
     boundingBoxDimensions,
     canvasDimensions,
     boundingBoxCoordinate,
+    isDrawing,
   ]);
 
   const handleMouseUp = useCallback(() => {
-    if (!didMouseMoveRef.current && isDrawing.current && stageRef.current) {
+    if (!didMouseMoveRef.current && isDrawing && stageRef.current) {
       const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
       if (!scaledCursorPosition || !maskLayerRef.current) return;
@@ -181,13 +183,13 @@ const InpaintingCanvas = () => {
     } else {
       didMouseMoveRef.current = false;
     }
-    isDrawing.current = false;
-  }, [dispatch]);
+    dispatch(setIsDrawing(false));
+  }, [dispatch, isDrawing]);
 
   const handleMouseOutCanvas = useCallback(() => {
     dispatch(setCursorPosition(null));
     dispatch(setIsMovingBoundingBox(false));
-    isDrawing.current = false;
+    dispatch(setIsDrawing(false));
   }, [dispatch]);
 
   const handleMouseEnter = useCallback(
@@ -197,9 +199,15 @@ const InpaintingCanvas = () => {
 
         const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-        if (!scaledCursorPosition || !maskLayerRef.current) return;
+        if (
+          !scaledCursorPosition ||
+          !maskLayerRef.current ||
+          isMovingBoundingBox ||
+          isBoundingBoxTransforming
+        )
+          return;
 
-        isDrawing.current = true;
+        dispatch(setIsDrawing(true));
 
         // Add a new line starting from the current cursor position.
         dispatch(
@@ -211,7 +219,7 @@ const InpaintingCanvas = () => {
         );
       }
     },
-    [dispatch, brushSize, tool]
+    [dispatch, brushSize, tool, isMovingBoundingBox, isBoundingBoxTransforming]
   );
 
   return (

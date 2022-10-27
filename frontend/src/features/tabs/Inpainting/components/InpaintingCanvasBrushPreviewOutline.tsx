@@ -13,6 +13,7 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
       shouldShowBrushPreview,
       brushSize,
       stageScale,
+      shouldShowBrush,
     } = inpainting;
 
     return {
@@ -22,6 +23,7 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
       shouldShowBrushPreview,
       brushSize,
       strokeWidth: 1 / stageScale, // scale stroke thickness
+      shouldShowBrush,
     };
   },
   {
@@ -42,21 +44,31 @@ const InpaintingCanvasBrushPreviewOutline = () => {
     shouldShowBrushPreview,
     brushSize,
     strokeWidth,
+    shouldShowBrush,
   } = useAppSelector(inpaintingCanvasBrushPreviewSelector);
 
-  if (!((cursorPosition || shouldShowBrushPreview) && width && height))
+  if (!shouldShowBrush || !(cursorPosition || shouldShowBrushPreview))
     return null;
 
   return (
-    <Circle
-      x={cursorPosition ? cursorPosition.x : width / 2}
-      y={cursorPosition ? cursorPosition.y : height / 2}
-      radius={brushSize / 2}
-      stroke={'rgba(0,0,0,1)'}
-      strokeWidth={strokeWidth}
-      strokeEnabled={true}
-      listening={false}
-    />
+    <>
+      <Circle
+        x={cursorPosition ? cursorPosition.x : width / 2}
+        y={cursorPosition ? cursorPosition.y : height / 2}
+        radius={brushSize / 2}
+        stroke={'rgba(0,0,0,1)'}
+        strokeWidth={strokeWidth}
+        strokeEnabled={true}
+        listening={false}
+      />
+      <Circle
+        x={cursorPosition ? cursorPosition.x : width / 2}
+        y={cursorPosition ? cursorPosition.y : height / 2}
+        radius={1}
+        fill={'rgba(0,0,0,1)'}
+        listening={false}
+      />
+    </>
   );
 };
 export default InpaintingCanvasBrushPreviewOutline;
