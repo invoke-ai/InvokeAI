@@ -7,7 +7,11 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/store';
-import { setCurrentImage } from './gallerySlice';
+import {
+  setCurrentImage,
+  setShouldHoldGalleryOpen,
+  setShouldShowGallery,
+} from './gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { memo, useState } from 'react';
@@ -40,14 +44,15 @@ const memoEqualityCheck = (
  */
 const HoverableImage = memo((props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { activeTabName, galleryImageObjectFit } = useAppSelector(hoverableImageSelector);
+  const { activeTabName, galleryImageObjectFit } = useAppSelector(
+    hoverableImageSelector
+  );
+  const { image, isSelected } = props;
+  const { url, uuid, metadata } = image;
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const toast = useToast();
-
-  const { image, isSelected } = props;
-  const { url, uuid, metadata } = image;
 
   const handleMouseOver = () => setIsHovered(true);
 
@@ -137,7 +142,12 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleSelectImage = () => dispatch(setCurrentImage(image));
 
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root
+      onOpenChange={(open: boolean) => {
+        dispatch(setShouldHoldGalleryOpen(open));
+        dispatch(setShouldShowGallery(true));
+      }}
+    >
       <ContextMenu.Trigger>
         <Box
           position={'relative'}
@@ -180,7 +190,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           )}
         </Box>
       </ContextMenu.Trigger>
-      <ContextMenu.Content className="hoverable-image-context-menu">
+      <ContextMenu.Content
+        className="hoverable-image-context-menu"
+        sticky={'always'}
+      >
         <ContextMenu.Item
           onClickCapture={handleUsePrompt}
           disabled={image?.metadata?.image?.prompt === undefined}

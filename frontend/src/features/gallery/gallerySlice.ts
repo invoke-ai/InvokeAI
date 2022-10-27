@@ -18,6 +18,7 @@ export interface GalleryState {
   galleryScrollPosition: number;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
+  shouldHoldGalleryOpen: boolean;
 }
 
 const initialState: GalleryState = {
@@ -29,6 +30,7 @@ const initialState: GalleryState = {
   galleryScrollPosition: 0,
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'contain',
+  shouldHoldGalleryOpen: false,
 };
 
 export const gallerySlice = createSlice({
@@ -181,6 +183,9 @@ export const gallerySlice = createSlice({
     ) => {
       state.galleryImageObjectFit = action.payload;
     },
+    setShouldHoldGalleryOpen: (state, action: PayloadAction<boolean>) => {
+      state.shouldHoldGalleryOpen = action.payload;
+    },
   },
 });
 
@@ -198,6 +203,7 @@ export const {
   setGalleryScrollPosition,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
+  setShouldHoldGalleryOpen,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

@@ -1,7 +1,7 @@
 import { Button } from '@chakra-ui/button';
 import { NumberSize, Resizable, Size } from 're-resizable';
 
-import React, { ChangeEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdClear, MdPhotoLibrary } from 'react-icons/md';
 import { BsPinAngleFill } from 'react-icons/bs';
@@ -14,6 +14,7 @@ import {
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setGalleryScrollPosition,
+  setShouldHoldGalleryOpen,
   setShouldPinGallery,
 } from './gallerySlice';
 import HoverableImage from './HoverableImage';
@@ -43,6 +44,7 @@ export default function ImageGallery() {
     galleryGridTemplateColumns,
     activeTabName,
     galleryImageObjectFit,
+    shouldHoldGalleryOpen,
   } = useAppSelector(imageGallerySelector);
 
   const [gallerySize, setGallerySize] = useState<Size>({
@@ -119,6 +121,10 @@ export default function ImageGallery() {
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
       )
     );
+    if (!shouldHoldGalleryOpen) {
+      dispatch(setShouldHoldGalleryOpen(false));
+      setCloseGalleryTimer();
+    }
     dispatch(setShouldShowGallery(false));
   };
 
@@ -247,7 +253,7 @@ export default function ImageGallery() {
   return (
     <CSSTransition
       nodeRef={galleryRef}
-      in={shouldShowGallery}
+      in={shouldShowGallery || shouldHoldGalleryOpen}
       unmountOnExit
       timeout={200}
       classNames="image-gallery-area"
@@ -258,6 +264,7 @@ export default function ImageGallery() {
         ref={galleryRef}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}
         onMouseEnter={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
+        onMouseOver={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
       >
         <Resizable
           minWidth={galleryMinSize.width}

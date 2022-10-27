@@ -12,7 +12,7 @@ type InvokeWorkareaProps = {
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const { optionsPanel, className, children } = props;
 
-  const { shouldShowGallery } = useAppSelector(
+  const { shouldShowGallery, shouldHoldGalleryOpen } = useAppSelector(
     (state: RootState) => state.gallery
   );
 
@@ -27,7 +27,9 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
         <div className="workarea-content">{children}</div>
         <ImageGallery />
       </div>
-      {!shouldShowGallery && <ShowHideGalleryButton />}
+      {!(shouldShowGallery || shouldHoldGalleryOpen) && (
+        <ShowHideGalleryButton />
+      )}
     </div>
   );
 };
