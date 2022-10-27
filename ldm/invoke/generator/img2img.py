@@ -30,7 +30,7 @@ class Img2Img(Generator):
         )
 
         if isinstance(init_image, PIL.Image.Image):
-            init_image = self._image_to_tensor(init_image)
+            init_image = self._image_to_tensor(init_image.convert('RGB'))
 
         scope = choose_autocast(self.precision)
         with scope(self.model.device.type):
