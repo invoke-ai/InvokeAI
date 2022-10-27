@@ -6,6 +6,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'fix-build-container-action'
   pull_request_target:
     branches:
       - 'main'
@@ -15,6 +16,10 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
+      - name: prepare docker-tag
+        env:
+          repository: ${{ github.repository }}
+        run: echo "dockertag=${repository,,}" >> $GITHUB_ENV
       - name: Checkout
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -34,6 +39,6 @@ jobs:
           file: docker-build/Dockerfile
           platforms: linux/amd64
           push: false
-          tags: ${{ github.repository }}:latest
+          tags: ${{ env.dockertag }}:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
