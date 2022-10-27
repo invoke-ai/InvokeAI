@@ -279,12 +279,12 @@ const InpaintingCanvas = () => {
                   />
                 )}
               </Layer>
-              <Layer name={'preview-layer'}>
-                <InpaintingCanvasBrushPreviewOutline />
+              <Layer>
                 {shouldShowBoundingBoxFill && (
                   <InpaintingBoundingBoxPreviewOverlay />
                 )}
                 <InpaintingBoundingBoxPreview />
+                <InpaintingCanvasBrushPreviewOutline />
               </Layer>
             </>
           )}

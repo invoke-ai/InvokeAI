@@ -26,6 +26,7 @@ const Cacher = () => {
     shouldShowCheckboardTransparency,
     imageToInpaint,
     shouldShowBrush,
+    shouldShowBoundingBoxFill,
   } = useAppSelector((state: RootState) => state.inpainting);
 
   useLayoutEffect(() => {
@@ -50,6 +51,7 @@ const Cacher = () => {
     shouldShowCheckboardTransparency,
     imageToInpaint,
     shouldShowBrush,
+    shouldShowBoundingBoxFill,
   ]);
 
   return null;
