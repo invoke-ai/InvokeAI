@@ -111,6 +111,8 @@ export declare type Image = {
   url: string;
   mtime: number;
   metadata: Metadata;
+  width: number;
+  height: number;
 };
 
 // GalleryImages is an array of Image.
@@ -154,6 +156,8 @@ export declare type ImageResultResponse = {
   url: string;
   mtime: number;
   metadata: Metadata;
+  width: number;
+  height: number;
 };
 
 export declare type ErrorResponse = {

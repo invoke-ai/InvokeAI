@@ -1,13 +1,19 @@
 import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
 import dateFormat from 'dateformat';
 import { Socket } from 'socket.io-client';
-import { frontendToBackendParameters } from '../../common/util/parameterTranslation';
+import {
+  frontendToBackendParameters,
+  FrontendToBackendParametersConfig,
+} from '../../common/util/parameterTranslation';
 import {
   addLogEntry,
+  errorOccurred,
   setIsProcessing,
 } from '../../features/system/systemSlice';
-import { tabMap, tab_dict } from '../../features/tabs/InvokeTabs';
+import { inpaintingImageElementRef } from '../../features/tabs/Inpainting/InpaintingCanvas';
+import { InvokeTabName } from '../../features/tabs/InvokeTabs';
 import * as InvokeAI from '../invokeai';
+import { RootState } from '../store';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -21,17 +27,56 @@ const makeSocketIOEmitters = (
   const { dispatch, getState } = store;
 
   return {
-    emitGenerateImage: () => {
+    emitGenerateImage: (generationMode: InvokeTabName) => {
       dispatch(setIsProcessing(true));
 
-      const options = { ...getState().options };
+      const state: RootState = getState();
 
-      if (tabMap[options.activeTab] !== 'img2img') {
-        options.shouldUseInitImage = false;
+      const {
+        options: optionsState,
+        system: systemState,
+        inpainting: inpaintingState,
+        gallery: galleryState,
+      } = state;
+
+      const frontendToBackendParametersConfig: FrontendToBackendParametersConfig =
+        {
+          generationMode,
+          optionsState,
+          inpaintingState,
+          systemState,
+        };
+
+      if (generationMode === 'inpainting') {
+        if (
+          !inpaintingImageElementRef.current ||
+          !inpaintingState.imageToInpaint?.url
+        ) {
+          dispatch(
+            addLogEntry({
+              timestamp: dateFormat(new Date(), 'isoDateTime'),
+              message: 'Inpainting image not loaded, cannot generate image.',
+              level: 'error',
+            })
+          );
+          dispatch(errorOccurred());
+          return;
+        }
+
+        frontendToBackendParametersConfig.imageToProcessUrl =
+          inpaintingState.imageToInpaint.url;
+
+        frontendToBackendParametersConfig.maskImageElement =
+          inpaintingImageElementRef.current;
+      } else if (!['txt2img', 'img2img'].includes(generationMode)) {
+        if (!galleryState.currentImage?.url) return;
+
+        frontendToBackendParametersConfig.imageToProcessUrl =
+          galleryState.currentImage.url;
       }
 
       const { generationParameters, esrganParameters, facetoolParameters } =
-        frontendToBackendParameters(options, getState().system);
+        frontendToBackendParameters(frontendToBackendParametersConfig);
 
       socketio.emit(
         'generateImage',
@@ -39,6 +84,14 @@ const makeSocketIOEmitters = (
         esrganParameters,
         facetoolParameters
       );
+
+      // we need to truncate the init_mask base64 else it takes up the whole log
+      // TODO: handle maintaining masks for reproducibility in future
+      if (generationParameters.init_mask) {
+        generationParameters.init_mask = generationParameters.init_mask
+          .substr(0, 20)
+          .concat('...');
+      }
 
       dispatch(
         addLogEntry({

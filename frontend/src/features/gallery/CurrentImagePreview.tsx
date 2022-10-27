@@ -1,5 +1,5 @@
 import { IconButton, Image } from '@chakra-ui/react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import { GalleryState, selectNextImage, selectPrevImage } from './gallerySlice';

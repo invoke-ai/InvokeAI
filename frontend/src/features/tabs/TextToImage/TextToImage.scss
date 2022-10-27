@@ -23,12 +23,18 @@
   .current-image-display,
   .current-image-display-placeholder {
     grid-area: text-to-image-display;
-    height: $app-content-height;
   }
 
   .image-gallery-area {
     height: 100%;
     z-index: 2;
     place-self: end;
+  }
+}
+
+// Overrides
+.txt-to-image-workarea-container {
+  .current-image-preview {
+    padding: 0 1rem 1rem 1rem;
   }
 }

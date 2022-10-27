@@ -5,6 +5,8 @@ import shutil
 import mimetypes
 import traceback
 import math
+import io
+import base64
 
 from flask import Flask, redirect, send_from_directory
 from flask_socketio import SocketIO
@@ -64,10 +66,7 @@ class InvokeAIWebServer:
             __name__, static_url_path='', static_folder='../frontend/dist/'
         )
 
-        self.socketio = SocketIO(
-            self.app,
-            **socketio_args
-        )
+        self.socketio = SocketIO(self.app, **socketio_args)
 
         # Keep Server Alive Route
         @self.app.route('/flaskwebgui-keep-server-alive')
@@ -102,6 +101,7 @@ class InvokeAIWebServer:
                 close_server_on_exit = False
             try:
                 from flaskwebgui import FlaskUI
+
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
@@ -186,11 +186,14 @@ class InvokeAIWebServer:
 
                 for path in image_paths:
                     metadata = retrieve_metadata(path)
+                    (width, height) = Image.open(path).size
                     image_array.append(
                         {
                             'url': self.get_url_from_image_path(path),
                             'mtime': os.path.getmtime(path),
                             'metadata': metadata['sd-metadata'],
+                            'width': width,
+                            'height': height,
                         }
                     )
 
@@ -233,11 +236,16 @@ class InvokeAIWebServer:
 
                 for path in image_paths:
                     metadata = retrieve_metadata(path)
+
+                    (width, height) = Image.open(path).size
+
                     image_array.append(
                         {
                             'url': self.get_url_from_image_path(path),
                             'mtime': os.path.getmtime(path),
                             'metadata': metadata['sd-metadata'],
+                            'width': width,
+                            'height': height,
                         }
                     )
 
@@ -260,11 +268,24 @@ class InvokeAIWebServer:
             generation_parameters, esrgan_parameters, facetool_parameters
         ):
             try:
-                print(
-                    f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}'
-                )
+                # truncate long init_mask base64 if needed
+                if 'init_mask' in generation_parameters:
+                    printable_parameters = {
+                        **generation_parameters,
+                        'init_mask': generation_parameters['init_mask'][:20]
+                        + '...',
+                    }
+                    print(
+                        f'>> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}'
+                    )
+                else:
+                    print(
+                        f'>> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}'
+                    )
                 self.generate_images(
-                    generation_parameters, esrgan_parameters, facetool_parameters
+                    generation_parameters,
+                    esrgan_parameters,
+                    facetool_parameters,
                 )
             except Exception as e:
                 self.socketio.emit('error', {'message': (str(e))})
@@ -321,16 +342,24 @@ class InvokeAIWebServer:
                 elif postprocessing_parameters['type'] == 'gfpgan':
                     image = self.gfpgan.process(
                         image=image,
-                        strength=postprocessing_parameters['facetool_strength'],
+                        strength=postprocessing_parameters[
+                            'facetool_strength'
+                        ],
                         seed=seed,
                     )
                 elif postprocessing_parameters['type'] == 'codeformer':
                     image = self.codeformer.process(
                         image=image,
-                        strength=postprocessing_parameters['facetool_strength'],
-                        fidelity=postprocessing_parameters['codeformer_fidelity'],
+                        strength=postprocessing_parameters[
+                            'facetool_strength'
+                        ],
+                        fidelity=postprocessing_parameters[
+                            'codeformer_fidelity'
+                        ],
                         seed=seed,
-                        device='cpu' if str(self.generate.device) == 'mps' else self.generate.device
+                        device='cpu'
+                        if str(self.generate.device) == 'mps'
+                        else self.generate.device,
                     )
                 else:
                     raise TypeError(
@@ -348,6 +377,8 @@ class InvokeAIWebServer:
                 )
 
                 command = parameters_to_command(postprocessing_parameters)
+
+                (width, height) = image.size
 
                 path = self.save_result_image(
                     image,
@@ -371,6 +402,8 @@ class InvokeAIWebServer:
                         'url': self.get_url_from_image_path(path),
                         'mtime': os.path.getmtime(path),
                         'metadata': metadata,
+                        'width': width,
+                        'height': height,
                     },
                 )
             except Exception as e:
@@ -482,19 +515,41 @@ class InvokeAIWebServer:
 
             if 'init_img' in generation_parameters:
                 init_img_url = generation_parameters['init_img']
-                generation_parameters[
-                    'init_img'
-                ] = self.get_image_path_from_url(
-                    generation_parameters['init_img']
-                )
+                init_img_path = self.get_image_path_from_url(init_img_url)
+                generation_parameters['init_img'] = init_img_path
+
+            # if 'init_mask' in generation_parameters:
+            #     mask_img_url = generation_parameters['init_mask']
+            #     generation_parameters[
+            #         'init_mask'
+            #     ] = self.get_image_path_from_url(
+            #         generation_parameters['init_mask']
+            #     )
 
             if 'init_mask' in generation_parameters:
-                mask_img_url = generation_parameters['init_mask']
-                generation_parameters[
-                    'init_mask'
-                ] = self.get_image_path_from_url(
-                    generation_parameters['init_mask']
+                # grab an Image of the init image
+                original_image = Image.open(init_img_path)
+
+                # copy a region from it which we will inpaint
+                cropped_init_image = copy_image_from_bounding_box(
+                    original_image, **generation_parameters['bounding_box']
                 )
+                generation_parameters['init_img'] = cropped_init_image
+
+                # grab an Image of the mask
+                mask_image = Image.open(
+                    io.BytesIO(
+                        base64.decodebytes(
+                            bytes(generation_parameters['init_mask'], 'utf-8')
+                        )
+                    )
+                )
+
+                # crop the mask image
+                cropped_mask_image = copy_image_from_bounding_box(
+                    mask_image, **generation_parameters['bounding_box']
+                )
+                generation_parameters['init_mask'] = cropped_mask_image
 
             totalSteps = self.calculate_real_steps(
                 steps=generation_parameters['steps'],
@@ -532,6 +587,8 @@ class InvokeAIWebServer:
                     )
                     command = parameters_to_command(generation_parameters)
 
+                    (width, height) = image.size
+
                     path = self.save_result_image(
                         image,
                         command,
@@ -548,6 +605,8 @@ class InvokeAIWebServer:
                             'url': self.get_url_from_image_path(path),
                             'mtime': os.path.getmtime(path),
                             'metadata': metadata,
+                            'width': width,
+                            'height': height
                         },
                     )
                 self.socketio.emit(
@@ -625,7 +684,9 @@ class InvokeAIWebServer:
                     if facetool_parameters['type'] == 'gfpgan':
                         progress.set_current_status('Restoring Faces (GFPGAN)')
                     elif facetool_parameters['type'] == 'codeformer':
-                        progress.set_current_status('Restoring Faces (Codeformer)')
+                        progress.set_current_status(
+                            'Restoring Faces (Codeformer)'
+                        )
 
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit(
@@ -643,11 +704,17 @@ class InvokeAIWebServer:
                         image = self.codeformer.process(
                             image=image,
                             strength=facetool_parameters['strength'],
-                            fidelity=facetool_parameters['codeformer_fidelity'],
+                            fidelity=facetool_parameters[
+                                'codeformer_fidelity'
+                            ],
                             seed=seed,
-                            device='cpu' if str(self.generate.device) == 'mps' else self.generate.device,
+                            device='cpu'
+                            if str(self.generate.device) == 'mps'
+                            else self.generate.device,
                         )
-                        all_parameters['codeformer_fidelity'] = facetool_parameters['codeformer_fidelity']
+                        all_parameters[
+                            'codeformer_fidelity'
+                        ] = facetool_parameters['codeformer_fidelity']
 
                     postprocessing = True
                     all_parameters['facetool_strength'] = facetool_parameters[
@@ -663,18 +730,28 @@ class InvokeAIWebServer:
                 )
                 eventlet.sleep(0)
 
+                # paste the inpainting image back onto the original
+                if 'init_mask' in generation_parameters:
+                    image = paste_image_into_bounding_box(
+                        Image.open(init_img_path),
+                        image,
+                        **generation_parameters['bounding_box'],
+                    )
+
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
                 if 'init_img' in all_parameters:
                     all_parameters['init_img'] = init_img_url
 
                 if 'init_mask' in all_parameters:
-                    all_parameters['init_mask'] = mask_img_url
+                    all_parameters['init_mask'] = ''  #
 
                 metadata = self.parameters_to_generated_image_metadata(
                     all_parameters
                 )
 
                 command = parameters_to_command(all_parameters)
+
+                (width, height) = image.size
 
                 path = self.save_result_image(
                     image,
@@ -705,6 +782,8 @@ class InvokeAIWebServer:
                         'url': self.get_url_from_image_path(path),
                         'mtime': os.path.getmtime(path),
                         'metadata': metadata,
+                        'width': width,
+                        'height': height,
                     },
                 )
                 eventlet.sleep(0)
@@ -766,12 +845,14 @@ class InvokeAIWebServer:
             # 'postprocessing' is either null or an
             if 'facetool_strength' in parameters:
                 facetool_parameters = {
-                        'type': str(parameters['facetool_type']),
-                        'strength': float(parameters['facetool_strength']),
-                    }
+                    'type': str(parameters['facetool_type']),
+                    'strength': float(parameters['facetool_strength']),
+                }
 
                 if parameters['facetool_type'] == 'codeformer':
-                    facetool_parameters['fidelity'] = float(parameters['codeformer_fidelity'])
+                    facetool_parameters['fidelity'] = float(
+                        parameters['codeformer_fidelity']
+                    )
 
                 postprocessing.append(facetool_parameters)
 
@@ -792,7 +873,9 @@ class InvokeAIWebServer:
             rfc_dict['sampler'] = parameters['sampler_name']
 
             # display weighted subprompts (liable to change)
-            subprompts = split_weighted_subprompts(parameters['prompt'], skip_normalize=True)
+            subprompts = split_weighted_subprompts(
+                parameters['prompt'], skip_normalize=True
+            )
             subprompts = [{'prompt': x[0], 'weight': x[1]} for x in subprompts]
             rfc_dict['prompt'] = subprompts
 
@@ -817,13 +900,13 @@ class InvokeAIWebServer:
                 rfc_dict['init_image_path'] = parameters[
                     'init_img'
                 ]  # TODO: Noncompliant
-                if 'init_mask' in parameters:
-                    rfc_dict['mask_hash'] = calculate_init_img_hash(
-                        self.get_image_path_from_url(parameters['init_mask'])
-                    )  # TODO: Noncompliant
-                    rfc_dict['mask_image_path'] = parameters[
-                        'init_mask'
-                    ]  # TODO: Noncompliant
+                # if 'init_mask' in parameters:
+                #     rfc_dict['mask_hash'] = calculate_init_img_hash(
+                #         self.get_image_path_from_url(parameters['init_mask'])
+                #     )  # TODO: Noncompliant
+                #     rfc_dict['mask_image_path'] = parameters[
+                #         'init_mask'
+                #     ]  # TODO: Noncompliant
             else:
                 rfc_dict['type'] = 'txt2img'
 
@@ -875,7 +958,9 @@ class InvokeAIWebServer:
                 postprocessing_metadata['strength'] = parameters[
                     'facetool_strength'
                 ]
-                postprocessing_metadata['fidelity'] = parameters['codeformer_fidelity']
+                postprocessing_metadata['fidelity'] = parameters[
+                    'codeformer_fidelity'
+                ]
 
             else:
                 raise TypeError(f"Invalid type: {parameters['type']}")
@@ -1119,3 +1204,29 @@ class Progress:
 
 class CanceledException(Exception):
     pass
+
+
+"""
+Crops an image to a bounding box.
+"""
+
+
+def copy_image_from_bounding_box(image, x, y, width, height):
+    with image as im:
+        bounds = (x, y, x + width, y + height)
+        im_cropped = im.crop(bounds)
+        return im_cropped
+
+
+"""
+Pastes an image onto another with a bounding box.
+"""
+
+
+def paste_image_into_bounding_box(
+    recipient_image, donor_image, x, y, width, height
+):
+    with recipient_image as im:
+        bounds = (x, y, x + width, y + height)
+        im.paste(donor_image, bounds)
+        return recipient_image

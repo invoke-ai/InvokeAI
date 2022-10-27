@@ -1,22 +1,38 @@
-/*
-    These functions translate frontend state into parameters
-    suitable for consumption by the backend, and vice-versa.
-*/
-
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
 import { OptionsState } from '../../features/options/optionsSlice';
 import { SystemState } from '../../features/system/systemSlice';
 
-import {
-  seedWeightsToString,
-  stringToSeedWeightsArray,
-} from './seedWeightPairs';
+import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
+import { InvokeTabName } from '../../features/tabs/InvokeTabs';
+import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice';
+import generateMask from '../../features/tabs/Inpainting/util/generateMask';
 
+export type FrontendToBackendParametersConfig = {
+  generationMode: InvokeTabName;
+  optionsState: OptionsState;
+  inpaintingState: InpaintingState;
+  systemState: SystemState;
+  imageToProcessUrl?: string;
+  maskImageElement?: HTMLImageElement;
+};
+
+/**
+ * Translates/formats frontend state into parameters suitable
+ * for consumption by the API.
+ */
 export const frontendToBackendParameters = (
-  optionsState: OptionsState,
-  systemState: SystemState
+  config: FrontendToBackendParametersConfig
 ): { [key: string]: any } => {
+  const {
+    generationMode,
+    optionsState,
+    inpaintingState,
+    systemState,
+    imageToProcessUrl,
+    maskImageElement,
+  } = config;
+
   const {
     prompt,
     iterations,
@@ -30,10 +46,8 @@ export const frontendToBackendParameters = (
     seed,
     seamless,
     hiresFix,
-    shouldUseInitImage,
     img2imgStrength,
     initialImagePath,
-    maskPath,
     shouldFitToWidthHeight,
     shouldGenerateVariations,
     variationAmount,
@@ -61,8 +75,6 @@ export const frontendToBackendParameters = (
     width,
     sampler_name: sampler,
     seed,
-    seamless,
-    hires_fix: hiresFix,
     progress_images: shouldDisplayInProgress,
   };
 
@@ -70,13 +82,45 @@ export const frontendToBackendParameters = (
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
     : seed;
 
-  if (shouldUseInitImage) {
+  // parameters common to txt2img and img2img
+  if (['txt2img', 'img2img'].includes(generationMode)) {
+    generationParameters.seamless = seamless;
+    generationParameters.hires_fix = hiresFix;
+  }
+
+  // img2img exclusive parameters
+  if (generationMode === 'img2img') {
     generationParameters.init_img = initialImagePath;
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = shouldFitToWidthHeight;
-    if (maskPath) {
-      generationParameters.init_mask = maskPath;
-    }
+  }
+
+  // inpainting exclusive parameters
+  if (generationMode === 'inpainting' && maskImageElement) {
+    const {
+      lines,
+      boundingBoxCoordinate: { x, y },
+      boundingBoxDimensions: { width, height },
+    } = inpaintingState;
+
+    const boundingBox = {
+      x,
+      y,
+      width,
+      height,
+    };
+
+    generationParameters.init_img = imageToProcessUrl;
+    generationParameters.strength = img2imgStrength;
+    generationParameters.fit = false;
+
+    const maskDataURL = generateMask(maskImageElement, lines, boundingBox);
+
+    generationParameters.init_mask = maskDataURL.split(
+      'data:image/png;base64,'
+    )[1];
+
+    generationParameters.bounding_box = boundingBox;
   }
 
   if (shouldGenerateVariations) {
@@ -105,7 +149,7 @@ export const frontendToBackendParameters = (
       strength: facetoolStrength,
     };
     if (facetoolType === 'codeformer') {
-      facetoolParameters.codeformer_fidelity = codeformerFidelity
+      facetoolParameters.codeformer_fidelity = codeformerFidelity;
     }
   }
 

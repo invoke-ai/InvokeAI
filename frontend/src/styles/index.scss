@@ -3,12 +3,13 @@
 @use 'Colors_Light';
 @use 'Fonts';
 @use 'Animations';
+@use 'Misc';
 
 // Component Styles
 //app
 @use '../app/App.scss';
 
-//systen
+//system
 @use '../features/system/SiteHeader.scss';
 @use '../features/system/StatusIndicator.scss';
 @use '../features/system/SettingsModal/SettingsModal.scss';
@@ -21,6 +22,7 @@
 @use '../features/options/MainOptions/MainOptions.scss';
 @use '../features/options/AccordionItems/AdvancedSettings.scss';
 @use '../features/options/AdvancedOptions/Upscale/UpscaleOptions.scss';
+@use '../features/options/AdvancedOptions/Inpainting/BoundingBoxDimensions.scss';
 @use '../features/system/ProgressBar.scss';
 
 // gallery
@@ -28,20 +30,32 @@
 @use '../features/gallery/ImageGallery.scss';
 @use '../features/gallery/HoverableImage.scss';
 @use '../features/gallery/InvokePopover.scss';
+@use '../features/gallery/ShowHideGalleryButton.scss';
 @use '../features/gallery/ImageMetaDataViewer/ImageMetadataViewer.scss';
 
 // Tabs
 @use '../features/tabs/InvokeTabs.scss';
+@use '../features/tabs/InvokeWorkarea.scss';
 @use '../features/tabs/TextToImage/TextToImage.scss';
 @use '../features/tabs/ImageToImage/ImageToImage.scss';
+@use '../features/tabs/Inpainting/Inpainting.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';
 @use '../common/components/IAIInput.scss';
-@use '../common/components/IAISelect.scss';
+@use '../common/components/IAIIconButton.scss';
 @use '../common/components/IAISwitch.scss';
+@use '../common/components/IAISelect.scss';
+@use '../common/components/IAISlider.scss';
+@use '../common/components/IAICheckbox.scss';
+@use '../common/components/IAIPopover.scss';
+@use '../common/components/IAIColorPicker.scss';
 @use '../common/components/WorkInProgress/WorkInProgress.scss';
 @use '../common/components/GuidePopover.scss';
+
+// Component Shared - Radix UI
+// @use '../common/components/radix-ui/IAISlider.scss';
+// @use '../common/components/radix-ui/IAITooltip.scss';
 
 // Shared Styles
 @use './Mixins/' as *;

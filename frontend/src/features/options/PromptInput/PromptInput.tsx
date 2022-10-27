@@ -10,12 +10,15 @@ import useCheckParameters, {
   systemSelector,
 } from '../../../common/hooks/useCheckParameters';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { tabMap } from '../../tabs/InvokeTabs';
 
 export const optionsSelector = createSelector(
   (state: RootState) => state.options,
   (options: OptionsState) => {
+    const { prompt, activeTab } = options;
     return {
-      prompt: options.prompt,
+      prompt,
+      activeTabName: tabMap[activeTab],
     };
   },
   {
@@ -30,7 +33,7 @@ export const optionsSelector = createSelector(
  */
 const PromptInput = () => {
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const { prompt } = useAppSelector(optionsSelector);
+  const { prompt, activeTabName } = useAppSelector(optionsSelector);
   const { isProcessing } = useAppSelector(systemSelector);
   const dispatch = useAppDispatch();
   const isReady = useCheckParameters();
@@ -40,13 +43,13 @@ const PromptInput = () => {
   };
 
   useHotkeys(
-    'ctrl+enter',
+    'ctrl+enter, cmd+enter',
     () => {
       if (isReady) {
-        dispatch(generateImage());
+        dispatch(generateImage(activeTabName));
       }
     },
-    [isReady]
+    [isReady, activeTabName]
   );
 
   useHotkeys(
@@ -60,7 +63,7 @@ const PromptInput = () => {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && e.shiftKey === false && isReady) {
       e.preventDefault();
-      dispatch(generateImage());
+      dispatch(generateImage(activeTabName));
     }
   };
 

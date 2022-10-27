@@ -28,7 +28,7 @@ export default function CancelButton() {
       aria-label="Cancel"
       isDisabled={!isConnected || !isProcessing}
       onClick={handleClickCancel}
-      className="cancel-btn"
+      styleClass="cancel-btn"
     />
   );
 }

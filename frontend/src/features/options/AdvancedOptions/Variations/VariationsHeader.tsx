@@ -2,7 +2,7 @@ import { Flex } from '@chakra-ui/react';
 import React from 'react';
 import GenerateVariations from './GenerateVariations';
 
-export default function Variations() {
+export default function VariationsHeader() {
   return (
     <Flex
       justifyContent={'space-between'}

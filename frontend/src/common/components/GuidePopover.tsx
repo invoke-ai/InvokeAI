@@ -25,7 +25,10 @@ const systemSelector = createSelector(
 const GuidePopover = ({ children, feature }: GuideProps) => {
   const shouldDisplayGuides = useAppSelector(systemSelector);
   const { text } = FEATURES[feature];
-  return shouldDisplayGuides ? (
+
+  if (!shouldDisplayGuides) return null;
+
+  return (
     <Popover trigger={'hover'}>
       <PopoverTrigger>
         <Box>{children}</Box>
@@ -40,8 +43,6 @@ const GuidePopover = ({ children, feature }: GuideProps) => {
         <div className="guide-popover-guide-content">{text}</div>
       </PopoverContent>
     </Popover>
-  ) : (
-    <></>
   );
 };
 

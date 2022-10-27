@@ -7,16 +7,16 @@
 ) {
   min-width: $btn-width;
   min-height: $btn-height;
-  background-color: $btn-color;
+  background-color: $btn-color !important;
 
   &:hover {
-    background-color: $btn-color-hover;
+    background-color: $btn-color-hover !important;
   }
 
   &:disabled {
-    background-color: rgb(45, 45, 55);
+    background-color: rgb(45, 45, 55) !important;
     &:hover {
-      background-color: rgb(45, 45, 55);
+      background-color: rgb(45, 45, 55) !important;
     }
   }
 

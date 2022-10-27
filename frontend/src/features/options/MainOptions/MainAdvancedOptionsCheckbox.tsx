@@ -1,8 +1,10 @@
+import { Checkbox } from '@chakra-ui/react';
 import React, { ChangeEvent } from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import IAICheckbox from '../../../common/components/IAICheckbox';
 import { setShowAdvancedOptions } from '../optionsSlice';
 
-export default function MainAdvancedOptions() {
+export default function MainAdvancedOptionsCheckbox() {
   const showAdvancedOptions = useAppSelector(
     (state: RootState) => state.options.showAdvancedOptions
   );
@@ -12,15 +14,11 @@ export default function MainAdvancedOptions() {
     dispatch(setShowAdvancedOptions(e.target.checked));
 
   return (
-    <div className="advanced_options_checker">
-      <input
-        type="checkbox"
-        name="advanced_options"
-        id=""
-        onChange={handleShowAdvancedOptions}
-        checked={showAdvancedOptions}
-      />
-      <label htmlFor="advanced_options">Advanced Options</label>
-    </div>
+    <IAICheckbox
+      label="Advanced Options"
+      styleClass="advanced-options-checkbox"
+      onChange={handleShowAdvancedOptions}
+      isChecked={showAdvancedOptions}
+    />
   );
 }

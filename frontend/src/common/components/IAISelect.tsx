@@ -21,13 +21,13 @@ const IAISelect = (props: Props) => {
     ...rest
   } = props;
   return (
-    <FormControl isDisabled={isDisabled} className={`iai-select ${styleClass}`}>
+    <FormControl isDisabled={isDisabled} className={`invokeai__select ${styleClass}`}>
       <FormLabel
         fontSize={fontSize}
         marginBottom={1}
         flexGrow={2}
         whiteSpace="nowrap"
-        className="iai-select-label"
+        className="invokeai__select-label"
       >
         {label}
       </FormLabel>
@@ -35,11 +35,11 @@ const IAISelect = (props: Props) => {
         fontSize={fontSize}
         size={size}
         {...rest}
-        className="iai-select-picker"
+        className="invokeai__select-picker"
       >
         {validValues.map((opt) => {
           return typeof opt === 'string' || typeof opt === 'number' ? (
-            <option key={opt} value={opt} className="iai-select-option">
+            <option key={opt} value={opt} className="invokeai__select-option">
               {opt}
             </option>
           ) : (

@@ -43,14 +43,14 @@ export default function ImageToImageDisplay() {
                   <InitImagePreview />
                   <div className="image-to-image-current-image-display">
                     <CurrentImagePreview imageToDisplay={imageToDisplay} />
+                    {shouldShowImageDetails && (
+                      <ImageMetadataViewer
+                        image={imageToDisplay}
+                        styleClass="img2img-metadata"
+                      />
+                    )}
                   </div>
                 </div>
-                {shouldShowImageDetails && (
-                  <ImageMetadataViewer
-                    image={imageToDisplay}
-                    styleClass="img2img-metadata"
-                  />
-                )}
               </div>
             </>
           ) : (

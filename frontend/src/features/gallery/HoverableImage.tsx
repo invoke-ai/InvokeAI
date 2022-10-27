@@ -22,6 +22,8 @@ import {
 import * as InvokeAI from '../../app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { tabMap } from '../tabs/InvokeTabs';
+import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
+import { hoverableImageSelector } from './gallerySliceSelectors';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -38,9 +40,7 @@ const memoEqualityCheck = (
  */
 const HoverableImage = memo((props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const activeTab = useAppSelector(
-    (state: RootState) => state.options.activeTab
-  );
+  const { activeTabName } = useAppSelector(hoverableImageSelector);
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -75,11 +75,24 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const handleSendToImageToImage = () => {
     dispatch(setInitialImagePath(image.url));
-    if (activeTab !== 1) {
-      dispatch(setActiveTab(1));
+    if (activeTabName !== 'img2img') {
+      dispatch(setActiveTab('img2img'));
     }
     toast({
       title: 'Sent to Image To Image',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
+  const handleSendToInpainting = () => {
+    dispatch(setImageToInpaint(image));
+    if (activeTabName !== 'inpainting') {
+      dispatch(setActiveTab('inpainting'));
+    }
+    toast({
+      title: 'Sent to Inpainting',
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -199,6 +212,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         </Tooltip>
         <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
           Send to Image To Image
+        </ContextMenu.Item>
+        <ContextMenu.Item onClickCapture={handleSendToInpainting}>
+          Send to Inpainting
         </ContextMenu.Item>
         <DeleteImageModal image={image}>
           <ContextMenu.Item data-warning>Delete Image</ContextMenu.Item>
