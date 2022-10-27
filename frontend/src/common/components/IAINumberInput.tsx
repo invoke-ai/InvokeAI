@@ -116,7 +116,11 @@ const IAINumberInput = (props: Props) => {
       <FormControl
         isDisabled={isDisabled}
         isInvalid={isInvalid}
-        className={`invokeai__number-input-form-control ${styleClass}`}
+        className={
+          styleClass
+            ? `invokeai__number-input-form-control ${styleClass}`
+            : `invokeai__number-input-form-control`
+        }
         {...formControlProps}
       >
         <FormLabel

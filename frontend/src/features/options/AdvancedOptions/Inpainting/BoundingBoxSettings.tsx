@@ -129,6 +129,10 @@ const BoundingBoxSettings = () => {
             onClick={handleResetWidth}
             icon={<BiReset />}
             styleClass="inpainting-bounding-box-reset-icon-btn"
+            isDisabled={
+              !shouldShowBoundingBox ||
+              canvasDimensions.width === boundingBoxDimensions.width
+            }
           />
         </div>
         <div className="inpainting-bounding-box-dimensions-slider-numberinput">
@@ -159,6 +163,10 @@ const BoundingBoxSettings = () => {
             onClick={handleResetHeight}
             icon={<BiReset />}
             styleClass="inpainting-bounding-box-reset-icon-btn"
+            isDisabled={
+              !shouldShowBoundingBox ||
+              canvasDimensions.height === boundingBoxDimensions.height
+            }
           />
         </div>
         <IAICheckbox
