@@ -16,6 +16,7 @@ export const imageGallerySelector = createSelector(
       galleryScrollPosition,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
+      shouldHoldGalleryOpen,
     } = gallery;
 
     const { activeTab } = options;
@@ -31,6 +32,7 @@ export const imageGallerySelector = createSelector(
       galleryImageObjectFit,
       galleryGridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       activeTabName: tabMap[activeTab],
+      shouldHoldGalleryOpen,
     };
   }
 );
