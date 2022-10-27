@@ -886,23 +886,22 @@ class Generate:
     # consistent, at least
     def _set_sampler(self):
         msg = f'>> Setting Sampler to {self.sampler_name}'
-        karras_max = self.karras_max  # set in generate() call
         if self.sampler_name == 'plms':
             self.sampler = PLMSSampler(self.model, device=self.device)
         elif self.sampler_name == 'ddim':
             self.sampler = DDIMSampler(self.model, device=self.device)
         elif self.sampler_name == 'k_dpm_2_a':
-            self.sampler = KSampler(self.model, 'dpm_2_ancestral', device=self.device, karras_max=karras_max)
+            self.sampler = KSampler(self.model, 'dpm_2_ancestral', device=self.device)
         elif self.sampler_name == 'k_dpm_2':
-            self.sampler = KSampler(self.model, 'dpm_2', device=self.device, karras_max=karras_max)
+            self.sampler = KSampler(self.model, 'dpm_2', device=self.device)
         elif self.sampler_name == 'k_euler_a':
-            self.sampler = KSampler(self.model, 'euler_ancestral', device=self.device, karras_max=karras_max)
+            self.sampler = KSampler(self.model, 'euler_ancestral', device=self.device)
         elif self.sampler_name == 'k_euler':
-            self.sampler = KSampler(self.model, 'euler', device=self.device, karras_max=karras_max)
+            self.sampler = KSampler(self.model, 'euler', device=self.device)
         elif self.sampler_name == 'k_heun':
-            self.sampler = KSampler(self.model, 'heun', device=self.device, karras_max=karras_max)
+            self.sampler = KSampler(self.model, 'heun', device=self.device)
         elif self.sampler_name == 'k_lms':
-            self.sampler = KSampler(self.model, 'lms', device=self.device, karras_max=karras_max)
+            self.sampler = KSampler(self.model, 'lms', device=self.device)
         else:
             msg = f'>> Unsupported Sampler: {self.sampler_name}, Defaulting to plms'
             self.sampler = PLMSSampler(self.model, device=self.device)
