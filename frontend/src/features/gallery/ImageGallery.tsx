@@ -1,7 +1,7 @@
 import { Button } from '@chakra-ui/button';
 import { NumberSize, Resizable, Size } from 're-resizable';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdClear, MdPhotoLibrary } from 'react-icons/md';
 import { BsPinAngleFill } from 'react-icons/bs';
@@ -12,6 +12,7 @@ import {
   selectNextImage,
   selectPrevImage,
   setGalleryImageMinimumWidth,
+  setGalleryImageObjectFit,
   setGalleryScrollPosition,
   setShouldPinGallery,
 } from './gallerySlice';
@@ -25,6 +26,7 @@ import { FaWrench } from 'react-icons/fa';
 import IAIPopover from '../../common/components/IAIPopover';
 import IAISlider from '../../common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
+import IAICheckbox from '../../common/components/IAICheckbox';
 
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
@@ -40,6 +42,7 @@ export default function ImageGallery() {
     galleryImageMinimumWidth,
     galleryGridTemplateColumns,
     activeTabName,
+    galleryImageObjectFit,
   } = useAppSelector(imageGallerySelector);
 
   const [gallerySize, setGallerySize] = useState<Size>({
@@ -310,6 +313,7 @@ export default function ImageGallery() {
             <IAIPopover
               trigger="click"
               hasArrow={activeTabName === 'inpainting' ? false : true}
+              // styleClass="image-gallery-settings-popover"
               triggerComponent={
                 <IAIIconButton
                   size={'sm'}
@@ -319,29 +323,47 @@ export default function ImageGallery() {
                   cursor={'pointer'}
                 />
               }
-              styleClass="image-gallery-size-popover"
             >
-              <IAISlider
-                value={galleryImageMinimumWidth}
-                onChange={handleChangeGalleryImageMinimumWidth}
-                min={32}
-                max={256}
-                width={100}
-                label={'Image Size'}
-                formLabelProps={{ style: { fontSize: '0.9rem' } }}
-                sliderThumbTooltipProps={{
-                  label: `${galleryImageMinimumWidth}px`,
-                }}
-              />
-              <IAIIconButton
-                size={'sm'}
-                aria-label={'Reset'}
-                tooltip={'Reset Size'}
-                onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
-                icon={<BiReset />}
-                data-selected={shouldPinGallery}
-                styleClass="image-gallery-icon-btn"
-              />
+              <div className="image-gallery-settings-popover">
+                <div>
+                  <IAISlider
+                    value={galleryImageMinimumWidth}
+                    onChange={handleChangeGalleryImageMinimumWidth}
+                    min={32}
+                    max={256}
+                    width={100}
+                    label={'Image Size'}
+                    formLabelProps={{ style: { fontSize: '0.9rem' } }}
+                    sliderThumbTooltipProps={{
+                      label: `${galleryImageMinimumWidth}px`,
+                    }}
+                  />
+                  <IAIIconButton
+                    size={'sm'}
+                    aria-label={'Reset'}
+                    tooltip={'Reset Size'}
+                    onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
+                    icon={<BiReset />}
+                    data-selected={shouldPinGallery}
+                    styleClass="image-gallery-icon-btn"
+                  />
+                </div>
+                <div>
+                  <IAICheckbox
+                    label="Maintain Aspect Ratio"
+                    isChecked={galleryImageObjectFit === 'contain'}
+                    onChange={() =>
+                      dispatch(
+                        setGalleryImageObjectFit(
+                          galleryImageObjectFit === 'contain'
+                            ? 'cover'
+                            : 'contain'
+                        )
+                      )
+                    }
+                  />
+                </div>
+              </div>
             </IAIPopover>
 
             <IAIIconButton

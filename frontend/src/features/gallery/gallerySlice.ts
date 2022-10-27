@@ -3,6 +3,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import _, { clamp } from 'lodash';
 import * as InvokeAI from '../../app/invokeai';
 
+type GalleryImageObjectFitType = 'contain' | 'cover';
+
 export interface GalleryState {
   currentImage?: InvokeAI.Image;
   currentImageUuid: string;
@@ -15,6 +17,7 @@ export interface GalleryState {
   shouldShowGallery: boolean;
   galleryScrollPosition: number;
   galleryImageMinimumWidth: number;
+  galleryImageObjectFit: GalleryImageObjectFitType;
 }
 
 const initialState: GalleryState = {
@@ -25,6 +28,7 @@ const initialState: GalleryState = {
   shouldShowGallery: true,
   galleryScrollPosition: 0,
   galleryImageMinimumWidth: 64,
+  galleryImageObjectFit: 'contain',
 };
 
 export const gallerySlice = createSlice({
@@ -171,6 +175,12 @@ export const gallerySlice = createSlice({
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
+    setGalleryImageObjectFit: (
+      state,
+      action: PayloadAction<GalleryImageObjectFitType>
+    ) => {
+      state.galleryImageObjectFit = action.payload;
+    },
   },
 });
 
@@ -187,6 +197,7 @@ export const {
   setShouldShowGallery,
   setGalleryScrollPosition,
   setGalleryImageMinimumWidth,
+  setGalleryImageObjectFit,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

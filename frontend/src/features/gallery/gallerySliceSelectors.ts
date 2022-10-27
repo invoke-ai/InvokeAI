@@ -15,6 +15,7 @@ export const imageGallerySelector = createSelector(
       shouldShowGallery,
       galleryScrollPosition,
       galleryImageMinimumWidth,
+      galleryImageObjectFit,
     } = gallery;
 
     const { activeTab } = options;
@@ -27,6 +28,7 @@ export const imageGallerySelector = createSelector(
       shouldShowGallery,
       galleryScrollPosition,
       galleryImageMinimumWidth,
+      galleryImageObjectFit,
       galleryGridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       activeTabName: tabMap[activeTab],
     };
@@ -34,9 +36,10 @@ export const imageGallerySelector = createSelector(
 );
 
 export const hoverableImageSelector = createSelector(
-  (state: RootState) => state.options,
-  (options: OptionsState) => {
+  [(state: RootState) => state.options, (state: RootState) => state.gallery],
+  (options: OptionsState, gallery: GalleryState) => {
     return {
+      galleryImageObjectFit: gallery.galleryImageObjectFit,
       activeTabName: tabMap[options.activeTab],
     };
   }

@@ -6,7 +6,7 @@ import {
   Tooltip,
   useToast,
 } from '@chakra-ui/react';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
+import { useAppDispatch, useAppSelector } from '../../app/store';
 import { setCurrentImage } from './gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
@@ -40,7 +40,7 @@ const memoEqualityCheck = (
  */
 const HoverableImage = memo((props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { activeTabName } = useAppSelector(hoverableImageSelector);
+  const { activeTabName, galleryImageObjectFit } = useAppSelector(hoverableImageSelector);
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -148,7 +148,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         >
           <Image
             className="hoverable-image-image"
-            objectFit="cover"
+            objectFit={galleryImageObjectFit}
             rounded={'md'}
             src={url}
             loading={'lazy'}
