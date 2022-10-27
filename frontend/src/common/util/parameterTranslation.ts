@@ -114,7 +114,7 @@ export const frontendToBackendParameters = (
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = false;
 
-    const maskDataURL = generateMask(maskImageElement, lines, boundingBox);
+    const maskDataURL = generateMask(maskImageElement, lines);
 
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'

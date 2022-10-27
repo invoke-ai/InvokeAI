@@ -2,19 +2,12 @@ import Konva from 'konva';
 import { MaskLine } from '../inpaintingSlice';
 
 /**
- * Generating a mask image from InpaintingCanvas.tsx is not as simple
- * as calling toDataURL() on the canvas, because the mask may be represented
- * by colored lines or transparency, or the user may have inverted the mask
- * display.
- *
- * So we need to regenerate the mask image by creating an offscreen canvas,
- * drawing the mask and compositing everything correctly to output a valid
- * mask image.
+ * Converts canvas into pixel buffer and checks if it is empty (all pixels full alpha).
  */
-const generateMask = (image: HTMLImageElement, lines: MaskLine[]) => {
-  const { width, height } = image;
-
+const checkIsMaskEmpty = (image: HTMLImageElement, lines: MaskLine[]) => {
   const offscreenContainer = document.createElement('div');
+
+  const { width, height } = image;
 
   const stage = new Konva.Stage({
     container: offscreenContainer,
@@ -42,13 +35,13 @@ const generateMask = (image: HTMLImageElement, lines: MaskLine[]) => {
     )
   );
 
-  layer.add(
-    new Konva.Image({ image: image, globalCompositeOperation: 'source-out' })
-  );
-
   offscreenContainer.remove();
 
-  return stage.toDataURL();
+  const pixelBuffer = new Uint32Array(
+    layer.getContext().getImageData(0, 0, width, height).data.buffer
+  );
+
+  return !pixelBuffer.some((color) => color !== 0);
 };
 
-export default generateMask;
+export default checkIsMaskEmpty;
