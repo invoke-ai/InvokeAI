@@ -45,7 +45,7 @@ Here's a prompt that depicts what it does.
 
 original prompt:
 
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent pony made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
 
 <div align="center" markdown>
 ![step1](../assets/negative_prompt_walkthru/step1.png)
@@ -110,7 +110,10 @@ See the section below on "Prompt Blending" for more information about how this w
 
 ### Cross-Attention Control ('prompt2prompt')
 
-Denoise with a given prompt and then re-use the attention→pixel maps to substitute words in the original prompt for words in a new prompt. Based off [bloc97's colab](https://github.com/bloc97/CrossAttentionControl).  
+Generate an image with a given prompt and then paint over the image
+using the `prompt2prompt` syntax to substitute words in the original
+prompt for words in a new prompt. Based off [bloc97's
+colab](https://github.com/bloc97/CrossAttentionControl).
 
 * `a ("fluffy cat").swap("smiling dog") eating a hotdog`.
   * quotes optional: `a (fluffy cat).swap(smiling dog) eating a hotdog`.
@@ -122,9 +125,26 @@ Denoise with a given prompt and then re-use the attention→pixel maps to substi
 * Convenience option `shape_freedom` (0-1) to specify how much "freedom" Stable Diffusion should have to change the shape of the subject being swapped. 
   * `a (cat).swap(dog, shape_freedom=0.5) eating a hotdog`.
 
+Note that `prompt2prompt` is not currently working with the runwayML
+inpainting model, and may never work due to the way this model is set
+up. If you attempt to use `prompt2prompt` you will get the original
+image back. However, since this model is so good at inpainting, a
+good substitute is to use the `clipseg` text masking option:
+
+```
+invoke> a fluffy cat eating a hotdot
+Outputs:
+[1010] outputs/000025.2182095108.png: a fluffy cat eating a hotdog
+invoke> a smiling dog eating a hotdog -I 000025.2182095108.png -tm cat
+```
+
 ### Escaping parantheses () and speech marks ""
 
-If the model you are using has parentheses () or speech marks "" as part of its syntax, you will need to "escape" these using a backslash, so that`(my_keyword)` becomes `\(my_keyword\)`. Otherwise, the prompt parser will attempt to interpret the parentheses as part of the prompt syntax and it will get confused.
+If the model you are using has parentheses () or speech marks "" as
+part of its syntax, you will need to "escape" these using a backslash,
+so that`(my_keyword)` becomes `\(my_keyword\)`. Otherwise, the prompt
+parser will attempt to interpret the parentheses as part of the prompt
+syntax and it will get confused.
 
 ## **Prompt Blending**
 

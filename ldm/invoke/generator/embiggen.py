@@ -21,6 +21,7 @@ class Embiggen(Generator):
     def generate(self,prompt,iterations=1,seed=None,
                  image_callback=None, step_callback=None,
                  **kwargs):
+        
         scope      = choose_autocast(self.precision)
         make_image = self.get_make_image(
             prompt,
@@ -63,6 +64,8 @@ class Embiggen(Generator):
         Returns a function returning an image derived from the prompt and multi-stage twice-baked potato layering over the img2img on the initial image
         Return value depends on the seed at the time you call it
         """
+        assert not sampler.uses_inpainting_model(), "--embiggen is not supported by inpainting models"
+
         # Construct embiggen arg array, and sanity check arguments
         if embiggen == None:  # embiggen can also be called with just embiggen_tiles
             embiggen = [1.0]  # If not specified, assume no scaling

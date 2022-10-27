@@ -5,10 +5,11 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 import torch
 import numpy as  np
 import math
-from ldm.invoke.generator.base  import Generator
+from ldm.invoke.generator.base import Generator
 from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.invoke.generator.omnibus import Omnibus
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
-
+from PIL import Image
 
 class Txt2Img2Img(Generator):
     def __init__(self, model, precision):
@@ -25,16 +26,16 @@ class Txt2Img2Img(Generator):
         """
         uc, c, extra_conditioning_info = conditioning
 
-        @torch.no_grad()
-        def make_image(x_T):           
-            
-            trained_square = 512 * 512
-            actual_square = width * height
-            scale = math.sqrt(trained_square / actual_square)
+        trained_square = 512 * 512
+        actual_square = width * height
+        scale = math.sqrt(trained_square / actual_square)
 
-            init_width = math.ceil(scale * width / 64) * 64
-            init_height = math.ceil(scale * height / 64) * 64
-            
+        init_width = math.ceil(scale * width / 64) * 64
+        init_height = math.ceil(scale * height / 64) * 64
+
+        @torch.no_grad()
+        def make_image(x_T):
+
             shape = [
                 self.latent_channels,
                 init_height // self.downsampling_factor,
@@ -105,8 +106,49 @@ class Txt2Img2Img(Generator):
 
             return self.sample_to_image(samples)
 
-        return make_image
-
+        # in the case of the inpainting model being loaded, the trick of
+        # providing an interpolated latent doesn't work, so we transiently
+        # create a 512x512 PIL image, upscale it, and run the inpainting
+        # over it in img2img mode. Because the inpaing model is so conservative
+        # it doesn't change the image (much)
+        def inpaint_make_image(x_T):
+            omnibus = Omnibus(self.model,self.precision)
+            result = omnibus.generate(
+                prompt,
+                sampler=sampler,
+                width=init_width,
+                height=init_height,
+                step_callback=step_callback,
+                steps = steps,
+                cfg_scale = cfg_scale,
+                ddim_eta = ddim_eta,
+                conditioning = conditioning,
+                **kwargs
+            )
+            assert result is not None and len(result)>0,'** txt2img failed **'
+            image = result[0][0]
+            interpolated_image = image.resize((width,height),resample=Image.Resampling.LANCZOS)
+            print(kwargs.pop('init_image',None))
+            result = omnibus.generate(
+                prompt,
+                sampler=sampler,
+                init_image=interpolated_image,
+                width=width,
+                height=height,
+                seed=result[0][1],
+                step_callback=step_callback,
+                steps = steps,
+                cfg_scale = cfg_scale,
+                ddim_eta = ddim_eta,
+                conditioning = conditioning,
+                **kwargs
+                )
+            return result[0][0]
+            
+        if sampler.uses_inpainting_model():
+            return inpaint_make_image
+        else:
+            return make_image
 
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height,scale = True):
@@ -134,3 +176,4 @@ class Txt2Img2Img(Generator):
                                 scaled_height // self.downsampling_factor,
                                 scaled_width  // self.downsampling_factor],
                                 device=device)
+

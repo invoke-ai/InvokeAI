@@ -706,6 +706,11 @@ class Args(object):
             help='Path to input mask for inpainting mode (supersedes width and height)',
         )
         img2img_group.add_argument(
+            '--invert_mask',
+            action='store_true',
+            help='Invert the mask',
+        )
+        img2img_group.add_argument(
             '-tm',
             '--text_mask',
             nargs='+',

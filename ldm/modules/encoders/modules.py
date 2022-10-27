@@ -439,7 +439,6 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             param.requires_grad = False
 
     def forward(self, text, **kwargs):
-        print(f'DEBUG text={text}, max_length={self.max_length}')
         batch_encoding = self.tokenizer(
             text,
             truncation=True,

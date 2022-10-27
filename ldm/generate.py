@@ -274,6 +274,7 @@ class Generate:
             init_img         = None,
             init_mask        = None,
             text_mask        = None,
+            invert_mask      = False,
             fit              = False,
             strength         = None,
             init_color       = None,
@@ -311,6 +312,7 @@ class Generate:
            init_img                        // path to an initial image
            init_mask                       // path to a mask for the initial image
            text_mask                       // a text string that will be used to guide clipseg generation of the init_mask
+           invert_mask                     // boolean, if true invert the mask
            strength                        // strength for noising/unnoising init_img. 0.0 preserves image exactly, 1.0 replaces it completely
            facetool_strength               // strength for GFPGAN/CodeFormer. 0.0 preserves image exactly, 1.0 replaces it completely
            ddim_eta                        // image randomness (eta=0.0 means the same seed always produces the same image)
@@ -418,22 +420,11 @@ class Generate:
                 height,
                 fit=fit,
                 text_mask=text_mask,
+                invert_mask=invert_mask,
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            if self.sampler.conditioning_key() in ('hybrid','concat'):
-                print(f'** Inpainting model detected. Will try it! **')
-                generator = self._make_omnibus()
-            elif (init_image is not None) and (mask_image is not None):
-                generator = self._make_inpaint()
-            elif (embiggen != None or embiggen_tiles != None):
-                generator = self._make_embiggen()
-            elif init_image is not None:
-                generator = self._make_img2img()
-            elif hires_fix:
-                generator = self._make_txt2img2img()
-            else:
-                generator = self._make_txt2img()
+            generator = self.select_generator(init_image, mask_image, embiggen, hires_fix)
 
             generator.set_variation(
                 self.seed, variation_amount, with_variations
@@ -549,7 +540,7 @@ class Generate:
         # try to reuse the same filename prefix as the original file.
         # we take everything up to the first period
         prefix = None
-        m    = re.match('^([^.]+)\.',os.path.basename(image_path))
+        m = re.match(r'^([^.]+)\.',os.path.basename(image_path))
         if m:
             prefix = m.groups()[0]
 
@@ -603,10 +594,9 @@ class Generate:
 
         elif tool == 'embiggen':
             # fetch the metadata from the image
-            generator = self._make_embiggen()
+            generator = self.select_generator(embiggen=True)
             opt.strength  = 0.40
             print(f'>> Setting img2img strength to {opt.strength} for happy embiggening')
-            # embiggen takes a image path (sigh)
             generator.generate(
                 prompt,
                 sampler     = self.sampler,
@@ -640,6 +630,31 @@ class Generate:
             print(f'* postprocessing tool {tool} is not yet supported')
             return None
 
+    def select_generator(
+            self,
+            init_image:Image.Image=None,
+            mask_image:Image.Image=None,
+            embiggen:bool=False,
+            hires_fix:bool=False,
+    ):
+        inpainting_model_in_use = self.sampler.uses_inpainting_model()
+
+        if hires_fix:
+            return self._make_txt2img2img()
+
+        if embiggen is not None:
+            return self._make_embiggen()
+            
+        if inpainting_model_in_use:
+            return self._make_omnibus()
+
+        if (init_image is not None) and (mask_image is not None):
+            return self._make_inpaint()
+        
+        if init_image is not None:
+            return self._make_img2img()
+
+        return self._make_txt2img()
 
     def _make_images(
             self,
@@ -649,6 +664,7 @@ class Generate:
             height,
             fit=False,
             text_mask=None,
+            invert_mask=False,
     ):
         init_image      = None
         init_mask       = None
@@ -678,6 +694,9 @@ class Generate:
         elif text_mask:
             init_mask = self._txt2mask(image, text_mask, width, height, fit=fit)
 
+        if invert_mask:
+            init_mask = ImageOps.invert(init_mask)
+            
         return init_image,init_mask
 
     # lots o' repeated code here! Turn into a make_func()
@@ -855,6 +874,8 @@ class Generate:
     def sample_to_image(self, samples):
         return self._make_base().sample_to_image(samples)
 
+    # very repetitive code - can this be simplified? The KSampler names are
+    # consistent, at least
     def _set_sampler(self):
         msg = f'>> Setting Sampler to {self.sampler_name}'
         if self.sampler_name == 'plms':

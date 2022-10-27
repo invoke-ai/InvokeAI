@@ -218,7 +218,12 @@ well as the --mask (-M) and --text_mask (-tm) arguments:
 | Argument <img width="100" align="right"/> |  Shortcut  |  Default            |  Description |
 |--------------------|------------|---------------------|--------------|
 | `--init_mask <path>` | `-M<path>`   | `None`                |Path to an image the same size as the initial_image, with areas for inpainting made transparent.|
+| `--invert_mask   ` |                | False                 |If true, invert the mask so that transparent areas are opaque and vice versa.|
 | `--text_mask <prompt> [<float>]` | `-tm <prompt> [<float>]` | <none>  | Create a mask from a text prompt describing part of the image|
+
+The mask may either be an image with transparent areas, in which case
+the inpainting will occur in the transparent areas only, or a black
+and white image, in which case all black areas will be painted into.
 
 `--text_mask` (short form `-tm`) is a way to generate a mask using a
 text description of the part of the image to replace. For example, if

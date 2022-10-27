@@ -29,7 +29,8 @@ class Generator():
         self.threshold = 0
         self.variation_amount = 0
         self.with_variations = []
-        self.use_mps_noise       = False
+        self.use_mps_noise = False
+        self.free_gpu_mem = None
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
     def get_make_image(self,prompt,**kwargs):
@@ -50,7 +51,7 @@ class Generator():
                  **kwargs):
         scope = choose_autocast(self.precision)
         self.safety_checker = safety_checker
-        make_image          = self.get_make_image(
+        make_image = self.get_make_image(
             prompt,
             sampler = sampler,
             init_image    = init_image,
