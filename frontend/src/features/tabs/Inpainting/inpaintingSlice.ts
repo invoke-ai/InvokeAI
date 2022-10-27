@@ -221,66 +221,66 @@ export const inpaintingSlice = createSlice({
     },
     setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
       state.boundingBoxDimensions = action.payload;
-      // const { width: boundingBoxWidth, height: boundingBoxHeight } =
-      //   action.payload;
-      // const { x: boundingBoxX, y: boundingBoxY } = state.boundingBoxCoordinate;
-      // const { width: canvasWidth, height: canvasHeight } =
-      //   state.canvasDimensions;
+      const { width: boundingBoxWidth, height: boundingBoxHeight } =
+        action.payload;
+      const { x: boundingBoxX, y: boundingBoxY } = state.boundingBoxCoordinate;
+      const { width: canvasWidth, height: canvasHeight } =
+        state.canvasDimensions;
 
-      // const roundedCanvasWidth = roundDownToMultiple(canvasWidth, 64);
-      // const roundedCanvasHeight = roundDownToMultiple(canvasHeight, 64);
-      // const roundedBoundingBoxWidth = roundDownToMultiple(boundingBoxWidth, 64);
-      // const roundedBoundingBoxHeight = roundDownToMultiple(
-      //   boundingBoxHeight,
-      //   64
-      // );
+      const roundedCanvasWidth = roundDownToMultiple(canvasWidth, 64);
+      const roundedCanvasHeight = roundDownToMultiple(canvasHeight, 64);
+      const roundedBoundingBoxWidth = roundDownToMultiple(boundingBoxWidth, 64);
+      const roundedBoundingBoxHeight = roundDownToMultiple(
+        boundingBoxHeight,
+        64
+      );
 
-      // const overflowX = boundingBoxX + boundingBoxWidth - canvasWidth;
-      // const overflowY = boundingBoxY + boundingBoxHeight - canvasHeight;
+      const overflowX = boundingBoxX + boundingBoxWidth - canvasWidth;
+      const overflowY = boundingBoxY + boundingBoxHeight - canvasHeight;
 
-      // const newBoundingBoxWidth = _.clamp(
-      //   roundedBoundingBoxWidth,
-      //   64,
-      //   roundedCanvasWidth
-      // );
+      const newBoundingBoxWidth = _.clamp(
+        roundedBoundingBoxWidth,
+        64,
+        roundedCanvasWidth
+      );
 
-      // const newBoundingBoxHeight = _.clamp(
-      //   roundedBoundingBoxHeight,
-      //   64,
-      //   roundedCanvasHeight
-      // );
+      const newBoundingBoxHeight = _.clamp(
+        roundedBoundingBoxHeight,
+        64,
+        roundedCanvasHeight
+      );
+      console.log(overflowX, boundingBoxX, boundingBoxX - overflowX);
+      const overflowCorrectedX =
+        overflowX > 0 ? boundingBoxX - overflowX : boundingBoxX;
 
-      // const overflowCorrectedX =
-      //   overflowX > 0 ? boundingBoxX - overflowX : boundingBoxX;
+      const overflowCorrectedY =
+        overflowY > 0 ? boundingBoxY - overflowY : boundingBoxY;
 
-      // const overflowCorrectedY =
-      //   overflowY > 0 ? boundingBoxY - overflowY : boundingBoxY;
+      const clampedX = _.clamp(
+        overflowCorrectedX,
+        0,
+        roundedCanvasWidth - newBoundingBoxWidth
+      );
 
-      // const clampedX = _.clamp(
-      //   overflowCorrectedX,
-      //   64,
-      //   roundedCanvasWidth - newBoundingBoxWidth
-      // );
+      const clampedY = _.clamp(
+        overflowCorrectedY,
+        0,
+        roundedCanvasHeight - newBoundingBoxHeight
+      );
 
-      // const clampedY = _.clamp(
-      //   overflowCorrectedY,
-      //   64,
-      //   roundedCanvasHeight - newBoundingBoxHeight
-      // );
+      const newBoundingBoxX = roundDownToMultiple(clampedX, 64);
 
-      // const newBoundingBoxX = roundDownToMultiple(clampedX, 64);
+      const newBoundingBoxY = roundDownToMultiple(clampedY, 64);
 
-      // const newBoundingBoxY = roundDownToMultiple(clampedY, 64);
+      state.boundingBoxDimensions = {
+        width: newBoundingBoxWidth,
+        height: newBoundingBoxHeight,
+      };
 
-      // state.boundingBoxDimensions = {
-      //   width: newBoundingBoxWidth,
-      //   height: newBoundingBoxHeight,
-      // };
-
-      // state.boundingBoxCoordinate = {
-      //   x: newBoundingBoxX,
-      //   y: newBoundingBoxY,
-      // };
+      state.boundingBoxCoordinate = {
+        x: newBoundingBoxX,
+        y: newBoundingBoxY,
+      };
     },
     setBoundingBoxCoordinate: (state, action: PayloadAction<Vector2d>) => {
       state.boundingBoxCoordinate = action.payload;
@@ -340,7 +340,7 @@ export const {
   setShouldShowBoundingBoxFill,
   setIsBoundingBoxTransforming,
   setIsDrawing,
-  setShouldShowBrush
+  setShouldShowBrush,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;

@@ -17,14 +17,12 @@ import {
   setBoundingBoxDimensions,
   setIsBoundingBoxTransforming,
   setIsDrawing,
-  setIsMovingBoundingBox,
   setShouldShowBrush,
 } from '../inpaintingSlice';
 import { rgbaColorToString } from '../util/colorToString';
 import {
   DASH_WIDTH,
   // MARCHING_ANTS_SPEED,
-  TRANSFORMER_ANCHOR_SIZE,
 } from '../util/constants';
 
 const boundingBoxPreviewSelector = createSelector(
@@ -48,7 +46,6 @@ const boundingBoxPreviewSelector = createSelector(
       imageToInpaint,
       dash: DASH_WIDTH / stageScale, // scale dash lengths
       strokeWidth: 1 / stageScale, // scale stroke thickness
-      anchorSize: TRANSFORMER_ANCHOR_SIZE,
       isMovingBoundingBox,
     };
   },
@@ -158,10 +155,8 @@ const InpaintingBoundingBoxPreview = () => {
     boundingBoxCoordinate,
     boundingBoxDimensions,
     strokeWidth,
-    anchorSize,
     stageScale,
     imageToInpaint,
-    isMovingBoundingBox,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -237,11 +232,12 @@ const InpaintingBoundingBoxPreview = () => {
       <Transformer
         ref={transformerRef}
         rotateEnabled={false}
-        anchorSize={anchorSize}
+        anchorSize={15}
+        anchorFill={'rgba(212,216,234,1)'}
         anchorStroke={'rgb(42,42,42)'}
         borderEnabled={true}
         borderStroke={'black'}
-        borderDash={[DASH_WIDTH, DASH_WIDTH]}
+        borderDash={[4, 4]}
         anchorCornerRadius={3}
         ignoreStroke={true}
         keepRatio={false}
