@@ -129,7 +129,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
 
         default_options = {
             's_start': 0.0,
-            's_end': 0.206, # ~= shape_freedom=0.5
+            's_end': 0.2062994740159002, # ~= shape_freedom=0.5
             't_start': 0.0,
             't_end': 1.0
         }
@@ -145,7 +145,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
                 # so for shape_freedom = 0.5 we probably want s_end to be 0.2
                 #  -> cube root and subtract from 1.0
                 merged_options['s_end'] = 1.0 - shape_freedom ** (1. / 3.)
-                print('converted shape_freedom argument to', merged_options)
+                #print('converted shape_freedom argument to', merged_options)
             merged_options.update(options)
 
         self.options = merged_options
@@ -514,10 +514,11 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
 
     # cross attention control
     debug_cross_attention_control = False
-    original_fragment = pp.Or([empty_string.set_debug(debug_cross_attention_control),
+    original_fragment = pp.MatchFirst([
                         quoted_fragment.set_debug(debug_cross_attention_control),
                         parenthesized_fragment.set_debug(debug_cross_attention_control),
-                        pp.Word(pp.printables, exclude_chars=string.whitespace + '.').set_parse_action(make_text_fragment) + pp.FollowedBy(".swap")
+                        pp.Word(pp.printables, exclude_chars=string.whitespace + '.').set_parse_action(make_text_fragment) + pp.FollowedBy(".swap"),
+                        empty_string.set_debug(debug_cross_attention_control),
                ])
     # support keyword=number arguments
     cross_attention_option_keyword = pp.Or([pp.Keyword("s_start"), pp.Keyword("s_end"), pp.Keyword("t_start"), pp.Keyword("t_end"), pp.Keyword("shape_freedom")])
@@ -525,8 +526,8 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     edited_fragment = pp.MatchFirst([
         (lparen + rparen).set_parse_action(lambda x: Fragment('')),
         lparen +
-            (quoted_fragment |
-                pp.Group(pp.ZeroOrMore(pp.Word(pp.printables, exclude_chars=string.whitespace + ',').set_parse_action(make_text_fragment)))
+            (quoted_fragment | attention |
+                pp.Group(pp.ZeroOrMore(build_escaped_word_parser_charbychar(',)').set_parse_action(make_text_fragment)))
             ) +
             pp.Dict(pp.ZeroOrMore(comma + cross_attention_option)) +
         rparen,
