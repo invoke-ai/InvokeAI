@@ -5,25 +5,22 @@ import { generateImage } from '../../../app/socketio/actions';
 
 import { OptionsState, setPrompt } from '../optionsSlice';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
-import useCheckParameters, {
-  systemSelector,
-} from '../../../common/hooks/useCheckParameters';
+import _ from 'lodash';
+import useCheckParameters from '../../../common/hooks/useCheckParameters';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { tabMap } from '../../tabs/InvokeTabs';
 
-export const optionsSelector = createSelector(
+const promptInputSelector = createSelector(
   (state: RootState) => state.options,
   (options: OptionsState) => {
-    const { prompt, activeTab } = options;
     return {
-      prompt,
-      activeTabName: tabMap[activeTab],
+      prompt: options.prompt,
+      activeTabName: tabMap[options.activeTab],
     };
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: isEqual,
+      resultEqualityCheck: _.isEqual,
     },
   }
 );
@@ -33,8 +30,7 @@ export const optionsSelector = createSelector(
  */
 const PromptInput = () => {
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const { prompt, activeTabName } = useAppSelector(optionsSelector);
-  const { isProcessing } = useAppSelector(systemSelector);
+  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
   const dispatch = useAppDispatch();
   const isReady = useCheckParameters();
 
