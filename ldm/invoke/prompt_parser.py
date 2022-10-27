@@ -129,7 +129,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
 
         default_options = {
             's_start': 0.0,
-            's_end': 0.206, # ~= shape_freedom=0.5
+            's_end': 0.2062994740159002, # ~= shape_freedom=0.5
             't_start': 0.0,
             't_end': 1.0
         }
@@ -145,7 +145,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
                 # so for shape_freedom = 0.5 we probably want s_end to be 0.2
                 #  -> cube root and subtract from 1.0
                 merged_options['s_end'] = 1.0 - shape_freedom ** (1. / 3.)
-                print('converted shape_freedom argument to', merged_options)
+                #print('converted shape_freedom argument to', merged_options)
             merged_options.update(options)
 
         self.options = merged_options
@@ -250,7 +250,7 @@ class PromptParser():
 
     def parse_legacy_blend(self, text: str) -> Optional[Blend]:
         weighted_subprompts = split_weighted_subprompts(text, skip_normalize=False)
-        if len(weighted_subprompts) == 1:
+        if len(weighted_subprompts) <= 1:
             return None
         strings = [x[0] for x in weighted_subprompts]
         weights = [x[1] for x in weighted_subprompts]
@@ -358,10 +358,11 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     quoted_fragment = pp.Forward()
     parenthesized_fragment = pp.Forward()
     cross_attention_substitute = pp.Forward()
-    prompt_part = pp.Forward()
 
     def make_text_fragment(x):
         #print("### making fragment for", x)
+        if type(x[0]) is Fragment:
+            assert(False)
         if type(x) is str:
             return Fragment(x)
         elif type(x) is pp.ParseResults or type(x) is list:
@@ -396,8 +397,10 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
 
 
     def parse_fragment_str(x, in_quotes: bool=False, in_parens: bool=False):
-        #print(f"parsing fragment string \"{x}\"")
+        #print(f"parsing fragment string for {x}")
         fragment_string = x[0]
+        #print(f"ppparsing fragment string \"{fragment_string}\"")
+
         if len(fragment_string.strip()) == 0:
             return Fragment('')
 
@@ -406,13 +409,16 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
             fragment_string = fragment_string.replace('"', '\\"')
 
         #fragment_parser = pp.Group(pp.OneOrMore(attention | cross_attention_substitute | (greedy_word.set_parse_action(make_text_fragment))))
-        result = pp.Group(pp.MatchFirst([
-                pp.OneOrMore(prompt_part | quoted_fragment),
-                pp.Empty().set_parse_action(make_text_fragment) + pp.StringEnd()
-        ])).set_name('rr').set_debug(False).parse_string(fragment_string)
-        #result = (pp.OneOrMore(attention | unquoted_word) + pp.StringEnd()).parse_string(x[0])
-        #print("parsed to", result)
-        return result
+        try:
+            result = pp.Group(pp.MatchFirst([
+                    pp.OneOrMore(quoted_fragment | attention | unquoted_word).set_name('pf_str_qfuq'),
+                    pp.Empty().set_parse_action(make_text_fragment) + pp.StringEnd()
+            ])).set_name('blend-result').set_debug(False).parse_string(fragment_string)
+            #print("parsed to", result)
+            return result
+        except pp.ParseException as e:
+            #print("parse_fragment_str couldn't parse prompt string:", e)
+            raise
 
     quoted_fragment << pp.QuotedString(quote_char='"', esc_char=None, esc_quote='\\"')
     quoted_fragment.set_parse_action(lambda x: parse_fragment_str(x, in_quotes=True)).set_name('quoted_fragment')
@@ -422,24 +428,34 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     escaped_rparen = pp.Literal('\\)')#.set_parse_action(lambda x: ')')
     escaped_backslash = pp.Literal('\\\\')#.set_parse_action(lambda x: '"')
 
+    empty = (
+            (lparen + pp.ZeroOrMore(pp.Word(string.whitespace)) + rparen) |
+            (quotes + pp.ZeroOrMore(pp.Word(string.whitespace)) + quotes)).set_debug(False).set_name('empty')
+
+
     def not_ends_with_swap(x):
         #print("trying to match:", x)
         return not x[0].endswith('.swap')
 
-    unquoted_fragment = pp.Combine(pp.OneOrMore(
+    unquoted_word = pp.Combine(pp.OneOrMore(
             escaped_rparen | escaped_lparen | escaped_quote | escaped_backslash |
-            pp.Word(pp.printables, exclude_chars=string.whitespace + '\\"()')))
-    unquoted_fragment.set_parse_action(make_text_fragment).set_name('unquoted_fragment').set_debug(False)
+            (pp.Word(pp.printables, exclude_chars=string.whitespace + '\\"()') + (pp.NotAny(pp.Word('+') | pp.Word('-'))))
+    ))
+
+    unquoted_word.set_parse_action(make_text_fragment).set_name('unquoted_word').set_debug(False)
     #print(unquoted_fragment.parse_string("cat.swap(dog)"))
 
-    parenthesized_fragment << pp.Or([
-        (lparen + quoted_fragment.copy().set_parse_action(lambda x: parse_fragment_str(x, in_quotes=True)).set_debug(False) + rparen).set_name('-quoted_paren_internal').set_debug(False),
-        (lparen + rparen).set_parse_action(lambda x: make_text_fragment('')).set_name('-()').set_debug(False),
-        (lparen + pp.Combine(pp.OneOrMore(
+    parenthesized_fragment << (lparen +
+       pp.Or([
+        (parenthesized_fragment),
+        (quoted_fragment.copy().set_parse_action(lambda x: parse_fragment_str(x, in_quotes=True)).set_debug(False)).set_name('-quoted_paren_internal').set_debug(False),
+        (pp.Combine(pp.OneOrMore(
             escaped_quote | escaped_lparen | escaped_rparen | escaped_backslash |
             pp.Word(pp.printables, exclude_chars=string.whitespace + '\\"()') |
             pp.Word(string.whitespace)
-        )).set_name('--combined').set_parse_action(lambda x: parse_fragment_str(x, in_parens=True)).set_debug(False) + rparen)]).set_name('-unquoted_paren_internal').set_debug(False)
+        )).set_name('--combined').set_parse_action(lambda x: parse_fragment_str(x, in_parens=True)).set_debug(False)),
+        pp.Empty()
+       ]) + rparen)
     parenthesized_fragment.set_name('parenthesized_fragment').set_debug(False)
 
     debug_attention = False
@@ -459,11 +475,12 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
         + rparen + attention_with_parens_foot)
     attention_with_parens.set_name('attention_with_parens').set_debug(debug_attention)
 
-    attention_without_parens_foot = pp.Or(pp.Word('+') | pp.Word('-')).set_name('attention_without_parens_foots')
-    attention_without_parens <<= pp.Group(
-        (quoted_fragment.copy().set_name('attention_quoted_fragment_without_parens').set_debug(debug_attention) + attention_without_parens_foot) |
+    attention_without_parens_foot = pp.NotAny(pp.White()) + pp.Or(pp.Word('+') | pp.Word('-')).set_name('attention_without_parens_foots')
+    attention_without_parens <<= pp.Group(pp.MatchFirst([
+        quoted_fragment.copy().set_name('attention_quoted_fragment_without_parens').set_debug(debug_attention) + attention_without_parens_foot,
         pp.Combine(build_escaped_word_parser_charbychar('()+-')).set_name('attention_word_without_parens').set_debug(debug_attention)#.set_parse_action(lambda x: print('escapéd', x))
-                                 + attention_without_parens_foot)#.leave_whitespace()
+                                 + attention_without_parens_foot#.leave_whitespace()
+    ]))
     attention_without_parens.set_name('attention_without_parens').set_debug(debug_attention)
 
 
@@ -501,24 +518,26 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
 
     # cross attention control
     debug_cross_attention_control = False
-    original_fragment = pp.Or([empty_string.set_debug(debug_cross_attention_control),
+    original_fragment = pp.MatchFirst([
                         quoted_fragment.set_debug(debug_cross_attention_control),
                         parenthesized_fragment.set_debug(debug_cross_attention_control),
-                        pp.Word(pp.printables, exclude_chars=string.whitespace + '.').set_parse_action(make_text_fragment) + pp.FollowedBy(".swap")
+                        pp.Word(pp.printables, exclude_chars=string.whitespace + '.').set_parse_action(make_text_fragment) + pp.FollowedBy(".swap"),
+                        empty_string.set_debug(debug_cross_attention_control),
                ])
     # support keyword=number arguments
     cross_attention_option_keyword = pp.Or([pp.Keyword("s_start"), pp.Keyword("s_end"), pp.Keyword("t_start"), pp.Keyword("t_end"), pp.Keyword("shape_freedom")])
     cross_attention_option = pp.Group(cross_attention_option_keyword + pp.Literal("=").suppress() + number)
     edited_fragment = pp.MatchFirst([
+        (lparen + rparen).set_parse_action(lambda x: Fragment('')),
         lparen +
-            (quoted_fragment |
-                pp.Group(pp.OneOrMore(pp.Word(pp.printables, exclude_chars=string.whitespace + ',').set_parse_action(make_text_fragment)))
+            (quoted_fragment | attention |
+                pp.Group(pp.ZeroOrMore(build_escaped_word_parser_charbychar(',)').set_parse_action(make_text_fragment)))
             ) +
-            pp.Dict(pp.OneOrMore(comma + cross_attention_option)) +
+            pp.Dict(pp.ZeroOrMore(comma + cross_attention_option)) +
         rparen,
         parenthesized_fragment
     ])
-    cross_attention_substitute << original_fragment + pp.Literal(".swap").suppress() + edited_fragment
+    cross_attention_substitute << original_fragment + pp.Literal(".swap").set_debug(False).suppress() + edited_fragment
 
     original_fragment.set_name('original_fragment').set_debug(debug_cross_attention_control)
     edited_fragment.set_name('edited_fragment').set_debug(debug_cross_attention_control)
@@ -533,24 +552,18 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     cross_attention_substitute.set_parse_action(make_cross_attention_substitute)
 
 
-    # simple fragments of text
-    # use Or to match the longest
-    prompt_part << pp.MatchFirst([
-            cross_attention_substitute,
-            attention,
-            unquoted_fragment,
-            lparen + unquoted_fragment + rparen # matches case where user has +(term) and just deletes the +
-         ])
-    prompt_part.set_debug(False)
-    prompt_part.set_name("prompt_part")
-
-    empty = (
-            (lparen + pp.ZeroOrMore(pp.Word(string.whitespace)) + rparen) |
-            (quotes + pp.ZeroOrMore(pp.Word(string.whitespace)) + quotes)).set_debug(False).set_name('empty')
-
     # root prompt definition
-    prompt = (pp.OneOrMore(pp.Or([prompt_part, quoted_fragment, empty])) + pp.StringEnd()) \
-        .set_parse_action(lambda x: Prompt(x))
+    debug_root_prompt = False
+    prompt = (pp.OneOrMore(pp.Or([cross_attention_substitute.set_debug(debug_root_prompt),
+                                  attention.set_debug(debug_root_prompt),
+                                  quoted_fragment.set_debug(debug_root_prompt),
+                                  parenthesized_fragment.set_debug(debug_root_prompt),
+                                  unquoted_word.set_debug(debug_root_prompt),
+                                  empty.set_parse_action(make_text_fragment).set_debug(debug_root_prompt)])
+                           ) + pp.StringEnd()) \
+        .set_name('prompt') \
+        .set_parse_action(lambda x: Prompt(x)) \
+        .set_debug(debug_root_prompt)
 
     #print("parsing test:", prompt.parse_string("spaced eyes--"))
     #print("parsing test:", prompt.parse_string("eyes--"))
@@ -567,7 +580,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
         if len(x_unquoted.strip()) == 0:
             # print(' b : just an empty string')
             return Prompt([Fragment('')])
-        # print(' b parsing ', c_unquoted)
+        #print(f' b parsing \'{x_unquoted}\'')
         x_parsed = prompt.parse_string(x_unquoted)
         #print(" quoted prompt was parsed to", type(x_parsed),":", x_parsed)
         return x_parsed[0]

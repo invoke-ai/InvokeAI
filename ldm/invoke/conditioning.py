@@ -114,7 +114,7 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
 
             conditioning = original_embeddings
             edited_conditioning = edited_embeddings
-            print('got edit_opcodes', edit_opcodes, 'options', edit_options)
+            #print('>> got edit_opcodes', edit_opcodes, 'options', edit_options)
             cac_args = CrossAttentionControl.Arguments(
                 edited_conditioning = edited_conditioning,
                 edit_opcodes = edit_opcodes,
@@ -124,7 +124,13 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
             conditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt, log_tokens=log_tokens)
 
     unconditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, parsed_negative_prompt, log_tokens=log_tokens)
-    conditioning = flatten_hybrid_conditioning(unconditioning, conditioning)
+    if isinstance(conditioning, dict):
+        # hybrid conditioning is in play
+        unconditioning, conditioning = flatten_hybrid_conditioning(unconditioning, conditioning)
+        if cac_args is not None:
+            print(">> Hybrid conditioning cannot currently be combined with cross attention control. Cross attention control will be ignored.")
+            cac_args = None
+
     return (
         unconditioning, conditioning, InvokeAIDiffuserComponent.ExtraConditioningInfo(
             cross_attention_control_args=cac_args
@@ -172,19 +178,17 @@ def flatten_hybrid_conditioning(uncond, cond):
     that is a tensor (used by cross attention) vs one that has additional
     dimensions as well, as used by 'hybrid'
     '''
-    if isinstance(cond, dict):
-        assert isinstance(uncond, dict)
-        cond_in = dict()
-        for k in cond:
-            if isinstance(cond[k], list):
-                cond_in[k] = [
-                    torch.cat([uncond[k][i], cond[k][i]])
-                    for i in range(len(cond[k]))
-                ]
-            else:
-                cond_in[k] = torch.cat([uncond[k], cond[k]])
-        return cond_in
-    else:
-        return cond
+    assert isinstance(uncond, dict)
+    assert isinstance(cond, dict)
+    cond_flattened = dict()
+    for k in cond:
+        if isinstance(cond[k], list):
+            cond_flattened[k] = [
+                torch.cat([uncond[k][i], cond[k][i]])
+                for i in range(len(cond[k]))
+            ]
+        else:
+            cond_flattened[k] = torch.cat([uncond[k], cond[k]])
+    return uncond, cond_flattened
 
             

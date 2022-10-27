@@ -32,6 +32,7 @@ class PromptParserTestCase(unittest.TestCase):
         self.assertEqual(make_weighted_conjunction([("fire flames", 1)]), parse_prompt("fire flames"))
         self.assertEqual(make_weighted_conjunction([("fire, flames", 1)]), parse_prompt("fire, flames"))
         self.assertEqual(make_weighted_conjunction([("fire, flames , fire", 1)]), parse_prompt("fire, flames , fire"))
+        self.assertEqual(make_weighted_conjunction([("cat hot-dog eating", 1)]), parse_prompt("cat hot-dog eating"))
 
     def test_attention(self):
         self.assertEqual(make_weighted_conjunction([('flames', 0.5)]), parse_prompt("(flames)0.5"))
@@ -106,10 +107,7 @@ class PromptParserTestCase(unittest.TestCase):
         #with self.assertRaises(pyparsing.ParseException):
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('a badly (formed +test prompt')
-        with self.assertRaises(pyparsing.ParseException):
-            parse_prompt('a badly (formed +test )prompt')
-        with self.assertRaises(pyparsing.ParseException):
-            parse_prompt('a badly (formed +test )prompt')
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a badly formed +test prompt',1)])]) , parse_prompt('a badly (formed +test )prompt'))
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('(((a badly (formed +test )prompt')
         with self.assertRaises(pyparsing.ParseException):
@@ -118,6 +116,15 @@ class PromptParserTestCase(unittest.TestCase):
             parse_prompt('(a (ba)dly (f)ormed +test +prompt')
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('("((a badly (formed +test ").blend(1.0)')
+
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger bun', 1)])]),
+            parse_prompt("hamburger ((bun))"))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger bun', 1)])]),
+            parse_prompt("hamburger (bun)"))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger kaiser roll', 1)])]),
+            parse_prompt("hamburger (kaiser roll)"))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger kaiser roll', 1)])]),
+            parse_prompt("hamburger ((kaiser roll))"))
 
 
     def test_blend(self):
@@ -251,6 +258,41 @@ class PromptParserTestCase(unittest.TestCase):
                                                        CrossAttentionControlSubstitute([Fragment('fire',0.5), Fragment('flames',0.25)], [Fragment('trees',0.7), Fragment('houses', 1)]),
                                                         Fragment(',', 1), Fragment('fire', 2.0)])])
         self.assertEqual(flames_to_trees_fire, parse_prompt('"(fire (flames)0.5)0.5".swap("(trees)0.7 houses"), (fire)2.0'))
+
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('cat',1)], [Fragment('dog',1)]),
+                                                       Fragment('eating a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('hotdog',1)], [Fragment('hotdog', pow(1.1,4))])
+                                                       ])]),
+            parse_prompt("a cat.swap(dog) eating a hotdog.swap(hotdog++++, shape_freedom=0.5)"))
+
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('cat',1)], [Fragment('dog',1)]),
+                                                       Fragment('eating a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('hotdog',1)], [Fragment('hotdog', pow(1.1,4))])
+                                                       ])]),
+            parse_prompt("a cat.swap(dog) eating a hotdog.swap(\"hotdog++++\", shape_freedom=0.5)"))
+
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('cat',1)], [Fragment('dog',1)]),
+                                                       Fragment('eating a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('hotdog',1)], [Fragment('h(o)tdog', pow(1.1,4))])
+                                                       ])]),
+            parse_prompt("a cat.swap(dog) eating a hotdog.swap(h\(o\)tdog++++, shape_freedom=0.5)"))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('cat',1)], [Fragment('dog',1)]),
+                                                       Fragment('eating a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('hotdog',1)], [Fragment('h(o)tdog', pow(1.1,4))])
+                                                       ])]),
+            parse_prompt("a cat.swap(dog) eating a hotdog.swap(\"h\(o\)tdog++++\", shape_freedom=0.5)"))
+
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('cat',1)], [Fragment('dog',1)]),
+                                                       Fragment('eating a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('hotdog',1)], [Fragment('h(o)tdog', pow(0.9,1))])
+                                                       ])]),
+            parse_prompt("a cat.swap(dog) eating a hotdog.swap(h\(o\)tdog-, shape_freedom=0.5)"))
+
 
     def test_cross_attention_control_options(self):
         self.assertEqual(Conjunction([
@@ -394,6 +436,9 @@ class PromptParserTestCase(unittest.TestCase):
         # todo handle this
         #self.assertEqual(make_basic_conjunction(['a badly formed +test prompt']),
         #                 parse_prompt('a badly formed +test prompt'))
+        trees_and_houses_to_flames = Conjunction([FlattenedPrompt([('fire', 1.0), \
+                                                       CrossAttentionControlSubstitute([Fragment('trees and houses', 1)], [Fragment('flames',1)])])])
+        self.assertEqual(trees_and_houses_to_flames, parse_prompt('fire (trees and houses).swap("flames")'))
         pass
 
 
