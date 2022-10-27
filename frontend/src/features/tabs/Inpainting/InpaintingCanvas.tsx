@@ -1,6 +1,5 @@
 // lib
 import {
-  KeyboardEvent,
   MutableRefObject,
   useCallback,
   useEffect,
@@ -20,7 +19,6 @@ import {
   setBoundingBoxCoordinate,
   setCursorPosition,
   setIsMovingBoundingBox,
-  setTool,
 } from './inpaintingSlice';
 import { inpaintingCanvasSelector } from './inpaintingSliceSelectors';
 
@@ -32,7 +30,9 @@ import Cacher from './components/Cacher';
 import { Vector2d } from 'konva/lib/types';
 import getScaledCursorPosition from './util/getScaledCursorPosition';
 import _ from 'lodash';
-import InpaintingBoundingBoxPreview from './components/InpaintingBoundingBoxPreview';
+import InpaintingBoundingBoxPreview, {
+  InpaintingBoundingBoxPreviewOverlay,
+} from './components/InpaintingBoundingBoxPreview';
 import { KonvaEventObject } from 'konva/lib/Node';
 import KeyboardEventManager from './components/KeyboardEventManager';
 
@@ -50,13 +50,14 @@ const InpaintingCanvas = () => {
     shouldInvertMask,
     shouldShowMask,
     shouldShowCheckboardTransparency,
-    maskOpacity,
+    maskColor,
     imageToInpaint,
     isMovingBoundingBox,
     boundingBoxDimensions,
     canvasDimensions,
     boundingBoxCoordinate,
     stageScale,
+    shouldShowBoundingBoxFill,
   } = useAppSelector(inpaintingCanvasSelector);
 
   // set the closure'd refs
@@ -248,7 +249,7 @@ const InpaintingCanvas = () => {
                 opacity={
                   shouldShowCheckboardTransparency || shouldInvertMask
                     ? 1
-                    : maskOpacity
+                    : maskColor.a
                 }
                 ref={maskLayerRef}
               >
@@ -270,8 +271,11 @@ const InpaintingCanvas = () => {
                   />
                 )}
               </Layer>
-              <Layer name={'preview-layer'} listening={false}>
+              <Layer name={'preview-layer'}>
                 <InpaintingCanvasBrushPreviewOutline />
+                {shouldShowBoundingBoxFill && (
+                  <InpaintingBoundingBoxPreviewOverlay />
+                )}
                 <InpaintingBoundingBoxPreview />
               </Layer>
             </>
@@ -283,7 +287,5 @@ const InpaintingCanvas = () => {
     </div>
   );
 };
-
-// </div>
 
 export default InpaintingCanvas;

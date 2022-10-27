@@ -1,5 +1,6 @@
 import { Line } from 'react-konva';
-import { RootState, useAppSelector } from '../../../../app/store';
+import { useAppSelector } from '../../../../app/store';
+import { inpaintingCanvasLinesSelector } from '../inpaintingSliceSelectors';
 
 /**
  * Draws the lines which comprise the mask.
@@ -7,11 +8,9 @@ import { RootState, useAppSelector } from '../../../../app/store';
  * Uses globalCompositeOperation to handle the brush and eraser tools.
  */
 const InpaintingCanvasLines = () => {
-  const { lines, maskColor } = useAppSelector(
-    (state: RootState) => state.inpainting
+  const { lines, maskColorString } = useAppSelector(
+    inpaintingCanvasLinesSelector
   );
-  const { r, g, b } = maskColor;
-  const maskColorString = `rgb(${r},${g},${b})`;
 
   return (
     <>

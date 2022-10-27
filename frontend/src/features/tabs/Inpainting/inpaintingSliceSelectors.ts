@@ -4,6 +4,18 @@ import { RootState } from '../../../app/store';
 import { OptionsState } from '../../options/optionsSlice';
 import { tabMap } from '../InvokeTabs';
 import { InpaintingState } from './inpaintingSlice';
+import { rgbaColorToRgbString } from './util/colorToString';
+
+export const inpaintingCanvasLinesSelector = createSelector(
+  (state: RootState) => state.inpainting,
+  (inpainting: InpaintingState) => {
+    const { lines, maskColor } = inpainting;
+    return {
+      lines,
+      maskColorString: rgbaColorToRgbString(maskColor),
+    };
+  }
+);
 
 export const inpaintingControlsSelector = createSelector(
   [(state: RootState) => state.inpainting, (state: RootState) => state.options],
@@ -12,7 +24,6 @@ export const inpaintingControlsSelector = createSelector(
       tool,
       brushSize,
       maskColor,
-      maskOpacity,
       shouldInvertMask,
       shouldShowMask,
       shouldShowCheckboardTransparency,
@@ -20,6 +31,7 @@ export const inpaintingControlsSelector = createSelector(
       pastLines,
       futureLines,
       isMovingBoundingBox,
+      shouldShowBoundingBoxFill,
     } = inpainting;
 
     const { activeTab, showDualDisplay } = options;
@@ -28,7 +40,6 @@ export const inpaintingControlsSelector = createSelector(
       tool,
       brushSize,
       maskColor,
-      maskOpacity,
       shouldInvertMask,
       shouldShowMask,
       shouldShowCheckboardTransparency,
@@ -38,6 +49,7 @@ export const inpaintingControlsSelector = createSelector(
       isMovingBoundingBox,
       activeTabName: tabMap[activeTab],
       showDualDisplay,
+      shouldShowBoundingBoxFill,
     };
   },
   {
@@ -58,13 +70,13 @@ export const inpaintingCanvasSelector = createSelector(
       shouldShowMask,
       shouldShowCheckboardTransparency,
       shouldShowBrushPreview,
-      maskOpacity,
       imageToInpaint,
       isMovingBoundingBox,
       boundingBoxDimensions,
       canvasDimensions,
       boundingBoxCoordinate,
       stageScale,
+      shouldShowBoundingBoxFill,
     } = inpainting;
     return {
       tool,
@@ -74,13 +86,13 @@ export const inpaintingCanvasSelector = createSelector(
       shouldShowMask,
       shouldShowCheckboardTransparency,
       shouldShowBrushPreview,
-      maskOpacity,
       imageToInpaint,
       isMovingBoundingBox,
       boundingBoxDimensions,
       canvasDimensions,
       boundingBoxCoordinate,
       stageScale,
+      shouldShowBoundingBoxFill,
     };
   },
   {

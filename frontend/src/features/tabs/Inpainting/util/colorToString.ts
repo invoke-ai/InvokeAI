@@ -5,6 +5,11 @@ export const rgbaColorToString = (color: RgbaColor): string => {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
+export const rgbaColorToRgbString = (color: RgbaColor): string => {
+  const { r, g, b } = color;
+  return `rgba(${r}, ${g}, ${b})`;
+};
+
 export const rgbColorToString = (color: RgbColor): string => {
   const { r, g, b } = color;
   return `rgba(${r}, ${g}, ${b})`;
