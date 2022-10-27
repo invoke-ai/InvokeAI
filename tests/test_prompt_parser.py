@@ -32,6 +32,7 @@ class PromptParserTestCase(unittest.TestCase):
         self.assertEqual(make_weighted_conjunction([("fire flames", 1)]), parse_prompt("fire flames"))
         self.assertEqual(make_weighted_conjunction([("fire, flames", 1)]), parse_prompt("fire, flames"))
         self.assertEqual(make_weighted_conjunction([("fire, flames , fire", 1)]), parse_prompt("fire, flames , fire"))
+        self.assertEqual(make_weighted_conjunction([("cat hot-dog eating", 1)]), parse_prompt("cat hot-dog eating"))
 
     def test_attention(self):
         self.assertEqual(make_weighted_conjunction([('flames', 0.5)]), parse_prompt("(flames)0.5"))
@@ -106,10 +107,7 @@ class PromptParserTestCase(unittest.TestCase):
         #with self.assertRaises(pyparsing.ParseException):
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('a badly (formed +test prompt')
-        with self.assertRaises(pyparsing.ParseException):
-            parse_prompt('a badly (formed +test )prompt')
-        with self.assertRaises(pyparsing.ParseException):
-            parse_prompt('a badly (formed +test )prompt')
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a badly formed +test prompt',1)])]) , parse_prompt('a badly (formed +test )prompt'))
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('(((a badly (formed +test )prompt')
         with self.assertRaises(pyparsing.ParseException):
@@ -394,6 +392,9 @@ class PromptParserTestCase(unittest.TestCase):
         # todo handle this
         #self.assertEqual(make_basic_conjunction(['a badly formed +test prompt']),
         #                 parse_prompt('a badly formed +test prompt'))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a forest landscape', 1),
+                                                                   CrossAttentionControlSubstitute([Fragment('in winter',1)], [Fragment('',1)])])]),
+                         parse_prompt('a forest landscape "in winter".swap()'))
         pass
 
 
