@@ -113,7 +113,7 @@ Using `-` to reduce apricot-ness:
 Using `+` to increase apricot-ness:
 
 | `a man picking apricots+ from a tree` | `a man picking apricots++ from a tree` | `a man picking apricots+++ from a tree` | `a man picking apricots++++ from a tree` | `a man picking apricots+++++ from a tree` |
-| -- | -- | -- |
+| -- | -- | -- | -- | -- |
 | ![an AI generated image of a man picking apricots from a tree, with larger, more vibrant apricots](../assets/prompt_syntax/apricots-1.png) | ![an AI generated image of a man picking apricots from a tree with even larger, even more vibrant apricots](../assets/prompt_syntax/apricots-2.png) | ![an AI generated image of a man picking apricots from a tree, but the man has been replaced by a pile of apricots](../assets/prompt_syntax/apricots-3.png) | ![an AI generated image of a man picking apricots from a tree, but the man has been replaced by a mound of giant melting-looking apricots](../assets/prompt_syntax/apricots-4.png) | ![an AI generated image of a man picking apricots from a tree, but the man and the leaves and parts of the ground have all been replaced by giant melting-looking apricots](../assets/prompt_syntax/apricots-5.png) |
 
 You can also change the balance between different parts of a prompt:
