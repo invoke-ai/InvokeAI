@@ -107,7 +107,7 @@ export default function ImageGallery() {
             />
           </div>
           <div className="image-gallery-auto-refresh-container">
-            <h2>Auto Upate Selected Image</h2>
+            <h2>Auto Update Selected Image</h2>
             <IAISwitch
               isChecked={shouldRefreshCurrentImage}
               onChange={handleToggleAutoRefresh}
