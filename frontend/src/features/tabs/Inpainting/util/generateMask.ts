@@ -1,4 +1,5 @@
 import Konva from 'konva';
+import { IRect } from 'konva/lib/types';
 import { MaskLine } from '../inpaintingSlice';
 
 /**
@@ -11,7 +12,11 @@ import { MaskLine } from '../inpaintingSlice';
  * drawing the mask and compositing everything correctly to output a valid
  * mask image.
  */
-const generateMask = (image: HTMLImageElement, lines: MaskLine[]) => {
+const generateMask = (
+  image: HTMLImageElement,
+  lines: MaskLine[],
+  boundingBox: IRect
+) => {
   const { width, height } = image;
 
   const offscreenContainer = document.createElement('div');
