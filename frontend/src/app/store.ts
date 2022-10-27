@@ -62,6 +62,7 @@ const galleryPersistConfig = {
     'shouldShowGallery',
     'galleryScrollPosition',
     'galleryImageMinimumWidth',
+    'galleryImageObjectFit',
   ],
 };
 
