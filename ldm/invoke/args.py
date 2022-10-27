@@ -169,8 +169,12 @@ class Args(object):
 
     def parse_cmd(self,cmd_string):
         '''Parse a invoke>-style command string '''
+        # handle the case in which the first token is a switch
+        if cmd_string.startswith('-'):
+            prompt = ''
+            switches = cmd_string
         # handle the case in which the prompt is enclosed by quotes
-        if cmd_string.startswith('"'):
+        elif cmd_string.startswith('"'):
             a = shlex.split(cmd_string)
             prompt = a[0]
             switches = shlex.join(a[1:])

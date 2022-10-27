@@ -149,7 +149,39 @@ region directly:
 invoke> medusa with cobras -I ./test-pictures/curly.png -tm hair -C20
 ```
 
-### Inpainting is not changing the masked region enough!
+## Outpainting
+
+Outpainting is the same as inpainting, except that the painting occurs
+in the regions outside of the original image. To outpaint using the
+`invoke.py` command line script, prepare an image in which the borders
+to be extended are pure black. Add an alpha channel (if there isn't one
+already), and make the borders completely transparent and the interior
+completely opaque. If you wish to modify the interior as well, you may
+create transparent holes in the transparency layer, which `img2img` will
+paint into as usual.
+
+Pass the image as the argument to the `-I` switch as you would for
+regular inpainting. You'll likely be delighted by the results.
+
+### Tips
+
+1. Do not try to expand the image too much at once. Generally it is best
+   to expand the margins in 64-pixel increments. 128 pixels often works,
+   but your mileage may vary depending on the nature of the image you are
+   trying to outpaint into.
+
+2. There are a series of switches that can be used to adjust how the
+   inpainting algorithm operates. In particular, you can use these to
+   minimize the seam that sometimes appears between the original image
+   and the extended part. These switches are:
+
+
+
+## Troubleshooting
+
+Here are some troubleshooting tips for inpainting and outpainting.
+
+## Inpainting is not changing the masked region enough!
 
 One of the things to understand about how inpainting works is that it
 is equivalent to running img2img on just the masked (transparent)
