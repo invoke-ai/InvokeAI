@@ -11,14 +11,41 @@
     font-size: 1.2rem;
     font-weight: bold;
   }
+
+  h2 {
+    font-weight: bold;
+  }
 }
 
 .hotkeys-modal-items {
-  display: grid;
-  row-gap: 0.5rem;
   max-height: 32rem;
   overflow-y: scroll;
   @include HideScrollbar;
+
+  .chakra-accordion {
+    display: grid;
+    row-gap: 0.5rem;
+  }
+
+  .chakra-accordion__item {
+    border: none;
+    border-radius: 0.3rem;
+    background-color: var(--tab-hover-color);
+  }
+
+  button {
+    border-radius: 0.3rem !important;
+
+    &[aria-expanded='true'] {
+      background-color: var(--tab-hover-color);
+      border-radius: 0.3rem;
+    }
+  }
+}
+
+.hotkey-modal-category {
+  display: grid;
+  row-gap: 0.5rem;
 }
 
 .hotkey-modal-item {
