@@ -43,14 +43,7 @@ class CFGDenoiser(nn.Module):
 
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
-        if isinstance(cond,dict): # hybrid model
-            x_in = torch.cat([x] * 2)
-            sigma_in = torch.cat([sigma] * 2)
-            cond_in = self.sampler.make_cond_in(uncond,cond)
-            uncond, cond = self.inner_model(x_in, sigma_in, cond=cond_in).chunk(2)
-            next_x = uncond + (cond - uncond) * cond_scale
-        else: # cross attention model
-            next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale)
+        next_x = self.invokeai_diffuser.do_diffusion_step(x, sigma, uncond, cond, cond_scale)
         if self.warmup < self.warmup_max:
             thresh = max(1, 1 + (self.threshold - 1) * (self.warmup / self.warmup_max))
             self.warmup += 1

@@ -90,7 +90,19 @@ class InvokeAIDiffuserComponent:
             # faster batched path
             x_twice = torch.cat([x]*2)
             sigma_twice = torch.cat([sigma]*2)
-            both_conditionings = torch.cat([unconditioning, conditioning])
+            if isinstance(conditioning, dict):
+                assert isinstance(unconditioning, dict)
+                both_conditionings = dict()
+                for k in conditioning:
+                    if isinstance(conditioning[k], list):
+                        both_conditionings[k] = [
+                            torch.cat([unconditioning[k][i], conditioning[k][i]])
+                            for i in range(len(conditioning[k]))
+                        ]
+                    else:
+                        both_conditionings[k] = torch.cat([unconditioning[k], conditioning[k]])
+            else:
+                both_conditionings = torch.cat([unconditioning, conditioning])
             unconditioned_next_x, conditioned_next_x = self.model_forward_callback(x_twice, sigma_twice, both_conditionings).chunk(2)
         else:
             #print('pct', percent_through, ': doing cross attention control on', cross_attention_control_types_to_do)

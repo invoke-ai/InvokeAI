@@ -76,4 +76,4 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm.modules.encoders.modules.FrozenCLIPEmbedder
+      target: ldm.modules.encoders.modules.WeightedFrozenCLIPEmbedder
