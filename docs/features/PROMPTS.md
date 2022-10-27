@@ -102,6 +102,7 @@ The following syntax is recognised:
 You can use this to increase or decrease the amount of something:
 
 `a man picking apricots from a tree`
+
 ![an AI generated image of a man picking apricots from a tree](../assets/prompt_syntax/apricots-0.png)
 
 Using `-` to reduce apricot-ness:
@@ -119,6 +120,7 @@ Using `+` to increase apricot-ness:
 You can also change the balance between different parts of a prompt:
 
 `mountain man`
+
 ![an AI generated image of a mountain man](../assets/prompt_syntax/mountain-man.png)
 
 More mountain:
