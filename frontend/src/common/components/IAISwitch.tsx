@@ -1,10 +1,4 @@
-import {
-  Flex,
-  FormControl,
-  FormLabel,
-  Switch,
-  SwitchProps,
-} from '@chakra-ui/react';
+import { FormControl, FormLabel, Switch, SwitchProps } from '@chakra-ui/react';
 
 interface Props extends SwitchProps {
   label?: string;
