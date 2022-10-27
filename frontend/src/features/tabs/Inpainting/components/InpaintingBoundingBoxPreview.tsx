@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import Konva from 'konva';
+import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useEffect, useRef } from 'react';
@@ -14,6 +15,10 @@ import {
   InpaintingState,
   setBoundingBoxCoordinate,
   setBoundingBoxDimensions,
+  setIsBoundingBoxTransforming,
+  setIsDrawing,
+  setIsMovingBoundingBox,
+  setShouldShowBrush,
 } from '../inpaintingSlice';
 import { rgbaColorToString } from '../util/colorToString';
 import {
@@ -32,6 +37,7 @@ const boundingBoxPreviewSelector = createSelector(
       canvasDimensions,
       stageScale,
       imageToInpaint,
+      isMovingBoundingBox,
     } = inpainting;
     return {
       boundingBoxCoordinate,
@@ -43,6 +49,7 @@ const boundingBoxPreviewSelector = createSelector(
       dash: DASH_WIDTH / stageScale, // scale dash lengths
       strokeWidth: 1 / stageScale, // scale stroke thickness
       anchorSize: TRANSFORMER_ANCHOR_SIZE,
+      isMovingBoundingBox,
     };
   },
   {
@@ -154,6 +161,7 @@ const InpaintingBoundingBoxPreview = () => {
     anchorSize,
     stageScale,
     imageToInpaint,
+    isMovingBoundingBox,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -176,12 +184,22 @@ const InpaintingBoundingBoxPreview = () => {
         stroke={'white'}
         strokeWidth={strokeWidth}
         listening={false}
+        onTransformStart={() => {
+          dispatch(setIsDrawing(false));
+          dispatch(setShouldShowBrush(false));
+          dispatch(setIsBoundingBoxTransforming(true));
+        }}
+        onTransformEnd={() => {
+          dispatch(setShouldShowBrush(true));
+          dispatch(setIsBoundingBoxTransforming(false));
+        }}
         onTransform={() => {
           /**
            * The Konva Transformer changes the object's anchor point and scale factor,
            * not its width and height. We need to un-scale the width and height before
            * setting the values.
            */
+           console.log(isMovingBoundingBox)
           if (!shapeRef.current) return;
 
           const rect = shapeRef.current;
@@ -227,11 +245,14 @@ const InpaintingBoundingBoxPreview = () => {
         ignoreStroke={true}
         keepRatio={false}
         flipEnabled={false}
+        onMouseDown={(e: KonvaEventObject<MouseEvent>) => {
+          e.cancelBubble = true;
+        }}
         anchorDragBoundFunc={(
           oldPos: Vector2d, // old absolute position of anchor point
           newPos: Vector2d, // new absolute position (potentially) of anchor point
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          _event: MouseEvent
+          _e: MouseEvent
         ) => {
           /**
            * Konva does not transform with width or height. It transforms the anchor point

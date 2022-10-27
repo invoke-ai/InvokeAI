@@ -15,6 +15,7 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
       brushSize,
       maskColor,
       tool,
+      shouldShowBrush,
     } = inpainting;
 
     return {
@@ -25,6 +26,7 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
       brushSize,
       maskColorString: rgbaColorToRgbString(maskColor),
       tool,
+      shouldShowBrush,
     };
   },
   {
@@ -46,9 +48,12 @@ const InpaintingCanvasBrushPreview = () => {
     brushSize,
     maskColorString,
     tool,
+    shouldShowBrush,
   } = useAppSelector(inpaintingCanvasBrushPreviewSelector);
 
-  if (!(cursorPosition || shouldShowBrushPreview)) return null;
+  if (!shouldShowBrush || !(cursorPosition || shouldShowBrushPreview)) {
+    return null;
+  }
 
   return (
     <Circle
