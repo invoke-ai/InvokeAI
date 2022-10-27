@@ -6,32 +6,29 @@ import {
   FaPalette,
   FaPlus,
   FaRedo,
+  FaTint,
+  FaTintSlash,
   FaUndo,
 } from 'react-icons/fa';
 import { BiHide, BiShow } from 'react-icons/bi';
 import { VscSplitHorizontal } from 'react-icons/vsc';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import { useAppDispatch, useAppSelector } from '../../../app/store';
 import IAIIconButton from '../../../common/components/IAIIconButton';
 import {
   clearMask,
   redo,
   setMaskColor,
   setBrushSize,
-  setMaskOpacity,
   setShouldShowBrushPreview,
   setTool,
   undo,
   setShouldShowMask,
   setShouldInvertMask,
   setNeedsRepaint,
+  setShouldShowBoundingBoxFill,
 } from './inpaintingSlice';
 
-import { tabMap } from '../InvokeTabs';
-import {
-  MdInvertColors,
-  MdInvertColorsOff,
-  MdOutlineCloseFullscreen,
-} from 'react-icons/md';
+import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
 import IAISlider from '../../../common/components/IAISlider';
 import IAINumberInput from '../../../common/components/IAINumberInput';
 import { inpaintingControlsSelector } from './inpaintingSliceSelectors';
@@ -39,14 +36,12 @@ import IAIPopover from '../../../common/components/IAIPopover';
 import IAIColorPicker from '../../../common/components/IAIColorPicker';
 import { RgbaColor } from 'react-colorful';
 import { setShowDualDisplay } from '../../options/optionsSlice';
-import { useEffect } from 'react';
 
 const InpaintingControls = () => {
   const {
     tool,
     brushSize,
     maskColor,
-    maskOpacity,
     shouldInvertMask,
     shouldShowMask,
     canUndo,
@@ -54,12 +49,17 @@ const InpaintingControls = () => {
     isMaskEmpty,
     activeTabName,
     showDualDisplay,
+    shouldShowBoundingBoxFill,
   } = useAppSelector(inpaintingControlsSelector);
 
   const dispatch = useAppDispatch();
   const toast = useToast();
 
-  // Hotkeys
+  /**
+   * Hotkeys
+   */
+
+  // Decrease brush size
   useHotkeys(
     '[',
     (e: KeyboardEvent) => {
@@ -76,6 +76,7 @@ const InpaintingControls = () => {
     [activeTabName, shouldShowMask, brushSize]
   );
 
+  // Increase brush size
   useHotkeys(
     ']',
     (e: KeyboardEvent) => {
@@ -88,30 +89,39 @@ const InpaintingControls = () => {
     [activeTabName, shouldShowMask, brushSize]
   );
 
+  // Decrease mask opacity
   useHotkeys(
     'shift+[',
     (e: KeyboardEvent) => {
       e.preventDefault();
-      handleChangeMaskOpacity(Math.max(maskOpacity - 0.05, 0));
+      handleChangeMaskColor({
+        ...maskColor,
+        a: Math.max(maskColor.a - 0.05, 0),
+      });
     },
     {
       enabled: activeTabName === 'inpainting' && shouldShowMask,
     },
-    [activeTabName, shouldShowMask, maskOpacity]
+    [activeTabName, shouldShowMask, maskColor.a]
   );
 
+  // Increase mask opacity
   useHotkeys(
     'shift+]',
     (e: KeyboardEvent) => {
       e.preventDefault();
-      handleChangeMaskOpacity(Math.min(maskOpacity + 0.05, 100));
+      handleChangeMaskColor({
+        ...maskColor,
+        a: Math.min(maskColor.a + 0.05, 100),
+      });
     },
     {
       enabled: activeTabName === 'inpainting' && shouldShowMask,
     },
-    [activeTabName, shouldShowMask, maskOpacity]
+    [activeTabName, shouldShowMask, maskColor.a]
   );
 
+  // Set tool to eraser
   useHotkeys(
     'e',
     (e: KeyboardEvent) => {
@@ -125,6 +135,7 @@ const InpaintingControls = () => {
     [activeTabName, shouldShowMask]
   );
 
+  // Set tool to brush
   useHotkeys(
     'b',
     (e: KeyboardEvent) => {
@@ -137,6 +148,7 @@ const InpaintingControls = () => {
     [activeTabName, shouldShowMask]
   );
 
+  // Undo
   useHotkeys(
     'cmd+z, control+z',
     (e: KeyboardEvent) => {
@@ -149,6 +161,7 @@ const InpaintingControls = () => {
     [activeTabName, shouldShowMask, canUndo]
   );
 
+  // Redo
   useHotkeys(
     'cmd+shift+z, control+shift+z, control+y, cmd+y',
     (e: KeyboardEvent) => {
@@ -161,6 +174,7 @@ const InpaintingControls = () => {
     [activeTabName, shouldShowMask, canRedo]
   );
 
+  // Show/hide mask
   useHotkeys(
     'h',
     (e: KeyboardEvent) => {
@@ -173,6 +187,7 @@ const InpaintingControls = () => {
     [activeTabName, shouldShowMask]
   );
 
+  // Invert mask
   useHotkeys(
     'shift+m',
     (e: KeyboardEvent) => {
@@ -185,6 +200,7 @@ const InpaintingControls = () => {
     [activeTabName, shouldInvertMask, shouldShowMask]
   );
 
+  // Clear mask
   useHotkeys(
     'shift+c',
     (e: KeyboardEvent) => {
@@ -203,6 +219,7 @@ const InpaintingControls = () => {
     [activeTabName, isMaskEmpty, shouldShowMask]
   );
 
+  // Toggle split view
   useHotkeys(
     'shift+j',
     () => {
@@ -224,10 +241,6 @@ const InpaintingControls = () => {
     dispatch(setBrushSize(v));
   };
 
-  const handleChangeMaskOpacity = (v: number) => {
-    dispatch(setMaskOpacity(v));
-  };
-
   const handleToggleShouldShowMask = () =>
     dispatch(setShouldShowMask(!shouldShowMask));
 
@@ -242,10 +255,8 @@ const InpaintingControls = () => {
     dispatch(setShouldShowBrushPreview(false));
   };
 
-  const handleChangeBrushColor = (newColor: RgbaColor) => {
-    const { r, g, b, a: maskOpacity } = newColor;
-    dispatch(setMaskColor({ r, g, b }));
-    dispatch(setMaskOpacity(maskOpacity));
+  const handleChangeMaskColor = (newColor: RgbaColor) => {
+    dispatch(setMaskColor(newColor));
   };
 
   const handleUndo = () => dispatch(undo());
@@ -255,6 +266,10 @@ const InpaintingControls = () => {
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
     dispatch(setNeedsRepaint(true));
+  };
+
+  const handleChangeShouldShowBoundingBoxFill = () => {
+    dispatch(setShouldShowBoundingBoxFill(!shouldShowBoundingBoxFill));
   };
 
   return (
@@ -320,8 +335,8 @@ const InpaintingControls = () => {
             }
           >
             <IAIColorPicker
-              color={{ ...maskColor, a: maskOpacity }}
-              onChange={handleChangeBrushColor}
+              color={maskColor}
+              onChange={handleChangeMaskColor}
             />
           </IAIPopover>
           <IAIIconButton
@@ -374,6 +389,13 @@ const InpaintingControls = () => {
             icon={<VscSplitHorizontal />}
             data-selected={showDualDisplay}
             onClick={handleDualDisplay}
+          />
+          <IAIIconButton
+            aria-label="Darken Outside Bounding Box (xxx)"
+            tooltip="Darken Outside Bounding Box (xxx)"
+            icon={shouldShowBoundingBoxFill ? <FaTint /> : <FaTintSlash />}
+            data-selected={shouldShowBoundingBoxFill}
+            onClick={handleChangeShouldShowBoundingBoxFill}
           />
         </div>
       </div>

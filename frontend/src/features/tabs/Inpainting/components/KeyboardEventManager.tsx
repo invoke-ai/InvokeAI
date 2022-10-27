@@ -39,24 +39,10 @@ const KeyboardEventManager = () => {
 
   const isFirstEvent = useRef<boolean>(true);
   const wasLastEventOverCanvas = useRef<boolean>(false);
+  const lastEvent = useRef<KeyboardEvent | null>(null);
 
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (!isCursorOnCanvas) {
-        wasLastEventOverCanvas.current = false;
-
-        if (isFirstEvent.current) {
-          isFirstEvent.current = false;
-        }
-
-        return;
-      }
-
-      if (isFirstEvent.current) {
-        wasLastEventOverCanvas.current = true;
-        isFirstEvent.current = false;
-      }
-
       if (
         !['Alt', ' '].includes(e.key) ||
         activeTabName !== 'inpainting' ||
@@ -66,8 +52,27 @@ const KeyboardEventManager = () => {
         return;
       }
 
-      if (!wasLastEventOverCanvas.current) {
+      // cursor is NOT over canvas
+      if (!isCursorOnCanvas) {
+        if (!lastEvent.current) {
+          lastEvent.current = e;
+        }
+
+        wasLastEventOverCanvas.current = false;
+        return;
+      }
+
+      // cursor is over canvas
+
+      // if this is the first event
+      if (!lastEvent.current) {
         wasLastEventOverCanvas.current = true;
+        lastEvent.current = e;
+      }
+
+      if (!wasLastEventOverCanvas.current && e.type === 'keyup') {
+        wasLastEventOverCanvas.current = true;
+        lastEvent.current = e;
         return;
       }
 
@@ -83,9 +88,11 @@ const KeyboardEventManager = () => {
           break;
         }
       }
+
+      lastEvent.current = e;
+      wasLastEventOverCanvas.current = true;
     };
 
-    console.log('adding listeners');
     document.addEventListener('keydown', listener);
     document.addEventListener('keyup', listener);
 

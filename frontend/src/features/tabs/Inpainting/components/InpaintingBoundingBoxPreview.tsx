@@ -1,13 +1,26 @@
 import { createSelector } from '@reduxjs/toolkit';
 import Konva from 'konva';
+import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useEffect, useRef } from 'react';
-import { Group, Rect } from 'react-konva';
-import { RootState, useAppSelector } from '../../../../app/store';
-import { InpaintingState } from '../inpaintingSlice';
+import { Group, Rect, Transformer } from 'react-konva';
+import {
+  RootState,
+  useAppDispatch,
+  useAppSelector,
+} from '../../../../app/store';
+import { roundToMultiple } from '../../../../common/util/roundDownToMultiple';
+import {
+  InpaintingState,
+  setBoundingBoxCoordinate,
+  setBoundingBoxDimensions,
+} from '../inpaintingSlice';
 import { rgbaColorToString } from '../util/colorToString';
-import { DASH_WIDTH, MARCHING_ANTS_SPEED } from '../util/constants';
-
+import {
+  DASH_WIDTH,
+  // MARCHING_ANTS_SPEED,
+  TRANSFORMER_ANCHOR_SIZE,
+} from '../util/constants';
 
 const boundingBoxPreviewSelector = createSelector(
   (state: RootState) => state.inpainting,
@@ -18,14 +31,18 @@ const boundingBoxPreviewSelector = createSelector(
       boundingBoxPreviewFill,
       canvasDimensions,
       stageScale,
+      imageToInpaint,
     } = inpainting;
     return {
       boundingBoxCoordinate,
       boundingBoxDimensions,
       boundingBoxPreviewFillString: rgbaColorToString(boundingBoxPreviewFill),
       canvasDimensions,
-      dash: DASH_WIDTH / stageScale,  // scale dash lengths
+      stageScale,
+      imageToInpaint,
+      dash: DASH_WIDTH / stageScale, // scale dash lengths
       strokeWidth: 1 / stageScale, // scale stroke thickness
+      anchorSize: TRANSFORMER_ANCHOR_SIZE,
     };
   },
   {
@@ -38,7 +55,7 @@ const boundingBoxPreviewSelector = createSelector(
 /**
  * Shades the area around the mask.
  */
-const InpaintingBoundingBoxPreviewOverlay = () => {
+export const InpaintingBoundingBoxPreviewOverlay = () => {
   const {
     boundingBoxCoordinate,
     boundingBoxDimensions,
@@ -68,122 +85,228 @@ const InpaintingBoundingBoxPreviewOverlay = () => {
   );
 };
 
-/**
- * Draws marching ants around the mask.
- */
-const InpaintingBoundingBoxPreviewMarchingAnts = () => {
-  const { boundingBoxCoordinate, boundingBoxDimensions } = useAppSelector(
-    boundingBoxPreviewSelector
-  );
+// /**
+//  * Draws marching ants around the mask. Unused.
+//  */
+// const _InpaintingBoundingBoxPreviewMarchingAnts = () => {
+//   const { boundingBoxCoordinate, boundingBoxDimensions } = useAppSelector(
+//     boundingBoxPreviewSelector
+//   );
 
-  const blackStrokeRectRef = useRef<Konva.Rect>(null);
-  const whiteStrokeRectRef = useRef<Konva.Rect>(null);
+//   const blackStrokeRectRef = useRef<Konva.Rect>(null);
+//   const whiteStrokeRectRef = useRef<Konva.Rect>(null);
+
+//   useEffect(() => {
+//     const blackStrokeRect = blackStrokeRectRef.current;
+//     const whiteStrokeRect = whiteStrokeRectRef.current;
+
+//     const anim = new Konva.Animation((frame) => {
+//       if (!frame) return;
+//       blackStrokeRect?.dashOffset(
+//         -1 * (Math.floor(frame.time / MARCHING_ANTS_SPEED) % 16)
+//       );
+//       whiteStrokeRect?.dashOffset(
+//         -1 * ((Math.floor(frame.time / MARCHING_ANTS_SPEED) % 16) + 4)
+//       );
+//     });
+
+//     anim.start();
+
+//     return () => {
+//       anim.stop();
+//     };
+//   }, []);
+
+//   return (
+//     <Group>
+//       <Rect
+//         x={boundingBoxCoordinate.x}
+//         y={boundingBoxCoordinate.y}
+//         width={boundingBoxDimensions.width}
+//         height={boundingBoxDimensions.height}
+//         stroke={'black'}
+//         strokeWidth={1}
+//         dash={[4, 4]}
+//         ref={blackStrokeRectRef}
+//         listening={false}
+//       />
+//       <Rect
+//         x={boundingBoxCoordinate.x}
+//         y={boundingBoxCoordinate.y}
+//         width={boundingBoxDimensions.width}
+//         height={boundingBoxDimensions.height}
+//         stroke={'white'}
+//         dash={[4, 4]}
+//         strokeWidth={1}
+//         ref={whiteStrokeRectRef}
+//         listening={false}
+//       />
+//     </Group>
+//   );
+// };
+
+const InpaintingBoundingBoxPreview = () => {
+  const dispatch = useAppDispatch();
+  const {
+    boundingBoxCoordinate,
+    boundingBoxDimensions,
+    strokeWidth,
+    anchorSize,
+    stageScale,
+    imageToInpaint,
+  } = useAppSelector(boundingBoxPreviewSelector);
+
+  const transformerRef = useRef<Konva.Transformer>(null);
+  const shapeRef = useRef<Konva.Rect>(null);
 
   useEffect(() => {
-    const blackStrokeRect = blackStrokeRectRef.current;
-    const whiteStrokeRect = whiteStrokeRectRef.current;
-
-    const anim = new Konva.Animation((frame) => {
-      if (!frame) return;
-      blackStrokeRect?.dashOffset(
-        -1 * (Math.floor(frame.time / MARCHING_ANTS_SPEED) % 16)
-      );
-      whiteStrokeRect?.dashOffset(
-        -1 * ((Math.floor(frame.time / MARCHING_ANTS_SPEED) % 16) + 4)
-      );
-    });
-
-    anim.start();
-
-    return () => {
-      anim.stop();
-    };
+    if (!transformerRef.current || !shapeRef.current) return;
+    transformerRef.current.nodes([shapeRef.current]);
+    transformerRef.current.getLayer()?.batchDraw();
   }, []);
 
   return (
-    <Group>
+    <>
       <Rect
         x={boundingBoxCoordinate.x}
         y={boundingBoxCoordinate.y}
         width={boundingBoxDimensions.width}
         height={boundingBoxDimensions.height}
-        stroke={'black'}
-        strokeWidth={1}
-        dash={[4, 4]}
-        ref={blackStrokeRectRef}
-        listening={false}
-      />
-      <Rect
-        x={boundingBoxCoordinate.x}
-        y={boundingBoxCoordinate.y}
-        width={boundingBoxDimensions.width}
-        height={boundingBoxDimensions.height}
+        ref={shapeRef}
         stroke={'white'}
-        dash={[4, 4]}
-        strokeWidth={1}
-        ref={whiteStrokeRectRef}
-        listening={false}
-      />
-    </Group>
-  );
-};
-
-/**
- * Draws non-marching ants around the mask.
- */
-const InpaintingBoundingBoxPreviewAnts = () => {
-  const { boundingBoxCoordinate, boundingBoxDimensions, dash, strokeWidth } =
-    useAppSelector(boundingBoxPreviewSelector);
-
-  return (
-    <Group>
-      <Rect
-        x={boundingBoxCoordinate.x}
-        y={boundingBoxCoordinate.y}
-        width={boundingBoxDimensions.width}
-        height={boundingBoxDimensions.height}
-        stroke={'black'}
         strokeWidth={strokeWidth}
-        dash={[dash, dash]}
-        dashOffset={0}
         listening={false}
+        onTransform={() => {
+          /**
+           * The Konva Transformer changes the object's anchor point and scale factor,
+           * not its width and height. We need to un-scale the width and height before
+           * setting the values.
+           */
+          if (!shapeRef.current) return;
+
+          const rect = shapeRef.current;
+
+          const scaleX = rect.scaleX();
+          const scaleY = rect.scaleY();
+
+          // undo the scaling
+          const width = Math.round(rect.width() * scaleX);
+          const height = Math.round(rect.height() * scaleY);
+
+          const x = Math.round(rect.x());
+          const y = Math.round(rect.y());
+
+          dispatch(
+            setBoundingBoxDimensions({
+              width,
+              height,
+            })
+          );
+
+          dispatch(
+            setBoundingBoxCoordinate({
+              x,
+              y,
+            })
+          );
+
+          // Reset the scale now that the coords/dimensions have been un-scaled
+          rect.scaleX(1);
+          rect.scaleY(1);
+        }}
       />
-      <Rect
-        x={boundingBoxCoordinate.x}
-        y={boundingBoxCoordinate.y}
-        width={boundingBoxDimensions.width}
-        height={boundingBoxDimensions.height}
-        stroke={'white'}
-        dash={[dash, dash]}
-        strokeWidth={strokeWidth}
-        dashOffset={dash}
-        listening={false}
+      <Transformer
+        ref={transformerRef}
+        rotateEnabled={false}
+        anchorSize={anchorSize}
+        anchorStroke={'rgb(42,42,42)'}
+        borderEnabled={true}
+        borderStroke={'black'}
+        borderDash={[DASH_WIDTH, DASH_WIDTH]}
+        anchorCornerRadius={3}
+        ignoreStroke={true}
+        keepRatio={false}
+        flipEnabled={false}
+        anchorDragBoundFunc={(
+          oldPos: Vector2d, // old absolute position of anchor point
+          newPos: Vector2d, // new absolute position (potentially) of anchor point
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          _event: MouseEvent
+        ) => {
+          /**
+           * Konva does not transform with width or height. It transforms the anchor point
+           * and scale factor. This is then sent to the shape's onTransform listeners.
+           *
+           * We need to snap the new width to steps of 64 without also snapping the
+           * coordinates of the bounding box to steps of 64. But because the whole
+           * stage is scaled, our actual desired step is actually 64 * the stage scale.
+           */
+
+          // Get the scaled step
+          const scaledStep = 64 * stageScale;
+
+          // Difference of the old coords from the nearest multiple the scaled step
+          const offsetX = oldPos.x % scaledStep;
+          const offsetY = oldPos.y % scaledStep;
+
+          // Round new position to the nearest multiple of the scaled step
+          const closestX = roundToMultiple(newPos.x, scaledStep) + offsetX;
+          const closestY = roundToMultiple(newPos.y, scaledStep) + offsetY;
+
+          // the difference between the old coord and new
+          const diffX = Math.abs(newPos.x - closestX);
+          const diffY = Math.abs(newPos.y - closestY);
+
+          // if the difference is less than the scaled step, we want to snap
+          const didSnapX = diffX < scaledStep;
+          const didSnapY = diffY < scaledStep;
+
+          // We may not change anything, stash the old position
+          let newCoordinate = { ...oldPos };
+
+          // Set the new coords based on what snapped
+          if (didSnapX && !didSnapY) {
+            newCoordinate = {
+              x: closestX,
+              y: oldPos.y,
+            };
+          } else if (!didSnapX && didSnapY) {
+            newCoordinate = {
+              x: oldPos.x,
+              y: closestY,
+            };
+          } else if (didSnapX && didSnapY) {
+            newCoordinate = {
+              x: closestX,
+              y: closestY,
+            };
+          }
+
+          return newCoordinate;
+        }}
+        boundBoxFunc={(oldBoundBox, newBoundBox) => {
+          /**
+           * The transformer uses this callback to limit valid transformations.
+           * Unlike anchorDragBoundFunc, it does get a width and height, so
+           * the logic to constrain the size of the bounding box is very simple.
+           */
+
+          if (!imageToInpaint) return oldBoundBox;
+
+          if (
+            newBoundBox.width + newBoundBox.x > imageToInpaint.width ||
+            newBoundBox.height + newBoundBox.y > imageToInpaint.height ||
+            newBoundBox.x < 0 ||
+            newBoundBox.y < 0
+          ) {
+            return oldBoundBox;
+          }
+
+          return newBoundBox;
+        }}
       />
-    </Group>
+    </>
   );
-};
-
-const boundingBoxPreviewTypeSelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => inpainting.boundingBoxPreviewType
-);
-
-const InpaintingBoundingBoxPreview = () => {
-  const boundingBoxPreviewType = useAppSelector(boundingBoxPreviewTypeSelector);
-
-  switch (boundingBoxPreviewType) {
-    case 'overlay': {
-      return <InpaintingBoundingBoxPreviewOverlay />;
-    }
-    case 'ants': {
-      return <InpaintingBoundingBoxPreviewAnts />;
-    }
-    case 'marchingAnts': {
-      return <InpaintingBoundingBoxPreviewMarchingAnts />;
-    }
-    default:
-      return null;
-  }
 };
 
 export default InpaintingBoundingBoxPreview;

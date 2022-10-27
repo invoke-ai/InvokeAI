@@ -3,7 +3,7 @@ import _ from 'lodash';
 import { Circle } from 'react-konva';
 import { RootState, useAppSelector } from '../../../../app/store';
 import { InpaintingState } from '../inpaintingSlice';
-import { rgbColorToString } from '../util/colorToString';
+import { rgbaColorToRgbString } from '../util/colorToString';
 
 const inpaintingCanvasBrushPreviewSelector = createSelector(
   (state: RootState) => state.inpainting,
@@ -23,7 +23,7 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
       height,
       shouldShowBrushPreview,
       brushSize,
-      maskColorString: rgbColorToString(maskColor),
+      maskColorString: rgbaColorToRgbString(maskColor),
       tool,
     };
   },

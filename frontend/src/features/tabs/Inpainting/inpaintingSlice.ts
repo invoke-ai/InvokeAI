@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { Vector2d } from 'konva/lib/types';
-import { RgbaColor, RgbColor } from 'react-colorful';
+import { RgbaColor } from 'react-colorful';
 import * as InvokeAI from '../../../app/invokeai';
 import _ from 'lodash';
 import { roundDownToMultiple } from '../../../common/util/roundDownToMultiple';
@@ -31,15 +31,15 @@ export type BoundingBoxPreviewType = 'overlay' | 'ants' | 'marchingAnts';
 export interface InpaintingState {
   tool: 'brush' | 'eraser';
   brushSize: number;
-  maskColor: RgbColor;
-  maskOpacity: number;
+  maskColor: RgbaColor;
   cursorPosition: Vector2d | null;
   canvasDimensions: Dimensions;
   boundingBoxDimensions: Dimensions;
   boundingBoxCoordinate: Vector2d;
   isMovingBoundingBox: boolean;
   boundingBoxPreviewFill: RgbaColor;
-  boundingBoxPreviewType: BoundingBoxPreviewType;
+  shouldShowBoundingBoxFill: boolean;
+  isBoundingBoxTransforming: boolean;
   lines: MaskLine[];
   pastLines: MaskLine[][];
   futureLines: MaskLine[][];
@@ -50,18 +50,19 @@ export interface InpaintingState {
   imageToInpaint?: InvokeAI.Image;
   needsRepaint: boolean;
   stageScale: number;
+  isDrawing: boolean;
 }
 
 const initialInpaintingState: InpaintingState = {
   tool: 'brush',
   brushSize: 50,
-  maskColor: { r: 255, g: 90, b: 90 },
-  maskOpacity: 0.5,
+  maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
   canvasDimensions: { width: 0, height: 0 },
   boundingBoxDimensions: { width: 64, height: 64 },
   boundingBoxCoordinate: { x: 0, y: 0 },
-  boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
-  boundingBoxPreviewType: 'ants',
+  boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.7 },
+  shouldShowBoundingBoxFill: false,
+  isBoundingBoxTransforming: false,
   cursorPosition: null,
   lines: [],
   pastLines: [],
@@ -72,6 +73,7 @@ const initialInpaintingState: InpaintingState = {
   shouldShowBrushPreview: false,
   isMovingBoundingBox: false,
   needsRepaint: false,
+  isDrawing: false,
   stageScale: 1,
 };
 
@@ -142,12 +144,10 @@ export const inpaintingSlice = createSlice({
     setShouldShowBrushPreview: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBrushPreview = action.payload;
     },
-    setMaskColor: (state, action: PayloadAction<RgbColor>) => {
+    setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
       state.maskColor = action.payload;
     },
-    setMaskOpacity: (state, action: PayloadAction<number>) => {
-      state.maskOpacity = action.payload;
-    },
+    // },
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state.cursorPosition = action.payload;
     },
@@ -215,34 +215,67 @@ export const inpaintingSlice = createSlice({
       };
     },
     setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
-      const { width: boundingBoxWidth, height: boundingBoxHeight } =
-        action.payload;
-      const { x: boundingBoxX, y: boundingBoxY } = state.boundingBoxCoordinate;
-      const { width: canvasWidth, height: canvasHeight } =
-        state.canvasDimensions;
+      state.boundingBoxDimensions = action.payload;
+      // const { width: boundingBoxWidth, height: boundingBoxHeight } =
+      //   action.payload;
+      // const { x: boundingBoxX, y: boundingBoxY } = state.boundingBoxCoordinate;
+      // const { width: canvasWidth, height: canvasHeight } =
+      //   state.canvasDimensions;
 
-      const overflowX = boundingBoxX + boundingBoxWidth - canvasWidth;
-      const overflowY = boundingBoxY + boundingBoxHeight - canvasHeight;
+      // const roundedCanvasWidth = roundDownToMultiple(canvasWidth, 64);
+      // const roundedCanvasHeight = roundDownToMultiple(canvasHeight, 64);
+      // const roundedBoundingBoxWidth = roundDownToMultiple(boundingBoxWidth, 64);
+      // const roundedBoundingBoxHeight = roundDownToMultiple(
+      //   boundingBoxHeight,
+      //   64
+      // );
 
-      const newBoundingBoxX = roundDownToMultiple(
-        overflowX > 0 ? boundingBoxX - overflowX : boundingBoxX,
-        64
-      );
+      // const overflowX = boundingBoxX + boundingBoxWidth - canvasWidth;
+      // const overflowY = boundingBoxY + boundingBoxHeight - canvasHeight;
 
-      const newBoundingBoxY = roundDownToMultiple(
-        overflowY > 0 ? boundingBoxY - overflowY : boundingBoxY,
-        64
-      );
+      // const newBoundingBoxWidth = _.clamp(
+      //   roundedBoundingBoxWidth,
+      //   64,
+      //   roundedCanvasWidth
+      // );
 
-      state.boundingBoxDimensions = {
-        width: roundDownToMultiple(boundingBoxWidth, 64),
-        height: roundDownToMultiple(boundingBoxHeight, 64),
-      };
+      // const newBoundingBoxHeight = _.clamp(
+      //   roundedBoundingBoxHeight,
+      //   64,
+      //   roundedCanvasHeight
+      // );
 
-      state.boundingBoxCoordinate = {
-        x: newBoundingBoxX,
-        y: newBoundingBoxY,
-      };
+      // const overflowCorrectedX =
+      //   overflowX > 0 ? boundingBoxX - overflowX : boundingBoxX;
+
+      // const overflowCorrectedY =
+      //   overflowY > 0 ? boundingBoxY - overflowY : boundingBoxY;
+
+      // const clampedX = _.clamp(
+      //   overflowCorrectedX,
+      //   64,
+      //   roundedCanvasWidth - newBoundingBoxWidth
+      // );
+
+      // const clampedY = _.clamp(
+      //   overflowCorrectedY,
+      //   64,
+      //   roundedCanvasHeight - newBoundingBoxHeight
+      // );
+
+      // const newBoundingBoxX = roundDownToMultiple(clampedX, 64);
+
+      // const newBoundingBoxY = roundDownToMultiple(clampedY, 64);
+
+      // state.boundingBoxDimensions = {
+      //   width: newBoundingBoxWidth,
+      //   height: newBoundingBoxHeight,
+      // };
+
+      // state.boundingBoxCoordinate = {
+      //   x: newBoundingBoxX,
+      //   y: newBoundingBoxY,
+      // };
     },
     setBoundingBoxCoordinate: (state, action: PayloadAction<Vector2d>) => {
       state.boundingBoxCoordinate = action.payload;
@@ -256,18 +289,21 @@ export const inpaintingSlice = createSlice({
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
       state.boundingBoxPreviewFill = action.payload;
     },
-    setBoundingBoxPreviewType: (
-      state,
-      action: PayloadAction<BoundingBoxPreviewType>
-    ) => {
-      state.boundingBoxPreviewType = action.payload;
-    },
     setNeedsRepaint: (state, action: PayloadAction<boolean>) => {
       state.needsRepaint = action.payload;
     },
     setStageScale: (state, action: PayloadAction<number>) => {
       state.stageScale = action.payload;
       state.needsRepaint = false;
+    },
+    setShouldShowBoundingBoxFill: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowBoundingBoxFill = action.payload;
+    },
+    setIsBoundingBoxTransforming: (state, action: PayloadAction<boolean>) => {
+      state.isBoundingBoxTransforming = action.payload;
+    },
+    setIsDrawing: (state, action: PayloadAction<boolean>) => {
+      state.isDrawing = action.payload;
     },
   },
 });
@@ -283,7 +319,6 @@ export const {
   setShouldShowBrushPreview,
   setMaskColor,
   clearMask,
-  setMaskOpacity,
   undo,
   redo,
   setCursorPosition,
@@ -293,11 +328,13 @@ export const {
   setBoundingBoxCoordinate,
   setIsMovingBoundingBox,
   setBoundingBoxPreviewFill,
-  setBoundingBoxPreviewType,
   setNeedsRepaint,
   setStageScale,
   toggleTool,
   toggleIsMovingBoundingBox,
+  setShouldShowBoundingBoxFill,
+  setIsBoundingBoxTransforming,
+  setIsDrawing,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;
