@@ -11,12 +11,14 @@ export interface GalleryState {
   areMoreImagesAvailable: boolean;
   latest_mtime?: number;
   earliest_mtime?: number;
+  autoRefresh: boolean;
 }
 
 const initialState: GalleryState = {
   currentImageUuid: '',
   images: [],
   areMoreImagesAvailable: true,
+  autoRefresh: true,
 };
 
 export const gallerySlice = createSlice({
@@ -26,6 +28,9 @@ export const gallerySlice = createSlice({
     setCurrentImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       state.currentImage = action.payload;
       state.currentImageUuid = action.payload.uuid;
+    },
+    setAutoRefresh: (state, action: PayloadAction<boolean>) => {
+      state.autoRefresh = action.payload;
     },
     removeImage: (state, action: PayloadAction<string>) => {
       const uuid = action.payload;
@@ -80,9 +85,11 @@ export const gallerySlice = createSlice({
       }
 
       state.images.unshift(newImage);
-      state.currentImageUuid = uuid;
-      state.intermediateImage = undefined;
-      state.currentImage = newImage;
+      if (state.autoRefresh) {
+        state.currentImageUuid = uuid;
+        state.intermediateImage = undefined;
+        state.currentImage = newImage;
+      }
       state.latest_mtime = mtime;
     },
     setIntermediateImage: (state, action: PayloadAction<InvokeAI.Image>) => {
@@ -159,6 +166,7 @@ export const {
   clearIntermediateImage,
   removeImage,
   setCurrentImage,
+  setAutoRefresh,
   addGalleryImages,
   setIntermediateImage,
   selectNextImage,

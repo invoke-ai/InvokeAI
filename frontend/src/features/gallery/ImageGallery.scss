@@ -33,6 +33,7 @@
 .image-gallery-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
 
   h1 {
     font-weight: bold;
@@ -44,6 +45,16 @@
   &:hover {
     background-color: var(--btn-load-more-hover) !important;
   }
+}
+
+.image-gallery-auto-refresh-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.image-gallery-auto-refresh-switch {
+  margin-left: 1rem;
 }
 
 .image-gallery-container {

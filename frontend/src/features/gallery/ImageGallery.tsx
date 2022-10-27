@@ -7,9 +7,14 @@ import { MdClear, MdPhotoLibrary } from 'react-icons/md';
 import { requestImages } from '../../app/socketio/actions';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
-import { selectNextImage, selectPrevImage } from './gallerySlice';
+import {
+  setAutoRefresh,
+  selectNextImage,
+  selectPrevImage,
+} from './gallerySlice';
 import HoverableImage from './HoverableImage';
 import { setShouldShowGallery } from '../options/optionsSlice';
+import IAISwitch from '../../common/components/IAISwitch';
 
 export default function ImageGallery() {
   const { images, currentImageUuid, areMoreImagesAvailable } = useAppSelector(
@@ -24,6 +29,10 @@ export default function ImageGallery() {
     (state: RootState) => state.options.activeTab
   );
 
+  const shouldRefreshCurrentImage = useAppSelector(
+    (state: RootState) => state.gallery.autoRefresh
+  );
+
   const dispatch = useAppDispatch();
 
   const handleShowGalleryToggle = () => {
@@ -32,6 +41,10 @@ export default function ImageGallery() {
 
   const handleGalleryClose = () => {
     dispatch(setShouldShowGallery(false));
+  };
+
+  const handleToggleAutoRefresh = () => {
+    dispatch(setAutoRefresh(!shouldRefreshCurrentImage));
   };
 
   const handleClickLoadMore = () => {
@@ -91,6 +104,15 @@ export default function ImageGallery() {
               onClick={handleGalleryClose}
               className="image-gallery-close-btn"
               icon={<MdClear />}
+            />
+          </div>
+          <div className="image-gallery-auto-refresh-container">
+            <h2>Auto Upate Selected Image</h2>
+            <IAISwitch
+              isChecked={shouldRefreshCurrentImage}
+              onChange={handleToggleAutoRefresh}
+              className="image-gallery-auto-refresh-switch"
+              aria-lable={'Auto refresh current image'}
             />
           </div>
           <div className="image-gallery-container">
