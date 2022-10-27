@@ -117,6 +117,15 @@ class PromptParserTestCase(unittest.TestCase):
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('("((a badly (formed +test ").blend(1.0)')
 
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger bun', 1)])]),
+            parse_prompt("hamburger ((bun))"))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger bun', 1)])]),
+            parse_prompt("hamburger (bun)"))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger kaiser roll', 1)])]),
+            parse_prompt("hamburger (kaiser roll)"))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('hamburger kaiser roll', 1)])]),
+            parse_prompt("hamburger ((kaiser roll))"))
+
 
     def test_blend(self):
         self.assertEqual(Conjunction(
@@ -284,6 +293,7 @@ class PromptParserTestCase(unittest.TestCase):
                                                        ])]),
             parse_prompt("a cat.swap(dog) eating a hotdog.swap(h\(o\)tdog-, shape_freedom=0.5)"))
 
+
     def test_cross_attention_control_options(self):
         self.assertEqual(Conjunction([
             FlattenedPrompt([Fragment('a', 1),
@@ -426,9 +436,9 @@ class PromptParserTestCase(unittest.TestCase):
         # todo handle this
         #self.assertEqual(make_basic_conjunction(['a badly formed +test prompt']),
         #                 parse_prompt('a badly formed +test prompt'))
-        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a forest landscape', 1),
-                                                                   CrossAttentionControlSubstitute([Fragment('in winter',1)], [Fragment('',1)])])]),
-                         parse_prompt('a forest landscape "in winter".swap()'))
+        trees_and_houses_to_flames = Conjunction([FlattenedPrompt([('fire', 1.0), \
+                                                       CrossAttentionControlSubstitute([Fragment('trees and houses', 1)], [Fragment('flames',1)])])])
+        self.assertEqual(trees_and_houses_to_flames, parse_prompt('fire (trees and houses).swap("flames")'))
         pass
 
 
