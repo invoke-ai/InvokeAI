@@ -277,6 +277,13 @@ class PromptParserTestCase(unittest.TestCase):
                                                        ])]),
             parse_prompt("a cat.swap(dog) eating a hotdog.swap(\"h\(o\)tdog++++\", shape_freedom=0.5)"))
 
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('cat',1)], [Fragment('dog',1)]),
+                                                       Fragment('eating a', 1),
+                                                       CrossAttentionControlSubstitute([Fragment('hotdog',1)], [Fragment('h(o)tdog', pow(0.9,1))])
+                                                       ])]),
+            parse_prompt("a cat.swap(dog) eating a hotdog.swap(h\(o\)tdog-, shape_freedom=0.5)"))
+
     def test_cross_attention_control_options(self):
         self.assertEqual(Conjunction([
             FlattenedPrompt([Fragment('a', 1),
