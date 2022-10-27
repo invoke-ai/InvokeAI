@@ -1,9 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
+import _ from 'lodash';
 import { useMemo } from 'react';
 import { useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
-import { GalleryState } from '../../features/gallery/gallerySlice';
 import { OptionsState } from '../../features/options/optionsSlice';
 
 import { SystemState } from '../../features/system/systemSlice';
@@ -11,10 +10,15 @@ import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice'
 import { tabMap } from '../../features/tabs/InvokeTabs';
 import { validateSeedWeights } from '../util/seedWeightPairs';
 
-export const optionsSelector = createSelector(
-  (state: RootState) => state.options,
-  (options: OptionsState) => {
+export const useCheckParametersSelector = createSelector(
+  [
+    (state: RootState) => state.options,
+    (state: RootState) => state.system,
+    (state: RootState) => state.inpainting,
+  ],
+  (options: OptionsState, system: SystemState, inpainting: InpaintingState) => {
     return {
+      // options
       prompt: options.prompt,
       shouldGenerateVariations: options.shouldGenerateVariations,
       seedWeights: options.seedWeights,
@@ -22,58 +26,21 @@ export const optionsSelector = createSelector(
       initialImagePath: options.initialImagePath,
       seed: options.seed,
       activeTabName: tabMap[options.activeTab],
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
-export const systemSelector = createSelector(
-  (state: RootState) => state.system,
-  (system: SystemState) => {
-    return {
+      // system
       isProcessing: system.isProcessing,
       isConnected: system.isConnected,
+      // inpainting
+      isMaskEmpty:
+        inpainting.lines.filter((line) => line.tool === 'brush').length === 0,
+      hasInpaintingImage: Boolean(inpainting.imageToInpaint),
     };
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: isEqual,
+      resultEqualityCheck: _.isEqual,
     },
   }
 );
-
-export const inpaintingSelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => {
-    return {
-      isMaskEmpty: inpainting.lines.length === 0,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
-export const gallerySelector = createSelector(
-  (state: RootState) => state.gallery,
-  (gallery: GalleryState) => {
-    return {
-      hasCurrentImage: Boolean(gallery.currentImage),
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
 /**
  * Checks relevant pieces of state to confirm generation will not deterministically fail.
  * This is used to prevent the 'Generate' button from being clicked.
@@ -87,13 +54,11 @@ const useCheckParameters = (): boolean => {
     initialImagePath,
     seed,
     activeTabName,
-  } = useAppSelector(optionsSelector);
-
-  const { isProcessing, isConnected } = useAppSelector(systemSelector);
-
-  const { isMaskEmpty } = useAppSelector(inpaintingSelector);
-
-  const { hasCurrentImage } = useAppSelector(gallerySelector);
+    isProcessing,
+    isConnected,
+    isMaskEmpty,
+    hasInpaintingImage,
+  } = useAppSelector(useCheckParametersSelector);
 
   return useMemo(() => {
     // Cannot generate without a prompt
@@ -105,7 +70,10 @@ const useCheckParameters = (): boolean => {
       return false;
     }
 
-    if (activeTabName === 'inpainting' && (!hasCurrentImage || isMaskEmpty)) {
+    if (
+      activeTabName === 'inpainting' &&
+      (!hasInpaintingImage || isMaskEmpty)
+    ) {
       return false;
     }
 
@@ -145,8 +113,8 @@ const useCheckParameters = (): boolean => {
     seedWeights,
     seed,
     activeTabName,
-    hasCurrentImage,
     isMaskEmpty,
+    hasInpaintingImage,
   ]);
 };
 
