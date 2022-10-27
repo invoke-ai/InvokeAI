@@ -62,10 +62,17 @@
         }
       }
 
-      .image-gallery-size-popover {
-        display: grid;
-        grid-template-columns: repeat(2, max-content);
-        column-gap: 0.5rem;
+      .image-gallery-settings-popover {
+        display: flex;
+        flex-direction: column;
+        row-gap: 0.5rem;
+
+        div {
+          display: flex;
+          column-gap: 0.5rem;
+          align-items: center;
+          justify-content: space-between;
+        }
       }
 
       h1 {
