@@ -99,9 +99,7 @@ The following syntax is recognised:
   * all of the above with explicit numbers `a tall thin man picking (apricots)1.1` `a tall thin man (picking (apricots)1.3)1.1`. (`+` is equivalent to 1.1, `++` is pow(1.1,2), `+++` is pow(1.1,3), etc; `-` means 0.9, `--` means pow(0.9,2), etc.)
   * attention also applies to `[unconditioning]` so `a tall thin man picking apricots [(ladder)0.01]` will *very gently* nudge SD away from trying to draw the man on a ladder
 
-You can use this to increase or decrease the amount of something:
-
-`a man picking apricots from a tree`
+You can use this to increase or decrease the amount of something. Starting from this prompt of `a man picking apricots from a tree`, let's see what happens if we increase and decrease how much attention we want Stable Diffusion to pay to the word `apricots`:
 
 ![an AI generated image of a man picking apricots from a tree](../assets/prompt_syntax/apricots-0.png)
 
@@ -117,19 +115,17 @@ Using `+` to increase apricot-ness:
 | -- | -- | -- | -- | -- |
 | ![an AI generated image of a man picking apricots from a tree, with larger, more vibrant apricots](../assets/prompt_syntax/apricots-1.png) | ![an AI generated image of a man picking apricots from a tree with even larger, even more vibrant apricots](../assets/prompt_syntax/apricots-2.png) | ![an AI generated image of a man picking apricots from a tree, but the man has been replaced by a pile of apricots](../assets/prompt_syntax/apricots-3.png) | ![an AI generated image of a man picking apricots from a tree, but the man has been replaced by a mound of giant melting-looking apricots](../assets/prompt_syntax/apricots-4.png) | ![an AI generated image of a man picking apricots from a tree, but the man and the leaves and parts of the ground have all been replaced by giant melting-looking apricots](../assets/prompt_syntax/apricots-5.png) |
 
-You can also change the balance between different parts of a prompt:
-
-`mountain man`
+You can also change the balance between different parts of a prompt. For example, below is a `mountain man`:
 
 ![an AI generated image of a mountain man](../assets/prompt_syntax/mountain-man.png)
 
-More mountain:
+And here he is with more mountain:
 
 | `mountain+ man` | `mountain++ man` | `mountain+++ man` | 
 | -- | -- | -- |
 | ![](../assets/prompt_syntax/mountain1-man.png) | ![](../assets/prompt_syntax/mountain2-man.png) | ![](../assets/prompt_syntax/mountain3-man.png) |
 
-More man:
+Or, alternatively, with more man:
 
 | `mountain man+` | `mountain man++` | `mountain man+++` | `mountain man++++` | 
 | -- | -- | -- | -- |
