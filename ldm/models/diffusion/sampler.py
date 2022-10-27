@@ -2,8 +2,8 @@
 ldm.models.diffusion.sampler
 
 Base class for ldm.models.diffusion.ddim, ldm.models.diffusion.ksampler, etc
-
 '''
+
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -411,3 +411,15 @@ class Sampler(object):
         return self.model.inner_model.q_sample(x0,ts)
         '''
         return self.model.q_sample(x0,ts)
+
+    def adjust_settings(self,**kwargs):
+        '''
+        This is a catch-all method for adjusting any instance variables
+        after the sampler is instantiated. No type-checking performed
+        here, so use with care!
+        '''
+        for k in kwargs.keys():
+            try:
+                setattr(self,k,kwargs[k])
+            except AttributeError:
+                print(f'** Warning: attempt to set unknown attribute {k} in sampler of type {type(self)}')

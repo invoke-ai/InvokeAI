@@ -14,7 +14,7 @@ from ldm.modules.diffusionmodules.util import (
 
 # at this threshold, the scheduler will stop using the Karras
 # noise schedule and start using the model's schedule
-STEP_THRESHOLD = 30
+STEP_THRESHOLD = 29
 
 def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
     if threshold <= 0.0:
@@ -64,6 +64,9 @@ class KSampler(Sampler):
         self.sigmas = None
         self.ds     = None
         self.s_in   = None
+        self.karras_max = kwargs.get('karras_max',STEP_THRESHOLD)
+        if self.karras_max is None:
+            self.karras_max = STEP_THRESHOLD
 
         def forward(self, x, sigma, uncond, cond, cond_scale):
             x_in = torch.cat([x] * 2)
@@ -103,11 +106,11 @@ class KSampler(Sampler):
             device=self.device,
         )
 
-        if ddim_num_steps >= STEP_THRESHOLD:
-            print(f'>> number of steps ({ddim_num_steps}) >= {STEP_THRESHOLD}: using model sigmas')
+        if ddim_num_steps >= self.karras_max:
+            print(f'>> Ksampler using model noise schedule (steps > {self.karras_max})')
             self.sigmas = self.model_sigmas
         else:
-            print(f'>> number of steps ({ddim_num_steps}) < {STEP_THRESHOLD}: using karras sigmas')
+            print(f'>> Ksampler using karras noise schedule (steps <= {self.karras_max})')
             self.sigmas = self.karras_sigmas
         
     # ALERT: We are completely overriding the sample() method in the base class, which
