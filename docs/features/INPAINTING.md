@@ -149,33 +149,77 @@ region directly:
 invoke> medusa with cobras -I ./test-pictures/curly.png -tm hair -C20
 ```
 
-## Outpainting
+## Using the RunwayML inpainting model
 
-Outpainting is the same as inpainting, except that the painting occurs
-in the regions outside of the original image. To outpaint using the
-`invoke.py` command line script, prepare an image in which the borders
-to be extended are pure black. Add an alpha channel (if there isn't one
-already), and make the borders completely transparent and the interior
-completely opaque. If you wish to modify the interior as well, you may
-create transparent holes in the transparency layer, which `img2img` will
-paint into as usual.
+The [RunwayML Inpainting Model
+v1.5](https://huggingface.co/runwayml/stable-diffusion-inpainting) is
+a specialized version of [Stable Diffusion
+v1.5](https://huggingface.co/spaces/runwayml/stable-diffusion-v1-5)
+that contains extra channels specifically designed to enhance
+inpainting and outpainting. While it can do regular `txt2img` and
+`img2img`, it really shines when filling in missing regions. It has an
+almost uncanny ability to blend the new regions with existing ones in
+a semantically coherent way.
 
-Pass the image as the argument to the `-I` switch as you would for
-regular inpainting. You'll likely be delighted by the results.
+To install the inpainting model, follow the
+[instructions](INSTALLING-MODELS.md) for installing a new model. You
+may use either the CLI (`invoke.py` script) or directly edit the
+`configs/models.yaml` configuration file to do this. The main thing to
+watch out for is that the the model `config` option must be set up to
+use `v1-inpainting-inference.yaml` rather than the `v1-inference.yaml`
+file that is used by Stable Diffusion 1.4 and 1.5.
 
-### Tips
+After installation, your `models.yaml` should contain an entry that
+looks like this one:
 
-1. Do not try to expand the image too much at once. Generally it is best
-   to expand the margins in 64-pixel increments. 128 pixels often works,
-   but your mileage may vary depending on the nature of the image you are
-   trying to outpaint into.
+ inpainting-1.5:
+   weights: models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
+   description: SD inpainting v1.5
+   config: configs/stable-diffusion/v1-inpainting-inference.yaml
+   vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+   width: 512
+   height: 512
 
-2. There are a series of switches that can be used to adjust how the
-   inpainting algorithm operates. In particular, you can use these to
-   minimize the seam that sometimes appears between the original image
-   and the extended part. These switches are:
+As shown in the example, you may include a VAE fine-tuning weights
+file as well. This is strongly recommended.
 
+To use the custom inpainting model, launch `invoke.py` with the
+argument `--model inpainting-1.5` or alternatively from within the
+script use the `!switch inpainting-1.5` command to load and switch to
+the inpainting model.
 
+You can now do inpainting and outpainting exactly as described above,
+but there will (likely) be a noticeable improvement in
+coherence. Txt2img and Img2img will work as well.
+
+There are a few caveats to be aware of:
+
+1. The inpainting model is larger than the standard model, and will
+   use nearly 4 GB of GPU VRAM. This makes it unlikely to run on
+   a 4 GB graphics card.
+
+2. When operating in Img2img mode, the inpainting model is much less
+   steerable than the standard model. It is great for making small
+   changes, such as changing the pattern of a fabric, or slightly
+   changing a subject's expression or hair, but the model will
+   resist making the dramatic alterations that the standard
+   model lets you do.
+
+3. While the `--hires` option works fine with the inpainting model,
+   some special features, such as `--embiggen` are disabled.
+
+4. Prompt weighting (`banana++ sushi`) and merging work well with
+   the inpainting model, but prompt swapping (a ("fluffy cat").swap("smiling dog") eating a hotdog`)
+   will not have any effect due to the way the model is set up.
+   You may use text masking (with `-tm thing-to-mask`) as an
+   effective replacement.
+
+5. The model tends to oversharpen image if you use high step or CFG
+   values. If you need to do large steps, use the standard model.
+
+6. The `--strength` (`-f`) option has no effect on the inpainting
+   model due to its fundamental differences with the standard
+   model. It will always take the full number of steps you specify.
 
 ## Troubleshooting
 
