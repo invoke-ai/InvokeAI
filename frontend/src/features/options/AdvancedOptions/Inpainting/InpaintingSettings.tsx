@@ -55,14 +55,13 @@ export default function InpaintingSettings() {
   };
   return (
     <>
-      <BoundingBoxSettings />
-      <IAIButton
-        label="Clear Brush History"
-        onClick={handleClearBrushHistory}
-        tooltip="Clears brush stroke history"
-        disabled={futureLines.length > 0 || pastLines.length > 0 ? false : true}
-      />
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 1rem 0 0.2rem',
+        }}
+      >
         <IAINumberInput
           label="Inpaint Replace"
           value={inpaintReplace}
@@ -84,6 +83,13 @@ export default function InpaintingSettings() {
           }
         />
       </div>
+      <BoundingBoxSettings />
+      <IAIButton
+        label="Clear Brush History"
+        onClick={handleClearBrushHistory}
+        tooltip="Clears brush stroke history"
+        disabled={futureLines.length > 0 || pastLines.length > 0 ? false : true}
+      />
     </>
   );
 }
