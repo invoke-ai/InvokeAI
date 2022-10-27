@@ -6,8 +6,6 @@ import {
   FaPalette,
   FaPlus,
   FaRedo,
-  FaTint,
-  FaTintSlash,
   FaUndo,
 } from 'react-icons/fa';
 import { BiHide, BiShow } from 'react-icons/bi';
@@ -25,7 +23,6 @@ import {
   setShouldShowMask,
   setShouldInvertMask,
   setNeedsRepaint,
-  setShouldShowBoundingBoxFill,
 } from './inpaintingSlice';
 
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
@@ -49,7 +46,6 @@ const InpaintingControls = () => {
     isMaskEmpty,
     activeTabName,
     showDualDisplay,
-    shouldShowBoundingBoxFill,
   } = useAppSelector(inpaintingControlsSelector);
 
   const dispatch = useAppDispatch();
@@ -268,10 +264,6 @@ const InpaintingControls = () => {
     dispatch(setNeedsRepaint(true));
   };
 
-  const handleChangeShouldShowBoundingBoxFill = () => {
-    dispatch(setShouldShowBoundingBoxFill(!shouldShowBoundingBoxFill));
-  };
-
   return (
     <div className="inpainting-settings">
       <div className="inpainting-buttons">
@@ -389,13 +381,6 @@ const InpaintingControls = () => {
             icon={<VscSplitHorizontal />}
             data-selected={showDualDisplay}
             onClick={handleDualDisplay}
-          />
-          <IAIIconButton
-            aria-label="Darken Outside Bounding Box (xxx)"
-            tooltip="Darken Outside Bounding Box (xxx)"
-            icon={shouldShowBoundingBoxFill ? <FaTint /> : <FaTintSlash />}
-            data-selected={shouldShowBoundingBoxFill}
-            onClick={handleChangeShouldShowBoundingBoxFill}
           />
         </div>
       </div>
