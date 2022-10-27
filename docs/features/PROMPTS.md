@@ -110,10 +110,15 @@ See the section below on "Prompt Blending" for more information about how this w
 
 ### Cross-Attention Control ('prompt2prompt')
 
-Generate an image with a given prompt and then paint over the image
-using the `prompt2prompt` syntax to substitute words in the original
-prompt for words in a new prompt. Based off [bloc97's
-colab](https://github.com/bloc97/CrossAttentionControl).
+Sometimes an image you generate is almost right, and you just want to
+change one detail without affecting the rest. You could use a photo editor and inpainting
+to overpaint the area, but that's a pain. Here's where `prompt2prompt`
+comes in handy.
+
+Generate an image with a given prompt, record the seed of the image,
+and then use the `prompt2prompt` syntax to substitute words in the
+original prompt for words in a new prompt. This works for `img2img` as well.
+
 
 * `a ("fluffy cat").swap("smiling dog") eating a hotdog`.
   * quotes optional: `a (fluffy cat).swap(smiling dog) eating a hotdog`.
@@ -124,6 +129,9 @@ colab](https://github.com/bloc97/CrossAttentionControl).
     * For img2img, the step sequence does not start at 0 but instead at (1-strength) - so if strength is 0.7, s_start and s_end must both be greater than 0.3 (1-0.7) to have any effect. 
 * Convenience option `shape_freedom` (0-1) to specify how much "freedom" Stable Diffusion should have to change the shape of the subject being swapped. 
   * `a (cat).swap(dog, shape_freedom=0.5) eating a hotdog`.
+
+The `prompt2prompt` code is based off [bloc97's
+colab](https://github.com/bloc97/CrossAttentionControl).
 
 Note that `prompt2prompt` is not currently working with the runwayML
 inpainting model, and may never work due to the way this model is set

@@ -1,5 +1,5 @@
 from math import ceil
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import torch
 
@@ -54,7 +54,7 @@ class InvokeAIDiffuserComponent:
         CrossAttentionControl.remove_cross_attention_control(self.model)
 
     def do_diffusion_step(self, x: torch.Tensor, sigma: torch.Tensor,
-                                   unconditioning: torch.Tensor, conditioning: torch.Tensor,
+                                   unconditioning: Union[torch.Tensor,dict], conditioning: Union[torch.Tensor,dict],
                                    unconditional_guidance_scale: float,
                                    step_index: int=None
                           ):

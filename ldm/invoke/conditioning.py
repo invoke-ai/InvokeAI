@@ -114,7 +114,7 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
 
             conditioning = original_embeddings
             edited_conditioning = edited_embeddings
-            print('got edit_opcodes', edit_opcodes, 'options', edit_options)
+            print('>> got edit_opcodes', edit_opcodes, 'options', edit_options)
             cac_args = CrossAttentionControl.Arguments(
                 edited_conditioning = edited_conditioning,
                 edit_opcodes = edit_opcodes,
