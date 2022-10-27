@@ -215,6 +215,8 @@ class Args(object):
         switches.append(f'-W {a["width"]}')
         switches.append(f'-H {a["height"]}')
         switches.append(f'-C {a["cfg_scale"]}')
+        if a['karras_max'] is not None:
+            switches.append(f'--karras_max {a["karras_max"]}')
         if a['perlin'] > 0:
             switches.append(f'--perlin {a["perlin"]}')
         if a['threshold'] > 0:
@@ -691,7 +693,13 @@ class Args(object):
             default=6,
             choices=range(0,10),
             dest='png_compression',
-            help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
+            help='level of PNG compression, from 0 (none) to 9 (maximum). [6]'
+        )
+        render_group.add_argument(
+            '--karras_max',
+            type=int,
+            default=None,
+            help="control the point at which the K* samplers will shift from using the Karras noise schedule (good for low step counts) to the LatentDiffusion noise schedule (good for high step counts). Set to 0 to use LatentDiffusion for all step values, and to a high value (e.g. 1000) to use Karras for all step values. [29]."
         )
         img2img_group.add_argument(
             '-I',
