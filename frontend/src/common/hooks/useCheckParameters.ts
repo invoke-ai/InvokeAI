@@ -30,8 +30,6 @@ export const useCheckParametersSelector = createSelector(
       isProcessing: system.isProcessing,
       isConnected: system.isConnected,
       // inpainting
-      isMaskEmpty:
-        inpainting.lines.filter((line) => line.tool === 'brush').length === 0,
       hasInpaintingImage: Boolean(inpainting.imageToInpaint),
     };
   },
@@ -56,7 +54,6 @@ const useCheckParameters = (): boolean => {
     activeTabName,
     isProcessing,
     isConnected,
-    isMaskEmpty,
     hasInpaintingImage,
   } = useAppSelector(useCheckParametersSelector);
 
@@ -70,10 +67,7 @@ const useCheckParameters = (): boolean => {
       return false;
     }
 
-    if (
-      activeTabName === 'inpainting' &&
-      (!hasInpaintingImage || isMaskEmpty)
-    ) {
+    if (activeTabName === 'inpainting' && !hasInpaintingImage) {
       return false;
     }
 
@@ -113,7 +107,6 @@ const useCheckParameters = (): boolean => {
     seedWeights,
     seed,
     activeTabName,
-    isMaskEmpty,
     hasInpaintingImage,
   ]);
 };
