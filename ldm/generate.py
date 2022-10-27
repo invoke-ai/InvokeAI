@@ -436,6 +436,7 @@ class Generate:
                 fit=fit,
                 text_mask=text_mask,
                 invert_mask=invert_mask,
+                force_outpaint=force_outpaint,
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
@@ -657,6 +658,7 @@ class Generate:
             mask_image:Image.Image=None,
             embiggen:bool=False,
             hires_fix:bool=False,
+            force_outpaint:bool=False,
     ):
         inpainting_model_in_use = self.sampler.uses_inpainting_model()
 
@@ -669,7 +671,7 @@ class Generate:
         if inpainting_model_in_use:
             return self._make_omnibus()
 
-        if (init_image is not None) and (mask_image is not None):
+        if ((init_image is not None) and (mask_image is not None)) or force_outpaint:
             return self._make_inpaint()
         
         if init_image is not None:
@@ -686,6 +688,7 @@ class Generate:
             fit=False,
             text_mask=None,
             invert_mask=False,
+            force_outpaint=False,
     ):
         init_image      = None
         init_mask       = None
@@ -699,7 +702,7 @@ class Generate:
 
         # if image has a transparent area and no mask was provided, then try to generate mask
         if self._has_transparency(image):
-            self._transparency_check_and_warning(image, mask)
+            self._transparency_check_and_warning(image, mask, force_outpaint)
             init_mask = self._create_init_mask(image, width, height, fit=fit)
             
         if (image.width * image.height) > (self.width * self.height) and self.size_matters:
@@ -1009,11 +1012,11 @@ class Generate:
                         colored += 1
         return colored == 0
 
-    def _transparency_check_and_warning(self,image, mask):
+    def _transparency_check_and_warning(self,image, mask, force_outpaint=False):
         if not mask:
             print(
                 '>> Initial image has transparent areas. Will inpaint in these regions.')
-            if self._check_for_erasure(image):
+            if (not force_outpaint) and self._check_for_erasure(image):
                 print(
                     '>> WARNING: Colors underneath the transparent region seem to have been erased.\n',
                     '>>          Inpainting will be suboptimal. Please preserve the colors when making\n',

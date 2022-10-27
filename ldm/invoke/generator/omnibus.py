@@ -42,7 +42,7 @@ class Omnibus(Img2Img,Txt2Img):
         )
 
         if isinstance(init_image, Image.Image):
-            if init_image.mode=='RGBA':
+            if init_image.mode != 'RGB':
                 init_image = init_image.convert('RGB')
             init_image = self._image_to_tensor(init_image)
 

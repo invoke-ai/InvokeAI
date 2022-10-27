@@ -181,13 +181,16 @@ class Args(object):
         else:
             # no initial quote, so get everything up to the first thing
             # that looks like a switch
-            match = re.match('^(.+?)\s(--?[a-zA-Z].+)',cmd_string)
-            if match:
-                prompt,switches = match.groups()
+            if cmd_string.startswith('-'):
+                prompt = ''
+                switches = cmd_string
             else:
-                prompt = cmd_string
-                switches = ''
-
+                match = re.match('^(.+?)\s(--?[a-zA-Z].+)',cmd_string)
+                if match:
+                    prompt,switches = match.groups()
+                else:
+                    prompt = cmd_string
+                    switches = ''
         try:
             self._cmd_switches = self._cmd_parser.parse_args(shlex.split(switches))
             setattr(self._cmd_switches,'prompt',prompt)
@@ -572,9 +575,12 @@ class Args(object):
         )
         render_group     = parser.add_argument_group('General rendering')
         img2img_group    = parser.add_argument_group('Image-to-image and inpainting')
+        inpainting_group    = parser.add_argument_group('Inpainting')
+        outpainting_group    = parser.add_argument_group('Outpainting and outcropping')
         variation_group  = parser.add_argument_group('Creating and combining variations')
         postprocessing_group   = parser.add_argument_group('Post-processing')
         special_effects_group  = parser.add_argument_group('Special effects')
+        deprecated_group = parser.add_argument_group('Deprecated options')
         render_group.add_argument(
             '--prompt',
             default='',
@@ -712,17 +718,6 @@ class Args(object):
             help='Path to input image for img2img mode (supersedes width and height)',
         )
         img2img_group.add_argument(
-            '-M',
-            '--init_mask',
-            type=str,
-            help='Path to input mask for inpainting mode (supersedes width and height)',
-        )
-        img2img_group.add_argument(
-            '--invert_mask',
-            action='store_true',
-            help='Invert the mask',
-        )
-        img2img_group.add_argument(
             '-tm',
             '--text_mask',
             nargs='+',
@@ -749,28 +744,67 @@ class Args(object):
             help='Strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely',
             default=0.75,
         )
-        img2img_group.add_argument(
-            '-D',
-            '--out_direction',
-            nargs='+',
+        inpainting_group.add_argument(
+            '-M',
+            '--init_mask',
             type=str,
-            metavar=('direction', 'pixels'),
-            help='Direction to extend the given image (left|right|top|bottom). If a distance pixel value is not specified it defaults to half the image size'
+            help='Path to input mask for inpainting mode (supersedes width and height)',
         )
-        img2img_group.add_argument(
-            '-c',
-            '--outcrop',
-            nargs='+',
-            type=str,
-            metavar=('direction','pixels'),
-            help='Outcrop the image with one or more direction/pixel pairs: -c top 64 bottom 128 left 64 right 64',
+        inpainting_group.add_argument(
+            '--invert_mask',
+            action='store_true',
+            help='Invert the mask',
         )
-        img2img_group.add_argument(
+        inpainting_group.add_argument(
             '-r',
             '--inpaint_replace',
             type=float,
             default=0.0,
             help='when inpainting, adjust how aggressively to replace the part of the picture under the mask, from 0.0 (a gentle merge) to 1.0 (replace entirely)',
+        )
+        outpainting_group.add_argument(
+            '-c',
+            '--outcrop',
+            nargs='+',
+            type=str,
+            metavar=('direction','pixels'),
+            help='Outcrop the image with one or more direction/pixel pairs: e.g. -c top 64 bottom 128 left 64 right 64',
+        )
+        outpainting_group.add_argument(
+            '--force_outpaint',
+            action='store_true',
+            default=False,
+            help='Force outpainting if you have no inpainting mask to pass',
+        )
+        outpainting_group.add_argument(
+            '--seam_size',
+            type=int,
+            default=0,
+            help='When outpainting, size of the mask around the seam between original and outpainted image',
+        )
+        outpainting_group.add_argument(
+            '--seam_blur',
+            type=int,
+            default=0,
+            help='When outpainting, the amount to blur the seam inwards',
+        )
+        outpainting_group.add_argument(
+            '--seam_strength',
+            type=float,
+            default=0.7,
+            help='When outpainting, the img2img strength to use when filling the seam. Values around 0.7 work well',
+        )
+        outpainting_group.add_argument(
+            '--seam_steps',
+            type=int,
+            default=10,
+            help='When outpainting, the number of steps to use to fill the seam. Low values (~10) work well',
+        )
+        outpainting_group.add_argument(
+            '--tile_size',
+            type=int,
+            default=32,
+            help='When outpainting, the tile size to use for filling outpaint areas',
         )
         postprocessing_group.add_argument(
             '-ft',
@@ -855,7 +889,14 @@ class Args(object):
             dest='use_mps_noise',
             help='Simulate noise on M1 systems to get the same results'
         )
-
+        deprecated_group.add_argument(
+            '-D',
+            '--out_direction',
+            nargs='+',
+            type=str,
+            metavar=('direction', 'pixels'),
+            help='Older outcropping system. Direction to extend the given image (left|right|top|bottom). If a distance pixel value is not specified it defaults to half the image size'
+        )
         return parser
 
 def format_metadata(**kwargs):
