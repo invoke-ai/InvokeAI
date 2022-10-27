@@ -61,6 +61,7 @@ const InpaintingCanvas = () => {
     shouldShowBoundingBoxFill,
     isDrawing,
     isBoundingBoxTransforming,
+    shouldShowBoundingBox,
   } = useAppSelector(inpaintingCanvasSelector);
 
   // set the closure'd refs
@@ -280,10 +281,10 @@ const InpaintingCanvas = () => {
                 )}
               </Layer>
               <Layer>
-                {shouldShowBoundingBoxFill && (
+                {shouldShowBoundingBox && shouldShowBoundingBoxFill && (
                   <InpaintingBoundingBoxPreviewOverlay />
                 )}
-                <InpaintingBoundingBoxPreview />
+                {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
                 <InpaintingCanvasBrushPreviewOutline />
               </Layer>
             </>

@@ -101,13 +101,26 @@ export const frontendToBackendParameters = (
       lines,
       boundingBoxCoordinate: { x, y },
       boundingBoxDimensions: { width, height },
+      shouldShowBoundingBox,
     } = inpaintingState;
 
+    let bx = x,
+      by = y,
+      bwidth = width,
+      bheight = height;
+
+    if (!shouldShowBoundingBox) {
+      bx = 0;
+      by = 0;
+      bwidth = maskImageElement.width;
+      bheight = maskImageElement.height;
+    }
+
     const boundingBox = {
-      x,
-      y,
-      width,
-      height,
+      x: bx,
+      y: by,
+      width: bwidth,
+      height: bheight,
     };
 
     generationParameters.init_img = imageToProcessUrl;

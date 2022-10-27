@@ -79,6 +79,7 @@ export const inpaintingCanvasSelector = createSelector(
       shouldShowBoundingBoxFill,
       isDrawing,
       isBoundingBoxTransforming,
+      shouldShowBoundingBox,
     } = inpainting;
     return {
       tool,
@@ -97,6 +98,7 @@ export const inpaintingCanvasSelector = createSelector(
       shouldShowBoundingBoxFill,
       isDrawing,
       isBoundingBoxTransforming,
+      shouldShowBoundingBox,
     };
   },
   {

@@ -3,7 +3,7 @@ import { RootState, useAppSelector } from '../../../app/store';
 import FaceRestoreHeader from '../../options/AdvancedOptions/FaceRestore/FaceRestoreHeader';
 import FaceRestoreOptions from '../../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import ImageToImageStrength from '../../options/AdvancedOptions/ImageToImage/ImageToImageStrength';
-import BoundingBoxDimensions from '../../options/AdvancedOptions/Inpainting/BoundingBoxDimensions';
+import InpaintingSettings from '../../options/AdvancedOptions/Inpainting/InpaintingSettings';
 import SeedHeader from '../../options/AdvancedOptions/Seed/SeedHeader';
 import SeedOptions from '../../options/AdvancedOptions/Seed/SeedOptions';
 import UpscaleHeader from '../../options/AdvancedOptions/Upscale/UpscaleHeader';
@@ -49,11 +49,11 @@ export default function InpaintingPanel() {
       <PromptInput />
       <ProcessButtons />
       <MainOptions />
-      <BoundingBoxDimensions />
       <ImageToImageStrength
         label="Image To Image Strength"
         styleClass="main-option-block image-to-image-strength-main-option"
       />
+      <InpaintingSettings />
       <MainAdvancedOptionsCheckbox />
       {showAdvancedOptions ? (
         <OptionsAccordion accordionInfo={imageToImageAccordions} />
