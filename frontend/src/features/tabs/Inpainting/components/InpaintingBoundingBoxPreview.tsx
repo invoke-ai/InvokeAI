@@ -173,6 +173,8 @@ const InpaintingBoundingBoxPreview = () => {
     transformerRef.current.getLayer()?.batchDraw();
   }, []);
 
+  const scaledStep = 64 * stageScale;
+
   return (
     <>
       <Rect
@@ -199,7 +201,6 @@ const InpaintingBoundingBoxPreview = () => {
            * not its width and height. We need to un-scale the width and height before
            * setting the values.
            */
-           console.log(isMovingBoundingBox)
           if (!shapeRef.current) return;
 
           const rect = shapeRef.current;
@@ -263,9 +264,6 @@ const InpaintingBoundingBoxPreview = () => {
            * stage is scaled, our actual desired step is actually 64 * the stage scale.
            */
 
-          // Get the scaled step
-          const scaledStep = 64 * stageScale;
-
           // Difference of the old coords from the nearest multiple the scaled step
           const offsetX = oldPos.x % scaledStep;
           const offsetY = oldPos.y % scaledStep;
@@ -311,12 +309,13 @@ const InpaintingBoundingBoxPreview = () => {
            * Unlike anchorDragBoundFunc, it does get a width and height, so
            * the logic to constrain the size of the bounding box is very simple.
            */
-
           if (!imageToInpaint) return oldBoundBox;
 
           if (
-            newBoundBox.width + newBoundBox.x > imageToInpaint.width ||
-            newBoundBox.height + newBoundBox.y > imageToInpaint.height ||
+            newBoundBox.width + newBoundBox.x >
+              imageToInpaint.width * stageScale ||
+            newBoundBox.height + newBoundBox.y >
+              imageToInpaint.height * stageScale ||
             newBoundBox.x < 0 ||
             newBoundBox.y < 0
           ) {
