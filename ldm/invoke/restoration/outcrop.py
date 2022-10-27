@@ -89,6 +89,9 @@ class Outcrop(object):
     def _extend(self,image:Image,pixels:int)-> Image:
         extended_img = Image.new('RGBA',(image.width,image.height+pixels))
 
+        mask_height = pixels if self.generate.model.model.conditioning_key in ('hybrid','concat') \
+                      else pixels *2
+
         # first paste places old image at top of extended image, stretch
         # it, and applies a gaussian blur to it
         # take the top half region, stretch and paste it
@@ -105,7 +108,9 @@ class Outcrop(object):
         
         # now make the top part transparent to use as a mask
         alpha = extended_img.getchannel('A')
-        alpha.paste(0,(0,0,extended_img.width,pixels*2))
+        alpha.paste(0,(0,0,extended_img.width,mask_height))
         extended_img.putalpha(alpha)
+
+        extended_img.save('outputs/curly_extended.png')
 
         return extended_img

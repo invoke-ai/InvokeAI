@@ -34,6 +34,16 @@ original unedited image and the masked (partially transparent) image:
 invoke> "man with cat on shoulder" -I./images/man.png -M./images/man-transparent.png
 ```
 
+If you are using Photoshop to make your transparent masks, here is a
+protocol contributed by III_Communication36 (Discord name):
+
+  Create your alpha channel for mask in photoshop, then run
+  image/adjust/threshold on that channel.  Export as Save a copy using
+  superpng (3rd party free download plugin) making sure alpha channel
+  is selected.  Then masking works as it should for the img2img
+  process 100%. Can feed just one image this way without needing to
+  feed the -M mask behind it
+
 ## **Masking using Text**
 
 You can also create a mask using a text prompt to select the part of

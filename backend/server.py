@@ -33,7 +33,7 @@ from ldm.generate import Generate
 from ldm.invoke.restoration import Restoration
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.args import APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.invoke.conditioning import split_weighted_subprompts
+from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 from modules.parameters import parameters_to_command
 
