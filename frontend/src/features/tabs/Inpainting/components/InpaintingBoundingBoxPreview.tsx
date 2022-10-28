@@ -87,66 +87,6 @@ export const InpaintingBoundingBoxPreviewOverlay = () => {
   );
 };
 
-// /**
-//  * Draws marching ants around the mask. Unused.
-//  */
-// const _InpaintingBoundingBoxPreviewMarchingAnts = () => {
-//   const { boundingBoxCoordinate, boundingBoxDimensions } = useAppSelector(
-//     boundingBoxPreviewSelector
-//   );
-
-//   const blackStrokeRectRef = useRef<Konva.Rect>(null);
-//   const whiteStrokeRectRef = useRef<Konva.Rect>(null);
-
-//   useEffect(() => {
-//     const blackStrokeRect = blackStrokeRectRef.current;
-//     const whiteStrokeRect = whiteStrokeRectRef.current;
-
-//     const anim = new Konva.Animation((frame) => {
-//       if (!frame) return;
-//       blackStrokeRect?.dashOffset(
-//         -1 * (Math.floor(frame.time / MARCHING_ANTS_SPEED) % 16)
-//       );
-//       whiteStrokeRect?.dashOffset(
-//         -1 * ((Math.floor(frame.time / MARCHING_ANTS_SPEED) % 16) + 4)
-//       );
-//     });
-
-//     anim.start();
-
-//     return () => {
-//       anim.stop();
-//     };
-//   }, []);
-
-//   return (
-//     <Group>
-//       <Rect
-//         x={boundingBoxCoordinate.x}
-//         y={boundingBoxCoordinate.y}
-//         width={boundingBoxDimensions.width}
-//         height={boundingBoxDimensions.height}
-//         stroke={'black'}
-//         strokeWidth={1}
-//         dash={[4, 4]}
-//         ref={blackStrokeRectRef}
-//         listening={false}
-//       />
-//       <Rect
-//         x={boundingBoxCoordinate.x}
-//         y={boundingBoxCoordinate.y}
-//         width={boundingBoxDimensions.width}
-//         height={boundingBoxDimensions.height}
-//         stroke={'white'}
-//         dash={[4, 4]}
-//         strokeWidth={1}
-//         ref={whiteStrokeRectRef}
-//         listening={false}
-//       />
-//     </Group>
-//   );
-// };
-
 const InpaintingBoundingBoxPreview = () => {
   const dispatch = useAppDispatch();
   const {
@@ -326,15 +266,14 @@ const InpaintingBoundingBoxPreview = () => {
         strokeWidth={strokeWidth}
         listening={!shouldLockBoundingBox}
         onMouseEnter={(e) => {
-          // style stage container:
           const container = e?.target?.getStage()?.container();
           if (!container) return;
-          container.style.cursor = 'move';
+          container.style.cursor = shouldLockBoundingBox ? 'none' : 'move';
         }}
         onMouseLeave={(e) => {
           const container = e?.target?.getStage()?.container();
           if (!container) return;
-          container.style.cursor = 'default';
+          container.style.cursor = shouldLockBoundingBox ? 'none' : 'default';
         }}
         draggable={!shouldLockBoundingBox}
         onDragMove={handleOnDragMove}

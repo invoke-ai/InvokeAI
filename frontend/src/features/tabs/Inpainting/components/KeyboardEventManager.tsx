@@ -12,7 +12,6 @@ import {
   InpaintingState,
   setIsDrawing,
   setShouldLockBoundingBox,
-  setShouldShowBrush,
   toggleTool,
 } from '../inpaintingSlice';
 
@@ -91,10 +90,8 @@ const KeyboardEventManager = () => {
         case ' ': {
           if (e.type === 'keydown') {
             dispatch(setIsDrawing(false));
-            dispatch(setShouldLockBoundingBox(false));
-          } else {
-            dispatch(setShouldLockBoundingBox(true));
           }
+          dispatch(setShouldLockBoundingBox(!shouldLockBoundingBox));
           break;
         }
       }

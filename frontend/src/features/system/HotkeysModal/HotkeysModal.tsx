@@ -1,6 +1,7 @@
 import {
   Accordion,
   AccordionButton,
+  AccordionIcon,
   AccordionItem,
   AccordionPanel,
   Modal,
@@ -181,8 +182,13 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Ctrl+Shift+Z, Ctrl+Y',
     },
     {
-      title: 'Move Bounding Box',
-      desc: 'Hold to move bounding box',
+      title: 'Lock Bounding Box',
+      desc: 'Locks the bounding box',
+      hotkey: 'M',
+    },
+    {
+      title: 'Quick Toggle Lock Bounding Box',
+      desc: 'Hold to toggle locking the bounding box',
       hotkey: 'Space',
     },
     {
@@ -225,8 +231,9 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
           <div className="hotkeys-modal-items">
             <Accordion allowToggle allowMultiple>
               <AccordionItem>
-                <AccordionButton>
+                <AccordionButton className="hotkeys-modal-button">
                   <h2>App Hotkeys</h2>
+                  <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(appHotkeys)}
@@ -234,8 +241,9 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
               </AccordionItem>
 
               <AccordionItem>
-                <AccordionButton>
+                <AccordionButton className="hotkeys-modal-button">
                   <h2>General Hotkeys</h2>
+                  <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(generalHotkeys)}
@@ -243,8 +251,9 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
               </AccordionItem>
 
               <AccordionItem>
-                <AccordionButton>
+                <AccordionButton className="hotkeys-modal-button">
                   <h2>Gallery Hotkeys</h2>
+                  <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(galleryHotkeys)}
@@ -252,8 +261,9 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
               </AccordionItem>
 
               <AccordionItem>
-                <AccordionButton>
+                <AccordionButton className="hotkeys-modal-button">
                   <h2>Inpainting Hotkeys</h2>
+                  <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(inpaintingHotkeys)}
