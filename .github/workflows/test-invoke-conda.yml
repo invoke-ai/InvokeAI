@@ -15,10 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stable-diffusion-model:
-          [
-            https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt,
-          ]
+        stable-diffusion-model: ['https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt']
         os: [ubuntu-latest, macos-latest]
         include:
           - os: ubuntu-latest
