@@ -177,6 +177,9 @@ const makeSocketIOEmitters = (
     emitRequestSystemConfig: () => {
       socketio.emit('requestSystemConfig');
     },
+    emitSetModel: (modelName: string) => {
+      socketio.emit('setModel', modelName);
+    },
   };
 };
 

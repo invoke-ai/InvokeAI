@@ -35,6 +35,7 @@ export interface SystemState
   currentStatusHasSteps: boolean;
   shouldDisplayGuides: boolean;
   wasErrorSeen: boolean;
+  available_models?: InvokeAI.ModelList;
 }
 
 const initialSystemState = {
@@ -140,7 +141,10 @@ export const systemSlice = createSlice({
       state.openAccordions = action.payload;
     },
     setSystemConfig: (state, action: PayloadAction<InvokeAI.SystemConfig>) => {
-      return { ...state, ...action.payload };
+      return {
+        ...state,
+        ...action.payload,
+      };
     },
     setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayGuides = action.payload;
