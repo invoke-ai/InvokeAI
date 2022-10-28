@@ -89,10 +89,12 @@
 
       .image-gallery-container-placeholder {
         display: flex;
+        flex-direction: column;
         background-color: var(--background-color-secondary);
         border-radius: 0.5rem;
         place-items: center;
-        padding: 2rem 0;
+        padding: 2rem;
+        text-align: center;
 
         p {
           color: var(--subtext-color-bright);

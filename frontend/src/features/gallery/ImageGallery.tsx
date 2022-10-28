@@ -21,7 +21,7 @@ import {
 } from './gallerySlice';
 import HoverableImage from './HoverableImage';
 import { setShouldShowGallery } from '../gallery/gallerySlice';
-import { ButtonGroup, Spacer, useToast } from '@chakra-ui/react';
+import { ButtonGroup, useToast } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
 import { imageGallerySelector } from './gallerySliceSelectors';
@@ -76,6 +76,13 @@ export default function ImageGallery() {
       });
       setGallerySize((prevSize) => {
         return { ...prevSize, width: Math.min(Number(prevSize.width), 200) };
+      });
+    } else if (activeTabName === 'img2img' && shouldPinGallery) {
+      setGalleryMaxSize((prevSize) => {
+        return { ...prevSize, width: '490', height: '100%' };
+      });
+      setGallerySize((prevSize) => {
+        return { ...prevSize, width: Math.min(Number(prevSize.width), 490) };
       });
     } else {
       setGalleryMaxSize((prevSize) => {
@@ -319,12 +326,6 @@ export default function ImageGallery() {
           }}
         >
           <div className="image-gallery-header">
-            {/*{activeTabName !== 'inpainting' ? (
-              <>
-                <h1>Your Invocations</h1>
-                <Spacer />
-              </>
-            ) : null}*/}
             <div>
               <ButtonGroup
                 size="sm"
@@ -351,6 +352,7 @@ export default function ImageGallery() {
             <IAIPopover
               trigger="hover"
               hasArrow={activeTabName === 'inpainting' ? false : true}
+              placement={'left'}
               triggerComponent={
                 <IAIIconButton
                   size={'sm'}
