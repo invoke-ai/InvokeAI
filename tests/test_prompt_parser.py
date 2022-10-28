@@ -33,6 +33,7 @@ class PromptParserTestCase(unittest.TestCase):
         self.assertEqual(make_weighted_conjunction([("fire, flames", 1)]), parse_prompt("fire, flames"))
         self.assertEqual(make_weighted_conjunction([("fire, flames , fire", 1)]), parse_prompt("fire, flames , fire"))
         self.assertEqual(make_weighted_conjunction([("cat hot-dog eating", 1)]), parse_prompt("cat hot-dog eating"))
+        self.assertEqual(make_basic_conjunction(['Dalí']), parse_prompt("Dalí"))
 
     def test_attention(self):
         self.assertEqual(make_weighted_conjunction([('flames', 0.5)]), parse_prompt("(flames)0.5"))
@@ -100,8 +101,7 @@ class PromptParserTestCase(unittest.TestCase):
             self.assertEqual(make_untouched_prompt(prompt), parse_prompt(prompt))
 
         assert_if_prompt_string_not_untouched('a test prompt')
-        # todo handle this
-        #assert_if_prompt_string_not_untouched('a badly formed +test prompt')
+        assert_if_prompt_string_not_untouched('a badly formed +test prompt')
         with self.assertRaises(pyparsing.ParseException):
             parse_prompt('a badly (formed test prompt')
         #with self.assertRaises(pyparsing.ParseException):
@@ -433,12 +433,6 @@ class PromptParserTestCase(unittest.TestCase):
 
 
     def test_single(self):
-        # todo handle this
-        #self.assertEqual(make_basic_conjunction(['a badly formed +test prompt']),
-        #                 parse_prompt('a badly formed +test prompt'))
-        trees_and_houses_to_flames = Conjunction([FlattenedPrompt([('fire', 1.0), \
-                                                       CrossAttentionControlSubstitute([Fragment('trees and houses', 1)], [Fragment('flames',1)])])])
-        self.assertEqual(trees_and_houses_to_flames, parse_prompt('fire (trees and houses).swap("flames")'))
         pass
 
 
