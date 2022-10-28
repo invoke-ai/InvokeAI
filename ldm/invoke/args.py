@@ -175,7 +175,7 @@ class Args(object):
             switches = cmd_string
         # handle the case in which the prompt is enclosed by quotes
         elif cmd_string.startswith('"'):
-            a = shlex.split(cmd_string)
+            a = shlex.split(cmd_string,comments=True)
             prompt = a[0]
             switches = shlex.join(a[1:])
         else:
@@ -192,7 +192,7 @@ class Args(object):
                     prompt = cmd_string
                     switches = ''
         try:
-            self._cmd_switches = self._cmd_parser.parse_args(shlex.split(switches))
+            self._cmd_switches = self._cmd_parser.parse_args(shlex.split(switches,comments=True))
             setattr(self._cmd_switches,'prompt',prompt)
             return self._cmd_switches
         except:
@@ -932,7 +932,7 @@ def metadata_dumps(opt,
 
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
-                         'cfg_scale','threshold','perlin','fnformat', 'step_number','width','height','extra','strength',
+                         'cfg_scale','threshold','perlin','step_number','width','height','extra','strength',
                          'init_img','init_mask','facetool','facetool_strength','upscale']
     rfc_dict ={}
 
@@ -984,17 +984,31 @@ def metadata_dumps(opt,
     return metadata
 
 @functools.lru_cache(maxsize=50)
+def args_from_png(png_file_path) -> list[Args]:
+    '''
+    Given the path to a PNG file created by invoke.py,
+    retrieves a list of Args objects containing the image
+    data.
+    '''
+    try:
+        meta = ldm.invoke.pngwriter.retrieve_metadata(png_file_path)
+    except AttributeError:
+        return [legacy_metadata_load({},png_file_path)]
+    
+    try:
+        return metadata_loads(meta)
+    except:
+        return [legacy_metadata_load(meta,png_file_path)]
+
+@functools.lru_cache(maxsize=50)
 def metadata_from_png(png_file_path) -> Args:
     '''
     Given the path to a PNG file created by dream.py, retrieves
     an Args object containing the image metadata. Note that this
     returns a single Args object, not multiple.
     '''
-    meta = ldm.invoke.pngwriter.retrieve_metadata(png_file_path)
-    if 'sd-metadata' in meta and len(meta['sd-metadata'])>0 :
-        return metadata_loads(meta)[0]
-    else:
-        return legacy_metadata_load(meta,png_file_path)
+    args_list = args_from_png(png_file_path)
+    return args_list[0]
 
 def dream_cmd_from_png(png_file_path):
     opt = metadata_from_png(png_file_path)
@@ -1009,7 +1023,7 @@ def metadata_loads(metadata) -> list:
     '''
     results = []
     try:
-        if 'grid' in metadata['sd-metadata']:
+        if 'images' in metadata['sd-metadata']:
             images = metadata['sd-metadata']['images']
         else:
             images = [metadata['sd-metadata']['image']]
