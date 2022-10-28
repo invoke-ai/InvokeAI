@@ -23,7 +23,7 @@ export const useCheckParametersSelector = createSelector(
       shouldGenerateVariations: options.shouldGenerateVariations,
       seedWeights: options.seedWeights,
       maskPath: options.maskPath,
-      initialImagePath: options.initialImagePath,
+      initialImage: options.initialImage,
       seed: options.seed,
       activeTabName: tabMap[options.activeTab],
       // system
@@ -49,7 +49,7 @@ const useCheckParameters = (): boolean => {
     shouldGenerateVariations,
     seedWeights,
     maskPath,
-    initialImagePath,
+    initialImage,
     seed,
     activeTabName,
     isProcessing,
@@ -63,7 +63,7 @@ const useCheckParameters = (): boolean => {
       return false;
     }
 
-    if (activeTabName === 'img2img' && !initialImagePath) {
+    if (activeTabName === 'img2img' && !initialImage) {
       return false;
     }
 
@@ -72,7 +72,7 @@ const useCheckParameters = (): boolean => {
     }
 
     //  Cannot generate with a mask without img2img
-    if (maskPath && !initialImagePath) {
+    if (maskPath && !initialImage) {
       return false;
     }
 
@@ -100,8 +100,8 @@ const useCheckParameters = (): boolean => {
   }, [
     prompt,
     maskPath,
-    initialImagePath,
     isProcessing,
+    initialImage,
     isConnected,
     shouldGenerateVariations,
     seedWeights,

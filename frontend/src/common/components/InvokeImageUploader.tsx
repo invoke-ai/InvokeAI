@@ -1,29 +1,23 @@
-import { Button, useToast } from '@chakra-ui/react';
-import React, { useCallback } from 'react';
+import { Button, Heading, useToast } from '@chakra-ui/react';
+import { useCallback } from 'react';
 import { FileRejection } from 'react-dropzone';
-import { useAppDispatch } from '../../app/store';
+import { FaUpload } from 'react-icons/fa';
 import ImageUploader from '../../features/options/ImageUploader';
 
 interface InvokeImageUploaderProps {
-  label?: string;
-  icon?: any;
-  onMouseOver?: any;
-  OnMouseout?: any;
-  dispatcher: any;
+  handleFile: (file: File) => void;
   styleClass?: string;
 }
 
 export default function InvokeImageUploader(props: InvokeImageUploaderProps) {
-  const { label, icon, dispatcher, styleClass, onMouseOver, OnMouseout } =
-    props;
+  const { handleFile, styleClass } = props;
 
   const toast = useToast();
-  const dispatch = useAppDispatch();
 
   // Callbacks to for handling file upload attempts
   const fileAcceptedCallback = useCallback(
-    (file: File) => dispatch(dispatcher(file)),
-    [dispatch, dispatcher]
+    (file: File) => handleFile(file),
+    [handleFile]
   );
 
   const fileRejectionCallback = useCallback(
@@ -44,22 +38,17 @@ export default function InvokeImageUploader(props: InvokeImageUploaderProps) {
   );
 
   return (
-    <ImageUploader
-      fileAcceptedCallback={fileAcceptedCallback}
-      fileRejectionCallback={fileRejectionCallback}
-      styleClass={styleClass}
-    >
-      <Button
-        size={'sm'}
-        fontSize={'md'}
-        fontWeight={'normal'}
-        onMouseOver={onMouseOver}
-        onMouseOut={OnMouseout}
-        leftIcon={icon}
-        width={'100%'}
+    <div className="image-upload-zone">
+      <ImageUploader
+        fileAcceptedCallback={fileAcceptedCallback}
+        fileRejectionCallback={fileRejectionCallback}
+        styleClass={`${styleClass} image-upload-child-wrapper`}
       >
-        {label ? label : null}
-      </Button>
-    </ImageUploader>
+        <div className="image-upload-child">
+          <FaUpload size={'7rem'} />
+          <Heading size={'lg'}>Upload or Drop Image Here</Heading>
+        </div>
+      </ImageUploader>
+    </div>
   );
 }

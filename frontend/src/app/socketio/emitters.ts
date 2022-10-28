@@ -6,6 +6,11 @@ import {
   FrontendToBackendParametersConfig,
 } from '../../common/util/parameterTranslation';
 import {
+  GalleryCategory,
+  GalleryState,
+} from '../../features/gallery/gallerySlice';
+import { OptionsState } from '../../features/options/optionsSlice';
+import {
   addLogEntry,
   errorOccurred,
   setCurrentStatus,
@@ -108,7 +113,8 @@ const makeSocketIOEmitters = (
     },
     emitRunESRGAN: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const { upscalingLevel, upscalingStrength } = getState().options;
+      const options: OptionsState = getState().options;
+      const { upscalingLevel, upscalingStrength } = options;
       const esrganParameters = {
         upscale: [upscalingLevel, upscalingStrength],
       };
@@ -128,8 +134,8 @@ const makeSocketIOEmitters = (
     },
     emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const { facetoolType, facetoolStrength, codeformerFidelity } =
-        getState().options;
+      const options: OptionsState = getState().options;
+      const { facetoolType, facetoolStrength, codeformerFidelity } = options;
 
       const facetoolParameters: Record<string, any> = {
         facetool_strength: facetoolStrength,
@@ -156,22 +162,25 @@ const makeSocketIOEmitters = (
       );
     },
     emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
-      const { url, uuid } = imageToDelete;
-      socketio.emit('deleteImage', url, uuid);
+      const { url, uuid, category } = imageToDelete;
+      socketio.emit('deleteImage', url, uuid, category);
     },
-    emitRequestImages: () => {
-      const { earliest_mtime } = getState().gallery;
-      socketio.emit('requestImages', earliest_mtime);
+    emitRequestImages: (category: GalleryCategory) => {
+      const gallery: GalleryState = getState().gallery;
+      const { earliest_mtime } = gallery.categories[category];
+      socketio.emit('requestImages', category, earliest_mtime);
     },
-    emitRequestNewImages: () => {
-      const { latest_mtime } = getState().gallery;
-      socketio.emit('requestLatestImages', latest_mtime);
+    emitRequestNewImages: (category: GalleryCategory) => {
+      const gallery: GalleryState = getState().gallery;
+      const { latest_mtime } = gallery.categories[category];
+      socketio.emit('requestLatestImages', category, latest_mtime);
     },
     emitCancelProcessing: () => {
       socketio.emit('cancel');
     },
-    emitUploadInitialImage: (file: File) => {
-      socketio.emit('uploadInitialImage', file, file.name);
+    emitUploadImage: (payload: InvokeAI.UploadImagePayload) => {
+      const { file, destination } = payload;
+      socketio.emit('uploadImage', file, file.name, destination);
     },
     emitUploadMaskImage: (file: File) => {
       socketio.emit('uploadMaskImage', file, file.name);

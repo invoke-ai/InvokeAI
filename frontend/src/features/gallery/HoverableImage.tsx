@@ -19,7 +19,7 @@ import {
   setActiveTab,
   setAllImageToImageParameters,
   setAllTextToImageParameters,
-  setInitialImagePath,
+  setInitialImage,
   setPrompt,
   setSeed,
 } from '../options/optionsSlice';
@@ -58,7 +58,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleMouseOut = () => setIsHovered(false);
 
   const handleUsePrompt = () => {
-    dispatch(setPrompt(image.metadata.image.prompt));
+    image.metadata && dispatch(setPrompt(image.metadata.image.prompt));
     toast({
       title: 'Prompt Set',
       status: 'success',
@@ -68,7 +68,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseSeed = () => {
-    dispatch(setSeed(image.metadata.image.seed));
+    image.metadata && dispatch(setSeed(image.metadata.image.seed));
     toast({
       title: 'Seed Set',
       status: 'success',
@@ -78,7 +78,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToImageToImage = () => {
-    dispatch(setInitialImagePath(image.url));
+    dispatch(setInitialImage(image));
     if (activeTabName !== 'img2img') {
       dispatch(setActiveTab('img2img'));
     }
@@ -104,7 +104,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseAllParameters = () => {
-    dispatch(setAllTextToImageParameters(metadata));
+    metadata && dispatch(setAllTextToImageParameters(metadata));
     toast({
       title: 'Parameters Set',
       status: 'success',

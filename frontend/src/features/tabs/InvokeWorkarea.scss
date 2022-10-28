@@ -1,11 +1,11 @@
 @use '../../styles/Mixins/' as *;
 
-.workarea-container {
+.workarea-wrapper {
   position: relative;
   width: 100%;
   height: 100%;
 
-  .workarea {
+  .workarea-main {
     display: flex;
     column-gap: 1rem;
 
@@ -15,8 +15,40 @@
       flex-shrink: 0;
     }
 
-    .workarea-content {
+    .workarea-split-view {
       width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: $app-content-height;
+      background-color: var(--background-color-secondary);
+      border-radius: 0.5rem;
+    }
+
+    .workarea-single-view {
+      width: 100%;
+      height: $app-content-height;
+      background-color: var(--background-color-secondary);
+      border-radius: 0.5rem;
+    }
+
+    .workarea-split-view-left,
+    .workarea-split-view-right {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      row-gap: 1rem;
+      background-color: var(--background-color-secondary);
+      border-radius: 0.5rem;
+      padding: 1rem;
+    }
+
+    .workarea-split-view-left {
+      padding-right: 0.5rem;
+    }
+
+    .workarea-split-view-right {
+      padding-left: 0.5rem;
     }
   }
 }

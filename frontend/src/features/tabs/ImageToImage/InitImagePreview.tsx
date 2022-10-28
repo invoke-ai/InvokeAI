@@ -2,12 +2,10 @@ import { IconButton, Image, useToast } from '@chakra-ui/react';
 import React, { SyntheticEvent } from 'react';
 import { MdClear } from 'react-icons/md';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import { setInitialImagePath } from '../../options/optionsSlice';
+import { clearInitialImage } from '../../options/optionsSlice';
 
 export default function InitImagePreview() {
-  const initialImagePath = useAppSelector(
-    (state: RootState) => state.options.initialImagePath
-  );
+  const { initialImage } = useAppSelector((state: RootState) => state.options);
 
   const dispatch = useAppDispatch();
 
@@ -15,7 +13,7 @@ export default function InitImagePreview() {
 
   const handleClickResetInitialImage = (e: SyntheticEvent) => {
     e.stopPropagation();
-    dispatch(setInitialImagePath(null));
+    dispatch(clearInitialImage());
   };
 
   const alertMissingInitImage = () => {
@@ -25,31 +23,33 @@ export default function InitImagePreview() {
       status: 'error',
       isClosable: true,
     });
-    dispatch(setInitialImagePath(null));
+    dispatch(clearInitialImage());
   };
 
   return (
-    <div className="init-image-preview">
+    <>
       <div className="init-image-preview-header">
-        <h1>Initial Image</h1>
+        <h2>Initial Image</h2>
         <IconButton
-          isDisabled={!initialImagePath}
-          size={'sm'}
+          isDisabled={!initialImage}
           aria-label={'Reset Initial Image'}
           onClick={handleClickResetInitialImage}
           icon={<MdClear />}
         />
       </div>
-      {initialImagePath && (
-        <div className="init-image-image">
+      {initialImage && (
+        <div className="init-image-preview">
           <Image
             fit={'contain'}
-            src={initialImagePath}
-            rounded={'md'}
+            maxWidth={'100%'}
+            maxHeight={'100%'}
+            src={
+              typeof initialImage === 'string' ? initialImage : initialImage.url
+            }
             onError={alertMissingInitImage}
           />
         </div>
       )}
-    </div>
+    </>
   );
 }

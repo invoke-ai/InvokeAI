@@ -160,23 +160,34 @@ class InvokeAIWebServer:
 
         @socketio.on("requestModelChange")
         def handle_set_model(model_name: str):
-            print(f">> Model change requested: {model_name}")
-            model = self.generate.set_model(model_name)
-            model_list = self.generate.model_cache.list_models()
-            if model is None:
-                socketio.emit(
-                    "modelChangeFailed",
-                    {"model_name": model_name, "model_list": model_list},
-                )
-            else:
-                socketio.emit(
-                    "modelChanged", {"model_name": model_name, "model_list": model_list}
-                )
+            try:
+                print(f">> Model change requested: {model_name}")
+                model = self.generate.set_model(model_name)
+                model_list = self.generate.model_cache.list_models()
+                if model is None:
+                    socketio.emit(
+                        "modelChangeFailed",
+                        {"model_name": model_name, "model_list": model_list},
+                    )
+                else:
+                    socketio.emit(
+                        "modelChanged",
+                        {"model_name": model_name, "model_list": model_list},
+                    )
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
 
         @socketio.on("requestLatestImages")
-        def handle_request_latest_images(latest_mtime):
+        def handle_request_latest_images(category, latest_mtime):
             try:
-                paths = glob.glob(os.path.join(self.result_path, "*.png"))
+                base_path = (
+                    self.result_path if category == "result" else self.init_image_path
+                )
+                paths = glob.glob(os.path.join(base_path, "*.png"))
 
                 image_paths = sorted(
                     paths, key=lambda x: os.path.getmtime(x), reverse=True
@@ -201,14 +212,13 @@ class InvokeAIWebServer:
                             "metadata": metadata["sd-metadata"],
                             "width": width,
                             "height": height,
+                            "category": category,
                         }
                     )
 
                 socketio.emit(
                     "galleryImages",
-                    {
-                        "images": image_array,
-                    },
+                    {"images": image_array, "category": category},
                 )
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
@@ -218,11 +228,15 @@ class InvokeAIWebServer:
                 print("\n")
 
         @socketio.on("requestImages")
-        def handle_request_images(earliest_mtime=None):
+        def handle_request_images(category, earliest_mtime=None):
             try:
                 page_size = 50
 
-                paths = glob.glob(os.path.join(self.result_path, "*.png"))
+                base_path = (
+                    self.result_path if category == "result" else self.init_image_path
+                )
+
+                paths = glob.glob(os.path.join(base_path, "*.png"))
 
                 image_paths = sorted(
                     paths, key=lambda x: os.path.getmtime(x), reverse=True
@@ -253,6 +267,7 @@ class InvokeAIWebServer:
                             "metadata": metadata["sd-metadata"],
                             "width": width,
                             "height": height,
+                            "category": category,
                         }
                     )
 
@@ -261,6 +276,7 @@ class InvokeAIWebServer:
                     {
                         "images": image_array,
                         "areMoreImagesAvailable": areMoreImagesAvailable,
+                        "category": category,
                     },
                 )
             except Exception as e:
@@ -416,14 +432,17 @@ class InvokeAIWebServer:
 
         # TODO: I think this needs a safety mechanism.
         @socketio.on("deleteImage")
-        def handle_delete_image(url, uuid):
+        def handle_delete_image(url, uuid, category):
             try:
                 print(f'>> Delete requested "{url}"')
                 from send2trash import send2trash
 
                 path = self.get_image_path_from_url(url)
+                print(path)
                 send2trash(path)
-                socketio.emit("imageDeleted", {"url": url, "uuid": uuid})
+                socketio.emit(
+                    "imageDeleted", {"url": url, "uuid": uuid, "category": category}
+                )
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
                 print("\n")
@@ -432,18 +451,25 @@ class InvokeAIWebServer:
                 print("\n")
 
         # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadInitialImage")
-        def handle_upload_initial_image(bytes, name):
+        @socketio.on("uploadImage")
+        def handle_upload_image(bytes, name, destination):
             try:
-                print(f'>> Init image upload requested "{name}"')
+                print(f'>> Image upload requested "{name}"')
                 file_path = self.save_file_unique_uuid_name(
                     bytes=bytes, name=name, path=self.init_image_path
                 )
-
+                mtime = os.path.getmtime(file_path)
+                (width, height) = Image.open(file_path).size
+                print(file_path)
                 socketio.emit(
-                    "initialImageUploaded",
+                    "imageUploaded",
                     {
                         "url": self.get_url_from_image_path(file_path),
+                        "mtime": mtime,
+                        "width": width,
+                        "height": height,
+                        "category": "user",
+                        "destination": destination,
                     },
                 )
             except Exception as e:

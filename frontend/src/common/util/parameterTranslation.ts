@@ -47,7 +47,7 @@ export const frontendToBackendParameters = (
     seamless,
     hiresFix,
     img2imgStrength,
-    initialImagePath,
+    initialImage,
     shouldFitToWidthHeight,
     shouldGenerateVariations,
     variationAmount,
@@ -89,8 +89,9 @@ export const frontendToBackendParameters = (
   }
 
   // img2img exclusive parameters
-  if (generationMode === 'img2img') {
-    generationParameters.init_img = initialImagePath;
+  if (generationMode === 'img2img' && initialImage) {
+    generationParameters.init_img =
+      typeof initialImage === 'string' ? initialImage : initialImage.url;
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = shouldFitToWidthHeight;
   }

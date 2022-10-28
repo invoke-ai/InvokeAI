@@ -1,14 +1,11 @@
 import TextToImagePanel from './TextToImagePanel';
-import CurrentImageDisplay from '../../gallery/CurrentImageDisplay';
 import InvokeWorkarea from '../InvokeWorkarea';
+import TextToImageDisplay from './TextToImageDisplay';
 
 export default function TextToImageWorkarea() {
   return (
-    <InvokeWorkarea
-      optionsPanel={<TextToImagePanel />}
-      className="txt-to-image-workarea-container"
-    >
-      <CurrentImageDisplay />
+    <InvokeWorkarea optionsPanel={<TextToImagePanel />}>
+      <TextToImageDisplay />
     </InvokeWorkarea>
   );
 }

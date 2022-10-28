@@ -12,6 +12,8 @@
  * 'gfpgan'.
  */
 
+import { Category as GalleryCategory } from '../features/gallery/gallerySlice';
+
 /**
  * TODO:
  * Once an image has been generated, if it is postprocessed again,
@@ -105,14 +107,15 @@ export declare type Metadata = SystemConfig & {
   image: GeneratedImageMetadata | PostProcessedImageMetadata;
 };
 
-// An Image has a UUID, url (path?) and Metadata.
+// An Image has a UUID, url, modified timestamp, width, height and maybe metadata
 export declare type Image = {
   uuid: string;
   url: string;
   mtime: number;
-  metadata: Metadata;
+  metadata?: Metadata;
   width: number;
   height: number;
+  category: GalleryCategory;
 };
 
 // GalleryImages is an array of Image.
@@ -167,12 +170,10 @@ export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;
 
-export declare type ImageResultResponse = {
-  url: string;
-  mtime: number;
-  metadata: Metadata;
-  width: number;
-  height: number;
+export declare type ImageResultResponse = Omit<Image, 'uuid'>;
+
+export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
+  destination: 'img2img' | 'inpainting';
 };
 
 export declare type ErrorResponse = {
@@ -183,13 +184,20 @@ export declare type ErrorResponse = {
 export declare type GalleryImagesResponse = {
   images: Array<Omit<Image, 'uuid'>>;
   areMoreImagesAvailable: boolean;
+  category: GalleryCategory;
 };
 
-export declare type ImageUrlAndUuidResponse = {
+export declare type ImageDeletedResponse = {
   uuid: string;
   url: string;
+  category: GalleryCategory;
 };
 
 export declare type ImageUrlResponse = {
   url: string;
+};
+
+export declare type UploadImagePayload = {
+  file: File;
+  destination: 'img2img' | 'inpainting';
 };

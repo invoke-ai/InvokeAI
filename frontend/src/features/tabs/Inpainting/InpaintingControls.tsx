@@ -6,6 +6,7 @@ import {
   FaPalette,
   FaPlus,
   FaRedo,
+  FaTrash,
   FaUndo,
 } from 'react-icons/fa';
 import { BiHide, BiShow } from 'react-icons/bi';
@@ -24,6 +25,7 @@ import {
   setShouldInvertMask,
   setNeedsRepaint,
   toggleShouldLockBoundingBox,
+  clearImageToInpaint,
 } from './inpaintingSlice';
 
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
@@ -278,125 +280,131 @@ const InpaintingControls = () => {
     dispatch(setNeedsRepaint(true));
   };
 
+  const handleClearImage = () => {
+    dispatch(clearImageToInpaint());
+  };
+
   return (
     <div className="inpainting-settings">
-      <div className="inpainting-buttons">
-        <div className="inpainting-buttons-group">
-          <IAIPopover
-            trigger="hover"
-            onOpen={handleShowBrushPreview}
-            onClose={handleHideBrushPreview}
-            triggerComponent={
-              <IAIIconButton
-                aria-label="Brush (B)"
-                tooltip="Brush (B)"
-                icon={<FaPaintBrush />}
-                onClick={handleSelectBrushTool}
-                data-selected={tool === 'brush'}
-                isDisabled={!shouldShowMask}
-              />
-            }
-          >
-            <div className="inpainting-slider-numberinput">
-              <IAISlider
-                label="Brush Size"
-                value={brushSize}
-                onChange={handleChangeBrushSize}
-                min={1}
-                max={200}
-                width="100px"
-                focusThumbOnChange={false}
-                isDisabled={!shouldShowMask}
-              />
-              <IAINumberInput
-                value={brushSize}
-                onChange={handleChangeBrushSize}
-                width={'80px'}
-                min={1}
-                max={999}
-                isDisabled={!shouldShowMask}
-              />
-            </div>
-          </IAIPopover>
-          <IAIIconButton
-            aria-label="Eraser (E)"
-            tooltip="Eraser (E)"
-            icon={<FaEraser />}
-            onClick={handleSelectEraserTool}
-            data-selected={tool === 'eraser'}
-            isDisabled={!shouldShowMask}
-          />
-        </div>
-        <div className="inpainting-buttons-group">
-          <IAIPopover
-            trigger="hover"
-            triggerComponent={
-              <IAIIconButton
-                aria-label="Mask Color"
-                tooltip="Mask Color"
-                icon={<FaPalette />}
-                isDisabled={!shouldShowMask}
-                cursor={'pointer'}
-              />
-            }
-          >
-            <IAIColorPicker
-              color={maskColor}
-              onChange={handleChangeMaskColor}
+      <div className="inpainting-buttons-group">
+        <IAIPopover
+          trigger="hover"
+          onOpen={handleShowBrushPreview}
+          onClose={handleHideBrushPreview}
+          triggerComponent={
+            <IAIIconButton
+              aria-label="Brush (B)"
+              tooltip="Brush (B)"
+              icon={<FaPaintBrush />}
+              onClick={handleSelectBrushTool}
+              data-selected={tool === 'brush'}
+              isDisabled={!shouldShowMask}
             />
-          </IAIPopover>
-          <IAIIconButton
-            aria-label="Hide/Show Mask (H)"
-            tooltip="Hide/Show Mask (H)"
-            data-selected={!shouldShowMask}
-            icon={shouldShowMask ? <BiShow size={22} /> : <BiHide size={22} />}
-            onClick={handleToggleShouldShowMask}
-          />
-          <IAIIconButton
-            tooltip="Invert Mask Display (Shift+M)"
-            aria-label="Invert Mask Display (Shift+M)"
-            data-selected={shouldInvertMask}
-            icon={
-              shouldInvertMask ? (
-                <MdInvertColors size={22} />
-              ) : (
-                <MdInvertColorsOff size={22} />
-              )
-            }
-            onClick={handleToggleShouldInvertMask}
-            isDisabled={!shouldShowMask}
-          />
-        </div>
-        <div className="inpainting-buttons-group">
-          <IAIIconButton
-            aria-label="Undo"
-            tooltip="Undo"
-            icon={<FaUndo />}
-            onClick={handleUndo}
-            isDisabled={!canUndo || !shouldShowMask}
-          />
-          <IAIIconButton
-            aria-label="Redo"
-            tooltip="Redo"
-            icon={<FaRedo />}
-            onClick={handleRedo}
-            isDisabled={!canRedo || !shouldShowMask}
-          />
-          <IAIIconButton
-            aria-label="Clear Mask (Shift + C)"
-            tooltip="Clear Mask (Shift + C)"
-            icon={<FaPlus size={18} style={{ transform: 'rotate(45deg)' }} />}
-            onClick={handleClearMask}
-            isDisabled={isMaskEmpty || !shouldShowMask}
-          />
-          <IAIIconButton
-            aria-label="Split Layout (Shift+J)"
-            tooltip="Split Layout (Shift+J)"
-            icon={<VscSplitHorizontal />}
-            data-selected={showDualDisplay}
-            onClick={handleDualDisplay}
-          />
-        </div>
+          }
+        >
+          <div className="inpainting-slider-numberinput">
+            <IAISlider
+              label="Brush Size"
+              value={brushSize}
+              onChange={handleChangeBrushSize}
+              min={1}
+              max={200}
+              width="100px"
+              focusThumbOnChange={false}
+              isDisabled={!shouldShowMask}
+            />
+            <IAINumberInput
+              value={brushSize}
+              onChange={handleChangeBrushSize}
+              width={'80px'}
+              min={1}
+              max={999}
+              isDisabled={!shouldShowMask}
+            />
+          </div>
+        </IAIPopover>
+        <IAIIconButton
+          aria-label="Eraser (E)"
+          tooltip="Eraser (E)"
+          icon={<FaEraser />}
+          onClick={handleSelectEraserTool}
+          data-selected={tool === 'eraser'}
+          isDisabled={!shouldShowMask}
+        />
+      </div>
+      <div className="inpainting-buttons-group">
+        <IAIPopover
+          trigger="hover"
+          triggerComponent={
+            <IAIIconButton
+              aria-label="Mask Color"
+              tooltip="Mask Color"
+              icon={<FaPalette />}
+              isDisabled={!shouldShowMask}
+              cursor={'pointer'}
+            />
+          }
+        >
+          <IAIColorPicker color={maskColor} onChange={handleChangeMaskColor} />
+        </IAIPopover>
+        <IAIIconButton
+          aria-label="Hide/Show Mask (H)"
+          tooltip="Hide/Show Mask (H)"
+          data-selected={!shouldShowMask}
+          icon={shouldShowMask ? <BiShow size={22} /> : <BiHide size={22} />}
+          onClick={handleToggleShouldShowMask}
+        />
+        <IAIIconButton
+          tooltip="Invert Mask Display (Shift+M)"
+          aria-label="Invert Mask Display (Shift+M)"
+          data-selected={shouldInvertMask}
+          icon={
+            shouldInvertMask ? (
+              <MdInvertColors size={22} />
+            ) : (
+              <MdInvertColorsOff size={22} />
+            )
+          }
+          onClick={handleToggleShouldInvertMask}
+          isDisabled={!shouldShowMask}
+        />
+      </div>
+      <div className="inpainting-buttons-group">
+        <IAIIconButton
+          aria-label="Undo"
+          tooltip="Undo"
+          icon={<FaUndo />}
+          onClick={handleUndo}
+          isDisabled={!canUndo || !shouldShowMask}
+        />
+        <IAIIconButton
+          aria-label="Redo"
+          tooltip="Redo"
+          icon={<FaRedo />}
+          onClick={handleRedo}
+          isDisabled={!canRedo || !shouldShowMask}
+        />
+        <IAIIconButton
+          aria-label="Clear Mask Canvas (Shift + C)"
+          tooltip="Clear Mask Canvas (Shift + C)"
+          icon={<FaPlus size={18} style={{ transform: 'rotate(45deg)' }} />}
+          onClick={handleClearMask}
+          isDisabled={isMaskEmpty || !shouldShowMask}
+        />
+        <IAIIconButton
+          aria-label="Clear Image"
+          tooltip="Clear Image"
+          icon={<FaTrash size={18} />}
+          onClick={handleClearImage}
+          // isDisabled={}
+        />
+        <IAIIconButton
+          aria-label="Split Layout (Shift+J)"
+          tooltip="Split Layout (Shift+J)"
+          icon={<VscSplitHorizontal />}
+          data-selected={showDualDisplay}
+          onClick={handleDualDisplay}
+        />
       </div>
     </div>
   );

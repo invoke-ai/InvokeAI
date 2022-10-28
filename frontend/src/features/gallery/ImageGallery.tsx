@@ -11,6 +11,7 @@ import IAIIconButton from '../../common/components/IAIIconButton';
 import {
   selectNextImage,
   selectPrevImage,
+  setCurrentCategory,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setGalleryScrollPosition,
@@ -20,11 +21,11 @@ import {
 } from './gallerySlice';
 import HoverableImage from './HoverableImage';
 import { setShouldShowGallery } from '../gallery/gallerySlice';
-import { Spacer, useToast } from '@chakra-ui/react';
+import { ButtonGroup, Spacer, useToast } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
 import { imageGallerySelector } from './gallerySliceSelectors';
-import { FaWrench } from 'react-icons/fa';
+import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
 import IAIPopover from '../../common/components/IAIPopover';
 import IAISlider from '../../common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
@@ -36,8 +37,8 @@ export default function ImageGallery() {
 
   const {
     images,
+    currentCategory,
     currentImageUuid,
-    areMoreImagesAvailable,
     shouldPinGallery,
     shouldShowGallery,
     galleryScrollPosition,
@@ -47,6 +48,7 @@ export default function ImageGallery() {
     galleryImageObjectFit,
     shouldHoldGalleryOpen,
     shouldAutoSwitchToNewImages,
+    areMoreImagesAvailable,
   } = useAppSelector(imageGallerySelector);
 
   const [gallerySize, setGallerySize] = useState<Size>({
@@ -128,7 +130,7 @@ export default function ImageGallery() {
   };
 
   const handleClickLoadMore = () => {
-    dispatch(requestImages());
+    dispatch(requestImages(currentCategory));
   };
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
@@ -151,13 +153,21 @@ export default function ImageGallery() {
     [shouldShowGallery]
   );
 
-  useHotkeys('left', () => {
-    dispatch(selectPrevImage());
-  });
+  useHotkeys(
+    'left',
+    () => {
+      dispatch(selectPrevImage(currentCategory));
+    },
+    [currentCategory]
+  );
 
-  useHotkeys('right', () => {
-    dispatch(selectNextImage());
-  });
+  useHotkeys(
+    'right',
+    () => {
+      dispatch(selectNextImage(currentCategory));
+    },
+    [currentCategory]
+  );
 
   useHotkeys(
     'shift+p',
@@ -309,17 +319,38 @@ export default function ImageGallery() {
           }}
         >
           <div className="image-gallery-header">
-            {activeTabName !== 'inpainting' ? (
+            {/*{activeTabName !== 'inpainting' ? (
               <>
                 <h1>Your Invocations</h1>
                 <Spacer />
               </>
-            ) : null}
-
+            ) : null}*/}
+            <div>
+              <ButtonGroup
+                size="sm"
+                isAttached
+                variant="solid"
+                className="image-gallery-category-btn-group"
+              >
+                <IAIIconButton
+                  aria-label="Show Invocations"
+                  tooltip="Show Invocations"
+                  data-selected={currentCategory === 'result'}
+                  icon={<FaImage />}
+                  onClick={() => dispatch(setCurrentCategory('result'))}
+                />
+                <IAIIconButton
+                  aria-label="Show Uploads"
+                  tooltip="Show Uploads"
+                  data-selected={currentCategory === 'user'}
+                  icon={<FaUser />}
+                  onClick={() => dispatch(setCurrentCategory('user'))}
+                />
+              </ButtonGroup>
+            </div>
             <IAIPopover
-              trigger="click"
+              trigger="hover"
               hasArrow={activeTabName === 'inpainting' ? false : true}
-              // styleClass="image-gallery-settings-popover"
               triggerComponent={
                 <IAIIconButton
                   size={'sm'}
@@ -438,3 +469,18 @@ export default function ImageGallery() {
     </CSSTransition>
   );
 }
+
+// <IAIIconButton
+//                   aria-label="Show Invocations"
+//                   tooltip="Show Invocations"
+//                   data-selected={currentCategory === 'result'}
+//                   icon={<FaImage />}
+//                   onClick={() => dispatch(setCurrentCategory('result'))}
+//                 />
+//                 <IAIIconButton
+//                   aria-label="Show Uploads"
+//                   tooltip="Show Uploads"
+//                   data-selected={currentCategory === 'user'}
+//                   icon={<FaUser />}
+//                   onClick={() => dispatch(setCurrentCategory('user'))}
+//                 />
