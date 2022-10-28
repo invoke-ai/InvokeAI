@@ -337,6 +337,7 @@ export const {
   setShouldShowBrushPreview,
   setMaskColor,
   clearMask,
+  clearImageToInpaint,
   undo,
   redo,
   setCursorPosition,

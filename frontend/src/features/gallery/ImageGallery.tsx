@@ -25,7 +25,7 @@ import { ButtonGroup, Spacer, useToast } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
 import { imageGallerySelector } from './gallerySliceSelectors';
-import { FaWrench } from 'react-icons/fa';
+import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
 import IAIPopover from '../../common/components/IAIPopover';
 import IAISlider from '../../common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
@@ -319,17 +319,38 @@ export default function ImageGallery() {
           }}
         >
           <div className="image-gallery-header">
-            {activeTabName !== 'inpainting' ? (
+            {/*{activeTabName !== 'inpainting' ? (
               <>
                 <h1>Your Invocations</h1>
                 <Spacer />
               </>
-            ) : null}
-
+            ) : null}*/}
+            <div>
+              <ButtonGroup
+                size="sm"
+                isAttached
+                variant="solid"
+                className="image-gallery-category-btn-group"
+              >
+                <IAIIconButton
+                  aria-label="Show Invocations"
+                  tooltip="Show Invocations"
+                  data-selected={currentCategory === 'result'}
+                  icon={<FaImage />}
+                  onClick={() => dispatch(setCurrentCategory('result'))}
+                />
+                <IAIIconButton
+                  aria-label="Show Uploads"
+                  tooltip="Show Uploads"
+                  data-selected={currentCategory === 'user'}
+                  icon={<FaUser />}
+                  onClick={() => dispatch(setCurrentCategory('user'))}
+                />
+              </ButtonGroup>
+            </div>
             <IAIPopover
               trigger="hover"
               hasArrow={activeTabName === 'inpainting' ? false : true}
-              // styleClass="image-gallery-settings-popover"
               triggerComponent={
                 <IAIIconButton
                   size={'sm'}
@@ -341,27 +362,6 @@ export default function ImageGallery() {
               }
             >
               <div className="image-gallery-settings-popover">
-                <div>
-                  <ButtonGroup
-                    size="sm"
-                    isAttached
-                    variant="solid"
-                    className="image-gallery-category-btn-group"
-                  >
-                    <Button
-                      data-selected={currentCategory === 'result'}
-                      onClick={() => dispatch(setCurrentCategory('result'))}
-                    >
-                      Invocations
-                    </Button>
-                    <Button
-                      data-selected={currentCategory === 'user'}
-                      onClick={() => dispatch(setCurrentCategory('user'))}
-                    >
-                      Uploads
-                    </Button>
-                  </ButtonGroup>
-                </div>
                 <div>
                   <IAISlider
                     value={galleryImageMinimumWidth}
@@ -469,3 +469,18 @@ export default function ImageGallery() {
     </CSSTransition>
   );
 }
+
+// <IAIIconButton
+//                   aria-label="Show Invocations"
+//                   tooltip="Show Invocations"
+//                   data-selected={currentCategory === 'result'}
+//                   icon={<FaImage />}
+//                   onClick={() => dispatch(setCurrentCategory('result'))}
+//                 />
+//                 <IAIIconButton
+//                   aria-label="Show Uploads"
+//                   tooltip="Show Uploads"
+//                   data-selected={currentCategory === 'user'}
+//                   icon={<FaUser />}
+//                   onClick={() => dispatch(setCurrentCategory('user'))}
+//                 />
