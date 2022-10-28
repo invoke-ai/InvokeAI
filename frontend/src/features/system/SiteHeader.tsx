@@ -41,16 +41,6 @@ const SiteHeader = () => {
       <div className="site-header-right-side">
         <StatusIndicator />
 
-        <SettingsModal>
-          <IconButton
-            aria-label="Settings"
-            variant="link"
-            fontSize={24}
-            size={'sm'}
-            icon={<MdSettings />}
-          />
-        </SettingsModal>
-
         <HotkeysModal>
           <IconButton
             aria-label="Hotkeys"
@@ -60,6 +50,17 @@ const SiteHeader = () => {
             icon={<MdKeyboard />}
           />
         </HotkeysModal>
+
+        <Tooltip hasArrow label="Theme" placement={'bottom'}>
+          <IconButton
+            aria-label="Toggle Dark Mode"
+            onClick={toggleColorMode}
+            variant="link"
+            size={'sm'}
+            fontSize={colorModeIconFontSize}
+            icon={colorModeIcon}
+          />
+        </Tooltip>
 
         <Tooltip hasArrow label="Report Bug" placement={'bottom'}>
           <IconButton
@@ -106,16 +107,15 @@ const SiteHeader = () => {
           />
         </Tooltip>
 
-        <Tooltip hasArrow label="Theme" placement={'bottom'}>
+        <SettingsModal>
           <IconButton
-            aria-label="Toggle Dark Mode"
-            onClick={toggleColorMode}
+            aria-label="Settings"
             variant="link"
+            fontSize={24}
             size={'sm'}
-            fontSize={colorModeIconFontSize}
-            icon={colorModeIcon}
+            icon={<MdSettings />}
           />
-        </Tooltip>
+        </SettingsModal>
       </div>
     </div>
   );
