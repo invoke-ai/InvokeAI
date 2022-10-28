@@ -43,6 +43,10 @@ class Inpaint(Img2Img):
         )
 
     def tile_fill_missing(self, im: Image.Image, tile_size: int = 16, seed: int = None) -> Image:
+        # Only fill if there's an alpha layer
+        if im.mode != 'RGBA':
+            return im
+
         a = np.asarray(im, dtype=np.uint8)
 
         tile_size = (tile_size, tile_size)
