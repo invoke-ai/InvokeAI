@@ -125,7 +125,6 @@ export default function ImageGallery() {
     );
     if (!shouldHoldGalleryOpen) {
       dispatch(setShouldHoldGalleryOpen(false));
-      setCloseGalleryTimer();
     }
     dispatch(setShouldShowGallery(false));
   };
