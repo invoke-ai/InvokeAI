@@ -352,7 +352,6 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     # accepts int or float notation, always maps to float
     number = pp.pyparsing_common.real | \
              pp.Combine(pp.Optional("-")+pp.Word(pp.nums)).set_parse_action(pp.token_map(float))
-    greedy_word = pp.Word(pp.printables, exclude_chars=string.whitespace).set_name('greedy_word')
 
     attention = pp.Forward()
     quoted_fragment = pp.Forward()
@@ -370,18 +369,6 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
             return Fragment(' '.join([s for s in x]))
         else:
             raise PromptParser.ParsingException("Cannot make fragment from " + str(x))
-
-    def build_escaped_word_parser(escaped_chars_to_ignore: str):
-        terms = []
-        for c in escaped_chars_to_ignore:
-            terms.append(pp.Literal('\\'+c))
-        terms.append(
-            #pp.CharsNotIn(string.whitespace + escaped_chars_to_ignore, exact=1)
-            pp.Word(pp.printables, exclude_chars=string.whitespace + escaped_chars_to_ignore)
-        )
-        return pp.Combine(pp.OneOrMore(
-            pp.MatchFirst(terms)
-        ))
 
     def build_escaped_word_parser_charbychar(escaped_chars_to_ignore: str):
         escapes = []
@@ -437,10 +424,16 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
         #print("trying to match:", x)
         return not x[0].endswith('.swap')
 
-    unquoted_word = pp.Combine(pp.OneOrMore(
+    unquoted_word = (pp.Combine(pp.OneOrMore(
             escaped_rparen | escaped_lparen | escaped_quote | escaped_backslash |
-            (pp.Word(pp.printables, exclude_chars=string.whitespace + '\\"()') + (pp.NotAny(pp.Word('+') | pp.Word('-'))))
-    ))
+            (pp.CharsNotIn(string.whitespace + '\\"()', exact=1)
+    )))
+            # don't whitespace when the next word starts with +, eg "badly +formed"
+         + (pp.White().suppress() |
+            # don't eat +/-
+            pp.NotAny(pp.Word('+') | pp.Word('-'))
+            )
+                     )
 
     unquoted_word.set_parse_action(make_text_fragment).set_name('unquoted_word').set_debug(False)
     #print(unquoted_fragment.parse_string("cat.swap(dog)"))
@@ -451,8 +444,8 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
         (quoted_fragment.copy().set_parse_action(lambda x: parse_fragment_str(x, in_quotes=True)).set_debug(False)).set_name('-quoted_paren_internal').set_debug(False),
         (pp.Combine(pp.OneOrMore(
             escaped_quote | escaped_lparen | escaped_rparen | escaped_backslash |
-            pp.Word(pp.printables, exclude_chars=string.whitespace + '\\"()') |
-            pp.Word(string.whitespace)
+            pp.CharsNotIn(string.whitespace + '\\"()', exact=1) |
+            pp.White()
         )).set_name('--combined').set_parse_action(lambda x: parse_fragment_str(x, in_parens=True)).set_debug(False)),
         pp.Empty()
        ]) + rparen)
@@ -475,7 +468,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
         + rparen + attention_with_parens_foot)
     attention_with_parens.set_name('attention_with_parens').set_debug(debug_attention)
 
-    attention_without_parens_foot = pp.NotAny(pp.White()) + pp.Or(pp.Word('+') | pp.Word('-')).set_name('attention_without_parens_foots')
+    attention_without_parens_foot = (pp.NotAny(pp.White()) + pp.Or([pp.Word('+'), pp.Word('-')]) + pp.FollowedBy(pp.StringEnd() | pp.White() | pp.Literal('(') | pp.Literal(')') | pp.Literal(',') | pp.Literal('"')) ).set_name('attention_without_parens_foots')
     attention_without_parens <<= pp.Group(pp.MatchFirst([
         quoted_fragment.copy().set_name('attention_quoted_fragment_without_parens').set_debug(debug_attention) + attention_without_parens_foot,
         pp.Combine(build_escaped_word_parser_charbychar('()+-')).set_name('attention_word_without_parens').set_debug(debug_attention)#.set_parse_action(lambda x: print('escapéd', x))
@@ -521,7 +514,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
     original_fragment = pp.MatchFirst([
                         quoted_fragment.set_debug(debug_cross_attention_control),
                         parenthesized_fragment.set_debug(debug_cross_attention_control),
-                        pp.Word(pp.printables, exclude_chars=string.whitespace + '.').set_parse_action(make_text_fragment) + pp.FollowedBy(".swap"),
+                        pp.Combine(pp.OneOrMore(pp.CharsNotIn(string.whitespace + '.', exact=1))).set_parse_action(make_text_fragment) + pp.FollowedBy(".swap"),
                         empty_string.set_debug(debug_cross_attention_control),
                ])
     # support keyword=number arguments
@@ -554,7 +547,7 @@ def build_parser_syntax(attention_plus_base: float, attention_minus_base: float)
 
     # root prompt definition
     debug_root_prompt = False
-    prompt = (pp.OneOrMore(pp.Or([cross_attention_substitute.set_debug(debug_root_prompt),
+    prompt = (pp.OneOrMore(pp.MatchFirst([cross_attention_substitute.set_debug(debug_root_prompt),
                                   attention.set_debug(debug_root_prompt),
                                   quoted_fragment.set_debug(debug_root_prompt),
                                   parenthesized_fragment.set_debug(debug_root_prompt),
