@@ -218,7 +218,7 @@ const InpaintingCanvas = () => {
   );
 
   return (
-    <div className="inpainting-canvas-wrapper checkerboard" tabIndex={1}>
+    <div className="inpainting-canvas-wrapper" tabIndex={1}>
       <div className="inpainting-alerts">
         {!shouldShowMask && (
           <div style={{ pointerEvents: 'none' }}>Mask Hidden (H)</div>
@@ -245,7 +245,7 @@ const InpaintingCanvas = () => {
           onMouseOut={handleMouseOutCanvas}
           onMouseLeave={handleMouseOutCanvas}
           style={{ cursor: shouldShowMask ? 'none' : 'default' }}
-          className="inpainting-canvas-stage"
+          className="inpainting-canvas-stage checkerboard"
           ref={stageRef}
         >
           {!shouldInvertMask && !shouldShowCheckboardTransparency && (

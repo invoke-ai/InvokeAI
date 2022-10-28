@@ -3,39 +3,65 @@ import CurrentImageButtons from './CurrentImageButtons';
 import { MdPhoto } from 'react-icons/md';
 import CurrentImagePreview from './CurrentImagePreview';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
+import { tabMap } from '../tabs/InvokeTabs';
+import { GalleryState } from './gallerySlice';
+import { OptionsState } from '../options/optionsSlice';
+import _ from 'lodash';
+import { createSelector } from '@reduxjs/toolkit';
+
+export const currentImageDisplaySelector = createSelector(
+  [(state: RootState) => state.gallery, (state: RootState) => state.options],
+  (gallery: GalleryState, options: OptionsState) => {
+    const { currentImage, intermediateImage } = gallery;
+    const { activeTab, shouldShowImageDetails } = options;
+
+    return {
+      currentImage,
+      intermediateImage,
+      activeTabName: tabMap[activeTab],
+      shouldShowImageDetails,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
+  }
+);
 
 /**
  * Displays the current image if there is one, plus associated actions.
  */
 const CurrentImageDisplay = () => {
-  const { currentImage, intermediateImage } = useAppSelector(
-    (state: RootState) => state.gallery
-  );
-
-  const shouldShowImageDetails = useAppSelector(
-    (state: RootState) => state.options.shouldShowImageDetails
-  );
+  const {
+    currentImage,
+    intermediateImage,
+    activeTabName,
+    shouldShowImageDetails,
+  } = useAppSelector(currentImageDisplaySelector);
 
   const imageToDisplay = intermediateImage || currentImage;
 
-  return imageToDisplay ? (
-    <div className="current-image-display">
-      <div className="current-image-tools">
-        <CurrentImageButtons image={imageToDisplay} />
-      </div>
-      <div className="current-image-viewer">
-        <CurrentImagePreview imageToDisplay={imageToDisplay} />
-        {shouldShowImageDetails && (
-          <ImageMetadataViewer
-            image={imageToDisplay}
-            styleClass="current-image-metadata"
-          />
-        )}
-      </div>
-    </div>
-  ) : (
-    <div className="current-image-display-placeholder">
-      <MdPhoto />
+  return (
+    <div className="current-image-area" data-tab-name={activeTabName}>
+      {imageToDisplay ? (
+        <>
+          <CurrentImageButtons image={imageToDisplay} />
+          <div className="current-image-viewer">
+            <CurrentImagePreview imageToDisplay={imageToDisplay} />
+            {shouldShowImageDetails && (
+              <ImageMetadataViewer
+                image={imageToDisplay}
+                styleClass="current-image-metadata"
+              />
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="current-image-display-placeholder">
+          <MdPhoto />
+        </div>
+      )}
     </div>
   );
 };

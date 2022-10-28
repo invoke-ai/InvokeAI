@@ -6,11 +6,13 @@ import { GalleryState, selectNextImage, selectPrevImage } from './gallerySlice';
 import * as InvokeAI from '../../app/invokeai';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
+import { OptionsState } from '../options/optionsSlice';
 
-const imagesSelector = createSelector(
-  (state: RootState) => state.gallery,
-  (gallery: GalleryState) => {
+export const imagesSelector = createSelector(
+  [(state: RootState) => state.gallery, (state: RootState) => state.options],
+  (gallery: GalleryState, options: OptionsState) => {
     const { currentCategory } = gallery;
+    const { shouldShowImageDetails } = options;
 
     const tempImages = gallery.categories[currentCategory].images;
     const currentImageIndex = tempImages.findIndex(
@@ -22,6 +24,7 @@ const imagesSelector = createSelector(
       isOnFirstImage: currentImageIndex === 0,
       isOnLastImage:
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
+      shouldShowImageDetails,
     };
   },
   {
@@ -39,11 +42,12 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
   const { imageToDisplay } = props;
   const dispatch = useAppDispatch();
 
-  const { isOnFirstImage, isOnLastImage, currentCategory } = useAppSelector(imagesSelector);
-
-  const shouldShowImageDetails = useAppSelector(
-    (state: RootState) => state.options.shouldShowImageDetails
-  );
+  const {
+    isOnFirstImage,
+    isOnLastImage,
+    currentCategory,
+    shouldShowImageDetails,
+  } = useAppSelector(imagesSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
     useState<boolean>(false);
@@ -65,7 +69,7 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
   };
 
   return (
-    <div className="current-image-preview">
+    <div className={'current-image-preview'}>
       <Image
         src={imageToDisplay.url}
         fit="contain"

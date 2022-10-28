@@ -443,10 +443,10 @@ class InvokeAIWebServer:
                 print("\n")
 
         # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadInitialImage")
-        def handle_upload_initial_image(bytes, name):
+        @socketio.on("uploadImage")
+        def handle_upload_image(bytes, name, destination):
             try:
-                print(f'>> Init image upload requested "{name}"')
+                print(f'>> Image upload requested "{name}"')
                 file_path = self.save_file_unique_uuid_name(
                     bytes=bytes, name=name, path=self.init_image_path
                 )
@@ -454,13 +454,14 @@ class InvokeAIWebServer:
                 (width, height) = Image.open(file_path).size
                 print(file_path)
                 socketio.emit(
-                    "initialImageUploaded",
+                    "imageUploaded",
                     {
                         "url": self.get_url_from_image_path(file_path),
                         "mtime": mtime,
                         "width": width,
                         "height": height,
                         "category": "user",
+                        "destination": destination,
                     },
                 )
             except Exception as e:

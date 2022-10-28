@@ -1,62 +1,47 @@
 @use '../../../styles/Mixins/' as *;
 
-.brush-preview-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.brush-preview {
-  border-radius: 50%;
-  border: 1px black solid;
-}
-
-.inpainting-workarea {
-  display: grid;
-  grid-template-columns: max-content auto;
-  column-gap: 1rem;
-}
-
-.inpainting-display-area {
-  display: grid;
-  column-gap: 0.5rem;
-}
-
-.inpainting-display {
-  border-radius: 0.5rem;
-  background-color: var(--background-color-secondary);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  // column-gap: 1rem;
-  height: $app-content-height;
-}
-
-.inpainting-toolkit {
-  // display: grid;
-  // grid-template-rows: auto auto;
+.inpainting-main-area {
   display: flex;
   flex-direction: column;
-  background-color: var(--inpaint-bg-color);
-  border-radius: 0.5rem;
-}
-
-.inpainting-canvas-container {
+  align-items: center;
+  row-gap: 1rem;
   width: 100%;
   height: 100%;
-  padding-left: 1rem;
-  padding-right: 1rem;
-  padding-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+  .inpainting-settings {
+    display: flex;
+    align-items: center;
+    column-gap: 1rem;
+
+    .inpainting-buttons-group {
+      display: flex;
+      align-items: center;
+      column-gap: 0.5rem;
+    }
+
+    .inpainting-slider-numberinput {
+      display: flex;
+      column-gap: 1rem;
+      align-items: center;
+    }
+  }
+
+  .inpainting-canvas-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    row-gap: 1rem;
+    width: 100%;
+    height: 100%;
+  }
 
   .inpainting-canvas-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     position: relative;
-    width: min-content;
-    height: min-content;
+    height: 100%;
+    width: 100%;
     border-radius: 0.5rem;
 
     .inpainting-alerts {
@@ -80,6 +65,7 @@
     }
 
     .inpainting-canvas-stage {
+      border-radius: 0.5rem;
       canvas {
         border-radius: 0.5rem;
       }
@@ -87,61 +73,8 @@
   }
 }
 
-// .canvas-scale-calculator {
-//   width: calc(100% - 1rem);
-//   height: calc(100% - 1rem);
-//   display: flex;
-//   align-items: center;
-//   justify-content: center;
-// }
-
-.inpainting-canvas-scale-wrapper {
-  width: calc(100% - 1rem);
-  height: calc(100% - 1rem);
-  // width: max-content;
-  // height: max-content;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.inpainting-settings {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  row-gap: 1rem;
-  padding: 1rem;
-
-  .inpainting-buttons {
-    display: flex;
-    align-items: center;
-    column-gap: 0.8rem;
-
-    button {
-      height: 2.4rem;
-      svg {
-        width: 15px;
-        height: 15px;
-      }
-    }
-
-    .inpainting-buttons-group {
-      display: flex;
-      align-items: center;
-      column-gap: 0.5rem;
-    }
-  }
-
-  .inpainting-slider-numberinput {
-    display: flex;
-    column-gap: 1rem;
-    align-items: center;
-  }
-}
-
 // Overrides
-.inpainting-workarea-container {
+.inpainting-workarea-overrides {
   .image-gallery-area {
     .chakra-popover__popper {
       inset: 0 auto auto -75px !important;
@@ -149,21 +82,8 @@
   }
 
   .current-image-options {
-    button {
-      @include Button(
-        $btn-width: 2.5rem,
-        $icon-size: 18px,
-        $btn-color: var(--btn-grey),
-        $btn-color-hover: var(--btn-grey-hover)
-      );
-    }
-
     .chakra-popover__popper {
       z-index: 11;
     }
-  }
-
-  .current-image-preview {
-    padding: 0 1rem 1rem 1rem;
   }
 }

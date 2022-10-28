@@ -5,25 +5,20 @@ import ShowHideGalleryButton from '../gallery/ShowHideGalleryButton';
 
 type InvokeWorkareaProps = {
   optionsPanel: ReactNode;
-  className?: string;
   children: ReactNode;
 };
 
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
-  const { optionsPanel, className, children } = props;
+  const { optionsPanel, children } = props;
 
   const { shouldShowGallery, shouldHoldGalleryOpen, shouldPinGallery } =
     useAppSelector((state: RootState) => state.gallery);
 
   return (
-    <div
-      className={
-        className ? `workarea-container ${className}` : `workarea-container`
-      }
-    >
-      <div className="workarea">
+    <div className="workarea-wrapper">
+      <div className="workarea-main">
         <div className="workarea-options-panel">{optionsPanel}</div>
-        <div className="workarea-content">{children}</div>
+        {children}
         <ImageGallery />
       </div>
       {!(shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)) && (

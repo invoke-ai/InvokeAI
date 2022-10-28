@@ -280,7 +280,6 @@ const InpaintingControls = () => {
 
   return (
     <div className="inpainting-settings">
-      <div className="inpainting-buttons">
         <div className="inpainting-buttons-group">
           <IAIPopover
             trigger="hover"
@@ -397,7 +396,6 @@ const InpaintingControls = () => {
             onClick={handleDualDisplay}
           />
         </div>
-      </div>
     </div>
   );
 };

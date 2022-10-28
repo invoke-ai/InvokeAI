@@ -27,29 +27,29 @@ export default function InitImagePreview() {
   };
 
   return (
-    <div className="init-image-preview">
+    <>
       <div className="init-image-preview-header">
-        <h1>Initial Image</h1>
+        <h2>Initial Image</h2>
         <IconButton
           isDisabled={!initialImage}
-          size={'sm'}
           aria-label={'Reset Initial Image'}
           onClick={handleClickResetInitialImage}
           icon={<MdClear />}
         />
       </div>
       {initialImage && (
-        <div className="init-image-image">
+        <div className="init-image-preview">
           <Image
             fit={'contain'}
+            maxWidth={'100%'}
+            maxHeight={'100%'}
             src={
               typeof initialImage === 'string' ? initialImage : initialImage.url
             }
-            rounded={'md'}
             onError={alertMissingInitImage}
           />
         </div>
       )}
-    </div>
+    </>
   );
 }

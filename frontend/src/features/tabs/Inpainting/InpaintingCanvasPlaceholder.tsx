@@ -25,7 +25,7 @@ const InpaintingCanvasPlaceholder = () => {
   }, [dispatch, imageToInpaint, needsRepaint]);
 
   return (
-    <div ref={ref} className="inpainting-canvas-container">
+    <div ref={ref} className="inpainting-canvas-area">
       <Spinner thickness="2px" speed="1s" size="xl" />
     </div>
   );

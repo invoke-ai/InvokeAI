@@ -43,7 +43,7 @@ export const socketioMiddleware = () => {
       onGalleryImages,
       onProcessingCanceled,
       onImageDeleted,
-      onInitialImageUploaded,
+      onImageUploaded,
       onMaskImageUploaded,
       onSystemConfig,
       onModelChanged,
@@ -58,7 +58,7 @@ export const socketioMiddleware = () => {
       emitRequestImages,
       emitRequestNewImages,
       emitCancelProcessing,
-      emitUploadInitialImage,
+      emitUploadImage,
       emitUploadMaskImage,
       emitRequestSystemConfig,
       emitRequestModelChange,
@@ -104,14 +104,10 @@ export const socketioMiddleware = () => {
         onImageDeleted(data);
       });
 
-      // socketio.on('initialImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
-      //   onInitialImageUploaded(data);
-      // });
-
       socketio.on(
-        'initialImageUploaded',
+        'imageUploaded',
         (data: InvokeAI.ImageUploadResponse) => {
-          onInitialImageUploaded(data);
+          onImageUploaded(data);
         }
       );
 
@@ -173,8 +169,8 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/uploadInitialImage': {
-        emitUploadInitialImage(action.payload);
+      case 'socketio/uploadImage': {
+        emitUploadImage(action.payload);
         break;
       }
 

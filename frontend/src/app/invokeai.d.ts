@@ -172,7 +172,9 @@ export declare type SystemConfigResponse = SystemConfig;
 
 export declare type ImageResultResponse = Omit<Image, 'uuid'>;
 
-export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'>;
+export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
+  destination: 'img2img' | 'inpainting';
+};
 
 export declare type ErrorResponse = {
   message: string;
@@ -193,4 +195,9 @@ export declare type ImageDeletedResponse = {
 
 export declare type ImageUrlResponse = {
   url: string;
+};
+
+export declare type UploadImagePayload = {
+  file: File;
+  destination: 'img2img' | 'inpainting';
 };

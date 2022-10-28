@@ -178,8 +178,9 @@ const makeSocketIOEmitters = (
     emitCancelProcessing: () => {
       socketio.emit('cancel');
     },
-    emitUploadInitialImage: (file: File) => {
-      socketio.emit('uploadInitialImage', file, file.name);
+    emitUploadImage: (payload: InvokeAI.UploadImagePayload) => {
+      const { file, destination } = payload;
+      socketio.emit('uploadImage', file, file.name, destination);
     },
     emitUploadMaskImage: (file: File) => {
       socketio.emit('uploadMaskImage', file, file.name);

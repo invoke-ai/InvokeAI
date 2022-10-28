@@ -7,12 +7,11 @@
 # was trained on.
 stable-diffusion-1.4:
   config: configs/stable-diffusion/v1-inference.yaml
-  weights: models/ldm/stable-diffusion-v1/model.ckpt
+  weights: models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
 #  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
   description: Stable Diffusion inference model version 1.4
   width: 512
   height: 512
-  default: true
 inpainting-1.5:
   description: runwayML tuned inpainting model v1.5
   weights: models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
@@ -27,3 +26,4 @@ stable-diffusion-1.5:
   description: Stable Diffusion inference model version 1.5
   width: 512
   height: 512
+  default: true

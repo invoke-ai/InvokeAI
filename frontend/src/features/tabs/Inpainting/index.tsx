@@ -6,7 +6,7 @@ export default function InpaintingWorkarea() {
   return (
     <InvokeWorkarea
       optionsPanel={<InpaintingPanel />}
-      className="inpainting-workarea-container"
+      className="inpainting-workarea-overrides"
     >
       <InpaintingDisplay />
     </InvokeWorkarea>

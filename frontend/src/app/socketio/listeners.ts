@@ -32,6 +32,7 @@ import {
   setMaskPath,
 } from '../../features/options/optionsSlice';
 import { requestImages, requestNewImages } from './actions';
+import { setImageToInpaint } from '../../features/tabs/Inpainting/inpaintingSlice';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -285,15 +286,26 @@ const makeSocketIOListeners = (
         })
       );
     },
-    onInitialImageUploaded: (data: InvokeAI.ImageUploadResponse) => {
+    onImageUploaded: (data: InvokeAI.ImageUploadResponse) => {
+      const { destination, ...rest } = data;
       const image = {
         uuid: uuidv4(),
-        ...data,
+        ...rest,
       };
 
       try {
         dispatch(addImage({ image, category: 'user' }));
-        dispatch(setInitialImage(image));
+
+        switch (destination) {
+          case 'img2img': {
+            dispatch(setInitialImage(image));
+            break;
+          }
+          case 'inpainting': {
+            dispatch(setImageToInpaint(image));
+            break;
+          }
+        }
 
         dispatch(
           addLogEntry({

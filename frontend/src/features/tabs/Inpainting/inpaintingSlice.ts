@@ -156,9 +156,11 @@ export const inpaintingSlice = createSlice({
     setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
       state.maskColor = action.payload;
     },
-    // },
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state.cursorPosition = action.payload;
+    },
+    clearImageToInpaint: (state) => {
+      state.imageToInpaint = undefined;
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
       const { width: imageWidth, height: imageHeight } = action.payload;
