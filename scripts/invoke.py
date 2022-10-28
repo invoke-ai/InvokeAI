@@ -532,12 +532,8 @@ def del_config(model_name:str, gen, opt, completer):
     if model_name == current_model:
         print("** Can't delete active model. !switch to another model first. **")
         return
-    yaml_str = gen.model_cache.del_model(model_name)
-    
-    tmpfile = os.path.join(os.path.dirname(opt.conf),'new_config.tmp')
-    with open(tmpfile, 'w') as outfile:
-        outfile.write(yaml_str)
-    os.rename(tmpfile,opt.conf)
+    if gen.model_cache.del_model(model_name):
+        gen.model_cache.commit(opt.conf)
     print(f'** {model_name} deleted')
     completer.del_model(model_name)
     
