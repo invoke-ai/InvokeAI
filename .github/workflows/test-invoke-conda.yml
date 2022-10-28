@@ -4,6 +4,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'use-bearer-token-to-download-model-debug'
   pull_request_target:
     branches:
       - 'main'
