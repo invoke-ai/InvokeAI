@@ -42,6 +42,7 @@ export const hoverableImageSelector = createSelector(
   (options: OptionsState, gallery: GalleryState) => {
     return {
       galleryImageObjectFit: gallery.galleryImageObjectFit,
+      galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
       activeTabName: tabMap[options.activeTab],
     };
   }

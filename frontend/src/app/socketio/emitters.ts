@@ -8,6 +8,8 @@ import {
 import {
   addLogEntry,
   errorOccurred,
+  setCurrentStatus,
+  setIsCancelable,
   setIsProcessing,
 } from '../../features/system/systemSlice';
 import { inpaintingImageElementRef } from '../../features/tabs/Inpainting/InpaintingCanvas';
@@ -177,8 +179,11 @@ const makeSocketIOEmitters = (
     emitRequestSystemConfig: () => {
       socketio.emit('requestSystemConfig');
     },
-    emitSetModel: (modelName: string) => {
-      socketio.emit('setModel', modelName);
+    emitRequestModelChange: (modelName: string) => {
+      dispatch(setCurrentStatus('Changing Model'));
+      dispatch(setIsProcessing(true));
+      dispatch(setIsCancelable(false));
+      socketio.emit('requestModelChange', modelName);
     },
   };
 };

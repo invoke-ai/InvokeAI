@@ -14,10 +14,8 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _, { isEqual } from 'lodash';
-import { ChangeEvent, cloneElement, ReactElement } from 'react';
-import { setModel } from '../../../app/socketio/actions';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAISelect from '../../../common/components/IAISelect';
+import { cloneElement, ReactElement } from 'react';
+import { RootState, useAppSelector } from '../../../app/store';
 import { persistor } from '../../../main';
 import {
   setShouldConfirmOnDelete,
@@ -25,6 +23,7 @@ import {
   setShouldDisplayInProgress,
   SystemState,
 } from '../systemSlice';
+import ModelList from './ModelList';
 import SettingsModalItem from './SettingsModalItem';
 
 const systemSelector = createSelector(
@@ -34,15 +33,13 @@ const systemSelector = createSelector(
       shouldDisplayInProgress,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
-      available_models,
+      model_list,
     } = system;
     return {
       shouldDisplayInProgress,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
-      models: available_models
-        ? _.map(available_models, (model, key) => key)
-        : [],
+      models: _.map(model_list, (_model, key) => key),
     };
   },
   {
@@ -62,7 +59,6 @@ type SettingsModalProps = {
  * Secondary post-reset modal is included here.
  */
 const SettingsModal = ({ children }: SettingsModalProps) => {
-  const dispatch = useAppDispatch();
   const {
     isOpen: isSettingsModalOpen,
     onOpen: onSettingsModalOpen,
@@ -79,7 +75,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldDisplayInProgress,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
-    models,
   } = useAppSelector(systemSelector);
 
   /**
@@ -91,10 +86,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
       onSettingsModalClose();
       onRefreshModalOpen();
     });
-  };
-
-  const handleChangeModel = (e: ChangeEvent<HTMLSelectElement>) => {
-    dispatch(setModel(e.target.value));
   };
 
   return (
@@ -109,11 +100,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalHeader className="settings-modal-header">Settings</ModalHeader>
           <ModalCloseButton />
           <ModalBody className="settings-modal-content">
-            <IAISelect
-              label="Model"
-              validValues={models}
-              onChange={handleChangeModel}
-            />
+            <ModelList />
             <div className="settings-modal-items">
               <SettingsModalItem
                 settingTitle="Display In-Progress Images (slower)"

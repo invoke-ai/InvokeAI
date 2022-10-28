@@ -13,6 +13,7 @@ const cancelButtonSelector = createSelector(
     return {
       isProcessing: system.isProcessing,
       isConnected: system.isConnected,
+      isCancelable: system.isCancelable,
     };
   },
   {
@@ -24,17 +25,18 @@ const cancelButtonSelector = createSelector(
 
 export default function CancelButton() {
   const dispatch = useAppDispatch();
-  const { isProcessing, isConnected } = useAppSelector(cancelButtonSelector);
+  const { isProcessing, isConnected, isCancelable } =
+    useAppSelector(cancelButtonSelector);
   const handleClickCancel = () => dispatch(cancelProcessing());
 
   useHotkeys(
     'shift+x',
     () => {
-      if (isConnected || isProcessing) {
+      if ((isConnected || isProcessing) && isCancelable) {
         handleClickCancel();
       }
     },
-    [isConnected, isProcessing]
+    [isConnected, isProcessing, isCancelable]
   );
 
   return (
@@ -42,7 +44,7 @@ export default function CancelButton() {
       icon={<MdCancel />}
       tooltip="Cancel"
       aria-label="Cancel"
-      isDisabled={!isConnected || !isProcessing}
+      isDisabled={!isConnected || !isProcessing || !isCancelable}
       onClick={handleClickCancel}
       styleClass="cancel-btn"
     />

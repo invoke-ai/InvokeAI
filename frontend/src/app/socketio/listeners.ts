@@ -13,6 +13,8 @@ import {
   setSystemConfig,
   processingCanceled,
   errorOccurred,
+  setModelList,
+  setIsCancelable,
 } from '../../features/system/systemSlice';
 
 import {
@@ -288,6 +290,34 @@ const makeSocketIOListeners = (
     },
     onSystemConfig: (data: InvokeAI.SystemConfig) => {
       dispatch(setSystemConfig(data));
+    },
+    onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
+      const { model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setCurrentStatus('Connected'));
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(false));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model changed: ${model_name}`,
+          level: 'info',
+        })
+      );
+    },
+    onModelChangeFailed: (data: InvokeAI.ModelChangeResponse) => {
+      const { model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(false));
+      dispatch(errorOccurred());
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model change failed: ${model_name}`,
+          level: 'error',
+        })
+      );
     },
   };
 };

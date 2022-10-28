@@ -31,4 +31,4 @@ export const requestSystemConfig = createAction<undefined>(
   'socketio/requestSystemConfig'
 );
 
-export const setModel = createAction<string>('socketio/setModel');
+export const requestModelChange = createAction<string>('socketio/requestModelChange');

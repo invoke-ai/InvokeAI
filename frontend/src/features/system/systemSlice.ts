@@ -35,7 +35,7 @@ export interface SystemState
   currentStatusHasSteps: boolean;
   shouldDisplayGuides: boolean;
   wasErrorSeen: boolean;
-  available_models?: InvokeAI.ModelList;
+  isCancelable: boolean;
 }
 
 const initialSystemState = {
@@ -61,8 +61,10 @@ const initialSystemState = {
   model_hash: '',
   app_id: '',
   app_version: '',
+  model_list: {},
   hasError: false,
   wasErrorSeen: true,
+  isCancelable: true,
 };
 
 const initialState: SystemState = initialSystemState;
@@ -158,6 +160,15 @@ export const systemSlice = createSlice({
       state.currentStatusHasSteps = false;
       state.currentStatus = 'Processing canceled';
     },
+    setModelList: (
+      state,
+      action: PayloadAction<InvokeAI.ModelList | Record<string, never>>
+    ) => {
+      state.model_list = action.payload;
+    },
+    setIsCancelable: (state, action: PayloadAction<boolean>) => {
+      state.isCancelable = action.payload;
+    },
   },
 });
 
@@ -177,6 +188,8 @@ export const {
   processingCanceled,
   errorOccurred,
   errorSeen,
+  setModelList,
+  setIsCancelable,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
