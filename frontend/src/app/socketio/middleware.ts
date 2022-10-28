@@ -59,6 +59,7 @@ export const socketioMiddleware = () => {
       emitUploadInitialImage,
       emitUploadMaskImage,
       emitRequestSystemConfig,
+      emitSetModel,
     } = makeSocketIOEmitters(store, socketio);
 
     /**
@@ -167,6 +168,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/requestSystemConfig': {
         emitRequestSystemConfig();
+        break;
+      }
+
+      case 'socketio/setModel': {
+        emitSetModel(action.payload);
         break;
       }
     }

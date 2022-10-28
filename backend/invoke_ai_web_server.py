@@ -166,6 +166,15 @@ class InvokeAIWebServer:
             config = self.get_system_config()
             socketio.emit('systemConfig', config)
 
+        @socketio.on("setModel")
+        def handle_set_model(model_name: str):
+            print(f'>> Set model requested: {model_name}')
+            model = self.generate.set_model(model_name)
+            if model is None:
+                socketio.emit("modelChangeFailed", { "model_name": model_name })
+            else:
+                socketio.emit("modelChanged", { "model_name": model_name })
+
         @socketio.on('requestLatestImages')
         def handle_request_latest_images(latest_mtime):
             try:
@@ -482,12 +491,14 @@ class InvokeAIWebServer:
 
     # App Functions
     def get_system_config(self):
+        model_list = self.generate.model_cache.list_models()
         return {
             'model': 'stable diffusion',
             'model_id': args.model,
             'model_hash': self.generate.model_hash,
             'app_id': APP_ID,
             'app_version': APP_VERSION,
+            'available_models': model_list
         }
 
     def generate_images(
