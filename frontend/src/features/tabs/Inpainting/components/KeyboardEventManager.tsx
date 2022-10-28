@@ -19,11 +19,8 @@ import {
 const keyboardEventManagerSelector = createSelector(
   [(state: RootState) => state.options, (state: RootState) => state.inpainting],
   (options: OptionsState, inpainting: InpaintingState) => {
-    const {
-      shouldShowMask,
-      cursorPosition,
-      shouldLockBoundingBox,
-    } = inpainting;
+    const { shouldShowMask, cursorPosition, shouldLockBoundingBox } =
+      inpainting;
     return {
       activeTabName: tabMap[options.activeTab],
       shouldShowMask,
@@ -95,10 +92,8 @@ const KeyboardEventManager = () => {
           if (e.type === 'keydown') {
             dispatch(setIsDrawing(false));
             dispatch(setShouldLockBoundingBox(false));
-            dispatch(setShouldShowBrush(false));
           } else {
             dispatch(setShouldLockBoundingBox(true));
-            dispatch(setShouldShowBrush(true));
           }
           break;
         }

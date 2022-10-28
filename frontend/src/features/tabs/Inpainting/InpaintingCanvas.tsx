@@ -118,32 +118,29 @@ const InpaintingCanvas = () => {
    * Canvas onMouseMove
    *
    */
-  const handleMouseMove = useCallback(
-    () => {
-      if (!stageRef.current) return;
+  const handleMouseMove = useCallback(() => {
+    if (!stageRef.current) return;
 
-      const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
+    const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-      if (!scaledCursorPosition) return;
+    if (!scaledCursorPosition) return;
 
-      dispatch(setCursorPosition(scaledCursorPosition));
+    dispatch(setCursorPosition(scaledCursorPosition));
 
-      if (!maskLayerRef.current || !shouldLockBoundingBox) {
-        return;
-      }
+    if (!maskLayerRef.current || !shouldLockBoundingBox) {
+      return;
+    }
 
-      lastCursorPosition.current = scaledCursorPosition;
+    lastCursorPosition.current = scaledCursorPosition;
 
-      if (!isDrawing) return;
+    if (!isDrawing) return;
 
-      didMouseMoveRef.current = true;
-      // Extend the current line
-      dispatch(
-        addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-      );
-    },
-    [dispatch, isDrawing, shouldLockBoundingBox]
-  );
+    didMouseMoveRef.current = true;
+    // Extend the current line
+    dispatch(
+      addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
+    );
+  }, [dispatch, isDrawing, shouldLockBoundingBox]);
 
   /**
    *
@@ -260,7 +257,8 @@ const InpaintingCanvas = () => {
                 ref={maskLayerRef}
               >
                 <InpaintingCanvasLines />
-                <InpaintingCanvasBrushPreview />
+
+                {shouldLockBoundingBox && <InpaintingCanvasBrushPreview />}
 
                 {shouldInvertMask && (
                   <KonvaImage
@@ -282,7 +280,9 @@ const InpaintingCanvas = () => {
                   <InpaintingBoundingBoxPreviewOverlay />
                 )}
                 {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
-                <InpaintingCanvasBrushPreviewOutline />
+                {shouldLockBoundingBox && (
+                  <InpaintingCanvasBrushPreviewOutline />
+                )}
               </Layer>
             </>
           )}
