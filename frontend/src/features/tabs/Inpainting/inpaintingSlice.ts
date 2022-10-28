@@ -237,6 +237,7 @@ export const inpaintingSlice = createSlice({
 
       const roundedCanvasWidth = roundDownToMultiple(canvasWidth, 64);
       const roundedCanvasHeight = roundDownToMultiple(canvasHeight, 64);
+
       const roundedBoundingBoxWidth = roundDownToMultiple(boundingBoxWidth, 64);
       const roundedBoundingBoxHeight = roundDownToMultiple(
         boundingBoxHeight,
@@ -276,22 +277,18 @@ export const inpaintingSlice = createSlice({
         roundedCanvasHeight - newBoundingBoxHeight
       );
 
-      const newBoundingBoxX = roundDownToMultiple(clampedX, 64);
-
-      const newBoundingBoxY = roundDownToMultiple(clampedY, 64);
-
       state.boundingBoxDimensions = {
         width: newBoundingBoxWidth,
         height: newBoundingBoxHeight,
       };
 
       state.boundingBoxCoordinate = {
-        x: newBoundingBoxX,
-        y: newBoundingBoxY,
+        x: clampedX,
+        y: clampedY,
       };
     },
     setBoundingBoxCoordinate: (state, action: PayloadAction<Vector2d>) => {
-      state.boundingBoxCoordinate = action.payload
+      state.boundingBoxCoordinate = action.payload;
       // const { x, y } = action.payload;
 
       // const maxX =
