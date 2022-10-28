@@ -1,6 +1,5 @@
-import { FormControl, FormLabel, Switch } from '@chakra-ui/react';
-import React from 'react';
 import { useAppDispatch } from '../../../app/store';
+import IAISwitch from '../../../common/components/IAISwitch';
 
 export default function SettingsModalItem({
   settingTitle,
@@ -13,12 +12,11 @@ export default function SettingsModalItem({
 }) {
   const dispatch = useAppDispatch();
   return (
-    <FormControl className="settings-modal-item">
-      <FormLabel marginBottom={1}>{settingTitle}</FormLabel>
-      <Switch
-        isChecked={isChecked}
-        onChange={(e) => dispatch(dispatcher(e.target.checked))}
-      />
-    </FormControl>
+    <IAISwitch
+      styleClass="settings-modal-item"
+      label={settingTitle}
+      isChecked={isChecked}
+      onChange={(e) => dispatch(dispatcher(e.target.checked))}
+    />
   );
 }

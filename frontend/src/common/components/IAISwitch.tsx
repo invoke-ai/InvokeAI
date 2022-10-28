@@ -1,8 +1,18 @@
-import { FormControl, FormLabel, Switch, SwitchProps } from '@chakra-ui/react';
+import {
+  FormControl,
+  FormControlProps,
+  FormLabel,
+  FormLabelProps,
+  Switch,
+  SwitchProps,
+} from '@chakra-ui/react';
 
 interface Props extends SwitchProps {
   label?: string;
   width?: string | number;
+  styleClass?: string;
+  formControlProps?: FormControlProps;
+  formLabelProps?: FormLabelProps;
 }
 
 /**
@@ -12,26 +22,31 @@ const IAISwitch = (props: Props) => {
   const {
     label,
     isDisabled = false,
-    fontSize = 'md',
-    size = 'md',
+    // fontSize = 'md',
+    // size = 'md',
     width = 'auto',
+    formControlProps,
+    formLabelProps,
+    styleClass,
     ...rest
   } = props;
   return (
     <FormControl
       isDisabled={isDisabled}
       width={width}
-      className="invokeai__switch-form-control"
+      className={`invokeai__switch-form-control ${styleClass}`}
+      {...formControlProps}
     >
       <FormLabel
         className="invokeai__switch-form-label"
-        fontSize={fontSize}
+        // fontSize={fontSize}
         whiteSpace="nowrap"
+        {...formLabelProps}
       >
         {label}
         <Switch
           className="invokeai__switch-root"
-          size={size}
+          // size={size}
           // className="switch-button"
           {...rest}
         />

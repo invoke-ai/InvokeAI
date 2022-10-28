@@ -1,8 +1,19 @@
-import { Button, Tooltip, Spacer, Heading } from '@chakra-ui/react';
+import {
+  Button,
+  Tooltip,
+  Spacer,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
+} from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { Model, ModelStatus } from '../../../app/invokeai';
+import { ModelStatus } from '../../../app/invokeai';
 import { requestModelChange } from '../../../app/socketio/actions';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import { SystemState } from '../systemSlice';
 
 type ModelListItemProps = {
   name: string;
@@ -11,6 +22,10 @@ type ModelListItemProps = {
 };
 
 const ModelListItem = (props: ModelListItemProps) => {
+  const { isProcessing, isConnected } = useAppSelector(
+    (state: RootState) => state.system
+  );
+
   const dispatch = useAppDispatch();
   const { name, status, description } = props;
   const handleChangeModel = () => {
@@ -29,7 +44,7 @@ const ModelListItem = (props: ModelListItemProps) => {
         <Button
           size={'sm'}
           onClick={handleChangeModel}
-          isDisabled={status === 'active'}
+          isDisabled={status === 'active' || isProcessing || !isConnected}
         >
           Load
         </Button>
@@ -38,24 +53,50 @@ const ModelListItem = (props: ModelListItemProps) => {
   );
 };
 
+const modelListSelector = createSelector(
+  (state: RootState) => state.system,
+  (system: SystemState) => {
+    const models = _.map(system.model_list, (model, key) => {
+      return { name: key, ...model };
+    });
+
+    const activeModel = models.find((model) => model.status === 'active');
+
+    return {
+      models,
+      activeModel: activeModel,
+    };
+  }
+);
+
 const ModelList = () => {
-  const { model_list } = useAppSelector((state: RootState) => state.system);
+  const { models } = useAppSelector(modelListSelector);
 
   return (
     <div className="model-list">
-      <Heading size={'md'} className="model-list-header">
-        Available Models
-      </Heading>
-      <div className="model-list-list">
-        {_.map(model_list, (model: Model, key) => (
-          <ModelListItem
-            key={key}
-            name={key}
-            status={model.status}
-            description={model.description}
-          />
-        ))}
-      </div>
+      <Accordion allowToggle>
+        <AccordionItem>
+          <AccordionButton>
+            <div className="model-list-button">
+              <h2>Models</h2>
+              <AccordionIcon />
+            </div>
+          </AccordionButton>
+
+          <AccordionPanel>
+            <div className="model-list-list">
+              {models.map((model, i) => (
+                <ModelListItem
+                  key={i}
+                  name={model.name}
+                  status={model.status}
+                  description={model.description}
+                />
+              ))}
+            </div>
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };

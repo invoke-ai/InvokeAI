@@ -294,7 +294,7 @@ const makeSocketIOListeners = (
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
       dispatch(setModelList(model_list));
-      dispatch(setCurrentStatus('Connected'));
+      dispatch(setCurrentStatus('Model Changed'));
       dispatch(setIsProcessing(false));
       dispatch(setIsCancelable(false));
       dispatch(
