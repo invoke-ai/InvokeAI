@@ -24,7 +24,7 @@ jobs:
           - os: macos-latest
             environment-file: environment-mac.yml
             default-shell: bash -l {0}
-    name: Test invoke.py on ${{ matrix.os }} with conda
+    name: Test invoke.py on ${{ matrix.os }} with ${{ matrix.stable-diffusion-model }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
