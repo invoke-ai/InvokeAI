@@ -71,24 +71,6 @@ jobs:
           [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
             || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
 
-      - name: Use cached Conda Environment
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
-          conda-env-file: ${{ matrix.environment-file }}
-        with:
-          path: ${{ env.CONDA }}/envs/${{ env.CONDA_ENV_NAME }}
-          key: env-${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.conda-env-file) }}
-
-      - name: Use cached Conda Packages
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-conda-pkgs-${{ env.CONDA_ENV_NAME }}
-          conda-env-file: ${{ matrix.environment-file }}
-        with:
-          path: ${{ env.CONDA_PKGS_DIR }}
-          key: pkgs-${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.conda-env-file) }}
-
       - name: Activate Conda Env
         uses: conda-incubator/setup-miniconda@v2
         with:
