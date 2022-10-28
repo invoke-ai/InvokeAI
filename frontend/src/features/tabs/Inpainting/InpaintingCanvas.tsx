@@ -189,7 +189,6 @@ const InpaintingCanvas = () => {
 
   const handleMouseOutCanvas = useCallback(() => {
     dispatch(setCursorPosition(null));
-    dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsDrawing(false));
   }, [dispatch]);
 
