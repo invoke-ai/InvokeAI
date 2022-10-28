@@ -44,9 +44,8 @@ const memoEqualityCheck = (
  */
 const HoverableImage = memo((props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { activeTabName, galleryImageObjectFit } = useAppSelector(
-    hoverableImageSelector
-  );
+  const { activeTabName, galleryImageObjectFit, galleryImageMinimumWidth } =
+    useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, uuid, metadata } = image;
 
@@ -173,7 +172,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               />
             )}
           </div>
-          {isHovered && (
+          {isHovered && galleryImageMinimumWidth >= 64 && (
             <div className="hoverable-image-delete-button">
               <Tooltip label={'Delete image'} hasArrow>
                 <DeleteImageModal image={image}>

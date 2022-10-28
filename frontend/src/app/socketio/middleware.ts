@@ -46,6 +46,8 @@ export const socketioMiddleware = () => {
       onInitialImageUploaded,
       onMaskImageUploaded,
       onSystemConfig,
+      onModelChanged,
+      onModelChangeFailed,
     } = makeSocketIOListeners(store);
 
     const {
@@ -59,7 +61,7 @@ export const socketioMiddleware = () => {
       emitUploadInitialImage,
       emitUploadMaskImage,
       emitRequestSystemConfig,
-      emitSetModel,
+      emitRequestModelChange,
     } = makeSocketIOEmitters(store, socketio);
 
     /**
@@ -112,6 +114,14 @@ export const socketioMiddleware = () => {
 
       socketio.on('systemConfig', (data: InvokeAI.SystemConfig) => {
         onSystemConfig(data);
+      });
+
+      socketio.on('modelChanged', (data: InvokeAI.ModelChangeResponse) => {
+        onModelChanged(data);
+      });
+
+      socketio.on('modelChangeFailed', (data: InvokeAI.ModelChangeResponse) => {
+        onModelChangeFailed(data);
       });
 
       areListenersSet = true;
@@ -171,8 +181,8 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/setModel': {
-        emitSetModel(action.payload);
+      case 'socketio/requestModelChange': {
+        emitRequestModelChange(action.payload);
         break;
       }
     }

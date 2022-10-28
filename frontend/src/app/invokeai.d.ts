@@ -142,11 +142,13 @@ export declare type SystemConfig = {
   model_hash: string;
   app_id: string;
   app_version: string;
-  available_models?: ModelList;
+  model_list: ModelList;
 };
 
+export declare type ModelStatus = 'active' | 'cached' | 'not loaded';
+
 export declare type Model = {
-  status: 'active' | 'cached' | 'not loaded';
+  status: ModelStatus;
   description: string;
 };
 
@@ -155,6 +157,11 @@ export declare type ModelList = Record<string, Model>;
 /**
  * These types type data received from the server via socketio.
  */
+
+export declare type ModelChangeResponse = {
+  model_name: string;
+  model_list: ModelList;
+};
 
 export declare type SystemStatusResponse = SystemStatus;
 
