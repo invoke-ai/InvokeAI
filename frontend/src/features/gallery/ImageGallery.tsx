@@ -123,10 +123,8 @@ export default function ImageGallery() {
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
       )
     );
-    if (!shouldHoldGalleryOpen) {
-      dispatch(setShouldHoldGalleryOpen(false));
-    }
     dispatch(setShouldShowGallery(false));
+    dispatch(setShouldHoldGalleryOpen(false));
   };
 
   const handleClickLoadMore = () => {
@@ -254,7 +252,7 @@ export default function ImageGallery() {
   return (
     <CSSTransition
       nodeRef={galleryRef}
-      in={shouldShowGallery || shouldHoldGalleryOpen}
+      in={shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)}
       unmountOnExit
       timeout={200}
       classNames="image-gallery-area"
