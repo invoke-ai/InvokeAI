@@ -1,4 +1,4 @@
-import { Button, Heading, useToast } from '@chakra-ui/react';
+import { Heading, useToast } from '@chakra-ui/react';
 import { useCallback } from 'react';
 import { FileRejection } from 'react-dropzone';
 import { FaUpload } from 'react-icons/fa';
@@ -42,7 +42,11 @@ export default function InvokeImageUploader(props: InvokeImageUploaderProps) {
       <ImageUploader
         fileAcceptedCallback={fileAcceptedCallback}
         fileRejectionCallback={fileRejectionCallback}
-        styleClass={`${styleClass} image-upload-child-wrapper`}
+        styleClass={
+          styleClass
+            ? `${styleClass} image-upload-child-wrapper`
+            : `image-upload-child-wrapper`
+        }
       >
         <div className="image-upload-child">
           <FaUpload size={'7rem'} />

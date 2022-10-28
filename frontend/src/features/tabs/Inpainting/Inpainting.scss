@@ -19,6 +19,16 @@
       column-gap: 0.5rem;
     }
 
+    .inpainting-button-dropdown {
+      display: flex;
+      flex-direction: column;
+      row-gap: 0.5rem;
+    }
+
+    .inpainting-color-picker {
+      margin-left: 1rem !important;
+    }
+
     .inpainting-slider-numberinput {
       display: flex;
       column-gap: 1rem;
@@ -78,12 +88,6 @@
   .image-gallery-area {
     .chakra-popover__popper {
       inset: 0 auto auto -75px !important;
-    }
-  }
-
-  .current-image-options {
-    .chakra-popover__popper {
-      z-index: 11;
     }
   }
 }

@@ -140,7 +140,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     [image]
   );
 
-  const handleClickUseSeed = () => image.metadata && dispatch(setSeed(image.metadata.image.seed));
+  const handleClickUseSeed = () =>
+    image.metadata && dispatch(setSeed(image.metadata.image.seed));
   useHotkeys(
     's',
     () => {

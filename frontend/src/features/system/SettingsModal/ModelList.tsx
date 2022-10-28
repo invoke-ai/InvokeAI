@@ -33,7 +33,7 @@ const ModelListItem = (props: ModelListItemProps) => {
   };
   return (
     <div className="model-list-item">
-      <Tooltip label={description} hasArrow placement="top">
+      <Tooltip label={description} hasArrow placement="bottom">
         <div className="model-list-item-name">{name}</div>
       </Tooltip>
       <Spacer />

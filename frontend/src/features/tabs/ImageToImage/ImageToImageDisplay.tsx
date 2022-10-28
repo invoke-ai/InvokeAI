@@ -27,7 +27,7 @@ const ImageToImageDisplay = () => {
 
   return (
     <div className="workarea-split-view">
-      <div className="workarea-split-view-left">{imageToImageComponent} </div>
+      <div className="workarea-split-view-left">{imageToImageComponent}</div>
       {currentImage && (
         <div className="workarea-split-view-right">
           <CurrentImageDisplay />

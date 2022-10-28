@@ -4,7 +4,10 @@ import InvokeWorkarea from '../InvokeWorkarea';
 
 export default function InpaintingWorkarea() {
   return (
-    <InvokeWorkarea optionsPanel={<InpaintingPanel />}>
+    <InvokeWorkarea
+      optionsPanel={<InpaintingPanel />}
+      styleClass="inpainting-workarea-overrides"
+    >
       <InpaintingDisplay />
     </InvokeWorkarea>
   );
