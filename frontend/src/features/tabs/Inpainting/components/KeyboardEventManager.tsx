@@ -11,19 +11,24 @@ import { tabMap } from '../../InvokeTabs';
 import {
   InpaintingState,
   setIsMovingBoundingBox,
-  toggleIsMovingBoundingBox,
   toggleTool,
 } from '../inpaintingSlice';
 
 const keyboardEventManagerSelector = createSelector(
   [(state: RootState) => state.options, (state: RootState) => state.inpainting],
   (options: OptionsState, inpainting: InpaintingState) => {
-    const { shouldShowMask, cursorPosition, isMovingBoundingBox } = inpainting;
+    const {
+      shouldShowMask,
+      cursorPosition,
+      isMovingBoundingBox,
+      shouldLockBoundingBox,
+    } = inpainting;
     return {
       activeTabName: tabMap[options.activeTab],
       shouldShowMask,
       isCursorOnCanvas: Boolean(cursorPosition),
       isMovingBoundingBox,
+      shouldLockBoundingBox,
     };
   },
   {
@@ -40,9 +45,9 @@ const KeyboardEventManager = () => {
     activeTabName,
     isCursorOnCanvas,
     isMovingBoundingBox,
+    shouldLockBoundingBox,
   } = useAppSelector(keyboardEventManagerSelector);
 
-  const isFirstEvent = useRef<boolean>(true);
   const wasLastEventOverCanvas = useRef<boolean>(false);
   const lastEvent = useRef<KeyboardEvent | null>(null);
 
@@ -52,7 +57,8 @@ const KeyboardEventManager = () => {
         !['Alt', ' '].includes(e.key) ||
         activeTabName !== 'inpainting' ||
         !shouldShowMask ||
-        e.repeat
+        e.repeat ||
+        shouldLockBoundingBox
       ) {
         return;
       }

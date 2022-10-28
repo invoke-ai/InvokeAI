@@ -40,7 +40,7 @@ export interface InpaintingState {
   boundingBoxPreviewFill: RgbaColor;
   shouldShowBoundingBox: boolean;
   shouldShowBoundingBoxFill: boolean;
-  isBoundingBoxTransforming: boolean;
+  isTransformingBoundingBox: boolean;
   lines: MaskLine[];
   pastLines: MaskLine[][];
   futureLines: MaskLine[][];
@@ -55,6 +55,7 @@ export interface InpaintingState {
   isDrawing: boolean;
   shouldUseInpaintReplace: boolean;
   inpaintReplace: number;
+  shouldLockBoundingBox: boolean;
 }
 
 const initialInpaintingState: InpaintingState = {
@@ -67,7 +68,7 @@ const initialInpaintingState: InpaintingState = {
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.7 },
   shouldShowBoundingBox: false,
   shouldShowBoundingBoxFill: false,
-  isBoundingBoxTransforming: false,
+  isTransformingBoundingBox: false,
   cursorPosition: null,
   lines: [],
   pastLines: [],
@@ -83,6 +84,7 @@ const initialInpaintingState: InpaintingState = {
   stageScale: 1,
   shouldUseInpaintReplace: false,
   inpaintReplace: 1,
+  shouldLockBoundingBox: true,
 };
 
 const initialState: InpaintingState = initialInpaintingState;
@@ -310,8 +312,8 @@ export const inpaintingSlice = createSlice({
     setShouldShowBoundingBoxFill: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBoxFill = action.payload;
     },
-    setIsBoundingBoxTransforming: (state, action: PayloadAction<boolean>) => {
-      state.isBoundingBoxTransforming = action.payload;
+    setIsTransformingBoundingBox: (state, action: PayloadAction<boolean>) => {
+      state.isTransformingBoundingBox = action.payload;
     },
     setIsDrawing: (state, action: PayloadAction<boolean>) => {
       state.isDrawing = action.payload;
@@ -328,6 +330,9 @@ export const inpaintingSlice = createSlice({
     },
     setInpaintReplace: (state, action: PayloadAction<number>) => {
       state.inpaintReplace = action.payload;
+    },
+    setShouldLockBoundingBox: (state, action: PayloadAction<boolean>) => {
+      state.shouldLockBoundingBox = action.payload;
     },
   },
 });
@@ -357,13 +362,14 @@ export const {
   toggleTool,
   toggleIsMovingBoundingBox,
   setShouldShowBoundingBoxFill,
-  setIsBoundingBoxTransforming,
+  setIsTransformingBoundingBox,
   setIsDrawing,
   setShouldShowBrush,
   setShouldShowBoundingBox,
   setClearBrushHistory,
   setShouldUseInpaintReplace,
   setInpaintReplace,
+  setShouldLockBoundingBox,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;

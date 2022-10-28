@@ -78,7 +78,7 @@ export const inpaintingCanvasSelector = createSelector(
       stageScale,
       shouldShowBoundingBoxFill,
       isDrawing,
-      isBoundingBoxTransforming,
+      isTransformingBoundingBox,
       shouldShowBoundingBox,
     } = inpainting;
     return {
@@ -97,7 +97,7 @@ export const inpaintingCanvasSelector = createSelector(
       stageScale,
       shouldShowBoundingBoxFill,
       isDrawing,
-      isBoundingBoxTransforming,
+      isTransformingBoundingBox,
       shouldShowBoundingBox,
     };
   },
