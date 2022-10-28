@@ -100,13 +100,20 @@ export const socketioMiddleware = () => {
         onProcessingCanceled();
       });
 
-      socketio.on('imageDeleted', (data: InvokeAI.ImageUrlAndUuidResponse) => {
+      socketio.on('imageDeleted', (data: InvokeAI.ImageDeletedResponse) => {
         onImageDeleted(data);
       });
 
-      socketio.on('initialImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
-        onInitialImageUploaded(data);
-      });
+      // socketio.on('initialImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
+      //   onInitialImageUploaded(data);
+      // });
+
+      socketio.on(
+        'initialImageUploaded',
+        (data: InvokeAI.ImageUploadResponse) => {
+          onInitialImageUploaded(data);
+        }
+      );
 
       socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
         onMaskImageUploaded(data);
@@ -152,12 +159,12 @@ export const socketioMiddleware = () => {
       }
 
       case 'socketio/requestImages': {
-        emitRequestImages();
+        emitRequestImages(action.payload);
         break;
       }
 
       case 'socketio/requestNewImages': {
-        emitRequestNewImages();
+        emitRequestNewImages(action.payload);
         break;
       }
 

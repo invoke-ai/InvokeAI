@@ -10,11 +10,15 @@ import _ from 'lodash';
 const imagesSelector = createSelector(
   (state: RootState) => state.gallery,
   (gallery: GalleryState) => {
-    const currentImageIndex = gallery.images.findIndex(
+    const { currentCategory } = gallery;
+
+    const tempImages = gallery.categories[currentCategory].images;
+    const currentImageIndex = tempImages.findIndex(
       (i) => i.uuid === gallery?.currentImage?.uuid
     );
-    const imagesLength = gallery.images.length;
+    const imagesLength = tempImages.length;
     return {
+      currentCategory,
       isOnFirstImage: currentImageIndex === 0,
       isOnLastImage:
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
@@ -35,7 +39,7 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
   const { imageToDisplay } = props;
   const dispatch = useAppDispatch();
 
-  const { isOnFirstImage, isOnLastImage } = useAppSelector(imagesSelector);
+  const { isOnFirstImage, isOnLastImage, currentCategory } = useAppSelector(imagesSelector);
 
   const shouldShowImageDetails = useAppSelector(
     (state: RootState) => state.options.shouldShowImageDetails
@@ -53,11 +57,11 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
   };
 
   const handleClickPrevButton = () => {
-    dispatch(selectPrevImage());
+    dispatch(selectPrevImage(currentCategory));
   };
 
   const handleClickNextButton = () => {
-    dispatch(selectNextImage());
+    dispatch(selectNextImage(currentCategory));
   };
 
   return (

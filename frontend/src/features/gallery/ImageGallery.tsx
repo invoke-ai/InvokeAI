@@ -11,6 +11,7 @@ import IAIIconButton from '../../common/components/IAIIconButton';
 import {
   selectNextImage,
   selectPrevImage,
+  setCurrentCategory,
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setGalleryScrollPosition,
@@ -20,7 +21,7 @@ import {
 } from './gallerySlice';
 import HoverableImage from './HoverableImage';
 import { setShouldShowGallery } from '../gallery/gallerySlice';
-import { Spacer, useToast } from '@chakra-ui/react';
+import { ButtonGroup, Spacer, useToast } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
 import { imageGallerySelector } from './gallerySliceSelectors';
@@ -36,8 +37,8 @@ export default function ImageGallery() {
 
   const {
     images,
+    currentCategory,
     currentImageUuid,
-    areMoreImagesAvailable,
     shouldPinGallery,
     shouldShowGallery,
     galleryScrollPosition,
@@ -47,6 +48,7 @@ export default function ImageGallery() {
     galleryImageObjectFit,
     shouldHoldGalleryOpen,
     shouldAutoSwitchToNewImages,
+    areMoreImagesAvailable,
   } = useAppSelector(imageGallerySelector);
 
   const [gallerySize, setGallerySize] = useState<Size>({
@@ -128,7 +130,7 @@ export default function ImageGallery() {
   };
 
   const handleClickLoadMore = () => {
-    dispatch(requestImages());
+    dispatch(requestImages(currentCategory));
   };
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
@@ -151,13 +153,21 @@ export default function ImageGallery() {
     [shouldShowGallery]
   );
 
-  useHotkeys('left', () => {
-    dispatch(selectPrevImage());
-  });
+  useHotkeys(
+    'left',
+    () => {
+      dispatch(selectPrevImage(currentCategory));
+    },
+    [currentCategory]
+  );
 
-  useHotkeys('right', () => {
-    dispatch(selectNextImage());
-  });
+  useHotkeys(
+    'right',
+    () => {
+      dispatch(selectNextImage(currentCategory));
+    },
+    [currentCategory]
+  );
 
   useHotkeys(
     'shift+p',
@@ -317,7 +327,7 @@ export default function ImageGallery() {
             ) : null}
 
             <IAIPopover
-              trigger="click"
+              trigger="hover"
               hasArrow={activeTabName === 'inpainting' ? false : true}
               // styleClass="image-gallery-settings-popover"
               triggerComponent={
@@ -331,6 +341,27 @@ export default function ImageGallery() {
               }
             >
               <div className="image-gallery-settings-popover">
+                <div>
+                  <ButtonGroup
+                    size="sm"
+                    isAttached
+                    variant="solid"
+                    className="image-gallery-category-btn-group"
+                  >
+                    <Button
+                      data-selected={currentCategory === 'result'}
+                      onClick={() => dispatch(setCurrentCategory('result'))}
+                    >
+                      Invocations
+                    </Button>
+                    <Button
+                      data-selected={currentCategory === 'user'}
+                      onClick={() => dispatch(setCurrentCategory('user'))}
+                    >
+                      Uploads
+                    </Button>
+                  </ButtonGroup>
+                </div>
                 <div>
                   <IAISlider
                     value={galleryImageMinimumWidth}

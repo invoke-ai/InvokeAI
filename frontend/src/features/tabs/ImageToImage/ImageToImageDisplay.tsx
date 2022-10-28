@@ -10,8 +10,8 @@ import ImageMetadataViewer from '../../gallery/ImageMetaDataViewer/ImageMetadata
 import InitImagePreview from './InitImagePreview';
 
 export default function ImageToImageDisplay() {
-  const initialImagePath = useAppSelector(
-    (state: RootState) => state.options.initialImagePath
+  const initialImage = useAppSelector(
+    (state: RootState) => state.options.initialImage
   );
 
   const { currentImage, intermediateImage } = useAppSelector(
@@ -33,7 +33,7 @@ export default function ImageToImageDisplay() {
           : { gridAutoRows: 'auto' }
       }
     >
-      {initialImagePath ? (
+      {initialImage ? (
         <>
           {imageToDisplay ? (
             <>

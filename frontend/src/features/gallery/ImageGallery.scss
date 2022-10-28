@@ -126,6 +126,22 @@
   }
 }
 
+.image-gallery-category-btn-group {
+  width: 100% !important;
+  column-gap: 0 !important;
+  justify-content: stretch !important;
+
+  button {
+    flex-grow: 1;
+    &[data-selected='true'] {
+      background-color: var(--accent-color);
+      &:hover {
+        background-color: var(--accent-color-hover);
+      }
+    }
+  }
+}
+
 // from https://css-tricks.com/a-grid-of-logos-in-squares/
 .image-gallery {
   display: grid;

@@ -8,7 +8,7 @@ import { RootState } from '../../app/store';
 import {
   setActiveTab,
   setAllParameters,
-  setInitialImagePath,
+  setInitialImage,
   setSeed,
   setShouldShowImageDetails,
 } from '../options/optionsSlice';
@@ -85,7 +85,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     useAppSelector(systemSelector);
 
   const handleClickUseAsInitialImage = () => {
-    dispatch(setInitialImagePath(image.url));
+    dispatch(setInitialImage(image));
     dispatch(setActiveTab(1));
   };
 
@@ -114,7 +114,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
   );
 
   const handleClickUseAllParameters = () =>
-    dispatch(setAllParameters(image.metadata));
+    image.metadata && dispatch(setAllParameters(image.metadata));
+
   useHotkeys(
     'a',
     () => {
@@ -139,9 +140,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     [image]
   );
 
-  // Non-null assertion: this button is disabled if there is no seed.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const handleClickUseSeed = () => dispatch(setSeed(image.metadata.image.seed));
+  const handleClickUseSeed = () => image.metadata && dispatch(setSeed(image.metadata.image.seed));
   useHotkeys(
     's',
     () => {

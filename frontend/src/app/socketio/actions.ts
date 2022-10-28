@@ -1,4 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
+import { GalleryCategory } from '../../features/gallery/gallerySlice';
 import { InvokeTabName } from '../../features/tabs/InvokeTabs';
 import * as InvokeAI from '../invokeai';
 
@@ -15,8 +16,8 @@ export const generateImage = createAction<InvokeTabName>(
 export const runESRGAN = createAction<InvokeAI.Image>('socketio/runESRGAN');
 export const runFacetool = createAction<InvokeAI.Image>('socketio/runFacetool');
 export const deleteImage = createAction<InvokeAI.Image>('socketio/deleteImage');
-export const requestImages = createAction<undefined>('socketio/requestImages');
-export const requestNewImages = createAction<undefined>(
+export const requestImages = createAction<GalleryCategory>('socketio/requestImages');
+export const requestNewImages = createAction<GalleryCategory>(
   'socketio/requestNewImages'
 );
 export const cancelProcessing = createAction<undefined>(

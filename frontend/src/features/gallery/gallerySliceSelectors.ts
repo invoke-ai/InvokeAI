@@ -8,24 +8,22 @@ export const imageGallerySelector = createSelector(
   [(state: RootState) => state.gallery, (state: RootState) => state.options],
   (gallery: GalleryState, options: OptionsState) => {
     const {
-      images,
+      categories,
+      currentCategory,
       currentImageUuid,
-      areMoreImagesAvailable,
       shouldPinGallery,
       shouldShowGallery,
       galleryScrollPosition,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldHoldGalleryOpen,
-      shouldAutoSwitchToNewImages
+      shouldAutoSwitchToNewImages,
     } = gallery;
 
     const { activeTab } = options;
 
     return {
-      images,
       currentImageUuid,
-      areMoreImagesAvailable,
       shouldPinGallery,
       shouldShowGallery,
       galleryScrollPosition,
@@ -34,7 +32,11 @@ export const imageGallerySelector = createSelector(
       galleryGridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       activeTabName: tabMap[activeTab],
       shouldHoldGalleryOpen,
-      shouldAutoSwitchToNewImages
+      shouldAutoSwitchToNewImages,
+      images: categories[currentCategory].images,
+      areMoreImagesAvailable:
+        categories[currentCategory].areMoreImagesAvailable,
+      currentCategory,
     };
   }
 );
