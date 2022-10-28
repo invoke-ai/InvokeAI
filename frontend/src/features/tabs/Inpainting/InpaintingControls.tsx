@@ -2,6 +2,7 @@ import { useToast } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
   FaEraser,
+  FaMask,
   FaPaintBrush,
   FaPalette,
   FaPlus,
@@ -36,6 +37,7 @@ import IAIPopover from '../../../common/components/IAIPopover';
 import IAIColorPicker from '../../../common/components/IAIColorPicker';
 import { RgbaColor } from 'react-colorful';
 import { setShowDualDisplay } from '../../options/optionsSlice';
+import { useState } from 'react';
 
 const InpaintingControls = () => {
   const {
@@ -53,6 +55,9 @@ const InpaintingControls = () => {
 
   const dispatch = useAppDispatch();
   const toast = useToast();
+
+  // Button State Controllers
+  const [maskOptionsOpen, setMaskOptionsOpen] = useState<boolean>(false);
 
   /**
    * Hotkeys
@@ -334,39 +339,71 @@ const InpaintingControls = () => {
       </div>
       <div className="inpainting-buttons-group">
         <IAIPopover
-          trigger="hover"
+          trigger="click"
+          onOpen={() => setMaskOptionsOpen(true)}
+          onClose={() => setMaskOptionsOpen(false)}
           triggerComponent={
             <IAIIconButton
-              aria-label="Mask Color"
-              tooltip="Mask Color"
-              icon={<FaPalette />}
-              isDisabled={!shouldShowMask}
+              aria-label="Mask Options"
+              tooltip="Mask Options"
+              icon={<FaMask />}
               cursor={'pointer'}
+              isDisabled={isMaskEmpty}
+              data-selected={maskOptionsOpen}
             />
           }
         >
-          <IAIColorPicker color={maskColor} onChange={handleChangeMaskColor} />
+          <div className="inpainting-button-dropdown">
+            <IAIIconButton
+              aria-label="Hide/Show Mask (H)"
+              tooltip="Hide/Show Mask (H)"
+              data-selected={!shouldShowMask}
+              icon={
+                shouldShowMask ? <BiShow size={22} /> : <BiHide size={22} />
+              }
+              onClick={handleToggleShouldShowMask}
+            />
+            <IAIIconButton
+              tooltip="Invert Mask Display (Shift+M)"
+              aria-label="Invert Mask Display (Shift+M)"
+              data-selected={shouldInvertMask}
+              icon={
+                shouldInvertMask ? (
+                  <MdInvertColors size={22} />
+                ) : (
+                  <MdInvertColorsOff size={22} />
+                )
+              }
+              onClick={handleToggleShouldInvertMask}
+              isDisabled={!shouldShowMask}
+            />
+            <IAIPopover
+              trigger="hover"
+              placement="right"
+              styleClass="inpainting-color-picker"
+              triggerComponent={
+                <IAIIconButton
+                  aria-label="Mask Color"
+                  tooltip="Mask Color"
+                  icon={<FaPalette />}
+                  isDisabled={!shouldShowMask}
+                  cursor={'pointer'}
+                />
+              }
+            >
+              <IAIColorPicker
+                color={maskColor}
+                onChange={handleChangeMaskColor}
+              />
+            </IAIPopover>
+          </div>
         </IAIPopover>
         <IAIIconButton
-          aria-label="Hide/Show Mask (H)"
-          tooltip="Hide/Show Mask (H)"
-          data-selected={!shouldShowMask}
-          icon={shouldShowMask ? <BiShow size={22} /> : <BiHide size={22} />}
-          onClick={handleToggleShouldShowMask}
-        />
-        <IAIIconButton
-          tooltip="Invert Mask Display (Shift+M)"
-          aria-label="Invert Mask Display (Shift+M)"
-          data-selected={shouldInvertMask}
-          icon={
-            shouldInvertMask ? (
-              <MdInvertColors size={22} />
-            ) : (
-              <MdInvertColorsOff size={22} />
-            )
-          }
-          onClick={handleToggleShouldInvertMask}
-          isDisabled={!shouldShowMask}
+          aria-label="Clear Mask (Shift+C)"
+          tooltip="Clear Mask (Shift+C)"
+          icon={<FaPlus size={18} style={{ transform: 'rotate(45deg)' }} />}
+          onClick={handleClearMask}
+          isDisabled={isMaskEmpty || !shouldShowMask}
         />
       </div>
       <div className="inpainting-buttons-group">
@@ -384,28 +421,23 @@ const InpaintingControls = () => {
           onClick={handleRedo}
           isDisabled={!canRedo || !shouldShowMask}
         />
-        <IAIIconButton
-          aria-label="Clear Mask Canvas (Shift + C)"
-          tooltip="Clear Mask Canvas (Shift + C)"
-          icon={<FaPlus size={18} style={{ transform: 'rotate(45deg)' }} />}
-          onClick={handleClearMask}
-          isDisabled={isMaskEmpty || !shouldShowMask}
-        />
+      </div>
+
+      <div className="inpainting-buttons-group">
         <IAIIconButton
           aria-label="Clear Image"
           tooltip="Clear Image"
-          icon={<FaTrash size={18} />}
+          icon={<FaTrash size={16} />}
           onClick={handleClearImage}
-          // isDisabled={}
-        />
-        <IAIIconButton
-          aria-label="Split Layout (Shift+J)"
-          tooltip="Split Layout (Shift+J)"
-          icon={<VscSplitHorizontal />}
-          data-selected={showDualDisplay}
-          onClick={handleDualDisplay}
         />
       </div>
+      <IAIIconButton
+        aria-label="Split Layout (Shift+J)"
+        tooltip="Split Layout (Shift+J)"
+        icon={<VscSplitHorizontal />}
+        data-selected={showDualDisplay}
+        onClick={handleDualDisplay}
+      />
     </div>
   );
 };

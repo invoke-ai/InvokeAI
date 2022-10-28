@@ -24,7 +24,14 @@
 .image-upload-child {
   display: flex;
   flex-direction: column;
-  row-gap: 3rem;
   align-items: center;
   justify-content: center;
+  text-align: center;
+
+  svg {
+    width: 4rem !important;
+  }
+  h2 {
+    font-size: 1.2rem !important;
+  }
 }

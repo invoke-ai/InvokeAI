@@ -17,7 +17,7 @@ interface Props extends IconButtonProps {
 const IAIIconButton = (props: Props) => {
   const {
     tooltip = '',
-    tooltipPlacement = 'top',
+    tooltipPlacement = 'bottom',
     styleClass,
     onClick,
     cursor,
