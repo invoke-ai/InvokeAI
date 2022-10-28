@@ -291,7 +291,19 @@ export const inpaintingSlice = createSlice({
       };
     },
     setBoundingBoxCoordinate: (state, action: PayloadAction<Vector2d>) => {
-      state.boundingBoxCoordinate = action.payload;
+      state.boundingBoxCoordinate = action.payload
+      // const { x, y } = action.payload;
+
+      // const maxX =
+      //   state.canvasDimensions.width - state.boundingBoxDimensions.width;
+
+      // const maxY =
+      //   state.canvasDimensions.height - state.boundingBoxDimensions.height;
+
+      // const clampedX = _.clamp(x, 0, maxX);
+      // const clampedY = _.clamp(y, 0, maxY);
+
+      // state.boundingBoxCoordinate = { x: clampedX, y: clampedY };
     },
     setIsMovingBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.isMovingBoundingBox = action.payload;

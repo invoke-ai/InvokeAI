@@ -16,10 +16,8 @@ import { useAppDispatch, useAppSelector } from '../../../app/store';
 import {
   addLine,
   addPointToCurrentLine,
-  setBoundingBoxCoordinate,
   setCursorPosition,
   setIsDrawing,
-  setIsMovingBoundingBox,
 } from './inpaintingSlice';
 import { inpaintingCanvasSelector } from './inpaintingSliceSelectors';
 
@@ -30,7 +28,6 @@ import InpaintingCanvasBrushPreviewOutline from './components/InpaintingCanvasBr
 import Cacher from './components/Cacher';
 import { Vector2d } from 'konva/lib/types';
 import getScaledCursorPosition from './util/getScaledCursorPosition';
-import _ from 'lodash';
 import InpaintingBoundingBoxPreview, {
   InpaintingBoundingBoxPreviewOverlay,
 } from './components/InpaintingBoundingBoxPreview';
@@ -53,14 +50,10 @@ const InpaintingCanvas = () => {
     shouldShowCheckboardTransparency,
     maskColor,
     imageToInpaint,
-    isMovingBoundingBox,
-    boundingBoxDimensions,
-    canvasDimensions,
-    boundingBoxCoordinate,
     stageScale,
     shouldShowBoundingBoxFill,
     isDrawing,
-    isTransformingBoundingBox,
+    shouldLockBoundingBox,
     shouldShowBoundingBox,
   } = useAppSelector(inpaintingCanvasSelector);
 
@@ -91,12 +84,22 @@ const InpaintingCanvas = () => {
     }
   }, [imageToInpaint, dispatch, stageScale]);
 
+  /**
+   *
+   * Canvas onMouseDown
+   *
+   */
   const handleMouseDown = useCallback(() => {
     if (!stageRef.current) return;
 
     const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-    if (!scaledCursorPosition || !maskLayerRef.current) return;
+    if (
+      !scaledCursorPosition ||
+      !maskLayerRef.current ||
+      !shouldLockBoundingBox
+    )
+      return;
 
     dispatch(setIsDrawing(true));
 
@@ -108,69 +111,55 @@ const InpaintingCanvas = () => {
         points: [scaledCursorPosition.x, scaledCursorPosition.y],
       })
     );
-  }, [dispatch, brushSize, tool]);
+  }, [dispatch, brushSize, tool, shouldLockBoundingBox]);
 
-  const handleMouseMove = useCallback(() => {
-    if (!stageRef.current) return;
+  /**
+   *
+   * Canvas onMouseMove
+   *
+   */
+  const handleMouseMove = useCallback(
+    () => {
+      if (!stageRef.current) return;
 
-    const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
+      const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-    if (!scaledCursorPosition) return;
+      if (!scaledCursorPosition) return;
 
-    dispatch(setCursorPosition(scaledCursorPosition));
+      dispatch(setCursorPosition(scaledCursorPosition));
 
-    if (!maskLayerRef.current) {
-      return;
-    }
+      if (!maskLayerRef.current || !shouldLockBoundingBox) {
+        return;
+      }
 
-    const deltaX = lastCursorPosition.current.x - scaledCursorPosition.x;
-    const deltaY = lastCursorPosition.current.y - scaledCursorPosition.y;
+      lastCursorPosition.current = scaledCursorPosition;
 
-    lastCursorPosition.current = scaledCursorPosition;
+      if (!isDrawing) return;
 
-    if (isMovingBoundingBox) {
-      const x = _.clamp(
-        Math.floor(boundingBoxCoordinate.x - deltaX),
-        0,
-        canvasDimensions.width - boundingBoxDimensions.width
-      );
-
-      const y = _.clamp(
-        Math.floor(boundingBoxCoordinate.y - deltaY),
-        0,
-        canvasDimensions.height - boundingBoxDimensions.height
-      );
-
+      didMouseMoveRef.current = true;
+      // Extend the current line
       dispatch(
-        setBoundingBoxCoordinate({
-          x,
-          y,
-        })
+        addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
       );
+    },
+    [dispatch, isDrawing, shouldLockBoundingBox]
+  );
 
-      return;
-    }
-    if (!isDrawing) return;
-
-    didMouseMoveRef.current = true;
-    // Extend the current line
-    dispatch(
-      addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-    );
-  }, [
-    dispatch,
-    isMovingBoundingBox,
-    boundingBoxDimensions,
-    canvasDimensions,
-    boundingBoxCoordinate,
-    isDrawing,
-  ]);
-
+  /**
+   *
+   * Canvas onMouseUp
+   *
+   */
   const handleMouseUp = useCallback(() => {
     if (!didMouseMoveRef.current && isDrawing && stageRef.current) {
       const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-      if (!scaledCursorPosition || !maskLayerRef.current) return;
+      if (
+        !scaledCursorPosition ||
+        !maskLayerRef.current ||
+        !shouldLockBoundingBox
+      )
+        return;
 
       /**
        * Extend the current line.
@@ -185,13 +174,23 @@ const InpaintingCanvas = () => {
       didMouseMoveRef.current = false;
     }
     dispatch(setIsDrawing(false));
-  }, [dispatch, isDrawing]);
+  }, [dispatch, isDrawing, shouldLockBoundingBox]);
 
+  /**
+   *
+   * Canvas onMouseOut
+   *
+   */
   const handleMouseOutCanvas = useCallback(() => {
     dispatch(setCursorPosition(null));
     dispatch(setIsDrawing(false));
   }, [dispatch]);
 
+  /**
+   *
+   * Canvas onMouseEnter
+   *
+   */
   const handleMouseEnter = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       if (e.evt.buttons === 1) {
@@ -202,8 +201,7 @@ const InpaintingCanvas = () => {
         if (
           !scaledCursorPosition ||
           !maskLayerRef.current ||
-          isMovingBoundingBox ||
-          isTransformingBoundingBox
+          !shouldLockBoundingBox
         )
           return;
 
@@ -219,7 +217,7 @@ const InpaintingCanvas = () => {
         );
       }
     },
-    [dispatch, brushSize, tool, isMovingBoundingBox, isTransformingBoundingBox]
+    [dispatch, brushSize, tool, shouldLockBoundingBox]
   );
 
   return (
