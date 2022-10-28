@@ -30,7 +30,6 @@ export const inpaintingControlsSelector = createSelector(
       lines,
       pastLines,
       futureLines,
-      isMovingBoundingBox,
       shouldShowBoundingBoxFill,
     } = inpainting;
 
@@ -46,7 +45,6 @@ export const inpaintingControlsSelector = createSelector(
       canUndo: pastLines.length > 0,
       canRedo: futureLines.length > 0,
       isMaskEmpty: lines.length === 0,
-      isMovingBoundingBox,
       activeTabName: tabMap[activeTab],
       showDualDisplay,
       shouldShowBoundingBoxFill,
