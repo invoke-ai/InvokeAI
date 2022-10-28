@@ -220,8 +220,17 @@ const InpaintingCanvas = () => {
   return (
     <div className="inpainting-canvas-wrapper checkerboard" tabIndex={1}>
       <div className="inpainting-alerts">
-        {!shouldShowMask && <div>Mask Hidden (H)</div>}
-        {shouldInvertMask && <div>Mask Inverted (Shift+M)</div>}
+        {!shouldShowMask && (
+          <div style={{ pointerEvents: 'none' }}>Mask Hidden (H)</div>
+        )}
+        {shouldInvertMask && (
+          <div style={{ pointerEvents: 'none' }}>Mask Inverted (Shift+M)</div>
+        )}
+        {!shouldLockBoundingBox && (
+          <div style={{ pointerEvents: 'none' }}>
+            Transforming Bounding Box (M)
+          </div>
+        )}
       </div>
 
       {canvasBgImage && (

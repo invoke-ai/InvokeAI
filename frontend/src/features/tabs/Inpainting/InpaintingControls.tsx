@@ -23,6 +23,7 @@ import {
   setShouldShowMask,
   setShouldInvertMask,
   setNeedsRepaint,
+  toggleShouldLockBoundingBox,
 } from './inpaintingSlice';
 
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
@@ -137,6 +138,19 @@ const InpaintingControls = () => {
     (e: KeyboardEvent) => {
       e.preventDefault();
       handleSelectBrushTool();
+    },
+    {
+      enabled: activeTabName === 'inpainting' && shouldShowMask,
+    },
+    [activeTabName, shouldShowMask]
+  );
+
+  // Toggle lock bounding box
+  useHotkeys(
+    'm',
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      dispatch(toggleShouldLockBoundingBox());
     },
     {
       enabled: activeTabName === 'inpainting' && shouldShowMask,

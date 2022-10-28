@@ -36,11 +36,9 @@ export interface InpaintingState {
   canvasDimensions: Dimensions;
   boundingBoxDimensions: Dimensions;
   boundingBoxCoordinate: Vector2d;
-  isMovingBoundingBox: boolean;
   boundingBoxPreviewFill: RgbaColor;
   shouldShowBoundingBox: boolean;
   shouldShowBoundingBoxFill: boolean;
-  isTransformingBoundingBox: boolean;
   lines: MaskLine[];
   pastLines: MaskLine[][];
   futureLines: MaskLine[][];
@@ -68,7 +66,6 @@ const initialInpaintingState: InpaintingState = {
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.7 },
   shouldShowBoundingBox: false,
   shouldShowBoundingBoxFill: false,
-  isTransformingBoundingBox: false,
   cursorPosition: null,
   lines: [],
   pastLines: [],
@@ -78,7 +75,6 @@ const initialInpaintingState: InpaintingState = {
   shouldShowCheckboardTransparency: false,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
-  isMovingBoundingBox: false,
   needsRepaint: false,
   isDrawing: false,
   stageScale: 1,
@@ -289,24 +285,6 @@ export const inpaintingSlice = createSlice({
     },
     setBoundingBoxCoordinate: (state, action: PayloadAction<Vector2d>) => {
       state.boundingBoxCoordinate = action.payload;
-      // const { x, y } = action.payload;
-
-      // const maxX =
-      //   state.canvasDimensions.width - state.boundingBoxDimensions.width;
-
-      // const maxY =
-      //   state.canvasDimensions.height - state.boundingBoxDimensions.height;
-
-      // const clampedX = _.clamp(x, 0, maxX);
-      // const clampedY = _.clamp(y, 0, maxY);
-
-      // state.boundingBoxCoordinate = { x: clampedX, y: clampedY };
-    },
-    setIsMovingBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state.isMovingBoundingBox = action.payload;
-    },
-    toggleIsMovingBoundingBox: (state) => {
-      state.isMovingBoundingBox = !state.isMovingBoundingBox;
     },
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
       state.boundingBoxPreviewFill = action.payload;
@@ -320,9 +298,6 @@ export const inpaintingSlice = createSlice({
     },
     setShouldShowBoundingBoxFill: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBoxFill = action.payload;
-    },
-    setIsTransformingBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state.isTransformingBoundingBox = action.payload;
     },
     setIsDrawing: (state, action: PayloadAction<boolean>) => {
       state.isDrawing = action.payload;
@@ -342,6 +317,9 @@ export const inpaintingSlice = createSlice({
     },
     setShouldLockBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldLockBoundingBox = action.payload;
+    },
+    toggleShouldLockBoundingBox: (state) => {
+      state.shouldLockBoundingBox = !state.shouldLockBoundingBox;
     },
   },
 });
@@ -364,14 +342,11 @@ export const {
   setImageToInpaint,
   setBoundingBoxDimensions,
   setBoundingBoxCoordinate,
-  setIsMovingBoundingBox,
   setBoundingBoxPreviewFill,
   setNeedsRepaint,
   setStageScale,
   toggleTool,
-  toggleIsMovingBoundingBox,
   setShouldShowBoundingBoxFill,
-  setIsTransformingBoundingBox,
   setIsDrawing,
   setShouldShowBrush,
   setShouldShowBoundingBox,
@@ -379,6 +354,7 @@ export const {
   setShouldUseInpaintReplace,
   setInpaintReplace,
   setShouldLockBoundingBox,
+  toggleShouldLockBoundingBox,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;
