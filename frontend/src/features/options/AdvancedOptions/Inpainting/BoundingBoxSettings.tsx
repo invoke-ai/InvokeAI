@@ -1,3 +1,4 @@
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { ChangeEvent } from 'react';
@@ -18,6 +19,7 @@ import { roundDownToMultiple } from '../../../../common/util/roundDownToMultiple
 import {
   InpaintingState,
   setBoundingBoxDimensions,
+  setShouldLockBoundingBox,
   setShouldShowBoundingBox,
   setShouldShowBoundingBoxFill,
 } from '../../../tabs/Inpainting/inpaintingSlice';
@@ -32,6 +34,7 @@ const boundingBoxDimensionsSelector = createSelector(
       shouldShowBoundingBoxFill,
       pastLines,
       futureLines,
+      shouldLockBoundingBox,
     } = inpainting;
     return {
       canvasDimensions,
@@ -40,6 +43,7 @@ const boundingBoxDimensionsSelector = createSelector(
       shouldShowBoundingBoxFill,
       pastLines,
       futureLines,
+      shouldLockBoundingBox,
     };
   },
   {
@@ -56,6 +60,7 @@ const BoundingBoxSettings = () => {
     boundingBoxDimensions,
     shouldShowBoundingBox,
     shouldShowBoundingBoxFill,
+    shouldLockBoundingBox,
   } = useAppSelector(boundingBoxDimensionsSelector);
 
   const handleChangeBoundingBoxWidth = (v: number) => {
@@ -71,6 +76,10 @@ const BoundingBoxSettings = () => {
 
   const handleChangeShouldShowBoundingBoxFill = () => {
     dispatch(setShouldShowBoundingBoxFill(!shouldShowBoundingBoxFill));
+  };
+
+  const handleChangeShouldLockBoundingBox = () => {
+    dispatch(setShouldLockBoundingBox(!shouldLockBoundingBox));
   };
 
   const handleResetWidth = () => {
@@ -169,13 +178,22 @@ const BoundingBoxSettings = () => {
             }
           />
         </div>
-        <IAICheckbox
-          label="Darken Outside Box"
-          isChecked={shouldShowBoundingBoxFill}
-          onChange={handleChangeShouldShowBoundingBoxFill}
-          styleClass="inpainting-bounding-box-darken"
-          isDisabled={!shouldShowBoundingBox}
-        />
+        <Flex alignItems={'center'} justifyContent={'space-between'}>
+          <IAICheckbox
+            label="Darken Outside Box"
+            isChecked={shouldShowBoundingBoxFill}
+            onChange={handleChangeShouldShowBoundingBoxFill}
+            styleClass="inpainting-bounding-box-darken"
+            isDisabled={!shouldShowBoundingBox}
+          />
+          <IAICheckbox
+            label="Lock Bounding Box"
+            isChecked={shouldLockBoundingBox}
+            onChange={handleChangeShouldLockBoundingBox}
+            styleClass="inpainting-bounding-box-darken"
+            isDisabled={!shouldShowBoundingBox}
+          />
+        </Flex>
       </div>
     </div>
   );

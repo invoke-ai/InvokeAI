@@ -3,7 +3,7 @@ import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
 import {
   RootState,
@@ -15,7 +15,7 @@ import {
   InpaintingState,
   setBoundingBoxCoordinate,
   setBoundingBoxDimensions,
-  setIsBoundingBoxTransforming,
+  setIsTransformingBoundingBox,
   setIsDrawing,
   setShouldShowBrush,
 } from '../inpaintingSlice';
@@ -36,6 +36,7 @@ const boundingBoxPreviewSelector = createSelector(
       stageScale,
       imageToInpaint,
       isMovingBoundingBox,
+      shouldLockBoundingBox,
     } = inpainting;
     return {
       boundingBoxCoordinate,
@@ -47,6 +48,7 @@ const boundingBoxPreviewSelector = createSelector(
       dash: DASH_WIDTH / stageScale, // scale dash lengths
       strokeWidth: 1 / stageScale, // scale stroke thickness
       isMovingBoundingBox,
+      shouldLockBoundingBox,
     };
   },
   {
@@ -157,6 +159,7 @@ const InpaintingBoundingBoxPreview = () => {
     strokeWidth,
     stageScale,
     imageToInpaint,
+    shouldLockBoundingBox,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -166,9 +169,11 @@ const InpaintingBoundingBoxPreview = () => {
     if (!transformerRef.current || !shapeRef.current) return;
     transformerRef.current.nodes([shapeRef.current]);
     transformerRef.current.getLayer()?.batchDraw();
-  }, []);
+  }, [shouldLockBoundingBox]);
 
   const scaledStep = 64 * stageScale;
+
+  console.log(shouldLockBoundingBox);
 
   return (
     <>
@@ -184,11 +189,11 @@ const InpaintingBoundingBoxPreview = () => {
         onTransformStart={() => {
           dispatch(setIsDrawing(false));
           dispatch(setShouldShowBrush(false));
-          dispatch(setIsBoundingBoxTransforming(true));
+          dispatch(setIsTransformingBoundingBox(true));
         }}
         onTransformEnd={() => {
           dispatch(setShouldShowBrush(true));
-          dispatch(setIsBoundingBoxTransforming(false));
+          dispatch(setIsTransformingBoundingBox(false));
         }}
         onTransform={() => {
           /**
@@ -230,6 +235,7 @@ const InpaintingBoundingBoxPreview = () => {
         }}
       />
       <Transformer
+        enabledAnchors={shouldLockBoundingBox ? [] : undefined}
         ref={transformerRef}
         rotateEnabled={false}
         anchorSize={15}
@@ -243,6 +249,9 @@ const InpaintingBoundingBoxPreview = () => {
         keepRatio={false}
         flipEnabled={false}
         onMouseDown={(e: KonvaEventObject<MouseEvent>) => {
+          e.cancelBubble = true;
+        }}
+        onMouseOver={(e: KonvaEventObject<MouseEvent>) => {
           e.cancelBubble = true;
         }}
         anchorDragBoundFunc={(
