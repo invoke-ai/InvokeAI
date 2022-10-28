@@ -40,6 +40,7 @@ const systemPersistConfig = {
   key: 'system',
   storage,
   blacklist: [
+    'isCancelable',
     'isConnected',
     'isProcessing',
     'currentStep',
