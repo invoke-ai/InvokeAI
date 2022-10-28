@@ -30,7 +30,7 @@ const initialState: GalleryState = {
   shouldShowGallery: true,
   galleryScrollPosition: 0,
   galleryImageMinimumWidth: 64,
-  galleryImageObjectFit: 'contain',
+  galleryImageObjectFit: 'cover',
   shouldHoldGalleryOpen: false,
   shouldAutoSwitchToNewImages: true,
 };
