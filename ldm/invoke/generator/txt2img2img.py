@@ -25,15 +25,14 @@ class Txt2Img2Img(Generator):
         kwargs are 'width' and 'height'
         """
         uc, c, extra_conditioning_info = conditioning
+        scale_dim = min(width, height)
+        scale = 512 / scale_dim
+
+        init_width = math.ceil(scale * width / 64) * 64
+        init_height = math.ceil(scale * height / 64) * 64
 
         @torch.no_grad()
         def make_image(x_T):
-
-            scale_dim = min(width, height)
-            scale = 512 / scale_dim
-            
-            init_width = math.ceil(scale * width / 64) * 64
-            init_height = math.ceil(scale * height / 64) * 64
 
             shape = [
                 self.latent_channels,
