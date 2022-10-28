@@ -60,7 +60,7 @@ const InpaintingCanvas = () => {
     stageScale,
     shouldShowBoundingBoxFill,
     isDrawing,
-    isBoundingBoxTransforming,
+    isTransformingBoundingBox,
     shouldShowBoundingBox,
   } = useAppSelector(inpaintingCanvasSelector);
 
@@ -204,7 +204,7 @@ const InpaintingCanvas = () => {
           !scaledCursorPosition ||
           !maskLayerRef.current ||
           isMovingBoundingBox ||
-          isBoundingBoxTransforming
+          isTransformingBoundingBox
         )
           return;
 
@@ -220,7 +220,7 @@ const InpaintingCanvas = () => {
         );
       }
     },
-    [dispatch, brushSize, tool, isMovingBoundingBox, isBoundingBoxTransforming]
+    [dispatch, brushSize, tool, isMovingBoundingBox, isTransformingBoundingBox]
   );
 
   return (
