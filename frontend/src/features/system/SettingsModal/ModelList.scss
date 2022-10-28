@@ -1,9 +1,36 @@
 .model-list {
-  display: flex;
-  flex-direction: column;
-  row-gap: 0.5rem;
+  .chakra-accordion {
+    display: grid;
+    row-gap: 0.5rem;
+  }
 
-  .model-list-header {
+  .chakra-accordion__item {
+    border: none;
+    border-radius: 0.3rem;
+    background-color: var(--tab-hover-color);
+  }
+
+  button {
+    border-radius: 0.3rem !important;
+
+    &[aria-expanded='true'] {
+      background-color: var(--tab-hover-color);
+      border-radius: 0.3rem;
+    }
+  }
+
+  .model-list-button {
+    display: flex;
+    flex-direction: row;
+    row-gap: 0.5rem;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .model-list-header-hint {
+    color: var(--text-color-secondary);
+    font-weight: normal;
   }
 
   .model-list-list {
