@@ -10,7 +10,9 @@ import { OptionsState } from '../../../options/optionsSlice';
 import { tabMap } from '../../InvokeTabs';
 import {
   InpaintingState,
-  setIsMovingBoundingBox,
+  setIsDrawing,
+  setShouldLockBoundingBox,
+  setShouldShowBrush,
   toggleTool,
 } from '../inpaintingSlice';
 
@@ -20,14 +22,12 @@ const keyboardEventManagerSelector = createSelector(
     const {
       shouldShowMask,
       cursorPosition,
-      isMovingBoundingBox,
       shouldLockBoundingBox,
     } = inpainting;
     return {
       activeTabName: tabMap[options.activeTab],
       shouldShowMask,
       isCursorOnCanvas: Boolean(cursorPosition),
-      isMovingBoundingBox,
       shouldLockBoundingBox,
     };
   },
@@ -44,7 +44,6 @@ const KeyboardEventManager = () => {
     shouldShowMask,
     activeTabName,
     isCursorOnCanvas,
-    isMovingBoundingBox,
     shouldLockBoundingBox,
   } = useAppSelector(keyboardEventManagerSelector);
 
@@ -54,11 +53,9 @@ const KeyboardEventManager = () => {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (
-        !['Alt', ' '].includes(e.key) ||
+        !['z', ' '].includes(e.key) ||
         activeTabName !== 'inpainting' ||
-        !shouldShowMask ||
-        e.repeat ||
-        shouldLockBoundingBox
+        !shouldShowMask
       ) {
         return;
       }
@@ -72,8 +69,10 @@ const KeyboardEventManager = () => {
         wasLastEventOverCanvas.current = false;
         return;
       }
-
-      // cursor is over canvas
+      e.stopPropagation();
+      e.preventDefault();
+      if (e.repeat) return;
+      // cursor is over canvas, we can preventDefault now
 
       // if this is the first event
       if (!lastEvent.current) {
@@ -87,15 +86,20 @@ const KeyboardEventManager = () => {
         return;
       }
 
-      e.preventDefault();
-
       switch (e.key) {
-        case 'Alt': {
+        case 'z': {
           dispatch(toggleTool());
           break;
         }
         case ' ': {
-          dispatch(setIsMovingBoundingBox(e.type === 'keydown' ? true : false));
+          if (e.type === 'keydown') {
+            dispatch(setIsDrawing(false));
+            dispatch(setShouldLockBoundingBox(false));
+            dispatch(setShouldShowBrush(false));
+          } else {
+            dispatch(setShouldLockBoundingBox(true));
+            dispatch(setShouldShowBrush(true));
+          }
           break;
         }
       }
@@ -116,7 +120,7 @@ const KeyboardEventManager = () => {
     activeTabName,
     shouldShowMask,
     isCursorOnCanvas,
-    isMovingBoundingBox,
+    shouldLockBoundingBox,
   ]);
 
   return null;
