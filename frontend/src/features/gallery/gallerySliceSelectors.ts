@@ -17,6 +17,7 @@ export const imageGallerySelector = createSelector(
       galleryImageMinimumWidth,
       galleryImageObjectFit,
       shouldHoldGalleryOpen,
+      shouldAutoSwitchToNewImages
     } = gallery;
 
     const { activeTab } = options;
@@ -33,6 +34,7 @@ export const imageGallerySelector = createSelector(
       galleryGridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       activeTabName: tabMap[activeTab],
       shouldHoldGalleryOpen,
+      shouldAutoSwitchToNewImages
     };
   }
 );

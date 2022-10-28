@@ -1,7 +1,7 @@
 import { Button } from '@chakra-ui/button';
 import { NumberSize, Resizable, Size } from 're-resizable';
 
-import { useEffect, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdClear, MdPhotoLibrary } from 'react-icons/md';
 import { BsPinAngleFill } from 'react-icons/bs';
@@ -14,6 +14,7 @@ import {
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setGalleryScrollPosition,
+  setShouldAutoSwitchToNewImages,
   setShouldHoldGalleryOpen,
   setShouldPinGallery,
 } from './gallerySlice';
@@ -45,6 +46,7 @@ export default function ImageGallery() {
     activeTabName,
     galleryImageObjectFit,
     shouldHoldGalleryOpen,
+    shouldAutoSwitchToNewImages,
   } = useAppSelector(imageGallerySelector);
 
   const [gallerySize, setGallerySize] = useState<Size>({
@@ -367,6 +369,15 @@ export default function ImageGallery() {
                             : 'contain'
                         )
                       )
+                    }
+                  />
+                </div>
+                <div>
+                  <IAICheckbox
+                    label="Auto-Switch to New Images"
+                    isChecked={shouldAutoSwitchToNewImages}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldAutoSwitchToNewImages(e.target.checked))
                     }
                   />
                 </div>

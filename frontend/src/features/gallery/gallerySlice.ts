@@ -19,6 +19,7 @@ export interface GalleryState {
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldHoldGalleryOpen: boolean;
+  shouldAutoSwitchToNewImages: boolean;
 }
 
 const initialState: GalleryState = {
@@ -31,6 +32,7 @@ const initialState: GalleryState = {
   galleryImageMinimumWidth: 64,
   galleryImageObjectFit: 'contain',
   shouldHoldGalleryOpen: false,
+  shouldAutoSwitchToNewImages: true,
 };
 
 export const gallerySlice = createSlice({
@@ -94,9 +96,11 @@ export const gallerySlice = createSlice({
       }
 
       state.images.unshift(newImage);
-      state.currentImageUuid = uuid;
+      if (state.shouldAutoSwitchToNewImages) {
+        state.currentImageUuid = uuid;
+        state.currentImage = newImage;
+      }
       state.intermediateImage = undefined;
-      state.currentImage = newImage;
       state.latest_mtime = mtime;
     },
     setIntermediateImage: (state, action: PayloadAction<InvokeAI.Image>) => {
@@ -186,6 +190,9 @@ export const gallerySlice = createSlice({
     setShouldHoldGalleryOpen: (state, action: PayloadAction<boolean>) => {
       state.shouldHoldGalleryOpen = action.payload;
     },
+    setShouldAutoSwitchToNewImages: (state, action: PayloadAction<boolean>) => {
+      state.shouldAutoSwitchToNewImages = action.payload;
+    },
   },
 });
 
@@ -204,6 +211,7 @@ export const {
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setShouldHoldGalleryOpen,
+  setShouldAutoSwitchToNewImages,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
