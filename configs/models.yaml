@@ -6,10 +6,10 @@
 # and the width and height of the images it
 # was trained on.
 stable-diffusion-1.4:
-  config: configs/stable-diffusion/v1-inference.yaml
-  weights: models/ldm/stable-diffusion-v1/model.ckpt
-  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
-  description: Stable Diffusion inference model version 1.4
+  config: ./configs/stable-diffusion/v1-inference.yaml
+  weights: ./models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
+  vae: ./models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+  description: The original Stable Diffusion version 1.4 weight file (4.27 GB)
   width: 512
   height: 512
 stable-diffusion-1.5:

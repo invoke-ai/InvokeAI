@@ -93,6 +93,22 @@ and other large models that are needed for text to image generation. At any poin
 this program and resume later.\n'''
     )
 
+#--------------------------------------------
+def postscript():
+    print(
+        '''You're all set! You may now launch InvokeAI using one of these two commands:
+Web version: 
+
+    python scripts/invoke.py --web  (connect to http://localhost:9090)
+
+Command-line version:
+
+   python scripts/invoke.py
+
+Have fun!
+'''
+)
+
 #---------------------------------------------
 def yes_or_no(prompt:str, default_yes=True):
     default = "y" if default_yes else 'n'
@@ -144,19 +160,43 @@ will be given the option to view and change your selections.
 #-------------------------------Authenticate against Hugging Face
 def authenticate():
     print('''
-To download the Stable Diffusion weight files you need to read and accept the
-CreativeML Responsible AI license. If you have not already done so, please 
-create an account at https://huggingface.co. Then login under your account and
-read and accept the license available at https://huggingface.co/CompVis/stable-diffusion-v-1-4-original.
+To download the Stable Diffusion weight files from the official Hugging Face 
+repository, you need to read and accept the CreativeML Responsible AI license.
+
+This involves a few easy steps.
+
+1. If you have not already done so, create an account on Hugging Face's web site
+   using the "Sign Up" button:
+
+   https://huggingface.co/join
+
+   You will need to verify your email address as part of the HuggingFace
+   registration process.
+
+2. Log into your account Hugging Face:
+
+    https://huggingface.co/login
+
+3. Accept the license terms located here:
+
+   https://huggingface.co/CompVis/stable-diffusion-v-1-4-original
 '''
     )
     input('Press <enter> when you are ready to continue:')
     access_token = HfFolder.get_token()
     if access_token is None:
         print('''
-Thank you! Now you need to authenticate with your HuggingFace access token.
-Go to https://huggingface.co/settings/tokens and create a token. Copy it to the
-clipboard and paste it here: '''
+4. Thank you! The last step is to enter your HuggingFace access token so that
+   this script is authorized to initiate the download. Go to the access tokens
+   page of your Hugging Face account and create a token by clicking the 
+   "New token" button:
+
+   https://huggingface.co/settings/tokens
+
+   (You can enter anything you like in the token creation field marked "Name". 
+   "Role" should be "read").
+
+   Now copy the token to your clipboard and paste it here: '''
         )
         access_token = getpass.getpass()
         HfFolder.save_token(access_token)
@@ -391,21 +431,30 @@ def download_safety_checker():
     
 #-------------------------------------
 if __name__ == '__main__':
-    introduction()
-    if user_wants_to_download_weights():
-        models = select_datasets()
-        if models is None:
-            if yes_or_no('Quit?',default_yes=False):
-                sys.exit(0)
-        access_token = authenticate()
-        successfully_downloaded = download_weight_datasets(models, access_token)
-        update_config_file(successfully_downloaded)
-    download_bert()
-    download_kornia()
-    download_clip()
-    download_gfpgan()
-    download_codeformer()
-    download_clipseg()
-    download_safety_checker()
+    try:
+        introduction()
+        print('** WEIGHT SELECTION **')
+        if user_wants_to_download_weights():
+            models = select_datasets()
+            if models is None:
+                if yes_or_no('Quit?',default_yes=False):
+                    sys.exit(0)
+            print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+            access_token = authenticate()
+            print('\n** DOWNLOADING WEIGHTS **')
+            successfully_downloaded = download_weight_datasets(models, access_token)
+            update_config_file(successfully_downloaded)
+        print('\n** DOWNLOADING SUPPORT MODELS **')
+        download_bert()
+        download_kornia()
+        download_clip()
+        download_gfpgan()
+        download_codeformer()
+        download_clipseg()
+        download_safety_checker()
+        postscript()
+    except KeyboardInterrupt:
+        print("\nGoodbye! Come back soon.")
+
 
     
