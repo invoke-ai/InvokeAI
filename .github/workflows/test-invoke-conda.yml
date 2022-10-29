@@ -111,10 +111,9 @@ jobs:
       - name: Run the tests
         id: run-tests
         run: |
-          echo "!switch ${{ matrix.stable-diffusion-model-switch }}" > testprompts.txt
-          cat ${{ env.TEST_PROMPTS }} >> testprompts.txt
           time python scripts/invoke.py \
-            --from_file testprompts.txt
+            --model ${{ matrix.stable-diffusion-model-switch }} \
+            --from_file ${{ env.TEST_PROMPTS }}
 
       - name: export conda env
         id: export-conda-env
