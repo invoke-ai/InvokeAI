@@ -31,7 +31,7 @@ const Cacher = () => {
     stageScale,
     pastLines,
     futureLines,
-    needsRepaint,
+    needsCache,
     isDrawing,
   } = useAppSelector((state: RootState) => state.inpainting);
 
@@ -63,7 +63,7 @@ const Cacher = () => {
     stageScale,
     pastLines,
     futureLines,
-    needsRepaint,
+    needsCache,
     isDrawing,
   ]);
 
