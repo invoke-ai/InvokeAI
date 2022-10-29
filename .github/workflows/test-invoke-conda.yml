@@ -53,16 +53,6 @@ jobs:
           path: ~/conda_pkgs_dir
           key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
 
-      - name: Use Cached Huggingface and Torch models
-        id: cache-hugginface-and-torch-models
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-hugginface-and-torch-models
-        with:
-          path: ~/.cache
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
-
       - name: Activate Conda Env
         id: activate-conda-env
         uses: conda-incubator/setup-miniconda@v2
@@ -83,19 +73,8 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
-      - name: Use Cached ${{ matrix.stable-diffusion-model-switch }}
-        id: cache-stable-diffusion-model
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-sd-${{ matrix.stable-diffusion-model }}
-        with:
-          path: ${{ matrix.stable-diffusion-model-dl-path }}
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}
-
       - name: Download ${{ matrix.stable-diffusion-model-switch }}
         id: download-stable-diffusion-model
-        if: ${{ steps.cache-stable-diffusion-model.outputs.cache-hit != 'true' }}
         run: |
           [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
