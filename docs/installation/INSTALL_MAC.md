@@ -1,5 +1,5 @@
 ---
-title: macOS
+title: Manual Installation, macOS
 ---
 
 # :fontawesome-brands-apple: macOS
@@ -24,9 +24,15 @@ First you need to download a large checkpoint file.
 1. Sign up at https://huggingface.co
 2. Go to the [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
 3. Accept the terms and click Access Repository
-4. Download [sd-v1-4.ckpt (4.27 GB)](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/blob/main/sd-v1-4.ckpt) and note where you have saved it (probably the Downloads folder). You may want to move it somewhere else for longer term storage - SD needs this file to run.
+4. Download [v1-5-pruned-emaonly.ckpt (4.27 GB)](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned-emaonly.ckpt)
+and move it into this directory under `models/ldm/stable_diffusion_v1/v1-5-pruned-emaonly.ckpt`
 
-While that is downloading, open Terminal and run the following commands one at a time, reading the comments and taking care to run the appropriate command for your Mac's architecture (Intel or M1).
+There are many other models that you can try. Please see [../features/INSTALLING_MODELS.md]
+for details.
+
+While that is downloading, open Terminal and run the following
+commands one at a time, reading the comments and taking care to run
+the appropriate command for your Mac's architecture (Intel or M1).
 
 !!! todo "Homebrew"
 

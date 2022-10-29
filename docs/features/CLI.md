@@ -385,7 +385,7 @@ automatically.
 Example:
 
 <pre>
-invoke> <b>!import_model models/ldm/stable-diffusion-v1/	model-epoch08-float16.ckpt</b>
+invoke> <b>!import_model models/ldm/stable-diffusion-v1/model-epoch08-float16.ckpt</b>
 >> Model import in process. Please enter the values needed to configure this model:
 
 Name for this model: <b>waifu-diffusion</b>

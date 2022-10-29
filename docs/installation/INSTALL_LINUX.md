@@ -1,5 +1,5 @@
 ---
-title: Linux
+title: Manual Installation, Linux
 ---
 
 # :fontawesome-brands-linux: Linux
@@ -63,24 +63,16 @@ title: Linux
         model loading scheme to allow the script to work on GPU machines that are not
         internet connected. See [Preload Models](../features/OTHER.md#preload-models)
 
-7. Now you need to install the weights for the stable diffusion model.
+7. Install the weights for the stable diffusion model.
 
-      - For running with the released weights, you will first need to set up an acount
-        with [Hugging Face](https://huggingface.co).
-      - Use your credentials to log in, and then point your browser [here](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original).
-      - You may be asked to sign a license agreement at this point.
-      - Click on "Files and versions" near the top of the page, and then click on the
-        file named "sd-v1-4.ckpt". You'll be taken to a page that prompts you to click
-        the "download" link. Save the file somewhere safe on your local machine.
+- Sign up at https://huggingface.co
+- Go to the [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
+- Accept the terms and click Access Repository
+- Download [v1-5-pruned-emaonly.ckpt (4.27 GB)](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned-emaonly.ckpt)
+and move it into this directory under `models/ldm/stable_diffusion_v1/v1-5-pruned-emaonly.ckpt`
 
-      Now run the following commands from within the stable-diffusion directory.
-      This will create a symbolic link from the stable-diffusion model.ckpt file, to
-      the true location of the `sd-v1-4.ckpt` file.
-
-    ```bash
-    (invokeai) ~/InvokeAI$ mkdir -p models/ldm/stable-diffusion-v1
-    (invokeai) ~/InvokeAI$ ln -sf /path/to/sd-v1-4.ckpt models/ldm/stable-diffusion-v1/model.ckpt
-    ```
+There are many other models that you can use. Please see [../features/INSTALLING_MODELS.md]
+for details.
 
 8. Start generating images!
 
