@@ -76,20 +76,19 @@ jobs:
         env:
           cache-name: cache-sd-${{ matrix.stable-diffusion-model }}
         with:
-          path: models/ldm/stable-diffusion-v1/model.ckpt
+          path: ${{ matrix.stable-diffusion-model-dl-path }}
           key: ${{ env.cache-name }}
           restore-keys: ${{ env.cache-name }}
 
-      - name: Download Stable Diffusion v1.4 Model
+      - name: Download ${{ matrix.stable-diffusion-model-switch }}
         if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
         run: |
           [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
-          [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
-            || curl \
-              -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
-              -o ${{ matrix.stable-diffusion-model-dl-path }} \
-              -L ${{ matrix.stable-diffusion-model }}
+          curl \
+            -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
+            -o ${{ matrix.stable-diffusion-model-dl-path }} \
+            -L ${{ matrix.stable-diffusion-model }}
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
