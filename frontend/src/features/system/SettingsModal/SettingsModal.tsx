@@ -13,7 +13,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
+import _, { isEqual } from 'lodash';
 import { cloneElement, ReactElement } from 'react';
 import { RootState, useAppSelector } from '../../../app/store';
 import { persistor } from '../../../main';
@@ -23,6 +23,7 @@ import {
   setShouldDisplayInProgress,
   SystemState,
 } from '../systemSlice';
+import ModelList from './ModelList';
 import SettingsModalItem from './SettingsModalItem';
 
 const systemSelector = createSelector(
@@ -32,11 +33,13 @@ const systemSelector = createSelector(
       shouldDisplayInProgress,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
+      model_list,
     } = system;
     return {
       shouldDisplayInProgress,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
+      models: _.map(model_list, (_model, key) => key),
     };
   },
   {
@@ -97,6 +100,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalHeader className="settings-modal-header">Settings</ModalHeader>
           <ModalCloseButton />
           <ModalBody className="settings-modal-content">
+            <ModelList />
             <div className="settings-modal-items">
               <SettingsModalItem
                 settingTitle="Display In-Progress Images (slower)"

@@ -54,9 +54,10 @@ jobs:
           [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
           [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
-            || curl --user "${{ secrets.HUGGINGFACE_TOKEN }}" \
+            || curl \
+              -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
               -o models/ldm/stable-diffusion-v1/model.ckpt \
-              -O -L https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
+              -L https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
 
       - name: Activate Conda Env
         uses: conda-incubator/setup-miniconda@v2

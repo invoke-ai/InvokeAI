@@ -4,6 +4,7 @@ import * as InvokeAI from '../../app/invokeai';
 import promptToString from '../../common/util/promptToString';
 import { seedWeightsToString } from '../../common/util/seedWeightPairs';
 import { FACETOOL_TYPES } from '../../app/constants';
+import { InvokeTabName, tabMap } from '../tabs/InvokeTabs';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -26,8 +27,7 @@ export interface OptionsState {
   codeformerFidelity: number;
   upscalingLevel: UpscalingLevel;
   upscalingStrength: number;
-  shouldUseInitImage: boolean;
-  initialImagePath: string | null;
+  initialImage?: InvokeAI.Image | string; // can be an Image or url
   maskPath: string;
   seamless: boolean;
   hiresFix: boolean;
@@ -41,7 +41,7 @@ export interface OptionsState {
   showAdvancedOptions: boolean;
   activeTab: number;
   shouldShowImageDetails: boolean;
-  shouldShowGallery: boolean;
+  showDualDisplay: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -57,9 +57,7 @@ const initialOptionsState: OptionsState = {
   seed: 0,
   seamless: false,
   hiresFix: false,
-  shouldUseInitImage: false,
   img2imgStrength: 0.75,
-  initialImagePath: null,
   maskPath: '',
   shouldFitToWidthHeight: true,
   shouldGenerateVariations: false,
@@ -76,7 +74,7 @@ const initialOptionsState: OptionsState = {
   showAdvancedOptions: true,
   activeTab: 0,
   shouldShowImageDetails: false,
-  shouldShowGallery: false,
+  showDualDisplay: true,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -136,14 +134,6 @@ export const optionsSlice = createSlice({
     setUpscalingStrength: (state, action: PayloadAction<number>) => {
       state.upscalingStrength = action.payload;
     },
-    setShouldUseInitImage: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseInitImage = action.payload;
-    },
-    setInitialImagePath: (state, action: PayloadAction<string | null>) => {
-      const newInitialImagePath = action.payload;
-      state.shouldUseInitImage = newInitialImagePath ? true : false;
-      state.initialImagePath = newInitialImagePath;
-    },
     setMaskPath: (state, action: PayloadAction<string>) => {
       state.maskPath = action.payload;
     },
@@ -168,9 +158,6 @@ export const optionsSlice = createSlice({
       const temp = { ...state, [key]: value };
       if (key === 'seed') {
         temp.shouldRandomizeSeed = false;
-      }
-      if (key === 'initialImagePath' && value === '') {
-        temp.shouldUseInitImage = false;
       }
       return temp;
     },
@@ -235,13 +222,10 @@ export const optionsSlice = createSlice({
         action.payload.image;
 
       if (type === 'img2img') {
-        if (init_image_path) state.initialImagePath = init_image_path;
+        if (init_image_path) state.initialImage = init_image_path;
         if (mask_image_path) state.maskPath = mask_image_path;
         if (strength) state.img2imgStrength = strength;
         if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-        state.shouldUseInitImage = true;
-      } else {
-        state.shouldUseInitImage = false;
       }
     },
     setAllParameters: (state, action: PayloadAction<InvokeAI.Metadata>) => {
@@ -266,13 +250,10 @@ export const optionsSlice = createSlice({
       } = action.payload.image;
 
       if (type === 'img2img') {
-        if (init_image_path) state.initialImagePath = init_image_path;
+        if (init_image_path) state.initialImage = init_image_path;
         if (mask_image_path) state.maskPath = mask_image_path;
         if (strength) state.img2imgStrength = strength;
         if (typeof fit === 'boolean') state.shouldFitToWidthHeight = fit;
-        state.shouldUseInitImage = true;
-      } else {
-        state.shouldUseInitImage = false;
       }
 
       if (variations && variations.length > 0) {
@@ -321,14 +302,27 @@ export const optionsSlice = createSlice({
     setShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
       state.showAdvancedOptions = action.payload;
     },
-    setActiveTab: (state, action: PayloadAction<number>) => {
-      state.activeTab = action.payload;
+    setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
+      if (typeof action.payload === 'number') {
+        state.activeTab = action.payload;
+      } else {
+        state.activeTab = tabMap.indexOf(action.payload);
+      }
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
     },
-    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowGallery = action.payload;
+    setShowDualDisplay: (state, action: PayloadAction<boolean>) => {
+      state.showDualDisplay = action.payload;
+    },
+    setInitialImage: (
+      state,
+      action: PayloadAction<InvokeAI.Image | string>
+    ) => {
+      state.initialImage = action.payload;
+    },
+    clearInitialImage: (state) => {
+      state.initialImage = undefined;
     },
   },
 });
@@ -352,8 +346,6 @@ export const {
   setCodeformerFidelity,
   setUpscalingLevel,
   setUpscalingStrength,
-  setShouldUseInitImage,
-  setInitialImagePath,
   setMaskPath,
   resetSeed,
   resetOptionsState,
@@ -369,9 +361,11 @@ export const {
   setShowAdvancedOptions,
   setActiveTab,
   setShouldShowImageDetails,
-  setShouldShowGallery,
   setAllTextToImageParameters,
   setAllImageToImageParameters,
+  setShowDualDisplay,
+  setInitialImage,
+  clearInitialImage,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

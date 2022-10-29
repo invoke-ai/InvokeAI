@@ -1,13 +1,26 @@
 import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
 import dateFormat from 'dateformat';
 import { Socket } from 'socket.io-client';
-import { frontendToBackendParameters } from '../../common/util/parameterTranslation';
+import {
+  frontendToBackendParameters,
+  FrontendToBackendParametersConfig,
+} from '../../common/util/parameterTranslation';
+import {
+  GalleryCategory,
+  GalleryState,
+} from '../../features/gallery/gallerySlice';
+import { OptionsState } from '../../features/options/optionsSlice';
 import {
   addLogEntry,
+  errorOccurred,
+  setCurrentStatus,
+  setIsCancelable,
   setIsProcessing,
 } from '../../features/system/systemSlice';
-import { tabMap, tab_dict } from '../../features/tabs/InvokeTabs';
+import { inpaintingImageElementRef } from '../../features/tabs/Inpainting/InpaintingCanvas';
+import { InvokeTabName } from '../../features/tabs/InvokeTabs';
 import * as InvokeAI from '../invokeai';
+import { RootState } from '../store';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -21,17 +34,56 @@ const makeSocketIOEmitters = (
   const { dispatch, getState } = store;
 
   return {
-    emitGenerateImage: () => {
+    emitGenerateImage: (generationMode: InvokeTabName) => {
       dispatch(setIsProcessing(true));
 
-      const options = { ...getState().options };
+      const state: RootState = getState();
 
-      if (tabMap[options.activeTab] !== 'img2img') {
-        options.shouldUseInitImage = false;
+      const {
+        options: optionsState,
+        system: systemState,
+        inpainting: inpaintingState,
+        gallery: galleryState,
+      } = state;
+
+      const frontendToBackendParametersConfig: FrontendToBackendParametersConfig =
+        {
+          generationMode,
+          optionsState,
+          inpaintingState,
+          systemState,
+        };
+
+      if (generationMode === 'inpainting') {
+        if (
+          !inpaintingImageElementRef.current ||
+          !inpaintingState.imageToInpaint?.url
+        ) {
+          dispatch(
+            addLogEntry({
+              timestamp: dateFormat(new Date(), 'isoDateTime'),
+              message: 'Inpainting image not loaded, cannot generate image.',
+              level: 'error',
+            })
+          );
+          dispatch(errorOccurred());
+          return;
+        }
+
+        frontendToBackendParametersConfig.imageToProcessUrl =
+          inpaintingState.imageToInpaint.url;
+
+        frontendToBackendParametersConfig.maskImageElement =
+          inpaintingImageElementRef.current;
+      } else if (!['txt2img', 'img2img'].includes(generationMode)) {
+        if (!galleryState.currentImage?.url) return;
+
+        frontendToBackendParametersConfig.imageToProcessUrl =
+          galleryState.currentImage.url;
       }
 
       const { generationParameters, esrganParameters, facetoolParameters } =
-        frontendToBackendParameters(options, getState().system);
+        frontendToBackendParameters(frontendToBackendParametersConfig);
 
       socketio.emit(
         'generateImage',
@@ -39,6 +91,14 @@ const makeSocketIOEmitters = (
         esrganParameters,
         facetoolParameters
       );
+
+      // we need to truncate the init_mask base64 else it takes up the whole log
+      // TODO: handle maintaining masks for reproducibility in future
+      if (generationParameters.init_mask) {
+        generationParameters.init_mask = generationParameters.init_mask
+          .substr(0, 20)
+          .concat('...');
+      }
 
       dispatch(
         addLogEntry({
@@ -53,7 +113,8 @@ const makeSocketIOEmitters = (
     },
     emitRunESRGAN: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const { upscalingLevel, upscalingStrength } = getState().options;
+      const options: OptionsState = getState().options;
+      const { upscalingLevel, upscalingStrength } = options;
       const esrganParameters = {
         upscale: [upscalingLevel, upscalingStrength],
       };
@@ -73,8 +134,8 @@ const makeSocketIOEmitters = (
     },
     emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const { facetoolType, facetoolStrength, codeformerFidelity } =
-        getState().options;
+      const options: OptionsState = getState().options;
+      const { facetoolType, facetoolStrength, codeformerFidelity } = options;
 
       const facetoolParameters: Record<string, any> = {
         facetool_strength: facetoolStrength,
@@ -101,28 +162,37 @@ const makeSocketIOEmitters = (
       );
     },
     emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
-      const { url, uuid } = imageToDelete;
-      socketio.emit('deleteImage', url, uuid);
+      const { url, uuid, category } = imageToDelete;
+      socketio.emit('deleteImage', url, uuid, category);
     },
-    emitRequestImages: () => {
-      const { earliest_mtime } = getState().gallery;
-      socketio.emit('requestImages', earliest_mtime);
+    emitRequestImages: (category: GalleryCategory) => {
+      const gallery: GalleryState = getState().gallery;
+      const { earliest_mtime } = gallery.categories[category];
+      socketio.emit('requestImages', category, earliest_mtime);
     },
-    emitRequestNewImages: () => {
-      const { latest_mtime } = getState().gallery;
-      socketio.emit('requestLatestImages', latest_mtime);
+    emitRequestNewImages: (category: GalleryCategory) => {
+      const gallery: GalleryState = getState().gallery;
+      const { latest_mtime } = gallery.categories[category];
+      socketio.emit('requestLatestImages', category, latest_mtime);
     },
     emitCancelProcessing: () => {
       socketio.emit('cancel');
     },
-    emitUploadInitialImage: (file: File) => {
-      socketio.emit('uploadInitialImage', file, file.name);
+    emitUploadImage: (payload: InvokeAI.UploadImagePayload) => {
+      const { file, destination } = payload;
+      socketio.emit('uploadImage', file, file.name, destination);
     },
     emitUploadMaskImage: (file: File) => {
       socketio.emit('uploadMaskImage', file, file.name);
     },
     emitRequestSystemConfig: () => {
       socketio.emit('requestSystemConfig');
+    },
+    emitRequestModelChange: (modelName: string) => {
+      dispatch(setCurrentStatus('Changing Model'));
+      dispatch(setIsProcessing(true));
+      dispatch(setIsCancelable(false));
+      socketio.emit('requestModelChange', modelName);
     },
   };
 };

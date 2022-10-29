@@ -17,8 +17,8 @@
 
     &:focus {
       outline: none;
-      border: 2px solid var(--prompt-border-color);
-      box-shadow: 0 0 10px 0 var(--prompt-box-shadow-color);
+      border: 2px solid var(--input-border-color);
+      box-shadow: 0 0 10px 0 var(--input-box-shadow-color);
     }
 
     &:disabled {

@@ -2,22 +2,20 @@
 
 .App {
   display: grid;
-  width: max-content;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--background-color);
 }
 
 .app-content {
   display: grid;
-  row-gap: 1rem;
-  margin: 0.6rem;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  background-color: var(--background-color);
+  row-gap: 0.5rem;
+  padding: $app-padding;
   grid-auto-rows: max-content;
   width: $app-width;
   height: $app-height;
-  min-width: min-content;
 }
 
 .app-console {
-  z-index: 9999;
+  z-index: 20;
 }

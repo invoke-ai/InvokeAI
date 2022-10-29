@@ -20,7 +20,6 @@ import {
   setHeight,
   setHiresFix,
   setImg2imgStrength,
-  setInitialImagePath,
   setMaskPath,
   setPrompt,
   setSampler,
@@ -32,6 +31,7 @@ import {
   setUpscalingLevel,
   setUpscalingStrength,
   setWidth,
+  setInitialImage,
 } from '../../options/optionsSlice';
 import promptToString from '../../../common/util/promptToString';
 import { seedWeightsToString } from '../../../common/util/seedWeightPairs';
@@ -248,7 +248,7 @@ const ImageMetadataViewer = memo(
                   label="Initial image"
                   value={init_image_path}
                   isLink
-                  onClick={() => dispatch(setInitialImagePath(init_image_path))}
+                  onClick={() => dispatch(setInitialImage(init_image_path))}
                 />
               )}
               {mask_image_path && (

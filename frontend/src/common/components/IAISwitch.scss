@@ -1,18 +1,33 @@
-.chakra-switch,
-.switch-button {
-  span {
-    background-color: var(--switch-bg-color);
+.invokeai__switch-form-control {
+  .invokeai__switch-form-label {
+    display: flex;
+    column-gap: 1rem;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-color-secondary);
+    font-size: 1rem;
+    margin-right: 0;
+    margin-bottom: 0.1rem;
+    white-space: nowrap;
+    width: auto;
 
-    span {
-      background-color: var(--white);
-    }
-  }
+    .invokeai__switch-root {
+      span {
+        background-color: var(--switch-bg-color);
+        span {
+          background-color: var(--white);
+        }
+      }
 
-  span[data-checked] {
-    background: var(--switch-bg-active-color);
+      &[data-checked] {
+        span {
+          background: var(--switch-bg-active-color);
 
-    span {
-      background-color: var(--white);
+          span {
+            background-color: var(--white);
+          }
+        }
+      }
     }
   }
 }

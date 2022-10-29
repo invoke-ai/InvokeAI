@@ -13,21 +13,27 @@ import {
   setSystemConfig,
   processingCanceled,
   errorOccurred,
+  setModelList,
+  setIsCancelable,
 } from '../../features/system/systemSlice';
 
 import {
   addGalleryImages,
   addImage,
   clearIntermediateImage,
+  GalleryState,
   removeImage,
+  setCurrentImage,
   setIntermediateImage,
 } from '../../features/gallery/gallerySlice';
 
 import {
-  setInitialImagePath,
+  clearInitialImage,
+  setInitialImage,
   setMaskPath,
 } from '../../features/options/optionsSlice';
 import { requestImages, requestNewImages } from './actions';
+import { clearImageToInpaint, setImageToInpaint } from '../../features/tabs/Inpainting/inpaintingSlice';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -46,10 +52,18 @@ const makeSocketIOListeners = (
       try {
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus('Connected'));
-        if (getState().gallery.latest_mtime) {
-          dispatch(requestNewImages());
+        const gallery: GalleryState = getState().gallery;
+
+        if (gallery.categories.user.latest_mtime) {
+          dispatch(requestNewImages('user'));
         } else {
-          dispatch(requestImages());
+          dispatch(requestImages('user'));
+        }
+
+        if (gallery.categories.result.latest_mtime) {
+          dispatch(requestNewImages('result'));
+        } else {
+          dispatch(requestImages('result'));
         }
       } catch (e) {
         console.error(e);
@@ -79,21 +93,19 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const { url, mtime, metadata } = data;
-        const newUuid = uuidv4();
-
         dispatch(
           addImage({
-            uuid: newUuid,
-            url,
-            mtime,
-            metadata: metadata,
+            category: 'result',
+            image: {
+              uuid: uuidv4(),
+              ...data,
+            },
           })
         );
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Image generated: ${url}`,
+            message: `Image generated: ${data.url}`,
           })
         );
       } catch (e) {
@@ -105,20 +117,16 @@ const makeSocketIOListeners = (
      */
     onIntermediateResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const uuid = uuidv4();
-        const { url, metadata, mtime } = data;
         dispatch(
           setIntermediateImage({
-            uuid,
-            url,
-            mtime,
-            metadata,
+            uuid: uuidv4(),
+            ...data,
           })
         );
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Intermediate image generated: ${url}`,
+            message: `Intermediate image generated: ${data.url}`,
           })
         );
       } catch (e) {
@@ -130,21 +138,20 @@ const makeSocketIOListeners = (
      */
     onPostprocessingResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const { url, metadata, mtime } = data;
-
         dispatch(
           addImage({
-            uuid: uuidv4(),
-            url,
-            mtime,
-            metadata,
+            category: 'result',
+            image: {
+              uuid: uuidv4(),
+              ...data,
+            },
           })
         );
 
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Postprocessed: ${url}`,
+            message: `Postprocessed: ${data.url}`,
           })
         );
       } catch (e) {
@@ -191,7 +198,7 @@ const makeSocketIOListeners = (
      * Callback to run when we receive a 'galleryImages' event.
      */
     onGalleryImages: (data: InvokeAI.GalleryImagesResponse) => {
-      const { images, areMoreImagesAvailable } = data;
+      const { images, areMoreImagesAvailable, category } = data;
 
       /**
        * the logic here ideally would be in the reducer but we have a side effect:
@@ -200,17 +207,18 @@ const makeSocketIOListeners = (
 
       // Generate a UUID for each image
       const preparedImages = images.map((image): InvokeAI.Image => {
-        const { url, metadata, mtime } = image;
         return {
           uuid: uuidv4(),
-          url,
-          mtime,
-          metadata,
+          ...image,
         };
       });
 
       dispatch(
-        addGalleryImages({ images: preparedImages, areMoreImagesAvailable })
+        addGalleryImages({
+          images: preparedImages,
+          areMoreImagesAvailable,
+          category,
+        })
       );
 
       dispatch(
@@ -229,7 +237,12 @@ const makeSocketIOListeners = (
       const { intermediateImage } = getState().gallery;
 
       if (intermediateImage) {
-        dispatch(addImage(intermediateImage));
+        dispatch(
+          addImage({
+            category: 'result',
+            image: intermediateImage,
+          })
+        );
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -250,14 +263,22 @@ const makeSocketIOListeners = (
     /**
      * Callback to run when we receive a 'imageDeleted' event.
      */
-    onImageDeleted: (data: InvokeAI.ImageUrlAndUuidResponse) => {
-      const { url, uuid } = data;
-      dispatch(removeImage(uuid));
+    onImageDeleted: (data: InvokeAI.ImageDeletedResponse) => {
+      const { url, uuid, category } = data;
 
-      const { initialImagePath, maskPath } = getState().options;
+      // remove image from gallery
+      dispatch(removeImage(data));
 
-      if (initialImagePath === url) {
-        dispatch(setInitialImagePath(''));
+      // remove references to image in options
+      const { initialImage, maskPath } = getState().options;
+      const { imageToInpaint } = getState().inpainting;
+
+      if (initialImage?.url === url || initialImage === url) {
+        dispatch(clearInitialImage());
+      }
+
+      if (imageToInpaint?.url === url) {
+        dispatch(clearImageToInpaint());
       }
 
       if (maskPath === url) {
@@ -271,18 +292,40 @@ const makeSocketIOListeners = (
         })
       );
     },
-    /**
-     * Callback to run when we receive a 'initialImageUploaded' event.
-     */
-    onInitialImageUploaded: (data: InvokeAI.ImageUrlResponse) => {
-      const { url } = data;
-      dispatch(setInitialImagePath(url));
-      dispatch(
-        addLogEntry({
-          timestamp: dateFormat(new Date(), 'isoDateTime'),
-          message: `Initial image uploaded: ${url}`,
-        })
-      );
+    onImageUploaded: (data: InvokeAI.ImageUploadResponse) => {
+      const { destination, ...rest } = data;
+      const image = {
+        uuid: uuidv4(),
+        ...rest,
+      };
+
+      try {
+        dispatch(addImage({ image, category: 'user' }));
+
+        switch (destination) {
+          case 'img2img': {
+            dispatch(setInitialImage(image));
+            break;
+          }
+          case 'inpainting': {
+            dispatch(setImageToInpaint(image));
+            break;
+          }
+          default: {
+            dispatch(setCurrentImage(image));
+            break;
+          }
+        }
+
+        dispatch(
+          addLogEntry({
+            timestamp: dateFormat(new Date(), 'isoDateTime'),
+            message: `Image uploaded: ${data.url}`,
+          })
+        );
+      } catch (e) {
+        console.error(e);
+      }
     },
     /**
      * Callback to run when we receive a 'maskImageUploaded' event.
@@ -299,6 +342,34 @@ const makeSocketIOListeners = (
     },
     onSystemConfig: (data: InvokeAI.SystemConfig) => {
       dispatch(setSystemConfig(data));
+    },
+    onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
+      const { model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setCurrentStatus('Model Changed'));
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(false));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model changed: ${model_name}`,
+          level: 'info',
+        })
+      );
+    },
+    onModelChangeFailed: (data: InvokeAI.ModelChangeResponse) => {
+      const { model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(false));
+      dispatch(errorOccurred());
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model change failed: ${model_name}`,
+          level: 'error',
+        })
+      );
     },
   };
 };
