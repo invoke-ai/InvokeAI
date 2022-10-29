@@ -88,11 +88,8 @@ call python scripts\preload_models.py
 @rem make the models dir
 mkdir models\ldm\stable-diffusion-v1
 
-@rem tell the user that they need to download the ckpt
+@rem tell the user their next steps
 echo.
-echo "Now you need to install the weights for the stable diffusion model."
-echo "Please follow the steps at https://invoke-ai.github.io/InvokeAI/installation/INSTALL_WINDOWS/ to complete the installation"
-
-@rem it would be nice if the weights downloaded automatically, and didn't need the user to do this manually.
+echo "You can now start generating images by double-clicking the 'invoke.bat' file (inside this folder)
 
 pause

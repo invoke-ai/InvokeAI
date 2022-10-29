@@ -1,5 +1,6 @@
 #!/bin/bash
 
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
 if [ "$0" == "bash" ]; then
     INSTALL_ENV_DIR="$(pwd)/installer_files/env"
@@ -10,7 +11,16 @@ if [ "$0" == "bash" ]; then
 
     conda activate invokeai
 
-    echo "Ready to dream.."
+    echo "Do you want to generate images using the"
+    echo "1. command-line"
+    echo "2. browser-based UI"
+    read -p "Please enter 1 or 2: " yn
+    case $yn in
+        1 ) printf "\nStarting the InvokeAI command-line..\n"; python scripts/invoke.py; break;;
+        2 ) printf "\nStarting the InvokeAI browser-based UI..\n"; python scripts/invoke.py --web; break;;
+        * ) echo "Invalid selection"; exit;;
+    esac
 else
-    bash --init-file invoke.sh
+    file_name=$(basename "${BASH_SOURCE[0]}")
+    bash --init-file "$file_name"
 fi

@@ -110,14 +110,5 @@ python scripts/preload_models.py
 # make the models dir
 mkdir models/ldm/stable-diffusion-v1
 
-# tell the user that they need to download the ckpt
-WEIGHTS_DOC_URL="https://invoke-ai.github.io/InvokeAI/installation/INSTALL_LINUX/"
-if [ "$OS_NAME" == "mac" ]; then
-    WEIGHTS_DOC_URL="https://invoke-ai.github.io/InvokeAI/installation/INSTALL_MAC/"
-fi
-
-echo ""
-echo "Now you need to install the weights for the stable diffusion model."
-echo "Please follow the steps at $WEIGHTS_DOC_URL to complete the installation"
-
-# it would be nice if the weights downloaded automatically, and didn't need the user to do this manually.
+# tell the user their next steps
+echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"
