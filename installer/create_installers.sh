@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
 # make the installer zip for linux and mac
 rm -rf invokeAI
 mkdir -p invokeAI
