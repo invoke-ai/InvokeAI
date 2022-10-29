@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { RootState, useAppSelector } from '../../../../app/store';
 import { maskLayerRef } from '../InpaintingCanvas';
 
@@ -35,6 +35,7 @@ const Cacher = () => {
     isDrawing,
   } = useAppSelector((state: RootState) => state.inpainting);
 
+
   useLayoutEffect(() => {
     if (!maskLayerRef.current) return;
     maskLayerRef.current.cache({
@@ -66,7 +67,22 @@ const Cacher = () => {
     isDrawing,
   ]);
 
-  return null;
+  /**
+   * Hack to cache the mask layer after the canvas is ready.
+   */
+  useEffect(() => {
+    const intervalId = window.setTimeout(() => {
+      if (!maskLayerRef.current) return;
+      maskLayerRef.current.cache({
+        x: 0,
+        y: 0,
+        width,
+        height,
+      });
+    }, 0)
+
+    return () => { window.clearTimeout(intervalId); }
+  })
 };
 
 export default Cacher;
