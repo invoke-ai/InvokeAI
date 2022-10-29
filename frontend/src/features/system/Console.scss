@@ -1,4 +1,5 @@
 .console {
+  width: 100vw;
   display: flex;
   flex-direction: column;
   background: var(--console-bg-color);
@@ -7,7 +8,7 @@
   font-family: monospace;
   padding: 0 1rem 1rem 3rem;
   border-top-width: 0.3rem;
-  border-color: var(--console-border-color);
+  border-color: var(--resizeable-handle-border-color);
 
   .console-info-color {
     color: var(--error-level-info);
@@ -64,9 +65,9 @@
   }
 
   &.autoscroll-enabled {
-    background: var(--btn-purple) !important;
+    background: var(--accent-color) !important;
     &:hover {
-      background: var(--btn-purple-hover) !important;
+      background: var(--accent-color-hover) !important;
     }
   }
 }

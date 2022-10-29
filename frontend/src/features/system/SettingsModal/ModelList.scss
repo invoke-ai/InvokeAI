@@ -1,0 +1,70 @@
+.model-list {
+  .chakra-accordion {
+    display: grid;
+    row-gap: 0.5rem;
+  }
+
+  .chakra-accordion__item {
+    border: none;
+    border-radius: 0.3rem;
+    background-color: var(--tab-hover-color);
+  }
+
+  button {
+    border-radius: 0.3rem !important;
+
+    &[aria-expanded='true'] {
+      background-color: var(--tab-hover-color);
+      border-radius: 0.3rem;
+    }
+  }
+
+  .model-list-button {
+    display: flex;
+    flex-direction: row;
+    row-gap: 0.5rem;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .model-list-header-hint {
+    color: var(--text-color-secondary);
+    font-weight: normal;
+  }
+
+  .model-list-list {
+    display: flex;
+    flex-direction: column;
+    row-gap: 0.5rem;
+
+    .model-list-item {
+      display: flex;
+      column-gap: 0.5rem;
+      width: 100%;
+      justify-content: space-between;
+      align-items: center;
+
+      .model-list-item-name {
+      }
+      .model-list-item-description {
+        font-size: 0.9rem;
+      }
+      .model-list-item-status {
+        &.active {
+          color: var(--status-good-color);
+        }
+
+        &.cached {
+          color: var(--status-working-color);
+        }
+
+        &.not-loaded {
+          color: var(--text-color-secondary);
+        }
+      }
+      .model-list-item-load-btn {
+      }
+    }
+  }
+}

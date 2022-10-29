@@ -7,11 +7,13 @@ import { useAppDispatch } from './store';
 import { requestSystemConfig } from './socketio/actions';
 import { keepGUIAlive } from './utils';
 import InvokeTabs from '../features/tabs/InvokeTabs';
+import ImageUploader from '../common/components/ImageUploader';
 
 keepGUIAlive();
 
 const App = () => {
   const dispatch = useAppDispatch();
+
   const [isReady, setIsReady] = useState<boolean>(false);
 
   useEffect(() => {
@@ -21,14 +23,16 @@ const App = () => {
 
   return isReady ? (
     <div className="App">
-      <ProgressBar />
-      <div className="app-content">
-        <SiteHeader />
-        <InvokeTabs />
-      </div>
-      <div className="app-console">
-        <Console />
-      </div>
+      <ImageUploader>
+        <ProgressBar />
+        <div className="app-content">
+          <SiteHeader />
+          <InvokeTabs />
+        </div>
+        <div className="app-console">
+          <Console />
+        </div>
+      </ImageUploader>
     </div>
   ) : (
     <Loading />

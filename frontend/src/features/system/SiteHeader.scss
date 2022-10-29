@@ -4,10 +4,10 @@
 }
 
 .site-header-left-side {
-  display: grid;
-  grid-template-columns: repeat(2, max-content);
-  column-gap: 0.6rem;
+  display: flex;
   align-items: center;
+  column-gap: 0.7rem;
+  padding-left: 0.5rem;
 
   img {
     width: 32px;
@@ -20,8 +20,7 @@
 }
 
 .site-header-right-side {
-  display: grid;
-  grid-template-columns: repeat(7, max-content);
+  display: flex;
   align-items: center;
   column-gap: 0.5rem;
 }

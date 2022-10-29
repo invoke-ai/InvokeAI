@@ -1,0 +1,47 @@
+@use '../../styles/Mixins/' as *;
+
+.workarea-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+
+  .workarea-main {
+    display: flex;
+    column-gap: 0.5rem;
+    height: 100%;
+
+    .workarea-options-panel {
+      width: $options-bar-max-width;
+      max-width: $options-bar-max-width;
+      flex-shrink: 0;
+    }
+
+    .workarea-split-view {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      // height: $app-content-height;
+      background-color: var(--background-color-secondary);
+      border-radius: 0.5rem;
+    }
+
+    .workarea-single-view {
+      width: 100%;
+      // height: $app-content-height;
+      background-color: var(--background-color-secondary);
+      border-radius: 0.5rem;
+    }
+
+    .workarea-split-view-left,
+    .workarea-split-view-right {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      row-gap: 1rem;
+      background-color: var(--background-color-secondary);
+      border-radius: 0.5rem;
+      padding: 1rem;
+    }
+  }
+}

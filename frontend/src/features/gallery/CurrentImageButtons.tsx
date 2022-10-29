@@ -8,7 +8,7 @@ import { RootState } from '../../app/store';
 import {
   setActiveTab,
   setAllParameters,
-  setInitialImagePath,
+  setInitialImage,
   setSeed,
   setShouldShowImageDetails,
 } from '../options/optionsSlice';
@@ -17,12 +17,21 @@ import { SystemState } from '../system/systemSlice';
 import IAIButton from '../../common/components/IAIButton';
 import { runESRGAN, runFacetool } from '../../app/socketio/actions';
 import IAIIconButton from '../../common/components/IAIIconButton';
-import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
+import {
+  MdDelete,
+  MdFace,
+  MdHd,
+  MdImage,
+  MdInfo,
+} from 'react-icons/md';
 import InvokePopover from './InvokePopover';
 import UpscaleOptions from '../options/AdvancedOptions/Upscale/UpscaleOptions';
 import FaceRestoreOptions from '../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useToast } from '@chakra-ui/react';
+import { FaCopy, FaPaintBrush, FaSeedling } from 'react-icons/fa';
+import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
+import { hoverableImageSelector } from './gallerySliceSelectors';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -51,6 +60,7 @@ type CurrentImageButtonsProps = {
  */
 const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
   const dispatch = useAppDispatch();
+  const { activeTabName } = useAppSelector(hoverableImageSelector);
 
   const shouldShowImageDetails = useAppSelector(
     (state: RootState) => state.options.shouldShowImageDetails
@@ -74,7 +84,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     useAppSelector(systemSelector);
 
   const handleClickUseAsInitialImage = () => {
-    dispatch(setInitialImagePath(image.url));
+    dispatch(setInitialImage(image));
     dispatch(setActiveTab(1));
   };
 
@@ -103,7 +113,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
   );
 
   const handleClickUseAllParameters = () =>
-    dispatch(setAllParameters(image.metadata));
+    image.metadata && dispatch(setAllParameters(image.metadata));
+
   useHotkeys(
     'a',
     () => {
@@ -128,9 +139,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     [image]
   );
 
-  // Non-null assertion: this button is disabled if there is no seed.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const handleClickUseSeed = () => dispatch(setSeed(image.metadata.image.seed));
+  const handleClickUseSeed = () =>
+    image.metadata && dispatch(setSeed(image.metadata.image.seed));
   useHotkeys(
     's',
     () => {
@@ -221,6 +231,19 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
   const handleClickShowImageDetails = () =>
     dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
 
+  const handleSendToInpainting = () => {
+    dispatch(setImageToInpaint(image));
+    if (activeTabName !== 'inpainting') {
+      dispatch(setActiveTab('inpainting'));
+    }
+    toast({
+      title: 'Sent to Inpainting',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
   useHotkeys(
     'i',
     () => {
@@ -247,7 +270,32 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         onClick={handleClickUseAsInitialImage}
       />
 
-      <IAIButton
+      <IAIIconButton
+        icon={<FaPaintBrush />}
+        tooltip="Send To Inpainting"
+        aria-label="Send To Inpainting"
+        onClick={handleSendToInpainting}
+      />
+
+      <IAIIconButton
+        icon={<FaCopy />}
+        tooltip="Use All"
+        aria-label="Use All"
+        isDisabled={
+          !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
+        }
+        onClick={handleClickUseAllParameters}
+      />
+
+      <IAIIconButton
+        icon={<FaSeedling />}
+        tooltip="Use Seed"
+        aria-label="Use Seed"
+        isDisabled={!image?.metadata?.image?.seed}
+        onClick={handleClickUseSeed}
+      />
+
+      {/* <IAIButton
         label="Use All"
         isDisabled={
           !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
@@ -259,7 +307,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         label="Use Seed"
         isDisabled={!image?.metadata?.image?.seed}
         onClick={handleClickUseSeed}
-      />
+      /> */}
 
       <InvokePopover
         title="Restore Faces"

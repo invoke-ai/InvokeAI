@@ -3,7 +3,6 @@ import _ from 'lodash';
 import React, { ReactElement } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import InpaintingWIP from '../../common/components/WorkInProgress/InpaintingWIP';
 import NodesWIP from '../../common/components/WorkInProgress/NodesWIP';
 import OutpaintingWIP from '../../common/components/WorkInProgress/OutpaintingWIP';
 import { PostProcessingWIP } from '../../common/components/WorkInProgress/PostProcessingWIP';
@@ -14,38 +13,39 @@ import OutpaintIcon from '../../common/icons/OutpaintIcon';
 import PostprocessingIcon from '../../common/icons/PostprocessingIcon';
 import TextToImageIcon from '../../common/icons/TextToImageIcon';
 import { setActiveTab } from '../options/optionsSlice';
-import ImageToImage from './ImageToImage/ImageToImage';
-import TextToImage from './TextToImage/TextToImage';
+import ImageToImageWorkarea from './ImageToImage';
+import InpaintingWorkarea from './Inpainting';
+import TextToImageWorkarea from './TextToImage';
 
 export const tab_dict = {
   txt2img: {
     title: <TextToImageIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <TextToImage />,
+    workarea: <TextToImageWorkarea />,
     tooltip: 'Text To Image',
   },
   img2img: {
     title: <ImageToImageIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <ImageToImage />,
+    workarea: <ImageToImageWorkarea />,
     tooltip: 'Image To Image',
   },
   inpainting: {
     title: <InpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <InpaintingWIP />,
+    workarea: <InpaintingWorkarea />,
     tooltip: 'Inpainting',
   },
   outpainting: {
     title: <OutpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <OutpaintingWIP />,
+    workarea: <OutpaintingWIP />,
     tooltip: 'Outpainting',
   },
   nodes: {
     title: <NodesIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <NodesWIP />,
+    workarea: <NodesWIP />,
     tooltip: 'Nodes',
   },
   postprocess: {
     title: <PostprocessingIcon fill={'black'} boxSize={'2.5rem'} />,
-    panel: <PostProcessingWIP />,
+    workarea: <PostProcessingWIP />,
     tooltip: 'Post Processing',
   },
 };
@@ -109,7 +109,7 @@ export default function InvokeTabs() {
     Object.keys(tab_dict).forEach((key) => {
       tabPanelsToRender.push(
         <TabPanel className="app-tabs-panel" key={key}>
-          {tab_dict[key as keyof typeof tab_dict].panel}
+          {tab_dict[key as keyof typeof tab_dict].workarea}
         </TabPanel>
       );
     });

@@ -43,9 +43,11 @@ export const socketioMiddleware = () => {
       onGalleryImages,
       onProcessingCanceled,
       onImageDeleted,
-      onInitialImageUploaded,
+      onImageUploaded,
       onMaskImageUploaded,
       onSystemConfig,
+      onModelChanged,
+      onModelChangeFailed,
     } = makeSocketIOListeners(store);
 
     const {
@@ -56,9 +58,10 @@ export const socketioMiddleware = () => {
       emitRequestImages,
       emitRequestNewImages,
       emitCancelProcessing,
-      emitUploadInitialImage,
+      emitUploadImage,
       emitUploadMaskImage,
       emitRequestSystemConfig,
+      emitRequestModelChange,
     } = makeSocketIOEmitters(store, socketio);
 
     /**
@@ -97,13 +100,16 @@ export const socketioMiddleware = () => {
         onProcessingCanceled();
       });
 
-      socketio.on('imageDeleted', (data: InvokeAI.ImageUrlAndUuidResponse) => {
+      socketio.on('imageDeleted', (data: InvokeAI.ImageDeletedResponse) => {
         onImageDeleted(data);
       });
 
-      socketio.on('initialImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
-        onInitialImageUploaded(data);
-      });
+      socketio.on(
+        'imageUploaded',
+        (data: InvokeAI.ImageUploadResponse) => {
+          onImageUploaded(data);
+        }
+      );
 
       socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
         onMaskImageUploaded(data);
@@ -111,6 +117,14 @@ export const socketioMiddleware = () => {
 
       socketio.on('systemConfig', (data: InvokeAI.SystemConfig) => {
         onSystemConfig(data);
+      });
+
+      socketio.on('modelChanged', (data: InvokeAI.ModelChangeResponse) => {
+        onModelChanged(data);
+      });
+
+      socketio.on('modelChangeFailed', (data: InvokeAI.ModelChangeResponse) => {
+        onModelChangeFailed(data);
       });
 
       areListenersSet = true;
@@ -121,7 +135,7 @@ export const socketioMiddleware = () => {
      */
     switch (action.type) {
       case 'socketio/generateImage': {
-        emitGenerateImage();
+        emitGenerateImage(action.payload);
         break;
       }
 
@@ -141,12 +155,12 @@ export const socketioMiddleware = () => {
       }
 
       case 'socketio/requestImages': {
-        emitRequestImages();
+        emitRequestImages(action.payload);
         break;
       }
 
       case 'socketio/requestNewImages': {
-        emitRequestNewImages();
+        emitRequestNewImages(action.payload);
         break;
       }
 
@@ -155,8 +169,8 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/uploadInitialImage': {
-        emitUploadInitialImage(action.payload);
+      case 'socketio/uploadImage': {
+        emitUploadImage(action.payload);
         break;
       }
 
@@ -167,6 +181,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/requestSystemConfig': {
         emitRequestSystemConfig();
+        break;
+      }
+
+      case 'socketio/requestModelChange': {
+        emitRequestModelChange(action.payload);
         break;
       }
     }

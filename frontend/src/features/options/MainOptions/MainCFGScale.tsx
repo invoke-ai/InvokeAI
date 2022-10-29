@@ -14,7 +14,7 @@ export default function MainCFGScale() {
     <IAINumberInput
       label="CFG Scale"
       step={0.5}
-      min={1}
+      min={1.01}
       max={30}
       onChange={handleChangeCfgScale}
       value={cfgScale}

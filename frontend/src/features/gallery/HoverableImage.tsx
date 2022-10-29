@@ -6,8 +6,12 @@ import {
   Tooltip,
   useToast,
 } from '@chakra-ui/react';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import { setCurrentImage } from './gallerySlice';
+import { useAppDispatch, useAppSelector } from '../../app/store';
+import {
+  setCurrentImage,
+  setShouldHoldGalleryOpen,
+  setShouldShowGallery,
+} from './gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { memo, useState } from 'react';
@@ -15,13 +19,15 @@ import {
   setActiveTab,
   setAllImageToImageParameters,
   setAllTextToImageParameters,
-  setInitialImagePath,
+  setInitialImage,
   setPrompt,
   setSeed,
 } from '../options/optionsSlice';
 import * as InvokeAI from '../../app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { tabMap } from '../tabs/InvokeTabs';
+import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
+import { hoverableImageSelector } from './gallerySliceSelectors';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -38,23 +44,21 @@ const memoEqualityCheck = (
  */
 const HoverableImage = memo((props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const activeTab = useAppSelector(
-    (state: RootState) => state.options.activeTab
-  );
+  const { activeTabName, galleryImageObjectFit, galleryImageMinimumWidth } =
+    useAppSelector(hoverableImageSelector);
+  const { image, isSelected } = props;
+  const { url, uuid, metadata } = image;
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const toast = useToast();
-
-  const { image, isSelected } = props;
-  const { url, uuid, metadata } = image;
 
   const handleMouseOver = () => setIsHovered(true);
 
   const handleMouseOut = () => setIsHovered(false);
 
   const handleUsePrompt = () => {
-    dispatch(setPrompt(image.metadata.image.prompt));
+    image.metadata && dispatch(setPrompt(image.metadata.image.prompt));
     toast({
       title: 'Prompt Set',
       status: 'success',
@@ -64,7 +68,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseSeed = () => {
-    dispatch(setSeed(image.metadata.image.seed));
+    image.metadata && dispatch(setSeed(image.metadata.image.seed));
     toast({
       title: 'Seed Set',
       status: 'success',
@@ -74,9 +78,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToImageToImage = () => {
-    dispatch(setInitialImagePath(image.url));
-    if (activeTab !== 1) {
-      dispatch(setActiveTab(1));
+    dispatch(setInitialImage(image));
+    if (activeTabName !== 'img2img') {
+      dispatch(setActiveTab('img2img'));
     }
     toast({
       title: 'Sent to Image To Image',
@@ -86,8 +90,21 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     });
   };
 
+  const handleSendToInpainting = () => {
+    dispatch(setImageToInpaint(image));
+    if (activeTabName !== 'inpainting') {
+      dispatch(setActiveTab('inpainting'));
+    }
+    toast({
+      title: 'Sent to Inpainting',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
   const handleUseAllParameters = () => {
-    dispatch(setAllTextToImageParameters(metadata));
+    metadata && dispatch(setAllTextToImageParameters(metadata));
     toast({
       title: 'Parameters Set',
       status: 'success',
@@ -124,7 +141,12 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleSelectImage = () => dispatch(setCurrentImage(image));
 
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root
+      onOpenChange={(open: boolean) => {
+        dispatch(setShouldHoldGalleryOpen(open));
+        dispatch(setShouldShowGallery(true));
+      }}
+    >
       <ContextMenu.Trigger>
         <Box
           position={'relative'}
@@ -135,7 +157,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         >
           <Image
             className="hoverable-image-image"
-            objectFit="cover"
+            objectFit={galleryImageObjectFit}
             rounded={'md'}
             src={url}
             loading={'lazy'}
@@ -150,7 +172,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
               />
             )}
           </div>
-          {isHovered && (
+          {isHovered && galleryImageMinimumWidth >= 64 && (
             <div className="hoverable-image-delete-button">
               <Tooltip label={'Delete image'} hasArrow>
                 <DeleteImageModal image={image}>
@@ -167,7 +189,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           )}
         </Box>
       </ContextMenu.Trigger>
-      <ContextMenu.Content className="hoverable-image-context-menu">
+      <ContextMenu.Content
+        className="hoverable-image-context-menu"
+        sticky={'always'}
+      >
         <ContextMenu.Item
           onClickCapture={handleUsePrompt}
           disabled={image?.metadata?.image?.prompt === undefined}
@@ -199,6 +224,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         </Tooltip>
         <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
           Send to Image To Image
+        </ContextMenu.Item>
+        <ContextMenu.Item onClickCapture={handleSendToInpainting}>
+          Send to Inpainting
         </ContextMenu.Item>
         <DeleteImageModal image={image}>
           <ContextMenu.Item data-warning>Delete Image</ContextMenu.Item>

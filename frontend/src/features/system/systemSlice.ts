@@ -35,6 +35,7 @@ export interface SystemState
   currentStatusHasSteps: boolean;
   shouldDisplayGuides: boolean;
   wasErrorSeen: boolean;
+  isCancelable: boolean;
 }
 
 const initialSystemState = {
@@ -60,8 +61,10 @@ const initialSystemState = {
   model_hash: '',
   app_id: '',
   app_version: '',
+  model_list: {},
   hasError: false,
   wasErrorSeen: true,
+  isCancelable: true,
 };
 
 const initialState: SystemState = initialSystemState;
@@ -85,12 +88,13 @@ export const systemSlice = createSlice({
     errorOccurred: (state) => {
       state.hasError = true;
       state.isProcessing = false;
+      state.isCancelable = true;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Server error';
+      state.currentStatus = 'Error';
       state.wasErrorSeen = false;
     },
     errorSeen: (state) => {
@@ -123,6 +127,7 @@ export const systemSlice = createSlice({
     setIsConnected: (state, action: PayloadAction<boolean>) => {
       state.isConnected = action.payload;
       state.isProcessing = false;
+      state.isCancelable = true;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.currentIteration = 0;
@@ -140,19 +145,32 @@ export const systemSlice = createSlice({
       state.openAccordions = action.payload;
     },
     setSystemConfig: (state, action: PayloadAction<InvokeAI.SystemConfig>) => {
-      return { ...state, ...action.payload };
+      return {
+        ...state,
+        ...action.payload,
+      };
     },
     setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayGuides = action.payload;
     },
     processingCanceled: (state) => {
       state.isProcessing = false;
+      state.isCancelable = true;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
       state.currentStatus = 'Processing canceled';
+    },
+    setModelList: (
+      state,
+      action: PayloadAction<InvokeAI.ModelList | Record<string, never>>
+    ) => {
+      state.model_list = action.payload;
+    },
+    setIsCancelable: (state, action: PayloadAction<boolean>) => {
+      state.isCancelable = action.payload;
     },
   },
 });
@@ -173,6 +191,8 @@ export const {
   processingCanceled,
   errorOccurred,
   errorSeen,
+  setModelList,
+  setIsCancelable,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

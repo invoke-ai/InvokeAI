@@ -1,0 +1,20 @@
+@use '../../styles/Mixins/' as *;
+
+.icon-button {
+  background-color: var(--btn-grey);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--btn-grey-hover);
+  }
+
+  &[data-selected=true] {
+    background-color: var(--accent-color);
+    &:hover {
+      background-color: var(--accent-color-hover);
+    }
+  }
+  &[disabled] {
+    cursor: not-allowed;
+  }
+}
