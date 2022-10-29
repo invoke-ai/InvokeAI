@@ -6,7 +6,6 @@ dependencies:
   - python=3.9.13
   - pip=22.2.2
 
-  # pytorch left unpinned
   - pytorch=1.12.1
   - torchvision=0.13.1
 
@@ -17,6 +16,7 @@ dependencies:
   # sed -E 's/invokeai/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
   # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
   # ```
+
   - albumentations=1.2.1
   - coloredlogs=15.0.1
   - diffusers=0.6.0
@@ -28,7 +28,7 @@ dependencies:
   - imgaug=0.4.0
   - kornia=0.6.7
   - mpmath=1.2.1
-  - nomkl=1.0
+  - nomkl # arm64 has only 1.0 while x64 needs 3.0
   - numpy=1.23.4
   - omegaconf=2.1.1
   - openh264=2.3.0
