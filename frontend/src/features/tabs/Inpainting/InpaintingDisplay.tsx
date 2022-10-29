@@ -1,9 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useLayoutEffect } from 'react';
-import { uploadImage } from '../../../app/socketio/actions';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import InvokeImageUploader from '../../../common/components/InvokeImageUploader';
+import ImageUploadButton from '../../../common/components/ImageUploaderButton';
 import CurrentImageDisplay from '../../gallery/CurrentImageDisplay';
 import { OptionsState } from '../../options/optionsSlice';
 import InpaintingCanvas from './InpaintingCanvas';
@@ -36,10 +35,7 @@ const InpaintingDisplay = () => {
   );
 
   useLayoutEffect(() => {
-    const resizeCallback = _.debounce(
-      () => dispatch(setNeedsCache(true)),
-      250
-    );
+    const resizeCallback = _.debounce(() => dispatch(setNeedsCache(true)), 250);
     window.addEventListener('resize', resizeCallback);
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
@@ -52,11 +48,7 @@ const InpaintingDisplay = () => {
       </div>
     </div>
   ) : (
-    <InvokeImageUploader
-      handleFile={(file: File) =>
-        dispatch(uploadImage({ file, destination: 'inpainting' }))
-      }
-    />
+    <ImageUploadButton />
   );
 
   return (

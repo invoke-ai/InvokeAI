@@ -23,6 +23,7 @@ import {
   clearIntermediateImage,
   GalleryState,
   removeImage,
+  setCurrentImage,
   setIntermediateImage,
 } from '../../features/gallery/gallerySlice';
 
@@ -303,6 +304,10 @@ const makeSocketIOListeners = (
           }
           case 'inpainting': {
             dispatch(setImageToInpaint(image));
+            break;
+          }
+          default: {
+            dispatch(setCurrentImage(image));
             break;
           }
         }

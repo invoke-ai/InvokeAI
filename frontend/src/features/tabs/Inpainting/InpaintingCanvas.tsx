@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from '../../../app/store';
 import {
   addLine,
   addPointToCurrentLine,
+  clearImageToInpaint,
   setCursorPosition,
   setIsDrawing,
 } from './inpaintingSlice';
@@ -33,6 +34,7 @@ import InpaintingBoundingBoxPreview, {
 } from './components/InpaintingBoundingBoxPreview';
 import { KonvaEventObject } from 'konva/lib/Node';
 import KeyboardEventManager from './components/KeyboardEventManager';
+import { useToast } from '@chakra-ui/react';
 
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
@@ -57,6 +59,8 @@ const InpaintingCanvas = () => {
     shouldShowBoundingBox,
   } = useAppSelector(inpaintingCanvasSelector);
 
+  const toast = useToast();
+
   // set the closure'd refs
   stageRef = useRef<StageType>(null);
   maskLayerRef = useRef<Konva.Layer>(null);
@@ -80,9 +84,18 @@ const InpaintingCanvas = () => {
         inpaintingImageElementRef.current = image;
         setCanvasBgImage(image);
       };
+      image.onerror = () => {
+        toast({
+          title: 'Unable to Load Image',
+          description: `Image ${imageToInpaint.url} failed to load`,
+          status: 'error',
+          isClosable: true,
+        });
+        dispatch(clearImageToInpaint());
+      };
       image.src = imageToInpaint.url;
     }
-  }, [imageToInpaint, dispatch, stageScale]);
+  }, [imageToInpaint, dispatch, stageScale, toast]);
 
   /**
    *

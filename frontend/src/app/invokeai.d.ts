@@ -197,7 +197,9 @@ export declare type ImageUrlResponse = {
   url: string;
 };
 
+export declare type ImageUploadDestination = 'img2img' | 'inpainting';
+
 export declare type UploadImagePayload = {
   file: File;
-  destination: 'img2img' | 'inpainting';
+  destination?: ImageUploadDestination;
 };

@@ -1,12 +1,9 @@
-import { uploadImage } from '../../../app/socketio/actions';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import InvokeImageUploader from '../../../common/components/InvokeImageUploader';
+import { RootState, useAppSelector } from '../../../app/store';
+import ImageUploadButton from '../../../common/components/ImageUploaderButton';
 import CurrentImageDisplay from '../../gallery/CurrentImageDisplay';
 import InitImagePreview from './InitImagePreview';
 
 const ImageToImageDisplay = () => {
-  const dispatch = useAppDispatch();
-
   const initialImage = useAppSelector(
     (state: RootState) => state.options.initialImage
   );
@@ -18,11 +15,7 @@ const ImageToImageDisplay = () => {
       <InitImagePreview />
     </div>
   ) : (
-    <InvokeImageUploader
-      handleFile={(file: File) =>
-        dispatch(uploadImage({ file, destination: 'img2img' }))
-      }
-    />
+    <ImageUploadButton />
   );
 
   return (
