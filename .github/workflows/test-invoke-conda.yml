@@ -76,6 +76,13 @@ jobs:
               -o models/ldm/stable-diffusion-v1/model.ckpt \
               -L ${{ matrix.stable-diffusion-model }}
 
+      - name: Cache Conda env
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.CONDA }}/envs
+          key: conda-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('${{ matrix.environment-file }}') }}
+        id: cache-conda-pkgs
+
       - name: Activate Conda Env
         uses: conda-incubator/setup-miniconda@v2
         with:
