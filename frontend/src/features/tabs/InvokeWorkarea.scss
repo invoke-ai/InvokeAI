@@ -8,6 +8,7 @@
   .workarea-main {
     display: flex;
     column-gap: 0.5rem;
+    height: 100%;
 
     .workarea-options-panel {
       width: $options-bar-max-width;

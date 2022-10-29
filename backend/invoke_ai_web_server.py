@@ -800,6 +800,7 @@ class InvokeAIWebServer:
             )
 
         except KeyboardInterrupt:
+            self.socketio.emit("processingCanceled")
             raise
         except CanceledException:
             self.socketio.emit("processingCanceled")

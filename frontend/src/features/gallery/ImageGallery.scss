@@ -20,7 +20,7 @@
 
 .image-gallery-area {
   z-index: 10;
-  height: 100%;
+  
   &[data-pinned='false'] {
     position: fixed;
     height: 100vh;
@@ -154,7 +154,6 @@
 // from https://css-tricks.com/a-grid-of-logos-in-squares/
 .image-gallery {
   display: grid;
-  // grid-template-columns: repeat(auto-fill, minmax(80px, auto));
   grid-gap: 0.5rem;
   .hoverable-image {
     padding: 0.5rem;
