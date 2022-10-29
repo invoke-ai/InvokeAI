@@ -47,7 +47,7 @@ strongly recommend that you install this weights file if nothing else.
 ## Community-Contributed Models
 
 There are too many to list here and more are being contributed every
-day. [This Page](https://rentry.org/sdmodels) hosts an updated list of
+day. [This page](https://rentry.org/sdmodels) hosts an updated list of
 Stable Diffusion models and where they can be obtained.
 
 ## Installation
@@ -156,7 +156,7 @@ ones, via the command-line client's `!import_model` command.
    `invoke> !import_model models/ldm/stable-diffusion-v1/arabian-nights-1.0.ckpt`
 
    (Hint - the CLI supports file path autocompletion. Type a bit of the path
-   name and hit <tab> in order to get a choice of possible completions.
+   name and hit <tab> in order to get a choice of possible completions.)
 
 4. Follow the wizard's instructions to complete installation as shown in the example
    here:
@@ -197,7 +197,7 @@ be available to use in the CLI immediately.
 
 The CLI has additional commands for switching among, viewing, editing,
 deleting the available models. These are described in [Command Line
-Client](CLI.md#model-selection-and-importation), but the two most
+Client](../features/CLI.md#model-selection-and-importation), but the two most
 frequently-used are `!models` and `!switch <name of model>`. The first
 prints a table of models that InvokeAI knows about and their load
 status. The second will load the requested model and lets you switch
@@ -245,7 +245,7 @@ arabian-nights-1.0:
   to need a custom configuration, in which case the place you downloaded it
   from will tell you what to use instead. For example, the runwayML custom
   inpainting model requires the file `configs/stable-diffusion/v1-inpainting-inference.yaml`.
-  (This is already inclued in the InvokeAI distribution and configured automatically
+  This is already inclued in the InvokeAI distribution and is configured automatically
   for you by the `preload_models.py` script.
 
 * vae
@@ -255,7 +255,7 @@ arabian-nights-1.0:
   - This is the width and height of the images used to train the model.
   Currently they are always 512 and 512.
 
-Save the `models.yaml` and relaunch InvokeAI. The new model should be
+Save the `models.yaml` and relaunch InvokeAI. The new model should now be
 available for your use.
 
 

@@ -120,6 +120,13 @@ def yes_or_no(prompt:str, default_yes=True):
 
 #---------------------------------------------
 def user_wants_to_download_weights():
+    print('''You can download and configure the weights files manually or let this
+script do it for you. Manual installation is described at:
+
+https://github.com/invoke-ai/InvokeAI/blob/main/docs/installation/INSTALLING_MODELS.md
+
+'''
+    )
     return yes_or_no('Would you like to download the Stable Diffusion model weights now?')
 
 #---------------------------------------------
@@ -454,7 +461,9 @@ if __name__ == '__main__':
         download_safety_checker()
         postscript()
     except KeyboardInterrupt:
-        print("\nGoodbye! Come back soon.")
+        print('\nGoodbye! Come back soon.')
+    except Exception as e:
+        print(f'\nA problem occurred during download.\nThe error was: "{str(e)}"')
 
 
     
