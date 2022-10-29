@@ -94,6 +94,8 @@ const InpaintingCanvas = () => {
         dispatch(clearImageToInpaint());
       };
       image.src = imageToInpaint.url;
+    } else {
+      setCanvasBgImage(null)
     }
   }, [imageToInpaint, dispatch, stageScale, toast]);
 

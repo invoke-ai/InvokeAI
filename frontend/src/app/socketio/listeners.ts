@@ -33,7 +33,7 @@ import {
   setMaskPath,
 } from '../../features/options/optionsSlice';
 import { requestImages, requestNewImages } from './actions';
-import { setImageToInpaint } from '../../features/tabs/Inpainting/inpaintingSlice';
+import { clearImageToInpaint, setImageToInpaint } from '../../features/tabs/Inpainting/inpaintingSlice';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -271,9 +271,14 @@ const makeSocketIOListeners = (
 
       // remove references to image in options
       const { initialImage, maskPath } = getState().options;
+      const { imageToInpaint } = getState().inpainting;
 
       if (initialImage?.url === url || initialImage === url) {
         dispatch(clearInitialImage());
+      }
+
+      if (imageToInpaint?.url === url) {
+        dispatch(clearImageToInpaint());
       }
 
       if (maskPath === url) {
