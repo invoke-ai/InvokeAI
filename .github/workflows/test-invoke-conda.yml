@@ -70,7 +70,7 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
-      - name: Use Cached Stable Diffusion Model
+      - name: Use Cached ${{ matrix.stable-diffusion-model-switch }}
         id: cache-stable-diffusion-model
         uses: actions/cache@v3
         env:
@@ -81,7 +81,7 @@ jobs:
           restore-keys: ${{ env.cache-name }}
 
       - name: Download ${{ matrix.stable-diffusion-model-switch }}
-        if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-stable-diffusion-model.outputs.cache-hit != 'true' }}
         run: |
           [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
