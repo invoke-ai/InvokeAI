@@ -119,5 +119,5 @@ jobs:
       - name: Archive results
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ matrix.os }}
+          name: results_${{ matrix.os }}_${{ matrix.stable-diffusion-model-switch }}
           path: outputs/img-samples
