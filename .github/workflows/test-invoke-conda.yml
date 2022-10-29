@@ -45,11 +45,22 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      - name: Cache conda packages
+      - name: Use cached conda packages
         uses: actions/cache@v3
         with:
           path: ~/conda_pkgs_dir
           key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
+
+      - name: Use Cached Huggingface and Torch models
+        id: cache-hugginface-torch
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-hugginface-and-torch-models
+        with:
+          path: ~/.cache
+          key: ${{ env.cache-name }}
+          restore-keys: |
+            ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
 
       - name: Activate Conda Env
         uses: conda-incubator/setup-miniconda@v2
@@ -90,19 +101,8 @@ jobs:
             -o ${{ matrix.stable-diffusion-model-dl-path }} \
             -L ${{ matrix.stable-diffusion-model }}
 
-      # - name: Use Cached Huggingface and Torch models
-      #   id: cache-hugginface-torch
-      #   uses: actions/cache@v3
-      #   env:
-      #     cache-name: cache-hugginface-torch
-      #   with:
-      #     path: ~/.cache
-      #     key: ${{ env.cache-name }}
-      #     restore-keys: |
-      #       ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
-
-      # - name: run preload_models.py
-      #   run: python scripts/preload_models.py
+      - name: run preload_models.py
+        run: python scripts/preload_models.py
 
       - name: Run the tests
         run: |
