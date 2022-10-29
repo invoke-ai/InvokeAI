@@ -111,7 +111,12 @@ const InpaintingBoundingBoxPreview = () => {
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
-      dispatch(setBoundingBoxCoordinate({ x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }));
+      dispatch(
+        setBoundingBoxCoordinate({
+          x: Math.floor(e.target.x()),
+          y: Math.floor(e.target.y()),
+        })
+      );
     },
     [dispatch]
   );
@@ -125,12 +130,12 @@ const InpaintingBoundingBoxPreview = () => {
       const maxX = imageToInpaint.width - boundingBoxDimensions.width;
       const maxY = imageToInpaint.height - boundingBoxDimensions.height;
 
-      const clampedX = _.clamp(x, 0, maxX);
-      const clampedY = _.clamp(y, 0, maxY);
+      const clampedX = Math.floor(_.clamp(x, 0, maxX * stageScale));
+      const clampedY = Math.floor(_.clamp(y, 0, maxY * stageScale));
 
       return { x: clampedX, y: clampedY };
     },
-    [boundingBoxCoordinate, boundingBoxDimensions, imageToInpaint]
+    [boundingBoxCoordinate, boundingBoxDimensions, imageToInpaint, stageScale]
   );
 
   const handleOnTransform = useCallback(() => {
@@ -242,7 +247,7 @@ const InpaintingBoundingBoxPreview = () => {
       if (
         newBoundBox.width + newBoundBox.x > imageToInpaint.width * stageScale ||
         newBoundBox.height + newBoundBox.y >
-        imageToInpaint.height * stageScale ||
+          imageToInpaint.height * stageScale ||
         newBoundBox.x < 0 ||
         newBoundBox.y < 0
       ) {
