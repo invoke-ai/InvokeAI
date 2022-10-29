@@ -55,7 +55,6 @@ const IAISlider = (props: IAISliderProps) => {
         <Slider
           className={`invokeai__slider-root`}
           aria-label={label}
-          focusThumbOnChange={false}
           {...rest}
         >
           <SliderTrack

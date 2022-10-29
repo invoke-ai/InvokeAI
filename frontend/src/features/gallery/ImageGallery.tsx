@@ -82,6 +82,7 @@ export default function ImageGallery() {
       );
       setGalleryMaxWidth(590);
     }
+    dispatch(setNeedsCache(true));
   }, [dispatch, activeTabName, shouldPinGallery, galleryWidth]);
 
   useEffect(() => {
@@ -100,17 +101,15 @@ export default function ImageGallery() {
   };
 
   const handleToggleGallery = () => {
-    dispatch(setNeedsCache(true));
     shouldShowGallery ? handleCloseGallery() : handleOpenGallery();
   };
 
   const handleOpenGallery = () => {
-    dispatch(setNeedsCache(true));
     dispatch(setShouldShowGallery(true));
+    dispatch(setNeedsCache(true));
   };
 
   const handleCloseGallery = () => {
-    dispatch(setNeedsCache(true));
     dispatch(
       setGalleryScrollPosition(
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
@@ -118,6 +117,7 @@ export default function ImageGallery() {
     );
     dispatch(setShouldShowGallery(false));
     dispatch(setShouldHoldGalleryOpen(false));
+    dispatch(setNeedsCache(true));
   };
 
   const handleClickLoadMore = () => {
@@ -126,6 +126,7 @@ export default function ImageGallery() {
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
+    dispatch(setNeedsCache(true));
   };
 
   const setCloseGalleryTimer = () => {
