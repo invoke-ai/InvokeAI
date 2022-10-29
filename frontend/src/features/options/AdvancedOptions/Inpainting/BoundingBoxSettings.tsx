@@ -64,11 +64,11 @@ const BoundingBoxSettings = () => {
   } = useAppSelector(boundingBoxDimensionsSelector);
 
   const handleChangeBoundingBoxWidth = (v: number) => {
-    dispatch(setBoundingBoxDimensions({ ...boundingBoxDimensions, width: v }));
+    dispatch(setBoundingBoxDimensions({ ...boundingBoxDimensions, width: Math.floor(v) }));
   };
 
   const handleChangeBoundingBoxHeight = (v: number) => {
-    dispatch(setBoundingBoxDimensions({ ...boundingBoxDimensions, height: v }));
+    dispatch(setBoundingBoxDimensions({ ...boundingBoxDimensions, height: Math.floor(v) }));
   };
 
   const handleShowBoundingBox = (e: ChangeEvent<HTMLInputElement>) =>
@@ -86,7 +86,7 @@ const BoundingBoxSettings = () => {
     dispatch(
       setBoundingBoxDimensions({
         ...boundingBoxDimensions,
-        width: canvasDimensions.width,
+        width: Math.floor(canvasDimensions.width),
       })
     );
   };
@@ -95,7 +95,7 @@ const BoundingBoxSettings = () => {
     dispatch(
       setBoundingBoxDimensions({
         ...boundingBoxDimensions,
-        height: canvasDimensions.height,
+        height: Math.floor(canvasDimensions.height),
       })
     );
   };

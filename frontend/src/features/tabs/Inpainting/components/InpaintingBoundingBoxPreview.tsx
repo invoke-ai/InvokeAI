@@ -111,7 +111,7 @@ const InpaintingBoundingBoxPreview = () => {
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
-      dispatch(setBoundingBoxCoordinate({ x: e.target.x(), y: e.target.y() }));
+      dispatch(setBoundingBoxCoordinate({ x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }));
     },
     [dispatch]
   );
@@ -242,7 +242,7 @@ const InpaintingBoundingBoxPreview = () => {
       if (
         newBoundBox.width + newBoundBox.x > imageToInpaint.width * stageScale ||
         newBoundBox.height + newBoundBox.y >
-          imageToInpaint.height * stageScale ||
+        imageToInpaint.height * stageScale ||
         newBoundBox.x < 0 ||
         newBoundBox.y < 0
       ) {
