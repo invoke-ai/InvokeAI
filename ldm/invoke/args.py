@@ -113,8 +113,8 @@ PRECISION_CHOICES = [
 ]
 
 # is there a way to pick this up during git commits?
-APP_ID      = 'lstein/stable-diffusion'
-APP_VERSION = 'v1.15'
+APP_ID      = 'invoke-ai/InvokeAI'
+APP_VERSION = 'v2.02'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -172,6 +172,7 @@ class Args(object):
         command = cmd_string.replace("'", "\\'")
         try:
             elements = shlex.split(command)
+            elements = [x.replace("\\'","'") for x in elements]
         except ValueError:
             import sys, traceback
             print(traceback.format_exc(), file=sys.stderr)
@@ -239,12 +240,19 @@ class Args(object):
                 switches.append(f'--init_color {a["init_color"]}')
             if a['strength'] and a['strength']>0:
                 switches.append(f'-f {a["strength"]}')
+            if a['inpaint_replace']:
+                switches.append(f'--inpaint_replace')
+            if a['text_mask']:
+                switches.append(f'-tm {" ".join([str(u) for u in a["text_mask"]])}')
         else:
             switches.append(f'-A {a["sampler_name"]}')
 
-        # gfpgan-specific parameters
-        if a['gfpgan_strength']:
-            switches.append(f'-G {a["gfpgan_strength"]}')
+        # facetool-specific parameters, only print if running facetool
+        if a['facetool_strength']:
+            switches.append(f'-G {a["facetool_strength"]}')
+            switches.append(f'-ft {a["facetool"]}')
+            if a["facetool"] == "codeformer":
+                switches.append(f'-cf {a["codeformer_fidelity"]}')
 
         if a['outcrop']:
             switches.append(f'-c {" ".join([str(u) for u in a["outcrop"]])}')
@@ -262,11 +270,12 @@ class Args(object):
         # outpainting parameters
         if a['out_direction']:
             switches.append(f'-D {" ".join([str(u) for u in a["out_direction"]])}')
+
         # LS: slight semantic drift which needs addressing in the future:
         # 1. Variations come out of the stored metadata as a packed string with the keyword "variations"
         # 2. However, they come out of the CLI (and probably web) with the keyword "with_variations" and
         #    in broken-out form. Variation (1) should be changed to comply with (2)
-        if a['with_variations']:
+        if a['with_variations'] and len(a['with_variations'])>0:
             formatted_variations = ','.join(f'{seed}:{weight}' for seed, weight in (a["with_variations"]))
             switches.append(f'-V {formatted_variations}')
         if 'variations' in a and len(a['variations'])>0:
@@ -360,17 +369,24 @@ class Args(object):
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
         model_group.add_argument(
-            '--conf',
+            '--config',
             '-c',
-            '-conf',
+            '-config',
             dest='conf',
             default='./configs/models.yaml',
             help='Path to configuration file for alternate models.',
         )
         model_group.add_argument(
             '--model',
-            default='stable-diffusion-1.4',
-            help='Indicates which diffusion model to load. (currently "stable-diffusion-1.4" (default) or "laion400m")',
+            help='Indicates which diffusion model to load (defaults to "default" stanza in configs/models.yaml)',
+        )
+        model_group.add_argument(
+            '--png_compression','-z',
+            type=int,
+            default=6,
+            choices=range(0,9),
+            dest='png_compression',
+            help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
         )
         model_group.add_argument(
             '--sampler',
@@ -405,6 +421,11 @@ class Args(object):
             help=f'Set model precision. Defaults to auto selected based on device. Options: {", ".join(PRECISION_CHOICES)}',
             default='auto',
         )
+        model_group.add_argument(
+            '--safety_checker',
+            action='store_true',
+            help='Check for and blur potentially NSFW images',
+        )
         file_group.add_argument(
             '--from_file',
             dest='infile',
@@ -423,6 +444,12 @@ class Args(object):
             '-p',
             action='store_true',
             help='Place images in subdirectories named after the prompt.',
+        )
+        render_group.add_argument(
+            '--fnformat',
+            default='{prefix}.{seed}.png',
+            type=str,
+            help='Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png',
         )
         render_group.add_argument(
             '--grid',
@@ -515,7 +542,7 @@ class Args(object):
             formatter_class=ArgFormatter,
             description=
             """
-            *Image generation:*
+            *Image generation*
                  invoke> a fantastic alien landscape -W576 -H512 -s60 -n4
 
             *postprocessing*
@@ -530,6 +557,13 @@ class Args(object):
             !history lists all the commands issued during the current session.
 
             !NN retrieves the NNth command from the history
+
+            *Model manipulation*
+            !models                                 -- list models in configs/models.yaml
+            !switch <model_name>                    -- switch to model named <model_name>
+            !import_model path/to/weights/file.ckpt -- adds a model to your config
+            !edit_model <model_name>                -- edit a model's description
+            !del_model <model_name>                 -- delete a model
             """
         )
         render_group     = parser.add_argument_group('General rendering')
@@ -591,6 +625,12 @@ class Args(object):
             help='Perlin noise scale (0.0 - 1.0) - add perlin noise to the initialization instead of the usual gaussian noise.',
         )
         render_group.add_argument(
+            '--fnformat',
+            default='{prefix}.{seed}.png',
+            type=str,
+            help='Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png',
+        )
+        render_group.add_argument(
             '--grid',
             '-g',
             action='store_true',
@@ -636,6 +676,21 @@ class Args(object):
             dest='hires_fix',
             help='Create hires image using img2img to prevent duplicated objects'
         )
+        render_group.add_argument(
+            '--save_intermediates',
+            type=int,
+            default=0,
+            dest='save_intermediates',
+            help='Save every nth intermediate image into an "intermediates" directory within the output directory'
+        )
+        render_group.add_argument(
+            '--png_compression','-z',
+            type=int,
+            default=6,
+            choices=range(0,10),
+            dest='png_compression',
+            help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
+        )
         img2img_group.add_argument(
             '-I',
             '--init_img',
@@ -647,6 +702,14 @@ class Args(object):
             '--init_mask',
             type=str,
             help='Path to input mask for inpainting mode (supersedes width and height)',
+        )
+        img2img_group.add_argument(
+            '-tm',
+            '--text_mask',
+            nargs='+',
+            type=str,
+            help='Use the clipseg classifier to generate the mask area for inpainting. Provide a description of the area to mask ("a mug"), optionally followed by the confidence level threshold (0-1.0; defaults to 0.5).',
+            default=None,
         )
         img2img_group.add_argument(
             '--init_color',
@@ -683,6 +746,13 @@ class Args(object):
             metavar=('direction','pixels'),
             help='Outcrop the image with one or more direction/pixel pairs: -c top 64 bottom 128 left 64 right 64',
         )
+        img2img_group.add_argument(
+            '-r',
+            '--inpaint_replace',
+            type=float,
+            default=0.0,
+            help='when inpainting, adjust how aggressively to replace the part of the picture under the mask, from 0.0 (a gentle merge) to 1.0 (replace entirely)',
+        )
         postprocessing_group.add_argument(
             '-ft',
             '--facetool',
@@ -692,6 +762,7 @@ class Args(object):
         )
         postprocessing_group.add_argument(
             '-G',
+            '--facetool_strength',
             '--gfpgan_strength',
             type=float,
             help='The strength at which to apply the face restoration to the result.',
@@ -739,6 +810,12 @@ class Args(object):
             action='store_true',
             help='Change the model to seamless tiling (circular) mode',
         )
+        special_effects_group.add_argument(
+            '--seamless_axes',
+            default=['x', 'y'],
+            type=list[str],
+            help='Specify which axes to use circular convolution on.',
+        )
         variation_group.add_argument(
             '-v',
             '--variation_amount',
@@ -753,6 +830,13 @@ class Args(object):
             type=str,
             help='list of variations to apply, in the format `seed:weight,seed:weight,...'
         )
+        render_group.add_argument(
+            '--use_mps_noise',
+            action='store_true',
+            dest='use_mps_noise',
+            help='Simulate noise on M1 systems to get the same results'
+        )
+
         return parser
 
 def format_metadata(**kwargs):
@@ -788,8 +872,8 @@ def metadata_dumps(opt,
 
     # remove any image keys not mentioned in RFC #266
     rfc266_img_fields = ['type','postprocessing','sampler','prompt','seed','variations','steps',
-                         'cfg_scale','threshold','perlin','step_number','width','height','extra','strength']
-
+                         'cfg_scale','threshold','perlin','fnformat', 'step_number','width','height','extra','strength',
+                         'init_img','init_mask','facetool','facetool_strength','upscale']
     rfc_dict ={}
 
     for item in image_dict.items():
@@ -809,11 +893,15 @@ def metadata_dumps(opt,
     # 'variations' should always exist and be an array, empty or consisting of {'seed': seed, 'weight': weight} pairs
     rfc_dict['variations'] = [{'seed':x[0],'weight':x[1]} for x in opt.with_variations] if opt.with_variations else []
 
+    # if variations are present then we need to replace 'seed' with 'orig_seed'
+    if hasattr(opt,'first_seed'):
+        rfc_dict['seed'] = opt.first_seed
+
     if opt.init_img:
-        rfc_dict['type']           = 'img2img'
-        rfc_dict['strength_steps'] = rfc_dict.pop('strength')
-        rfc_dict['orig_hash']      = calculate_init_img_hash(opt.init_img)
-        rfc_dict['sampler']        = 'ddim'  # TODO: FIX ME WHEN IMG2IMG SUPPORTS ALL SAMPLERS
+        rfc_dict['type']            = 'img2img'
+        rfc_dict['strength_steps']  = rfc_dict.pop('strength')
+        rfc_dict['orig_hash']       = calculate_init_img_hash(opt.init_img)
+        rfc_dict['inpaint_replace'] = opt.inpaint_replace
     else:
         rfc_dict['type']  = 'txt2img'
         rfc_dict.pop('strength')
@@ -868,7 +956,7 @@ def metadata_loads(metadata) -> list:
         for image in images:
             # repack the prompt and variations
             if 'prompt' in image:
-                image['prompt']     = ','.join([':'.join([x['prompt'],   str(x['weight'])]) for x in image['prompt']])
+                image['prompt']     = repack_prompt(image['prompt'])
             if 'variations' in image:
                 image['variations'] = ','.join([':'.join([str(x['seed']),str(x['weight'])]) for x in image['variations']])
             # fix a bit of semantic drift here
@@ -876,11 +964,18 @@ def metadata_loads(metadata) -> list:
             opt = Args()
             opt._cmd_switches = Namespace(**image)
             results.append(opt)
-    except KeyError as e:
+    except Exception as e:
         import sys, traceback
-        print('>> badly-formatted metadata',file=sys.stderr)
+        print('>> could not read metadata',file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
     return results
+
+def repack_prompt(prompt_list:list)->str:
+    # in the common case of no weighting syntax, just return the prompt as is
+    if len(prompt_list) > 1:
+        return ','.join([':'.join([x['prompt'], str(x['weight'])]) for x in prompt_list])
+    else:
+        return prompt_list[0]['prompt']
 
 # image can either be a file path on disk or a base64-encoded
 # representation of the file's contents
@@ -911,17 +1006,17 @@ def sha256(path):
     return sha.hexdigest()
 
 def legacy_metadata_load(meta,pathname) -> Args:
+    opt = Args()
     if 'Dream' in meta and len(meta['Dream']) > 0:
         dream_prompt = meta['Dream']
-        opt = Args()
         opt.parse_cmd(dream_prompt)
-        return opt
     else:               # if nothing else, we can get the seed
         match = re.search('\d+\.(\d+)',pathname)
         if match:
             seed = match.groups()[0]
-            opt = Args()
             opt.seed = seed
-            return opt
-    return None
+        else:
+            opt.prompt = ''
+            opt.seed = 0
+    return opt
             

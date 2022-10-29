@@ -68,7 +68,6 @@ const PromptInput = () => {
     <div className="prompt-bar">
       <FormControl
         isInvalid={prompt.length === 0 || Boolean(prompt.match(/^[\s\r\n]+$/))}
-        isDisabled={isProcessing}
       >
         <Textarea
           id="prompt"

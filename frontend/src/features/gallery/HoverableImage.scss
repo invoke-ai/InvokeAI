@@ -17,6 +17,12 @@
     max-height: 100%;
   }
 
+  .hoverable-image-delete-button {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+  }
+
   .hoverable-image-content {
     display: flex;
     position: absolute;
@@ -54,6 +60,42 @@
         width: 12px;
         height: 12px;
       }
+    }
+  }
+}
+
+.hoverable-image-context-menu {
+  z-index: 999;
+  padding: 0.4rem;
+  border-radius: 0.25rem;
+  background-color: var(--context-menu-bg-color);
+  box-shadow: var(--context-menu-box-shadow);
+
+  [role='menuitem'] {
+    font-size: 0.8rem;
+    line-height: 1rem;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    position: relative;
+    user-select: none;
+    cursor: pointer;
+    outline: none;
+
+    &[data-disabled] {
+      color: grey;
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+
+    &[data-warning] {
+      color: var(--status-bad-color);
+    }
+
+    &[data-highlighted] {
+      background-color: var(--context-menu-bg-color-hover);
     }
   }
 }

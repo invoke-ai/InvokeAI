@@ -19,6 +19,7 @@ dependencies:
   # ```
   - albumentations==1.2.1
   - coloredlogs==15.0.1
+  - diffusers==0.6.0
   - einops==0.4.1
   - grpcio==1.46.4
   - humanfriendly==10.0
@@ -47,16 +48,17 @@ dependencies:
       - dependency_injector==4.40.0
       - eventlet==0.33.1
       - opencv-python==4.6.0
-      - protobuf==3.19.5
+      - protobuf==3.19.6
       - realesrgan==0.2.5.0
       - send2trash==1.8.0
       - test-tube==0.7.5
-      - transformers==4.21.2
+      - transformers==4.21.3
       - torch-fidelity==0.3.0
       - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
       - -e git+https://github.com/openai/CLIP.git@main#egg=clip
       - -e git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
       - -e git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
+      - -e git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
       - -e .
 variables:
   PYTORCH_ENABLE_MPS_FALLBACK: 1

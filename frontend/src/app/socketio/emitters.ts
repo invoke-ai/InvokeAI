@@ -26,18 +26,18 @@ const makeSocketIOEmitters = (
 
       const options = { ...getState().options };
 
-      if (tabMap[options.activeTab] === 'txt2img') {
+      if (tabMap[options.activeTab] !== 'img2img') {
         options.shouldUseInitImage = false;
       }
 
-      const { generationParameters, esrganParameters, gfpganParameters } =
+      const { generationParameters, esrganParameters, facetoolParameters } =
         frontendToBackendParameters(options, getState().system);
 
       socketio.emit(
         'generateImage',
         generationParameters,
         esrganParameters,
-        gfpganParameters
+        facetoolParameters
       );
 
       dispatch(
@@ -46,7 +46,7 @@ const makeSocketIOEmitters = (
           message: `Image generation requested: ${JSON.stringify({
             ...generationParameters,
             ...esrganParameters,
-            ...gfpganParameters,
+            ...facetoolParameters,
           })}`,
         })
       );
@@ -71,24 +71,32 @@ const makeSocketIOEmitters = (
         })
       );
     },
-    emitRunGFPGAN: (imageToProcess: InvokeAI.Image) => {
+    emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const { gfpganStrength } = getState().options;
+      const { facetoolType, facetoolStrength, codeformerFidelity } =
+        getState().options;
 
-      const gfpganParameters = {
-        gfpgan_strength: gfpganStrength,
+      const facetoolParameters: Record<string, any> = {
+        facetool_strength: facetoolStrength,
       };
+
+      if (facetoolType === 'codeformer') {
+        facetoolParameters.codeformer_fidelity = codeformerFidelity;
+      }
+
       socketio.emit('runPostprocessing', imageToProcess, {
-        type: 'gfpgan',
-        ...gfpganParameters,
+        type: facetoolType,
+        ...facetoolParameters,
       });
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
-          message: `GFPGAN fix faces requested: ${JSON.stringify({
-            file: imageToProcess.url,
-            ...gfpganParameters,
-          })}`,
+          message: `Face restoration (${facetoolType}) requested: ${JSON.stringify(
+            {
+              file: imageToProcess.url,
+              ...facetoolParameters,
+            }
+          )}`,
         })
       );
     },

@@ -2,7 +2,7 @@
 
 # InvokeAI: A Stable Diffusion Toolkit
 
-_Formally known as lstein/stable-diffusion_
+_Formerly known as lstein/stable-diffusion_
 
 ![project logo](docs/assets/logo.png)
 
@@ -133,6 +133,11 @@ you can try starting `invoke.py` with the `--precision=float32` flag:
 - [Preload Models](docs/features/OTHER.md#preload-models)
 
 ### Latest Changes
+
+- v2.0.1 (13 October 2022)
+  - fix noisy images at high step count when using k* samplers
+  - dream.py script now calls invoke.py module directly rather than
+    via a new python process (which could break the environment)
 
 - v2.0.0 (9 October 2022)
 

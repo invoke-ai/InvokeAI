@@ -14,13 +14,17 @@ import { useAppDispatch } from '../../../app/store';
 import * as InvokeAI from '../../../app/invokeai';
 import {
   setCfgScale,
-  setGfpganStrength,
+  setFacetoolStrength,
+  setCodeformerFidelity,
+  setFacetoolType,
   setHeight,
+  setHiresFix,
   setImg2imgStrength,
   setInitialImagePath,
   setMaskPath,
   setPrompt,
   setSampler,
+  setSeamless,
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,
@@ -116,6 +120,7 @@ const ImageMetadataViewer = memo(
       steps,
       cfg_scale,
       seamless,
+      hires_fix,
       width,
       height,
       strength,
@@ -148,7 +153,7 @@ const ImageMetadataViewer = memo(
                 <MetadataItem
                   label="Fix faces strength"
                   value={strength}
-                  onClick={() => dispatch(setGfpganStrength(strength))}
+                  onClick={() => dispatch(setFacetoolStrength(strength))}
                 />
               )}
               {type === 'esrgan' && scale !== undefined && (
@@ -214,7 +219,14 @@ const ImageMetadataViewer = memo(
                 <MetadataItem
                   label="Seamless"
                   value={seamless}
-                  onClick={() => dispatch(setWidth(seamless))}
+                  onClick={() => dispatch(setSeamless(seamless))}
+                />
+              )}
+              {hires_fix && (
+                <MetadataItem
+                  label="High Resolution Optimization"
+                  value={hires_fix}
+                  onClick={() => dispatch(setHiresFix(hires_fix))}
                 />
               )}
               {width && (
@@ -311,10 +323,44 @@ const ImageMetadataViewer = memo(
                             <MetadataItem
                               label="Strength"
                               value={strength}
-                              onClick={() =>
-                                dispatch(setGfpganStrength(strength))
-                              }
+                              onClick={() => {
+                                dispatch(setFacetoolStrength(strength));
+                                dispatch(setFacetoolType('gfpgan'));
+                              }}
                             />
+                          </Flex>
+                        );
+                      } else if (postprocess.type === 'codeformer') {
+                        const { strength, fidelity } = postprocess;
+                        return (
+                          <Flex
+                            key={i}
+                            pl={'2rem'}
+                            gap={1}
+                            direction={'column'}
+                          >
+                            <Text size={'md'}>{`${
+                              i + 1
+                            }: Face restoration (Codeformer)`}</Text>
+
+                            <MetadataItem
+                              label="Strength"
+                              value={strength}
+                              onClick={() => {
+                                dispatch(setFacetoolStrength(strength));
+                                dispatch(setFacetoolType('codeformer'));
+                              }}
+                            />
+                            {fidelity && (
+                              <MetadataItem
+                                label="Fidelity"
+                                value={fidelity}
+                                onClick={() => {
+                                  dispatch(setCodeformerFidelity(fidelity));
+                                  dispatch(setFacetoolType('codeformer'));
+                                }}
+                              />
+                            )}
                           </Flex>
                         );
                       }

@@ -15,7 +15,7 @@ import {
 import DeleteImageModal from './DeleteImageModal';
 import { SystemState } from '../system/systemSlice';
 import IAIButton from '../../common/components/IAIButton';
-import { runESRGAN, runGFPGAN } from '../../app/socketio/actions';
+import { runESRGAN, runFacetool } from '../../app/socketio/actions';
 import IAIIconButton from '../../common/components/IAIIconButton';
 import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
 import InvokePopover from './InvokePopover';
@@ -66,8 +66,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     (state: RootState) => state.options.upscalingLevel
   );
 
-  const gfpganStrength = useAppSelector(
-    (state: RootState) => state.options.gfpganStrength
+  const facetoolStrength = useAppSelector(
+    (state: RootState) => state.options.facetoolStrength
   );
 
   const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
@@ -186,7 +186,8 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     ]
   );
 
-  const handleClickFixFaces = () => dispatch(runGFPGAN(image));
+  const handleClickFixFaces = () => dispatch(runFacetool(image));
+
   useHotkeys(
     'r',
     () => {
@@ -195,7 +196,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         Boolean(!intermediateImage) &&
         isConnected &&
         !isProcessing &&
-        gfpganStrength
+        facetoolStrength
       ) {
         handleClickFixFaces();
       } else {
@@ -213,7 +214,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
       intermediateImage,
       isConnected,
       isProcessing,
-      gfpganStrength,
+      facetoolStrength,
     ]
   );
 
@@ -270,7 +271,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
               !isGFPGANAvailable ||
               Boolean(intermediateImage) ||
               !(isConnected && !isProcessing) ||
-              !gfpganStrength
+              !facetoolStrength
             }
             onClick={handleClickFixFaces}
           />

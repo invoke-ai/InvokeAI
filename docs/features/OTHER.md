@@ -26,6 +26,12 @@ for each `invoke>` prompt as shown here:
 invoke> "pond garden with lotus by claude monet" --seamless -s100 -n4
 ```
 
+By default this will tile on both the X and Y axes. However, you can also specify specific axes to tile on with `--seamless_axes`.
+Possible values are `x`, `y`, and `x,y`:
+```python
+invoke> "pond garden with lotus by claude monet" --seamless --seamless_axes=x -s100 -n4
+```
+
 ---
 
 ## **Shortcuts: Reusing Seeds**
@@ -66,6 +72,23 @@ tabby cat:0.25 white duck:0.75 hybrid
 This will tell the sampler to invest 25% of its effort on the tabby cat aspect of the image and 75%
 on the white duck aspect (surprisingly, this example actually works). The prompt weights can use any
 combination of integers and floating point numbers, and they do not need to add up to 1.
+
+---
+
+## **Filename Format**
+
+The argument `--fnformat` allows to specify the filename of the
+ image. Supported wildcards are all arguments what can be set such as
+ `perlin`, `seed`, `threshold`, `height`, `width`, `gfpgan_strength`,
+ `sampler_name`, `steps`, `model`, `upscale`, `prompt`, `cfg_scale`,
+ `prefix`.
+
+The following prompt
+```bash
+dream> a red car --steps 25 -C 9.8 --perlin 0.1 --fnformat {prompt}_steps.{steps}_cfg.{cfg_scale}_perlin.{perlin}.png
+```
+
+generates a file with the name: `outputs/img-samples/a red car_steps.25_cfg.9.8_perlin.0.1.png`
 
 ---
 

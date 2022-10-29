@@ -1,5 +1,6 @@
 albumentations==0.4.3
 einops==0.3.0
+diffusers==0.6.0
 huggingface-hub==0.8.1
 imageio==2.9.0
 imageio-ffmpeg==0.4.2
@@ -12,14 +13,15 @@ pillow==9.2.0
 pudb==2019.2
 torch==1.12.1
 torchvision==0.13.0
-pytorch-lightning==1.4.2
+pytorch-lightning==1.7.7
 streamlit==1.12.0
 test-tube>=0.7.5
 torch-fidelity==0.3.0
 torchmetrics==0.6.0
-transformers==4.19.2
+transformers==4.21.3
 -e git+https://github.com/openai/CLIP.git@main#egg=clip
 -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
 -e git+https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion
 -e git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
+-e git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
 -e .
