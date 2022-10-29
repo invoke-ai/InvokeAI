@@ -229,7 +229,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
           <h1>Keyboard Shorcuts</h1>
           <div className="hotkeys-modal-items">
-            <Accordion allowToggle allowMultiple>
+            <Accordion allowMultiple>
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
                   <h2>App Hotkeys</h2>

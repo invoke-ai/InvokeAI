@@ -49,7 +49,7 @@ export default function InvokeImageUploader(props: InvokeImageUploaderProps) {
         }
       >
         <div className="image-upload-child">
-          <FaUpload size={'7rem'} />
+          <FaUpload />
           <Heading size={'lg'}>Upload or Drop Image Here</Heading>
         </div>
       </ImageUploader>
