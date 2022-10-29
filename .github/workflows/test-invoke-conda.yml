@@ -25,7 +25,7 @@ jobs:
           - os: ubuntu-latest
             environment-file: environment.yml
             default-shell: bash -l {0}
-          - os: macos-latest
+          - os: macOS-12
             environment-file: environment-mac.yml
             default-shell: bash -l {0}
           - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
