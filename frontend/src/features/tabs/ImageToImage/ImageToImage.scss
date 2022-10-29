@@ -39,16 +39,17 @@
 }
 
 .init-image-preview {
+  position: relative;
   height: 100%;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: $app-text-to-image-height;
 
   img {
     border-radius: 0.5rem;
     object-fit: contain;
+    position: absolute;
   }
 }
 

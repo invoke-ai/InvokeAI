@@ -2,7 +2,6 @@ import { RootState, useAppSelector } from '../../app/store';
 import CurrentImageButtons from './CurrentImageButtons';
 import { MdPhoto } from 'react-icons/md';
 import CurrentImagePreview from './CurrentImagePreview';
-import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import { tabMap } from '../tabs/InvokeTabs';
 import { GalleryState } from './gallerySlice';
 import { OptionsState } from '../options/optionsSlice';
@@ -37,7 +36,6 @@ const CurrentImageDisplay = () => {
     currentImage,
     intermediateImage,
     activeTabName,
-    shouldShowImageDetails,
   } = useAppSelector(currentImageDisplaySelector);
 
   const imageToDisplay = intermediateImage || currentImage;
@@ -47,15 +45,7 @@ const CurrentImageDisplay = () => {
       {imageToDisplay ? (
         <>
           <CurrentImageButtons image={imageToDisplay} />
-          <div className="current-image-viewer">
-            <CurrentImagePreview imageToDisplay={imageToDisplay} />
-            {shouldShowImageDetails && (
-              <ImageMetadataViewer
-                image={imageToDisplay}
-                styleClass="current-image-metadata"
-              />
-            )}
-          </div>
+          <CurrentImagePreview imageToDisplay={imageToDisplay} />
         </>
       ) : (
         <div className="current-image-display-placeholder">

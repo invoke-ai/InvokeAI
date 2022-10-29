@@ -7,6 +7,7 @@ import * as InvokeAI from '../../app/invokeai';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { OptionsState } from '../options/optionsSlice';
+import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 
 export const imagesSelector = createSelector(
   [(state: RootState) => state.gallery, (state: RootState) => state.options],
@@ -72,9 +73,8 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
     <div className={'current-image-preview'}>
       <Image
         src={imageToDisplay.url}
-        fit="contain"
-        maxWidth={'100%'}
-        maxHeight={'100%'}
+        width={imageToDisplay.width}
+        height={imageToDisplay.height}
       />
       {!shouldShowImageDetails && (
         <div className="current-image-next-prev-buttons">
@@ -107,6 +107,12 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
             )}
           </div>
         </div>
+      )}
+      {shouldShowImageDetails && (
+        <ImageMetadataViewer
+          image={imageToDisplay}
+          styleClass="current-image-metadata"
+        />
       )}
     </div>
   );

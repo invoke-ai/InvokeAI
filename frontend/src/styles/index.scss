@@ -74,6 +74,7 @@ html,
 body {
   @include HideScrollbar;
   background-color: var(--root-bg-color);
+  overflow: hidden;
 }
 
 #root {
