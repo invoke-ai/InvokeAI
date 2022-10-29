@@ -8,17 +8,22 @@ call conda activate invokeai
 echo Do you want to generate images using the
 echo 1. command-line
 echo 2. browser-based UI
-set /P restore="Please enter 1 or 2: "
+echo 3. open the developer console
+set /P restore="Please enter 1, 2 or 3: "
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
     python scripts\invoke.py
 ) ELSE IF /I "%restore%" == "2" (
     echo Starting the InvokeAI browser-based UI..
     python scripts\invoke.py --web
+) ELSE IF /I "%restore%" == "3" (
+    echo Developer Console
+    call where python
+    call python --version
+
+    cmd /k
 ) ELSE (
     echo Invalid selection
     pause
     exit /b
 )
-
-cmd /k

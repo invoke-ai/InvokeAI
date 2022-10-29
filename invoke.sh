@@ -22,4 +22,7 @@ if [ "$0" != "bash" ]; then
         3 ) printf "\nDeveloper Console:\n"; file_name=$(basename "${BASH_SOURCE[0]}"); bash --init-file "$file_name";;
         * ) echo "Invalid selection"; exit;;
     esac
+else
+    which python
+    python --version
 fi
