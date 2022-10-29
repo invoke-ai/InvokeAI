@@ -31,6 +31,7 @@ import IAISlider from '../../common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
 import IAICheckbox from '../../common/components/IAICheckbox';
 import { setNeedsCache } from '../tabs/Inpainting/inpaintingSlice';
+import _ from 'lodash';
 
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
@@ -67,33 +68,44 @@ export default function ImageGallery() {
     height: '100%',
   });
 
+  console.log(gallerySize, galleryMaxSize, galleryMinSize);
+
   useEffect(() => {
     if (activeTabName === 'inpainting' && shouldPinGallery) {
       setGalleryMinSize((prevSize) => {
-        return { ...prevSize, width: '200' };
+        return { ...prevSize, width: 220 };
       });
       setGalleryMaxSize((prevSize) => {
-        return { ...prevSize, width: '200' };
+        return { ...prevSize, width: 220 };
       });
       setGallerySize((prevSize) => {
-        return { ...prevSize, width: Math.min(Number(prevSize.width), 200) };
+        return {
+          ...prevSize,
+          width: Math.min(Math.max(Number(prevSize.width), 0), 220),
+        };
       });
     } else if (activeTabName === 'img2img' && shouldPinGallery) {
       setGalleryMaxSize((prevSize) => {
-        return { ...prevSize, width: '490', height: '100%' };
+        return { ...prevSize, width: 490, height: '100%' };
       });
       setGallerySize((prevSize) => {
-        return { ...prevSize, width: Math.min(Number(prevSize.width), 490) };
+        return {
+          ...prevSize,
+          width: Math.min(Math.max(Number(prevSize.width), 0), 490),
+        };
       });
     } else {
       setGalleryMaxSize((prevSize) => {
-        return { ...prevSize, width: '590', height: '100%' };
+        return { ...prevSize, width: 590, height: '100%' };
       });
       setGallerySize((prevSize) => {
-        return { ...prevSize, width: Math.min(Number(prevSize.width), 590) };
+        return {
+          ...prevSize,
+          width: Math.min(Math.max(Number(prevSize.width), 0), 590),
+        };
       });
     }
-  }, [activeTabName, shouldPinGallery, setGalleryMaxSize]);
+  }, [activeTabName, shouldPinGallery]);
 
   useEffect(() => {
     if (!shouldPinGallery) {
@@ -112,7 +124,7 @@ export default function ImageGallery() {
   const timeoutIdRef = useRef<number | null>(null);
 
   const handleSetShouldPinGallery = () => {
-    dispatch(setNeedsCache(true))
+    dispatch(setNeedsCache(true));
     dispatch(setShouldPinGallery(!shouldPinGallery));
     setGallerySize({
       ...gallerySize,
@@ -121,17 +133,17 @@ export default function ImageGallery() {
   };
 
   const handleToggleGallery = () => {
-    dispatch(setNeedsCache(true))
+    dispatch(setNeedsCache(true));
     shouldShowGallery ? handleCloseGallery() : handleOpenGallery();
   };
 
   const handleOpenGallery = () => {
-    dispatch(setNeedsCache(true))
+    dispatch(setNeedsCache(true));
     dispatch(setShouldShowGallery(true));
   };
 
   const handleCloseGallery = () => {
-    dispatch(setNeedsCache(true))
+    dispatch(setNeedsCache(true));
     dispatch(
       setGalleryScrollPosition(
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
@@ -292,7 +304,7 @@ export default function ImageGallery() {
           maxWidth={galleryMaxSize.width}
           maxHeight={'100%'}
           className={'image-gallery-popup'}
-          handleStyles={{ left: { width: '20px' } }}
+          handleStyles={{ left: { width: '15px' } }}
           enable={{
             top: false,
             right: false,
@@ -311,7 +323,7 @@ export default function ImageGallery() {
             delta: NumberSize
           ) => {
             setGallerySize({
-              width: Number(gallerySize.width) + delta.width,
+              width: _.clamp(Number(gallerySize.width) + delta.width, 0, Number(galleryMaxSize.width)),
               height: '100%',
             });
             elementRef.removeAttribute('data-resize-alert');
@@ -322,11 +334,19 @@ export default function ImageGallery() {
             elementRef: HTMLElement,
             delta: NumberSize
           ) => {
-            const newWidth = Number(gallerySize.width) + delta.width;
+            const newWidth = _.clamp(
+              Number(gallerySize.width) + delta.width,
+              0,
+              Number(galleryMaxSize.width)
+            );
             if (newWidth >= galleryMaxSize.width) {
               elementRef.setAttribute('data-resize-alert', 'true');
             } else {
               elementRef.removeAttribute('data-resize-alert');
+              setGallerySize({
+                width: newWidth,
+                height: '100%',
+              });
             }
           }}
         >
@@ -338,20 +358,39 @@ export default function ImageGallery() {
                 variant="solid"
                 className="image-gallery-category-btn-group"
               >
-                <IAIIconButton
-                  aria-label="Show Invocations"
-                  tooltip="Show Invocations"
-                  data-selected={currentCategory === 'result'}
-                  icon={<FaImage />}
-                  onClick={() => dispatch(setCurrentCategory('result'))}
-                />
-                <IAIIconButton
-                  aria-label="Show Uploads"
-                  tooltip="Show Uploads"
-                  data-selected={currentCategory === 'user'}
-                  icon={<FaUser />}
-                  onClick={() => dispatch(setCurrentCategory('user'))}
-                />
+                {gallerySize.width > 320 ? (
+                  <>
+                    <Button
+                      data-selected={currentCategory === 'result'}
+                      onClick={() => dispatch(setCurrentCategory('result'))}
+                    >
+                      Invocations
+                    </Button>
+                    <Button
+                      data-selected={currentCategory === 'user'}
+                      onClick={() => dispatch(setCurrentCategory('user'))}
+                    >
+                      User
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <IAIIconButton
+                      aria-label="Show Invocations"
+                      tooltip="Show Invocations"
+                      data-selected={currentCategory === 'result'}
+                      icon={<FaImage />}
+                      onClick={() => dispatch(setCurrentCategory('result'))}
+                    />
+                    <IAIIconButton
+                      aria-label="Show Uploads"
+                      tooltip="Show Uploads"
+                      data-selected={currentCategory === 'user'}
+                      icon={<FaUser />}
+                      onClick={() => dispatch(setCurrentCategory('user'))}
+                    />
+                  </>
+                )}
               </ButtonGroup>
             </div>
             <IAIPopover
@@ -476,18 +515,3 @@ export default function ImageGallery() {
     </CSSTransition>
   );
 }
-
-// <IAIIconButton
-//                   aria-label="Show Invocations"
-//                   tooltip="Show Invocations"
-//                   data-selected={currentCategory === 'result'}
-//                   icon={<FaImage />}
-//                   onClick={() => dispatch(setCurrentCategory('result'))}
-//                 />
-//                 <IAIIconButton
-//                   aria-label="Show Uploads"
-//                   tooltip="Show Uploads"
-//                   data-selected={currentCategory === 'user'}
-//                   icon={<FaUser />}
-//                   onClick={() => dispatch(setCurrentCategory('user'))}
-//                 />

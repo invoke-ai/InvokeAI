@@ -20,6 +20,7 @@
 
 .image-gallery-area {
   z-index: 10;
+  height: 100%;
   &[data-pinned='false'] {
     position: fixed;
     height: 100vh;
