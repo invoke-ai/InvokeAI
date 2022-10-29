@@ -1,4 +1,4 @@
-name: Test Invoke with Conda
+name: Test invoke.py
 on:
   push:
     branches:
@@ -34,7 +34,7 @@ jobs:
           - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-switch: stable-diffusion-1.5
-    name: Test invoke.py on ${{ matrix.os }} with ${{ matrix.stable-diffusion-model-switch }}
+    name: ${{ matrix.os }} with ${{ matrix.stable-diffusion-model-switch }}
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
