@@ -441,7 +441,8 @@ class InvokeAIWebServer:
                 print(path)
                 send2trash(path)
                 socketio.emit(
-                    "imageDeleted", {"url": url, "uuid": uuid, "category": category}
+                    "imageDeleted",
+                    {"url": url, "uuid": uuid, "category": category},
                 )
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
@@ -988,7 +989,11 @@ class InvokeAIWebServer:
     ):
         try:
             pngwriter = PngWriter(output_dir)
-            prefix = pngwriter.unique_prefix()
+
+            number_prefix = pngwriter.unique_prefix()
+
+            uuid = uuid4().hex
+            truncated_uuid = uuid[:8]
 
             seed = "unknown_seed"
 
@@ -996,7 +1001,7 @@ class InvokeAIWebServer:
                 if "seed" in metadata["image"]:
                     seed = metadata["image"]["seed"]
 
-            filename = f"{prefix}.{seed}"
+            filename = f"{number_prefix}.{truncated_uuid}.{seed}"
 
             if step_index:
                 filename += f".{step_index}"
@@ -1100,12 +1105,18 @@ class InvokeAIWebServer:
     def save_file_unique_uuid_name(self, bytes, name, path):
         try:
             uuid = uuid4().hex
+            truncated_uuid = uuid[:8]
+
             split = os.path.splitext(name)
-            name = f"{split[0]}.{uuid}{split[1]}"
+            name = f"{split[0]}.{truncated_uuid}{split[1]}"
+
             file_path = os.path.join(path, name)
+
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
             newFile = open(file_path, "wb")
             newFile.write(bytes)
+
             return file_path
         except Exception as e:
             self.socketio.emit("error", {"message": (str(e))})
