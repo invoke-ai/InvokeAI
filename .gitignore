@@ -199,7 +199,13 @@ checkpoints
 .scratch/
 .vscode/
 gfpgan/
-models/ldm/stable-diffusion-v1/model.sha256
+models/ldm/stable-diffusion-v1/*.sha256
 
 # GFPGAN model files
 gfpgan/
+
+# config file (will be created by installer)
+configs/models.yaml
+
+# weights (will be created by installer)
+models/ldm/stable-diffusion-v1/*.ckpt

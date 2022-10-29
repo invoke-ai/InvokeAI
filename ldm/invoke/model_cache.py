@@ -281,7 +281,7 @@ class ModelCache(object):
         Returns the preamble for the config file.
         '''
         return '''# This file describes the alternative machine learning models
-# available to the dream script.
+# available to InvokeAI script.
 #
 # To add a new model, follow the examples below. Each
 # model requires a model config file, a weights file,

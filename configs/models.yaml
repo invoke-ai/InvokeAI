@@ -1,5 +1,5 @@
 # This file describes the alternative machine learning models
-# available to the dream script.
+# available to InvokeAI script.
 #
 # To add a new model, follow the examples below. Each
 # model requires a model config file, a weights file,
@@ -8,22 +8,29 @@
 stable-diffusion-1.4:
   config: configs/stable-diffusion/v1-inference.yaml
   weights: models/ldm/stable-diffusion-v1/model.ckpt
-#  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
   description: Stable Diffusion inference model version 1.4
   width: 512
   height: 512
+stable-diffusion-1.5:
+  description: The newest Stable Diffusion version 1.5 weight file (4.27 GB)
+  weights: ./models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
+  config: ./configs/stable-diffusion/v1-inference.yaml
+  width: 512
+  height: 512
+  vae: ./models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
   default: true
 inpainting-1.5:
-  description: runwayML tuned inpainting model v1.5
-  weights: models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
-  config: configs/stable-diffusion/v1-inpainting-inference.yaml
-#  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+  description: RunwayML SD 1.5 model optimized for inpainting (4.27 GB)
+  weights: ./models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
+  config: ./configs/stable-diffusion/v1-inpainting-inference.yaml
   width: 512
   height: 512
-stable-diffusion-1.5:
-  config: configs/stable-diffusion/v1-inference.yaml
-  weights: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
-#  vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
-  description: Stable Diffusion inference model version 1.5
+  vae: ./models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+waifu-diffusion-1.3:
+  description: Stable Diffusion 1.4 fine tuned on anime-styled images (4.27)
+  weights: ./models/ldm/stable-diffusion-v1/model-epoch09-float32.ckpt
+  config: ./configs/stable-diffusion/v1-inference.yaml
   width: 512
   height: 512
+  vae: ./models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
