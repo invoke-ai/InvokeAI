@@ -88,6 +88,8 @@ const KeyboardEventManager = () => {
           break;
         }
         case ' ': {
+          if (!shouldShowMask) break;
+          
           if (e.type === 'keydown') {
             dispatch(setIsDrawing(false));
           }

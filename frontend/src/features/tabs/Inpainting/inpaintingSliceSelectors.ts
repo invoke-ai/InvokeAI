@@ -31,6 +31,7 @@ export const inpaintingControlsSelector = createSelector(
       pastLines,
       futureLines,
       shouldShowBoundingBoxFill,
+      shouldShowBoundingBox,
     } = inpainting;
 
     const { activeTab, showDualDisplay } = options;
@@ -48,6 +49,7 @@ export const inpaintingControlsSelector = createSelector(
       activeTabName: tabMap[activeTab],
       showDualDisplay,
       shouldShowBoundingBoxFill,
+      shouldShowBoundingBox,
     };
   },
   {
@@ -73,7 +75,6 @@ export const inpaintingCanvasSelector = createSelector(
       isDrawing,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
-
     } = inpainting;
     return {
       tool,

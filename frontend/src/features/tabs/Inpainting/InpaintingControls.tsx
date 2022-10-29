@@ -27,6 +27,7 @@ import {
   setNeedsRepaint,
   toggleShouldLockBoundingBox,
   clearImageToInpaint,
+  setShouldShowBoundingBox,
 } from './inpaintingSlice';
 
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
@@ -51,6 +52,7 @@ const InpaintingControls = () => {
     isMaskEmpty,
     activeTabName,
     showDualDisplay,
+    shouldShowBoundingBox
   } = useAppSelector(inpaintingControlsSelector);
 
   const dispatch = useAppDispatch();
@@ -160,9 +162,9 @@ const InpaintingControls = () => {
       dispatch(toggleShouldLockBoundingBox());
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: activeTabName === 'inpainting' && shouldShowMask && shouldShowBoundingBox,
     },
-    [activeTabName, shouldShowMask]
+    [activeTabName, shouldShowMask, shouldShowBoundingBox]
   );
 
   // Undo
