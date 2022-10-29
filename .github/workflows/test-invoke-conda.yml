@@ -20,7 +20,7 @@ jobs:
           - 'https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt'
         os:
           - ubuntu-latest
-          - macos-latest
+          - macOS-12
         include:
           - os: ubuntu-latest
             environment-file: environment.yml
@@ -34,7 +34,7 @@ jobs:
           - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-switch: stable-diffusion-1.5
-    name: Test invoke.py on ${{ matrix.os }} with ${{ matrix.stable-diffusion-model }}
+    name: Test invoke.py on ${{ matrix.os }} with ${{ matrix.stable-diffusion-model-switch }}
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
@@ -43,26 +43,28 @@ jobs:
         shell: ${{ matrix.default-shell }}
     steps:
       - name: Checkout sources
+        id: checkout-sources
         uses: actions/checkout@v3
 
       - name: Use cached conda packages
+        id: use-cached-conda-packages
         uses: actions/cache@v3
         with:
           path: ~/conda_pkgs_dir
           key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
 
       - name: Use Cached Huggingface and Torch models
-        id: cache-hugginface-torch
+        id: cache-hugginface-and-torch-models
         uses: actions/cache@v3
         env:
           cache-name: cache-hugginface-and-torch-models
         with:
           path: ~/.cache
           key: ${{ env.cache-name }}
-          restore-keys: |
-            ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
+          restore-keys: ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
 
       - name: Activate Conda Env
+        id: activate-conda-env
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: ${{ env.CONDA_ENV_NAME }}
@@ -70,14 +72,17 @@ jobs:
           miniconda-version: latest
 
       - name: set test prompt to main branch validation
+        id: set-test-prompt
         if: ${{ github.ref == 'refs/heads/main' }}
         run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_ENV
 
       - name: set test prompt to development branch validation
+        id: set-test-prompt
         if: ${{ github.ref == 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_ENV
 
       - name: set test prompt to Pull Request validation
+        id: set-test-prompt
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
@@ -92,6 +97,7 @@ jobs:
           restore-keys: ${{ env.cache-name }}
 
       - name: Download ${{ matrix.stable-diffusion-model-switch }}
+        id: download-stable-diffusion-model
         if: ${{ steps.cache-stable-diffusion-model.outputs.cache-hit != 'true' }}
         run: |
           [[ -d models/ldm/stable-diffusion-v1 ]] \
@@ -102,9 +108,11 @@ jobs:
             -L ${{ matrix.stable-diffusion-model }}
 
       - name: run preload_models.py
+        id: run-preload-models
         run: python scripts/preload_models.py
 
       - name: Run the tests
+        id: run-tests
         run: |
           echo "!switch ${{ matrix.stable-diffusion-model-switch }}" > testprompts.txt
           cat ${{ env.TEST_PROMPTS }} >> testprompts.txt
@@ -112,11 +120,13 @@ jobs:
             --from_file testprompts.txt
 
       - name: export conda env
+        id: export-conda-env
         run: |
           mkdir -p outputs/img-samples
-          conda env export --name ${{ env.CONDA_ENV_NAME }} > outputs/img-samples/environment-${{ runner.os }}.yml
+          conda env export --name ${{ env.CONDA_ENV_NAME }} > outputs/img-samples/environment-${{ runner.os }}-${{ runner.arch }}.yml
 
       - name: Archive results
+        id: archive-results
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.os }}_${{ matrix.stable-diffusion-model-switch }}
