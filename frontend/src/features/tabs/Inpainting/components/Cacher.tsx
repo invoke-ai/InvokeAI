@@ -35,7 +35,6 @@ const Cacher = () => {
     isDrawing,
   } = useAppSelector((state: RootState) => state.inpainting);
 
-
   useLayoutEffect(() => {
     if (!maskLayerRef.current) return;
     maskLayerRef.current.cache({
@@ -79,10 +78,14 @@ const Cacher = () => {
         width,
         height,
       });
-    }, 0)
+    }, 0);
 
-    return () => { window.clearTimeout(intervalId); }
-  })
+    return () => {
+      window.clearTimeout(intervalId);
+    };
+  });
+
+  return null;
 };
 
 export default Cacher;
