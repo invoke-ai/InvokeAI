@@ -16,8 +16,8 @@ if [ "$0" == "bash" ]; then
     echo "2. browser-based UI"
     read -p "Please enter 1 or 2: " yn
     case $yn in
-        1 ) printf "\nStarting the InvokeAI command-line..\n"; python scripts/invoke.py; break;;
-        2 ) printf "\nStarting the InvokeAI browser-based UI..\n"; python scripts/invoke.py --web; break;;
+        1 ) printf "\nStarting the InvokeAI command-line..\n"; python scripts/invoke.py;;
+        2 ) printf "\nStarting the InvokeAI browser-based UI..\n"; python scripts/invoke.py --web;;
         * ) echo "Invalid selection"; exit;;
     esac
 else
