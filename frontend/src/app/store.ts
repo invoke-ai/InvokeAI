@@ -59,6 +59,7 @@ const galleryPersistConfig = {
   key: 'gallery',
   storage,
   whitelist: [
+    'galleryWidth',
     'shouldPinGallery',
     'shouldShowGallery',
     'galleryScrollPosition',

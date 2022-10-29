@@ -18,6 +18,7 @@ export const imageGallerySelector = createSelector(
       galleryImageObjectFit,
       shouldHoldGalleryOpen,
       shouldAutoSwitchToNewImages,
+      galleryWidth,
     } = gallery;
 
     const { activeTab } = options;
@@ -37,6 +38,7 @@ export const imageGallerySelector = createSelector(
       areMoreImagesAvailable:
         categories[currentCategory].areMoreImagesAvailable,
       currentCategory,
+      galleryWidth,
     };
   }
 );

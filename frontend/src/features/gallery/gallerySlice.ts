@@ -36,6 +36,7 @@ export interface GalleryState {
     result: Gallery;
   };
   currentCategory: GalleryCategory;
+  galleryWidth: number;
 }
 
 const initialState: GalleryState = {
@@ -62,6 +63,7 @@ const initialState: GalleryState = {
       areMoreImagesAvailable: true,
     },
   },
+  galleryWidth: 300,
 };
 
 export const gallerySlice = createSlice({
@@ -248,6 +250,9 @@ export const gallerySlice = createSlice({
     setCurrentCategory: (state, action: PayloadAction<GalleryCategory>) => {
       state.currentCategory = action.payload;
     },
+    setGalleryWidth: (state, action: PayloadAction<number>) => {
+      state.galleryWidth = action.payload;
+    },
   },
 });
 
@@ -268,6 +273,7 @@ export const {
   setShouldHoldGalleryOpen,
   setShouldAutoSwitchToNewImages,
   setCurrentCategory,
+  setGalleryWidth,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

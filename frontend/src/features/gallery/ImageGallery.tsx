@@ -15,6 +15,7 @@ import {
   setGalleryImageMinimumWidth,
   setGalleryImageObjectFit,
   setGalleryScrollPosition,
+  setGalleryWidth,
   setShouldAutoSwitchToNewImages,
   setShouldHoldGalleryOpen,
   setShouldPinGallery,
@@ -32,6 +33,8 @@ import { BiReset } from 'react-icons/bi';
 import IAICheckbox from '../../common/components/IAICheckbox';
 import { setNeedsCache } from '../tabs/Inpainting/inpaintingSlice';
 import _ from 'lodash';
+
+const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
@@ -51,71 +54,39 @@ export default function ImageGallery() {
     shouldHoldGalleryOpen,
     shouldAutoSwitchToNewImages,
     areMoreImagesAvailable,
+    galleryWidth,
   } = useAppSelector(imageGallerySelector);
 
-  const [gallerySize, setGallerySize] = useState<Size>({
-    width: '300',
-    height: '100%',
-  });
+  const [galleryMinWidth, setGalleryMinWidth] = useState<number>(300);
+  const [galleryMaxWidth, setGalleryMaxWidth] = useState<number>(590);
 
-  const [galleryMaxSize, setGalleryMaxSize] = useState<Size>({
-    width: '590', // keep max at 590 for any tab
-    height: '100%',
-  });
-
-  const [galleryMinSize, setGalleryMinSize] = useState<Size>({
-    width: '300', // keep max at 590 for any tab
-    height: '100%',
-  });
-
-  console.log(gallerySize, galleryMaxSize, galleryMinSize);
+  const [shouldShowButtons, setShouldShowButtons] = useState<boolean>(
+    galleryWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH
+  );
 
   useEffect(() => {
-    if (activeTabName === 'inpainting' && shouldPinGallery) {
-      setGalleryMinSize((prevSize) => {
-        return { ...prevSize, width: 220 };
-      });
-      setGalleryMaxSize((prevSize) => {
-        return { ...prevSize, width: 220 };
-      });
-      setGallerySize((prevSize) => {
-        return {
-          ...prevSize,
-          width: Math.min(Math.max(Number(prevSize.width), 0), 220),
-        };
-      });
-    } else if (activeTabName === 'img2img' && shouldPinGallery) {
-      setGalleryMaxSize((prevSize) => {
-        return { ...prevSize, width: 490, height: '100%' };
-      });
-      setGallerySize((prevSize) => {
-        return {
-          ...prevSize,
-          width: Math.min(Math.max(Number(prevSize.width), 0), 490),
-        };
-      });
+    if (!shouldPinGallery) return;
+
+    if (activeTabName === 'inpainting') {
+      dispatch(setGalleryWidth(220));
+      setGalleryMinWidth(220);
+      setGalleryMaxWidth(220);
+    } else if (activeTabName === 'img2img') {
+      dispatch(
+        setGalleryWidth(Math.min(Math.max(Number(galleryWidth), 0), 490))
+      );
+      setGalleryMaxWidth(490);
     } else {
-      setGalleryMaxSize((prevSize) => {
-        return { ...prevSize, width: 590, height: '100%' };
-      });
-      setGallerySize((prevSize) => {
-        return {
-          ...prevSize,
-          width: Math.min(Math.max(Number(prevSize.width), 0), 590),
-        };
-      });
+      dispatch(
+        setGalleryWidth(Math.min(Math.max(Number(galleryWidth), 0), 590))
+      );
+      setGalleryMaxWidth(590);
     }
-  }, [activeTabName, shouldPinGallery]);
+  }, [dispatch, activeTabName, shouldPinGallery, galleryWidth]);
 
   useEffect(() => {
     if (!shouldPinGallery) {
-      setGalleryMaxSize((prevSize) => {
-        // calculate vh in px
-        return {
-          ...prevSize,
-          width: window.innerWidth,
-        };
-      });
+      setGalleryMaxWidth(window.innerWidth);
     }
   }, [shouldPinGallery]);
 
@@ -126,10 +97,6 @@ export default function ImageGallery() {
   const handleSetShouldPinGallery = () => {
     dispatch(setNeedsCache(true));
     dispatch(setShouldPinGallery(!shouldPinGallery));
-    setGallerySize({
-      ...gallerySize,
-      height: shouldPinGallery ? '100vh' : '100%',
-    });
   };
 
   const handleToggleGallery = () => {
@@ -300,9 +267,9 @@ export default function ImageGallery() {
         onMouseOver={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
       >
         <Resizable
-          minWidth={galleryMinSize.width}
-          maxWidth={galleryMaxSize.width}
-          maxHeight={'100%'}
+          minWidth={galleryMinWidth}
+          maxWidth={galleryMaxWidth}
+          // maxHeight={'100%'}
           className={'image-gallery-popup'}
           handleStyles={{ left: { width: '15px' } }}
           enable={{
@@ -315,17 +282,25 @@ export default function ImageGallery() {
             bottomLeft: false,
             topLeft: false,
           }}
-          size={gallerySize}
+          size={{
+            width: galleryWidth,
+            height: shouldPinGallery ? '100%' : '100vh',
+          }}
           onResizeStop={(
             _event: MouseEvent | TouchEvent,
             _direction: Direction,
             elementRef: HTMLElement,
             delta: NumberSize
           ) => {
-            setGallerySize({
-              width: _.clamp(Number(gallerySize.width) + delta.width, 0, Number(galleryMaxSize.width)),
-              height: '100%',
-            });
+            dispatch(
+              setGalleryWidth(
+                _.clamp(
+                  Number(galleryWidth) + delta.width,
+                  0,
+                  Number(galleryMaxWidth)
+                )
+              )
+            );
             elementRef.removeAttribute('data-resize-alert');
           }}
           onResize={(
@@ -335,18 +310,21 @@ export default function ImageGallery() {
             delta: NumberSize
           ) => {
             const newWidth = _.clamp(
-              Number(gallerySize.width) + delta.width,
+              Number(galleryWidth) + delta.width,
               0,
-              Number(galleryMaxSize.width)
+              Number(galleryMaxWidth)
             );
-            if (newWidth >= galleryMaxSize.width) {
+
+            if (newWidth >= 320 && !shouldShowButtons) {
+              setShouldShowButtons(true);
+            } else if (newWidth < 320 && shouldShowButtons) {
+              setShouldShowButtons(false);
+            }
+
+            if (newWidth >= galleryMaxWidth) {
               elementRef.setAttribute('data-resize-alert', 'true');
             } else {
               elementRef.removeAttribute('data-resize-alert');
-              setGallerySize({
-                width: newWidth,
-                height: '100%',
-              });
             }
           }}
         >
@@ -358,7 +336,7 @@ export default function ImageGallery() {
                 variant="solid"
                 className="image-gallery-category-btn-group"
               >
-                {gallerySize.width > 320 ? (
+                {shouldShowButtons ? (
                   <>
                     <Button
                       data-selected={currentCategory === 'result'}
@@ -393,88 +371,92 @@ export default function ImageGallery() {
                 )}
               </ButtonGroup>
             </div>
-            <IAIPopover
-              trigger="hover"
-              hasArrow={activeTabName === 'inpainting' ? false : true}
-              placement={'left'}
-              triggerComponent={
-                <IAIIconButton
-                  size={'sm'}
-                  aria-label={'Gallery Settings'}
-                  icon={<FaWrench />}
-                  className="image-gallery-icon-btn"
-                  cursor={'pointer'}
-                />
-              }
-            >
-              <div className="image-gallery-settings-popover">
-                <div>
-                  <IAISlider
-                    value={galleryImageMinimumWidth}
-                    onChange={handleChangeGalleryImageMinimumWidth}
-                    min={32}
-                    max={256}
-                    width={100}
-                    label={'Image Size'}
-                    formLabelProps={{ style: { fontSize: '0.9rem' } }}
-                    sliderThumbTooltipProps={{
-                      label: `${galleryImageMinimumWidth}px`,
-                    }}
-                  />
+            <div>
+              <IAIPopover
+                trigger="hover"
+                hasArrow={activeTabName === 'inpainting' ? false : true}
+                placement={'left'}
+                triggerComponent={
                   <IAIIconButton
                     size={'sm'}
-                    aria-label={'Reset'}
-                    tooltip={'Reset Size'}
-                    onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
-                    icon={<BiReset />}
-                    data-selected={shouldPinGallery}
-                    styleClass="image-gallery-icon-btn"
+                    aria-label={'Gallery Settings'}
+                    icon={<FaWrench />}
+                    className="image-gallery-icon-btn"
+                    cursor={'pointer'}
                   />
-                </div>
-                <div>
-                  <IAICheckbox
-                    label="Maintain Aspect Ratio"
-                    isChecked={galleryImageObjectFit === 'contain'}
-                    onChange={() =>
-                      dispatch(
-                        setGalleryImageObjectFit(
-                          galleryImageObjectFit === 'contain'
-                            ? 'cover'
-                            : 'contain'
+                }
+              >
+                <div className="image-gallery-settings-popover">
+                  <div>
+                    <IAISlider
+                      value={galleryImageMinimumWidth}
+                      onChange={handleChangeGalleryImageMinimumWidth}
+                      min={32}
+                      max={256}
+                      width={100}
+                      label={'Image Size'}
+                      formLabelProps={{ style: { fontSize: '0.9rem' } }}
+                      sliderThumbTooltipProps={{
+                        label: `${galleryImageMinimumWidth}px`,
+                      }}
+                    />
+                    <IAIIconButton
+                      size={'sm'}
+                      aria-label={'Reset'}
+                      tooltip={'Reset Size'}
+                      onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
+                      icon={<BiReset />}
+                      data-selected={shouldPinGallery}
+                      styleClass="image-gallery-icon-btn"
+                    />
+                  </div>
+                  <div>
+                    <IAICheckbox
+                      label="Maintain Aspect Ratio"
+                      isChecked={galleryImageObjectFit === 'contain'}
+                      onChange={() =>
+                        dispatch(
+                          setGalleryImageObjectFit(
+                            galleryImageObjectFit === 'contain'
+                              ? 'cover'
+                              : 'contain'
+                          )
                         )
-                      )
-                    }
-                  />
+                      }
+                    />
+                  </div>
+                  <div>
+                    <IAICheckbox
+                      label="Auto-Switch to New Images"
+                      isChecked={shouldAutoSwitchToNewImages}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        dispatch(
+                          setShouldAutoSwitchToNewImages(e.target.checked)
+                        )
+                      }
+                    />
+                  </div>
                 </div>
-                <div>
-                  <IAICheckbox
-                    label="Auto-Switch to New Images"
-                    isChecked={shouldAutoSwitchToNewImages}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setShouldAutoSwitchToNewImages(e.target.checked))
-                    }
-                  />
-                </div>
-              </div>
-            </IAIPopover>
+              </IAIPopover>
 
-            <IAIIconButton
-              size={'sm'}
-              aria-label={'Pin Gallery'}
-              tooltip={'Pin Gallery (Shift+P)'}
-              onClick={handleSetShouldPinGallery}
-              icon={<BsPinAngleFill />}
-              data-selected={shouldPinGallery}
-            />
+              <IAIIconButton
+                size={'sm'}
+                aria-label={'Pin Gallery'}
+                tooltip={'Pin Gallery (Shift+P)'}
+                onClick={handleSetShouldPinGallery}
+                icon={<BsPinAngleFill />}
+                data-selected={shouldPinGallery}
+              />
 
-            <IAIIconButton
-              size={'sm'}
-              aria-label={'Close Gallery'}
-              tooltip={'Close Gallery (G)'}
-              onClick={handleCloseGallery}
-              className="image-gallery-icon-btn"
-              icon={<MdClear />}
-            />
+              <IAIIconButton
+                size={'sm'}
+                aria-label={'Close Gallery'}
+                tooltip={'Close Gallery (G)'}
+                onClick={handleCloseGallery}
+                className="image-gallery-icon-btn"
+                icon={<MdClear />}
+              />
+            </div>
           </div>
           <div className="image-gallery-container" ref={galleryContainerRef}>
             {images.length || areMoreImagesAvailable ? (

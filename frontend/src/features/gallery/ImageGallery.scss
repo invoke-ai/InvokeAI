@@ -52,9 +52,15 @@
 
     .image-gallery-header {
       display: flex;
-      justify-content: end;
       align-items: center;
       column-gap: 0.5rem;
+      justify-content: space-between;
+
+      div {
+        display: flex;
+        column-gap: 0.5rem;
+        column-gap: 0.5rem;
+      }
 
       .image-gallery-icon-btn {
         background-color: var(--btn-load-more) !important;
