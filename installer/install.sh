@@ -107,8 +107,5 @@ conda activate invokeai
 # preload the models
 python scripts/preload_models.py
 
-# make the models dir
-mkdir models/ldm/stable-diffusion-v1
-
 # tell the user their next steps
 echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"

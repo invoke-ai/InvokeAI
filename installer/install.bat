@@ -85,9 +85,6 @@ call conda activate invokeai
 @rem preload the models
 call python scripts\preload_models.py
 
-@rem make the models dir
-mkdir models\ldm\stable-diffusion-v1
-
 @rem tell the user their next steps
 echo.
 echo "You can now start generating images by double-clicking the 'invoke.bat' file (inside this folder)
