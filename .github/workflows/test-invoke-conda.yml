@@ -77,7 +77,7 @@ jobs:
               -L ${{ matrix.stable-diffusion-model }}
 
       - name: Cache Conda env
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ${{ env.CONDA }}/envs
           key: conda-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('${{ matrix.environment-file }}') }}
