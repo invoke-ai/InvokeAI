@@ -11,12 +11,16 @@ on:
       - 'development'
 
 jobs:
-  os_matrix:
+  matrix:
     strategy:
       fail-fast: false
       matrix:
-        stable-diffusion-model: ['https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt']
-        os: [ubuntu-latest, macos-latest]
+        stable-diffusion-model:
+          - 'https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt'
+          - 'https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt'
+        os:
+          - ubuntu-latest
+          - macos-latest
         include:
           - os: ubuntu-latest
             environment-file: environment.yml
@@ -24,6 +28,12 @@ jobs:
           - os: macos-latest
             environment-file: environment-mac.yml
             default-shell: bash -l {0}
+          - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
+            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/model.ckpt
+            stable-diffusion-model-switch: stable-diffusion-1.4
+          - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-switch: stable-diffusion-1.5
     name: Test invoke.py on ${{ matrix.os }} with ${{ matrix.stable-diffusion-model }}
     runs-on: ${{ matrix.os }}
     env:
@@ -78,7 +88,7 @@ jobs:
           [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
             || curl \
               -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
-              -o models/ldm/stable-diffusion-v1/model.ckpt \
+              -o ${{ matrix.stable-diffusion-model-dl-path }} \
               -L ${{ matrix.stable-diffusion-model }}
 
       - name: Use Cached Huggingface and Torch models
@@ -97,8 +107,10 @@ jobs:
 
       - name: Run the tests
         run: |
+          echo "!switch ${{ matrix.stable-diffusion-model-switch }}" > testprompts.txt
+          cat ${{ env.TEST_PROMPTS }} >> testprompts.txt
           time python scripts/invoke.py \
-            --from_file ${{ env.TEST_PROMPTS }}
+            --from_file testprompts.txt
 
       - name: export conda env
         run: |
