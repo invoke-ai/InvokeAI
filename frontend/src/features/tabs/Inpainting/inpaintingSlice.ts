@@ -48,7 +48,7 @@ export interface InpaintingState {
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;
   imageToInpaint?: InvokeAI.Image;
-  needsRepaint: boolean;
+  needsCache: boolean;
   stageScale: number;
   isDrawing: boolean;
   shouldUseInpaintReplace: boolean;
@@ -75,7 +75,7 @@ const initialInpaintingState: InpaintingState = {
   shouldShowCheckboardTransparency: false,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
-  needsRepaint: false,
+  needsCache: false,
   isDrawing: false,
   stageScale: 1,
   shouldUseInpaintReplace: false,
@@ -201,7 +201,7 @@ export const inpaintingSlice = createSlice({
       };
 
       state.imageToInpaint = action.payload;
-      state.needsRepaint = true;
+      state.needsCache = true;
     },
     setCanvasDimensions: (state, action: PayloadAction<Dimensions>) => {
       state.canvasDimensions = action.payload;
@@ -291,12 +291,12 @@ export const inpaintingSlice = createSlice({
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
       state.boundingBoxPreviewFill = action.payload;
     },
-    setNeedsRepaint: (state, action: PayloadAction<boolean>) => {
-      state.needsRepaint = action.payload;
+    setNeedsCache: (state, action: PayloadAction<boolean>) => {
+      state.needsCache = action.payload;
     },
     setStageScale: (state, action: PayloadAction<number>) => {
       state.stageScale = action.payload;
-      state.needsRepaint = false;
+      state.needsCache = false;
     },
     setShouldShowBoundingBoxFill: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBoxFill = action.payload;
@@ -346,7 +346,7 @@ export const {
   setBoundingBoxDimensions,
   setBoundingBoxCoordinate,
   setBoundingBoxPreviewFill,
-  setNeedsRepaint,
+  setNeedsCache,
   setStageScale,
   toggleTool,
   setShouldShowBoundingBoxFill,

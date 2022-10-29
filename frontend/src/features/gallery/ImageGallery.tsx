@@ -30,6 +30,7 @@ import IAIPopover from '../../common/components/IAIPopover';
 import IAISlider from '../../common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
 import IAICheckbox from '../../common/components/IAICheckbox';
+import { setNeedsCache } from '../tabs/Inpainting/inpaintingSlice';
 
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
@@ -111,6 +112,7 @@ export default function ImageGallery() {
   const timeoutIdRef = useRef<number | null>(null);
 
   const handleSetShouldPinGallery = () => {
+    dispatch(setNeedsCache(true))
     dispatch(setShouldPinGallery(!shouldPinGallery));
     setGallerySize({
       ...gallerySize,
@@ -119,14 +121,17 @@ export default function ImageGallery() {
   };
 
   const handleToggleGallery = () => {
+    dispatch(setNeedsCache(true))
     shouldShowGallery ? handleCloseGallery() : handleOpenGallery();
   };
 
   const handleOpenGallery = () => {
+    dispatch(setNeedsCache(true))
     dispatch(setShouldShowGallery(true));
   };
 
   const handleCloseGallery = () => {
+    dispatch(setNeedsCache(true))
     dispatch(
       setGalleryScrollPosition(
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0

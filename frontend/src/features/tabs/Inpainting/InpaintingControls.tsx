@@ -24,10 +24,9 @@ import {
   undo,
   setShouldShowMask,
   setShouldInvertMask,
-  setNeedsRepaint,
+  setNeedsCache,
   toggleShouldLockBoundingBox,
   clearImageToInpaint,
-  setShouldShowBoundingBox,
 } from './inpaintingSlice';
 
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
@@ -284,7 +283,7 @@ const InpaintingControls = () => {
 
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
-    dispatch(setNeedsRepaint(true));
+    dispatch(setNeedsCache(true));
   };
 
   const handleClearImage = () => {

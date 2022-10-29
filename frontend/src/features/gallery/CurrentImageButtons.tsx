@@ -23,14 +23,13 @@ import {
   MdHd,
   MdImage,
   MdInfo,
-  MdSettings,
 } from 'react-icons/md';
 import InvokePopover from './InvokePopover';
 import UpscaleOptions from '../options/AdvancedOptions/Upscale/UpscaleOptions';
 import FaceRestoreOptions from '../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useToast } from '@chakra-ui/react';
-import { FaPaintBrush, FaSeedling } from 'react-icons/fa';
+import { FaCopy, FaPaintBrush, FaSeedling } from 'react-icons/fa';
 import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
@@ -279,7 +278,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
       />
 
       <IAIIconButton
-        icon={<MdSettings />}
+        icon={<FaCopy />}
         tooltip="Use All"
         aria-label="Use All"
         isDisabled={

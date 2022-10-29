@@ -9,15 +9,15 @@ import { OptionsState } from '../../options/optionsSlice';
 import InpaintingCanvas from './InpaintingCanvas';
 import InpaintingCanvasPlaceholder from './InpaintingCanvasPlaceholder';
 import InpaintingControls from './InpaintingControls';
-import { InpaintingState, setNeedsRepaint } from './inpaintingSlice';
+import { InpaintingState, setNeedsCache } from './inpaintingSlice';
 
 const inpaintingDisplaySelector = createSelector(
   [(state: RootState) => state.inpainting, (state: RootState) => state.options],
   (inpainting: InpaintingState, options: OptionsState) => {
-    const { needsRepaint, imageToInpaint } = inpainting;
+    const { needsCache, imageToInpaint } = inpainting;
     const { showDualDisplay } = options;
     return {
-      needsRepaint,
+      needsCache,
       showDualDisplay,
       imageToInpaint,
     };
@@ -31,13 +31,13 @@ const inpaintingDisplaySelector = createSelector(
 
 const InpaintingDisplay = () => {
   const dispatch = useAppDispatch();
-  const { showDualDisplay, needsRepaint, imageToInpaint } = useAppSelector(
+  const { showDualDisplay, needsCache, imageToInpaint } = useAppSelector(
     inpaintingDisplaySelector
   );
 
   useLayoutEffect(() => {
     const resizeCallback = _.debounce(
-      () => dispatch(setNeedsRepaint(true)),
+      () => dispatch(setNeedsCache(true)),
       250
     );
     window.addEventListener('resize', resizeCallback);
@@ -48,7 +48,7 @@ const InpaintingDisplay = () => {
     <div className="inpainting-main-area">
       <InpaintingControls />
       <div className="inpainting-canvas-area">
-        {needsRepaint ? <InpaintingCanvasPlaceholder /> : <InpaintingCanvas />}
+        {needsCache ? <InpaintingCanvasPlaceholder /> : <InpaintingCanvas />}
       </div>
     </div>
   ) : (

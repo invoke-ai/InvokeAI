@@ -5,7 +5,7 @@ import { setStageScale } from './inpaintingSlice';
 
 const InpaintingCanvasPlaceholder = () => {
   const dispatch = useAppDispatch();
-  const { needsRepaint, imageToInpaint } = useAppSelector(
+  const { needsCache, imageToInpaint } = useAppSelector(
     (state: RootState) => state.inpainting
   );
   const ref = useRef<HTMLDivElement>(null);
@@ -22,7 +22,7 @@ const InpaintingCanvasPlaceholder = () => {
     );
 
     dispatch(setStageScale(scale));
-  }, [dispatch, imageToInpaint, needsRepaint]);
+  }, [dispatch, imageToInpaint, needsCache]);
 
   return (
     <div ref={ref} className="inpainting-canvas-area">
