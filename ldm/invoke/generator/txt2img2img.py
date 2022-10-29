@@ -5,9 +5,11 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 import torch
 import numpy as  np
 import math
-from ldm.invoke.generator.base  import Generator
+from ldm.invoke.generator.base import Generator
 from ldm.models.diffusion.ddim import DDIMSampler
-
+from ldm.invoke.generator.omnibus import Omnibus
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+from PIL import Image
 
 class Txt2Img2Img(Generator):
     def __init__(self, model, precision):
@@ -22,31 +24,29 @@ class Txt2Img2Img(Generator):
         Return value depends on the seed at the time you call it
         kwargs are 'width' and 'height'
         """
-        uc, c   = conditioning
+        uc, c, extra_conditioning_info = conditioning
+        scale_dim = min(width, height)
+        scale = 512 / scale_dim
+
+        init_width = math.ceil(scale * width / 64) * 64
+        init_height = math.ceil(scale * height / 64) * 64
 
         @torch.no_grad()
-        def make_image(x_T):           
-            
-            trained_square = 512 * 512
-            actual_square = width * height
-            scale = math.sqrt(trained_square / actual_square)
+        def make_image(x_T):
 
-            init_width = math.ceil(scale * width / 64) * 64
-            init_height = math.ceil(scale * height / 64) * 64
-            
             shape = [
                 self.latent_channels,
                 init_height // self.downsampling_factor,
                 init_width // self.downsampling_factor,
             ]
-            
+
             sampler.make_schedule(
                     ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
             )
-            
+
             #x = self.get_noise(init_width, init_height)
             x = x_T
-            
+
             if self.free_gpu_mem and self.model.model.device != self.model.device:
                 self.model.model.to(self.model.device)
 
@@ -60,17 +60,18 @@ class Txt2Img2Img(Generator):
                 unconditional_guidance_scale = cfg_scale,
                 unconditional_conditioning   = uc,
                 eta                          = ddim_eta,
-                img_callback                 = step_callback
+                img_callback                 = step_callback,
+                extra_conditioning_info      = extra_conditioning_info
             )
-            
+
             print(
                   f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
                  )
-            
+
             # resizing
             samples = torch.nn.functional.interpolate(
-                samples, 
-                size=(height // self.downsampling_factor, width // self.downsampling_factor), 
+                samples,
+                size=(height // self.downsampling_factor, width // self.downsampling_factor),
                 mode="bilinear"
             )
 
@@ -94,6 +95,8 @@ class Txt2Img2Img(Generator):
                 img_callback = step_callback,
                 unconditional_guidance_scale=cfg_scale,
                 unconditional_conditioning=uc,
+                extra_conditioning_info=extra_conditioning_info,
+                all_timesteps_count=steps
             )
 
             if self.free_gpu_mem:
@@ -101,8 +104,49 @@ class Txt2Img2Img(Generator):
 
             return self.sample_to_image(samples)
 
-        return make_image
-
+        # in the case of the inpainting model being loaded, the trick of
+        # providing an interpolated latent doesn't work, so we transiently
+        # create a 512x512 PIL image, upscale it, and run the inpainting
+        # over it in img2img mode. Because the inpaing model is so conservative
+        # it doesn't change the image (much)
+        def inpaint_make_image(x_T):
+            omnibus = Omnibus(self.model,self.precision)
+            result = omnibus.generate(
+                prompt,
+                sampler=sampler,
+                width=init_width,
+                height=init_height,
+                step_callback=step_callback,
+                steps = steps,
+                cfg_scale = cfg_scale,
+                ddim_eta = ddim_eta,
+                conditioning = conditioning,
+                **kwargs
+            )
+            assert result is not None and len(result)>0,'** txt2img failed **'
+            image = result[0][0]
+            interpolated_image = image.resize((width,height),resample=Image.Resampling.LANCZOS)
+            print(kwargs.pop('init_image',None))
+            result = omnibus.generate(
+                prompt,
+                sampler=sampler,
+                init_image=interpolated_image,
+                width=width,
+                height=height,
+                seed=result[0][1],
+                step_callback=step_callback,
+                steps = steps,
+                cfg_scale = cfg_scale,
+                ddim_eta = ddim_eta,
+                conditioning = conditioning,
+                **kwargs
+                )
+            return result[0][0]
+            
+        if sampler.uses_inpainting_model():
+            return inpaint_make_image
+        else:
+            return make_image
 
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height,scale = True):
@@ -116,7 +160,7 @@ class Txt2Img2Img(Generator):
         else:
             scaled_width = width
             scaled_height = height
-            
+
         device      = self.model.device
         if self.use_mps_noise or device.type == 'mps':
             return torch.randn([1,
@@ -130,3 +174,4 @@ class Txt2Img2Img(Generator):
                                 scaled_height // self.downsampling_factor,
                                 scaled_width  // self.downsampling_factor],
                                 device=device)
+

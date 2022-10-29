@@ -18,6 +18,7 @@ from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from omegaconf import OmegaConf
 from pathlib import Path
+from pyparsing import ParseException
 
 # global used in multiple functions (fix)
 infile = None
@@ -172,8 +173,7 @@ def main_loop(gen, opt):
                 pass
 
         if len(opt.prompt) == 0:
-            print('\nTry again with a prompt!')
-            continue
+            opt.prompt = ''
 
         # width and height are set by model if not specified
         if not opt.width:
@@ -328,12 +328,16 @@ def main_loop(gen, opt):
             if operation == 'generate':
                 catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
                 opt.last_operation='generate'
-                gen.prompt2image(
-                    image_callback=image_writer,
-                    step_callback=step_callback,
-                    catch_interrupts=catch_ctrl_c,
-                    **vars(opt)
-                )
+                try:
+                    gen.prompt2image(
+                        image_callback=image_writer,
+                        step_callback=step_callback,
+                        catch_interrupts=catch_ctrl_c,
+                        **vars(opt)
+                    )
+                except ParseException as e:
+                    print('** An error occurred while processing your prompt **')
+                    print(f'** {str(e)} **')
             elif operation == 'postprocess':
                 print(f'>> fixing {opt.prompt}')
                 opt.last_operation = do_postprocess(gen,opt,image_writer)
@@ -528,12 +532,8 @@ def del_config(model_name:str, gen, opt, completer):
     if model_name == current_model:
         print("** Can't delete active model. !switch to another model first. **")
         return
-    yaml_str = gen.model_cache.del_model(model_name)
-    
-    tmpfile = os.path.join(os.path.dirname(opt.conf),'new_config.tmp')
-    with open(tmpfile, 'w') as outfile:
-        outfile.write(yaml_str)
-    os.rename(tmpfile,opt.conf)
+    if gen.model_cache.del_model(model_name):
+        gen.model_cache.commit(opt.conf)
     print(f'** {model_name} deleted')
     completer.del_model(model_name)
     
@@ -592,7 +592,9 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
 
 def do_textmask(gen, opt, callback):
     image_path = opt.prompt
-    assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+    if not os.path.exists(image_path):
+        image_path = os.path.join(opt.outdir,image_path)
+    assert os.path.exists(image_path), '** "{opt.prompt}" not found. Please enter the name of an existing image file to mask **'
     assert opt.text_mask is not None and len(opt.text_mask) >= 1, '** Please provide a text mask with -tm **'
     tm = opt.text_mask[0]
     threshold = float(opt.text_mask[1]) if len(opt.text_mask) > 1  else 0.5

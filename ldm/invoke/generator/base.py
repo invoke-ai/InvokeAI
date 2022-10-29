@@ -6,6 +6,7 @@ import torch
 import numpy as  np
 import random
 import os
+import traceback
 from tqdm import tqdm, trange
 from PIL import Image, ImageFilter
 from einops import rearrange, repeat
@@ -28,7 +29,8 @@ class Generator():
         self.threshold = 0
         self.variation_amount = 0
         self.with_variations = []
-        self.use_mps_noise       = False
+        self.use_mps_noise = False
+        self.free_gpu_mem = None
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
     def get_make_image(self,prompt,**kwargs):
@@ -43,14 +45,15 @@ class Generator():
         self.variation_amount = variation_amount
         self.with_variations  = with_variations
 
-    def generate(self,prompt,init_image,width,height,iterations=1,seed=None,
+    def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  safety_checker:dict=None,
                  **kwargs):
         scope = choose_autocast(self.precision)
         self.safety_checker = safety_checker
-        make_image          = self.get_make_image(
+        make_image = self.get_make_image(
             prompt,
+            sampler = sampler,
             init_image    = init_image,
             width         = width,
             height        = height,
@@ -59,12 +62,14 @@ class Generator():
             perlin        = perlin,
             **kwargs
         )
-
         results             = []
         seed                = seed if seed is not None else self.new_seed()
         first_seed          = seed
         seed, initial_noise = self.generate_initial_noise(seed, width, height)
-        with scope(self.model.device.type), self.model.ema_scope():
+
+        # There used to be an additional self.model.ema_scope() here, but it breaks
+        # the inpaint-1.5 model. Not sure what it did.... ?
+        with scope(self.model.device.type):
             for n in trange(iterations, desc='Generating'):
                 x_T = None
                 if self.variation_amount > 0:
@@ -79,7 +84,8 @@ class Generator():
                     try:
                         x_T = self.get_noise(width,height)
                     except:
-                        pass
+                        print('** An error occurred while getting initial noise **')
+                        print(traceback.format_exc())
 
                 image = make_image(x_T)
 
@@ -95,10 +101,10 @@ class Generator():
 
         return results
     
-    def sample_to_image(self,samples):
+    def sample_to_image(self,samples)->Image.Image:
         """
-        Returns a function returning an image derived from the prompt and the initial image
-        Return value depends on the seed at the time you call it
+        Given samples returned from a sampler, converts
+        it into a PIL Image
         """
         x_samples = self.model.decode_first_stage(samples)
         x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
