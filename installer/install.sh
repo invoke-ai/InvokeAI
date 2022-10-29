@@ -9,6 +9,8 @@
 
 # This enables a user to install this project without manually installing conda and git.
 
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
 echo "Installing InvokeAI.."
 echo ""
 
@@ -34,6 +36,7 @@ export MAMBA_ROOT_PREFIX="$(pwd)/installer_files/mamba"
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${OS_NAME}-${OS_ARCH}/latest"
 REPO_URL="https://github.com/cmdr2/InvokeAI.git"
+umamba_exists="F"
 
 # figure out whether git and conda needs to be installed
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
@@ -43,10 +46,12 @@ PACKAGES_TO_INSTALL=""
 if ! hash "conda" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL conda"; fi
 if ! hash "git" &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL git"; fi
 
+if "$MAMBA_ROOT_PREFIX/micromamba" --version &>/dev/null; then umamba_exists="T"; fi
+
 # (if necessary) install git and conda into a contained environment
 if [ "$PACKAGES_TO_INSTALL" != "" ]; then
     # download micromamba
-    if [ ! -e "$MAMBA_ROOT_PREFIX/micromamba" ]; then
+    if [ "$umamba_exists" == "F" ]; then
         echo "Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to $MAMBA_ROOT_PREFIX/micromamba"
 
         mkdir -p "$MAMBA_ROOT_PREFIX"
