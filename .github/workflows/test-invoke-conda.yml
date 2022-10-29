@@ -26,6 +26,8 @@ jobs:
             default-shell: bash -l {0}
     name: Test invoke.py on ${{ matrix.os }} with ${{ matrix.stable-diffusion-model }}
     runs-on: ${{ matrix.os }}
+    env:
+      CONDA_ENV_NAME: invokeai
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
@@ -33,11 +35,17 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      - name: setup miniconda
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        with:
+          path: ~/conda_pkgs_dir
+          key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
+
+      - name: Activate Conda Env
         uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-activate-base: false
-          auto-update-conda: false
+          activate-environment: ${{ env.CONDA_ENV_NAME }}
+          environment-file: ${{ matrix.environment-file }}
           miniconda-version: latest
 
       - name: set test prompt to main branch validation
@@ -51,9 +59,6 @@ jobs:
       - name: set test prompt to Pull Request validation
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
-
-      - name: set conda environment name
-        run: echo "CONDA_ENV_NAME=invokeai" >> $GITHUB_ENV
 
       - name: Use Cached Stable Diffusion Model
         id: cache-stable-diffusion-model
@@ -75,19 +80,6 @@ jobs:
               -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
               -o models/ldm/stable-diffusion-v1/model.ckpt \
               -L ${{ matrix.stable-diffusion-model }}
-
-      - name: Cache Conda env
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.CONDA }}/envs
-          key: conda-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
-        id: cache-conda-pkgs
-
-      - name: Activate Conda Env
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          activate-environment: ${{ env.CONDA_ENV_NAME }}
-          environment-file: ${{ matrix.environment-file }}
 
       - name: Use Cached Huggingface and Torch models
         id: cache-hugginface-torch
