@@ -47,8 +47,14 @@ strongly recommend that you install this weights file if nothing else.
 ## Community-Contributed Models
 
 There are too many to list here and more are being contributed every
-day. [This page](https://rentry.org/sdmodels) hosts an updated list of
-Stable Diffusion models and where they can be obtained.
+day. Hugging Face maintains a [fast-growing
+repository](https://huggingface.co/sd-concepts-library) of fine-tune
+(".bin") models that can be imported into InvokeAI by passing the
+`--embedding_path` option to the `invoke.py` command.
+
+[This page](https://rentry.org/sdmodels) hosts a large list of
+official and unofficial Stable Diffusion models and where they can be
+obtained.
 
 ## Installation
 
