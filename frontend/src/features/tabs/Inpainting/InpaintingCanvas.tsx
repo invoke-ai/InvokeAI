@@ -53,6 +53,7 @@ const InpaintingCanvas = () => {
     maskColor,
     imageToInpaint,
     stageScale,
+    shouldShowBoundingBox,
     shouldShowBoundingBoxFill,
     isDrawing,
     shouldLockBoundingBox,
@@ -300,10 +301,10 @@ const InpaintingCanvas = () => {
                 )}
               </Layer>
               <Layer>
-                {shouldShowBoundingBoxFill && (
+                {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
                   <InpaintingBoundingBoxPreviewOverlay />
                 )}
-                <InpaintingBoundingBoxPreview />
+                {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
                 {shouldLockBoundingBox && (
                   <InpaintingCanvasBrushPreviewOutline />
                 )}

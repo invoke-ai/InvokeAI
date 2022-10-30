@@ -12,6 +12,16 @@
   justify-content: space-between;
   padding: 0.5rem 1rem;
   border-radius: 0.4rem 0.4rem 0 0;
+  align-items: center;
+
+  button {
+    width: 0.5rem !important;
+    height: 1.2rem !important;
+    background: none !important;
+    &:hover {
+      background: none !important;
+    }
+  }
 
   p {
     font-weight: bold;

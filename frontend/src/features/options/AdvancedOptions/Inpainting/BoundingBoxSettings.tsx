@@ -1,7 +1,8 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { BiReset } from 'react-icons/bi';
+
+import { BiHide, BiReset, BiShow } from 'react-icons/bi';
 
 import {
   RootState,
@@ -18,6 +19,7 @@ import {
   InpaintingState,
   setBoundingBoxDimensions,
   setShouldLockBoundingBox,
+  setShouldShowBoundingBox,
   setShouldShowBoundingBoxFill,
 } from '../../../tabs/Inpainting/inpaintingSlice';
 
@@ -27,6 +29,7 @@ const boundingBoxDimensionsSelector = createSelector(
     const {
       canvasDimensions,
       boundingBoxDimensions,
+      shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
       pastLines,
       futureLines,
@@ -35,6 +38,7 @@ const boundingBoxDimensionsSelector = createSelector(
     return {
       canvasDimensions,
       boundingBoxDimensions,
+      shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
       pastLines,
       futureLines,
@@ -53,6 +57,7 @@ const BoundingBoxSettings = () => {
   const {
     canvasDimensions,
     boundingBoxDimensions,
+    shouldShowBoundingBox,
     shouldShowBoundingBoxFill,
     shouldLockBoundingBox,
   } = useAppSelector(boundingBoxDimensionsSelector);
@@ -101,10 +106,22 @@ const BoundingBoxSettings = () => {
     );
   };
 
+  const handleShowBoundingBox = () =>
+    dispatch(setShouldShowBoundingBox(!shouldShowBoundingBox));
+
   return (
     <div className="inpainting-bounding-box-settings">
       <div className="inpainting-bounding-box-header">
         <p>Inpaint Box</p>
+        <IAIIconButton
+          aria-label="Toggle Bounding Box Visibility"
+          icon={
+            shouldShowBoundingBox ? <BiShow size={22} /> : <BiHide size={22} />
+          }
+          onClick={handleShowBoundingBox}
+          background={'none'}
+          padding={0}
+        />
       </div>
       <div className="inpainting-bounding-box-settings-items">
         <div className="inpainting-bounding-box-dimensions-slider-numberinput">
