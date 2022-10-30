@@ -111,6 +111,4 @@ class Outcrop(object):
         alpha.paste(0,(0,0,extended_img.width,mask_height))
         extended_img.putalpha(alpha)
 
-        extended_img.save('outputs/curly_extended.png')
-
         return extended_img
