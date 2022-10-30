@@ -157,7 +157,9 @@ export const gallerySlice = createSlice({
     selectNextImage: (state, action: PayloadAction<GalleryCategory>) => {
       const category = action.payload;
       const { currentImage } = state;
-      const tempImages = state.categories[category].images;
+      if (!currentImage) return;
+      const tempImages =
+        state.categories[currentImage.category as GalleryCategory].images;
 
       if (currentImage) {
         const currentImageIndex = tempImages.findIndex(
@@ -173,7 +175,9 @@ export const gallerySlice = createSlice({
     selectPrevImage: (state, action: PayloadAction<GalleryCategory>) => {
       const category = action.payload;
       const { currentImage } = state;
-      const tempImages = state.categories[category].images;
+      if (!currentImage) return;
+      const tempImages =
+        state.categories[currentImage.category as GalleryCategory].images;
 
       if (currentImage) {
         const currentImageIndex = tempImages.findIndex(
