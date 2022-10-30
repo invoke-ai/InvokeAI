@@ -83,16 +83,16 @@ with metadata_from_png():
 import argparse
 from argparse import Namespace, RawTextHelpFormatter
 import pydoc
-import shlex
 import json
 import hashlib
 import os
 import re
+import shlex
 import copy
 import base64
 import functools
 import ldm.invoke.pngwriter
-from ldm.invoke.conditioning import split_weighted_subprompts
+from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
     'ddim',
@@ -169,28 +169,24 @@ class Args(object):
 
     def parse_cmd(self,cmd_string):
         '''Parse a invoke>-style command string '''
-        command = cmd_string.replace("'", "\\'")
-        try:
-            elements = shlex.split(command)
-            elements = [x.replace("\\'","'") for x in elements]
-        except ValueError:
-            import sys, traceback
-            print(traceback.format_exc(), file=sys.stderr)
-            return
-        switches = ['']
-        switches_started = False
-
-        for element in elements:
-            if element[0] == '-' and not switches_started:
-                switches_started = True
-            if switches_started:
-                switches.append(element)
+        # handle the case in which the prompt is enclosed by quotes
+        if cmd_string.startswith('"'):
+            a = shlex.split(cmd_string)
+            prompt = a[0]
+            switches = shlex.join(a[1:])
+        else:
+            # no initial quote, so get everything up to the first thing
+            # that looks like a switch
+            match = re.match('^(.+?)\s(--?[a-zA-Z].+)',cmd_string)
+            if match:
+                prompt,switches = match.groups()
             else:
-                switches[0] += element
-                switches[0] += ' '
-        switches[0] = switches[0][: len(switches[0]) - 1]
+                prompt = cmd_string
+                switches = ''
+
         try:
-            self._cmd_switches = self._cmd_parser.parse_args(switches)
+            self._cmd_switches = self._cmd_parser.parse_args(shlex.split(switches))
+            setattr(self._cmd_switches,'prompt',prompt)
             return self._cmd_switches
         except:
             return None
@@ -211,13 +207,14 @@ class Args(object):
         a = vars(self)
         a.update(kwargs)
         switches = list()
-        switches.append(f'"{a["prompt"]}"')
+        prompt = a['prompt']
+        prompt.replace('"','\\"')
+        switches.append(prompt)
         switches.append(f'-s {a["steps"]}')
         switches.append(f'-S {a["seed"]}')
         switches.append(f'-W {a["width"]}')
         switches.append(f'-H {a["height"]}')
         switches.append(f'-C {a["cfg_scale"]}')
-        switches.append(f'--fnformat {a["fnformat"]}')
         if a['perlin'] > 0:
             switches.append(f'--perlin {a["perlin"]}')
         if a['threshold'] > 0:
@@ -243,6 +240,8 @@ class Args(object):
                 switches.append(f'-f {a["strength"]}')
             if a['inpaint_replace']:
                 switches.append(f'--inpaint_replace')
+            if a['text_mask']:
+                switches.append(f'-tm {" ".join([str(u) for u in a["text_mask"]])}')
         else:
             switches.append(f'-A {a["sampler_name"]}')
 
@@ -570,7 +569,11 @@ class Args(object):
         variation_group  = parser.add_argument_group('Creating and combining variations')
         postprocessing_group   = parser.add_argument_group('Post-processing')
         special_effects_group  = parser.add_argument_group('Special effects')
-        render_group.add_argument('prompt')
+        render_group.add_argument(
+            '--prompt',
+            default='',
+            help='prompt string',
+        )
         render_group.add_argument(
             '-s',
             '--steps',
@@ -701,6 +704,11 @@ class Args(object):
             '--init_mask',
             type=str,
             help='Path to input mask for inpainting mode (supersedes width and height)',
+        )
+        img2img_group.add_argument(
+            '--invert_mask',
+            action='store_true',
+            help='Invert the mask',
         )
         img2img_group.add_argument(
             '-tm',

@@ -73,7 +73,8 @@ class Inpaint(Img2Img):
             ) # move to latent space
 
         t_enc   = int(strength * steps)
-        uc, c   = conditioning
+        # todo: support cross-attention control
+        uc, c, _ = conditioning
 
         print(f">> target t_enc is {t_enc} steps")
 
