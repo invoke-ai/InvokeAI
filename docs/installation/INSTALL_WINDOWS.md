@@ -1,5 +1,5 @@
 ---
-title: Windows
+title: Manual Installation, Windows
 ---
 
 # :fontawesome-brands-windows: Windows
@@ -83,23 +83,14 @@ in the wiki
 
 8. Now you need to install the weights for the big stable diffusion model.
 
-      1. For running with the released weights, you will first need to set up an acount with Hugging Face (https://huggingface.co).
-      2. Use your credentials to log in, and then point your browser at https://huggingface.co/CompVis/stable-diffusion-v-1-4-original.
-      3. You may be asked to sign a license agreement at this point.
-      4. Click on "Files and versions" near the top of the page, and then click on the file named `sd-v1-4.ckpt`. You'll be taken to a page that
-        prompts you to click the "download" link. Now save the file somewhere safe on your local machine.
-      5. The weight file is >4 GB in size, so
-        downloading may take a while.
+   - Sign up at https://huggingface.co
+   - Go to the [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
+   - Accept the terms and click Access Repository
+   - Download [v1-5-pruned-emaonly.ckpt (4.27 GB)](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned-emaonly.ckpt)
+     and move it into this directory under `models/ldm/stable_diffusion_v1/v1-5-pruned-emaonly.ckpt`
 
-    Now run the following commands from **within the InvokeAI directory** to copy the weights file to the right place:
-
-    ```batch
-    mkdir -p models\ldm\stable-diffusion-v1
-    copy C:\path\to\sd-v1-4.ckpt models\ldm\stable-diffusion-v1\model.ckpt
-    ```
-
-    Please replace `C:\path\to\sd-v1.4.ckpt` with the correct path to wherever you stashed this file. If you prefer not to copy or move the .ckpt file,
-    you may instead create a shortcut to it from within `models\ldm\stable-diffusion-v1\`.
+   There are many other models that you can use. Please see [../features/INSTALLING_MODELS.md]
+   for details.
 
 9. Start generating images!
 

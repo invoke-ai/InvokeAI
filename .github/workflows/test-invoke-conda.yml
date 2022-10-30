@@ -84,7 +84,9 @@ jobs:
 
       - name: run preload_models.py
         id: run-preload-models
-        run: python scripts/preload_models.py
+        run: |
+          python scripts/preload_models.py \
+            --no-interactive
 
       - name: Run the tests
         id: run-tests

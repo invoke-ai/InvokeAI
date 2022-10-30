@@ -1,0 +1,2 @@
+See docs/features/INSTALLING_MODELS.md for how to populate this
+directory with one or more Stable Diffusion model weight files.
