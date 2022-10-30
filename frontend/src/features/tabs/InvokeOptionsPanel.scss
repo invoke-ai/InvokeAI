@@ -34,7 +34,6 @@
     height: 100%;
     @include HideScrollbar;
     background-color: var(--background-color) !important;
-    border-right: 1px solid var(--border-color);
   }
 
   &[data-pinned='false'] {
