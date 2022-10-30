@@ -16,7 +16,7 @@ echo.
 set MAMBA_ROOT_PREFIX=%cd%\installer_files\mamba
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 set MICROMAMBA_DOWNLOAD_URL=https://github.com/cmdr2/stable-diffusion-ui/releases/download/v1.1/micromamba.exe
-set REPO_URL=https://github.com/cmdr2/InvokeAI.git
+set REPO_URL=https://github.com/invoke-ai/InvokeAI.git
 set umamba_exists=F
 @rem Change the download URL to an InvokeAI repo's release URL
 

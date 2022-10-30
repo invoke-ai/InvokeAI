@@ -35,7 +35,7 @@ if [ "$OS_NAME" == "linux" ] && [ "$OS_ARCH" == "arm64" ]; then OS_ARCH="aarch64
 export MAMBA_ROOT_PREFIX="$(pwd)/installer_files/mamba"
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${OS_NAME}-${OS_ARCH}/latest"
-REPO_URL="https://github.com/cmdr2/InvokeAI.git"
+REPO_URL="https://github.com/invoke-ai/InvokeAI.git"
 umamba_exists="F"
 
 # figure out whether git and conda needs to be installed
@@ -87,7 +87,7 @@ if [ ! -e ".git" ]; then
     git init
     git remote add origin "$REPO_URL"
     git fetch
-    git checkout origin/main -ft
+    git checkout origin/release-candidate-2-1 -ft
 fi
 
 # create the environment
