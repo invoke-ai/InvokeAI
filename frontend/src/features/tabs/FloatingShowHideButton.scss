@@ -6,9 +6,12 @@
   transform: translate(0, -50%);
   z-index: 20;
   padding: 0;
-  min-width: 2rem !important;
 
   filter: var(--floating-button-drop-shadow);
+
+  svg {
+    fill: var(--tab-list-text);
+  }
 
   &.left {
     left: 0;

@@ -11,7 +11,6 @@ import {
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { CSSTransition } from 'react-transition-group';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import IAIIconButton from '../../common/components/IAIIconButton';
 import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
 import {
   OptionsState,
@@ -120,28 +119,29 @@ const InvokeOptionsPanel = (props: Props) => {
           !shouldPinOptionsPanel ? cancelCloseOptionsPanelTimer : undefined
         }
       >
-        <Tooltip label="Pin Options Panel">
+        <div className="options-panel-margin">
           <div
-            className="options-panel-pin-button"
-            data-selected={shouldPinOptionsPanel}
-            onClick={handleClickPinOptionsPanel}
+            className="options-panel"
+            ref={optionsPanelContainerRef}
+            onMouseLeave={(e: MouseEvent<HTMLDivElement>) => {
+              if (e.target !== optionsPanelContainerRef.current) {
+                cancelCloseOptionsPanelTimer();
+              } else {
+                !shouldPinOptionsPanel && setCloseOptionsPanelTimer();
+              }
+            }}
           >
-            {shouldPinOptionsPanel ? <BsPinAngleFill /> : <BsPinAngle />}
+            <Tooltip label="Pin Options Panel">
+              <div
+                className="options-panel-pin-button"
+                data-selected={shouldPinOptionsPanel}
+                onClick={handleClickPinOptionsPanel}
+              >
+                {shouldPinOptionsPanel ? <BsPinAngleFill /> : <BsPinAngle />}
+              </div>
+            </Tooltip>
+            {children}
           </div>
-        </Tooltip>
-
-        <div
-          className="options-panel"
-          ref={optionsPanelContainerRef}
-          onMouseLeave={(e: MouseEvent<HTMLDivElement>) => {
-            if (e.target !== optionsPanelContainerRef.current) {
-              cancelCloseOptionsPanelTimer();
-            } else {
-              !shouldPinOptionsPanel && setCloseOptionsPanelTimer();
-            }
-          }}
-        >
-          {children}
         </div>
       </div>
     </CSSTransition>

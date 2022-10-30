@@ -20,19 +20,19 @@
 
 .options-panel-wrapper {
   background-color: var(--background-color);
-  grid-auto-rows: max-content;
   height: $app-content-height;
   width: $options-bar-max-width;
   max-width: $options-bar-max-width;
   flex-shrink: 0;
   position: relative;
+  overflow-y: scroll;
+  @include HideScrollbar;
 
   .options-panel {
     display: flex;
     flex-direction: column;
     row-gap: 1rem;
     height: 100%;
-    overflow-y: scroll;
     @include HideScrollbar;
   }
 
@@ -42,13 +42,13 @@
     position: fixed;
     top: 0;
     left: 0;
-    box-shadow: 0 0 1rem var(--text-color-a3);
+    filter: var(--floating-panel-drop-shadow);
     width: calc($options-bar-max-width + 2rem);
     max-width: calc($options-bar-max-width + 2rem);
     height: 100%;
 
-    .options-panel {
-      padding: 1rem;
+    .options-panel-margin {
+      margin: 1rem;
     }
   }
 
