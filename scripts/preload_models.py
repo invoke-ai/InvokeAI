@@ -7,6 +7,7 @@
 # Coauthor: Kevin Turner http://github.com/keturn
 #
 print('Loading Python libraries...\n')
+import argparse
 import clip
 import sys
 import transformers
@@ -17,7 +18,6 @@ import zipfile
 import traceback
 import getpass
 import requests
-
 from urllib import request
 from tqdm import tqdm
 from omegaconf import OmegaConf
@@ -500,29 +500,39 @@ def download_safety_checker():
 
 #-------------------------------------
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='InvokeAI model downloader')
+    parser.add_argument('--interactive',
+                        dest='interactive',
+                        action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help='run in interactive mode (default)')
+    opt = parser.parse_args()
+    
     try:
-        introduction()
-        print('** WEIGHT SELECTION **')
-        choice = user_wants_to_download_weights()
-        if choice != 'skip':
-            models = select_datasets(choice)
-            if models is None:
-                if yes_or_no('Quit?',default_yes=False):
-                    sys.exit(0)
-            print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
-            access_token = authenticate()
-            print('\n** DOWNLOADING WEIGHTS **')
-            successfully_downloaded = download_weight_datasets(models, access_token)
-            update_config_file(successfully_downloaded)
-        print('\n** DOWNLOADING SUPPORT MODELS **')
-        download_bert()
-        download_kornia()
-        download_clip()
-        download_gfpgan()
-        download_codeformer()
-        download_clipseg()
-        download_safety_checker()
-        postscript()
+        if opt.interactive:
+            introduction()
+            print('** WEIGHT SELECTION **')
+            choice = user_wants_to_download_weights()
+            if choice != 'skip':
+                models = select_datasets(choice)
+                if models is None:
+                    if yes_or_no('Quit?',default_yes=False):
+                        sys.exit(0)
+                print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+                access_token = authenticate()
+                print('\n** DOWNLOADING WEIGHTS **')
+                successfully_downloaded = download_weight_datasets(models, access_token)
+                update_config_file(successfully_downloaded)
+        else:
+            print('\n** DOWNLOADING SUPPORT MODELS **')
+            download_bert()
+            download_kornia()
+            download_clip()
+            download_gfpgan()
+            download_codeformer()
+            download_clipseg()
+            download_safety_checker()
+            postscript()
     except KeyboardInterrupt:
         print('\nGoodbye! Come back soon.')
     except Exception as e:
