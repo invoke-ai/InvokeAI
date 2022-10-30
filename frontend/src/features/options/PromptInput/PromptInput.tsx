@@ -8,14 +8,14 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import useCheckParameters from '../../../common/hooks/useCheckParameters';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { tabMap } from '../../tabs/InvokeTabs';
+import { activeTabNameSelector } from '../optionsSelectors';
 
 const promptInputSelector = createSelector(
-  (state: RootState) => state.options,
-  (options: OptionsState) => {
+  [(state: RootState) => state.options, activeTabNameSelector],
+  (options: OptionsState, activeTabName) => {
     return {
       prompt: options.prompt,
-      activeTabName: tabMap[options.activeTab],
+      activeTabName,
     };
   },
   {
@@ -37,16 +37,6 @@ const PromptInput = () => {
   const handleChangePrompt = (e: ChangeEvent<HTMLTextAreaElement>) => {
     dispatch(setPrompt(e.target.value));
   };
-
-  useHotkeys(
-    'ctrl+enter, cmd+enter',
-    () => {
-      if (isReady) {
-        dispatch(generateImage(activeTabName));
-      }
-    },
-    [isReady, activeTabName]
-  );
 
   useHotkeys(
     'alt+a',

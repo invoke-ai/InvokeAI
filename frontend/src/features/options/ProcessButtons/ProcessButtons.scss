@@ -4,20 +4,20 @@
   display: grid;
   grid-template-columns: auto max-content;
   column-gap: 0.5rem;
+}
 
-  .invoke-btn {
-    @include Button(
-      $btn-color: var(--accent-color),
-      $btn-color-hover: var(--accent-color-hover),
-      $btn-width: 5rem
-    );
-  }
+.invoke-btn {
+  @include Button(
+    $btn-color: var(--accent-color),
+    $btn-color-hover: var(--accent-color-hover),
+    // $btn-width: 5rem
+  );
+}
 
-  .cancel-btn {
-    @include Button(
-      $btn-color: var(--destructive-color),
-      $btn-color-hover: var(--destructive-color-hover),
-      $btn-width: 3rem
-    );
-  }
+.cancel-btn {
+  @include Button(
+    $btn-color: var(--destructive-color),
+    $btn-color-hover: var(--destructive-color-hover),
+    // $btn-width: 3rem
+  );
 }

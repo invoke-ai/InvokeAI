@@ -143,9 +143,7 @@ export const gallerySlice = createSlice({
       if (state.shouldAutoSwitchToNewImages) {
         state.currentImageUuid = uuid;
         state.currentImage = newImage;
-        if (category === 'result') {
-          state.currentCategory = 'result';
-        }
+        state.currentCategory = category;
       }
       state.intermediateImage = undefined;
       tempCategory.latest_mtime = mtime;

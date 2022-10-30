@@ -33,6 +33,7 @@ import { BiReset } from 'react-icons/bi';
 import IAICheckbox from '../../common/components/IAICheckbox';
 import { setNeedsCache } from '../tabs/Inpainting/inpaintingSlice';
 import _ from 'lodash';
+import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 
@@ -110,6 +111,7 @@ export default function ImageGallery() {
   };
 
   const handleCloseGallery = () => {
+    if (shouldPinGallery) return;
     dispatch(
       setGalleryScrollPosition(
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
@@ -117,7 +119,7 @@ export default function ImageGallery() {
     );
     dispatch(setShouldShowGallery(false));
     dispatch(setShouldHoldGalleryOpen(false));
-    shouldPinGallery && dispatch(setNeedsCache(true));
+    // dispatch(setNeedsCache(true));
   };
 
   const handleClickLoadMore = () => {
@@ -254,6 +256,8 @@ export default function ImageGallery() {
   useEffect(() => {
     setShouldShowButtons(galleryWidth >= 280);
   }, [galleryWidth]);
+
+  useClickOutsideWatcher(galleryRef, handleCloseGallery);
 
   return (
     <CSSTransition

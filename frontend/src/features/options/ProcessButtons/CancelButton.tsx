@@ -6,6 +6,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { createSelector } from '@reduxjs/toolkit';
 import { SystemState } from '../../system/systemSlice';
 import _ from 'lodash';
+import { IAIButtonProps } from '../../../common/components/IAIButton';
 
 const cancelButtonSelector = createSelector(
   (state: RootState) => state.system,
@@ -23,7 +24,8 @@ const cancelButtonSelector = createSelector(
   }
 );
 
-export default function CancelButton() {
+export default function CancelButton(props: Omit<IAIButtonProps, 'label'>) {
+  const { ...rest } = props;
   const dispatch = useAppDispatch();
   const { isProcessing, isConnected, isCancelable } =
     useAppSelector(cancelButtonSelector);
@@ -47,6 +49,7 @@ export default function CancelButton() {
       isDisabled={!isConnected || !isProcessing || !isCancelable}
       onClick={handleClickCancel}
       styleClass="cancel-btn"
+      {...rest}
     />
   );
 }

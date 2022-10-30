@@ -3,11 +3,11 @@ import _ from 'lodash';
 import { useMemo } from 'react';
 import { useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
+import { activeTabNameSelector } from '../../features/options/optionsSelectors';
 import { OptionsState } from '../../features/options/optionsSlice';
 
 import { SystemState } from '../../features/system/systemSlice';
 import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice';
-import { tabMap } from '../../features/tabs/InvokeTabs';
 import { validateSeedWeights } from '../util/seedWeightPairs';
 
 export const useCheckParametersSelector = createSelector(
@@ -15,8 +15,9 @@ export const useCheckParametersSelector = createSelector(
     (state: RootState) => state.options,
     (state: RootState) => state.system,
     (state: RootState) => state.inpainting,
+    activeTabNameSelector
   ],
-  (options: OptionsState, system: SystemState, inpainting: InpaintingState) => {
+  (options: OptionsState, system: SystemState, inpainting: InpaintingState, activeTabName) => {
     return {
       // options
       prompt: options.prompt,
@@ -25,7 +26,7 @@ export const useCheckParametersSelector = createSelector(
       maskPath: options.maskPath,
       initialImage: options.initialImage,
       seed: options.seed,
-      activeTabName: tabMap[options.activeTab],
+      activeTabName,
       // system
       isProcessing: system.isProcessing,
       isConnected: system.isConnected,

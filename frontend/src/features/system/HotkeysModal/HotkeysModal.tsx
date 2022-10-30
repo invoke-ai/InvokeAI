@@ -134,7 +134,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Quick Toggle Brush/Eraser',
       desc: 'Quick toggle between brush and eraser',
-      hotkey: 'Z',
+      hotkey: 'X',
     },
     {
       title: 'Decrease Brush Size',

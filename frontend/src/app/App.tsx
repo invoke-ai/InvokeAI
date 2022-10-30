@@ -6,7 +6,7 @@ import Loading from '../Loading';
 import { useAppDispatch } from './store';
 import { requestSystemConfig } from './socketio/actions';
 import { keepGUIAlive } from './utils';
-import InvokeTabs, { tabMap } from '../features/tabs/InvokeTabs';
+import InvokeTabs from '../features/tabs/InvokeTabs';
 import ImageUploader from '../common/components/ImageUploader';
 import { RootState, useAppSelector } from '../app/store';
 
@@ -15,19 +15,23 @@ import ShowHideOptionsPanelButton from '../features/tabs/ShowHideOptionsPanelBut
 import { createSelector } from '@reduxjs/toolkit';
 import { GalleryState } from '../features/gallery/gallerySlice';
 import { OptionsState } from '../features/options/optionsSlice';
+import { activeTabNameSelector } from '../features/options/optionsSelectors';
 
 keepGUIAlive();
 
 const appSelector = createSelector(
-  [(state: RootState) => state.gallery, (state: RootState) => state.options],
-  (gallery: GalleryState, options: OptionsState) => {
+  [
+    (state: RootState) => state.gallery,
+    (state: RootState) => state.options,
+    activeTabNameSelector,
+  ],
+  (gallery: GalleryState, options: OptionsState, activeTabName) => {
     const { shouldShowGallery, shouldHoldGalleryOpen, shouldPinGallery } =
       gallery;
     const {
       shouldShowOptionsPanel,
       shouldHoldOptionsPanelOpen,
       shouldPinOptionsPanel,
-      activeTab,
     } = options;
 
     return {
@@ -39,7 +43,7 @@ const appSelector = createSelector(
         !(
           shouldShowOptionsPanel ||
           (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
-        ) && ['txt2img', 'img2img', 'inpainting'].includes(tabMap[activeTab]),
+        ) && ['txt2img', 'img2img', 'inpainting'].includes(activeTabName),
     };
   }
 );

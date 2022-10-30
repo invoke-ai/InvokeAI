@@ -1,9 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { MouseEvent, ReactNode, useEffect, useRef } from 'react';
+import {
+  FocusEvent,
+  MouseEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react';
 import { BsPinAngleFill } from 'react-icons/bs';
 import { CSSTransition } from 'react-transition-group';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
+import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
 import {
   OptionsState,
   setOptionsPanelScrollPosition,
@@ -50,7 +58,8 @@ const InvokeOptionsPanel = (props: Props) => {
 
   const { children } = props;
 
-  const handleCloseOptionsPanel = () => {
+  const handleCloseOptionsPanel = useCallback(() => {
+    if (shouldPinOptionsPanel) return;
     dispatch(
       setOptionsPanelScrollPosition(
         optionsPanelContainerRef.current
@@ -60,8 +69,10 @@ const InvokeOptionsPanel = (props: Props) => {
     );
     dispatch(setShouldShowOptionsPanel(false));
     dispatch(setShouldHoldOptionsPanelOpen(false));
-    shouldPinOptionsPanel && dispatch(setNeedsCache(true));
-  };
+    // dispatch(setNeedsCache(true));
+  }, [dispatch, shouldPinOptionsPanel]);
+
+  useClickOutsideWatcher(optionsPanelRef, handleCloseOptionsPanel);
 
   const setCloseOptionsPanelTimer = () => {
     timeoutIdRef.current = window.setTimeout(

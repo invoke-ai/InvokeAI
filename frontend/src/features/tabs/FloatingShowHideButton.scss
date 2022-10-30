@@ -8,7 +8,7 @@
   padding: 0;
   min-width: 2rem !important;
 
-  filter: drop-shadow(0 0 1rem var(--text-color-a3));
+  filter: var(--floating-button-drop-shadow);
 
   &.left {
     left: 0;

@@ -1,19 +1,37 @@
 import { IconButton, Link, Tooltip, useColorMode } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { FaSun, FaMoon, FaGithub, FaDiscord } from 'react-icons/fa';
 import { MdHelp, MdKeyboard, MdSettings } from 'react-icons/md';
+import { RootState, useAppSelector } from '../../app/store';
 
 import InvokeAILogo from '../../assets/images/logo.png';
+import { OptionsState } from '../options/optionsSlice';
+import CancelButton from '../options/ProcessButtons/CancelButton';
+import InvokeButton from '../options/ProcessButtons/InvokeButton';
+import ProcessButtons from '../options/ProcessButtons/ProcessButtons';
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 
 import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 
+const siteHeaderSelector = createSelector(
+  (state: RootState) => state.options,
+
+  (options: OptionsState) => {
+    const { shouldPinOptionsPanel } = options;
+    return { shouldShowProcessButtons: !shouldPinOptionsPanel };
+  },
+  { memoizeOptions: { resultEqualityCheck: _.isEqual } }
+);
+
 /**
  * Header, includes color mode toggle, settings button, status message.
  */
 const SiteHeader = () => {
+  const { shouldShowProcessButtons } = useAppSelector(siteHeaderSelector);
   const { colorMode, toggleColorMode } = useColorMode();
 
   useHotkeys(
@@ -36,6 +54,12 @@ const SiteHeader = () => {
         <h1>
           invoke <strong>ai</strong>
         </h1>
+        {shouldShowProcessButtons && (
+          <div className="process-buttons process-buttons">
+            <InvokeButton size={'sm'} />
+            <CancelButton size={'sm'} />
+          </div>
+        )}
       </div>
 
       <div className="site-header-right-side">

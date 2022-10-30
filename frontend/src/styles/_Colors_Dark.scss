@@ -25,8 +25,6 @@
   --destructive-color: rgb(185, 55, 55);
   --destructive-color-hover: rgb(255, 75, 75);
 
-  --text-color-a3: rgba(255, 255, 255, 0.3);
-
   // Error status colors
   --border-color-invalid: rgb(255, 80, 50);
   --box-shadow-color-invalid: rgb(210, 30, 10);
@@ -103,6 +101,6 @@
   --context-menu-box-shadow: none;
   --context-menu-bg-color-hover: rgb(30, 32, 42);
 
-  // Inpainting
-  --inpaint-bg-color: rgb(30, 32, 42);
+  // Shadows
+  --floating-button-drop-shadow: drop-shadow(0 0 1rem rgba(140, 101, 255, 0.5));
 }

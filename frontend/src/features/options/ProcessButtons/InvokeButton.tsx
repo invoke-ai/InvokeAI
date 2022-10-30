@@ -1,20 +1,32 @@
+import { useHotkeys } from 'react-hotkeys-hook';
 import { generateImage } from '../../../app/socketio/actions';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAIButton from '../../../common/components/IAIButton';
+import { useAppDispatch, useAppSelector } from '../../../app/store';
+import IAIButton, {
+  IAIButtonProps,
+} from '../../../common/components/IAIButton';
 import useCheckParameters from '../../../common/hooks/useCheckParameters';
-import { tabMap } from '../../tabs/InvokeTabs';
+import { activeTabNameSelector } from '../optionsSelectors';
 
-export default function InvokeButton() {
+export default function InvokeButton(props: Omit<IAIButtonProps, 'label'>) {
+  const { ...rest } = props;
   const dispatch = useAppDispatch();
   const isReady = useCheckParameters();
 
-  const activeTab = useAppSelector(
-    (state: RootState) => state.options.activeTab
-  );
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const handleClickGenerate = () => {
-    dispatch(generateImage(tabMap[activeTab]));
+    dispatch(generateImage(activeTabName));
   };
+
+  useHotkeys(
+    'ctrl+enter, cmd+enter',
+    () => {
+      if (isReady) {
+        dispatch(generateImage(activeTabName));
+      }
+    },
+    [isReady, activeTabName]
+  );
 
   return (
     <IAIButton
@@ -24,6 +36,7 @@ export default function InvokeButton() {
       isDisabled={!isReady}
       onClick={handleClickGenerate}
       className="invoke-btn"
+      {...rest}
     />
   );
 }
