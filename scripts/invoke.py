@@ -10,6 +10,9 @@ import warnings
 import time
 import traceback
 import yaml
+
+from ldm.invoke.prompt_parser import PromptParser
+
 sys.path.append('.')    # corrects a weird problem on Macs
 from ldm.invoke.readline import get_completer
 from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
@@ -18,7 +21,7 @@ from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from omegaconf import OmegaConf
 from pathlib import Path
-from pyparsing import ParseException
+import pyparsing
 
 # global used in multiple functions (fix)
 infile = None
@@ -335,7 +338,7 @@ def main_loop(gen, opt):
                         catch_interrupts=catch_ctrl_c,
                         **vars(opt)
                     )
-                except ParseException as e:
+                except (PromptParser.ParsingException, pyparsing.ParseException) as e:
                     print('** An error occurred while processing your prompt **')
                     print(f'** {str(e)} **')
             elif operation == 'postprocess':

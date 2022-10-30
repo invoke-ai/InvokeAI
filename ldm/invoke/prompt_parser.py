@@ -2,6 +2,19 @@ import string
 from typing import Union, Optional
 import re
 import pyparsing as pp
+'''
+This module parses prompt strings and produces tree-like structures that can be used generate and control the conditioning tensors. 
+weighted subprompts.
+
+Useful class exports:
+
+PromptParser - parses prompts
+
+Useful function exports:
+
+split_weighted_subpromopts()    split subprompts, normalize and weight them
+log_tokenization()              print out colour-coded tokens and warn if truncated
+'''
 
 class Prompt():
     """
@@ -205,12 +218,17 @@ class Blend():
         #print("making Blend with prompts", prompts, "and weights", weights)
         if len(prompts) != len(weights):
             raise PromptParser.ParsingException(f"while parsing Blend: mismatched prompts/weights counts {prompts}, {weights}")
-        for c in prompts:
-            if type(c) is not Prompt and type(c) is not FlattenedPrompt:
-                raise(PromptParser.ParsingException(f"{type(c)} cannot be added to a Blend, only Prompts or FlattenedPrompts"))
+        for p in prompts:
+            if type(p) is not Prompt and type(p) is not FlattenedPrompt:
+                raise(PromptParser.ParsingException(f"{type(p)} cannot be added to a Blend, only Prompts or FlattenedPrompts"))
+            for f in p.children:
+                if isinstance(f, CrossAttentionControlSubstitute):
+                    raise(PromptParser.ParsingException(f"while parsing Blend: sorry, you cannot do .swap() as part of a Blend"))
+
         # upcast all lists to Prompt objects
         self.prompts = [x if (type(x) is Prompt or type(x) is FlattenedPrompt)
-                         else Prompt(x) for x in prompts]
+                         else Prompt(x)
+                        for x in prompts]
         self.prompts = prompts
         self.weights = weights
         self.normalize_weights = normalize_weights
@@ -662,9 +680,7 @@ def split_weighted_subprompts(text, skip_normalize=False)->list:
 # shows how the prompt is tokenized
 # usually tokens have '</w>' to indicate end-of-word,
 # but for readability it has been replaced with ' '
-def log_tokenization(text, model, log=False, weight=1):
-    if not log:
-        return
+def log_tokenization(text, model, display_label=None):
     tokens    = model.cond_stage_model.tokenizer._tokenize(text)
     tokenized = ""
     discarded = ""
@@ -679,7 +695,7 @@ def log_tokenization(text, model, log=False, weight=1):
             usedTokens += 1
         else:  # over max token length
             discarded = discarded + f"\x1b[0;3{s};40m{token}"
-    print(f"\n>> Tokens ({usedTokens}), Weight ({weight:.2f}):\n{tokenized}\x1b[0m")
+    print(f"\n>> Tokens {display_label or ''} ({usedTokens}):\n{tokenized}\x1b[0m")
     if discarded != "":
         print(
             f">> Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m"
