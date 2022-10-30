@@ -33,7 +33,10 @@ import {
   setMaskPath,
 } from '../../features/options/optionsSlice';
 import { requestImages, requestNewImages } from './actions';
-import { clearImageToInpaint, setImageToInpaint } from '../../features/tabs/Inpainting/inpaintingSlice';
+import {
+  clearImageToInpaint,
+  setImageToInpaint,
+} from '../../features/tabs/Inpainting/inpaintingSlice';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -99,6 +102,7 @@ const makeSocketIOListeners = (
             image: {
               uuid: uuidv4(),
               ...data,
+              category: 'result',
             },
           })
         );
@@ -144,6 +148,7 @@ const makeSocketIOListeners = (
             image: {
               uuid: uuidv4(),
               ...data,
+              category: 'result',
             },
           })
         );
