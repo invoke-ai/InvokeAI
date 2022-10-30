@@ -81,9 +81,11 @@ export default function TextToImagePanel() {
   return (
     <Resizable
       enable={{ right: true }}
-      defaultSize={{ width: `${panelWidth}`, height: '100%' }}
-      minWidth={'370'}
-      maxWidth={'800'}
+      snapGap={50}
+      snap={{x: [370, (370+800)/2, 800]}}
+      defaultSize={{ width: panelWidth, height: '100%' }}
+      minWidth={370}
+      maxWidth={800}
       onResize={handleResize}
     >
       <div className="text-to-image-panel">
