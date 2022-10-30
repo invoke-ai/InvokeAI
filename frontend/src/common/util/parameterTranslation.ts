@@ -100,30 +100,15 @@ export const frontendToBackendParameters = (
   if (generationMode === 'inpainting' && maskImageElement) {
     const {
       lines,
-      boundingBoxCoordinate: { x, y },
-      boundingBoxDimensions: { width, height },
-      shouldShowBoundingBox,
+      boundingBoxCoordinate,
+      boundingBoxDimensions,
       inpaintReplace,
       shouldUseInpaintReplace,
     } = inpaintingState;
 
-    let bx = x,
-      by = y,
-      bwidth = width,
-      bheight = height;
-
-    if (!shouldShowBoundingBox) {
-      bx = 0;
-      by = 0;
-      bwidth = maskImageElement.width;
-      bheight = maskImageElement.height;
-    }
-
     const boundingBox = {
-      x: bx,
-      y: by,
-      width: bwidth,
-      height: bheight,
+      ...boundingBoxCoordinate,
+      ...boundingBoxDimensions,
     };
 
     if (shouldUseInpaintReplace) {
@@ -134,7 +119,7 @@ export const frontendToBackendParameters = (
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = false;
 
-    const maskDataURL = generateMask(maskImageElement, lines, boundingBox);
+    const maskDataURL = generateMask(maskImageElement, lines);
 
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'

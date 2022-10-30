@@ -37,7 +37,6 @@ export interface InpaintingState {
   boundingBoxDimensions: Dimensions;
   boundingBoxCoordinate: Vector2d;
   boundingBoxPreviewFill: RgbaColor;
-  shouldShowBoundingBox: boolean;
   shouldShowBoundingBoxFill: boolean;
   lines: MaskLine[];
   pastLines: MaskLine[][];
@@ -64,7 +63,6 @@ const initialInpaintingState: InpaintingState = {
   boundingBoxDimensions: { width: 64, height: 64 },
   boundingBoxCoordinate: { x: 0, y: 0 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.7 },
-  shouldShowBoundingBox: false,
   shouldShowBoundingBoxFill: false,
   cursorPosition: null,
   lines: [],
@@ -304,9 +302,6 @@ export const inpaintingSlice = createSlice({
     setIsDrawing: (state, action: PayloadAction<boolean>) => {
       state.isDrawing = action.payload;
     },
-    setShouldShowBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowBoundingBox = action.payload;
-    },
     setClearBrushHistory: (state) => {
       state.pastLines = [];
       state.futureLines = [];
@@ -352,7 +347,6 @@ export const {
   setShouldShowBoundingBoxFill,
   setIsDrawing,
   setShouldShowBrush,
-  setShouldShowBoundingBox,
   setClearBrushHistory,
   setShouldUseInpaintReplace,
   setInpaintReplace,

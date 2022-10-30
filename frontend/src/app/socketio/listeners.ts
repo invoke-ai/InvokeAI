@@ -269,7 +269,7 @@ const makeSocketIOListeners = (
      * Callback to run when we receive a 'imageDeleted' event.
      */
     onImageDeleted: (data: InvokeAI.ImageDeletedResponse) => {
-      const { url, uuid, category } = data;
+      const { url } = data;
 
       // remove image from gallery
       dispatch(removeImage(data));

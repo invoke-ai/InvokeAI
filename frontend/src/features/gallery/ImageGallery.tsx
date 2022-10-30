@@ -147,21 +147,13 @@ export default function ImageGallery() {
     [shouldShowGallery]
   );
 
-  useHotkeys(
-    'left',
-    () => {
-      dispatch(selectPrevImage(currentCategory));
-    },
-    [currentCategory]
-  );
+  useHotkeys('left', () => {
+    dispatch(selectPrevImage());
+  });
 
-  useHotkeys(
-    'right',
-    () => {
-      dispatch(selectNextImage(currentCategory));
-    },
-    [currentCategory]
-  );
+  useHotkeys('right', () => {
+    dispatch(selectNextImage());
+  });
 
   useHotkeys(
     'shift+p',

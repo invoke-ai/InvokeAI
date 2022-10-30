@@ -3,7 +3,6 @@ import _ from 'lodash';
 import { RootState } from '../../../app/store';
 import { activeTabNameSelector } from '../../options/optionsSelectors';
 import { OptionsState } from '../../options/optionsSlice';
-import { tabMap } from '../InvokeTabs';
 import { InpaintingState } from './inpaintingSlice';
 import { rgbaColorToRgbString } from './util/colorToString';
 
@@ -36,7 +35,6 @@ export const inpaintingControlsSelector = createSelector(
       pastLines,
       futureLines,
       shouldShowBoundingBoxFill,
-      shouldShowBoundingBox,
     } = inpainting;
 
     const { showDualDisplay } = options;
@@ -54,7 +52,6 @@ export const inpaintingControlsSelector = createSelector(
       activeTabName,
       showDualDisplay,
       shouldShowBoundingBoxFill,
-      shouldShowBoundingBox,
     };
   },
   {
@@ -79,7 +76,6 @@ export const inpaintingCanvasSelector = createSelector(
       shouldShowBoundingBoxFill,
       isDrawing,
       shouldLockBoundingBox,
-      shouldShowBoundingBox,
       boundingBoxDimensions,
     } = inpainting;
     return {
@@ -94,7 +90,6 @@ export const inpaintingCanvasSelector = createSelector(
       shouldShowBoundingBoxFill,
       isDrawing,
       shouldLockBoundingBox,
-      shouldShowBoundingBox,
       boundingBoxDimensions,
     };
   },

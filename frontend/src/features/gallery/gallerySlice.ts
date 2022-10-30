@@ -154,8 +154,7 @@ export const gallerySlice = createSlice({
     clearIntermediateImage: (state) => {
       state.intermediateImage = undefined;
     },
-    selectNextImage: (state, action: PayloadAction<GalleryCategory>) => {
-      const category = action.payload;
+    selectNextImage: (state) => {
       const { currentImage } = state;
       if (!currentImage) return;
       const tempImages =
@@ -172,8 +171,7 @@ export const gallerySlice = createSlice({
         }
       }
     },
-    selectPrevImage: (state, action: PayloadAction<GalleryCategory>) => {
-      const category = action.payload;
+    selectPrevImage: (state) => {
       const { currentImage } = state;
       if (!currentImage) return;
       const tempImages =
