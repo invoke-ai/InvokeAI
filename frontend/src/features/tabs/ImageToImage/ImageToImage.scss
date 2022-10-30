@@ -3,14 +3,14 @@
 .image-to-image-workarea {
   display: grid;
   grid-template-columns: max-content auto;
+  column-gap: 1rem;
 }
 
 .image-to-image-panel {
   display: grid;
   row-gap: 1rem;
-  padding-right: 1rem;
   grid-auto-rows: max-content;
-  // width: $options-bar-max-width;
+  width: $options-bar-max-width;
   height: $app-content-height;
   overflow-y: scroll;
   @include HideScrollbar;

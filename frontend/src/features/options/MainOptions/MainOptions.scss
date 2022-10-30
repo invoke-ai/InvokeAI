@@ -5,25 +5,6 @@
   row-gap: 1rem;
 }
 
-.advanced-settings,
-.main-options-list {
-  grid-gap: 0.5rem;
-  align-items: start;
-}
-.advanced-settings {
-  grid-template-columns: repeat(auto-fill, minmax(calc(275px + 0.25rem), 1fr));
-}
-.main-options-list, .image-settings {
-  grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
-  column-gap: 1rem;
-}
-
-.image-settings {
-  display: grid;
-  row-gap: 1rem;
-  align-items: center;
-}
-
 .main-options-list {
   display: grid;
   row-gap: 1rem;
@@ -33,7 +14,7 @@
   display: grid;
   grid-template-columns: repeat(3, auto);
   column-gap: 1rem;
-  // max-width: $options-bar-max-width;
+  max-width: $options-bar-max-width;
 }
 
 .main-option-block {

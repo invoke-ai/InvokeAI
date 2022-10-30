@@ -1,8 +1,7 @@
 import { Box } from '@chakra-ui/react';
 import React from 'react';
-import { Resizable } from 're-resizable';
 import { Feature } from '../../../app/features';
-import { RootState, useAppSelector, useAppDispatch } from '../../../app/store';
+import { RootState, useAppSelector } from '../../../app/store';
 import FaceRestore from '../../options/AdvancedOptions/FaceRestore/FaceRestore';
 import FaceRestoreOptions from '../../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import ImageFit from '../../options/AdvancedOptions/ImageToImage/ImageFit';
@@ -18,24 +17,11 @@ import OptionsAccordion from '../../options/OptionsAccordion';
 import OutputOptions from '../../options/OutputOptions';
 import ProcessButtons from '../../options/ProcessButtons/ProcessButtons';
 import PromptInput from '../../options/PromptInput/PromptInput';
-import { setPanelWidth } from '../../options/optionsSlice';
 
 export default function ImageToImagePanel() {
   const showAdvancedOptions = useAppSelector(
     (state: RootState) => state.options.showAdvancedOptions
   );
-
-  const panelWidth = useAppSelector(
-    (state: RootState) => state.options.panelWidth
-  );
-
-  const dispatch = useAppDispatch();
-
-  const handleResize = (event: MouseEvent | TouchEvent | any, direction, elementRef: HTMLElement) => {
-    dispatch(setPanelWidth(elementRef.clientWidth));
-    const upscaleOptions = elementRef.querySelector('.upscale-options');
-    upscaleOptions.style.gridTemplateColumns = (upscaleOptions.clientWidth >= 318) ? 'auto 1fr' : '1fr';
-  };
 
   const imageToImageAccordions = {
     seed: {
@@ -74,29 +60,19 @@ export default function ImageToImagePanel() {
   };
 
   return (
-    <Resizable
-      enable={{ right: true }}
-      defaultSize={{ width: `${panelWidth}`, height: '100%' }}
-      minWidth={'370'}
-      maxWidth={'800'}
-      onResize={handleResize}
-    >
-      <div className="image-to-image-panel">
-        <PromptInput />
-        <ProcessButtons />
-        <MainOptions />
-        <div class="image-settings">
-          <ImageToImageStrength
-            label="Image To Image Strength"
-            styleClass="main-option-block image-to-image-strength-main-option"
-          />
-          <ImageFit />
-        </div>
-        <MainAdvancedOptions />
-        {showAdvancedOptions ? (
-          <OptionsAccordion accordionInfo={imageToImageAccordions} />
-        ) : null}
-      </div>
-    </Resizable>
+    <div className="image-to-image-panel">
+      <PromptInput />
+      <ProcessButtons />
+      <MainOptions />
+      <ImageToImageStrength
+        label="Image To Image Strength"
+        styleClass="main-option-block image-to-image-strength-main-option"
+      />
+      <ImageFit />
+      <MainAdvancedOptions />
+      {showAdvancedOptions ? (
+        <OptionsAccordion accordionInfo={imageToImageAccordions} />
+      ) : null}
+    </div>
   );
 }
