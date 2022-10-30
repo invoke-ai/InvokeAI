@@ -29,8 +29,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-buildx-
+          key: buildx-${{ hashFiles('docker-build/Dockerfile') }}
       - name: Build container
         uses: docker/build-push-action@v3
         with:
