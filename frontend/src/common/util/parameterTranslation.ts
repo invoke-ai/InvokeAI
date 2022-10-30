@@ -111,19 +111,25 @@ export const frontendToBackendParameters = (
       ...boundingBoxDimensions,
     };
 
-    if (shouldUseInpaintReplace) {
-      generationParameters.inpaint_replace = inpaintReplace;
-    }
-
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = false;
 
-    const maskDataURL = generateMask(maskImageElement, lines);
+    const { maskDataURL, isMaskEmpty } = generateMask(
+      maskImageElement,
+      lines,
+      boundingBox
+    );
+
+    generationParameters.is_mask_empty = isMaskEmpty;
 
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'
     )[1];
+
+    if (shouldUseInpaintReplace) {
+      generationParameters.inpaint_replace = inpaintReplace;
+    }
 
     generationParameters.bounding_box = boundingBox;
   }
