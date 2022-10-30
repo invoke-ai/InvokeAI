@@ -10,7 +10,7 @@ from .shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 # at this threshold, the scheduler will stop using the Karras
 # noise schedule and start using the model's schedule
-STEP_THRESHOLD = 29
+STEP_THRESHOLD = 30
 
 def cfg_apply_threshold(result, threshold = 0.0, scale = 0.7):
     if threshold <= 0.0:
@@ -101,10 +101,10 @@ class KSampler(Sampler):
         )
 
         if ddim_num_steps >= self.karras_max:
-            print(f'>> Ksampler using model noise schedule (steps > {self.karras_max})')
+            print(f'>> Ksampler using model noise schedule (steps >= {self.karras_max})')
             self.sigmas = self.model_sigmas
         else:
-            print(f'>> Ksampler using karras noise schedule (steps <= {self.karras_max})')
+            print(f'>> Ksampler using karras noise schedule (steps < {self.karras_max})')
             self.sigmas = self.karras_sigmas
         
     # ALERT: We are completely overriding the sample() method in the base class, which
