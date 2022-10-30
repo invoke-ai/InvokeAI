@@ -39,8 +39,12 @@ const memoEqualityCheck = (
  */
 const HoverableImage = memo((props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { activeTabName, galleryImageObjectFit, galleryImageMinimumWidth } =
-    useAppSelector(hoverableImageSelector);
+  const {
+    activeTabName,
+    galleryImageObjectFit,
+    galleryImageMinimumWidth,
+    mayDeleteImage,
+  } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, uuid, metadata } = image;
 
@@ -177,6 +181,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                     size="xs"
                     variant={'imageHoverIconButton'}
                     fontSize={14}
+                    isDisabled={!mayDeleteImage}
                   />
                 </DeleteImageModal>
               </Tooltip>

@@ -17,13 +17,7 @@ import { SystemState } from '../system/systemSlice';
 import IAIButton from '../../common/components/IAIButton';
 import { runESRGAN, runFacetool } from '../../app/socketio/actions';
 import IAIIconButton from '../../common/components/IAIIconButton';
-import {
-  MdDelete,
-  MdFace,
-  MdHd,
-  MdImage,
-  MdInfo,
-} from 'react-icons/md';
+import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
 import InvokePopover from './InvokePopover';
 import UpscaleOptions from '../options/AdvancedOptions/Upscale/UpscaleOptions';
 import FaceRestoreOptions from '../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
@@ -360,7 +354,9 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
           icon={<MdDelete />}
           tooltip="Delete Image"
           aria-label="Delete Image"
-          isDisabled={Boolean(intermediateImage)}
+          isDisabled={
+            Boolean(intermediateImage) || !isConnected || isProcessing
+          }
         />
       </DeleteImageModal>
     </div>

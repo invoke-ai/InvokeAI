@@ -8,6 +8,7 @@ import {
 import {
   GalleryCategory,
   GalleryState,
+  removeImage,
 } from '../../features/gallery/gallerySlice';
 import { OptionsState } from '../../features/options/optionsSlice';
 import {
@@ -163,6 +164,7 @@ const makeSocketIOEmitters = (
     },
     emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
       const { url, uuid, category } = imageToDelete;
+      dispatch(removeImage(imageToDelete));
       socketio.emit('deleteImage', url, uuid, category);
     },
     emitRequestImages: (category: GalleryCategory) => {
