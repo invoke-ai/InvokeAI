@@ -93,7 +93,9 @@ jobs:
             ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
 
       - name: run preload_models.py
-        run: python scripts/preload_models.py
+        run: |
+          python scripts/preload_models.py \
+            --no-interactive
 
       - name: Run the tests
         run: |
