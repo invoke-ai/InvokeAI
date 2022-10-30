@@ -845,7 +845,7 @@ def retrieve_dream_command(opt,command,completer):
 def write_commands(opt, file_path:str, outfilepath:str):
     dir,basename = os.path.split(file_path)
     try:
-        paths = list(Path(dir).glob(basename))
+        paths = sorted(list(Path(dir).glob(basename)))
     except ValueError:
         print(f'## "{basename}": unacceptable pattern')
         return
