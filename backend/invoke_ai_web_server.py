@@ -336,7 +336,7 @@ class InvokeAIWebServer:
 
                 seed = (
                     original_image["metadata"]["seed"]
-                    if "seed" in original_image["metadata"]
+                    if "metadata" in original_image and "seed" in original_image["metadata"]
                     else "unknown_seed"
                 )
 
