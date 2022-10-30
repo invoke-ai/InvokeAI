@@ -1,3 +1,4 @@
+import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   FocusEvent,
@@ -7,7 +8,7 @@ import {
   useEffect,
   useRef,
 } from 'react';
-import { BsPinAngleFill } from 'react-icons/bs';
+import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { CSSTransition } from 'react-transition-group';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
@@ -119,6 +120,16 @@ const InvokeOptionsPanel = (props: Props) => {
           !shouldPinOptionsPanel ? cancelCloseOptionsPanelTimer : undefined
         }
       >
+        <Tooltip label="Pin Options Panel">
+          <div
+            className="options-panel-pin-button"
+            data-selected={shouldPinOptionsPanel}
+            onClick={handleClickPinOptionsPanel}
+          >
+            {shouldPinOptionsPanel ? <BsPinAngleFill /> : <BsPinAngle />}
+          </div>
+        </Tooltip>
+
         <div
           className="options-panel"
           ref={optionsPanelContainerRef}
@@ -130,14 +141,6 @@ const InvokeOptionsPanel = (props: Props) => {
             }
           }}
         >
-          <IAIIconButton
-            size={'sm'}
-            aria-label={'Pin Options Panel'}
-            tooltip={'Pin Options Panel (Shift+P)'}
-            onClick={handleClickPinOptionsPanel}
-            icon={<BsPinAngleFill />}
-            data-selected={shouldPinOptionsPanel}
-          />
           {children}
         </div>
       </div>

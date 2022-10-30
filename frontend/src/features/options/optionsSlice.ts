@@ -46,6 +46,7 @@ export interface OptionsState {
   shouldPinOptionsPanel: boolean;
   optionsPanelScrollPosition: number;
   shouldHoldOptionsPanelOpen: boolean;
+  shouldLoopback: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -83,6 +84,7 @@ const initialOptionsState: OptionsState = {
   shouldPinOptionsPanel: true,
   optionsPanelScrollPosition: 0,
   shouldHoldOptionsPanelOpen: false,
+  shouldLoopback: true,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -344,6 +346,9 @@ export const optionsSlice = createSlice({
     setShouldHoldOptionsPanelOpen: (state, action: PayloadAction<boolean>) => {
       state.shouldHoldOptionsPanelOpen = action.payload;
     },
+    setShouldLoopback: (state, action: PayloadAction<boolean>) => {
+      state.shouldLoopback = action.payload;
+    },
   },
 });
 
@@ -390,6 +395,7 @@ export const {
   setShouldPinOptionsPanel,
   setOptionsPanelScrollPosition,
   setShouldHoldOptionsPanelOpen,
+  setShouldLoopback,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

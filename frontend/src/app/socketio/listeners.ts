@@ -37,6 +37,7 @@ import {
   clearImageToInpaint,
   setImageToInpaint,
 } from '../../features/tabs/Inpainting/inpaintingSlice';
+import { tabMap } from '../../features/tabs/InvokeTabs';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -96,16 +97,34 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
+        const { shouldLoopback, activeTab } = getState().options;
+        const newImage = {
+          uuid: uuidv4(),
+          ...data,
+          category: 'result',
+        };
+
         dispatch(
           addImage({
             category: 'result',
-            image: {
-              uuid: uuidv4(),
-              ...data,
-              category: 'result',
-            },
+            image: newImage,
           })
         );
+
+        if (shouldLoopback) {
+          const activeTabName = tabMap[activeTab];
+          switch (activeTabName) {
+            case 'img2img': {
+              dispatch(setInitialImage(newImage));
+              break;
+            }
+            case 'inpainting': {
+              dispatch(setImageToInpaint(newImage));
+              break;
+            }
+          }
+        }
+
         dispatch(
           addLogEntry({
             timestamp: dateFormat(new Date(), 'isoDateTime'),
