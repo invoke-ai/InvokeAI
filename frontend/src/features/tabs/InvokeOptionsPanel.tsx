@@ -84,7 +84,11 @@ const InvokeOptionsPanel = (props: Props) => {
     // dispatch(setNeedsCache(true));
   }, [dispatch, shouldPinOptionsPanel]);
 
-  useClickOutsideWatcher(optionsPanelRef, handleCloseOptionsPanel);
+  useClickOutsideWatcher(
+    optionsPanelRef,
+    handleCloseOptionsPanel,
+    !shouldPinOptionsPanel
+  );
 
   const setCloseOptionsPanelTimer = () => {
     timeoutIdRef.current = window.setTimeout(

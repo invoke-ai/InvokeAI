@@ -111,13 +111,13 @@ export default function ImageGallery() {
   };
 
   const handleCloseGallery = () => {
-    if (shouldPinGallery) return;
+    // if (shouldPinGallery) return;
+    dispatch(setShouldShowGallery(false));
     dispatch(
       setGalleryScrollPosition(
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
       )
     );
-    dispatch(setShouldShowGallery(false));
     dispatch(setShouldHoldGalleryOpen(false));
     // dispatch(setNeedsCache(true));
   };
@@ -249,7 +249,7 @@ export default function ImageGallery() {
     setShouldShowButtons(galleryWidth >= 280);
   }, [galleryWidth]);
 
-  useClickOutsideWatcher(galleryRef, handleCloseGallery);
+  useClickOutsideWatcher(galleryRef, handleCloseGallery, !shouldPinGallery);
 
   return (
     <CSSTransition
