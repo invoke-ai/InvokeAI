@@ -56,8 +56,8 @@
   // Tabs
   --tab-color: rgb(30, 32, 42);
   --tab-hover-color: rgb(36, 38, 48);
-  --tab-list-bg: rgb(100, 50, 255);
-  --tab-list-text: rgb(20, 20, 20);
+  --tab-list-bg: var(--accent-color);
+  --tab-list-text: rgb(202,204,216);
   --tab-list-text-inactive: rgb(92, 94, 114);
   --tab-panel-bg: rgb(20, 22, 28);
 
