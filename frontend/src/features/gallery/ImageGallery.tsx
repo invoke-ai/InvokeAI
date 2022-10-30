@@ -4,7 +4,7 @@ import { NumberSize, Resizable, Size } from 're-resizable';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdClear, MdPhotoLibrary } from 'react-icons/md';
-import { BsPinAngleFill } from 'react-icons/bs';
+import { BsPin, BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { requestImages } from '../../app/socketio/actions';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
@@ -441,11 +441,11 @@ export default function ImageGallery() {
 
               <IAIIconButton
                 size={'sm'}
+                className={'image-gallery-icon-btn'}
                 aria-label={'Pin Gallery'}
                 tooltip={'Pin Gallery (Shift+P)'}
                 onClick={handleSetShouldPinGallery}
-                icon={<BsPinAngleFill />}
-                data-selected={shouldPinGallery}
+                icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
               />
             </div>
           </div>

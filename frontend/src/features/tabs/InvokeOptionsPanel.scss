@@ -19,16 +19,17 @@
 }
 
 .options-panel-wrapper {
-  z-index: 20;
   background-color: var(--background-color);
   grid-auto-rows: max-content;
   height: $app-content-height;
   width: $options-bar-max-width;
   max-width: $options-bar-max-width;
   flex-shrink: 0;
+  position: relative;
 
   .options-panel {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     row-gap: 1rem;
     height: 100%;
     overflow-y: scroll;
@@ -36,6 +37,8 @@
   }
 
   &[data-pinned='false'] {
+    z-index: 20;
+
     position: fixed;
     top: 0;
     left: 0;
@@ -46,6 +49,23 @@
 
     .options-panel {
       padding: 1rem;
+    }
+  }
+
+  .options-panel-pin-button {
+    position: absolute;
+    cursor: pointer;
+    padding: 0.5rem;
+    top: 1rem;
+    right: 1rem;
+    z-index: 25;
+
+    &[data-selected='true'] {
+      top: 0;
+      right: 0;
+    }
+    svg {
+      opacity: 0.5;
     }
   }
 }
