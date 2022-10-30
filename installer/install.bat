@@ -72,7 +72,8 @@ if not exist ".git" (
     call git init
     call git remote add origin %REPO_URL%
     call git fetch
-    call git checkout origin/main -ft
+#    call git checkout origin/main -ft
+    call git checkout origin/release-candidate-2-1 -ft
 )
 
 @rem activate the base env
