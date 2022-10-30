@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { Vector2d } from 'konva/lib/types';
+import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 import * as InvokeAI from '../../../app/invokeai';
 import _ from 'lodash';
@@ -60,7 +60,7 @@ const initialInpaintingState: InpaintingState = {
   brushSize: 50,
   maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
   canvasDimensions: { width: 0, height: 0 },
-  boundingBoxDimensions: { width: 64, height: 64 },
+  boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxCoordinate: { x: 0, y: 0 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.7 },
   shouldShowBoundingBoxFill: false,
@@ -162,36 +162,32 @@ export const inpaintingSlice = createSlice({
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
       const { width: imageWidth, height: imageHeight } = action.payload;
-      const { width: boundingBoxWidth, height: boundingBoxHeight } =
-        state.boundingBoxDimensions;
+      const { width, height } = state.boundingBoxDimensions;
       const { x, y } = state.boundingBoxCoordinate;
 
-      const newBoundingBoxWidth = roundDownToMultiple(
-        _.clamp(boundingBoxWidth, 64, imageWidth),
-        64
-      );
+      const newCoordinates: Vector2d = { x, y };
+      const newDimensions: Dimensions = { width, height };
 
-      const newBoundingBoxHeight = roundDownToMultiple(
-        _.clamp(boundingBoxHeight, 64, imageHeight),
-        64
-      );
+      if (width + x > imageWidth) {
+        // Bounding box at least needs to be translated
+        if (width > imageWidth) {
+          // Bounding box also needs to be resized
+          newDimensions.width = roundDownToMultiple(imageWidth, 64);
+        }
+        newCoordinates.x = imageWidth - newDimensions.width;
+      }
 
-      const newBoundingBoxX = roundDownToMultiple(
-        _.clamp(x, 0, imageWidth - newBoundingBoxWidth),
-        64
-      );
+      if (height + y > imageHeight) {
+        // Bounding box at least needs to be translated
+        if (height > imageHeight) {
+          // Bounding box also needs to be resized
+          newDimensions.height = roundDownToMultiple(imageHeight, 64);
+        }
+        newCoordinates.y = imageHeight - newDimensions.height;
+      }
 
-      const newBoundingBoxY = roundDownToMultiple(
-        _.clamp(y, 0, imageHeight - newBoundingBoxHeight),
-        64
-      );
-
-      state.boundingBoxDimensions = {
-        width: newBoundingBoxWidth,
-        height: newBoundingBoxHeight,
-      };
-
-      state.boundingBoxCoordinate = { x: newBoundingBoxX, y: newBoundingBoxY };
+      state.boundingBoxDimensions = newDimensions;
+      state.boundingBoxCoordinate = newCoordinates;
 
       state.canvasDimensions = {
         width: imageWidth,
