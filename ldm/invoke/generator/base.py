@@ -197,6 +197,7 @@ class Generator():
         checker = self.safety_checker['checker']
         extractor = self.safety_checker['extractor']
         features = extractor([image], return_tensors="pt")
+        features.to(self.model.device)
 
         # unfortunately checker requires the numpy version, so we have to convert back
         x_image = np.array(image).astype(np.float32) / 255.0

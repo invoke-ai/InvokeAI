@@ -217,6 +217,7 @@ class Generate:
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
                 self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id, local_files_only=True)
                 self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id, local_files_only=True)
+                self.safety_checker.to(self.device)
             except Exception:
                 print('** An error was encountered while installing the safety checker:')
                 print(traceback.format_exc())
