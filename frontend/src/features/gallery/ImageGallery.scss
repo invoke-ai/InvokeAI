@@ -19,8 +19,8 @@
 }
 
 .image-gallery-wrapper {
-  z-index: 10;
-  
+  z-index: 100;
+
   &[data-pinned='false'] {
     position: fixed;
     height: 100vh;

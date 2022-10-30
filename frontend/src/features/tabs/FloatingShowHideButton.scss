@@ -7,14 +7,13 @@
   z-index: 20;
   padding: 0;
 
-  filter: var(--floating-button-drop-shadow);
-
-  svg {
-    fill: var(--tab-list-text);
-  }
-
   &.left {
     left: 0;
+    border-radius: 0 0.5rem 0.5rem 0 !important;
+  }
+
+  &.btn-options {
+    left: 73px;
     border-radius: 0 0.5rem 0.5rem 0 !important;
   }
 

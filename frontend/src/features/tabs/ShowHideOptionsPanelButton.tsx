@@ -15,7 +15,7 @@ const ShowHideOptionsPanelButton = () => {
       tooltip="Show Options Panel (G)"
       tooltipPlacement="top"
       aria-label="Show Options Panel"
-      styleClass="floating-show-hide-button left"
+      styleClass="floating-show-hide-button btn-options"
       onMouseOver={handleShowOptionsPanel}
     >
       <IoMdOptions />

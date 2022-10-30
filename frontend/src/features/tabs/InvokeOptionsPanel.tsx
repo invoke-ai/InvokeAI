@@ -1,16 +1,11 @@
 import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import {
-  FocusEvent,
-  MouseEvent,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-} from 'react';
+import { MouseEvent, ReactNode, useCallback, useRef } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { CSSTransition } from 'react-transition-group';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
+
 import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
 import {
   OptionsState,
@@ -48,7 +43,6 @@ const InvokeOptionsPanel = (props: Props) => {
     shouldShowOptionsPanel,
     shouldHoldOptionsPanelOpen,
     shouldPinOptionsPanel,
-    optionsPanelScrollPosition,
   } = useAppSelector(optionsPanelSelector);
 
   const optionsPanelRef = useRef<HTMLDivElement>(null);
@@ -57,6 +51,24 @@ const InvokeOptionsPanel = (props: Props) => {
   const timeoutIdRef = useRef<number | null>(null);
 
   const { children } = props;
+
+  // Hotkeys
+  useHotkeys(
+    'o',
+    () => {
+      dispatch(setShouldShowOptionsPanel(!shouldShowOptionsPanel));
+    },
+    [shouldShowOptionsPanel]
+  );
+
+  useHotkeys(
+    'shift+o',
+    () => {
+      handleClickPinOptionsPanel();
+    },
+    [shouldPinOptionsPanel]
+  );
+  //
 
   const handleCloseOptionsPanel = useCallback(() => {
     if (shouldPinOptionsPanel) return;

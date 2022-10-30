@@ -156,7 +156,7 @@ export default function ImageGallery() {
   });
 
   useHotkeys(
-    'shift+p',
+    'shift+g',
     () => {
       handleSetShouldPinGallery();
     },
@@ -443,7 +443,7 @@ export default function ImageGallery() {
                 size={'sm'}
                 className={'image-gallery-icon-btn'}
                 aria-label={'Pin Gallery'}
-                tooltip={'Pin Gallery (Shift+P)'}
+                tooltip={'Pin Gallery (Shift+G)'}
                 onClick={handleSetShouldPinGallery}
                 icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
               />

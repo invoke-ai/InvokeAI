@@ -19,14 +19,13 @@
 }
 
 .options-panel-wrapper {
-  background-color: var(--background-color);
+  grid-auto-rows: max-content;
   height: $app-content-height;
   width: $options-bar-max-width;
   max-width: $options-bar-max-width;
   flex-shrink: 0;
   position: relative;
-  overflow-y: scroll;
-  @include HideScrollbar;
+  z-index: 20;
 
   .options-panel {
     display: flex;
@@ -34,6 +33,8 @@
     row-gap: 1rem;
     height: 100%;
     @include HideScrollbar;
+    background-color: var(--background-color) !important;
+    border-right: 1px solid var(--border-color);
   }
 
   &[data-pinned='false'] {
@@ -58,7 +59,7 @@
     padding: 0.5rem;
     top: 1rem;
     right: 1rem;
-    z-index: 25;
+    z-index: 20;
 
     &[data-selected='true'] {
       top: 0;

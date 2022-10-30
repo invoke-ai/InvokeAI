@@ -3,16 +3,19 @@ import { Button, ButtonProps, Tooltip } from '@chakra-ui/react';
 export interface IAIButtonProps extends ButtonProps {
   label: string;
   tooltip?: string;
+  styleClass?: string;
 }
 
 /**
  * Reusable customized button component.
  */
 const IAIButton = (props: IAIButtonProps) => {
-  const { label, tooltip = '', ...rest } = props;
+  const { label, tooltip = '', styleClass, ...rest } = props;
   return (
     <Tooltip label={tooltip}>
-      <Button {...rest}>{label}</Button>
+      <Button className={styleClass ? styleClass : ''} {...rest}>
+        {label}
+      </Button>
     </Tooltip>
   );
 };
