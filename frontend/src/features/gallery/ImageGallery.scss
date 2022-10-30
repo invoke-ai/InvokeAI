@@ -1,24 +1,24 @@
 @use '../../styles/Mixins/' as *;
 
-.image-gallery-area-enter {
+.image-gallery-wrapper-enter {
   transform: translateX(150%);
 }
 
-.image-gallery-area-enter-active {
+.image-gallery-wrapper-enter-active {
   transform: translateX(0);
   transition: all 120ms ease-out;
 }
 
-.image-gallery-area-exit {
+.image-gallery-wrapper-exit {
   transform: translateX(0);
 }
 
-.image-gallery-area-exit-active {
+.image-gallery-wrapper-exit-active {
   transform: translateX(150%);
   transition: all 120ms ease-out;
 }
 
-.image-gallery-area {
+.image-gallery-wrapper {
   z-index: 10;
   
   &[data-pinned='false'] {
@@ -29,6 +29,7 @@
 
     .image-gallery-popup {
       border-radius: 0;
+      box-shadow: 0 0 1rem var(--text-color-a3);
       .image-gallery-container {
         max-height: calc($app-height + 5rem);
       }

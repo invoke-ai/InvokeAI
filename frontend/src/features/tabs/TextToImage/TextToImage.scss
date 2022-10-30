@@ -4,12 +4,3 @@
   padding: 1rem;
   height: 100%;
 }
-
-.text-to-image-panel {
-  display: grid;
-  row-gap: 1rem;
-  grid-auto-rows: max-content;
-  height: $app-content-height;
-  overflow-y: scroll;
-  @include HideScrollbar;
-}

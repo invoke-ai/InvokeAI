@@ -1,0 +1,30 @@
+@use '../../styles/Mixins/' as *;
+
+.floating-show-hide-button {
+  position: absolute !important;
+  top: 50%;
+  transform: translate(0, -50%);
+  z-index: 20;
+  padding: 0;
+  min-width: 2rem !important;
+
+  filter: drop-shadow(0 0 1rem var(--text-color-a3));
+
+  &.left {
+    left: 0;
+    border-radius: 0 0.5rem 0.5rem 0 !important;
+  }
+
+  &.right {
+    right: 0;
+    border-radius: 0.5rem 0 0 0.5rem !important;
+  }
+
+  @include Button(
+    $btn-width: 1rem,
+    $btn-height: 12rem,
+    $icon-size: 20px,
+    $btn-color: var(--btn-grey),
+    $btn-color-hover: var(--btn-grey-hover)
+  );
+}

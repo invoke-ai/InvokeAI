@@ -1,0 +1,51 @@
+@use '../../styles/Mixins/' as *;
+
+.options-panel-wrapper-enter {
+  transform: translateX(-150%);
+}
+
+.options-panel-wrapper-enter-active {
+  transform: translateX(0);
+  transition: all 120ms ease-out;
+}
+
+.options-panel-wrapper-exit {
+  transform: translateX(0);
+}
+
+.options-panel-wrapper-exit-active {
+  transform: translateX(-150%);
+  transition: all 120ms ease-out;
+}
+
+.options-panel-wrapper {
+  z-index: 20;
+  background-color: var(--background-color);
+  grid-auto-rows: max-content;
+  height: $app-content-height;
+  width: $options-bar-max-width;
+  max-width: $options-bar-max-width;
+  flex-shrink: 0;
+
+  .options-panel {
+    display: grid;
+    row-gap: 1rem;
+    height: 100%;
+    overflow-y: scroll;
+    @include HideScrollbar;
+  }
+
+  &[data-pinned='false'] {
+    position: fixed;
+    top: 0;
+    left: 0;
+    box-shadow: 0 0 1rem var(--text-color-a3);
+    width: calc($options-bar-max-width + 2rem);
+    max-width: calc($options-bar-max-width + 2rem);
+    height: 100%;
+
+    .options-panel {
+      padding: 1rem;
+    }
+  }
+}

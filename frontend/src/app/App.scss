@@ -11,11 +11,7 @@
   display: grid;
   row-gap: 0.5rem;
   padding: $app-padding;
-  grid-auto-rows: max-content;
+  grid-auto-rows: min-content auto;
   width: $app-width;
   height: $app-height;
-}
-
-.app-console {
-  z-index: 20;
 }

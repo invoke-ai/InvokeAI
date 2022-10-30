@@ -8,15 +8,6 @@
   height: 100%;
 }
 
-.image-to-image-panel {
-  display: grid;
-  row-gap: 1rem;
-  grid-auto-rows: max-content;
-  height: $app-content-height;
-  overflow-y: scroll;
-  @include HideScrollbar;
-}
-
 .image-to-image-strength-main-option {
   display: grid;
   grid-template-columns: none !important;

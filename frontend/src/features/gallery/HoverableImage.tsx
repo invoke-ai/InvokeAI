@@ -142,10 +142,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   return (
     <ContextMenu.Root
-      onOpenChange={(open: boolean) => {
-        dispatch(setShouldHoldGalleryOpen(open));
-        dispatch(setShouldShowGallery(true));
-      }}
+      // onOpenChange={(open: boolean) => {
+      //   dispatch(setShouldHoldGalleryOpen(open));
+      //   dispatch(setShouldShowGallery(true));
+      // }}
     >
       <ContextMenu.Trigger>
         <Box

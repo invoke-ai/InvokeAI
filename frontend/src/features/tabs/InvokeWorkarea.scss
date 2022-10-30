@@ -10,12 +10,6 @@
     column-gap: 0.5rem;
     height: 100%;
 
-    .workarea-options-panel {
-      width: $options-bar-max-width;
-      max-width: $options-bar-max-width;
-      flex-shrink: 0;
-    }
-
     .workarea-split-view {
       width: 100%;
       display: grid;

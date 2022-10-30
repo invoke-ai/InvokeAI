@@ -96,8 +96,8 @@ export default function ImageGallery() {
   const timeoutIdRef = useRef<number | null>(null);
 
   const handleSetShouldPinGallery = () => {
-    dispatch(setNeedsCache(true));
     dispatch(setShouldPinGallery(!shouldPinGallery));
+    dispatch(setNeedsCache(true));
   };
 
   const handleToggleGallery = () => {
@@ -106,7 +106,7 @@ export default function ImageGallery() {
 
   const handleOpenGallery = () => {
     dispatch(setShouldShowGallery(true));
-    dispatch(setNeedsCache(true));
+    shouldPinGallery && dispatch(setNeedsCache(true));
   };
 
   const handleCloseGallery = () => {
@@ -117,7 +117,7 @@ export default function ImageGallery() {
     );
     dispatch(setShouldShowGallery(false));
     dispatch(setShouldHoldGalleryOpen(false));
-    dispatch(setNeedsCache(true));
+    shouldPinGallery && dispatch(setNeedsCache(true));
   };
 
   const handleClickLoadMore = () => {
@@ -251,16 +251,20 @@ export default function ImageGallery() {
     galleryContainerRef.current.scrollTop = galleryScrollPosition;
   }, [galleryScrollPosition, shouldShowGallery]);
 
+  useEffect(() => {
+    setShouldShowButtons(galleryWidth >= 280);
+  }, [galleryWidth]);
+
   return (
     <CSSTransition
       nodeRef={galleryRef}
       in={shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)}
       unmountOnExit
       timeout={200}
-      classNames="image-gallery-area"
+      classNames="image-gallery-wrapper"
     >
       <div
-        className="image-gallery-area"
+        className="image-gallery-wrapper"
         data-pinned={shouldPinGallery}
         ref={galleryRef}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}
@@ -270,7 +274,6 @@ export default function ImageGallery() {
         <Resizable
           minWidth={galleryMinWidth}
           maxWidth={galleryMaxWidth}
-          // maxHeight={'100%'}
           className={'image-gallery-popup'}
           handleStyles={{ left: { width: '15px' } }}
           enable={{
@@ -316,9 +319,9 @@ export default function ImageGallery() {
               Number(galleryMaxWidth)
             );
 
-            if (newWidth >= 320 && !shouldShowButtons) {
+            if (newWidth >= 280 && !shouldShowButtons) {
               setShouldShowButtons(true);
-            } else if (newWidth < 320 && shouldShowButtons) {
+            } else if (newWidth < 280 && shouldShowButtons) {
               setShouldShowButtons(false);
             }
 
@@ -447,15 +450,6 @@ export default function ImageGallery() {
                 onClick={handleSetShouldPinGallery}
                 icon={<BsPinAngleFill />}
                 data-selected={shouldPinGallery}
-              />
-
-              <IAIIconButton
-                size={'sm'}
-                aria-label={'Close Gallery'}
-                tooltip={'Close Gallery (G)'}
-                onClick={handleCloseGallery}
-                className="image-gallery-icon-btn"
-                icon={<MdClear />}
               />
             </div>
           </div>
