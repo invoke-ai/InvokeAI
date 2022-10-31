@@ -32,7 +32,7 @@ class Outcrop(object):
 
         result= self.generate.prompt2image(
             orig_opt.prompt,
-#            seed        = orig_opt.seed,    # uncomment to make it deterministic
+            seed        = orig_opt.seed,    # uncomment to make it deterministic
             sampler     = self.generate.sampler,
             steps       = opt.steps,
             cfg_scale   = opt.cfg_scale,
@@ -40,10 +40,14 @@ class Outcrop(object):
             width       = extended_image.width,
             height      = extended_image.height,
             init_img    = extended_image,
-            strength    = opt.strength,
+            strength    = 0.99,
             image_callback = wrapped_callback,
-            seam_size = 32,
-            seam_blur = 10,
+            seam_size = opt.seam_size or 96,
+            seam_blur = opt.seam_blur or 16,
+            seam_strength = opt.seam_strength or 0.7,
+            seam_steps = 20,
+            tile_size = 32,
+            color_match = True,
             force_outpaint = True,  # this just stops the warning about erased regions
         )
         
