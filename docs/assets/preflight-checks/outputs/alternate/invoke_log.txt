@@ -1,1 +1,0 @@
-outputs/preflight/alternate/000001.626976529.png: banana sushi -s 50 -S 626976529 -W 512 -H 512 -C 7.5 -A k_lms
