@@ -15,6 +15,7 @@ import {
   setShouldShowOptionsPanel,
 } from '../options/optionsSlice';
 import { setNeedsCache } from './Inpainting/inpaintingSlice';
+import InvokeAILogo from '../../assets/images/logo.png';
 
 type Props = { children: ReactNode };
 
@@ -161,6 +162,15 @@ const InvokeOptionsPanel = (props: Props) => {
                 {shouldPinOptionsPanel ? <BsPinAngleFill /> : <BsPinAngle />}
               </div>
             </Tooltip>
+            {!shouldPinOptionsPanel && (
+              <div className="invoke-ai-logo-wrapper">
+                <img src={InvokeAILogo} alt="invoke-ai-logo" />
+                <h1>
+                  invoke <strong>ai</strong>
+                </h1>
+              </div>
+            )}
+
             {children}
           </div>
         </div>
