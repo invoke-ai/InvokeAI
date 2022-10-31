@@ -321,22 +321,31 @@ def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
                              
 #---------------------------------------------
 def update_config_file(successfully_downloaded:dict):
+    yaml = new_config_file_contents(successfully_downloaded)
+
     try:
-        yaml = new_config_file_contents(successfully_downloaded)
+        if os.path.exists(Config_file):
+            print(f'** {Config_file} exists. Renaming to {Config_file}.orig')
+            os.rename(Config_file,f'{Config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(Config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
             outfile.write(Config_preamble)
             outfile.write(yaml)
         os.rename(tmpfile,Config_file)
+
     except Exception as e:
         print(f'**Error creating config file {Config_file}: {str(e)} **')
         return
+
     print(f'Successfully created new configuration file {Config_file}')
 
     
 #---------------------------------------------    
 def new_config_file_contents(successfully_downloaded:dict)->str:
-    conf = OmegaConf.load(Config_file)
+    if os.path.exists(Config_file):
+        conf = OmegaConf.load(Config_file)
+    else:
+        conf = OmegaConf.create()
 
     # find the VAE file, if there is one
     vae = None
