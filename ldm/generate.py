@@ -146,7 +146,7 @@ class Generate:
             esrgan=None,
             free_gpu_mem=False,
             safety_checker:bool=False,
-            max_loaded_models:int=3,
+            max_loaded_models:int=2,
             # these are deprecated; if present they override values in the conf file
             weights = None,
             config = None,

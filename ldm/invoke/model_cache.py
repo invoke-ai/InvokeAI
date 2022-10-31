@@ -20,7 +20,7 @@ from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config
 
-DEFAULT_MAX_MODELS=3
+DEFAULT_MAX_MODELS=2
 
 class ModelCache(object):
     def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
