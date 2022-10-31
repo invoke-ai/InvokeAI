@@ -28,7 +28,7 @@ jobs:
             environment-file: environment-mac.yml
             default-shell: bash -l {0}
           - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
-            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/model.ckpt
+            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
             stable-diffusion-model-switch: stable-diffusion-1.4
           - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
@@ -44,6 +44,9 @@ jobs:
       - name: Checkout sources
         id: checkout-sources
         uses: actions/checkout@v3
+
+      - name: create models.yaml from example
+        run: cp configs/models.yaml.example configs/models.yaml
 
       - name: Use cached conda packages
         id: use-cached-conda-packages
