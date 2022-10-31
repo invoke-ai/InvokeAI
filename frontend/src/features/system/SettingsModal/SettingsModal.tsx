@@ -123,6 +123,9 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
 
             <div className="settings-modal-reset">
               <Heading size={'md'}>Reset Web UI</Heading>
+              <Button colorScheme="red" onClick={handleClickResetWebUI}>
+                Reset Web UI
+              </Button>
               <Text>
                 Resetting the web UI only resets the browser's local cache of
                 your images and remembered settings. It does not delete any
@@ -133,9 +136,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 isn't working, please try resetting before submitting an issue
                 on GitHub.
               </Text>
-              <Button colorScheme="red" onClick={handleClickResetWebUI}>
-                Reset Web UI
-              </Button>
             </div>
           </ModalBody>
 

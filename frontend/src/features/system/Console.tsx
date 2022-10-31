@@ -99,7 +99,7 @@ const Console = () => {
             position: 'fixed',
             left: 0,
             bottom: 0,
-            zIndex: 20,
+            zIndex: 9999,
           }}
           maxHeight={'90vh'}
         >
