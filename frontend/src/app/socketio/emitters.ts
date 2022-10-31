@@ -8,11 +8,13 @@ import {
 import {
   GalleryCategory,
   GalleryState,
+  removeImage,
 } from '../../features/gallery/gallerySlice';
 import { OptionsState } from '../../features/options/optionsSlice';
 import {
   addLogEntry,
   errorOccurred,
+  modelChangeRequested,
   setCurrentStatus,
   setIsCancelable,
   setIsProcessing,
@@ -163,6 +165,7 @@ const makeSocketIOEmitters = (
     },
     emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
       const { url, uuid, category } = imageToDelete;
+      dispatch(removeImage(imageToDelete));
       socketio.emit('deleteImage', url, uuid, category);
     },
     emitRequestImages: (category: GalleryCategory) => {
@@ -189,9 +192,7 @@ const makeSocketIOEmitters = (
       socketio.emit('requestSystemConfig');
     },
     emitRequestModelChange: (modelName: string) => {
-      dispatch(setCurrentStatus('Changing Model'));
-      dispatch(setIsProcessing(true));
-      dispatch(setIsCancelable(false));
+      dispatch(modelChangeRequested());
       socketio.emit('requestModelChange', modelName);
     },
   };

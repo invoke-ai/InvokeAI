@@ -336,7 +336,8 @@ class InvokeAIWebServer:
 
                 seed = (
                     original_image["metadata"]["seed"]
-                    if "seed" in original_image["metadata"]
+                    if "metadata" in original_image
+                    and "seed" in original_image["metadata"]
                     else "unknown_seed"
                 )
 
@@ -561,20 +562,22 @@ class InvokeAIWebServer:
                 )
                 generation_parameters["init_img"] = cropped_init_image
 
-                # grab an Image of the mask
-                mask_image = Image.open(
-                    io.BytesIO(
-                        base64.decodebytes(
-                            bytes(generation_parameters["init_mask"], "utf-8")
+                if generation_parameters["is_mask_empty"]:
+                    generation_parameters["init_mask"] = None
+                else:
+                    # grab an Image of the mask
+                    mask_image = Image.open(
+                        io.BytesIO(
+                            base64.decodebytes(
+                                bytes(generation_parameters["init_mask"], "utf-8")
+                            )
                         )
                     )
-                )
-
-                # crop the mask image
-                cropped_mask_image = copy_image_from_bounding_box(
-                    mask_image, **generation_parameters["bounding_box"]
-                )
-                generation_parameters["init_mask"] = cropped_mask_image
+                    # crop the mask image
+                    cropped_mask_image = copy_image_from_bounding_box(
+                        mask_image, **generation_parameters["bounding_box"]
+                    )
+                    generation_parameters["init_mask"] = cropped_mask_image
 
             totalSteps = self.calculate_real_steps(
                 steps=generation_parameters["steps"],
@@ -750,7 +753,7 @@ class InvokeAIWebServer:
                     all_parameters["init_img"] = init_img_url
 
                 if "init_mask" in all_parameters:
-                    all_parameters["init_mask"] = ""  #
+                    all_parameters["init_mask"] = ""  # TODO: store the mask in metadata
 
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)
 

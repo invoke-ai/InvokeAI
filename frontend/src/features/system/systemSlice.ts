@@ -172,6 +172,12 @@ export const systemSlice = createSlice({
     setIsCancelable: (state, action: PayloadAction<boolean>) => {
       state.isCancelable = action.payload;
     },
+    modelChangeRequested: (state) => {
+      state.currentStatus = 'Loading Model';
+      state.isCancelable = false;
+      state.isProcessing = true;
+      state.currentStatusHasSteps = false;
+    },
   },
 });
 
@@ -193,6 +199,7 @@ export const {
   errorSeen,
   setModelList,
   setIsCancelable,
+  modelChangeRequested,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

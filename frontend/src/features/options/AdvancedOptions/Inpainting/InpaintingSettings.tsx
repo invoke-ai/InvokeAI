@@ -89,6 +89,7 @@ export default function InpaintingSettings() {
         onClick={handleClearBrushHistory}
         tooltip="Clears brush stroke history"
         disabled={futureLines.length > 0 || pastLines.length > 0 ? false : true}
+        styleClass="inpainting-options-btn"
       />
     </>
   );

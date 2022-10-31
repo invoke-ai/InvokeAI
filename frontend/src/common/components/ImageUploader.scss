@@ -39,10 +39,11 @@
   justify-content: center;
   cursor: pointer;
   border-radius: 0.5rem;
-  color: var(--subtext-color-bright);
+  color: var(--tab-list-text-inactive);
+  background-color: var(--btn-grey);
 
   &:hover {
-    background-color: var(--inpaint-bg-color);
+    background-color: var(--btn-grey-hover);
   }
 }
 

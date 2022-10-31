@@ -17,6 +17,7 @@ import MainOptions from '../../options/MainOptions/MainOptions';
 import OptionsAccordion from '../../options/OptionsAccordion';
 import ProcessButtons from '../../options/ProcessButtons/ProcessButtons';
 import PromptInput from '../../options/PromptInput/PromptInput';
+import InvokeOptionsPanel from '../InvokeOptionsPanel';
 
 export default function ImageToImagePanel() {
   const showAdvancedOptions = useAppSelector(
@@ -45,14 +46,14 @@ export default function ImageToImagePanel() {
       options: <UpscaleOptions />,
     },
     other: {
-      header: <OutputHeader /> ,
+      header: <OutputHeader />,
       feature: Feature.OTHER,
       options: <OutputOptions />,
     },
   };
 
   return (
-    <div className="image-to-image-panel">
+    <InvokeOptionsPanel>
       <PromptInput />
       <ProcessButtons />
       <MainOptions />
@@ -65,6 +66,6 @@ export default function ImageToImagePanel() {
       {showAdvancedOptions ? (
         <OptionsAccordion accordionInfo={imageToImageAccordions} />
       ) : null}
-    </div>
+    </InvokeOptionsPanel>
   );
 }

@@ -102,6 +102,6 @@
     0px 10px 20px -15px rgba(22, 23, 24, 0.2);
   --context-menu-bg-color-hover: var(--background-color-secondary);
 
-  // Inpainting
-  --inpaint-bg-color: rgb(180, 182, 184);
+  // Shadows
+  --floating-button-drop-shadow: drop-shadow(0 0 1rem rgba(0, 0, 0, 0.3));
 }

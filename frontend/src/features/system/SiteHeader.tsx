@@ -1,10 +1,12 @@
 import { IconButton, Link, Tooltip, useColorMode } from '@chakra-ui/react';
+
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { FaSun, FaMoon, FaGithub, FaDiscord } from 'react-icons/fa';
 import { MdHelp, MdKeyboard, MdSettings } from 'react-icons/md';
 
 import InvokeAILogo from '../../assets/images/logo.png';
+
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 
 import SettingsModal from './SettingsModal/SettingsModal';

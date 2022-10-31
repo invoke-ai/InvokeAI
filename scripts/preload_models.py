@@ -434,7 +434,7 @@ def download_gfpgan():
             if not os.path.exists(model_dest):
                 print(f'Downloading gfpgan model file {model_url}...',end='')
                 os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-                urllib.request.urlretrieve(model_url,model_dest)
+                request.urlretrieve(model_url,model_dest)
                 print('...success')
         except Exception:
             print('Error loading GFPGAN:')
@@ -449,7 +449,7 @@ def download_codeformer():
             if not os.path.exists(model_dest):
                 print('Downloading codeformer model file...')
                 os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-                urllib.request.urlretrieve(model_url,model_dest)
+                request.urlretrieve(model_url,model_dest)
     except Exception:
         print('Error loading CodeFormer:')
         print(traceback.format_exc())
@@ -464,7 +464,7 @@ def download_clipseg():
         weights_dir = 'src/clipseg/weights'
         if not os.path.exists(weights_dir):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-            urllib.request.urlretrieve(model_url,model_dest)
+            request.urlretrieve(model_url,model_dest)
             with zipfile.ZipFile(model_dest,'r') as zip:
                 zip.extractall('src/clipseg')
                 os.rename('src/clipseg/clipseg_weights','src/clipseg/weights')
@@ -523,16 +523,15 @@ if __name__ == '__main__':
                 print('\n** DOWNLOADING WEIGHTS **')
                 successfully_downloaded = download_weight_datasets(models, access_token)
                 update_config_file(successfully_downloaded)
-        else:
-            print('\n** DOWNLOADING SUPPORT MODELS **')
-            download_bert()
-            download_kornia()
-            download_clip()
-            download_gfpgan()
-            download_codeformer()
-            download_clipseg()
-            download_safety_checker()
-            postscript()
+        print('\n** DOWNLOADING SUPPORT MODELS **')
+        download_bert()
+        download_kornia()
+        download_clip()
+        download_gfpgan()
+        download_codeformer()
+        download_clipseg()
+        download_safety_checker()
+        postscript()
     except KeyboardInterrupt:
         print('\nGoodbye! Come back soon.')
     except Exception as e:

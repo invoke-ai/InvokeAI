@@ -15,6 +15,7 @@ import MainOptions from '../../options/MainOptions/MainOptions';
 import OptionsAccordion from '../../options/OptionsAccordion';
 import ProcessButtons from '../../options/ProcessButtons/ProcessButtons';
 import PromptInput from '../../options/PromptInput/PromptInput';
+import InvokeOptionsPanel from '../InvokeOptionsPanel';
 
 export default function InpaintingPanel() {
   const showAdvancedOptions = useAppSelector(
@@ -45,7 +46,7 @@ export default function InpaintingPanel() {
   };
 
   return (
-    <div className="image-to-image-panel">
+    <InvokeOptionsPanel>
       <PromptInput />
       <ProcessButtons />
       <MainOptions />
@@ -58,6 +59,6 @@ export default function InpaintingPanel() {
       {showAdvancedOptions ? (
         <OptionsAccordion accordionInfo={imageToImageAccordions} />
       ) : null}
-    </div>
+    </InvokeOptionsPanel>
   );
 }

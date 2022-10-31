@@ -6,8 +6,8 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
+import { activeTabNameSelector } from '../../../options/optionsSelectors';
 import { OptionsState } from '../../../options/optionsSlice';
-import { tabMap } from '../../InvokeTabs';
 import {
   InpaintingState,
   setIsDrawing,
@@ -16,12 +16,16 @@ import {
 } from '../inpaintingSlice';
 
 const keyboardEventManagerSelector = createSelector(
-  [(state: RootState) => state.options, (state: RootState) => state.inpainting],
-  (options: OptionsState, inpainting: InpaintingState) => {
+  [
+    (state: RootState) => state.options,
+    (state: RootState) => state.inpainting,
+    activeTabNameSelector,
+  ],
+  (options: OptionsState, inpainting: InpaintingState, activeTabName) => {
     const { shouldShowMask, cursorPosition, shouldLockBoundingBox } =
       inpainting;
     return {
-      activeTabName: tabMap[options.activeTab],
+      activeTabName,
       shouldShowMask,
       isCursorOnCanvas: Boolean(cursorPosition),
       shouldLockBoundingBox,
@@ -49,7 +53,7 @@ const KeyboardEventManager = () => {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (
-        !['z', ' '].includes(e.key) ||
+        !['x', ' '].includes(e.key) ||
         activeTabName !== 'inpainting' ||
         !shouldShowMask
       ) {
@@ -83,13 +87,13 @@ const KeyboardEventManager = () => {
       }
 
       switch (e.key) {
-        case 'z': {
+        case 'x': {
           dispatch(toggleTool());
           break;
         }
         case ' ': {
           if (!shouldShowMask) break;
-          
+
           if (e.type === 'keydown') {
             dispatch(setIsDrawing(false));
           }

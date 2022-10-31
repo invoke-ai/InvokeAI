@@ -83,11 +83,6 @@
   }
 }
 
-// Overrides
-.inpainting-workarea-overrides {
-  .image-gallery-area {
-    .chakra-popover__popper {
-      inset: 0 auto auto -75px !important;
-    }
-  }
+.inpainting-options-btn {
+  min-height: 2rem;
 }

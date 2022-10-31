@@ -53,10 +53,11 @@ const InpaintingCanvas = () => {
     maskColor,
     imageToInpaint,
     stageScale,
+    shouldShowBoundingBox,
     shouldShowBoundingBoxFill,
     isDrawing,
     shouldLockBoundingBox,
-    shouldShowBoundingBox,
+    boundingBoxDimensions,
   } = useAppSelector(inpaintingCanvasSelector);
 
   const toast = useToast();
@@ -95,7 +96,7 @@ const InpaintingCanvas = () => {
       };
       image.src = imageToInpaint.url;
     } else {
-      setCanvasBgImage(null)
+      setCanvasBgImage(null);
     }
   }, [imageToInpaint, dispatch, stageScale, toast]);
 
@@ -243,7 +244,7 @@ const InpaintingCanvas = () => {
         )}
         {!shouldLockBoundingBox && (
           <div style={{ pointerEvents: 'none' }}>
-            Transforming Bounding Box (M)
+            {`Transforming Bounding Box ${boundingBoxDimensions.width}x${boundingBoxDimensions.height} (M)`}
           </div>
         )}
       </div>
@@ -299,15 +300,17 @@ const InpaintingCanvas = () => {
                   />
                 )}
               </Layer>
-              <Layer>
-                {shouldShowBoundingBox && shouldShowBoundingBoxFill && (
-                  <InpaintingBoundingBoxPreviewOverlay />
-                )}
-                {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
-                {shouldLockBoundingBox && (
-                  <InpaintingCanvasBrushPreviewOutline />
-                )}
-              </Layer>
+              {shouldShowMask && (
+                <Layer>
+                  {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
+                    <InpaintingBoundingBoxPreviewOverlay />
+                  )}
+                  {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
+                  {shouldLockBoundingBox && (
+                    <InpaintingCanvasBrushPreviewOutline />
+                  )}
+                </Layer>
+              )}
             </>
           )}
         </Stage>

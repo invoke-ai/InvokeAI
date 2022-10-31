@@ -31,15 +31,16 @@
 @use '../features/gallery/ImageGallery.scss';
 @use '../features/gallery/HoverableImage.scss';
 @use '../features/gallery/InvokePopover.scss';
-@use '../features/gallery/ShowHideGalleryButton.scss';
 @use '../features/gallery/ImageMetaDataViewer/ImageMetadataViewer.scss';
 
 // Tabs
 @use '../features/tabs/InvokeTabs.scss';
 @use '../features/tabs/InvokeWorkarea.scss';
+@use '../features/tabs/InvokeOptionsPanel.scss';
 @use '../features/tabs/TextToImage/TextToImage.scss';
 @use '../features/tabs/ImageToImage/ImageToImage.scss';
 @use '../features/tabs/Inpainting/Inpainting.scss';
+@use '../features/tabs/FloatingButton.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';

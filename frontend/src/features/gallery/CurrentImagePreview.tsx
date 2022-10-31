@@ -62,11 +62,11 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
   };
 
   const handleClickPrevButton = () => {
-    dispatch(selectPrevImage(currentCategory));
+    dispatch(selectPrevImage());
   };
 
   const handleClickNextButton = () => {
-    dispatch(selectNextImage(currentCategory));
+    dispatch(selectNextImage());
   };
 
   return (

@@ -143,9 +143,7 @@ export const gallerySlice = createSlice({
       if (state.shouldAutoSwitchToNewImages) {
         state.currentImageUuid = uuid;
         state.currentImage = newImage;
-        if (category === 'result') {
-          state.currentCategory = 'result';
-        }
+        state.currentCategory = category;
       }
       state.intermediateImage = undefined;
       tempCategory.latest_mtime = mtime;
@@ -156,10 +154,11 @@ export const gallerySlice = createSlice({
     clearIntermediateImage: (state) => {
       state.intermediateImage = undefined;
     },
-    selectNextImage: (state, action: PayloadAction<GalleryCategory>) => {
-      const category = action.payload;
+    selectNextImage: (state) => {
       const { currentImage } = state;
-      const tempImages = state.categories[category].images;
+      if (!currentImage) return;
+      const tempImages =
+        state.categories[currentImage.category as GalleryCategory].images;
 
       if (currentImage) {
         const currentImageIndex = tempImages.findIndex(
@@ -172,10 +171,11 @@ export const gallerySlice = createSlice({
         }
       }
     },
-    selectPrevImage: (state, action: PayloadAction<GalleryCategory>) => {
-      const category = action.payload;
+    selectPrevImage: (state) => {
       const { currentImage } = state;
-      const tempImages = state.categories[category].images;
+      if (!currentImage) return;
+      const tempImages =
+        state.categories[currentImage.category as GalleryCategory].images;
 
       if (currentImage) {
         const currentImageIndex = tempImages.findIndex(

@@ -42,6 +42,11 @@ export interface OptionsState {
   activeTab: number;
   shouldShowImageDetails: boolean;
   showDualDisplay: boolean;
+  shouldShowOptionsPanel: boolean;
+  shouldPinOptionsPanel: boolean;
+  optionsPanelScrollPosition: number;
+  shouldHoldOptionsPanelOpen: boolean;
+  shouldLoopback: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -75,6 +80,11 @@ const initialOptionsState: OptionsState = {
   activeTab: 0,
   shouldShowImageDetails: false,
   showDualDisplay: true,
+  shouldShowOptionsPanel: true,
+  shouldPinOptionsPanel: true,
+  optionsPanelScrollPosition: 0,
+  shouldHoldOptionsPanelOpen: false,
+  shouldLoopback: true,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -324,6 +334,21 @@ export const optionsSlice = createSlice({
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
+    setShouldPinOptionsPanel: (state, action: PayloadAction<boolean>) => {
+      state.shouldPinOptionsPanel = action.payload;
+    },
+    setShouldShowOptionsPanel: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowOptionsPanel = action.payload;
+    },
+    setOptionsPanelScrollPosition: (state, action: PayloadAction<number>) => {
+      state.optionsPanelScrollPosition = action.payload;
+    },
+    setShouldHoldOptionsPanelOpen: (state, action: PayloadAction<boolean>) => {
+      state.shouldHoldOptionsPanelOpen = action.payload;
+    },
+    setShouldLoopback: (state, action: PayloadAction<boolean>) => {
+      state.shouldLoopback = action.payload;
+    },
   },
 });
 
@@ -366,6 +391,11 @@ export const {
   setShowDualDisplay,
   setInitialImage,
   clearInitialImage,
+  setShouldShowOptionsPanel,
+  setShouldPinOptionsPanel,
+  setOptionsPanelScrollPosition,
+  setShouldHoldOptionsPanelOpen,
+  setShouldLoopback,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

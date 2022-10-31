@@ -12,6 +12,7 @@ import {
   useAppSelector,
 } from '../../../../app/store';
 import { roundToMultiple } from '../../../../common/util/roundDownToMultiple';
+import { stageRef } from '../InpaintingCanvas';
 import {
   InpaintingState,
   setBoundingBoxCoordinate,
@@ -106,6 +107,15 @@ const InpaintingBoundingBoxPreview = () => {
     transformerRef.current.nodes([shapeRef.current]);
     transformerRef.current.getLayer()?.batchDraw();
   }, [shouldLockBoundingBox]);
+
+  useEffect(
+    () => () => {
+      const container = stageRef.current?.container();
+      if (!container) return;
+      container.style.cursor = 'unset';
+    },
+    [shouldLockBoundingBox]
+  );
 
   const scaledStep = 64 * stageScale;
 

@@ -1,4 +1,5 @@
 import { FormControl, FormLabel, Select, SelectProps } from '@chakra-ui/react';
+import { MouseEvent } from 'react';
 
 interface Props extends SelectProps {
   label: string;
@@ -21,7 +22,16 @@ const IAISelect = (props: Props) => {
     ...rest
   } = props;
   return (
-    <FormControl isDisabled={isDisabled} className={`invokeai__select ${styleClass}`}>
+    <FormControl
+      isDisabled={isDisabled}
+      className={`invokeai__select ${styleClass}`}
+      onClick={(e: MouseEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
+        e.nativeEvent.stopPropagation();
+        e.nativeEvent.cancelBubble = true;
+      }}
+    >
       <FormLabel
         fontSize={fontSize}
         marginBottom={1}

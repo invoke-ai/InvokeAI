@@ -7,11 +7,7 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/store';
-import {
-  setCurrentImage,
-  setShouldHoldGalleryOpen,
-  setShouldShowGallery,
-} from './gallerySlice';
+import { setCurrentImage } from './gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { memo, useState } from 'react';
@@ -25,7 +21,6 @@ import {
 } from '../options/optionsSlice';
 import * as InvokeAI from '../../app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { tabMap } from '../tabs/InvokeTabs';
 import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
@@ -44,8 +39,12 @@ const memoEqualityCheck = (
  */
 const HoverableImage = memo((props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { activeTabName, galleryImageObjectFit, galleryImageMinimumWidth } =
-    useAppSelector(hoverableImageSelector);
+  const {
+    activeTabName,
+    galleryImageObjectFit,
+    galleryImageMinimumWidth,
+    mayDeleteImage,
+  } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, uuid, metadata } = image;
 
@@ -118,7 +117,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     if (metadata?.image?.init_image_path) {
       const response = await fetch(metadata.image.init_image_path);
       if (response.ok) {
-        dispatch(setActiveTab(tabMap.indexOf('img2img')));
+        dispatch(setActiveTab('img2img'));
         dispatch(setAllImageToImageParameters(metadata));
         toast({
           title: 'Initial Image Set',
@@ -142,10 +141,10 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   return (
     <ContextMenu.Root
-      onOpenChange={(open: boolean) => {
-        dispatch(setShouldHoldGalleryOpen(open));
-        dispatch(setShouldShowGallery(true));
-      }}
+    // onOpenChange={(open: boolean) => {
+    //   dispatch(setShouldHoldGalleryOpen(open));
+    //   dispatch(setShouldShowGallery(true));
+    // }}
     >
       <ContextMenu.Trigger>
         <Box
@@ -182,6 +181,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                     size="xs"
                     variant={'imageHoverIconButton'}
                     fontSize={14}
+                    isDisabled={!mayDeleteImage}
                   />
                 </DeleteImageModal>
               </Tooltip>

@@ -6,16 +6,16 @@ import { generateImage } from '../../../app/socketio/actions';
 import { OptionsState, setPrompt } from '../optionsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import useCheckParameters from '../../../common/hooks/useCheckParameters';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { tabMap } from '../../tabs/InvokeTabs';
+import { activeTabNameSelector } from '../optionsSelectors';
+import { readinessSelector } from '../../../app/selectors/readinessSelector';
 
 const promptInputSelector = createSelector(
-  (state: RootState) => state.options,
-  (options: OptionsState) => {
+  [(state: RootState) => state.options, activeTabNameSelector],
+  (options: OptionsState, activeTabName) => {
     return {
       prompt: options.prompt,
-      activeTabName: tabMap[options.activeTab],
+      activeTabName,
     };
   },
   {
@@ -29,24 +29,15 @@ const promptInputSelector = createSelector(
  * Prompt input text area.
  */
 const PromptInput = () => {
-  const promptRef = useRef<HTMLTextAreaElement>(null);
-  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
   const dispatch = useAppDispatch();
-  const isReady = useCheckParameters();
+  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
+  const isReady = useAppSelector(readinessSelector);
+
+  const promptRef = useRef<HTMLTextAreaElement>(null);
 
   const handleChangePrompt = (e: ChangeEvent<HTMLTextAreaElement>) => {
     dispatch(setPrompt(e.target.value));
   };
-
-  useHotkeys(
-    'ctrl+enter, cmd+enter',
-    () => {
-      if (isReady) {
-        dispatch(generateImage(activeTabName));
-      }
-    },
-    [isReady, activeTabName]
-  );
 
   useHotkeys(
     'alt+a',

@@ -40,6 +40,16 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Alt+A',
     },
     {
+      title: 'Toggle Options',
+      desc: 'Open and close the options panel',
+      hotkey: 'O',
+    },
+    {
+      title: 'Pin Options',
+      desc: 'Pin the options panel',
+      hotkey: 'Shift+O',
+    },
+    {
       title: 'Toggle Gallery',
       desc: 'Open and close the gallery drawer',
       hotkey: 'G',
@@ -101,7 +111,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Toggle Gallery Pin',
       desc: 'Pins and unpins the gallery to the UI',
-      hotkey: 'Shift+P',
+      hotkey: 'Shift+G',
     },
     {
       title: 'Increase Gallery Image Size',
@@ -134,7 +144,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Quick Toggle Brush/Eraser',
       desc: 'Quick toggle between brush and eraser',
-      hotkey: 'Z',
+      hotkey: 'X',
     },
     {
       title: 'Decrease Brush Size',

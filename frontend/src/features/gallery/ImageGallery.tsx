@@ -4,7 +4,7 @@ import { NumberSize, Resizable, Size } from 're-resizable';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdClear, MdPhotoLibrary } from 'react-icons/md';
-import { BsPinAngleFill } from 'react-icons/bs';
+import { BsPin, BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { requestImages } from '../../app/socketio/actions';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
@@ -33,6 +33,7 @@ import { BiReset } from 'react-icons/bi';
 import IAICheckbox from '../../common/components/IAICheckbox';
 import { setNeedsCache } from '../tabs/Inpainting/inpaintingSlice';
 import _ from 'lodash';
+import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 
@@ -96,8 +97,8 @@ export default function ImageGallery() {
   const timeoutIdRef = useRef<number | null>(null);
 
   const handleSetShouldPinGallery = () => {
-    dispatch(setNeedsCache(true));
     dispatch(setShouldPinGallery(!shouldPinGallery));
+    dispatch(setNeedsCache(true));
   };
 
   const handleToggleGallery = () => {
@@ -106,18 +107,19 @@ export default function ImageGallery() {
 
   const handleOpenGallery = () => {
     dispatch(setShouldShowGallery(true));
-    dispatch(setNeedsCache(true));
+    shouldPinGallery && dispatch(setNeedsCache(true));
   };
 
   const handleCloseGallery = () => {
+    // if (shouldPinGallery) return;
+    dispatch(setShouldShowGallery(false));
     dispatch(
       setGalleryScrollPosition(
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
       )
     );
-    dispatch(setShouldShowGallery(false));
     dispatch(setShouldHoldGalleryOpen(false));
-    dispatch(setNeedsCache(true));
+    // dispatch(setNeedsCache(true));
   };
 
   const handleClickLoadMore = () => {
@@ -145,24 +147,16 @@ export default function ImageGallery() {
     [shouldShowGallery]
   );
 
-  useHotkeys(
-    'left',
-    () => {
-      dispatch(selectPrevImage(currentCategory));
-    },
-    [currentCategory]
-  );
+  useHotkeys('left', () => {
+    dispatch(selectPrevImage());
+  });
+
+  useHotkeys('right', () => {
+    dispatch(selectNextImage());
+  });
 
   useHotkeys(
-    'right',
-    () => {
-      dispatch(selectNextImage(currentCategory));
-    },
-    [currentCategory]
-  );
-
-  useHotkeys(
-    'shift+p',
+    'shift+g',
     () => {
       handleSetShouldPinGallery();
     },
@@ -251,16 +245,22 @@ export default function ImageGallery() {
     galleryContainerRef.current.scrollTop = galleryScrollPosition;
   }, [galleryScrollPosition, shouldShowGallery]);
 
+  useEffect(() => {
+    setShouldShowButtons(galleryWidth >= 280);
+  }, [galleryWidth]);
+
+  useClickOutsideWatcher(galleryRef, handleCloseGallery, !shouldPinGallery);
+
   return (
     <CSSTransition
       nodeRef={galleryRef}
       in={shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)}
       unmountOnExit
       timeout={200}
-      classNames="image-gallery-area"
+      classNames="image-gallery-wrapper"
     >
       <div
-        className="image-gallery-area"
+        className="image-gallery-wrapper"
         data-pinned={shouldPinGallery}
         ref={galleryRef}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}
@@ -270,7 +270,6 @@ export default function ImageGallery() {
         <Resizable
           minWidth={galleryMinWidth}
           maxWidth={galleryMaxWidth}
-          // maxHeight={'100%'}
           className={'image-gallery-popup'}
           handleStyles={{ left: { width: '15px' } }}
           enable={{
@@ -316,9 +315,9 @@ export default function ImageGallery() {
               Number(galleryMaxWidth)
             );
 
-            if (newWidth >= 320 && !shouldShowButtons) {
+            if (newWidth >= 280 && !shouldShowButtons) {
               setShouldShowButtons(true);
-            } else if (newWidth < 320 && shouldShowButtons) {
+            } else if (newWidth < 280 && shouldShowButtons) {
               setShouldShowButtons(false);
             }
 
@@ -374,8 +373,8 @@ export default function ImageGallery() {
             </div>
             <div>
               <IAIPopover
+                isLazy
                 trigger="hover"
-                hasArrow={activeTabName === 'inpainting' ? false : true}
                 placement={'left'}
                 triggerComponent={
                   <IAIIconButton
@@ -442,20 +441,11 @@ export default function ImageGallery() {
 
               <IAIIconButton
                 size={'sm'}
+                className={'image-gallery-icon-btn'}
                 aria-label={'Pin Gallery'}
-                tooltip={'Pin Gallery (Shift+P)'}
+                tooltip={'Pin Gallery (Shift+G)'}
                 onClick={handleSetShouldPinGallery}
-                icon={<BsPinAngleFill />}
-                data-selected={shouldPinGallery}
-              />
-
-              <IAIIconButton
-                size={'sm'}
-                aria-label={'Close Gallery'}
-                tooltip={'Close Gallery (G)'}
-                onClick={handleCloseGallery}
-                className="image-gallery-icon-btn"
-                icon={<MdClear />}
+                icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
               />
             </div>
           </div>

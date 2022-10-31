@@ -51,7 +51,6 @@ const InpaintingControls = () => {
     isMaskEmpty,
     activeTabName,
     showDualDisplay,
-    shouldShowBoundingBox
   } = useAppSelector(inpaintingControlsSelector);
 
   const dispatch = useAppDispatch();
@@ -161,9 +160,9 @@ const InpaintingControls = () => {
       dispatch(toggleShouldLockBoundingBox());
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask && shouldShowBoundingBox,
+      enabled: activeTabName === 'inpainting' && shouldShowMask,
     },
-    [activeTabName, shouldShowMask, shouldShowBoundingBox]
+    [activeTabName, shouldShowMask]
   );
 
   // Undo
@@ -349,7 +348,6 @@ const InpaintingControls = () => {
               tooltip="Mask Options"
               icon={<FaMask />}
               cursor={'pointer'}
-              isDisabled={isMaskEmpty}
               data-selected={maskOptionsOpen}
             />
           }

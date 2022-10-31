@@ -1,23 +1,11 @@
 import { useCallback, ReactNode, useState, useEffect } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import { tabMap } from '../../features/tabs/InvokeTabs';
+import { useAppDispatch, useAppSelector } from '../../app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { Heading, Spinner, useToast } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { OptionsState } from '../../features/options/optionsSlice';
 import { uploadImage } from '../../app/socketio/actions';
 import { ImageUploadDestination, UploadImagePayload } from '../../app/invokeai';
 import { ImageUploaderTriggerContext } from '../../app/contexts/ImageUploaderTriggerContext';
-
-const appSelector = createSelector(
-  (state: RootState) => state.options,
-  (options: OptionsState) => {
-    const { activeTab } = options;
-    return {
-      activeTabName: tabMap[activeTab],
-    };
-  }
-);
+import { activeTabNameSelector } from '../../features/options/optionsSelectors';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -26,7 +14,7 @@ type ImageUploaderProps = {
 const ImageUploader = (props: ImageUploaderProps) => {
   const { children } = props;
   const dispatch = useAppDispatch();
-  const { activeTabName } = useAppSelector(appSelector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
   const toast = useToast({});
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
 

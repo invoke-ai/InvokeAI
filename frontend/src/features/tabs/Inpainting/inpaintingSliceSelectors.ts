@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { RootState } from '../../../app/store';
+import { activeTabNameSelector } from '../../options/optionsSelectors';
 import { OptionsState } from '../../options/optionsSlice';
-import { tabMap } from '../InvokeTabs';
 import { InpaintingState } from './inpaintingSlice';
 import { rgbaColorToRgbString } from './util/colorToString';
 
@@ -18,8 +18,12 @@ export const inpaintingCanvasLinesSelector = createSelector(
 );
 
 export const inpaintingControlsSelector = createSelector(
-  [(state: RootState) => state.inpainting, (state: RootState) => state.options],
-  (inpainting: InpaintingState, options: OptionsState) => {
+  [
+    (state: RootState) => state.inpainting,
+    (state: RootState) => state.options,
+    activeTabNameSelector,
+  ],
+  (inpainting: InpaintingState, options: OptionsState, activeTabName) => {
     const {
       tool,
       brushSize,
@@ -31,10 +35,9 @@ export const inpaintingControlsSelector = createSelector(
       pastLines,
       futureLines,
       shouldShowBoundingBoxFill,
-      shouldShowBoundingBox,
     } = inpainting;
 
-    const { activeTab, showDualDisplay } = options;
+    const { showDualDisplay } = options;
 
     return {
       tool,
@@ -46,10 +49,9 @@ export const inpaintingControlsSelector = createSelector(
       canUndo: pastLines.length > 0,
       canRedo: futureLines.length > 0,
       isMaskEmpty: lines.length === 0,
-      activeTabName: tabMap[activeTab],
+      activeTabName,
       showDualDisplay,
       shouldShowBoundingBoxFill,
-      shouldShowBoundingBox,
     };
   },
   {
@@ -71,10 +73,11 @@ export const inpaintingCanvasSelector = createSelector(
       shouldShowCheckboardTransparency,
       imageToInpaint,
       stageScale,
+      shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
       isDrawing,
       shouldLockBoundingBox,
-      shouldShowBoundingBox,
+      boundingBoxDimensions,
     } = inpainting;
     return {
       tool,
@@ -85,10 +88,11 @@ export const inpaintingCanvasSelector = createSelector(
       maskColor,
       imageToInpaint,
       stageScale,
+      shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
       isDrawing,
       shouldLockBoundingBox,
-      shouldShowBoundingBox,
+      boundingBoxDimensions,
     };
   },
   {

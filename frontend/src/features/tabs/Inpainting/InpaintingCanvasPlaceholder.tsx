@@ -11,17 +11,19 @@ const InpaintingCanvasPlaceholder = () => {
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (!ref.current || !imageToInpaint) return;
+    window.setTimeout(() => {
+      if (!ref.current || !imageToInpaint) return;
 
-    const width = ref.current.clientWidth;
-    const height = ref.current.clientHeight;
+      const width = ref.current.clientWidth;
+      const height = ref.current.clientHeight;
 
-    const scale = Math.min(
-      1,
-      Math.min(width / imageToInpaint.width, height / imageToInpaint.height)
-    );
+      const scale = Math.min(
+        1,
+        Math.min(width / imageToInpaint.width, height / imageToInpaint.height)
+      );
 
-    dispatch(setStageScale(scale));
+      dispatch(setStageScale(scale));
+    }, 0);
   }, [dispatch, imageToInpaint, needsCache]);
 
   return (
