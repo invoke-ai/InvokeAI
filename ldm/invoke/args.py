@@ -414,6 +414,13 @@ class Args(object):
             help='Deprecated way to set --precision=float32',
         )
         model_group.add_argument(
+            '--max_loaded_models',
+            dest='max_loaded_models',
+            type=int,
+            default=2,
+            help='Maximum number of models to keep in memory for fast switching, including the one in GPU',
+        )
+        model_group.add_argument(
             '--free_gpu_mem',
             dest='free_gpu_mem',
             action='store_true',

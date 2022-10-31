@@ -20,12 +20,10 @@ from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config
 
-GIGS=2**30
-AVG_MODEL_SIZE=2.1*GIGS
-DEFAULT_MIN_AVAIL=2*GIGS
+DEFAULT_MAX_MODELS=3
 
 class ModelCache(object):
-    def __init__(self, config:OmegaConf, device_type:str, precision:str, min_avail_mem=DEFAULT_MIN_AVAIL):
+    def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
         '''
         Initialize with the path to the models.yaml config file,
         the torch device type, and precision. The optional
@@ -38,7 +36,7 @@ class ModelCache(object):
         self.config = config
         self.precision = precision
         self.device = torch.device(device_type)
-        self.min_avail_mem = min_avail_mem
+        self.max_loaded_models = max_loaded_models
         self.models = {}
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
@@ -63,8 +61,8 @@ class ModelCache(object):
             width = self.models[model_name]['width']
             height = self.models[model_name]['height']
             hash = self.models[model_name]['hash']
-        else:
-            self._check_memory()
+        else: # we're about to load a new model, so potentially unload the least recently used one
+            self._check_cache_size()
             try:
                 requested_model, width, height, hash = self._load_model(model_name)
                 self.models[model_name] = {}
@@ -178,14 +176,16 @@ class ModelCache(object):
             self._invalidate_cached_model(model_name)
         return True
     
-    def _check_memory(self):
-        avail_memory = psutil.virtual_memory()[1]
-        if AVG_MODEL_SIZE + self.min_avail_mem > avail_memory:
+    def _check_cache_size(self):
+        num_loaded_models = len(self.models)
+        if num_loaded_models >= self.max_loaded_models:
             least_recent_model = self._pop_oldest_model()
+            print(f'>> Cache limit (max={self.max_loaded_models}) reached. Purging {least_recent_model}')
             if least_recent_model is not None:
                 del self.models[least_recent_model]
                 gc.collect()
-
+        else:
+            print(f'>> Model will be cached in CPU')
         
     def _load_model(self, model_name:str):
         """Load and initialize the model from configuration variables passed at object creation time"""
@@ -261,7 +261,7 @@ class ModelCache(object):
     def unload_model(self, model_name:str):
         if model_name not in self.models:
             return
-        print(f'>> Caching model {model_name} in system RAM')
+        print(f'>> Unloading {model_name} from GPU')
         model = self.models[model_name]['model']
         self.models[model_name]['model'] = self._model_to_cpu(model)
         gc.collect()
@@ -322,8 +322,7 @@ class ModelCache(object):
         to be the least recently accessed model. Do not
         pop the last one, because it is in active use!
         '''
-        if len(self.stack) > 1:
-            return self.stack.pop(0)
+        return self.stack.pop(0)
 
     def _push_newest_model(self,model_name:str):
         '''
