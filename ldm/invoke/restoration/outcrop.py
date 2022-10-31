@@ -40,7 +40,7 @@ class Outcrop(object):
             width       = extended_image.width,
             height      = extended_image.height,
             init_img    = extended_image,
-            strength    = 0.99,
+            strength    = 0.90,
             image_callback = wrapped_callback,
             seam_size = opt.seam_size or 96,
             seam_blur = opt.seam_blur or 16,
