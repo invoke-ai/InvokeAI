@@ -1,4 +1,3 @@
-import { Checkbox } from '@chakra-ui/react';
 import React, { ChangeEvent } from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import IAICheckbox from '../../../common/components/IAICheckbox';
