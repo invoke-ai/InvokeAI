@@ -1,12 +1,12 @@
 @use '../../../styles/Mixins/' as *;
 
 .process-buttons {
-  display: grid;
-  grid-template-columns: auto max-content max-content;
+  display: flex;
   column-gap: 0.5rem;
 }
 
 .invoke-btn {
+  flex-grow: 1;
   svg {
     width: 18px !important;
     height: 18px !important;
