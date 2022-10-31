@@ -7,6 +7,10 @@
 }
 
 .invoke-btn {
+  svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
   @include Button(
     $btn-color: var(--accent-color),
     $btn-color-hover: var(--accent-color-hover),

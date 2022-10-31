@@ -24,7 +24,7 @@ const canInvokeSelector = createSelector(
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
 );
 
-const ShowHideOptionsPanelButton = () => {
+const FloatingOptionsPanelButtons = () => {
   const dispatch = useAppDispatch();
   const { shouldShowProcessButtons } = useAppSelector(canInvokeSelector);
 
@@ -53,4 +53,4 @@ const ShowHideOptionsPanelButton = () => {
   );
 };
 
-export default ShowHideOptionsPanelButton;
+export default FloatingOptionsPanelButtons;

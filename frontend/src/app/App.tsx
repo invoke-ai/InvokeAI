@@ -10,8 +10,8 @@ import InvokeTabs from '../features/tabs/InvokeTabs';
 import ImageUploader from '../common/components/ImageUploader';
 import { RootState, useAppSelector } from '../app/store';
 
-import ShowHideGalleryButton from '../features/tabs/ShowHideGalleryButton';
-import ShowHideOptionsPanelButton from '../features/tabs/ShowHideOptionsPanelButton';
+import FloatingGalleryButton from '../features/tabs/FloatingGalleryButton';
+import FloatingOptionsPanelButtons from '../features/tabs/FloatingOptionsPanelButtons';
 import { createSelector } from '@reduxjs/toolkit';
 import { GalleryState } from '../features/gallery/gallerySlice';
 import { OptionsState } from '../features/options/optionsSlice';
@@ -72,8 +72,8 @@ const App = () => {
         <div className="app-console">
           <Console />
         </div>
-        {shouldShowGalleryButton && <ShowHideGalleryButton />}
-        {shouldShowOptionsPanelButton && <ShowHideOptionsPanelButton />}
+        {shouldShowGalleryButton && <FloatingGalleryButton />}
+        {shouldShowOptionsPanelButton && <FloatingOptionsPanelButtons />}
       </ImageUploader>
     </div>
   ) : (

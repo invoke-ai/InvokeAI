@@ -3,7 +3,7 @@ import { useAppDispatch } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
 import { setShouldShowGallery } from '../gallery/gallerySlice';
 
-const ShowHideGalleryButton = () => {
+const FloatingGalleryButton = () => {
   const dispatch = useAppDispatch();
 
   const handleShowGallery = () => {
@@ -23,4 +23,4 @@ const ShowHideGalleryButton = () => {
   );
 };
 
-export default ShowHideGalleryButton;
+export default FloatingGalleryButton;

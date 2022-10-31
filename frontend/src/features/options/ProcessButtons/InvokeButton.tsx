@@ -1,5 +1,7 @@
 import { useHotkeys } from 'react-hotkeys-hook';
-import { BsImageFill } from 'react-icons/bs';
+import { BsImageFill, BsPlayFill } from 'react-icons/bs';
+import { FaPlay, FaPlayCircle } from 'react-icons/fa';
+import { IoPlay } from 'react-icons/io5';
 import { generateImage } from '../../../app/socketio/actions';
 import { useAppDispatch, useAppSelector } from '../../../app/store';
 import IAIButton, {
@@ -38,10 +40,10 @@ export default function InvokeButton(props: InvokeButton) {
     <IAIIconButton
       aria-label="Invoke"
       type="submit"
-      icon={<BsImageFill />}
+      icon={<FaPlay />}
       isDisabled={!isReady}
       onClick={handleClickGenerate}
-      className="invoke-btn"
+      className="invoke-btn invoke"
       tooltip="Invoke"
       tooltipPlacement="bottom"
       {...rest}
