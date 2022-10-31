@@ -44,3 +44,18 @@ big (red dog).swap(tiger) playing with cat -s 50 -S 42 -W 512 -H 512 -C 7.5 -A k
 dog:0.3333333333333333,cat:0.6666666666666666 -s 50 -S 42 -W 512 -H 512 -C 7.5 -A k_lms
 # outputs/preflight/000021.42.png
 dog:0.6666666666666666,cat:0.3333333333333333 -s 50 -S 42 -W 512 -H 512 -C 7.5 -A k_lms
+# outputs/preflight/000022.1029061431.png
+medusa with cobras -s 50 -S 1029061431 -W 512 -H 512 -C 7.5 -I curly.png -A k_lms -f 0.75 -tm hair
+# outputs/preflight/000023.1284519352.png
+bearded man -s 50 -S 1284519352 -W 512 -H 512 -C 7.5 -I curly.png -A k_lms -f 0.75 -tm face
+# outputs/preflight/000024.curly.hair.deselected.png
+!mask -I curly.png -tm hair
+# outputs/preflight/curly.942491079.gfpgan.png
+!fix ./curly.png -U2 -G0.8
+# outputs/preflight/curly.942491079.outcrop.png
+!fix ./curly.png -c top 64
+# outputs/preflight/curly.942491079.outpaint.png
+!fix ./curly.png -D top 64
+# outputs/preflight/curly.942491079.outcrop-01.png
+!switch inpainting-1.5
+!fix ./curly.png -c top 64
