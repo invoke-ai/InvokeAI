@@ -34,3 +34,10 @@ waifu-diffusion-1.3:
   width: 512
   height: 512
   vae: ./models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+smirking-face-1.0:
+  description: Stable Diffusion 1.4 fine tuned on human figures (4.27)
+  weights: ./models/ldm/stable-diffusion-v1/SF_EB_1.0_ema_vae.ckpt
+  config: ./configs/stable-diffusion/v1-inference.yaml
+  width: 512
+  height: 512
+  vae: ./models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
