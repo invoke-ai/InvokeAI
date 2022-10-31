@@ -14,6 +14,7 @@ import { OptionsState } from '../../features/options/optionsSlice';
 import {
   addLogEntry,
   errorOccurred,
+  modelChangeRequested,
   setCurrentStatus,
   setIsCancelable,
   setIsProcessing,
@@ -191,9 +192,7 @@ const makeSocketIOEmitters = (
       socketio.emit('requestSystemConfig');
     },
     emitRequestModelChange: (modelName: string) => {
-      dispatch(setCurrentStatus('Changing Model'));
-      dispatch(setIsProcessing(true));
-      dispatch(setIsCancelable(false));
+      dispatch(modelChangeRequested());
       socketio.emit('requestModelChange', modelName);
     },
   };
