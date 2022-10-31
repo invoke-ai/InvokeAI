@@ -112,7 +112,7 @@ const InpaintingBoundingBoxPreview = () => {
     () => () => {
       const container = stageRef.current?.container();
       if (!container) return;
-      container.style.cursor = 'none';
+      container.style.cursor = 'unset';
     },
     [shouldLockBoundingBox]
   );

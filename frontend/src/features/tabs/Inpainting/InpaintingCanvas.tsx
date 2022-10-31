@@ -300,15 +300,17 @@ const InpaintingCanvas = () => {
                   />
                 )}
               </Layer>
-              <Layer>
-                {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
-                  <InpaintingBoundingBoxPreviewOverlay />
-                )}
-                {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
-                {shouldLockBoundingBox && (
-                  <InpaintingCanvasBrushPreviewOutline />
-                )}
-              </Layer>
+              {shouldShowMask && (
+                <Layer>
+                  {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
+                    <InpaintingBoundingBoxPreviewOverlay />
+                  )}
+                  {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
+                  {shouldLockBoundingBox && (
+                    <InpaintingCanvasBrushPreviewOutline />
+                  )}
+                </Layer>
+              )}
             </>
           )}
         </Stage>
