@@ -84,7 +84,7 @@ const initialOptionsState: OptionsState = {
   shouldPinOptionsPanel: true,
   optionsPanelScrollPosition: 0,
   shouldHoldOptionsPanelOpen: false,
-  shouldLoopback: true,
+  shouldLoopback: false,
 };
 
 const initialState: OptionsState = initialOptionsState;

@@ -43,12 +43,8 @@ export default function CurrentImagePreview(props: CurrentImagePreviewProps) {
   const { imageToDisplay } = props;
   const dispatch = useAppDispatch();
 
-  const {
-    isOnFirstImage,
-    isOnLastImage,
-    currentCategory,
-    shouldShowImageDetails,
-  } = useAppSelector(imagesSelector);
+  const { isOnFirstImage, isOnLastImage, shouldShowImageDetails } =
+    useAppSelector(imagesSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
     useState<boolean>(false);
