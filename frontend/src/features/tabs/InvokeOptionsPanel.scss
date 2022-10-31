@@ -19,13 +19,14 @@
 }
 
 .options-panel-wrapper {
-  grid-auto-rows: max-content;
+  background-color: var(--background-color);
   height: $app-content-height;
   width: $options-bar-max-width;
   max-width: $options-bar-max-width;
   flex-shrink: 0;
   position: relative;
-  z-index: 20;
+  overflow-y: scroll;
+  @include HideScrollbar;
 
   .options-panel {
     display: flex;

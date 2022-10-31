@@ -1,6 +1,6 @@
 // Calc Values
 $app-cutoff: 0px;
-$app-content-height-cutoff: 5rem; // default: 7rem
+$app-content-height-cutoff: calc(70px + 1rem); // default: 7rem
 
 // Usage Variables
 // app
