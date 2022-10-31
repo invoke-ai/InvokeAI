@@ -16,6 +16,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { GalleryState } from '../features/gallery/gallerySlice';
 import { OptionsState } from '../features/options/optionsSlice';
 import { activeTabNameSelector } from '../features/options/optionsSelectors';
+import { SystemState } from '../features/system/systemSlice';
+import _ from 'lodash';
+import { Model } from './invokeai';
 
 keepGUIAlive();
 
@@ -23,9 +26,15 @@ const appSelector = createSelector(
   [
     (state: RootState) => state.gallery,
     (state: RootState) => state.options,
+    (state: RootState) => state.system,
     activeTabNameSelector,
   ],
-  (gallery: GalleryState, options: OptionsState, activeTabName) => {
+  (
+    gallery: GalleryState,
+    options: OptionsState,
+    system: SystemState,
+    activeTabName
+  ) => {
     const { shouldShowGallery, shouldHoldGalleryOpen, shouldPinGallery } =
       gallery;
     const {
@@ -34,17 +43,36 @@ const appSelector = createSelector(
       shouldPinOptionsPanel,
     } = options;
 
+    const modelStatusText = _.reduce(
+      system.model_list,
+      (acc: string, cur: Model, key: string) => {
+        if (cur.status === 'active') acc = key;
+        return acc;
+      },
+      ''
+    );
+
+    const shouldShowGalleryButton = !(
+      shouldShowGallery ||
+      (shouldHoldGalleryOpen && !shouldPinGallery)
+    );
+
+    const shouldShowOptionsPanelButton =
+      !(
+        shouldShowOptionsPanel ||
+        (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
+      ) && ['txt2img', 'img2img', 'inpainting'].includes(activeTabName);
+
     return {
-      shouldShowGalleryButton: !(
-        shouldShowGallery ||
-        (shouldHoldGalleryOpen && !shouldPinGallery)
-      ),
-      shouldShowOptionsPanelButton:
-        !(
-          shouldShowOptionsPanel ||
-          (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
-        ) && ['txt2img', 'img2img', 'inpainting'].includes(activeTabName),
+      modelStatusText,
+      shouldShowGalleryButton,
+      shouldShowOptionsPanelButton,
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 

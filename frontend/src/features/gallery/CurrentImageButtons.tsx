@@ -6,6 +6,7 @@ import * as InvokeAI from '../../app/invokeai';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import {
+  OptionsState,
   setActiveTab,
   setAllParameters,
   setInitialImage,
@@ -26,15 +27,49 @@ import { useToast } from '@chakra-ui/react';
 import { FaCopy, FaPaintBrush, FaSeedling } from 'react-icons/fa';
 import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
+import { GalleryState } from './gallerySlice';
+import { activeTabNameSelector } from '../options/optionsSelectors';
+
+const intermediateImageSelector = createSelector(
+  (state: RootState) => state.gallery,
+  (gallery: GalleryState) => gallery.intermediateImage,
+  {
+    memoizeOptions: {
+      resultEqualityCheck: (a, b) =>
+        (a === undefined && b === undefined) || a.uuid === b.uuid,
+    },
+  }
+);
 
 const systemSelector = createSelector(
-  (state: RootState) => state.system,
-  (system: SystemState) => {
+  [
+    (state: RootState) => state.system,
+    (state: RootState) => state.options,
+    intermediateImageSelector,
+    activeTabNameSelector,
+  ],
+  (
+    system: SystemState,
+    options: OptionsState,
+    intermediateImage,
+    activeTabName
+  ) => {
+    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
+      system;
+
+    const { upscalingLevel, facetoolStrength, shouldShowImageDetails } =
+      options;
+
     return {
-      isProcessing: system.isProcessing,
-      isConnected: system.isConnected,
-      isGFPGANAvailable: system.isGFPGANAvailable,
-      isESRGANAvailable: system.isESRGANAvailable,
+      isProcessing,
+      isConnected,
+      isGFPGANAvailable,
+      isESRGANAvailable,
+      upscalingLevel,
+      facetoolStrength,
+      intermediateImage,
+      shouldShowImageDetails,
+      activeTabName,
     };
   },
   {
@@ -54,28 +89,19 @@ type CurrentImageButtonsProps = {
  */
 const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
   const dispatch = useAppDispatch();
-  const { activeTabName } = useAppSelector(hoverableImageSelector);
-
-  const shouldShowImageDetails = useAppSelector(
-    (state: RootState) => state.options.shouldShowImageDetails
-  );
+  const {
+    isProcessing,
+    isConnected,
+    isGFPGANAvailable,
+    isESRGANAvailable,
+    upscalingLevel,
+    facetoolStrength,
+    intermediateImage,
+    shouldShowImageDetails,
+    activeTabName,
+  } = useAppSelector(systemSelector);
 
   const toast = useToast();
-
-  const intermediateImage = useAppSelector(
-    (state: RootState) => state.gallery.intermediateImage
-  );
-
-  const upscalingLevel = useAppSelector(
-    (state: RootState) => state.options.upscalingLevel
-  );
-
-  const facetoolStrength = useAppSelector(
-    (state: RootState) => state.options.facetoolStrength
-  );
-
-  const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
-    useAppSelector(systemSelector);
 
   const handleClickUseAsInitialImage = () => {
     dispatch(setInitialImage(image));

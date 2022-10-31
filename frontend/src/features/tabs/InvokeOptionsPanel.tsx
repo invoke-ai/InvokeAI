@@ -1,5 +1,6 @@
 import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import _ from 'lodash';
 import { MouseEvent, ReactNode, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
@@ -33,6 +34,11 @@ const optionsPanelSelector = createSelector(
       shouldPinOptionsPanel,
       optionsPanelScrollPosition,
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 
