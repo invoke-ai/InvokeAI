@@ -372,7 +372,7 @@ const makeSocketIOListeners = (
       dispatch(setModelList(model_list));
       dispatch(setCurrentStatus('Model Changed'));
       dispatch(setIsProcessing(false));
-      dispatch(setIsCancelable(false));
+      dispatch(setIsCancelable(true));
       dispatch(
         addLogEntry({
           timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -385,7 +385,7 @@ const makeSocketIOListeners = (
       const { model_name, model_list } = data;
       dispatch(setModelList(model_list));
       dispatch(setIsProcessing(false));
-      dispatch(setIsCancelable(false));
+      dispatch(setIsCancelable(true));
       dispatch(errorOccurred());
       dispatch(
         addLogEntry({
