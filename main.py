@@ -918,7 +918,7 @@ if __name__ == '__main__':
             config.model.base_learning_rate,
         )
         if not cpu:
-            ngpu = len(lightning_config.trainer.gpus.strip(',').split(','))
+            ngpu = len(str(lightning_config.trainer.gpus).strip(',').split(','))
         else:
             ngpu = 1
         if 'accumulate_grad_batches' in lightning_config.trainer:

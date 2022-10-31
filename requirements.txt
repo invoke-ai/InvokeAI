@@ -13,7 +13,7 @@ opencv-python
 pillow
 pip>=22
 pudb
-pytorch-lightning
+pytorch-lightning==1.6.5
 scikit-image>=0.19
 streamlit
 pyreadline3
