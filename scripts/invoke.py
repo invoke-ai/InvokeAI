@@ -38,6 +38,10 @@ def main():
     if args.weights:
         print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
         sys.exit(-1)
+    if args.max_loaded_models is not None:
+        if args.max_loaded_models <= 0:
+            print('--max_loaded_models must be >= 1; using 1')
+            args.max_loaded_models = 1
 
     print('* Initializing, be patient...')
     from ldm.generate import Generate
@@ -81,6 +85,7 @@ def main():
             esrgan=esrgan,
             free_gpu_mem=opt.free_gpu_mem,
             safety_checker=opt.safety_checker,
+            max_loaded_models=opt.max_loaded_models,
             )
     except (FileNotFoundError, IOError, KeyError) as e:
         print(f'{e}. Aborting.')
