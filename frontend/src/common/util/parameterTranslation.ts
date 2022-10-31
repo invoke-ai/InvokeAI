@@ -132,6 +132,9 @@ export const frontendToBackendParameters = (
     }
 
     generationParameters.bounding_box = boundingBox;
+
+    // TODO: The server metadata generation needs to be changed to fix this.
+    generationParameters.progress_images = false;
   }
 
   if (shouldGenerateVariations) {
