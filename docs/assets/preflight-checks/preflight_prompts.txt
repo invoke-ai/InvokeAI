@@ -21,7 +21,7 @@ banana sushi -s 50 -S 2028635318 -W 512 -H 512 -C 7.5 -A k_lms
 # outputs/preflight/000009.1111168647.png
 pond with waterlillies -s 50 -S 1111168647 -W 512 -H 512 -C 7.5 -A k_lms
 # outputs/preflight/000010.1476370516.png
-pond with waterlillies -s 50 -S 1476370516 -W 512 -H 512 -C 7.5 -A k_lms
+pond with waterlillies -s 50 -S 1476370516 -W 512 -H 512 -C 7.5 -A k_lms --seamless
 # outputs/preflight/000011.4281108706.png
 banana sushi -s 50 -S 4281108706 -W 960 -H 960 -C 7.5 -A k_lms
 # outputs/preflight/000012.2396987386.png
