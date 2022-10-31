@@ -109,18 +109,6 @@ dog:2 cat:1 -s 50 -S 42 -W 512 -H 512 -C 7.5 -A k_lms
 ## curly.942491079.gfpgan.png
 ![](curly.942491079.gfpgan.png)
 
-!fix ./curly.png -s 50 -S 942491079 -W 512 -H 512 -C 7.5 -A k_lms -G 0.8 -ft gfpgan -U 2.0 0.75
-## curly.942491079.outcrop.png
-![](curly.942491079.outcrop.png)
-
-!fix ./curly.png -s 50 -S 942491079 -W 512 -H 512 -C 7.5 -A k_lms -c top 64
-## curly.942491079.outpaint.png
-![](curly.942491079.outpaint.png)
-
-!fix ./curly.png -s 50 -S 942491079 -W 512 -H 512 -C 7.5 -A k_lms -D top 64
-## curly.942491079.outcrop.png
-![](curly.942491079.outcrop.png)
-
 !fix ./curly.png -s 50 -S 942491079 -W 512 -H 512 -C 7.5 -A k_lms -c top 64
 ## curly.942491079.outcrop.png
 ![](curly.942491079.outcrop.png)
