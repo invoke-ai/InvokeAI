@@ -157,10 +157,11 @@ class InvokeAIDiffuserComponent:
             # percent_through will never reach 1.0 (but this is intended)
             return float(step_index) / float(self.cross_attention_control_context.step_count)
         # find the best possible index of the current sigma in the sigma sequence
-        sigma_index = torch.nonzero(self.model.sigmas <= sigma)[-1]
+        smaller_sigmas = torch.nonzero(self.model.sigmas <= sigma)
+        sigma_index = smaller_sigmas[-1].item() if smaller_sigmas.shape[0] > 0 else 0
         # flip because sigmas[0] is for the fully denoised image
         # percent_through must be <1
-        return 1.0 - float(sigma_index.item() + 1) / float(self.model.sigmas.shape[0])
+        return 1.0 - float(sigma_index + 1) / float(self.model.sigmas.shape[0])
         # print('estimated percent_through', percent_through, 'from sigma', sigma.item())
 
 

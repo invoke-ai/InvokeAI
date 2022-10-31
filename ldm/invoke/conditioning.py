@@ -1,12 +1,9 @@
 '''
-This module handles the generation of the conditioning tensors, including management of
-weighted subprompts.
+This module handles the generation of the conditioning tensors.
 
 Useful function exports:
 
 get_uc_and_c_and_ec()           get the conditioned and unconditioned latent, and edited conditioning if we're doing cross-attention control
-split_weighted_subpromopts()    split subprompts, normalize and weight them
-log_tokenization()              print out colour-coded tokens and warn if truncated
 
 '''
 import re
@@ -16,7 +13,7 @@ from typing import Union
 import torch
 
 from .prompt_parser import PromptParser, Blend, FlattenedPrompt, \
-    CrossAttentionControlledFragment, CrossAttentionControlSubstitute, CrossAttentionControlAppend, Fragment
+    CrossAttentionControlledFragment, CrossAttentionControlSubstitute, Fragment, log_tokenization
 from ..models.diffusion.cross_attention_control import CrossAttentionControl
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
@@ -58,8 +55,11 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
     if type(parsed_prompt) is Blend:
         blend: Blend = parsed_prompt
         embeddings_to_blend = None
-        for flattened_prompt in blend.prompts:
-            this_embedding, _ = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt, log_tokens=log_tokens)
+        for i,flattened_prompt in enumerate(blend.prompts):
+            this_embedding, _ = build_embeddings_and_tokens_for_flattened_prompt(model,
+                                                                                 flattened_prompt,
+                                                                                 log_tokens=log_tokens,
+                                                                                 log_display_label=f"(blend part {i+1}, weight={blend.weights[i]})" )
             embeddings_to_blend = this_embedding if embeddings_to_blend is None else torch.cat(
                 (embeddings_to_blend, this_embedding))
         conditioning = WeightedFrozenCLIPEmbedder.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
@@ -103,14 +103,20 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
                     edit_options.append(None)
                     original_token_count += count
                     edited_token_count += count
-            original_embeddings, original_tokens = build_embeddings_and_tokens_for_flattened_prompt(model, original_prompt, log_tokens=log_tokens)
+            original_embeddings, original_tokens = build_embeddings_and_tokens_for_flattened_prompt(model,
+                                                                                                    original_prompt,
+                                                                                                    log_tokens=log_tokens,
+                                                                                                    log_display_label="(.swap originals)")
             # naïvely building a single edited_embeddings like this disregards the effects of changing the absolute location of
             # subsequent tokens when there is >1 edit and earlier edits change the total token count.
             # eg "a cat.swap(smiling dog, s_start=0.5) eating a hotdog.swap(pizza)" - when the 'pizza' edit is active but the
             # 'cat' edit is not, the 'pizza' feature vector will nevertheless be affected by the introduction of the extra
             # token 'smiling' in the inactive 'cat' edit.
             # todo: build multiple edited_embeddings, one for each edit, and pass just the edited fragments through to the CrossAttentionControl functions
-            edited_embeddings, edited_tokens = build_embeddings_and_tokens_for_flattened_prompt(model, edited_prompt, log_tokens=log_tokens)
+            edited_embeddings, edited_tokens = build_embeddings_and_tokens_for_flattened_prompt(model,
+                                                                                                edited_prompt,
+                                                                                                log_tokens=log_tokens,
+                                                                                                log_display_label="(.swap replacements)")
 
             conditioning = original_embeddings
             edited_conditioning = edited_embeddings
@@ -121,9 +127,15 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
                 edit_options = edit_options
             )
         else:
-            conditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt, log_tokens=log_tokens)
+            conditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model,
+                                                                               flattened_prompt,
+                                                                               log_tokens=log_tokens,
+                                                                               log_display_label="(prompt)")
 
-    unconditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model, parsed_negative_prompt, log_tokens=log_tokens)
+    unconditioning, _ = build_embeddings_and_tokens_for_flattened_prompt(model,
+                                                                         parsed_negative_prompt,
+                                                                         log_tokens=log_tokens,
+                                                                         log_display_label="(unconditioning)")
     if isinstance(conditioning, dict):
         # hybrid conditioning is in play
         unconditioning, conditioning = flatten_hybrid_conditioning(unconditioning, conditioning)
@@ -144,26 +156,15 @@ def build_token_edit_opcodes(original_tokens, edited_tokens):
 
     return SequenceMatcher(None, original_tokens, edited_tokens).get_opcodes()
 
-def build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt: FlattenedPrompt, log_tokens: bool=False):
+def build_embeddings_and_tokens_for_flattened_prompt(model, flattened_prompt: FlattenedPrompt, log_tokens: bool=False, log_display_label: str=None):
     if type(flattened_prompt) is not FlattenedPrompt:
         raise Exception(f"embeddings can only be made from FlattenedPrompts, got {type(flattened_prompt)} instead")
     fragments = [x.text for x in flattened_prompt.children]
     weights = [x.weight for x in flattened_prompt.children]
     embeddings, tokens = model.get_learned_conditioning([fragments], return_tokens=True, fragment_weights=[weights])
-    if not flattened_prompt.is_empty and log_tokens:
-        start_token = model.cond_stage_model.tokenizer.bos_token_id
-        end_token = model.cond_stage_model.tokenizer.eos_token_id
-        tokens_list = tokens[0].tolist()
-        if tokens_list[0] == start_token:
-            tokens_list[0] = '<start>'
-        try:
-            first_end_token_index = tokens_list.index(end_token)
-            tokens_list[first_end_token_index] = '<end>'
-            tokens_list = tokens_list[:first_end_token_index+1]
-        except ValueError:
-            pass
-
-        print(f">> Prompt fragments {fragments}, tokenized to \n{tokens_list}")
+    if log_tokens:
+        text = " ".join(fragments)
+        log_tokenization(text, model, display_label=log_display_label)
 
     return embeddings, tokens
 
