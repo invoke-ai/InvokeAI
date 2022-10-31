@@ -571,7 +571,7 @@ class Generate:
 
         # used by multiple postfixers
         # todo: cross-attention control
-        uc, c, _ = get_uc_and_c_and_ec(
+        uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
             prompt, model =self.model,
             skip_normalize=opt.skip_normalize,
             log_tokens    =opt.log_tokenization
@@ -625,7 +625,7 @@ class Generate:
                 steps       = opt.steps,
                 cfg_scale   = opt.cfg_scale,
                 ddim_eta    = self.ddim_eta,
-                conditioning= (uc, c),
+                conditioning= (uc, c, extra_conditioning_info),
                 init_img    = image_path,  # not the Image! (sigh)
                 init_image  = image,       # embiggen wants both! (sigh)
                 strength    = opt.strength,
