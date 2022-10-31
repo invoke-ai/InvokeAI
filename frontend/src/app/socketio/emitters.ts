@@ -15,8 +15,6 @@ import {
   addLogEntry,
   errorOccurred,
   modelChangeRequested,
-  setCurrentStatus,
-  setIsCancelable,
   setIsProcessing,
 } from '../../features/system/systemSlice';
 import { inpaintingImageElementRef } from '../../features/tabs/Inpainting/InpaintingCanvas';

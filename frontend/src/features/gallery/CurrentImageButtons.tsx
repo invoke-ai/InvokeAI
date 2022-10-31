@@ -26,7 +26,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useToast } from '@chakra-ui/react';
 import { FaCopy, FaPaintBrush, FaSeedling } from 'react-icons/fa';
 import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
-import { hoverableImageSelector } from './gallerySliceSelectors';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from '../options/optionsSelectors';
 

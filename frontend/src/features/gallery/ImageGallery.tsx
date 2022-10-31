@@ -1,10 +1,10 @@
 import { Button } from '@chakra-ui/button';
-import { NumberSize, Resizable, Size } from 're-resizable';
+import { NumberSize, Resizable } from 're-resizable';
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { MdClear, MdPhotoLibrary } from 'react-icons/md';
-import { BsPin, BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
+import { MdPhotoLibrary } from 'react-icons/md';
+import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { requestImages } from '../../app/socketio/actions';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import IAIIconButton from '../../common/components/IAIIconButton';
