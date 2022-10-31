@@ -348,7 +348,6 @@ const InpaintingControls = () => {
               tooltip="Mask Options"
               icon={<FaMask />}
               cursor={'pointer'}
-              isDisabled={isMaskEmpty}
               data-selected={maskOptionsOpen}
             />
           }

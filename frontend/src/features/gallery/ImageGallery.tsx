@@ -373,8 +373,8 @@ export default function ImageGallery() {
             </div>
             <div>
               <IAIPopover
+                isLazy
                 trigger="hover"
-                hasArrow={activeTabName === 'inpainting' ? false : true}
                 placement={'left'}
                 triggerComponent={
                   <IAIIconButton

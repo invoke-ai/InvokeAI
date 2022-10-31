@@ -86,12 +86,3 @@
 .inpainting-options-btn {
   min-height: 2rem;
 }
-
-// Overrides
-.inpainting-workarea-overrides {
-  .image-gallery-wrapper {
-    .chakra-popover__popper {
-      inset: 0 auto auto -75px !important;
-    }
-  }
-}
