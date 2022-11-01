@@ -44,7 +44,7 @@ class SegmentedGrayscale(object):
         self.image = image
         
     def to_grayscale(self,invert:bool=False)->Image:
-        return self._rescale(Image.fromarray(np.uint8((255 if invert else 0) - self.heatmap * 255)))
+        return self._rescale(Image.fromarray(np.uint8(255 - self.heatmap * 255 if invert else self.heatmap * 255)))
 
     def to_mask(self,threshold:float=0.5)->Image:
         discrete_heatmap = self.heatmap.lt(threshold).int()
