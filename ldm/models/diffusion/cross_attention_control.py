@@ -116,6 +116,7 @@ class CrossAttentionControl:
         for m in self_attention_modules+tokens_attention_modules:
             m.save_last_attn_slice = False
             m.use_last_attn_slice = False
+            m.last_attn_slice = None
 
     @classmethod
     def request_save_attention_maps(cls, model, cross_attention_type: CrossAttentionType):
