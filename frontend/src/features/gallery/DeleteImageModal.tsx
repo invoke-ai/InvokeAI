@@ -28,12 +28,18 @@ import { RootState } from '../../app/store';
 import { setShouldConfirmOnDelete, SystemState } from '../system/systemSlice';
 import * as InvokeAI from '../../app/invokeai';
 import { useHotkeys } from 'react-hotkeys-hook';
+import _ from 'lodash';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
   (system: SystemState) => {
     const { shouldConfirmOnDelete, isConnected, isProcessing } = system;
     return { shouldConfirmOnDelete, isConnected, isProcessing };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 interface DeleteImageModalProps {
