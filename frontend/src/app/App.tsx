@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import ProgressBar from '../features/system/ProgressBar';
 import SiteHeader from '../features/system/SiteHeader';
 import Console from '../features/system/Console';
-import Loading from '../Loading';
 import { useAppDispatch } from './store';
 import { requestSystemConfig } from './socketio/actions';
 import { keepGUIAlive } from './utils';
@@ -16,9 +15,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { GalleryState } from '../features/gallery/gallerySlice';
 import { OptionsState } from '../features/options/optionsSlice';
 import { activeTabNameSelector } from '../features/options/optionsSelectors';
-import { SystemState } from '../features/system/systemSlice';
+import { readinessChanged, SystemState } from '../features/system/systemSlice';
 import _ from 'lodash';
 import { Model } from './invokeai';
+import { readinessSelector } from './selectors/readinessSelector';
 
 keepGUIAlive();
 
@@ -79,17 +79,20 @@ const appSelector = createSelector(
 const App = () => {
   const dispatch = useAppDispatch();
 
-  const [isReady, setIsReady] = useState<boolean>(false);
-
+  // const [isReady, setIsReady] = useState<boolean>(false);
+  const { isReady, reasonsWhyNotReady } = useAppSelector(readinessSelector);
   const { shouldShowGalleryButton, shouldShowOptionsPanelButton } =
     useAppSelector(appSelector);
 
   useEffect(() => {
     dispatch(requestSystemConfig());
-    setIsReady(true);
   }, [dispatch]);
 
-  return isReady ? (
+  useEffect(() => {
+    dispatch(readinessChanged({ isReady, reasonsWhyNotReady }));
+  }, [dispatch, isReady, reasonsWhyNotReady]);
+
+  return (
     <div className="App">
       <ImageUploader>
         <ProgressBar />
@@ -104,8 +107,6 @@ const App = () => {
         {shouldShowOptionsPanelButton && <FloatingOptionsPanelButtons />}
       </ImageUploader>
     </div>
-  ) : (
-    <Loading />
   );
 };
 

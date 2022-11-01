@@ -34,10 +34,7 @@ import InpaintingBoundingBoxPreview, {
 } from './components/InpaintingBoundingBoxPreview';
 import { KonvaEventObject } from 'konva/lib/Node';
 import KeyboardEventManager from './components/KeyboardEventManager';
-import { Icon, IconButton, Tooltip, useToast } from '@chakra-ui/react';
-import { FaLock, FaUnlock } from 'react-icons/fa';
-import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
-import { BiHide, BiShow } from 'react-icons/bi';
+import { useToast } from '@chakra-ui/react';
 import InpaintingCanvasStatusIcons from './InpaintingCanvasStatusIcons';
 
 // Use a closure allow other components to use these things... not ideal...
@@ -60,9 +57,6 @@ const InpaintingCanvas = () => {
     shouldShowBoundingBox,
     shouldShowBoundingBoxFill,
     isDrawing,
-    shouldLockBoundingBox,
-    boundingBoxDimensions,
-    // isTransformingBoundingBox,
     isMouseOverBoundingBox,
     isModifyingBoundingBox,
     stageCursor,
