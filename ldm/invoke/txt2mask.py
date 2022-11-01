@@ -43,8 +43,8 @@ class SegmentedGrayscale(object):
         self.heatmap = heatmap
         self.image = image
         
-    def to_grayscale(self)->Image:
-        return self._rescale(Image.fromarray(np.uint8(self.heatmap*255)))
+    def to_grayscale(self,invert:bool=False)->Image:
+        return self._rescale(Image.fromarray(np.uint8((255 if invert else 0) - self.heatmap * 255)))
 
     def to_mask(self,threshold:float=0.5)->Image:
         discrete_heatmap = self.heatmap.lt(threshold).int()
@@ -52,11 +52,9 @@ class SegmentedGrayscale(object):
 
     def to_transparent(self,invert:bool=False)->Image:
         transparent_image = self.image.copy()
-        gs = self.to_grayscale()
-        # The following line looks like a bug, but isn't.
         # For img2img, we want the selected regions to be transparent,
-        # but to_grayscale() returns the opposite.
-        gs = ImageOps.invert(gs) if not invert else gs
+        # but to_grayscale() returns the opposite. Thus invert.
+        gs = self.to_grayscale(invert)
         transparent_image.putalpha(gs)
         return transparent_image
 
