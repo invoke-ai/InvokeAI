@@ -113,7 +113,7 @@ const BoundingBoxSettings = () => {
     <div className="inpainting-bounding-box-settings">
       <div className="inpainting-bounding-box-header">
         <p>Inpaint Box</p>
-        {/* <IAIIconButton
+        <IAIIconButton
           aria-label="Toggle Bounding Box Visibility"
           icon={
             shouldShowBoundingBox ? <BiShow size={22} /> : <BiHide size={22} />
@@ -121,7 +121,7 @@ const BoundingBoxSettings = () => {
           onClick={handleShowBoundingBox}
           background={'none'}
           padding={0}
-        /> */}
+        />
       </div>
       <div className="inpainting-bounding-box-settings-items">
         <div className="inpainting-bounding-box-dimensions-slider-numberinput">
