@@ -54,7 +54,7 @@ class SegmentedGrayscale(object):
         transparent_image = self.image.copy()
         # For img2img, we want the selected regions to be transparent,
         # but to_grayscale() returns the opposite. Thus invert.
-        gs = self.to_grayscale(invert)
+        gs = self.to_grayscale(not invert)
         transparent_image.putalpha(gs)
         return transparent_image
 
