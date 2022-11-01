@@ -110,13 +110,14 @@ class CrossAttentionControl:
                       type(module).__name__ == "CrossAttention" and which_attn in name]
 
     @classmethod
-    def clear_requests(cls, model):
+    def clear_requests(cls, model, clear_attn_slice=True):
         self_attention_modules = cls.get_attention_modules(model, cls.CrossAttentionType.SELF)
         tokens_attention_modules = cls.get_attention_modules(model, cls.CrossAttentionType.TOKENS)
         for m in self_attention_modules+tokens_attention_modules:
             m.save_last_attn_slice = False
             m.use_last_attn_slice = False
-            m.last_attn_slice = None
+            if clear_attn_slice:
+                m.last_attn_slice = None
 
     @classmethod
     def request_save_attention_maps(cls, model, cross_attention_type: CrossAttentionType):
