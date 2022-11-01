@@ -4,7 +4,7 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import { Box } from 'konva/lib/shapes/Transformer';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
 import {
   RootState,
@@ -17,6 +17,9 @@ import {
   InpaintingState,
   setBoundingBoxCoordinate,
   setBoundingBoxDimensions,
+  setIsMouseOverBoundingBox,
+  setIsMovingBoundingBox,
+  setIsTransformingBoundingBox,
 } from '../inpaintingSlice';
 import { rgbaColorToString } from '../util/colorToString';
 import {
@@ -35,6 +38,10 @@ const boundingBoxPreviewSelector = createSelector(
       stageScale,
       imageToInpaint,
       shouldLockBoundingBox,
+      isDrawing,
+      isTransformingBoundingBox,
+      isMovingBoundingBox,
+      isMouseOverBoundingBox,
     } = inpainting;
     return {
       boundingBoxCoordinate,
@@ -46,6 +53,10 @@ const boundingBoxPreviewSelector = createSelector(
       dash: DASH_WIDTH / stageScale, // scale dash lengths
       strokeWidth: 1 / stageScale, // scale stroke thickness
       shouldLockBoundingBox,
+      isDrawing,
+      isTransformingBoundingBox,
+      isMouseOverBoundingBox,
+      isMovingBoundingBox,
     };
   },
   {
@@ -93,10 +104,13 @@ const InpaintingBoundingBoxPreview = () => {
   const {
     boundingBoxCoordinate,
     boundingBoxDimensions,
-    strokeWidth,
     stageScale,
     imageToInpaint,
     shouldLockBoundingBox,
+    isDrawing,
+    isTransformingBoundingBox,
+    isMovingBoundingBox,
+    isMouseOverBoundingBox,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -107,15 +121,6 @@ const InpaintingBoundingBoxPreview = () => {
     transformerRef.current.nodes([shapeRef.current]);
     transformerRef.current.getLayer()?.batchDraw();
   }, [shouldLockBoundingBox]);
-
-  useEffect(
-    () => () => {
-      const container = stageRef.current?.container();
-      if (!container) return;
-      container.style.cursor = 'unset';
-    },
-    [shouldLockBoundingBox]
-  );
 
   const scaledStep = 64 * stageScale;
 
@@ -269,6 +274,29 @@ const InpaintingBoundingBoxPreview = () => {
     [imageToInpaint, stageScale]
   );
 
+  const handleStartedTransforming = (e: KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true;
+    e.evt.stopImmediatePropagation();
+    dispatch(setIsTransformingBoundingBox(true));
+  };
+
+  const handleEndedTransforming = (e: KonvaEventObject<MouseEvent>) => {
+    dispatch(setIsTransformingBoundingBox(false));
+    dispatch(setIsMouseOverBoundingBox(false));
+  };
+
+  const handleStartedMoving = (e: KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true;
+    e.evt.stopImmediatePropagation();
+    dispatch(setIsMovingBoundingBox(true));
+  };
+
+  const handleEndedModifying = (e: KonvaEventObject<MouseEvent>) => {
+    dispatch(setIsTransformingBoundingBox(false));
+    dispatch(setIsMovingBoundingBox(false));
+    dispatch(setIsMouseOverBoundingBox(false));
+  };
+
   return (
     <>
       <Rect
@@ -277,23 +305,27 @@ const InpaintingBoundingBoxPreview = () => {
         width={boundingBoxDimensions.width}
         height={boundingBoxDimensions.height}
         ref={shapeRef}
-        stroke={'white'}
-        strokeWidth={strokeWidth}
-        listening={!shouldLockBoundingBox}
-        onMouseEnter={(e) => {
-          const container = e?.target?.getStage()?.container();
-          if (!container) return;
-          container.style.cursor = shouldLockBoundingBox ? 'none' : 'move';
+        stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.3)' : 'white'}
+        strokeWidth={Math.floor((isMouseOverBoundingBox ? 8 : 1) / stageScale)}
+        fillEnabled={false}
+        hitStrokeWidth={Math.floor(13 / stageScale)}
+        listening={!isDrawing && !shouldLockBoundingBox}
+        onMouseOver={() => {
+          dispatch(setIsMouseOverBoundingBox(true));
         }}
-        onMouseLeave={(e) => {
-          const container = e?.target?.getStage()?.container();
-          if (!container) return;
-          container.style.cursor = shouldLockBoundingBox ? 'none' : 'default';
+        onMouseOut={() => {
+          !isTransformingBoundingBox &&
+            !isMovingBoundingBox &&
+            dispatch(setIsMouseOverBoundingBox(false));
         }}
-        draggable={!shouldLockBoundingBox}
+        onMouseDown={handleStartedMoving}
+        onMouseUp={handleEndedModifying}
+        draggable={true}
         onDragMove={handleOnDragMove}
         dragBoundFunc={dragBoundFunc}
         onTransform={handleOnTransform}
+        onDragEnd={handleEndedModifying}
+        onTransformEnd={handleEndedTransforming}
       />
       <Transformer
         ref={transformerRef}
@@ -308,10 +340,22 @@ const InpaintingBoundingBoxPreview = () => {
         flipEnabled={false}
         ignoreStroke={true}
         keepRatio={false}
-        listening={!shouldLockBoundingBox}
+        listening={!isDrawing && !shouldLockBoundingBox}
+        onMouseDown={handleStartedTransforming}
+        onMouseUp={handleEndedTransforming}
         enabledAnchors={shouldLockBoundingBox ? [] : undefined}
         boundBoxFunc={boundBoxFunc}
         anchorDragBoundFunc={anchorDragBoundFunc}
+        onDragEnd={handleEndedModifying}
+        onTransformEnd={handleEndedTransforming}
+        onMouseOver={() => {
+          dispatch(setIsMouseOverBoundingBox(true));
+        }}
+        onMouseOut={() => {
+          !isTransformingBoundingBox &&
+            !isMovingBoundingBox &&
+            dispatch(setIsMouseOverBoundingBox(false));
+        }}
       />
     </>
   );

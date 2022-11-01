@@ -40,18 +40,10 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
  * Draws a black circle around the canvas brush preview.
  */
 const InpaintingCanvasBrushPreview = () => {
-  const {
-    cursorPosition,
-    width,
-    height,
-    shouldShowBrushPreview,
-    brushSize,
-    maskColorString,
-    tool,
-    shouldShowBrush,
-  } = useAppSelector(inpaintingCanvasBrushPreviewSelector);
+  const { cursorPosition, width, height, brushSize, maskColorString, tool } =
+    useAppSelector(inpaintingCanvasBrushPreviewSelector);
 
-  if (!shouldShowBrush || !(cursorPosition || shouldShowBrushPreview)) {
+  if (!cursorPosition) {
     return null;
   }
 

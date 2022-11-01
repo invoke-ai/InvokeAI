@@ -34,7 +34,10 @@ import InpaintingBoundingBoxPreview, {
 } from './components/InpaintingBoundingBoxPreview';
 import { KonvaEventObject } from 'konva/lib/Node';
 import KeyboardEventManager from './components/KeyboardEventManager';
-import { useToast } from '@chakra-ui/react';
+import { Icon, IconButton, Tooltip, useToast } from '@chakra-ui/react';
+import { FaLock, FaUnlock } from 'react-icons/fa';
+import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
+import { BiHide, BiShow } from 'react-icons/bi';
 
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
@@ -58,6 +61,10 @@ const InpaintingCanvas = () => {
     isDrawing,
     shouldLockBoundingBox,
     boundingBoxDimensions,
+    // isTransformingBoundingBox,
+    isMouseOverBoundingBox,
+    isModifyingBoundingBox,
+    stageCursor,
   } = useAppSelector(inpaintingCanvasSelector);
 
   const toast = useToast();
@@ -113,7 +120,7 @@ const InpaintingCanvas = () => {
     if (
       !scaledCursorPosition ||
       !maskLayerRef.current ||
-      !shouldLockBoundingBox
+      isModifyingBoundingBox
     )
       return;
 
@@ -127,7 +134,7 @@ const InpaintingCanvas = () => {
         points: [scaledCursorPosition.x, scaledCursorPosition.y],
       })
     );
-  }, [dispatch, brushSize, tool, shouldLockBoundingBox]);
+  }, [dispatch, brushSize, tool, isModifyingBoundingBox]);
 
   /**
    *
@@ -143,20 +150,20 @@ const InpaintingCanvas = () => {
 
     dispatch(setCursorPosition(scaledCursorPosition));
 
-    if (!maskLayerRef.current || !shouldLockBoundingBox) {
+    if (!maskLayerRef.current) {
       return;
     }
 
     lastCursorPosition.current = scaledCursorPosition;
 
-    if (!isDrawing) return;
+    if (!isDrawing || isModifyingBoundingBox) return;
 
     didMouseMoveRef.current = true;
     // Extend the current line
     dispatch(
       addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
     );
-  }, [dispatch, isDrawing, shouldLockBoundingBox]);
+  }, [dispatch, isDrawing, isModifyingBoundingBox]);
 
   /**
    *
@@ -170,7 +177,7 @@ const InpaintingCanvas = () => {
       if (
         !scaledCursorPosition ||
         !maskLayerRef.current ||
-        !shouldLockBoundingBox
+        isModifyingBoundingBox
       )
         return;
 
@@ -187,7 +194,7 @@ const InpaintingCanvas = () => {
       didMouseMoveRef.current = false;
     }
     dispatch(setIsDrawing(false));
-  }, [dispatch, isDrawing, shouldLockBoundingBox]);
+  }, [dispatch, isDrawing, isModifyingBoundingBox]);
 
   /**
    *
@@ -214,7 +221,7 @@ const InpaintingCanvas = () => {
         if (
           !scaledCursorPosition ||
           !maskLayerRef.current ||
-          !shouldLockBoundingBox
+          isModifyingBoundingBox
         )
           return;
 
@@ -230,93 +237,117 @@ const InpaintingCanvas = () => {
         );
       }
     },
-    [dispatch, brushSize, tool, shouldLockBoundingBox]
+    [dispatch, brushSize, tool, isModifyingBoundingBox]
   );
 
   return (
-    <div className="inpainting-canvas-wrapper" tabIndex={1}>
-      <div className="inpainting-alerts">
-        {!shouldShowMask && (
-          <div style={{ pointerEvents: 'none' }}>Mask Hidden (H)</div>
-        )}
-        {shouldInvertMask && (
-          <div style={{ pointerEvents: 'none' }}>Mask Inverted (Shift+M)</div>
-        )}
-        {!shouldLockBoundingBox && (
+    <div className="inpainting-canvas-container" tabIndex={1}>
+      <div className="inpainting-canvas-wrapper">
+        <div className="inpainting-alerts">
           <div style={{ pointerEvents: 'none' }}>
-            {`Transforming Bounding Box ${boundingBoxDimensions.width}x${boundingBoxDimensions.height} (M)`}
+            <IconButton
+              aria-label="Show/HideMask"
+              size="xs"
+              variant={'ghost'}
+              fontSize={'1rem'}
+              data-selected={!shouldShowMask}
+              icon={shouldShowMask ? <BiShow /> : <BiHide />}
+            />
           </div>
-        )}
-      </div>
+          <div style={{ pointerEvents: 'none' }}>
+            <IconButton
+              aria-label="Invert Mask"
+              size="xs"
+              variant={'ghost'}
+              fontSize={'1rem'}
+              data-selected={shouldInvertMask}
+              icon={
+                shouldInvertMask ? <MdInvertColors /> : <MdInvertColorsOff />
+              }
+            />
+          </div>
+          <div style={{ pointerEvents: 'none' }}>
+            <IconButton
+              aria-label="Bounding Box Lock"
+              size="xs"
+              variant={'ghost'}
+              data-selected={shouldLockBoundingBox}
+              icon={shouldLockBoundingBox ? <FaLock /> : <FaUnlock />}
+            />
+          </div>
+        </div>
 
-      {canvasBgImage && (
-        <Stage
-          width={Math.floor(canvasBgImage.width * stageScale)}
-          height={Math.floor(canvasBgImage.height * stageScale)}
-          scale={{ x: stageScale, y: stageScale }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseEnter={handleMouseEnter}
-          onMouseUp={handleMouseUp}
-          onMouseOut={handleMouseOutCanvas}
-          onMouseLeave={handleMouseOutCanvas}
-          style={{ cursor: shouldShowMask ? 'none' : 'default' }}
-          className="inpainting-canvas-stage checkerboard"
-          ref={stageRef}
-        >
-          {!shouldInvertMask && !shouldShowCheckboardTransparency && (
-            <Layer name={'image-layer'} listening={false}>
-              <KonvaImage listening={false} image={canvasBgImage} />
-            </Layer>
-          )}
-          {shouldShowMask && (
-            <>
-              <Layer
-                name={'mask-layer'}
-                listening={false}
-                opacity={
-                  shouldShowCheckboardTransparency || shouldInvertMask
-                    ? 1
-                    : maskColor.a
-                }
-                ref={maskLayerRef}
-              >
-                <InpaintingCanvasLines />
-
-                {shouldLockBoundingBox && <InpaintingCanvasBrushPreview />}
-
-                {shouldInvertMask && (
-                  <KonvaImage
-                    image={canvasBgImage}
-                    listening={false}
-                    globalCompositeOperation="source-in"
-                  />
-                )}
-                {!shouldInvertMask && shouldShowCheckboardTransparency && (
-                  <KonvaImage
-                    image={canvasBgImage}
-                    listening={false}
-                    globalCompositeOperation="source-out"
-                  />
-                )}
+        {canvasBgImage && (
+          <Stage
+            width={Math.floor(canvasBgImage.width * stageScale)}
+            height={Math.floor(canvasBgImage.height * stageScale)}
+            scale={{ x: stageScale, y: stageScale }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseEnter={handleMouseEnter}
+            onMouseUp={handleMouseUp}
+            onMouseOut={handleMouseOutCanvas}
+            onMouseLeave={handleMouseOutCanvas}
+            style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
+            className="inpainting-canvas-stage checkerboard"
+            ref={stageRef}
+          >
+            {!shouldInvertMask && !shouldShowCheckboardTransparency && (
+              <Layer name={'image-layer'} listening={false}>
+                <KonvaImage listening={false} image={canvasBgImage} />
               </Layer>
-              {shouldShowMask && (
-                <Layer>
-                  {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
-                    <InpaintingBoundingBoxPreviewOverlay />
+            )}
+            {shouldShowMask && (
+              <>
+                <Layer
+                  name={'mask-layer'}
+                  listening={false}
+                  opacity={
+                    shouldShowCheckboardTransparency || shouldInvertMask
+                      ? 1
+                      : maskColor.a
+                  }
+                  ref={maskLayerRef}
+                >
+                  <InpaintingCanvasLines />
+
+                  {!isMouseOverBoundingBox && !isModifyingBoundingBox && (
+                    <InpaintingCanvasBrushPreview />
                   )}
-                  {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
-                  {shouldLockBoundingBox && (
-                    <InpaintingCanvasBrushPreviewOutline />
+
+                  {shouldInvertMask && (
+                    <KonvaImage
+                      image={canvasBgImage}
+                      listening={false}
+                      globalCompositeOperation="source-in"
+                    />
+                  )}
+                  {!shouldInvertMask && shouldShowCheckboardTransparency && (
+                    <KonvaImage
+                      image={canvasBgImage}
+                      listening={false}
+                      globalCompositeOperation="source-out"
+                    />
                   )}
                 </Layer>
-              )}
-            </>
-          )}
-        </Stage>
-      )}
-      <Cacher />
-      <KeyboardEventManager />
+                {shouldShowMask && (
+                  <Layer>
+                    {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
+                      <InpaintingBoundingBoxPreviewOverlay />
+                    )}
+                    <InpaintingBoundingBoxPreview />
+                    {!isMouseOverBoundingBox && !isModifyingBoundingBox && (
+                      <InpaintingCanvasBrushPreviewOutline />
+                    )}
+                  </Layer>
+                )}
+              </>
+            )}
+          </Stage>
+        )}
+        <Cacher />
+        <KeyboardEventManager />
+      </div>
     </div>
   );
 };
