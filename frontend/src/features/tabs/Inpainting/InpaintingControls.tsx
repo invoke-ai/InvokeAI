@@ -339,7 +339,7 @@ const InpaintingControls = () => {
       </div>
       <div className="inpainting-buttons-group">
         <IAIPopover
-          trigger="click"
+          trigger="hover"
           onOpen={() => setMaskOptionsOpen(true)}
           onClose={() => setMaskOptionsOpen(false)}
           triggerComponent={
