@@ -9,7 +9,8 @@ source ./docker-build/env.sh || echo "please run from repository root" || exit 1
 invokeai_conda_version=${INVOKEAI_CONDA_VERSION:-py39_4.12.0-${platform/\//-}}
 invokeai_conda_prefix=${INVOKEAI_CONDA_PREFIX:-\/opt\/conda}
 invokeai_conda_env_file=${INVOKEAI_CONDA_ENV_FILE:-environment.yml}
-invokeai_git=${INVOKEAI_GIT:-https://github.com/invoke-ai/InvokeAI.git}
+invokeai_git=${INVOKEAI_GIT:-invoke-ai/InvokeAI}
+invokeai_branch=${INVOKEAI_BRANCH:-main}
 huggingface_token=${HUGGINGFACE_TOKEN?}
 
 # print the settings
@@ -78,5 +79,6 @@ docker build \
   --build-arg conda_prefix="${invokeai_conda_prefix}" \
   --build-arg conda_env_file="${invokeai_conda_env_file}" \
   --build-arg invokeai_git="${invokeai_git}" \
+  --build-arg invokeai_branch="${invokeai_branch}" \
   --file ./docker-build/Dockerfile \
   .
