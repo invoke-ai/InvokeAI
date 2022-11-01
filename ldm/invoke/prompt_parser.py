@@ -251,7 +251,7 @@ class PromptParser():
     class ParsingException(Exception):
         pass
 
-    class UnrecognizedOperatorException(Exception):
+    class UnrecognizedOperatorException(ParsingException):
         def __init__(self, operator:str):
             super().__init__("Unrecognized operator: " + operator)
 
