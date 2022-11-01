@@ -1,3 +1,5 @@
+import _ from 'lodash';
+
 const inpaintingCanvasStatusIconsSelector = createSelector(
   (state: RootState) => state.inpainting,
   (inpainting: InpaintingState) => {
@@ -14,6 +16,11 @@ const inpaintingCanvasStatusIconsSelector = createSelector(
       shouldLockBoundingBox,
       shouldShowBoundingBox,
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 
