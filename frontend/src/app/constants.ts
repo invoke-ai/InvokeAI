@@ -42,6 +42,6 @@ export const FACETOOL_TYPES = ['gfpgan', 'codeformer'] as const;
 
 export const IN_PROGRESS_IMAGE_TYPES: Array<{ key: string; value: string }> = [
   { key: "None", value: 'none'}, 
-  { key: "Fast", value: 'latents' },
-  { key: "Accurate", value: 'full-res' }
+  { key: "Full-res (slow)", value: 'full-res' },
+  { key: "Latents (fast)", value: 'latents' }
 ];

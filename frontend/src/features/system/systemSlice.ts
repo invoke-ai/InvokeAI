@@ -25,7 +25,7 @@ export type InProgressImageType = 'none' | 'full-res' | 'latents';
 export interface SystemState
   extends InvokeAI.SystemStatus,
     InvokeAI.SystemConfig {
-  shouldDisplayInProgressType: InProgressImageType;
+  shouldDisplayInProgressType: string;
   log: Array<LogEntry>;
   shouldShowLogViewer: boolean;
   isGFPGANAvailable: boolean;
@@ -51,7 +51,7 @@ const initialSystemState: SystemState = {
   isProcessing: false,
   log: [],
   shouldShowLogViewer: false,
-  shouldDisplayInProgressType: 'latents',
+  shouldDisplayInProgressType: "none",
   shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
@@ -80,10 +80,7 @@ export const systemSlice = createSlice({
   name: 'system',
   initialState: initialSystemState,
   reducers: {
-    setShouldDisplayInProgressType: (
-      state,
-      action: PayloadAction<InProgressImageType>
-    ) => {
+    setShouldDisplayInProgressType: (state, action: PayloadAction<string>) => {
       state.shouldDisplayInProgressType = action.payload;
     },
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
