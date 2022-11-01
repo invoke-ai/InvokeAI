@@ -44,6 +44,7 @@ ARG invokeai_git=https://github.com/invoke-ai/InvokeAI.git
 ARG project_name=invokeai
 RUN git clone ${invokeai_git} /${project_name} \
   && cp /${project_name}/configs/models.yaml.example /${project_name}/configs/models.yaml \
+  && mkdir -p models/ldm/stable-diffusion-v1 \
   && ln -s /data/models/v1-5-pruned-emaonly.ckpt /${project_name}/models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt \
   && ln -s /data/outputs/ /${project_name}/outputs
 
@@ -63,7 +64,6 @@ RUN source ${conda_prefix}/etc/profile.d/conda.sh \
   && rm -Rf ~/.cache \
   && conda clean -afy \
   && echo "conda activate ${project_name}" >> ~/.bashrc \
-  && ln -s /data/models/GFPGANv1.4.pth ./src/gfpgan/experiments/pretrained_models/GFPGANv1.4.pth \
   && conda activate ${project_name} \
   && python scripts/preload_models.py \
     --no-interactive
