@@ -1,0 +1,31 @@
+.inpainting-alerts {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  z-index: 2;
+  margin: 0.25rem;
+  padding: 0.25rem;
+  pointer-events: none;
+  background-color: var(--text-color);
+  opacity: 0.7;
+  border-radius: 0.5rem;
+
+  button {
+    svg {
+      fill: var(--background-color);
+    }
+
+    &[data-selected='true'] {
+      svg {
+        fill: var(--accent-color-hover);
+      }
+    }
+
+    &[data-alert='true'] {
+      svg {
+        fill: var(--destructive-color-hover);
+      }
+    }
+  }
+}
