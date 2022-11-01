@@ -57,7 +57,7 @@
   --tab-color: rgb(30, 32, 42);
   --tab-hover-color: rgb(36, 38, 48);
   --tab-list-bg: var(--accent-color);
-  --tab-list-text: rgb(202,204,216);
+  --tab-list-text: rgb(202, 204, 216);
   --tab-list-text-inactive: rgb(92, 94, 114);
   --tab-panel-bg: rgb(20, 22, 28);
 
@@ -103,4 +103,12 @@
 
   // Shadows
   --floating-button-drop-shadow: drop-shadow(0 0 1rem rgba(140, 101, 255, 0.5));
+
+  // Canvas
+  --inpainting-alerts-bg: rgba(20, 20, 26, 0.75);
+  --inpainting-alerts-icon-color: rgb(255, 255, 255);
+  --inpainting-alerts-bg-active: rgb(80, 40, 200);
+  --inpainting-alerts-icon-active: rgb(255, 255, 255);
+  --inpainting-alerts-bg-alert: var(--invalid);
+  --inpainting-alerts-icon-alert: rgb(255, 255, 255);
 }

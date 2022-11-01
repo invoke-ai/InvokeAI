@@ -18,7 +18,7 @@
     justify-content: center;
 
     &.is-drag-accept {
-      box-shadow: inset 0 0 20rem 1rem var(--status-good-color);
+      box-shadow: inset 0 0 20rem 1rem var(--accent-color);
     }
 
     &.is-drag-reject {

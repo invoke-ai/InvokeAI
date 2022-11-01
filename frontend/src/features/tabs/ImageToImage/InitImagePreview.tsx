@@ -5,7 +5,9 @@ import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import { clearInitialImage } from '../../options/optionsSlice';
 
 export default function InitImagePreview() {
-  const { initialImage } = useAppSelector((state: RootState) => state.options);
+  const initialImage = useAppSelector(
+    (state: RootState) => state.options.initialImage
+  );
 
   const dispatch = useAppDispatch();
 

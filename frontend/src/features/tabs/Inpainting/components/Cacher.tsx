@@ -33,6 +33,8 @@ const Cacher = () => {
     futureLines,
     needsCache,
     isDrawing,
+    isTransformingBoundingBox,
+    isMovingBoundingBox,
   } = useAppSelector((state: RootState) => state.inpainting);
 
   useLayoutEffect(() => {
@@ -64,6 +66,8 @@ const Cacher = () => {
     futureLines,
     needsCache,
     isDrawing,
+    isTransformingBoundingBox,
+    isMovingBoundingBox,
   ]);
 
   /**

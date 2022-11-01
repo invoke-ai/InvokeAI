@@ -23,7 +23,7 @@
 @use '../features/options/MainOptions/MainOptions.scss';
 @use '../features/options/AccordionItems/AdvancedSettings.scss';
 @use '../features/options/AdvancedOptions/Upscale/UpscaleOptions.scss';
-@use '../features/options/AdvancedOptions/Inpainting/BoundingBoxSettings.scss';
+@use '../features/options/AdvancedOptions/Inpainting/BoundingBoxSettings/BoundingBoxSettings.scss';
 @use '../features/system/ProgressBar.scss';
 
 // gallery
@@ -39,8 +39,9 @@
 @use '../features/tabs/InvokeOptionsPanel.scss';
 @use '../features/tabs/TextToImage/TextToImage.scss';
 @use '../features/tabs/ImageToImage/ImageToImage.scss';
-@use '../features/tabs/Inpainting/Inpainting.scss';
 @use '../features/tabs/FloatingButton.scss';
+@use '../features/tabs/Inpainting/Inpainting.scss';
+@use '../features/tabs/Inpainting/InpaintingCanvasStatusIcons.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';

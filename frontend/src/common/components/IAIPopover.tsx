@@ -4,12 +4,14 @@ import {
   PopoverContent,
   PopoverTrigger,
   Box,
+  BoxProps,
 } from '@chakra-ui/react';
 import { PopoverProps } from '@chakra-ui/react';
 import { ReactNode } from 'react';
 
 type IAIPopoverProps = PopoverProps & {
   triggerComponent: ReactNode;
+  triggerContainerProps?: BoxProps;
   children: ReactNode;
   styleClass?: string;
   hasArrow?: boolean;
@@ -18,15 +20,17 @@ type IAIPopoverProps = PopoverProps & {
 const IAIPopover = (props: IAIPopoverProps) => {
   const {
     triggerComponent,
+    triggerContainerProps,
     children,
     styleClass,
     hasArrow = true,
     ...rest
   } = props;
+
   return (
     <Popover {...rest}>
       <PopoverTrigger>
-        <Box>{triggerComponent}</Box>
+        <Box {...triggerContainerProps}>{triggerComponent}</Box>
       </PopoverTrigger>
       <PopoverContent className={`invokeai__popover-content ${styleClass}`}>
         {hasArrow && <PopoverArrow className={'invokeai__popover-arrow'} />}

@@ -10,7 +10,7 @@ import { activeTabNameSelector } from '../../../options/optionsSelectors';
 import { OptionsState } from '../../../options/optionsSlice';
 import {
   InpaintingState,
-  setIsDrawing,
+  setIsSpacebarHeld,
   setShouldLockBoundingBox,
   toggleTool,
 } from '../inpaintingSlice';
@@ -22,13 +22,18 @@ const keyboardEventManagerSelector = createSelector(
     activeTabNameSelector,
   ],
   (options: OptionsState, inpainting: InpaintingState, activeTabName) => {
-    const { shouldShowMask, cursorPosition, shouldLockBoundingBox } =
-      inpainting;
+    const {
+      shouldShowMask,
+      cursorPosition,
+      shouldLockBoundingBox,
+      shouldShowBoundingBox,
+    } = inpainting;
     return {
       activeTabName,
       shouldShowMask,
       isCursorOnCanvas: Boolean(cursorPosition),
       shouldLockBoundingBox,
+      shouldShowBoundingBox,
     };
   },
   {
@@ -45,6 +50,7 @@ const KeyboardEventManager = () => {
     activeTabName,
     isCursorOnCanvas,
     shouldLockBoundingBox,
+    shouldShowBoundingBox,
   } = useAppSelector(keyboardEventManagerSelector);
 
   const wasLastEventOverCanvas = useRef<boolean>(false);
@@ -53,7 +59,7 @@ const KeyboardEventManager = () => {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (
-        !['x', ' '].includes(e.key) ||
+        !['x', 'q'].includes(e.key) ||
         activeTabName !== 'inpainting' ||
         !shouldShowMask
       ) {
@@ -91,13 +97,10 @@ const KeyboardEventManager = () => {
           dispatch(toggleTool());
           break;
         }
-        case ' ': {
-          if (!shouldShowMask) break;
-
-          if (e.type === 'keydown') {
-            dispatch(setIsDrawing(false));
-          }
-          dispatch(setShouldLockBoundingBox(!shouldLockBoundingBox));
+        case 'q': {
+          if (!shouldShowMask || !shouldShowBoundingBox) break;
+          dispatch(setIsSpacebarHeld(e.type === 'keydown'));
+          dispatch(setShouldLockBoundingBox(e.type !== 'keydown'));
           break;
         }
       }
@@ -119,6 +122,7 @@ const KeyboardEventManager = () => {
     shouldShowMask,
     isCursorOnCanvas,
     shouldLockBoundingBox,
+    shouldShowBoundingBox,
   ]);
 
   return null;

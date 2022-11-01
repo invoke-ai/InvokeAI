@@ -1,3 +1,4 @@
+import { ListItem, UnorderedList } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaPlay } from 'react-icons/fa';
 import { readinessSelector } from '../../../app/selectors/readinessSelector';
@@ -7,6 +8,7 @@ import IAIButton, {
   IAIButtonProps,
 } from '../../../common/components/IAIButton';
 import IAIIconButton from '../../../common/components/IAIIconButton';
+import IAIPopover from '../../../common/components/IAIPopover';
 import { activeTabNameSelector } from '../optionsSelectors';
 
 interface InvokeButton extends Omit<IAIButtonProps, 'label'> {
@@ -16,7 +18,7 @@ interface InvokeButton extends Omit<IAIButtonProps, 'label'> {
 export default function InvokeButton(props: InvokeButton) {
   const { iconButton = false, ...rest } = props;
   const dispatch = useAppDispatch();
-  const isReady = useAppSelector(readinessSelector);
+  const { isReady, reasonsWhyNotReady } = useAppSelector(readinessSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   const handleClickGenerate = () => {
@@ -33,7 +35,7 @@ export default function InvokeButton(props: InvokeButton) {
     [isReady, activeTabName]
   );
 
-  return iconButton ? (
+  const buttonComponent = iconButton ? (
     <IAIIconButton
       aria-label="Invoke"
       type="submit"
@@ -55,5 +57,23 @@ export default function InvokeButton(props: InvokeButton) {
       className="invoke-btn"
       {...rest}
     />
+  );
+
+  return isReady ? (
+    buttonComponent
+  ) : (
+    <IAIPopover
+      trigger="hover"
+      triggerContainerProps={{ style: { flexGrow: 4 } }}
+      triggerComponent={buttonComponent}
+    >
+      {reasonsWhyNotReady && (
+        <UnorderedList>
+          {reasonsWhyNotReady.map((reason, i) => (
+            <ListItem key={i}>{reason}</ListItem>
+          ))}
+        </UnorderedList>
+      )}
+    </IAIPopover>
   );
 }
