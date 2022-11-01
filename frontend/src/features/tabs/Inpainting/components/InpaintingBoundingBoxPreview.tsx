@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import Konva from 'konva';
+import { Context } from 'konva/lib/Context';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Box } from 'konva/lib/shapes/Transformer';
 import { Vector2d } from 'konva/lib/types';
@@ -42,6 +43,7 @@ const boundingBoxPreviewSelector = createSelector(
       isTransformingBoundingBox,
       isMovingBoundingBox,
       isMouseOverBoundingBox,
+      isSpacebarHeld,
     } = inpainting;
     return {
       boundingBoxCoordinate,
@@ -57,6 +59,7 @@ const boundingBoxPreviewSelector = createSelector(
       isTransformingBoundingBox,
       isMouseOverBoundingBox,
       isMovingBoundingBox,
+      isSpacebarHeld,
     };
   },
   {
@@ -111,6 +114,7 @@ const InpaintingBoundingBoxPreview = () => {
     isTransformingBoundingBox,
     isMovingBoundingBox,
     isMouseOverBoundingBox,
+    isSpacebarHeld,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -297,6 +301,11 @@ const InpaintingBoundingBoxPreview = () => {
     dispatch(setIsMouseOverBoundingBox(false));
   };
 
+  const spacebarHeldHitFunc = (context: Context, shape: Konva.Shape) => {
+    context.rect(0, 0, imageToInpaint?.width, imageToInpaint?.height);
+    context.fillShape(shape);
+  };
+
   return (
     <>
       <Rect
@@ -307,7 +316,8 @@ const InpaintingBoundingBoxPreview = () => {
         ref={shapeRef}
         stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.3)' : 'white'}
         strokeWidth={Math.floor((isMouseOverBoundingBox ? 8 : 1) / stageScale)}
-        fillEnabled={false}
+        fillEnabled={isSpacebarHeld}
+        hitFunc={isSpacebarHeld ? spacebarHeldHitFunc : undefined}
         hitStrokeWidth={Math.floor(13 / stageScale)}
         listening={!isDrawing && !shouldLockBoundingBox}
         onMouseOver={() => {
