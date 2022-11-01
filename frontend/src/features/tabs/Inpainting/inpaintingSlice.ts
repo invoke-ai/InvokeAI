@@ -51,6 +51,9 @@ export interface InpaintingState {
   needsCache: boolean;
   stageScale: number;
   isDrawing: boolean;
+  isTransformingBoundingBox: boolean;
+  isMouseOverBoundingBox: boolean;
+  isMovingBoundingBox: boolean;
   shouldUseInpaintReplace: boolean;
   inpaintReplace: number;
   shouldLockBoundingBox: boolean;
@@ -63,7 +66,7 @@ const initialInpaintingState: InpaintingState = {
   canvasDimensions: { width: 0, height: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxCoordinate: { x: 0, y: 0 },
-  boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.7 },
+  boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
   shouldShowBoundingBox: true,
   shouldShowBoundingBoxFill: true,
   cursorPosition: null,
@@ -77,6 +80,9 @@ const initialInpaintingState: InpaintingState = {
   shouldShowBrushPreview: false,
   needsCache: false,
   isDrawing: false,
+  isTransformingBoundingBox: false,
+  isMouseOverBoundingBox: false,
+  isMovingBoundingBox: false,
   stageScale: 1,
   shouldUseInpaintReplace: false,
   inpaintReplace: 1,
@@ -319,6 +325,15 @@ export const inpaintingSlice = createSlice({
     setShouldShowBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBox = action.payload;
     },
+    setIsTransformingBoundingBox: (state, action: PayloadAction<boolean>) => {
+      state.isTransformingBoundingBox = action.payload;
+    },
+    setIsMovingBoundingBox: (state, action: PayloadAction<boolean>) => {
+      state.isMovingBoundingBox = action.payload;
+    },
+    setIsMouseOverBoundingBox: (state, action: PayloadAction<boolean>) => {
+      state.isMouseOverBoundingBox = action.payload;
+    },
   },
 });
 
@@ -354,6 +369,9 @@ export const {
   setInpaintReplace,
   setShouldLockBoundingBox,
   toggleShouldLockBoundingBox,
+  setIsMovingBoundingBox,
+  setIsTransformingBoundingBox,
+  setIsMouseOverBoundingBox,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;
