@@ -31,8 +31,6 @@ const boundingBoxDimensionsSelector = createSelector(
       boundingBoxDimensions,
       shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
-      pastLines,
-      futureLines,
       shouldLockBoundingBox,
     } = inpainting;
     return {
@@ -40,8 +38,6 @@ const boundingBoxDimensionsSelector = createSelector(
       boundingBoxDimensions,
       shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
-      pastLines,
-      futureLines,
       shouldLockBoundingBox,
     };
   },
