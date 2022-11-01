@@ -573,11 +573,7 @@ class InvokeAIWebServer:
                             )
                         )
                     )
-                    # crop the mask image
-                    cropped_mask_image = copy_image_from_bounding_box(
-                        mask_image, **generation_parameters["bounding_box"]
-                    )
-                    generation_parameters["init_mask"] = cropped_mask_image
+                    generation_parameters["init_mask"] = mask_image
 
             totalSteps = self.calculate_real_steps(
                 steps=generation_parameters["steps"],
