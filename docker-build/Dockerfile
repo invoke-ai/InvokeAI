@@ -44,7 +44,6 @@ ARG invokeai_git=https://github.com/invoke-ai/InvokeAI.git
 ARG project_name=invokeai
 RUN git clone ${invokeai_git} /${project_name} \
   && cp /${project_name}/configs/models.yaml.example /${project_name}/configs/models.yaml \
-  && mkdir -p models/ldm/stable-diffusion-v1 \
   && ln -s /data/models/v1-5-pruned-emaonly.ckpt /${project_name}/models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt \
   && ln -s /data/outputs/ /${project_name}/outputs
 
