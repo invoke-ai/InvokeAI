@@ -604,15 +604,11 @@ class InvokeAIWebServer:
                 progress.set_current_status("Generating")
                 progress.set_current_status_has_steps(True)
 
-                wants_progress_image = generation_parameters['progress_images'] and step % 5 == 0
-                wants_progress_latents = generation_parameters['progress_latents']
-
                 if (
-                    wants_progress_image | wants_progress_latents
-                    and step < generation_parameters['steps'] - 1
+                    generation_parameters['progress_images'] and step % 5 == 0 \
+                        and step < generation_parameters['steps'] - 1
                 ):
-                    image = self.generate.sample_to_image(sample) if wants_progress_image \
-                            else self.generate.sample_to_lowres_estimated_image(sample)
+                    image = self.generate.sample_to_image(sample)
                     metadata = self.parameters_to_generated_image_metadata(
                         generation_parameters
                     )
@@ -640,6 +636,25 @@ class InvokeAIWebServer:
                             "height": height,
                         },
                     )
+
+                if generation_parameters['progress_latents']:
+                    image = self.generate.sample_to_lowres_estimated_image(sample)
+                    (width, height) = image.size
+                    buffered = io.BytesIO()
+                    image.save(buffered, format="PNG")
+                    img_str = base64.b64encode(buffered.getvalue())
+                    img_base64 = bytes("data:image/jpeg;base64,", encoding='utf-8') + img_str
+                    self.socketio.emit(
+                        "intermediateResult",
+                        {
+                            "url": img_base64,
+                            "mtime": 0,
+                            "metadata": {},
+                            "width": width,
+                            "height": height,
+                        }
+                    )
+
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
