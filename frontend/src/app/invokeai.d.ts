@@ -115,7 +115,8 @@ export declare type Image = {
   metadata?: Metadata;
   width: number;
   height: number;
-  category: GalleryCategory;
+  category: GalleryCategory; 
+  isBase64: boolean; 
 };
 
 // GalleryImages is an array of Image.

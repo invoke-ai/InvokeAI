@@ -642,12 +642,12 @@ class InvokeAIWebServer:
                     (width, height) = image.size
                     buffered = io.BytesIO()
                     image.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode('UTF-8')
-                    img_base64 = "data:image/jpeg;base64," + img_str
+                    img_base64 = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('UTF-8')
                     self.socketio.emit(
                         "intermediateResult",
                         {
                             "url": img_base64,
+                            "isBase64": True,
                             "mtime": 0,
                             "metadata": {},
                             "width": width,
