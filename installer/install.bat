@@ -82,7 +82,7 @@ call conda activate
 @rem create the environment
 call conda env remove -n invokeai
 call conda env create
-if "%ERRORLEVEL%" NE "0" (
+if "%ERRORLEVEL%" NEQ "0" (
    echo ""
    echo "Something went wrong while installing Python libraries and cannot continue.
    echo "Please visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
@@ -95,7 +95,7 @@ if "%ERRORLEVEL%" NE "0" (
 call conda activate invokeai
 @rem preload the models
 call python scripts\preload_models.py
-if "%ERRORLEVEL%" NE "0" (
+if "%ERRORLEVEL%" NEQ "0" (
    echo ""
    echo "The preload_models.py script crashed or was cancelled."
    echo "InvokeAI is not ready to run. To run preload_models.py again,"
@@ -107,6 +107,7 @@ if "%ERRORLEVEL%" NE "0" (
 
 @rem tell the user their next steps
 echo ""
+echo "* InvokeAI installed successfully *"
 echo "You can now start generating images by double-clicking the 'invoke.bat' file (inside this folder)
 echo "Press any key to continue"
 pause

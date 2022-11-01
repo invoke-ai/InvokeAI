@@ -104,7 +104,7 @@ this program and resume later.\n'''
 #--------------------------------------------
 def postscript():
     print(
-        '''You're all set! You may now launch InvokeAI using one of these two commands:
+        '''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
 Web version: 
 
     python scripts/invoke.py --web  (connect to http://localhost:9090)
@@ -277,6 +277,7 @@ def download_weight_datasets(models:dict, access_token:str):
     if len(successful) < len(models):
         print(f'\n* There were errors downloading one or more files.')
         print('Please double-check your license agreements, and your access token. Type ^C to quit.\n')
+        hfFolder.delete_token()
         return None
 
     HfFolder.save_token(access_token)

@@ -103,20 +103,20 @@ else
     conda env create -f environment.yml
 fi
 
-status = $?
+status=$?
 
 if test $status -ne 0
 then
-   echo "Something went wrong while installing Python libraries and cannot continue.
+   echo "Something went wrong while installing Python libraries and cannot continue."
    echo "Please visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
    echo "installation methods"
 else
     conda activate invokeai
-
     # preload the models
     echo "Calling the preload_models.py script"
     python scripts/preload_models.py
-    if test $? -ne 0
+    status=$?
+    if test $status -ne 0
        then
 	   echo "The preload_models.py script crashed or was cancelled."
            echo "InvokeAI is not ready to run. To run preload_models.py again,"
@@ -124,4 +124,7 @@ else
        else
            # tell the user their next steps
 	   echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"
+       fi
 fi   
+
+conda activate invokeai
