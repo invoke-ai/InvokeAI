@@ -40,3 +40,6 @@ jobs:
           tags: ${{ env.dockertag }}:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
+          build-args: |
+            invokeai_git=${{ github.repository }}
+            invokeai_branch=${{ github.ref_name }}

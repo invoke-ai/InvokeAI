@@ -40,9 +40,10 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # clone repository, create models.yaml and create symlinks
-ARG invokeai_git=https://github.com/invoke-ai/InvokeAI.git
+ARG invokeai_git=invoke-ai/InvokeAI
+ARG invokeai_branch=main
 ARG project_name=invokeai
-RUN git clone ${invokeai_git} /${project_name} \
+RUN git clone -b ${invokeai_branch} https://github.com/${invokeai_git}.git /${project_name} \
   && cp /${project_name}/configs/models.yaml.example /${project_name}/configs/models.yaml \
   && ln -s /data/models/v1-5-pruned-emaonly.ckpt /${project_name}/models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt \
   && ln -s /data/outputs/ /${project_name}/outputs
