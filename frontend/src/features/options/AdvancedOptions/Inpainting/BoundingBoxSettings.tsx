@@ -113,7 +113,7 @@ const BoundingBoxSettings = () => {
     <div className="inpainting-bounding-box-settings">
       <div className="inpainting-bounding-box-header">
         <p>Inpaint Box</p>
-        <IAIIconButton
+        {/* <IAIIconButton
           aria-label="Toggle Bounding Box Visibility"
           icon={
             shouldShowBoundingBox ? <BiShow size={22} /> : <BiHide size={22} />
@@ -121,11 +121,12 @@ const BoundingBoxSettings = () => {
           onClick={handleShowBoundingBox}
           background={'none'}
           padding={0}
-        />
+        /> */}
       </div>
       <div className="inpainting-bounding-box-settings-items">
         <div className="inpainting-bounding-box-dimensions-slider-numberinput">
           <IAISlider
+            isDisabled={shouldLockBoundingBox}
             label="Box W"
             min={64}
             max={roundDownToMultiple(canvasDimensions.width, 64)}
@@ -135,6 +136,7 @@ const BoundingBoxSettings = () => {
             width={'5rem'}
           />
           <IAINumberInput
+            isDisabled={shouldLockBoundingBox}
             value={boundingBoxDimensions.width}
             onChange={handleChangeBoundingBoxWidth}
             min={64}
@@ -143,6 +145,7 @@ const BoundingBoxSettings = () => {
             width={'5rem'}
           />
           <IAIIconButton
+            isDisabled={shouldLockBoundingBox}
             size={'sm'}
             aria-label={'Reset Width'}
             tooltip={'Reset Width'}
@@ -154,6 +157,7 @@ const BoundingBoxSettings = () => {
         </div>
         <div className="inpainting-bounding-box-dimensions-slider-numberinput">
           <IAISlider
+            isDisabled={shouldLockBoundingBox}
             label="Box H"
             min={64}
             max={roundDownToMultiple(canvasDimensions.height, 64)}
@@ -163,6 +167,7 @@ const BoundingBoxSettings = () => {
             width={'5rem'}
           />
           <IAINumberInput
+            isDisabled={shouldLockBoundingBox}
             value={boundingBoxDimensions.height}
             onChange={handleChangeBoundingBoxHeight}
             min={64}
@@ -172,6 +177,7 @@ const BoundingBoxSettings = () => {
             width={'5rem'}
           />
           <IAIIconButton
+            isDisabled={shouldLockBoundingBox}
             size={'sm'}
             aria-label={'Reset Height'}
             tooltip={'Reset Height'}
