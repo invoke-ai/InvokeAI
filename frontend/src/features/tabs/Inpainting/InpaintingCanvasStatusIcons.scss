@@ -4,27 +4,32 @@
   left: 0;
   display: flex;
   z-index: 2;
-  margin: 0.25rem;
-  padding: 0.25rem;
+  margin: 0.5rem;
   pointer-events: none;
-  background-color: var(--text-color);
-  opacity: 0.7;
-  border-radius: 0.5rem;
+  background-color: var(--inpainting-alerts-bg);
+  border-radius: 0.2rem;
+  overflow: hidden;
 
   button {
+    border-radius: 0;
+    height: 100%;
+    vertical-align: top;
+
     svg {
-      fill: var(--background-color);
+      fill: var(--inpainting-alerts-icon-color);
     }
 
     &[data-selected='true'] {
+      background-color: var(--inpainting-alerts-bg-active);
       svg {
-        fill: var(--accent-color-hover);
+        fill: var(--inpainting-alerts-icon-active);
       }
     }
 
     &[data-alert='true'] {
+      background-color: var(--inpainting-alerts-bg-alert);
       svg {
-        fill: var(--destructive-color-hover);
+        fill: var(--inpainting-alerts-icon-alert);
       }
     }
   }

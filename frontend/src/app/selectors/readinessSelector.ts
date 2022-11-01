@@ -40,21 +40,17 @@ export const readinessSelector = createSelector(
     // Cannot generate without a prompt
     if (!prompt || Boolean(prompt.match(/^[\s\r\n]+$/))) {
       isReady = false;
-      reasonsWhyNotReady.push('Missing a prompt.');
+      reasonsWhyNotReady.push('Missing prompt');
     }
 
     if (activeTabName === 'img2img' && !initialImage) {
       isReady = false;
-      reasonsWhyNotReady.push(
-        'On ImageToImage tab, but no initial image is selected.'
-      );
+      reasonsWhyNotReady.push('No initial image selected');
     }
 
     if (activeTabName === 'inpainting' && !imageToInpaint) {
       isReady = false;
-      reasonsWhyNotReady.push(
-        'On Inpainting tab, but no initial image is selected.'
-      );
+      reasonsWhyNotReady.push('No inpainting image selected');
     }
 
     // // We don't use mask paths now.
@@ -70,13 +66,13 @@ export const readinessSelector = createSelector(
     // Cannot generate if already processing an image
     if (isProcessing) {
       isReady = false;
-      reasonsWhyNotReady.push('System is already processing something.');
+      reasonsWhyNotReady.push('System Busy');
     }
 
     // Cannot generate if not connected
     if (!isConnected) {
       isReady = false;
-      reasonsWhyNotReady.push('System is disconnected.');
+      reasonsWhyNotReady.push('System Disconnected');
     }
 
     // Cannot generate variations without valid seed weights
@@ -85,7 +81,7 @@ export const readinessSelector = createSelector(
       (!(validateSeedWeights(seedWeights) || seedWeights === '') || seed === -1)
     ) {
       isReady = false;
-      reasonsWhyNotReady.push('Seed-weight pairs are badly formatted.');
+      reasonsWhyNotReady.push('Seed-Weights badly formatted.');
     }
 
     // All good
