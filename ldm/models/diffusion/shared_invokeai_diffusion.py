@@ -142,7 +142,7 @@ class InvokeAIDiffuserComponent:
             for type in cross_attention_control_types_to_do:
                 CrossAttentionControl.request_save_attention_maps(self.model, type)
             _ = self.model_forward_callback(x, sigma, conditioning)
-            CrossAttentionControl.clear_requests(self.model)
+            CrossAttentionControl.clear_requests(self.model, clear_attn_slice=False)
 
             # process x again, using the saved attention maps to control where self.edited_conditioning will be applied
             for type in cross_attention_control_types_to_do:
