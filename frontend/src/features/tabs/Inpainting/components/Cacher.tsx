@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { RootState, useAppSelector } from '../../../../app/store';
 import { maskLayerRef } from '../InpaintingCanvas';
 

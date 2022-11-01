@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { IRect, Vector2d } from 'konva/lib/types';
+import { Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 import * as InvokeAI from '../../../app/invokeai';
 import _ from 'lodash';

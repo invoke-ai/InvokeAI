@@ -2,7 +2,7 @@ import { IconButton, Tooltip } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import { errorSeen, setShouldShowLogViewer, SystemState } from './systemSlice';
-import { UIEvent, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
