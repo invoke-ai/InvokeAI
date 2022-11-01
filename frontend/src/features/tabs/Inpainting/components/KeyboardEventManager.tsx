@@ -10,9 +10,7 @@ import { activeTabNameSelector } from '../../../options/optionsSelectors';
 import { OptionsState } from '../../../options/optionsSlice';
 import {
   InpaintingState,
-  setIsDrawing,
   setIsSpacebarHeld,
-  setNeedsCache,
   setShouldLockBoundingBox,
   toggleTool,
 } from '../inpaintingSlice';
