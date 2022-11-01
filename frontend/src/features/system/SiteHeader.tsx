@@ -44,15 +44,17 @@ const SiteHeader = () => {
         <StatusIndicator />
 
         <HotkeysModal>
-          <Tooltip hasArrow label="Hotkeys" placement={'bottom'}>
-            <IconButton
-              aria-label="Hotkeys"
-              variant="link"
-              fontSize={24}
-              size={'sm'}
-              icon={<MdKeyboard />}
-            />
-          </Tooltip>
+          <div>
+            <Tooltip hasArrow label="Hotkeys" placement={'bottom'}>
+              <IconButton
+                aria-label="Hotkeys"
+                variant="link"
+                fontSize={24}
+                size={'sm'}
+                icon={<MdKeyboard />}
+              />
+            </Tooltip>
+          </div>
         </HotkeysModal>
 
         <Tooltip hasArrow label="Theme" placement={'bottom'}>
@@ -112,15 +114,17 @@ const SiteHeader = () => {
         </Tooltip>
 
         <SettingsModal>
-          <Tooltip label="Settings">
-            <IconButton
-              aria-label="Settings"
-              variant="link"
-              fontSize={24}
-              size={'sm'}
-              icon={<MdSettings />}
-            />
-          </Tooltip>
+          <div>
+            <Tooltip label="Settings">
+              <IconButton
+                aria-label="Settings"
+                variant="link"
+                fontSize={24}
+                size={'sm'}
+                icon={<MdSettings />}
+              />
+            </Tooltip>
+          </div>
         </SettingsModal>
       </div>
     </div>
