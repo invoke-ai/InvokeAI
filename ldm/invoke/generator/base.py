@@ -116,6 +116,29 @@ class Generator():
         )
         return Image.fromarray(x_sample.astype(np.uint8))
 
+        # write an approximate RGB image from latent samples for a single step to PNG
+
+    def sample_to_lowres_estimated_image(self,samples):
+        # adapted from code by @erucipe and @keturn here:
+        # https://discuss.huggingface.co/t/decoding-latents-to-rgb-without-upscaling/23204/7
+
+        # these numbers were determined empirically by @keturn
+        v1_4_latent_rgb_factors = torch.tensor([
+                    # R        G        B
+                    [ 0.298, 0.207, 0.208],  # L1
+                    [ 0.187, 0.286, 0.173],  # L2
+                    [-0.158, 0.189, 0.264],  # L3
+                    [-0.184, -0.271, -0.473],  # L4
+        ], dtype=samples.dtype, device=samples.device)
+
+        latent_image = samples[0].permute(1, 2, 0) @ v1_4_latent_rgb_factors
+        latents_ubyte = (((latent_image + 1) / 2)
+                         .clamp(0, 1)  # change scale from -1..1 to 0..1
+                         .mul(0xFF)  # to 0..255
+                         .byte()).cpu()
+
+        return Image.fromarray(latents_ubyte.numpy())
+
     def generate_initial_noise(self, seed, width, height):
         initial_noise = None
         if self.variation_amount > 0 or len(self.with_variations) > 0:
