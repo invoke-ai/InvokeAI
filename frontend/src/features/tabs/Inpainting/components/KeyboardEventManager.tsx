@@ -11,6 +11,8 @@ import { OptionsState } from '../../../options/optionsSlice';
 import {
   InpaintingState,
   setIsDrawing,
+  setIsSpacebarHeld,
+  setNeedsCache,
   setShouldLockBoundingBox,
   toggleTool,
 } from '../inpaintingSlice';
@@ -93,11 +95,8 @@ const KeyboardEventManager = () => {
         }
         case ' ': {
           if (!shouldShowMask) break;
-
-          if (e.type === 'keydown') {
-            dispatch(setIsDrawing(false));
-          }
-          dispatch(setShouldLockBoundingBox(!shouldLockBoundingBox));
+          dispatch(setIsSpacebarHeld(e.type === 'keydown'));
+          dispatch(setShouldLockBoundingBox(e.type !== 'keydown'));
           break;
         }
       }
