@@ -1,4 +1,4 @@
-import BoundingBoxSettings from './BoundingBoxSettings';
+import BoundingBoxSettings from './BoundingBoxSettings/BoundingBoxSettings';
 import InpaintReplace from './InpaintReplace';
 import ClearBrushHistory from './ClearBrushHistory';
 
