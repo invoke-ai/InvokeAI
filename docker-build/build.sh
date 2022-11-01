@@ -38,11 +38,12 @@ _copyCheckpoints() {
   echo "creating subfolders for models and outputs"
   _runAlpine mkdir models
   _runAlpine mkdir outputs
-  echo -n "downloading sd-v1-4.ckpt"
-  _runAlpine wget --header="Authorization: Bearer ${huggingface_token}" -O models/sd-v1-4.ckpt https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
+  echo "downloading v1-5-pruned-emaonly.ckpt"
+  _runAlpine wget \
+    --header="Authorization: Bearer ${huggingface_token}" \
+    -O models/v1-5-pruned-emaonly.ckpt \
+    https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
   echo "done"
-  echo "downloading GFPGANv1.4.pth"
-  _runAlpine wget -O models/GFPGANv1.4.pth https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth
 }
 
 _checkVolumeContent() {
@@ -51,7 +52,7 @@ _checkVolumeContent() {
 
 _getModelMd5s() {
   _runAlpine  \
-    alpine sh -c "md5sum /data/models/*"
+    alpine sh -c "md5sum /data/models/*.ckpt"
 }
 
 if [[ -n "$(docker volume ls -f name="${volumename}" -q)" ]]; then
