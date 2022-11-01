@@ -99,13 +99,29 @@ conda activate
 if [ "$OS_NAME" == "mac" ]; then
     PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-${OS_ARCH} conda env create -f environment-mac.yml
 else
+    conda env remove -n invokeai
     conda env create -f environment.yml
 fi
 
-conda activate invokeai
+status = $?
 
-# preload the models
-python scripts/preload_models.py
+if test $status -ne 0
+then
+   echo "Something went wrong while installing Python libraries and cannot continue.
+   echo "Please visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
+   echo "installation methods"
+else
+    conda activate invokeai
 
-# tell the user their next steps
-echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"
+    # preload the models
+    echo "Calling the preload_models.py script"
+    python scripts/preload_models.py
+    if test $? -ne 0
+       then
+	   echo "The preload_models.py script crashed or was cancelled."
+           echo "InvokeAI is not ready to run. To run preload_models.py again,"
+           echo "give the command 'python scripts/preload_models.py'"
+       else
+           # tell the user their next steps
+	   echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"
+fi   
