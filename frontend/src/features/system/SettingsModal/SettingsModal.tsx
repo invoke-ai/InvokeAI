@@ -20,23 +20,24 @@ import { persistor } from '../../../main';
 import {
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
-  setShouldDisplayInProgress,
+  setShouldDisplayInProgressType,
   SystemState,
 } from '../systemSlice';
 import ModelList from './ModelList';
-import SettingsModalItem from './SettingsModalItem';
+import { SettingsModalItem, SettingsModalSelectItem } from './SettingsModalItem';
+import { IN_PROGRESS_IMAGE_TYPES } from '../../../app/constants';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
   (system: SystemState) => {
     const {
-      shouldDisplayInProgress,
+      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       model_list,
     } = system;
     return {
-      shouldDisplayInProgress,
+      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       models: _.map(model_list, (_model, key) => key),
@@ -72,7 +73,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   } = useDisclosure();
 
   const {
-    shouldDisplayInProgress,
+    shouldDisplayInProgressType,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
   } = useAppSelector(systemSelector);
@@ -102,10 +103,12 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalBody className="settings-modal-content">
             <ModelList />
             <div className="settings-modal-items">
-              <SettingsModalItem
-                settingTitle="Display In-Progress Images (slower)"
-                isChecked={shouldDisplayInProgress}
-                dispatcher={setShouldDisplayInProgress}
+
+              <SettingsModalSelectItem
+                settingTitle="Display In-Progress Images"
+                validValues={IN_PROGRESS_IMAGE_TYPES}
+                defaultValue={shouldDisplayInProgressType}
+                dispatcher={setShouldDisplayInProgressType}
               />
 
               <SettingsModalItem

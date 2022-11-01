@@ -913,6 +913,9 @@ class Generate:
     def sample_to_image(self, samples):
         return self._make_base().sample_to_image(samples)
 
+    def sample_to_lowres_estimated_image(self, samples):
+        return self._make_base().sample_to_lowres_estimated_image(samples)
+
     # very repetitive code - can this be simplified? The KSampler names are
     # consistent, at least
     def _set_sampler(self):
