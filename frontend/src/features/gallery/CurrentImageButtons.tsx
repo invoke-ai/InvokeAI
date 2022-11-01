@@ -61,7 +61,11 @@ const systemSelector = createSelector(
     const { upscalingLevel, facetoolStrength, shouldShowImageDetails } =
       options;
 
+<<<<<<< HEAD
     const { intermediateImage, currentImage } = gallery;
+=======
+    const { intermediateImage } = gallery;
+>>>>>>> 4013e8a... Fixes b64 image sending and displaying
 
     return {
       isProcessing,

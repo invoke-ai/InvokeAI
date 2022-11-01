@@ -654,7 +654,12 @@ class InvokeAIWebServer:
                     height *= 8
                     buffered = io.BytesIO()
                     image.save(buffered, format="PNG")
+<<<<<<< HEAD
                     img_base64 = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('UTF-8')
+=======
+                    img_str = base64.b64encode(buffered.getvalue()).decode('UTF-8')
+                    img_base64 = "data:image/jpeg;base64," + img_str
+>>>>>>> 4013e8a... Fixes b64 image sending and displaying
                     self.socketio.emit(
                         "intermediateResult",
                         {
