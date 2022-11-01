@@ -1,6 +1,5 @@
 import { useToast } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import React from 'react';
 import {
   RootState,
   useAppDispatch,
@@ -18,8 +17,7 @@ const clearBrushHistorySelector = createSelector(
   (inpainting: InpaintingState) => {
     const { pastLines, futureLines } = inpainting;
     return {
-      pastLines,
-      futureLines,
+      mayClearBrushHistory: futureLines.length > 0 || pastLines.length > 0 ? false : true
     };
   },
   {
@@ -33,7 +31,7 @@ export default function ClearBrushHistory() {
   const dispatch = useAppDispatch();
   const toast = useToast();
 
-  const { pastLines, futureLines } = useAppSelector(clearBrushHistorySelector);
+  const { mayClearBrushHistory } = useAppSelector(clearBrushHistorySelector);
 
   const handleClearBrushHistory = () => {
     dispatch(setClearBrushHistory());
@@ -49,7 +47,7 @@ export default function ClearBrushHistory() {
       label="Clear Brush History"
       onClick={handleClearBrushHistory}
       tooltip="Clears brush stroke history"
-      disabled={futureLines.length > 0 || pastLines.length > 0 ? false : true}
+      disabled={mayClearBrushHistory}
       styleClass="inpainting-options-btn"
     />
   );
