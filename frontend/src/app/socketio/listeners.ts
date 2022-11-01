@@ -261,18 +261,20 @@ const makeSocketIOListeners = (
       const { intermediateImage } = getState().gallery;
 
       if (intermediateImage) {
-        dispatch(
-          addImage({
-            category: 'result',
-            image: intermediateImage,
-          })
-        );
-        dispatch(
-          addLogEntry({
-            timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Intermediate image saved: ${intermediateImage.url}`,
-          })
-        );
+        if (!intermediateImage.isBase64) {
+          dispatch(
+            addImage({
+              category: 'result',
+              image: intermediateImage,
+            })
+          );
+          dispatch(
+            addLogEntry({
+              timestamp: dateFormat(new Date(), 'isoDateTime'),
+              message: `Intermediate image saved: ${intermediateImage.url}`,
+            })
+          );
+        }
         dispatch(clearIntermediateImage());
       }
 
