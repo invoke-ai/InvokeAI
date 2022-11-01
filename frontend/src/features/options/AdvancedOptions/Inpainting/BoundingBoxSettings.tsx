@@ -145,14 +145,16 @@ const BoundingBoxSettings = () => {
             width={'5rem'}
           />
           <IAIIconButton
-            isDisabled={shouldLockBoundingBox}
             size={'sm'}
             aria-label={'Reset Width'}
             tooltip={'Reset Width'}
             onClick={handleResetWidth}
             icon={<BiReset />}
             styleClass="inpainting-bounding-box-reset-icon-btn"
-            isDisabled={canvasDimensions.width === boundingBoxDimensions.width}
+            isDisabled={
+              shouldLockBoundingBox ||
+              canvasDimensions.width === boundingBoxDimensions.width
+            }
           />
         </div>
         <div className="inpainting-bounding-box-dimensions-slider-numberinput">
@@ -177,7 +179,6 @@ const BoundingBoxSettings = () => {
             width={'5rem'}
           />
           <IAIIconButton
-            isDisabled={shouldLockBoundingBox}
             size={'sm'}
             aria-label={'Reset Height'}
             tooltip={'Reset Height'}
@@ -185,6 +186,7 @@ const BoundingBoxSettings = () => {
             icon={<BiReset />}
             styleClass="inpainting-bounding-box-reset-icon-btn"
             isDisabled={
+              shouldLockBoundingBox ||
               canvasDimensions.height === boundingBoxDimensions.height
             }
           />
