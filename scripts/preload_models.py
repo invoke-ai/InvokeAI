@@ -6,6 +6,7 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
+print('Loading Python libraries...\n')
 import argparse
 import sys
 import os
@@ -17,6 +18,10 @@ from pathlib import Path
 import traceback
 import getpass
 import requests
+import clip
+import transformers
+import torch
+transformers.logging.set_verbosity_error()
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -26,12 +31,7 @@ warnings.filterwarnings('ignore')
 
 # deferred loading so that help message can be printed quickly
 def load_libs():
-    print('Loading Python libraries...\n')
-    import clip
-    import transformers
-    import torch
-    import zipfile
-    transformers.logging.set_verbosity_error()
+    pass
 
 #--------------------------globals--
 Model_dir = './models/ldm/stable-diffusion-v1/'
@@ -489,12 +489,14 @@ def download_codeformer():
 #---------------------------------------------
 def download_clipseg():
     print('Installing clipseg model for text-based masking...',end='')
+    import zipfile
     try:
         model_url  = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
         model_dest = 'src/clipseg/clipseg_weights.zip'
         weights_dir = 'src/clipseg/weights'
         if not os.path.exists(weights_dir):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
+        if not os.path.exists('src/clipseg/weights/rd64-uni-refined.pth'):
             request.urlretrieve(model_url,model_dest)
             with zipfile.ZipFile(model_dest,'r') as zip:
                 zip.extractall('src/clipseg')
