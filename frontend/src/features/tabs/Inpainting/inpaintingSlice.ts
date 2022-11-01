@@ -57,6 +57,7 @@ export interface InpaintingState {
   shouldUseInpaintReplace: boolean;
   inpaintReplace: number;
   shouldLockBoundingBox: boolean;
+  isSpacebarHeld: boolean;
 }
 
 const initialInpaintingState: InpaintingState = {
@@ -87,6 +88,7 @@ const initialInpaintingState: InpaintingState = {
   shouldUseInpaintReplace: false,
   inpaintReplace: 1,
   shouldLockBoundingBox: true,
+  isSpacebarHeld: false,
 };
 
 const initialState: InpaintingState = initialInpaintingState;
@@ -334,6 +336,9 @@ export const inpaintingSlice = createSlice({
     setIsMouseOverBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.isMouseOverBoundingBox = action.payload;
     },
+    setIsSpacebarHeld: (state, action: PayloadAction<boolean>) => {
+      state.isSpacebarHeld = action.payload;
+    },
   },
 });
 
@@ -372,6 +377,7 @@ export const {
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
   setIsMouseOverBoundingBox,
+  setIsSpacebarHeld,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;
