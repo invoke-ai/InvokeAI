@@ -104,4 +104,12 @@
 
   // Shadows
   --floating-button-drop-shadow: drop-shadow(0 0 1rem rgba(0, 0, 0, 0.3));
+
+  // Canvas
+  --inpainting-alerts-bg: rgba(220, 222, 224, 0.75);
+  --inpainting-alerts-icon-color: rgb(0, 0, 0);
+  --inpainting-alerts-bg-active: rgb(255, 200, 0);
+  --inpainting-alerts-icon-active: rgb(0, 0, 0);
+  --inpainting-alerts-bg-alert: var(--invalid);
+  --inpainting-alerts-icon-alert: rgb(0, 0, 0);
 }

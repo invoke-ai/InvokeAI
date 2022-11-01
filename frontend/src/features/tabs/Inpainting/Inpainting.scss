@@ -64,24 +64,6 @@
       position: relative;
     }
 
-    .inpainting-alerts {
-      position: absolute;
-      top: 0;
-      left: 0;
-      display: flex;
-      z-index: 2;
-      padding: 0.25rem;
-      pointer-events: none;
-
-      button {
-        &[data-selected='true'] {
-          svg {
-            fill: var(--accent-color);
-          }
-        }
-      }
-    }
-
     .inpainting-canvas-stage {
       border-radius: 0.5rem;
       canvas {
