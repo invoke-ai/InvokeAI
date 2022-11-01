@@ -38,6 +38,7 @@ import { Icon, IconButton, Tooltip, useToast } from '@chakra-ui/react';
 import { FaLock, FaUnlock } from 'react-icons/fa';
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
 import { BiHide, BiShow } from 'react-icons/bi';
+import InpaintingCanvasStatusIcons from './InpaintingCanvasStatusIcons';
 
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
@@ -243,39 +244,7 @@ const InpaintingCanvas = () => {
   return (
     <div className="inpainting-canvas-container" tabIndex={1}>
       <div className="inpainting-canvas-wrapper">
-        <div className="inpainting-alerts">
-          <div style={{ pointerEvents: 'none' }}>
-            <IconButton
-              aria-label="Show/HideMask"
-              size="xs"
-              variant={'ghost'}
-              fontSize={'1rem'}
-              data-selected={!shouldShowMask}
-              icon={shouldShowMask ? <BiShow /> : <BiHide />}
-            />
-          </div>
-          <div style={{ pointerEvents: 'none' }}>
-            <IconButton
-              aria-label="Invert Mask"
-              size="xs"
-              variant={'ghost'}
-              fontSize={'1rem'}
-              data-selected={shouldInvertMask}
-              icon={
-                shouldInvertMask ? <MdInvertColors /> : <MdInvertColorsOff />
-              }
-            />
-          </div>
-          <div style={{ pointerEvents: 'none' }}>
-            <IconButton
-              aria-label="Bounding Box Lock"
-              size="xs"
-              variant={'ghost'}
-              data-selected={shouldLockBoundingBox}
-              icon={shouldLockBoundingBox ? <FaLock /> : <FaUnlock />}
-            />
-          </div>
-        </div>
+        <InpaintingCanvasStatusIcons />
 
         {canvasBgImage && (
           <Stage
@@ -330,17 +299,16 @@ const InpaintingCanvas = () => {
                     />
                   )}
                 </Layer>
-                {shouldShowMask && (
-                  <Layer>
-                    {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
-                      <InpaintingBoundingBoxPreviewOverlay />
-                    )}
-                    <InpaintingBoundingBoxPreview />
-                    {!isMouseOverBoundingBox && !isModifyingBoundingBox && (
-                      <InpaintingCanvasBrushPreviewOutline />
-                    )}
-                  </Layer>
-                )}
+                <Layer>
+                  {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
+                    <InpaintingBoundingBoxPreviewOverlay />
+                  )}
+                  {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
+
+                  {!isMouseOverBoundingBox && !isModifyingBoundingBox && (
+                    <InpaintingCanvasBrushPreviewOutline />
+                  )}
+                </Layer>
               </>
             )}
           </Stage>

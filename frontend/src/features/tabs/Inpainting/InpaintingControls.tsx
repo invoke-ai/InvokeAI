@@ -154,7 +154,7 @@ const InpaintingControls = () => {
 
   // Toggle lock bounding box
   useHotkeys(
-    'm',
+    'shift+q',
     (e: KeyboardEvent) => {
       e.preventDefault();
       dispatch(toggleShouldLockBoundingBox());
