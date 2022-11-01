@@ -39,6 +39,7 @@ class DreamBase():
   model: str = None # The model to use (currently unused)
   embeddings = None # The embeddings to use (currently unused)
   progress_images: bool = False
+  progress_latents: bool = False
 
   # GFPGAN
   enable_gfpgan: bool
@@ -94,6 +95,7 @@ class DreamBase():
       self.seamless = 'seamless' in j
       self.hires_fix = 'hires_fix' in j
       self.progress_images = 'progress_images' in j
+      self.progress_latents = 'progress_latents' in j
 
     # GFPGAN
     self.enable_gfpgan = 'enable_gfpgan' in j and bool(j.get('enable_gfpgan'))

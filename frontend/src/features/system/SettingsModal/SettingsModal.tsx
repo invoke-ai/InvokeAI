@@ -22,7 +22,8 @@ import {
   setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
-  setShouldDisplayInProgressType,
+  setShouldDisplayInProgress,
+  setShouldDisplayInProgressLatents,
   SystemState,
 } from '../systemSlice';
 import ModelList from './ModelList';
@@ -33,13 +34,15 @@ const systemSelector = createSelector(
   (state: RootState) => state.system,
   (system: SystemState) => {
     const {
-      shouldDisplayInProgressType,
+      shouldDisplayInProgress,
+      shouldDisplayInProgressLatents,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       model_list,
     } = system;
     return {
-      shouldDisplayInProgressType,
+      shouldDisplayInProgress,
+      shouldDisplayInProgressLatents,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       models: _.map(model_list, (_model, key) => key),
@@ -83,7 +86,8 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   } = useDisclosure();
 
   const {
-    shouldDisplayInProgressType,
+    shouldDisplayInProgress,
+    shouldDisplayInProgressLatents,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
   } = useAppSelector(systemSelector);
@@ -123,6 +127,12 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 validValues={IN_PROGRESS_IMAGE_TYPES}
                 defaultValue={shouldDisplayInProgressType}
                 dispatcher={setShouldDisplayInProgressType}
+              />
+
+              <SettingsModalItem
+                settingTitle="Display In-Progress Latents (quick; lo-res)"
+                isChecked={shouldDisplayInProgressLatents}
+                dispatcher={setShouldDisplayInProgressLatents}
               />
 
               <SettingsModalItem
