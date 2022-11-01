@@ -15,10 +15,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { GalleryState } from '../features/gallery/gallerySlice';
 import { OptionsState } from '../features/options/optionsSlice';
 import { activeTabNameSelector } from '../features/options/optionsSelectors';
-import { readinessChanged, SystemState } from '../features/system/systemSlice';
+import { SystemState } from '../features/system/systemSlice';
 import _ from 'lodash';
 import { Model } from './invokeai';
-import { readinessSelector } from './selectors/readinessSelector';
 
 keepGUIAlive();
 
@@ -80,7 +79,7 @@ const App = () => {
   const dispatch = useAppDispatch();
 
   // const [isReady, setIsReady] = useState<boolean>(false);
-  const { isReady, reasonsWhyNotReady } = useAppSelector(readinessSelector);
+  // const { isReady, reasonsWhyNotReady } = useAppSelector(readinessSelector);
   const { shouldShowGalleryButton, shouldShowOptionsPanelButton } =
     useAppSelector(appSelector);
 
@@ -88,9 +87,9 @@ const App = () => {
     dispatch(requestSystemConfig());
   }, [dispatch]);
 
-  useEffect(() => {
-    dispatch(readinessChanged({ isReady, reasonsWhyNotReady }));
-  }, [dispatch, isReady, reasonsWhyNotReady]);
+  // useEffect(() => {
+  //   dispatch(readinessChanged({ isReady, reasonsWhyNotReady }));
+  // }, [dispatch, isReady, reasonsWhyNotReady]);
 
   return (
     <div className="App">
