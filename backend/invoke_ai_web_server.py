@@ -187,7 +187,10 @@ class InvokeAIWebServer:
                 base_path = (
                     self.result_path if category == "result" else self.init_image_path
                 )
-                paths = glob.glob(os.path.join(base_path, "*.png"))
+
+                paths = []
+                for ext in ("*.png", "*.jpg", "*.jpeg"):
+                    paths.extend(glob.glob(os.path.join(base_path, ext)))
 
                 image_paths = sorted(
                     paths, key=lambda x: os.path.getmtime(x), reverse=True
@@ -203,13 +206,19 @@ class InvokeAIWebServer:
                 image_array = []
 
                 for path in image_paths:
-                    metadata = retrieve_metadata(path)
+                    if os.path.splitext(path)[1] == ".png":
+                        metadata = retrieve_metadata(path)
+                        sd_metadata = metadata["sd-metadata"]
+                    else:
+                        sd_metadata = {}
+
                     (width, height) = Image.open(path).size
+
                     image_array.append(
                         {
                             "url": self.get_url_from_image_path(path),
                             "mtime": os.path.getmtime(path),
-                            "metadata": metadata["sd-metadata"],
+                            "metadata": sd_metadata,
                             "width": width,
                             "height": height,
                             "category": category,
@@ -236,7 +245,9 @@ class InvokeAIWebServer:
                     self.result_path if category == "result" else self.init_image_path
                 )
 
-                paths = glob.glob(os.path.join(base_path, "*.png"))
+                paths = []
+                for ext in ("*.png", "*.jpg", "*.jpeg"):
+                    paths.extend(glob.glob(os.path.join(base_path, ext)))
 
                 image_paths = sorted(
                     paths, key=lambda x: os.path.getmtime(x), reverse=True
@@ -254,9 +265,12 @@ class InvokeAIWebServer:
                 image_paths = image_paths[slice(0, page_size)]
 
                 image_array = []
-
                 for path in image_paths:
-                    metadata = retrieve_metadata(path)
+                    if os.path.splitext(path)[1] == ".png":
+                        metadata = retrieve_metadata(path)
+                        sd_metadata = metadata["sd-metadata"]
+                    else:
+                        sd_metadata = {}
 
                     (width, height) = Image.open(path).size
 
@@ -264,7 +278,7 @@ class InvokeAIWebServer:
                         {
                             "url": self.get_url_from_image_path(path),
                             "mtime": os.path.getmtime(path),
-                            "metadata": metadata["sd-metadata"],
+                            "metadata": sd_metadata,
                             "width": width,
                             "height": height,
                             "category": category,
@@ -601,8 +615,9 @@ class InvokeAIWebServer:
                 progress.set_current_status_has_steps(True)
 
                 if (
-                    generation_parameters['progress_images'] and step % 5 == 0 \
-                        and step < generation_parameters['steps'] - 1
+                    generation_parameters["progress_images"]
+                    and step % 5 == 0
+                    and step < generation_parameters["steps"] - 1
                 ):
                     image = self.generate.sample_to_image(sample)
                     metadata = self.parameters_to_generated_image_metadata(
@@ -633,14 +648,16 @@ class InvokeAIWebServer:
                         },
                     )
 
-                if generation_parameters['progress_latents']:
+                if generation_parameters["progress_latents"]:
                     image = self.generate.sample_to_lowres_estimated_image(sample)
                     (width, height) = image.size
                     width *= 8
                     height *= 8
                     buffered = io.BytesIO()
                     image.save(buffered, format="PNG")
-                    img_base64 = "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode('UTF-8')
+                    img_base64 = "data:image/png;base64," + base64.b64encode(
+                        buffered.getvalue()
+                    ).decode("UTF-8")
                     self.socketio.emit(
                         "intermediateResult",
                         {
@@ -650,7 +667,7 @@ class InvokeAIWebServer:
                             "metadata": {},
                             "width": width,
                             "height": height,
-                        }
+                        },
                     )
 
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
@@ -667,7 +684,6 @@ class InvokeAIWebServer:
 
                 step_index = 1
                 nonlocal prior_variations
-
 
                 # paste the inpainting image back onto the original
                 if "init_mask" in generation_parameters:
