@@ -44,7 +44,7 @@ export default function InvokeButton(props: InvokeButton) {
       onClick={handleClickGenerate}
       className="invoke-btn invoke"
       tooltip="Invoke"
-      tooltipPlacement="bottom"
+      tooltipProps={{ placement: 'bottom' }}
       {...rest}
     />
   ) : (

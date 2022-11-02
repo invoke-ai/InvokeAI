@@ -13,7 +13,7 @@ const FloatingGalleryButton = () => {
   return (
     <IAIIconButton
       tooltip="Show Gallery (G)"
-      tooltipPlacement="top"
+      tooltipProps={{ placement: 'top' }}
       aria-label="Show Gallery"
       styleClass="floating-show-hide-button right"
       onMouseOver={handleShowGallery}
