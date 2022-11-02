@@ -19,6 +19,7 @@ import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import { persistor } from '../../../main';
 import {
   InProgressImageType,
+  setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
@@ -28,6 +29,7 @@ import ModelList from './ModelList';
 import { IN_PROGRESS_IMAGE_TYPES } from '../../../app/constants';
 import IAISwitch from '../../../common/components/IAISwitch';
 import IAISelect from '../../../common/components/IAISelect';
+import IAINumberInput from '../../../common/components/IAINumberInput';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -64,6 +66,12 @@ type SettingsModalProps = {
 const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
 
+  const saveIntermediatesInterval = useAppSelector(
+    (state: RootState) => state.system.saveIntermediatesInterval
+  );
+
+  const steps = useAppSelector((state: RootState) => state.options.steps);
+
   const {
     isOpen: isSettingsModalOpen,
     onOpen: onSettingsModalOpen,
@@ -93,6 +101,12 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     });
   };
 
+  const handleChangeIntermediateSteps = (value: number) => {
+    if (value > steps) value = steps;
+    if (value < 1) value = 1;
+    dispatch(setSaveIntermediatesInterval(value));
+  };
+
   return (
     <>
       {cloneElement(children, {
@@ -109,20 +123,35 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               <div className="settings-modal-item">
                 <ModelList />
               </div>
-              <IAISelect
-                styleClass="settings-modal-item"
-                label={'Display In-Progress Images'}
-                validValues={IN_PROGRESS_IMAGE_TYPES}
-                value={shouldDisplayInProgressType}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  dispatch(
-                    setShouldDisplayInProgressType(
-                      e.target.value as InProgressImageType
+              <div
+                className="settings-modal-item"
+                style={{ gridAutoFlow: 'row', rowGap: '0.5rem' }}
+              >
+                <IAISelect
+                  label={'Display In-Progress Images'}
+                  validValues={IN_PROGRESS_IMAGE_TYPES}
+                  value={shouldDisplayInProgressType}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                    dispatch(
+                      setShouldDisplayInProgressType(
+                        e.target.value as InProgressImageType
+                      )
                     )
-                  )
-                }
-              />
-
+                  }
+                />
+                {shouldDisplayInProgressType === 'full-res' && (
+                  <IAINumberInput
+                    label="Save images every n steps"
+                    min={1}
+                    max={steps}
+                    step={1}
+                    onChange={handleChangeIntermediateSteps}
+                    value={saveIntermediatesInterval}
+                    width="auto"
+                    textAlign="center"
+                  />
+                )}
+              </div>
               <IAISwitch
                 styleClass="settings-modal-item"
                 label={'Confirm on Delete'}
