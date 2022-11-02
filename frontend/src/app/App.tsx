@@ -78,18 +78,12 @@ const appSelector = createSelector(
 const App = () => {
   const dispatch = useAppDispatch();
 
-  // const [isReady, setIsReady] = useState<boolean>(false);
-  // const { isReady, reasonsWhyNotReady } = useAppSelector(readinessSelector);
   const { shouldShowGalleryButton, shouldShowOptionsPanelButton } =
     useAppSelector(appSelector);
 
   useEffect(() => {
     dispatch(requestSystemConfig());
   }, [dispatch]);
-
-  // useEffect(() => {
-  //   dispatch(readinessChanged({ isReady, reasonsWhyNotReady }));
-  // }, [dispatch, isReady, reasonsWhyNotReady]);
 
   return (
     <div className="App">

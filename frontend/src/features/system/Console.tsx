@@ -75,6 +75,10 @@ const Console = () => {
     [shouldShowLogViewer]
   );
 
+  useHotkeys('esc', () => {
+    dispatch(setShouldShowLogViewer(false));
+  });
+
   const handleOnScroll = () => {
     if (!viewerRef.current) return;
     if (

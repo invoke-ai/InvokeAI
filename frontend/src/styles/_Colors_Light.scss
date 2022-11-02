@@ -19,11 +19,15 @@
   --invalid: rgb(255, 75, 75);
   --invalid-secondary: rgb(120, 5, 5);
 
+  --accent-color-dim: rgb(186, 146, 0);
   --accent-color: rgb(235, 185, 5);
   --accent-color-hover: rgb(255, 200, 0);
 
   --destructive-color: rgb(237, 51, 51);
   --destructive-color-hover: rgb(255, 55, 55);
+
+  --warning-color: rgb(224, 142, 42);
+  --warning-color-hover: rgb(255, 167, 60);
 
   // Error status colors
   --border-color-invalid: rgb(255, 80, 50);
@@ -45,6 +49,11 @@
 
   --btn-load-more: rgb(202, 204, 206);
   --btn-load-more-hover: rgb(178, 180, 182);
+
+  --btn-delete-image: rgb(213, 49, 49);
+
+  // IAI Button Colors
+  --btn-checkbox-border-hover: rgb(176, 178, 182);
 
   // Switch
   --switch-bg-color: rgb(178, 180, 182);

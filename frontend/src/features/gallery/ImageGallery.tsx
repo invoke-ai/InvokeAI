@@ -163,6 +163,15 @@ export default function ImageGallery() {
     [shouldPinGallery]
   );
 
+  useHotkeys(
+    'esc',
+    () => {
+      if (shouldPinGallery) return;
+      dispatch(setShouldShowGallery(false));
+    },
+    [shouldPinGallery]
+  );
+
   const IMAGE_SIZE_STEP = 32;
 
   useHotkeys(
@@ -261,6 +270,7 @@ export default function ImageGallery() {
     >
       <div
         className="image-gallery-wrapper"
+        style={{ zIndex: shouldPinGallery ? 1 : 100 }}
         data-pinned={shouldPinGallery}
         ref={galleryRef}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}

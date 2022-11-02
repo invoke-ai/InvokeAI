@@ -2,18 +2,11 @@
   position: absolute;
   top: 0;
   left: 0;
-  display: flex;
   z-index: 2;
   margin: 0.5rem;
-  pointer-events: none;
-  background-color: var(--inpainting-alerts-bg);
-  border-radius: 0.2rem;
-  overflow: hidden;
 
   button {
-    border-radius: 0;
-    height: 100%;
-    vertical-align: top;
+    background-color: var(--inpainting-alerts-bg);
 
     svg {
       fill: var(--inpainting-alerts-icon-color);

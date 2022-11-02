@@ -86,7 +86,7 @@ const initialInpaintingState: InpaintingState = {
   isMovingBoundingBox: false,
   stageScale: 1,
   shouldUseInpaintReplace: false,
-  inpaintReplace: 1,
+  inpaintReplace: 0.1,
   shouldLockBoundingBox: true,
   isSpacebarHeld: false,
 };

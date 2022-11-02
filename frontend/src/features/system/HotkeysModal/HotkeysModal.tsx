@@ -73,14 +73,19 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
   const generalHotkeys = [
     {
-      title: 'Set Parameters',
-      desc: 'Use all parameters of the current image',
-      hotkey: 'A',
+      title: 'Set Prompt',
+      desc: 'Use the prompt of the current image',
+      hotkey: 'P',
     },
     {
       title: 'Set Seed',
       desc: 'Use the seed of the current image',
       hotkey: 'S',
+    },
+    {
+      title: 'Set Parameters',
+      desc: 'Use all parameters of the current image',
+      hotkey: 'A',
     },
     { title: 'Restore Faces', desc: 'Restore the current image', hotkey: 'R' },
     { title: 'Upscale', desc: 'Upscale the current image', hotkey: 'U' },
@@ -95,6 +100,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Shift+I',
     },
     { title: 'Delete Image', desc: 'Delete the current image', hotkey: 'Del' },
+    { title: 'Close Panels', desc: 'Closes open panels', hotkey: 'Esc' },
   ];
 
   const galleryHotkeys = [

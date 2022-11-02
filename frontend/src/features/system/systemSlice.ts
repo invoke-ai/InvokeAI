@@ -20,10 +20,12 @@ export type ReadinessPayload = {
   reasonsWhyNotReady: string[];
 };
 
+export type InProgressImageType = 'none' | 'full-res' | 'latents';
+
 export interface SystemState
   extends InvokeAI.SystemStatus,
     InvokeAI.SystemConfig {
-  shouldDisplayInProgressType: string;
+  shouldDisplayInProgressType: InProgressImageType;
   log: Array<LogEntry>;
   shouldShowLogViewer: boolean;
   isGFPGANAvailable: boolean;
@@ -41,16 +43,15 @@ export interface SystemState
   shouldDisplayGuides: boolean;
   wasErrorSeen: boolean;
   isCancelable: boolean;
-  isReady: boolean;
-  reasonsWhyNotReady: string[];
+  saveIntermediatesInterval: number;
 }
 
-const initialSystemState = {
+const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
   log: [],
   shouldShowLogViewer: false,
-  shouldDisplayInProgressType: "none",
+  shouldDisplayInProgressType: 'latents',
   shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
@@ -72,17 +73,17 @@ const initialSystemState = {
   hasError: false,
   wasErrorSeen: true,
   isCancelable: true,
-  isReady: false,
-  reasonsWhyNotReady: [],
+  saveIntermediatesInterval: 5,
 };
-
-const initialState: SystemState = initialSystemState;
 
 export const systemSlice = createSlice({
   name: 'system',
-  initialState,
+  initialState: initialSystemState,
   reducers: {
-    setShouldDisplayInProgressType: (state, action: PayloadAction<string>) => {
+    setShouldDisplayInProgressType: (
+      state,
+      action: PayloadAction<InProgressImageType>
+    ) => {
       state.shouldDisplayInProgressType = action.payload;
     },
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
@@ -187,10 +188,8 @@ export const systemSlice = createSlice({
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
     },
-    readinessChanged: (state, action: PayloadAction<ReadinessPayload>) => {
-      const { isReady, reasonsWhyNotReady } = action.payload;
-      state.isReady = isReady;
-      state.reasonsWhyNotReady = reasonsWhyNotReady;
+    setSaveIntermediatesInterval: (state, action: PayloadAction<number>) => {
+      state.saveIntermediatesInterval = action.payload;
     },
   },
 });
@@ -214,7 +213,7 @@ export const {
   setModelList,
   setIsCancelable,
   modelChangeRequested,
-  readinessChanged,
+  setSaveIntermediatesInterval,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

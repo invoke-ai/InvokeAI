@@ -14,6 +14,7 @@ import sys
 import traceback
 import transformers
 import io
+import gc
 import hashlib
 import cv2
 import skimage
@@ -789,9 +790,20 @@ class Generate:
         if self.model_name == model_name and self.model is not None:
             return self.model
 
-        model_data = self.model_cache.get_model(model_name)
-        if model_data is None or len(model_data) == 0:
-            return None
+        # the model cache does the loading and offloading
+        cache = self.model_cache
+        cache.print_vram_usage()
+
+        # have to get rid of all references to model in order
+        # to free it from GPU memory
+        self.model = None
+        self.sampler = None
+        self.generators = {}
+        gc.collect()
+        
+        model_data = cache.get_model(model_name)
+        if model_data is None:  # restore previous
+            model_data = cache.get_model(self.model_name)
 
         self.model = model_data['model']
         self.width = model_data['width']

@@ -51,9 +51,9 @@ export default function InpaintingMaskVisibilityControl() {
   );
   return (
     <IAIIconButton
-      aria-label="Hide/Show Mask (H)"
-      tooltip="Hide/Show Mask (H)"
-      data-selected={!shouldShowMask}
+      aria-label="Hide Mask (H)"
+      tooltip="Hide Mask (H)"
+      data-alert={!shouldShowMask}
       icon={shouldShowMask ? <BiShow size={22} /> : <BiHide size={22} />}
       onClick={handleToggleShouldShowMask}
     />

@@ -50,7 +50,7 @@ interface DeleteImageModalProps {
   /**
    * The image to delete.
    */
-  image: InvokeAI.Image;
+  image?: InvokeAI.Image;
 }
 
 /**
@@ -73,7 +73,7 @@ const DeleteImageModal = forwardRef(
     };
 
     const handleDelete = () => {
-      if (isConnected && !isProcessing) {
+      if (isConnected && !isProcessing && image) {
         dispatch(deleteImage(image));
       }
       onClose();
@@ -95,7 +95,7 @@ const DeleteImageModal = forwardRef(
       <>
         {cloneElement(children, {
           // TODO: This feels wrong.
-          onClick: handleClickDelete,
+          onClick: image ? handleClickDelete : undefined,
           ref: ref,
         })}
 

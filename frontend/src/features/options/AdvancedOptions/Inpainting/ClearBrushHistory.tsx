@@ -17,7 +17,8 @@ const clearBrushHistorySelector = createSelector(
   (inpainting: InpaintingState) => {
     const { pastLines, futureLines } = inpainting;
     return {
-      mayClearBrushHistory: futureLines.length > 0 || pastLines.length > 0 ? false : true
+      mayClearBrushHistory:
+        futureLines.length > 0 || pastLines.length > 0 ? false : true,
     };
   },
   {
@@ -44,11 +45,12 @@ export default function ClearBrushHistory() {
   };
   return (
     <IAIButton
-      label="Clear Brush History"
       onClick={handleClearBrushHistory}
       tooltip="Clears brush stroke history"
       disabled={mayClearBrushHistory}
       styleClass="inpainting-options-btn"
-    />
+    >
+      Clear Brush History
+    </IAIButton>
   );
 }

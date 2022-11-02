@@ -280,6 +280,7 @@ const InpaintingBoundingBoxPreview = () => {
   const handleStartedTransforming = (e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     e.evt.stopImmediatePropagation();
+    console.log("Started transform")
     dispatch(setIsTransformingBoundingBox(true));
   };
 

@@ -1,11 +1,13 @@
 import { useCallback, ReactNode, useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
-import { Heading, Spinner, useToast } from '@chakra-ui/react';
+import { useToast } from '@chakra-ui/react';
 import { uploadImage } from '../../app/socketio/actions';
 import { ImageUploadDestination, UploadImagePayload } from '../../app/invokeai';
 import { ImageUploaderTriggerContext } from '../../app/contexts/ImageUploaderTriggerContext';
 import { activeTabNameSelector } from '../../features/options/optionsSelectors';
+import { tabDict } from '../../features/tabs/InvokeTabs';
+import ImageUploadOverlay from './ImageUploadOverlay';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -71,6 +73,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
     noClick: true,
     onDrop,
+    onDragOver: () => setIsHandlingUpload(true),
     maxFiles: 1,
   });
 
@@ -128,30 +131,22 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [dispatch, toast, activeTabName]);
 
+  const overlaySecondaryText = ['img2img', 'inpainting'].includes(activeTabName)
+    ? ` to ${tabDict[activeTabName as keyof typeof tabDict].tooltip}`
+    : ``;
+
   return (
     <ImageUploaderTriggerContext.Provider value={open}>
       <div {...getRootProps({ style: {} })}>
         <input {...getInputProps()} />
         {children}
-        {isDragActive && (
-          <div className="dropzone-container">
-            {isDragAccept && (
-              <div className="dropzone-overlay is-drag-accept">
-                <Heading size={'lg'}>Drop Images</Heading>
-              </div>
-            )}
-            {isDragReject && (
-              <div className="dropzone-overlay is-drag-reject">
-                <Heading size={'lg'}>Invalid Upload</Heading>
-                <Heading size={'md'}>Must be single JPEG or PNG image</Heading>
-              </div>
-            )}
-            {isHandlingUpload && (
-              <div className="dropzone-overlay is-handling-upload">
-                <Spinner />
-              </div>
-            )}
-          </div>
+        {isDragActive && isHandlingUpload && (
+          <ImageUploadOverlay
+            isDragAccept={isDragAccept}
+            isDragReject={isDragReject}
+            overlaySecondaryText={overlaySecondaryText}
+            setIsHandlingUpload={setIsHandlingUpload}
+          />
         )}
       </div>
     </ImageUploaderTriggerContext.Provider>
