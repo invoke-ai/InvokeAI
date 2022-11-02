@@ -3,7 +3,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  column-gap: 0.5rem;
+  column-gap: 0.5em;
 
   .current-image-send-to-popover,
   .current-image-postprocessing-popover {
@@ -15,5 +15,11 @@
 
   .chakra-popover__popper {
     z-index: 11;
+  }
+
+  .delete-image-btn {
+    svg {
+      fill: var(--btn-delete-image);
+    }
   }
 }
