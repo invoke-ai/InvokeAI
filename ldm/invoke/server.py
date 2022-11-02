@@ -34,6 +34,7 @@ def build_opt(post_data, seed, gfpgan_model_exists):
     setattr(opt, 'facetool_strength', float(post_data['facetool_strength']) if gfpgan_model_exists else 0)
     setattr(opt, 'upscale', [int(post_data['upscale_level']), float(post_data['upscale_strength'])] if post_data['upscale_level'] != '' else None)
     setattr(opt, 'progress_images', 'progress_images' in post_data)
+    setattr(opt, 'progress_latents', 'progress_latents' in post_data)
     setattr(opt, 'seed', None if int(post_data['seed']) == -1 else int(post_data['seed']))
     setattr(opt, 'threshold', float(post_data['threshold']))
     setattr(opt, 'perlin', float(post_data['perlin']))
@@ -227,8 +228,13 @@ class DreamServer(BaseHTTPRequestHandler):
             # since rendering images is moderately expensive, only render every 5th image
             # and don't bother with the last one, since it'll render anyway
             nonlocal step_index
-            if opt.progress_images and step % 5 == 0 and step < opt.steps - 1:
-                image = self.model.sample_to_image(sample)
+
+            wants_progress_latents = opt.progress_latents
+            wants_progress_image = opt.progress_image and step % 5 == 0
+
+            if (wants_progress_image | wants_progress_latents) and step < opt.steps - 1:
+                image = self.model.sample_to_image(sample) if wants_progress_image \
+                        else self.model.sample_to_lowres_estimated_image(sample)
                 step_index_padded = str(step_index).rjust(len(str(opt.steps)), '0')
                 name = f'{prefix}.{opt.seed}.{step_index_padded}.png'
                 metadata = f'{opt.prompt} -S{opt.seed} [intermediate]'
