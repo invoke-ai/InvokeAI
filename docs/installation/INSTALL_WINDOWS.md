@@ -69,40 +69,42 @@ in the wiki
     environment file isn't specified, conda will default to `environment.yml`. You will need
     to provide the `-f` option if you wish to load a different environment file at any point.
 
-7. Run the command:
+7. Load the big stable diffusion weights files and a couple of smaller machine-learning models:
 
-    ```batch
-    python scripts\preload_models.py
+    ```bash
+    (invokeai) ~/InvokeAI$ python3 scripts/preload_models.py
     ```
 
-    This installs several machine learning models that stable diffusion requires.
+    !!! note
+    	This script will lead you through the process of creating an account on Hugging Face,
+	accepting the terms and conditions of the Stable Diffusion model license, and
+	obtaining an access token for downloading. It will then download and install the
+	weights files for you.
 
-    Note: This step is required. This was done because some users may might be
-    blocked by firewalls or have limited internet connectivity for the models to
-    be downloaded just-in-time.
+	Please see [../features/INSTALLING_MODELS.md] for a manual process for doing the
+	same thing.
 
-8. Now you need to install the weights for the big stable diffusion model.
+8. Start generating images!
 
-   - Sign up at https://huggingface.co
-   - Go to the [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
-   - Accept the terms and click Access Repository
-   - Download [v1-5-pruned-emaonly.ckpt (4.27 GB)](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned-emaonly.ckpt)
-     and move it into this directory under `models/ldm/stable_diffusion_v1/v1-5-pruned-emaonly.ckpt`
+    # Command-line interface
+    (invokeai) python scripts/invoke.py
 
-   There are many other models that you can use. Please see [../features/INSTALLING_MODELS.md]
-   for details.
+    # or run the web interface on localhost:9090!
+    (invokeai) python scripts/invoke.py --web
 
-9. Start generating images!
+    # or run the web interface on your machine's network interface!
+    (invokeai) python scripts/invoke.py --web --host 0.0.0.0
 
-    ```batch title="for the pre-release weights"
-    python scripts\invoke.py -l
-    ```
+To use an alternative model you may invoke the `!switch` command in
+the CLI, or pass `--model <model_name>` during `invoke.py` launch for
+either the CLI or the Web UI. See [Command Line
+Client](../features/CLI.md#model-selection-and-importation). The
+model names are defined in `configs/models.yaml`.
 
-    ```batch title="for the post-release weights"
-    python scripts\invoke.py
-    ```
-
-10. Subsequently, to relaunch the script, first activate the Anaconda command window (step 3),enter the InvokeAI directory (step 5, `cd \path\to\InvokeAI`), run `conda activate invokeai` (step 6b), and then launch the invoke script (step 9).
+9. Subsequently, to relaunch the script, first activate the Anaconda
+command window (step 3),enter the InvokeAI directory (step 5, `cd
+\path\to\InvokeAI`), run `conda activate invokeai` (step 6b), and then
+launch the invoke script (step 9).
 
 !!! tip "Tildebyte has written an alternative"
 
