@@ -28,9 +28,9 @@
 
 // gallery
 @use '../features/gallery/CurrentImageDisplay.scss';
+@use '../features/gallery/CurrentImageButtons.scss';
 @use '../features/gallery/ImageGallery.scss';
 @use '../features/gallery/HoverableImage.scss';
-@use '../features/gallery/InvokePopover.scss';
 @use '../features/gallery/ImageMetaDataViewer/ImageMetadataViewer.scss';
 
 // Tabs
@@ -47,6 +47,7 @@
 @use '../common/components/IAINumberInput.scss';
 @use '../common/components/IAIInput.scss';
 @use '../common/components/IAIIconButton.scss';
+@use '../common/components/IAIButton.scss';
 @use '../common/components/IAISwitch.scss';
 @use '../common/components/IAISelect.scss';
 @use '../common/components/IAISlider.scss';
