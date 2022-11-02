@@ -1,8 +1,7 @@
 @use '../../styles/Mixins/' as *;
 
 .invokeai__select {
-  display: grid;
-  grid-template-columns: repeat(2, max-content);
+  display: flex;
   column-gap: 1rem;
   align-items: center;
   width: max-content;

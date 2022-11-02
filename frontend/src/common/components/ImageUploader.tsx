@@ -6,6 +6,7 @@ import { uploadImage } from '../../app/socketio/actions';
 import { ImageUploadDestination, UploadImagePayload } from '../../app/invokeai';
 import { ImageUploaderTriggerContext } from '../../app/contexts/ImageUploaderTriggerContext';
 import { activeTabNameSelector } from '../../features/options/optionsSelectors';
+import { tabDict } from '../../features/tabs/InvokeTabs';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -128,6 +129,12 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [dispatch, toast, activeTabName]);
 
+  const overlaySecondaryText = ['img2img', 'inpainting'].includes(
+    activeTabName
+  )
+    ? ` to ${tabDict[activeTabName as keyof typeof tabDict].tooltip}`
+    : ``;
+
   return (
     <ImageUploaderTriggerContext.Provider value={open}>
       <div {...getRootProps({ style: {} })}>
@@ -137,7 +144,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
           <div className="dropzone-container">
             {isDragAccept && (
               <div className="dropzone-overlay is-drag-accept">
-                <Heading size={'lg'}>Drop Images</Heading>
+                <Heading size={'lg'}>Upload Image{overlaySecondaryText}</Heading>
               </div>
             )}
             {isDragReject && (

@@ -14,18 +14,18 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _, { isEqual } from 'lodash';
-import { cloneElement, ReactElement } from 'react';
-import { RootState, useAppSelector } from '../../../app/store';
+import { ChangeEvent, cloneElement, ReactElement } from 'react';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import { persistor } from '../../../main';
 import {
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
-  setShouldDisplayInProgressType,
   SystemState,
 } from '../systemSlice';
 import ModelList from './ModelList';
-import { SettingsModalItem, SettingsModalSelectItem } from './SettingsModalItem';
 import { IN_PROGRESS_IMAGE_TYPES } from '../../../app/constants';
+import IAISwitch from '../../../common/components/IAISwitch';
+import IAISelect from '../../../common/components/IAISelect';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -60,6 +60,8 @@ type SettingsModalProps = {
  * Secondary post-reset modal is included here.
  */
 const SettingsModal = ({ children }: SettingsModalProps) => {
+  const dispatch = useAppDispatch();
+
   const {
     isOpen: isSettingsModalOpen,
     onOpen: onSettingsModalOpen,
@@ -101,26 +103,32 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalHeader className="settings-modal-header">Settings</ModalHeader>
           <ModalCloseButton />
           <ModalBody className="settings-modal-content">
-            <ModelList />
             <div className="settings-modal-items">
-
-              <SettingsModalSelectItem
-                settingTitle="Display In-Progress Images"
+              <div className="settings-modal-item">
+                <ModelList />
+              </div>
+              <IAISelect
+                styleClass="settings-modal-item"
+                label={'Display In-Progress Images'}
                 validValues={IN_PROGRESS_IMAGE_TYPES}
-                defaultValue={shouldDisplayInProgressType}
-                dispatcher={setShouldDisplayInProgressType}
+                value={shouldDisplayInProgressType}
               />
 
-              <SettingsModalItem
-                settingTitle="Confirm on Delete"
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={'Confirm on Delete'}
                 isChecked={shouldConfirmOnDelete}
-                dispatcher={setShouldConfirmOnDelete}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(setShouldConfirmOnDelete(e.target.checked))
+                }
               />
-
-              <SettingsModalItem
-                settingTitle="Display Help Icons"
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={'Display Help Icons'}
                 isChecked={shouldDisplayGuides}
-                dispatcher={setShouldDisplayGuides}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(setShouldDisplayGuides(e.target.checked))
+                }
               />
             </div>
 

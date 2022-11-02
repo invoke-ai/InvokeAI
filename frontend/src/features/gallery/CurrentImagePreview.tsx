@@ -26,6 +26,9 @@ export const imagesSelector = createSelector(
       isOnLastImage:
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
       shouldShowImageDetails,
+      shouldShowPrevImageButton: currentImageIndex === 0,
+      shouldShowNextImageButton:
+        !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
     };
   },
   {
