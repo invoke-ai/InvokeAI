@@ -32,7 +32,7 @@ class Outcrop(object):
 
         result= self.generate.prompt2image(
             orig_opt.prompt,
-            seed        = orig_opt.seed,    # uncomment to make it non-deterministic
+            seed        = orig_opt.seed,    # uncomment to make it deterministic
             sampler     = self.generate.sampler,
             steps       = opt.steps,
             cfg_scale   = opt.cfg_scale,
