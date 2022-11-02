@@ -151,7 +151,6 @@ class CrossAttentionControl:
             #else:
             #    print(f"in wrangler, whole, use_last_attn_slice is {self.use_last_attn_slice}, save_last_attn_slice is {self.save_last_attn_slice}")
 
-
             if self.use_last_attn_slice:
                 if dim is None:
                     last_attn_slice = self.last_attn_slice
