@@ -34,6 +34,7 @@ export interface SystemState
   currentStatus: string;
   currentStatusHasSteps: boolean;
   shouldDisplayGuides: boolean;
+  saveIntermediates: number;
   wasErrorSeen: boolean;
   isCancelable: boolean;
 }
@@ -45,6 +46,7 @@ const initialSystemState = {
   shouldShowLogViewer: false,
   shouldDisplayInProgressType: "none",
   shouldDisplayGuides: true,
+  saveIntermediates: 5,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
   socketId: '',
@@ -81,6 +83,9 @@ export const systemSlice = createSlice({
     },
     setCurrentStatus: (state, action: PayloadAction<string>) => {
       state.currentStatus = action.payload;
+    },
+    setSaveIntermediates: (state, action: PayloadAction<number>) => {
+      state.saveIntermediates = action.payload;
     },
     setSystemStatus: (state, action: PayloadAction<InvokeAI.SystemStatus>) => {
       return { ...state, ...action.payload };
@@ -183,6 +188,7 @@ export const systemSlice = createSlice({
 
 export const {
   setShouldDisplayInProgressType,
+  setSaveIntermediates,
   setIsProcessing,
   addLogEntry,
   setShouldShowLogViewer,

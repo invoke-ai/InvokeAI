@@ -15,9 +15,10 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import _, { isEqual } from 'lodash';
 import { cloneElement, ReactElement } from 'react';
-import { RootState, useAppSelector } from '../../../app/store';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import { persistor } from '../../../main';
 import {
+  setSaveIntermediates,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
@@ -26,6 +27,7 @@ import {
 import ModelList from './ModelList';
 import { SettingsModalItem, SettingsModalSelectItem } from './SettingsModalItem';
 import { IN_PROGRESS_IMAGE_TYPES } from '../../../app/constants';
+import IAINumberInput from '../../../common/components/IAINumberInput';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -60,6 +62,9 @@ type SettingsModalProps = {
  * Secondary post-reset modal is included here.
  */
 const SettingsModal = ({ children }: SettingsModalProps) => {
+  const dispatch = useAppDispatch();
+  const saveIntermediates = useAppSelector((state: RootState) => state.system.saveIntermediates)
+  const steps = useAppSelector((state: RootState) => state.options.steps);
   const {
     isOpen: isSettingsModalOpen,
     onOpen: onSettingsModalOpen,
@@ -77,6 +82,8 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldConfirmOnDelete,
     shouldDisplayGuides,
   } = useAppSelector(systemSelector);
+
+  const handleChangeSteps = (value: number) => dispatch(setSaveIntermediates(value));
 
   /**
    * Resets localstorage, then opens a secondary modal informing user to
@@ -121,6 +128,18 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 settingTitle="Display Help Icons"
                 isChecked={shouldDisplayGuides}
                 dispatcher={setShouldDisplayGuides}
+              />
+
+              <IAINumberInput
+                styleClass="save-intermediates"
+                label="Save images every n steps"
+                min={1}
+                max={steps - 1}
+                step={1}
+                onChange={handleChangeSteps}
+                value={saveIntermediates}
+                width="auto"
+                textAlign="center"
               />
             </div>
 
