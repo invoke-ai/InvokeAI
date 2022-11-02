@@ -163,6 +163,15 @@ export default function ImageGallery() {
     [shouldPinGallery]
   );
 
+  useHotkeys(
+    'esc',
+    () => {
+      if (shouldPinGallery) return;
+      dispatch(setShouldShowGallery(false));
+    },
+    [shouldPinGallery]
+  );
+
   const IMAGE_SIZE_STEP = 32;
 
   useHotkeys(

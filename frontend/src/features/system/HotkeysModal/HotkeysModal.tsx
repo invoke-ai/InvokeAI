@@ -100,6 +100,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Shift+I',
     },
     { title: 'Delete Image', desc: 'Delete the current image', hotkey: 'Del' },
+    { title: 'Close Panels', desc: 'Closes open panels', hotkey: 'Esc' },
   ];
 
   const galleryHotkeys = [
