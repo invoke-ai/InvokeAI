@@ -21,6 +21,7 @@ import {
 } from '../inpaintingSlice';
 
 import _ from 'lodash';
+import InpaintingMaskColorPicker from './InpaintingMaskControls/InpaintingMaskColorPicker';
 
 const inpaintingBrushSelector = createSelector(
   [(state: RootState) => state.inpainting, activeTabNameSelector],
@@ -123,7 +124,7 @@ export default function InpaintingBrushControl() {
         />
       }
     >
-      <div className="inpainting-slider-numberinput">
+      <div className="inpainting-brush-options">
         <IAISlider
           label="Brush Size"
           value={brushSize}
@@ -142,6 +143,7 @@ export default function InpaintingBrushControl() {
           max={999}
           isDisabled={!shouldShowMask}
         />
+        <InpaintingMaskColorPicker />
       </div>
     </IAIPopover>
   );

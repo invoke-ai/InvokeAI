@@ -1,7 +1,6 @@
 .invokeai__number-input-form-control {
   display: grid;
   grid-template-columns: max-content auto;
-  column-gap: 1rem;
   align-items: center;
 
   .invokeai__number-input-form-label {
@@ -11,6 +10,7 @@
     margin-bottom: 0;
     flex-grow: 2;
     white-space: nowrap;
+    padding-right: 1rem;
 
     &[data-focus] + .invokeai__number-input-root {
       outline: none;

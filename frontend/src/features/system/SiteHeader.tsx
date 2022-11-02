@@ -2,8 +2,15 @@ import { Link, useColorMode } from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 
-import { FaSun, FaMoon, FaGithub, FaDiscord, FaBug } from 'react-icons/fa';
-import { MdKeyboard, MdSettings } from 'react-icons/md';
+import {
+  FaSun,
+  FaMoon,
+  FaGithub,
+  FaDiscord,
+  FaBug,
+  FaKeyboard,
+  FaWrench,
+} from 'react-icons/fa';
 
 import InvokeAILogo from '../../assets/images/logo.png';
 import IAIIconButton from '../../common/components/IAIIconButton';
@@ -27,11 +34,6 @@ const SiteHeader = () => {
     [colorMode, toggleColorMode]
   );
 
-  const colorModeIcon = colorMode == 'light' ? <FaMoon /> : <FaSun />;
-
-  // Make FaMoon and FaSun icon apparent size consistent
-  const colorModeIconFontSize = colorMode == 'light' ? 18 : 20;
-
   return (
     <div className="site-header">
       <div className="site-header-left-side">
@@ -48,10 +50,11 @@ const SiteHeader = () => {
           <IAIIconButton
             aria-label="Hotkeys"
             tooltip="Hotkeys"
-            fontSize={24}
             size={'sm'}
             variant="link"
-            icon={<MdKeyboard />}
+            data-variant="link"
+            fontSize={20}
+            icon={<FaKeyboard />}
           />
         </HotkeysModal>
 
@@ -60,16 +63,18 @@ const SiteHeader = () => {
           tooltip="Dark Mode"
           onClick={toggleColorMode}
           variant="link"
+          data-variant="link"
+          fontSize={20}
           size={'sm'}
-          fontSize={colorModeIconFontSize}
-          icon={colorModeIcon}
+          icon={colorMode === 'light' ? <FaMoon /> : <FaSun />}
         />
 
         <IAIIconButton
           aria-label="Report Bug"
           tooltip="Report Bug"
           variant="link"
-          fontSize={19}
+          data-variant="link"
+          fontSize={20}
           size={'sm'}
           icon={
             <Link isExternal href="http://github.com/invoke-ai/InvokeAI/issues">
@@ -82,6 +87,7 @@ const SiteHeader = () => {
           aria-label="Link to Github Repo"
           tooltip="Github"
           variant="link"
+          data-variant="link"
           fontSize={20}
           size={'sm'}
           icon={
@@ -95,6 +101,7 @@ const SiteHeader = () => {
           aria-label="Link to Discord Server"
           tooltip="Discord"
           variant="link"
+          data-variant="link"
           fontSize={20}
           size={'sm'}
           icon={
@@ -109,9 +116,10 @@ const SiteHeader = () => {
             aria-label="Settings"
             tooltip="Settings"
             variant="link"
-            fontSize={24}
+            data-variant="link"
+            fontSize={20}
             size={'sm'}
-            icon={<MdSettings />}
+            icon={<FaWrench />}
           />
         </SettingsModal>
       </div>

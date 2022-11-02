@@ -7,7 +7,6 @@ import IAIPopover from '../../../../common/components/IAIPopover';
 import InpaintingMaskVisibilityControl from './InpaintingMaskControls/InpaintingMaskVisibilityControl';
 import InpaintingMaskInvertControl from './InpaintingMaskControls/InpaintingMaskInvertControl';
 import InpaintingMaskColorPicker from './InpaintingMaskControls/InpaintingMaskColorPicker';
-import InpaintingMaskClear from './InpaintingMaskControls/InpaintingMaskClear';
 
 export default function InpaintingMaskControl() {
   const [maskOptionsOpen, setMaskOptionsOpen] = useState<boolean>(false);
@@ -34,7 +33,6 @@ export default function InpaintingMaskControl() {
           <InpaintingMaskColorPicker />
         </div>
       </IAIPopover>
-      <InpaintingMaskClear />
     </>
   );
 }

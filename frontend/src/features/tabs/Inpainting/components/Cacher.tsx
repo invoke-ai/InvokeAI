@@ -35,6 +35,7 @@ const Cacher = () => {
     isDrawing,
     isTransformingBoundingBox,
     isMovingBoundingBox,
+    shouldShowBoundingBox,
   } = useAppSelector((state: RootState) => state.inpainting);
 
   useLayoutEffect(() => {
@@ -60,6 +61,7 @@ const Cacher = () => {
     imageToInpaint,
     shouldShowBrush,
     shouldShowBoundingBoxFill,
+    shouldShowBoundingBox,
     shouldLockBoundingBox,
     stageScale,
     pastLines,

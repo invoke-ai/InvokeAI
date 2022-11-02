@@ -33,9 +33,8 @@ import InpaintingBoundingBoxPreview, {
   InpaintingBoundingBoxPreviewOverlay,
 } from './components/InpaintingBoundingBoxPreview';
 import { KonvaEventObject } from 'konva/lib/Node';
-import KeyboardEventManager from './components/KeyboardEventManager';
+import KeyboardEventManager from './KeyboardEventManager';
 import { useToast } from '@chakra-ui/react';
-import InpaintingCanvasStatusIcons from './InpaintingCanvasStatusIcons';
 
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
@@ -57,7 +56,6 @@ const InpaintingCanvas = () => {
     shouldShowBoundingBox,
     shouldShowBoundingBoxFill,
     isDrawing,
-    isMouseOverBoundingBox,
     isModifyingBoundingBox,
     stageCursor,
   } = useAppSelector(inpaintingCanvasSelector);
@@ -236,10 +234,8 @@ const InpaintingCanvas = () => {
   );
 
   return (
-    <div className="inpainting-canvas-container" tabIndex={1}>
+    <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
-        <InpaintingCanvasStatusIcons />
-
         {canvasBgImage && (
           <Stage
             width={Math.floor(canvasBgImage.width * stageScale)}
@@ -274,9 +270,7 @@ const InpaintingCanvas = () => {
                 >
                   <InpaintingCanvasLines />
 
-                  {!isMouseOverBoundingBox && !isModifyingBoundingBox && (
-                    <InpaintingCanvasBrushPreview />
-                  )}
+                  <InpaintingCanvasBrushPreview />
 
                   {shouldInvertMask && (
                     <KonvaImage
@@ -299,9 +293,7 @@ const InpaintingCanvas = () => {
                   )}
                   {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
 
-                  {!isMouseOverBoundingBox && !isModifyingBoundingBox && (
-                    <InpaintingCanvasBrushPreviewOutline />
-                  )}
+                  <InpaintingCanvasBrushPreviewOutline />
                 </Layer>
               </>
             )}

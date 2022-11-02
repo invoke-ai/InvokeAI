@@ -75,12 +75,10 @@ export default function InpaintingMaskColorPicker() {
   return (
     <IAIPopover
       trigger="hover"
-      placement="right"
       styleClass="inpainting-color-picker"
       triggerComponent={
         <IAIIconButton
           aria-label="Mask Color"
-          tooltip="Mask Color"
           icon={<FaPalette />}
           isDisabled={!shouldShowMask}
           cursor={'pointer'}

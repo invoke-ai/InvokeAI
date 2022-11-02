@@ -21,6 +21,27 @@
 
   &[data-variant='link'] {
     background: none !important;
+    &:hover {
+      background: none !important;
+    }
+  }
+
+  &[data-selected='true'] {
+    border-color: var(--accent-color);
+    &:hover {
+      border-color: var(--accent-color-hover);
+    }
+  }
+
+  &[data-alert='true'] {
+    animation-name: pulseColor;
+    animation-duration: 1s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    &:hover {
+      animation: none;
+      background-color: var(--accent-color-hover);
+    }
   }
 
   &[data-as-checkbox='true'] {
@@ -38,13 +59,17 @@
         fill: var(--text-color);
       }
     }
+  }
+}
 
-    &[data-selected='true'] {
-      border-color: var(--accent-color);
-      background-color: var(--btn-grey);
-      svg {
-        fill: var(--text-color);
-      }
-    }
+@keyframes pulseColor {
+  0% {
+    background-color: var(--accent-color);
+  }
+  50% {
+    background-color: var(--accent-color-dim);
+  }
+  100% {
+    background-color: var(--accent-color);
   }
 }

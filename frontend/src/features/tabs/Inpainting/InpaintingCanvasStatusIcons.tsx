@@ -27,7 +27,7 @@ const inpaintingCanvasStatusIconsSelector = createSelector(
   }
 );
 
-import { ButtonGroup, IconButton } from '@chakra-ui/react';
+import { ButtonGroup, IconButton, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { BiHide, BiShow } from 'react-icons/bi';
 import { GiResize } from 'react-icons/gi';
@@ -36,6 +36,7 @@ import { FaLock, FaUnlock } from 'react-icons/fa';
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
 import { RootState, useAppSelector } from '../../../app/store';
 import { InpaintingState } from './inpaintingSlice';
+import { MouseEvent, useRef, useState } from 'react';
 
 const InpaintingCanvasStatusIcons = () => {
   const {
@@ -46,17 +47,48 @@ const InpaintingCanvasStatusIcons = () => {
     isBoundingBoxTooSmall,
   } = useAppSelector(inpaintingCanvasStatusIconsSelector);
 
+  const [shouldAcceptPointerEvents, setShouldAcceptPointerEvents] =
+    useState<boolean>(false);
+  const timeoutRef = useRef<number>(0);
+
+  const handleMouseOver = () => {
+    if (!shouldAcceptPointerEvents) {
+      timeoutRef.current = window.setTimeout(
+        () => setShouldAcceptPointerEvents(true),
+        1000
+      );
+    }
+  };
+
+  const handleMouseOut = () => {
+    if (!shouldAcceptPointerEvents) {
+      setShouldAcceptPointerEvents(false);
+      window.clearTimeout(timeoutRef.current);
+    }
+  };
+
   return (
-    <div className="inpainting-alerts">
-      <ButtonGroup isAttached>
-        <IconButton
-          aria-label="Show/HideMask"
-          size="xs"
-          variant={'ghost'}
-          fontSize={'1rem'}
-          data-selected={!shouldShowMask}
-          icon={shouldShowMask ? <BiShow /> : <BiHide />}
-        />
+    <div
+      className="inpainting-alerts"
+      onMouseOver={handleMouseOver}
+      onMouseOut={handleMouseOut}
+      onMouseLeave={handleMouseOut}
+      onBlur={handleMouseOut}
+    >
+      <ButtonGroup
+        isAttached
+        pointerEvents={shouldAcceptPointerEvents ? 'auto' : 'none'}
+      >
+        <Tooltip label="Mask Hidden">
+          <IconButton
+            aria-label="Show/HideMask"
+            size="xs"
+            variant={'ghost'}
+            fontSize={'1rem'}
+            data-selected={!shouldShowMask}
+            icon={shouldShowMask ? <BiShow /> : <BiHide />}
+          />
+        </Tooltip>
         <IconButton
           aria-label="Invert Mask"
           variant={'ghost'}
