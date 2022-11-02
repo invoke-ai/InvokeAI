@@ -13,6 +13,10 @@
     align-items: center;
     column-gap: 0.5rem;
 
+    svg {
+      transform: scale(0.9);
+    }
+
     .inpainting-buttons-group {
       display: flex;
       align-items: center;

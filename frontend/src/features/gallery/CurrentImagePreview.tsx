@@ -30,6 +30,7 @@ export const imagesSelector = createSelector(
 
     return {
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,
+      isIntermediate: intermediateImage,
       currentCategory,
       isOnFirstImage: currentImageIndex === 0,
       isOnLastImage:
@@ -55,6 +56,7 @@ export default function CurrentImagePreview() {
     isOnLastImage,
     shouldShowImageDetails,
     imageToDisplay,
+    isIntermediate,
   } = useAppSelector(imagesSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
@@ -78,7 +80,13 @@ export default function CurrentImagePreview() {
 
   return (
     <div className={'current-image-preview'}>
-      {imageToDisplay && <Image src={imageToDisplay.url} />}
+      {imageToDisplay && (
+        <Image
+          src={imageToDisplay.url}
+          width={isIntermediate ? imageToDisplay.width : undefined}
+          height={isIntermediate ? imageToDisplay.height : undefined}
+        />
+      )}
       {!shouldShowImageDetails && (
         <div className="current-image-next-prev-buttons">
           <div

@@ -23,12 +23,12 @@ const InpaintingControls = () => {
         <InpaintingMaskInvertControl />
         <InpaintingLockBoundingBoxControl />
         <InpaintingShowHideBoundingBoxControl />
+        <InpaintingMaskClear />
       </ButtonGroup>
 
       <ButtonGroup isAttached={true}>
         <InpaintingUndoControl />
         <InpaintingRedoControl />
-        <InpaintingMaskClear />
       </ButtonGroup>
       <ButtonGroup isAttached={true}>
         <ImageUploaderIconButton />
