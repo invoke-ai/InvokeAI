@@ -46,13 +46,13 @@ const systemSelector = createSelector(
   [
     (state: RootState) => state.system,
     (state: RootState) => state.options,
-    intermediateImageSelector,
+    (state: RootState) => state.gallery,
     activeTabNameSelector,
   ],
   (
     system: SystemState,
     options: OptionsState,
-    intermediateImage,
+    gallery: GalleryState,
     activeTabName
   ) => {
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =

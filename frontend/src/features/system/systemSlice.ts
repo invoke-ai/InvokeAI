@@ -195,7 +195,7 @@ export const systemSlice = createSlice({
 });
 
 export const {
-  setShouldDisplayInProgress,
+  setShouldDisplayInProgressType,
   setIsProcessing,
   addLogEntry,
   setShouldShowLogViewer,

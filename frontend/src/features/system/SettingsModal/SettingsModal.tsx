@@ -22,7 +22,7 @@ import {
   setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
-  setShouldDisplayInProgress,
+  setShouldDisplayInProgressType,
   SystemState,
 } from '../systemSlice';
 import ModelList from './ModelList';
@@ -35,13 +35,13 @@ const systemSelector = createSelector(
   (state: RootState) => state.system,
   (system: SystemState) => {
     const {
-      shouldDisplayInProgress,
+      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       model_list,
     } = system;
     return {
-      shouldDisplayInProgress,
+      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       models: _.map(model_list, (_model, key) => key),
@@ -85,7 +85,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   } = useDisclosure();
 
   const {
-    shouldDisplayInProgress,
+    shouldDisplayInProgressType,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
   } = useAppSelector(systemSelector);
