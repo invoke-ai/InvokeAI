@@ -50,7 +50,7 @@ const initialSystemState: SystemState = {
   isProcessing: false,
   log: [],
   shouldShowLogViewer: false,
-  shouldDisplayInProgressType: 'none',
+  shouldDisplayInProgressType: 'latents',
   shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
