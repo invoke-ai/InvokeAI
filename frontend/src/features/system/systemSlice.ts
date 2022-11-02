@@ -41,8 +41,6 @@ export interface SystemState
   shouldDisplayGuides: boolean;
   wasErrorSeen: boolean;
   isCancelable: boolean;
-  isReady: boolean;
-  reasonsWhyNotReady: string[];
 }
 
 const initialSystemState = {
@@ -187,11 +185,6 @@ export const systemSlice = createSlice({
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
     },
-    readinessChanged: (state, action: PayloadAction<ReadinessPayload>) => {
-      const { isReady, reasonsWhyNotReady } = action.payload;
-      state.isReady = isReady;
-      state.reasonsWhyNotReady = reasonsWhyNotReady;
-    },
   },
 });
 
@@ -214,7 +207,6 @@ export const {
   setModelList,
   setIsCancelable,
   modelChangeRequested,
-  readinessChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
