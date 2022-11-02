@@ -11,7 +11,7 @@
   .inpainting-settings {
     display: flex;
     align-items: center;
-    column-gap: 1rem;
+    column-gap: 0.5rem;
 
     .inpainting-buttons-group {
       display: flex;
@@ -29,10 +29,10 @@
       margin-left: 1rem !important;
     }
 
-    .inpainting-slider-numberinput {
+    .inpainting-brush-options {
       display: flex;
-      column-gap: 1rem;
       align-items: center;
+      column-gap: 1rem;
     }
   }
 

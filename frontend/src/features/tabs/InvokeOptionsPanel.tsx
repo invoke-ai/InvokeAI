@@ -112,12 +112,6 @@ const InvokeOptionsPanel = (props: Props) => {
     dispatch(setNeedsCache(true));
   };
 
-  // // set gallery scroll position
-  // useEffect(() => {
-  //   if (!optionsPanelContainerRef.current) return;
-  //   optionsPanelContainerRef.current.scrollTop = optionsPanelScrollPosition;
-  // }, [optionsPanelScrollPosition, shouldShowOptionsPanel]);
-
   return (
     <CSSTransition
       nodeRef={optionsPanelRef}

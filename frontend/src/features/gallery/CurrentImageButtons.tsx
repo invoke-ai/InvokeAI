@@ -34,7 +34,10 @@ import {
   FaShareAlt,
   FaTrash,
 } from 'react-icons/fa';
-import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
+import {
+  setImageToInpaint,
+  setNeedsCache,
+} from '../tabs/Inpainting/inpaintingSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from '../options/optionsSelectors';
 import IAIPopover from '../../common/components/IAIPopover';
@@ -95,7 +98,6 @@ const CurrentImageButtons = () => {
     facetoolStrength,
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
-    activeTabName,
     currentImage,
   } = useAppSelector(systemSelector);
 
@@ -108,7 +110,7 @@ const CurrentImageButtons = () => {
   const handleClickUseAsInitialImage = () => {
     if (!currentImage) return;
     dispatch(setInitialImage(currentImage));
-    dispatch(setActiveTab(1));
+    dispatch(setActiveTab('img2img'));
   };
 
   const handleCopyImageLink = () => {
@@ -308,9 +310,10 @@ const CurrentImageButtons = () => {
     if (!currentImage) return;
 
     dispatch(setImageToInpaint(currentImage));
-    if (activeTabName !== 'inpainting') {
-      dispatch(setActiveTab('inpainting'));
-    }
+
+    dispatch(setActiveTab('inpainting'));
+    dispatch(setNeedsCache(true));
+
     toast({
       title: 'Sent to Inpainting',
       status: 'success',
@@ -461,7 +464,7 @@ const CurrentImageButtons = () => {
             icon={<FaTrash />}
             tooltip="Delete Image"
             aria-label="Delete Image"
-            isDisabled={Boolean(currentImage) || !isConnected || isProcessing}
+            isDisabled={!currentImage || !isConnected || isProcessing}
           />
         </DeleteImageModal>
       </ButtonGroup>

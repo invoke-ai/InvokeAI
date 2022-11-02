@@ -62,7 +62,7 @@ export default function InpaintingMaskClear() {
     <IAIIconButton
       aria-label="Clear Mask (Shift+C)"
       tooltip="Clear Mask (Shift+C)"
-      icon={<FaPlus size={18} style={{ transform: 'rotate(45deg)' }} />}
+      icon={<FaPlus size={20} style={{ transform: 'rotate(45deg)' }} />}
       onClick={handleClearMask}
       isDisabled={isMaskEmpty || !shouldShowMask}
     />

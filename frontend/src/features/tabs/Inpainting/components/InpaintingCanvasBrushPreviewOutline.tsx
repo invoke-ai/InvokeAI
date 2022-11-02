@@ -4,26 +4,34 @@ import { Circle } from 'react-konva';
 import { RootState, useAppSelector } from '../../../../app/store';
 import { InpaintingState } from '../inpaintingSlice';
 
-const inpaintingCanvasBrushPreviewSelector = createSelector(
+const inpaintingCanvasBrushPrevieOutlineSelector = createSelector(
   (state: RootState) => state.inpainting,
   (inpainting: InpaintingState) => {
     const {
       cursorPosition,
       canvasDimensions: { width, height },
-      shouldShowBrushPreview,
       brushSize,
-      stageScale,
+      tool,
       shouldShowBrush,
+      isMovingBoundingBox,
+      isTransformingBoundingBox,
+      stageScale,
     } = inpainting;
 
     return {
       cursorPosition,
       width,
       height,
-      shouldShowBrushPreview,
       brushSize,
+      tool,
       strokeWidth: 1 / stageScale, // scale stroke thickness
-      shouldShowBrush,
+      radius: 1 / stageScale, // scale stroke thickness
+      shouldDrawBrushPreview:
+        !(
+          isMovingBoundingBox ||
+          isTransformingBoundingBox ||
+          !cursorPosition
+        ) && shouldShowBrush,
     };
   },
   {
@@ -41,15 +49,13 @@ const InpaintingCanvasBrushPreviewOutline = () => {
     cursorPosition,
     width,
     height,
-    shouldShowBrushPreview,
     brushSize,
+    shouldDrawBrushPreview,
     strokeWidth,
-    shouldShowBrush,
-  } = useAppSelector(inpaintingCanvasBrushPreviewSelector);
+    radius,
+  } = useAppSelector(inpaintingCanvasBrushPrevieOutlineSelector);
 
-  if (!shouldShowBrush || !(cursorPosition || shouldShowBrushPreview))
-    return null;
-
+  if (!shouldDrawBrushPreview) return null;
   return (
     <>
       <Circle
@@ -64,7 +70,7 @@ const InpaintingCanvasBrushPreviewOutline = () => {
       <Circle
         x={cursorPosition ? cursorPosition.x : width / 2}
         y={cursorPosition ? cursorPosition.y : height / 2}
-        radius={1}
+        radius={radius}
         fill={'rgba(0,0,0,1)'}
         listening={false}
       />

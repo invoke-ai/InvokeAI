@@ -11,22 +11,28 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
     const {
       cursorPosition,
       canvasDimensions: { width, height },
-      shouldShowBrushPreview,
       brushSize,
       maskColor,
       tool,
       shouldShowBrush,
+      isMovingBoundingBox,
+      isTransformingBoundingBox,
     } = inpainting;
 
     return {
       cursorPosition,
       width,
       height,
-      shouldShowBrushPreview,
       brushSize,
       maskColorString: rgbaColorToRgbString(maskColor),
       tool,
       shouldShowBrush,
+      shouldDrawBrushPreview:
+        !(
+          isMovingBoundingBox ||
+          isTransformingBoundingBox ||
+          !cursorPosition
+        ) && shouldShowBrush,
     };
   },
   {
@@ -40,12 +46,17 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
  * Draws a black circle around the canvas brush preview.
  */
 const InpaintingCanvasBrushPreview = () => {
-  const { cursorPosition, width, height, brushSize, maskColorString, tool } =
-    useAppSelector(inpaintingCanvasBrushPreviewSelector);
+  const {
+    cursorPosition,
+    width,
+    height,
+    brushSize,
+    maskColorString,
+    tool,
+    shouldDrawBrushPreview,
+  } = useAppSelector(inpaintingCanvasBrushPreviewSelector);
 
-  if (!cursorPosition) {
-    return null;
-  }
+  if (!shouldDrawBrushPreview) return null;
 
   return (
     <Circle

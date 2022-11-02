@@ -1,5 +1,19 @@
+import { Tooltip } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { ReactNode } from 'react';
+import { VscSplitHorizontal } from 'react-icons/vsc';
+import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import ImageGallery from '../gallery/ImageGallery';
+import { activeTabNameSelector } from '../options/optionsSelectors';
+import { OptionsState, setShowDualDisplay } from '../options/optionsSlice';
+
+const workareaSelector = createSelector(
+  [(state: RootState) => state.options, activeTabNameSelector],
+  (options: OptionsState, activeTabName) => {
+    const { showDualDisplay, shouldPinOptionsPanel } = options;
+    return { showDualDisplay, shouldPinOptionsPanel, activeTabName };
+  }
+);
 
 type InvokeWorkareaProps = {
   optionsPanel: ReactNode;
@@ -8,7 +22,9 @@ type InvokeWorkareaProps = {
 };
 
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
+  const dispatch = useAppDispatch();
   const { optionsPanel, children, styleClass } = props;
+  const { showDualDisplay, activeTabName } = useAppSelector(workareaSelector);
 
   return (
     <div
@@ -18,7 +34,20 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
     >
       <div className="workarea-main">
         {optionsPanel}
-        {children}
+        <div className="workarea-children-wrapper">
+          {children}
+          {activeTabName === 'inpainting' && (
+            <Tooltip label="Toggle Split View">
+              <div
+                className="workarea-split-button"
+                data-selected={showDualDisplay}
+                onClick={() => dispatch(setShowDualDisplay(!showDualDisplay))}
+              >
+                <VscSplitHorizontal />
+              </div>
+            </Tooltip>
+          )}
+        </div>
         <ImageGallery />
       </div>
     </div>

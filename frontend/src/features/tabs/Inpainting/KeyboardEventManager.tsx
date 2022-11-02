@@ -2,20 +2,16 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useEffect, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../../app/store';
-import { activeTabNameSelector } from '../../../options/optionsSelectors';
-import { OptionsState } from '../../../options/optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import { activeTabNameSelector } from '../../options/optionsSelectors';
+import { OptionsState } from '../../options/optionsSlice';
 import {
   InpaintingState,
   setIsSpacebarHeld,
   setShouldLockBoundingBox,
   toggleShouldLockBoundingBox,
   toggleTool,
-} from '../inpaintingSlice';
+} from './inpaintingSlice';
 
 const keyboardEventManagerSelector = createSelector(
   [

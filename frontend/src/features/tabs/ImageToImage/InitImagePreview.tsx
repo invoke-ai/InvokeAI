@@ -1,7 +1,7 @@
-import { IconButton, Image, useToast } from '@chakra-ui/react';
-import React, { SyntheticEvent } from 'react';
-import { MdClear } from 'react-icons/md';
+import { Image, useToast } from '@chakra-ui/react';
+import { SyntheticEvent } from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import ImageUploaderIconButton from '../../../common/components/ImageUploaderIconButton';
 import { clearInitialImage } from '../../options/optionsSlice';
 
 export default function InitImagePreview() {
@@ -13,10 +13,10 @@ export default function InitImagePreview() {
 
   const toast = useToast();
 
-  const handleClickResetInitialImage = (e: SyntheticEvent) => {
-    e.stopPropagation();
-    dispatch(clearInitialImage());
-  };
+  // const handleClickResetInitialImage = (e: SyntheticEvent) => {
+  //   e.stopPropagation();
+  //   dispatch(clearInitialImage());
+  // };
 
   const alertMissingInitImage = () => {
     toast({
@@ -31,13 +31,7 @@ export default function InitImagePreview() {
   return (
     <>
       <div className="init-image-preview-header">
-        <h2>Initial Image</h2>
-        <IconButton
-          isDisabled={!initialImage}
-          aria-label={'Reset Initial Image'}
-          onClick={handleClickResetInitialImage}
-          icon={<MdClear />}
-        />
+        <ImageUploaderIconButton />
       </div>
       {initialImage && (
         <div className="init-image-preview">
