@@ -99,7 +99,7 @@ if "%ERRORLEVEL%" NEQ "0" (
    echo ""
    echo "The preload_models.py script crashed or was cancelled."
    echo "InvokeAI is not ready to run. To run preload_models.py again,"
-   echo "run the command 'python scripts/preload_models.py'"
+   echo "run the command 'update.bat' in this directory."
    echo "Press any key to continue"
    pause
    exit /b

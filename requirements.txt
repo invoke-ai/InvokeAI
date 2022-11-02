@@ -2,6 +2,7 @@
 
 albumentations
 einops
+getpass_asterisk
 huggingface-hub
 imageio-ffmpeg
 imageio

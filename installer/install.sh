@@ -119,8 +119,8 @@ else
     if test $status -ne 0
        then
 	   echo "The preload_models.py script crashed or was cancelled."
-           echo "InvokeAI is not ready to run. To run preload_models.py again,"
-           echo "give the command 'python scripts/preload_models.py'"
+           echo "InvokeAI is not ready to run. Try again by running"
+           echo "update.sh in this directory."
        else
            # tell the user their next steps
 	   echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"

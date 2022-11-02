@@ -14,9 +14,10 @@ import warnings
 from urllib import request
 from tqdm import tqdm
 from omegaconf import OmegaConf
+from huggingface_hub import HfFolder, hf_hub_url
 from pathlib import Path
+from getpass_asterisk import getpass_asterisk
 import traceback
-import getpass
 import requests
 import clip
 import transformers
@@ -226,10 +227,13 @@ This involves a few easy steps.
 '''
     )
     input('Press <enter> when you are ready to continue:')
-
-    from huggingface_hub import HfFolder
+    print('(Fetching Hugging Face token from cache...',end='')
     access_token = HfFolder.get_token()
+    if access_token is not None:
+        print('found')
+    
     if access_token is None:
+        print('not found')
         print('''
 4. Thank you! The last step is to enter your HuggingFace access token so that
    this script is authorized to initiate the download. Go to the access tokens
@@ -243,7 +247,7 @@ This involves a few easy steps.
 
    Now copy the token to your clipboard and paste it here: '''
         )
-        access_token = getpass.getpass()
+        access_token = getpass_asterisk.getpass_asterisk()
     return access_token
 
 #---------------------------------------------
@@ -261,7 +265,6 @@ def migrate_models_ckpt():
             
 #---------------------------------------------
 def download_weight_datasets(models:dict, access_token:str):
-    from huggingface_hub import HfFolder
     migrate_models_ckpt()
     successful = dict()
     for mod in models.keys():
@@ -275,9 +278,11 @@ def download_weight_datasets(models:dict, access_token:str):
         if success:
             successful[mod] = True
     if len(successful) < len(models):
-        print(f'\n* There were errors downloading one or more files.')
-        print('Please double-check your license agreements, and your access token. Type ^C to quit.\n')
-        hfFolder.delete_token()
+        print(f'\n\n** There were errors downloading one or more files. **')
+        print('Please double-check your license agreements, and your access token.')
+        HfFolder.delete_token()
+        print('Press any key to try again. Type ^C to quit.\n')
+        input()
         return None
 
     HfFolder.save_token(access_token)
@@ -287,8 +292,6 @@ def download_weight_datasets(models:dict, access_token:str):
     
 #---------------------------------------------
 def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
-    from huggingface_hub import hf_hub_url
-
     model_dest = os.path.join(Model_dir, model_name)
     os.makedirs(os.path.dirname(model_dest), exist_ok=True)
     url = hf_hub_url(repo_id, model_name)

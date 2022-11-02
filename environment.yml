@@ -34,6 +34,7 @@ dependencies:
     - flask_cors==3.0.10
     - dependency_injector==4.40.0
     - eventlet
+    - getpass_asterisk
     - kornia==0.6.0
     - -e git+https://github.com/openai/CLIP.git@main#egg=clip
     - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
