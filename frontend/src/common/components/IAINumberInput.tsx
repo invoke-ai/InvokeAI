@@ -123,13 +123,15 @@ const IAINumberInput = (props: Props) => {
         }
         {...formControlProps}
       >
-        <FormLabel
-          className="invokeai__number-input-form-label"
-          style={{ display: label ? 'block' : 'none' }}
-          {...formLabelProps}
-        >
-          {label}
-        </FormLabel>
+        {label && (
+          <FormLabel
+            className="invokeai__number-input-form-label"
+            style={{ display: label ? 'block' : 'none' }}
+            {...formLabelProps}
+          >
+            {label}
+          </FormLabel>
+        )}
         <NumberInput
           className="invokeai__number-input-root"
           value={valueAsString}
@@ -145,19 +147,18 @@ const IAINumberInput = (props: Props) => {
             textAlign={textAlign}
             {...numberInputFieldProps}
           />
-          <div
-            className="invokeai__number-input-stepper"
-            style={showStepper ? { display: 'block' } : { display: 'none' }}
-          >
-            <NumberIncrementStepper
-              {...numberInputStepperProps}
-              className="invokeai__number-input-stepper-button"
-            />
-            <NumberDecrementStepper
-              {...numberInputStepperProps}
-              className="invokeai__number-input-stepper-button"
-            />
-          </div>
+          {showStepper && (
+            <div className="invokeai__number-input-stepper">
+              <NumberIncrementStepper
+                {...numberInputStepperProps}
+                className="invokeai__number-input-stepper-button"
+              />
+              <NumberDecrementStepper
+                {...numberInputStepperProps}
+                className="invokeai__number-input-stepper-button"
+              />
+            </div>
+          )}
         </NumberInput>
       </FormControl>
     </Tooltip>

@@ -15,9 +15,10 @@ import TextToImageIcon from '../../common/icons/TextToImageIcon';
 import { setActiveTab } from '../options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
 import InpaintingWorkarea from './Inpainting';
+import { setNeedsCache } from './Inpainting/inpaintingSlice';
 import TextToImageWorkarea from './TextToImage';
 
-export const tab_dict = {
+export const tabDict = {
   txt2img: {
     title: <TextToImageIcon fill={'black'} boxSize={'2.5rem'} />,
     workarea: <TextToImageWorkarea />,
@@ -50,8 +51,8 @@ export const tab_dict = {
   },
 };
 
-// Array where index maps to the key of tab_dict
-export const tabMap = _.map(tab_dict, (tab, key) => key);
+// Array where index maps to the key of tabDict
+export const tabMap = _.map(tabDict, (tab, key) => key);
 
 // Use tabMap to generate a union type of tab names
 const tabMapTypes = [...tabMap] as const;
@@ -73,6 +74,7 @@ export default function InvokeTabs() {
 
   useHotkeys('3', () => {
     dispatch(setActiveTab(2));
+    dispatch(setNeedsCache(true));
   });
 
   useHotkeys('4', () => {
@@ -89,15 +91,15 @@ export default function InvokeTabs() {
 
   const renderTabs = () => {
     const tabsToRender: ReactElement[] = [];
-    Object.keys(tab_dict).forEach((key) => {
+    Object.keys(tabDict).forEach((key) => {
       tabsToRender.push(
         <Tooltip
           key={key}
           hasArrow
-          label={tab_dict[key as keyof typeof tab_dict].tooltip}
+          label={tabDict[key as keyof typeof tabDict].tooltip}
           placement={'right'}
         >
-          <Tab>{tab_dict[key as keyof typeof tab_dict].title}</Tab>
+          <Tab>{tabDict[key as keyof typeof tabDict].title}</Tab>
         </Tooltip>
       );
     });
@@ -106,10 +108,10 @@ export default function InvokeTabs() {
 
   const renderTabPanels = () => {
     const tabPanelsToRender: ReactElement[] = [];
-    Object.keys(tab_dict).forEach((key) => {
+    Object.keys(tabDict).forEach((key) => {
       tabPanelsToRender.push(
         <TabPanel className="app-tabs-panel" key={key}>
-          {tab_dict[key as keyof typeof tab_dict].workarea}
+          {tabDict[key as keyof typeof tabDict].workarea}
         </TabPanel>
       );
     });
@@ -125,6 +127,7 @@ export default function InvokeTabs() {
       index={activeTab}
       onChange={(index: number) => {
         dispatch(setActiveTab(index));
+        dispatch(setNeedsCache(true));
       }}
     >
       <div className="app-tabs-list">{renderTabs()}</div>

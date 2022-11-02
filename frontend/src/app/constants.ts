@@ -1,5 +1,7 @@
 // TODO: use Enums?
 
+import { InProgressImageType } from '../features/system/systemSlice';
+
 // Valid samplers
 export const SAMPLERS: Array<string> = [
   'ddim',
@@ -37,3 +39,11 @@ export const NUMPY_RAND_MIN = 0;
 export const NUMPY_RAND_MAX = 4294967295;
 
 export const FACETOOL_TYPES = ['gfpgan', 'codeformer'] as const;
+export const IN_PROGRESS_IMAGE_TYPES: Array<{
+  key: string;
+  value: InProgressImageType;
+}> = [
+  { key: 'None', value: 'none' },
+  { key: 'Fast', value: 'latents' },
+  { key: 'Accurate', value: 'full-res' },
+];

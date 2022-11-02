@@ -1,19 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useEffect, useRef } from 'react';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../../app/store';
-import { activeTabNameSelector } from '../../../options/optionsSelectors';
-import { OptionsState } from '../../../options/optionsSlice';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import { activeTabNameSelector } from '../../options/optionsSelectors';
+import { OptionsState } from '../../options/optionsSlice';
 import {
   InpaintingState,
-  setIsDrawing,
+  setIsSpacebarHeld,
   setShouldLockBoundingBox,
+  toggleShouldLockBoundingBox,
   toggleTool,
-} from '../inpaintingSlice';
+} from './inpaintingSlice';
 
 const keyboardEventManagerSelector = createSelector(
   [
@@ -22,13 +20,18 @@ const keyboardEventManagerSelector = createSelector(
     activeTabNameSelector,
   ],
   (options: OptionsState, inpainting: InpaintingState, activeTabName) => {
-    const { shouldShowMask, cursorPosition, shouldLockBoundingBox } =
-      inpainting;
+    const {
+      shouldShowMask,
+      cursorPosition,
+      shouldLockBoundingBox,
+      shouldShowBoundingBox,
+    } = inpainting;
     return {
       activeTabName,
       shouldShowMask,
       isCursorOnCanvas: Boolean(cursorPosition),
       shouldLockBoundingBox,
+      shouldShowBoundingBox,
     };
   },
   {
@@ -45,15 +48,30 @@ const KeyboardEventManager = () => {
     activeTabName,
     isCursorOnCanvas,
     shouldLockBoundingBox,
+    shouldShowBoundingBox,
   } = useAppSelector(keyboardEventManagerSelector);
 
   const wasLastEventOverCanvas = useRef<boolean>(false);
   const lastEvent = useRef<KeyboardEvent | null>(null);
 
+  //  Toggle lock bounding box
+  useHotkeys(
+    'shift+q',
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      dispatch(toggleShouldLockBoundingBox());
+    },
+    {
+      enabled: activeTabName === 'inpainting' && shouldShowMask,
+    },
+    [activeTabName, shouldShowMask]
+  );
+
+  // Manages hold-style keyboard shortcuts
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (
-        !['x', ' '].includes(e.key) ||
+        !['x', 'q'].includes(e.key) ||
         activeTabName !== 'inpainting' ||
         !shouldShowMask
       ) {
@@ -91,13 +109,10 @@ const KeyboardEventManager = () => {
           dispatch(toggleTool());
           break;
         }
-        case ' ': {
-          if (!shouldShowMask) break;
-
-          if (e.type === 'keydown') {
-            dispatch(setIsDrawing(false));
-          }
-          dispatch(setShouldLockBoundingBox(!shouldLockBoundingBox));
+        case 'q': {
+          if (!shouldShowMask || !shouldShowBoundingBox) break;
+          dispatch(setIsSpacebarHeld(e.type === 'keydown'));
+          dispatch(setShouldLockBoundingBox(e.type !== 'keydown'));
           break;
         }
       }
@@ -119,6 +134,7 @@ const KeyboardEventManager = () => {
     shouldShowMask,
     isCursorOnCanvas,
     shouldLockBoundingBox,
+    shouldShowBoundingBox,
   ]);
 
   return null;

@@ -19,11 +19,15 @@
   --invalid: rgb(255, 75, 75);
   --invalid-secondary: rgb(120, 5, 5);
 
+  --accent-color-dim: rgb(57, 25, 153);
   --accent-color: rgb(80, 40, 200);
   --accent-color-hover: rgb(104, 60, 230);
 
   --destructive-color: rgb(185, 55, 55);
   --destructive-color-hover: rgb(255, 75, 75);
+
+  --warning-color: rgb(200, 88, 40);
+  --warning-color-hover: rgb(230, 117, 60);
 
   // Error status colors
   --border-color-invalid: rgb(255, 80, 50);
@@ -46,6 +50,11 @@
   --btn-load-more: rgb(30, 32, 42);
   --btn-load-more-hover: rgb(54, 56, 66);
 
+  --btn-delete-image: rgb(238, 107, 107);
+
+  // IAI Button Colors
+  --btn-checkbox-border-hover: rgb(46, 48, 68);
+
   // Switch
   --switch-bg-color: rgb(100, 102, 110);
   --switch-bg-active-color: rgb(80, 40, 200);
@@ -57,7 +66,7 @@
   --tab-color: rgb(30, 32, 42);
   --tab-hover-color: rgb(36, 38, 48);
   --tab-list-bg: var(--accent-color);
-  --tab-list-text: rgb(202,204,216);
+  --tab-list-text: rgb(202, 204, 216);
   --tab-list-text-inactive: rgb(92, 94, 114);
   --tab-panel-bg: rgb(20, 22, 28);
 
@@ -103,4 +112,12 @@
 
   // Shadows
   --floating-button-drop-shadow: drop-shadow(0 0 1rem rgba(140, 101, 255, 0.5));
+
+  // Canvas
+  --inpainting-alerts-bg: rgba(20, 20, 26, 0.75);
+  --inpainting-alerts-icon-color: rgb(255, 255, 255);
+  --inpainting-alerts-bg-active: rgb(80, 40, 200);
+  --inpainting-alerts-icon-active: rgb(255, 255, 255);
+  --inpainting-alerts-bg-alert: var(--invalid);
+  --inpainting-alerts-icon-alert: rgb(255, 255, 255);
 }

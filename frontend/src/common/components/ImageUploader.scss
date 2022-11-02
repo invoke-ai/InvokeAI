@@ -16,9 +16,10 @@
     row-gap: 1rem;
     align-items: center;
     justify-content: center;
+    background-color: var(--background-color);
 
     &.is-drag-accept {
-      box-shadow: inset 0 0 20rem 1rem var(--status-good-color);
+      box-shadow: inset 0 0 20rem 1rem var(--accent-color);
     }
 
     &.is-drag-reject {
@@ -32,6 +33,7 @@
 }
 
 .image-uploader-button-outer {
+  min-width: 20rem;
   width: 100%;
   height: 100%;
   display: flex;

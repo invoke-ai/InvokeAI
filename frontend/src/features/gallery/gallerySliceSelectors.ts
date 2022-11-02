@@ -4,6 +4,7 @@ import { activeTabNameSelector } from '../options/optionsSelectors';
 import { OptionsState } from '../options/optionsSlice';
 import { SystemState } from '../system/systemSlice';
 import { GalleryState } from './gallerySlice';
+import _ from 'lodash';
 
 export const imageGallerySelector = createSelector(
   [
@@ -43,6 +44,11 @@ export const imageGallerySelector = createSelector(
       currentCategory,
       galleryWidth,
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 
@@ -65,5 +71,10 @@ export const hoverableImageSelector = createSelector(
       galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
       activeTabName,
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );

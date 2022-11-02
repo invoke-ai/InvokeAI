@@ -19,10 +19,9 @@ export const currentImageDisplaySelector = createSelector(
     const { shouldShowImageDetails } = options;
 
     return {
-      currentImage,
-      intermediateImage,
       activeTabName,
       shouldShowImageDetails,
+      hasAnImageToDisplay: currentImage || intermediateImage,
     };
   },
   {
@@ -36,18 +35,16 @@ export const currentImageDisplaySelector = createSelector(
  * Displays the current image if there is one, plus associated actions.
  */
 const CurrentImageDisplay = () => {
-  const { currentImage, intermediateImage, activeTabName } = useAppSelector(
+  const { hasAnImageToDisplay, activeTabName } = useAppSelector(
     currentImageDisplaySelector
   );
 
-  const imageToDisplay = intermediateImage || currentImage;
-
   return (
     <div className="current-image-area" data-tab-name={activeTabName}>
-      {imageToDisplay ? (
+      {hasAnImageToDisplay ? (
         <>
-          <CurrentImageButtons image={imageToDisplay} />
-          <CurrentImagePreview imageToDisplay={imageToDisplay} />
+          <CurrentImageButtons />
+          <CurrentImagePreview />
         </>
       ) : (
         <div className="current-image-display-placeholder">

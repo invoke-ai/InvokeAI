@@ -36,7 +36,7 @@ const FloatingOptionsPanelButtons = () => {
     <div className="show-hide-button-options">
       <IAIIconButton
         tooltip="Show Options Panel (O)"
-        tooltipPlacement="top"
+        tooltipProps={{ placement: 'top' }}
         aria-label="Show Options Panel"
         onClick={handleShowOptionsPanel}
       >

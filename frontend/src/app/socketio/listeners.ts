@@ -146,12 +146,14 @@ const makeSocketIOListeners = (
             ...data,
           })
         );
-        dispatch(
-          addLogEntry({
-            timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Intermediate image generated: ${data.url}`,
-          })
-        );
+        if (!data.isBase64) {
+          dispatch(
+            addLogEntry({
+              timestamp: dateFormat(new Date(), 'isoDateTime'),
+              message: `Intermediate image generated: ${data.url}`,
+            })
+          );
+        }
       } catch (e) {
         console.error(e);
       }
