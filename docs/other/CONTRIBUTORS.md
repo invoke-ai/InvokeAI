@@ -60,6 +60,7 @@ We thank them for all of their time and hard work.
 - [Dmitry T.](https://github.com/ArDiouscuros)
 - [Kent Keirsey](https://github.com/hipsterusername)
 - [psychedelicious](https://github.com/psychedelicious)
+- [damian0815](https://github.com/damian0815)
 
 ## **Original CompVis Authors:**
 
