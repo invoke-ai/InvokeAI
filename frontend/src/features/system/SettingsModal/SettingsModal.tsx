@@ -18,6 +18,7 @@ import { ChangeEvent, cloneElement, ReactElement } from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import { persistor } from '../../../main';
 import {
+  InProgressImageType,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
@@ -114,7 +115,11 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 validValues={IN_PROGRESS_IMAGE_TYPES}
                 value={shouldDisplayInProgressType}
                 onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  dispatch(setShouldDisplayInProgressType(e.target.value))
+                  dispatch(
+                    setShouldDisplayInProgressType(
+                      e.target.value as InProgressImageType
+                    )
+                  )
                 }
               />
 
