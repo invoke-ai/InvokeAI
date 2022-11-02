@@ -2,7 +2,12 @@ import { IconButton, Image } from '@chakra-ui/react';
 import { useState } from 'react';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import { GalleryState, selectNextImage, selectPrevImage } from './gallerySlice';
+import {
+  GalleryCategory,
+  GalleryState,
+  selectNextImage,
+  selectPrevImage,
+} from './gallerySlice';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { OptionsState } from '../options/optionsSlice';
@@ -14,11 +19,15 @@ export const imagesSelector = createSelector(
     const { currentCategory, currentImage, intermediateImage } = gallery;
     const { shouldShowImageDetails } = options;
 
-    const tempImages = gallery.categories[currentCategory].images;
+    const tempImages =
+      gallery.categories[
+        currentImage ? (currentImage.category as GalleryCategory) : 'result'
+      ].images;
     const currentImageIndex = tempImages.findIndex(
       (i) => i.uuid === gallery?.currentImage?.uuid
     );
     const imagesLength = tempImages.length;
+
     return {
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,
       currentCategory,
@@ -66,17 +75,10 @@ export default function CurrentImagePreview() {
   const handleClickNextButton = () => {
     dispatch(selectNextImage());
   };
-  console.log(imageToDisplay);
 
   return (
     <div className={'current-image-preview'}>
-      {imageToDisplay && (
-        <Image
-          src={imageToDisplay.url}
-          width={imageToDisplay.width}
-          height={imageToDisplay.height}
-        />
-      )}
+      {imageToDisplay && <Image src={imageToDisplay.url} />}
       {!shouldShowImageDetails && (
         <div className="current-image-next-prev-buttons">
           <div
