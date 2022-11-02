@@ -640,9 +640,11 @@ class InvokeAIWebServer:
                 if generation_parameters['progress_latents']:
                     image = self.generate.sample_to_lowres_estimated_image(sample)
                     (width, height) = image.size
+                    width *= 8
+                    height *= 8
                     buffered = io.BytesIO()
                     image.save(buffered, format="PNG")
-                    img_base64 = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('UTF-8')
+                    img_base64 = "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode('UTF-8')
                     self.socketio.emit(
                         "intermediateResult",
                         {
