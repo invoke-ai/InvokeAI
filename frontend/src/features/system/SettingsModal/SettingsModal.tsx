@@ -22,27 +22,26 @@ import {
   setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
-  setShouldDisplayInProgress,
-  setShouldDisplayInProgressLatents,
+  setShouldDisplayInProgressType,
   SystemState,
 } from '../systemSlice';
 import ModelList from './ModelList';
-import { SettingsModalItem, SettingsModalSelectItem } from './SettingsModalItem';
 import { IN_PROGRESS_IMAGE_TYPES } from '../../../app/constants';
+import IAISwitch from '../../../common/components/IAISwitch';
+import IAISelect from '../../../common/components/IAISelect';
+import IAINumberInput from '../../../common/components/IAINumberInput';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
   (system: SystemState) => {
     const {
-      shouldDisplayInProgress,
-      shouldDisplayInProgressLatents,
+      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       model_list,
     } = system;
     return {
-      shouldDisplayInProgress,
-      shouldDisplayInProgressLatents,
+      shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       models: _.map(model_list, (_model, key) => key),
@@ -86,8 +85,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   } = useDisclosure();
 
   const {
-    shouldDisplayInProgress,
-    shouldDisplayInProgressLatents,
+    shouldDisplayInProgressType,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
   } = useAppSelector(systemSelector);
@@ -122,21 +120,41 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalCloseButton />
           <ModalBody className="settings-modal-content">
             <div className="settings-modal-items">
-              <SettingsModalSelectItem
-                settingTitle="Display In-Progress Images"
-                validValues={IN_PROGRESS_IMAGE_TYPES}
-                defaultValue={shouldDisplayInProgressType}
-                dispatcher={setShouldDisplayInProgressType}
-              />
-
-              <SettingsModalItem
-                settingTitle="Display In-Progress Latents (quick; lo-res)"
-                isChecked={shouldDisplayInProgressLatents}
-                dispatcher={setShouldDisplayInProgressLatents}
-              />
-
-              <SettingsModalItem
-                settingTitle="Confirm on Delete"
+              <div className="settings-modal-item">
+                <ModelList />
+              </div>
+              <div
+                className="settings-modal-item"
+                style={{ gridAutoFlow: 'row', rowGap: '0.5rem' }}
+              >
+                <IAISelect
+                  label={'Display In-Progress Images'}
+                  validValues={IN_PROGRESS_IMAGE_TYPES}
+                  value={shouldDisplayInProgressType}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                    dispatch(
+                      setShouldDisplayInProgressType(
+                        e.target.value as InProgressImageType
+                      )
+                    )
+                  }
+                />
+                {shouldDisplayInProgressType === 'full-res' && (
+                  <IAINumberInput
+                    label="Save images every n steps"
+                    min={1}
+                    max={steps}
+                    step={1}
+                    onChange={handleChangeIntermediateSteps}
+                    value={saveIntermediatesInterval}
+                    width="auto"
+                    textAlign="center"
+                  />
+                )}
+              </div>
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={'Confirm on Delete'}
                 isChecked={shouldConfirmOnDelete}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldConfirmOnDelete(e.target.checked))
