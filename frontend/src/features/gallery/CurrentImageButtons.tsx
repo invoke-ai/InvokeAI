@@ -1,8 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import * as InvokeAI from '../../app/invokeai';
-
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import {
@@ -60,7 +58,7 @@ const systemSelector = createSelector(
     const { upscalingLevel, facetoolStrength, shouldShowImageDetails } =
       options;
 
-    const { intermediateImage } = gallery;
+    const { intermediateImage, currentImage } = gallery;
 
     return {
       isProcessing,
@@ -69,7 +67,8 @@ const systemSelector = createSelector(
       isESRGANAvailable,
       upscalingLevel,
       facetoolStrength,
-      intermediateImage,
+      shouldDisableToolbarButtons: Boolean(intermediateImage) || !currentImage,
+      currentImage,
       shouldShowImageDetails,
       activeTabName,
     };
@@ -81,15 +80,11 @@ const systemSelector = createSelector(
   }
 );
 
-type CurrentImageButtonsProps = {
-  image: InvokeAI.Image;
-};
-
 /**
  * Row of buttons for common actions:
  * Use as init image, use all params, use seed, upscale, fix faces, details, delete.
  */
-const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
+const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const {
     isProcessing,
@@ -98,17 +93,21 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     isESRGANAvailable,
     upscalingLevel,
     facetoolStrength,
-    intermediateImage,
+    shouldDisableToolbarButtons,
     shouldShowImageDetails,
     activeTabName,
+    currentImage,
   } = useAppSelector(systemSelector);
 
-  const { onCopy } = useClipboard(window.location.toString() + image.url);
+  const { onCopy } = useClipboard(
+    currentImage ? window.location.toString() + currentImage.url : ''
+  );
 
   const toast = useToast();
 
   const handleClickUseAsInitialImage = () => {
-    dispatch(setInitialImage(image));
+    if (!currentImage) return;
+    dispatch(setInitialImage(currentImage));
     dispatch(setActiveTab(1));
   };
 
@@ -125,7 +124,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
   useHotkeys(
     'shift+i',
     () => {
-      if (image) {
+      if (currentImage) {
         handleClickUseAsInitialImage();
         toast({
           title: 'Sent To Image To Image',
@@ -143,16 +142,20 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image]
+    [currentImage]
   );
 
-  const handleClickUseAllParameters = () =>
-    image.metadata && dispatch(setAllParameters(image.metadata));
+  const handleClickUseAllParameters = () => {
+    if (!currentImage) return;
+    currentImage.metadata && dispatch(setAllParameters(currentImage.metadata));
+  };
 
   useHotkeys(
     'a',
     () => {
-      if (['txt2img', 'img2img'].includes(image?.metadata?.image?.type)) {
+      if (
+        ['txt2img', 'img2img'].includes(currentImage?.metadata?.image?.type)
+      ) {
         handleClickUseAllParameters();
         toast({
           title: 'Parameters Set',
@@ -170,15 +173,18 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image]
+    [currentImage]
   );
 
-  const handleClickUseSeed = () =>
-    image.metadata && dispatch(setSeed(image.metadata.image.seed));
+  const handleClickUseSeed = () => {
+    currentImage?.metadata &&
+      dispatch(setSeed(currentImage.metadata.image.seed));
+  };
+
   useHotkeys(
     's',
     () => {
-      if (image?.metadata?.image?.seed) {
+      if (currentImage?.metadata?.image?.seed) {
         handleClickUseSeed();
         toast({
           title: 'Seed Set',
@@ -196,17 +202,17 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image]
+    [currentImage]
   );
 
   const handleClickUsePrompt = () =>
-    image?.metadata?.image?.prompt &&
-    dispatch(setPrompt(image.metadata.image.prompt));
+    currentImage?.metadata?.image?.prompt &&
+    dispatch(setPrompt(currentImage.metadata.image.prompt));
 
   useHotkeys(
     'p',
     () => {
-      if (image?.metadata?.image?.prompt) {
+      if (currentImage?.metadata?.image?.prompt) {
         handleClickUsePrompt();
         toast({
           title: 'Prompt Set',
@@ -224,16 +230,19 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image]
+    [currentImage]
   );
 
-  const handleClickUpscale = () => dispatch(runESRGAN(image));
+  const handleClickUpscale = () => {
+    currentImage && dispatch(runESRGAN(currentImage));
+  };
+
   useHotkeys(
     'u',
     () => {
       if (
         isESRGANAvailable &&
-        Boolean(!intermediateImage) &&
+        !shouldDisableToolbarButtons &&
         isConnected &&
         !isProcessing &&
         upscalingLevel
@@ -249,23 +258,25 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
       }
     },
     [
-      image,
+      currentImage,
       isESRGANAvailable,
-      intermediateImage,
+      shouldDisableToolbarButtons,
       isConnected,
       isProcessing,
       upscalingLevel,
     ]
   );
 
-  const handleClickFixFaces = () => dispatch(runFacetool(image));
+  const handleClickFixFaces = () => {
+    currentImage && dispatch(runFacetool(currentImage));
+  };
 
   useHotkeys(
     'r',
     () => {
       if (
         isGFPGANAvailable &&
-        Boolean(!intermediateImage) &&
+        !shouldDisableToolbarButtons &&
         isConnected &&
         !isProcessing &&
         facetoolStrength
@@ -281,9 +292,9 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
       }
     },
     [
-      image,
+      currentImage,
       isGFPGANAvailable,
-      intermediateImage,
+      shouldDisableToolbarButtons,
       isConnected,
       isProcessing,
       facetoolStrength,
@@ -294,7 +305,9 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
     dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
 
   const handleSendToInpainting = () => {
-    dispatch(setImageToInpaint(image));
+    if (!currentImage) return;
+
+    dispatch(setImageToInpaint(currentImage));
     if (activeTabName !== 'inpainting') {
       dispatch(setActiveTab('inpainting'));
     }
@@ -309,7 +322,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
   useHotkeys(
     'i',
     () => {
-      if (image) {
+      if (currentImage) {
         handleClickShowImageDetails();
       } else {
         toast({
@@ -320,7 +333,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image, shouldShowImageDetails]
+    [currentImage, shouldShowImageDetails]
   );
 
   return (
@@ -356,7 +369,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
             </IAIButton>
 
             <IAIButton leftIcon={<FaDownload />} size={'sm'}>
-              <Link download={true} href={image.url}>
+              <Link download={true} href={currentImage?.url}>
                 Download Image
               </Link>
             </IAIButton>
@@ -367,7 +380,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
           icon={<FaQuoteRight />}
           tooltip="Use Prompt"
           aria-label="Use Prompt"
-          isDisabled={!image?.metadata?.image?.prompt}
+          isDisabled={!currentImage?.metadata?.image?.prompt}
           onClick={handleClickUsePrompt}
         />
 
@@ -375,7 +388,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
           icon={<FaSeedling />}
           tooltip="Use Seed"
           aria-label="Use Seed"
-          isDisabled={!image?.metadata?.image?.seed}
+          isDisabled={!currentImage?.metadata?.image?.seed}
           onClick={handleClickUseSeed}
         />
 
@@ -384,7 +397,9 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
           tooltip="Use All"
           aria-label="Use All"
           isDisabled={
-            !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
+            !['txt2img', 'img2img'].includes(
+              currentImage?.metadata?.image?.type
+            )
           }
           onClick={handleClickUseAllParameters}
         />
@@ -400,7 +415,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
             <IAIButton
               isDisabled={
                 !isGFPGANAvailable ||
-                Boolean(intermediateImage) ||
+                !currentImage ||
                 !(isConnected && !isProcessing) ||
                 !facetoolStrength
               }
@@ -422,7 +437,7 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
             <IAIButton
               isDisabled={
                 !isESRGANAvailable ||
-                Boolean(intermediateImage) ||
+                !currentImage ||
                 !(isConnected && !isProcessing) ||
                 !upscalingLevel
               }
@@ -441,14 +456,12 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
           onClick={handleClickShowImageDetails}
         />
 
-        <DeleteImageModal image={image}>
+        <DeleteImageModal image={currentImage}>
           <IAIIconButton
             icon={<FaTrash />}
             tooltip="Delete Image"
             aria-label="Delete Image"
-            isDisabled={
-              Boolean(intermediateImage) || !isConnected || isProcessing
-            }
+            isDisabled={Boolean(currentImage) || !isConnected || isProcessing}
           />
         </DeleteImageModal>
       </ButtonGroup>
