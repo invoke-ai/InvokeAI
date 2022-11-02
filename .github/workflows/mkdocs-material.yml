@@ -4,6 +4,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'release-candidate-2-1'
 
 jobs:
   mkdocs-material:

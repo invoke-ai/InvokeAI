@@ -896,7 +896,7 @@ class Generate:
         assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
         basename,_ = os.path.splitext(os.path.basename(image_path))
         if self.txt2mask is None:
-            self.txt2mask  = Txt2Mask(device = self.device)
+            self.txt2mask  = Txt2Mask(device = self.device, refined=True)
         segmented  = self.txt2mask.segment(image_path,prompt)
         trans = segmented.to_transparent()
         inverse = segmented.to_transparent(invert=True)
