@@ -69,9 +69,9 @@ export default function ImageGallery() {
     if (!shouldPinGallery) return;
 
     if (activeTabName === 'inpainting') {
-      dispatch(setGalleryWidth(220));
-      setGalleryMinWidth(220);
-      setGalleryMaxWidth(220);
+      dispatch(setGalleryWidth(190));
+      setGalleryMinWidth(190);
+      setGalleryMaxWidth(190);
     } else if (activeTabName === 'img2img') {
       dispatch(
         setGalleryWidth(Math.min(Math.max(Number(galleryWidth), 0), 490))
@@ -159,6 +159,15 @@ export default function ImageGallery() {
     'shift+g',
     () => {
       handleSetShouldPinGallery();
+    },
+    [shouldPinGallery]
+  );
+
+  useHotkeys(
+    'esc',
+    () => {
+      if (shouldPinGallery) return;
+      dispatch(setShouldShowGallery(false));
     },
     [shouldPinGallery]
   );
@@ -261,6 +270,7 @@ export default function ImageGallery() {
     >
       <div
         className="image-gallery-wrapper"
+        style={{ zIndex: shouldPinGallery ? 1 : 100 }}
         data-pinned={shouldPinGallery}
         ref={galleryRef}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}

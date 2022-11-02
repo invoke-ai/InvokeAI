@@ -101,7 +101,7 @@ const generateMask = (
     new Konva.Image({ image: image, globalCompositeOperation: 'source-out' })
   );
 
-  const maskDataURL = stage.toDataURL();
+  const maskDataURL = stage.toDataURL({ ...boundingBox });
 
   return { maskDataURL, isMaskEmpty };
 };

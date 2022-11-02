@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { RootState } from '../../app/store';
+import { RootState } from '../store';
 import { activeTabNameSelector } from '../../features/options/optionsSelectors';
 import { OptionsState } from '../../features/options/optionsSlice';
 
@@ -25,7 +25,7 @@ export const readinessSelector = createSelector(
       prompt,
       shouldGenerateVariations,
       seedWeights,
-      maskPath,
+      // maskPath,
       initialImage,
       seed,
     } = options;
@@ -34,33 +34,45 @@ export const readinessSelector = createSelector(
 
     const { imageToInpaint } = inpainting;
 
+    let isReady = true;
+    const reasonsWhyNotReady: string[] = [];
+
     // Cannot generate without a prompt
     if (!prompt || Boolean(prompt.match(/^[\s\r\n]+$/))) {
-      return false;
+      isReady = false;
+      reasonsWhyNotReady.push('Missing prompt');
     }
 
     if (activeTabName === 'img2img' && !initialImage) {
-      return false;
+      isReady = false;
+      reasonsWhyNotReady.push('No initial image selected');
     }
 
     if (activeTabName === 'inpainting' && !imageToInpaint) {
-      return false;
+      isReady = false;
+      reasonsWhyNotReady.push('No inpainting image selected');
     }
 
-    //  Cannot generate with a mask without img2img
-    if (maskPath && !initialImage) {
-      return false;
-    }
+    // // We don't use mask paths now.
+    // //  Cannot generate with a mask without img2img
+    // if (maskPath && !initialImage) {
+    //   isReady = false;
+    //   reasonsWhyNotReady.push(
+    //     'On ImageToImage tab, but no mask is provided.'
+    //   );
+    // }
 
     // TODO: job queue
     // Cannot generate if already processing an image
     if (isProcessing) {
-      return false;
+      isReady = false;
+      reasonsWhyNotReady.push('System Busy');
     }
 
     // Cannot generate if not connected
     if (!isConnected) {
-      return false;
+      isReady = false;
+      reasonsWhyNotReady.push('System Disconnected');
     }
 
     // Cannot generate variations without valid seed weights
@@ -68,11 +80,12 @@ export const readinessSelector = createSelector(
       shouldGenerateVariations &&
       (!(validateSeedWeights(seedWeights) || seedWeights === '') || seed === -1)
     ) {
-      return false;
+      isReady = false;
+      reasonsWhyNotReady.push('Seed-Weights badly formatted.');
     }
 
     // All good
-    return true;
+    return { isReady, reasonsWhyNotReady };
   },
   {
     memoizeOptions: {

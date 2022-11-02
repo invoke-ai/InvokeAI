@@ -31,7 +31,7 @@ const promptInputSelector = createSelector(
 const PromptInput = () => {
   const dispatch = useAppDispatch();
   const { prompt, activeTabName } = useAppSelector(promptInputSelector);
-  const isReady = useAppSelector(readinessSelector);
+  const { isReady } = useAppSelector(readinessSelector);
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
 

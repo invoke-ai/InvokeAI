@@ -68,13 +68,21 @@ const InvokeOptionsPanel = (props: Props) => {
   );
 
   useHotkeys(
+    'esc',
+    () => {
+      if (shouldPinOptionsPanel) return;
+      dispatch(setShouldShowOptionsPanel(false));
+    },
+    [shouldPinOptionsPanel]
+  );
+
+  useHotkeys(
     'shift+o',
     () => {
       handleClickPinOptionsPanel();
     },
     [shouldPinOptionsPanel]
   );
-  //
 
   const handleCloseOptionsPanel = useCallback(() => {
     if (shouldPinOptionsPanel) return;
@@ -111,12 +119,6 @@ const InvokeOptionsPanel = (props: Props) => {
     dispatch(setShouldPinOptionsPanel(!shouldPinOptionsPanel));
     dispatch(setNeedsCache(true));
   };
-
-  // // set gallery scroll position
-  // useEffect(() => {
-  //   if (!optionsPanelContainerRef.current) return;
-  //   optionsPanelContainerRef.current.scrollTop = optionsPanelScrollPosition;
-  // }, [optionsPanelScrollPosition, shouldShowOptionsPanel]);
 
   return (
     <CSSTransition
@@ -170,7 +172,6 @@ const InvokeOptionsPanel = (props: Props) => {
                 </h1>
               </div>
             )}
-
             {children}
           </div>
         </div>

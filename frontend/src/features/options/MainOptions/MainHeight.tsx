@@ -7,7 +7,7 @@ import { setHeight } from '../optionsSlice';
 import { fontSize } from './MainOptions';
 
 export default function MainHeight() {
-  const { height } = useAppSelector((state: RootState) => state.options);
+  const height = useAppSelector((state: RootState) => state.options.height);
   const activeTabName = useAppSelector(activeTabNameSelector);
   const dispatch = useAppDispatch();
 

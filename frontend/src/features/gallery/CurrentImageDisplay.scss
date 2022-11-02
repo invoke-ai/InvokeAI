@@ -9,18 +9,6 @@
   border-radius: 0.5rem;
 }
 
-.current-image-options {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  column-gap: 0.5rem;
-
-  .chakra-popover__popper {
-    z-index: 11;
-  }
-}
-
 .current-image-preview {
   position: relative;
   justify-content: center;
@@ -50,6 +38,7 @@
   justify-content: space-between;
   z-index: 1;
   height: 100%;
+  width: 100%;
   pointer-events: none;
 }
 

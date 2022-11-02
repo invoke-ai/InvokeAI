@@ -1,17 +1,17 @@
 import { FormControl, FormLabel, Select, SelectProps } from '@chakra-ui/react';
 import { MouseEvent } from 'react';
 
-interface Props extends SelectProps {
+type IAISelectProps = SelectProps & {
   label: string;
   styleClass?: string;
   validValues:
     | Array<number | string>
     | Array<{ key: string; value: string | number }>;
-}
+};
 /**
  * Customized Chakra FormControl + Select multi-part component.
  */
-const IAISelect = (props: Props) => {
+const IAISelect = (props: IAISelectProps) => {
   const {
     label,
     isDisabled,
@@ -33,19 +33,19 @@ const IAISelect = (props: Props) => {
       }}
     >
       <FormLabel
+        className="invokeai__select-label"
         fontSize={fontSize}
         marginBottom={1}
         flexGrow={2}
         whiteSpace="nowrap"
-        className="invokeai__select-label"
       >
         {label}
       </FormLabel>
       <Select
+        className="invokeai__select-picker"
         fontSize={fontSize}
         size={size}
         {...rest}
-        className="invokeai__select-picker"
       >
         {validValues.map((opt) => {
           return typeof opt === 'string' || typeof opt === 'number' ? (
@@ -53,7 +53,11 @@ const IAISelect = (props: Props) => {
               {opt}
             </option>
           ) : (
-            <option key={opt.value} value={opt.value}>
+            <option
+              key={opt.value}
+              value={opt.value}
+              className="invokeai__select-option"
+            >
               {opt.key}
             </option>
           );

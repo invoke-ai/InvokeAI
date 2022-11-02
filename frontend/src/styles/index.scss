@@ -23,14 +23,14 @@
 @use '../features/options/MainOptions/MainOptions.scss';
 @use '../features/options/AccordionItems/AdvancedSettings.scss';
 @use '../features/options/AdvancedOptions/Upscale/UpscaleOptions.scss';
-@use '../features/options/AdvancedOptions/Inpainting/BoundingBoxSettings.scss';
+@use '../features/options/AdvancedOptions/Inpainting/BoundingBoxSettings/BoundingBoxSettings.scss';
 @use '../features/system/ProgressBar.scss';
 
 // gallery
 @use '../features/gallery/CurrentImageDisplay.scss';
+@use '../features/gallery/CurrentImageButtons.scss';
 @use '../features/gallery/ImageGallery.scss';
 @use '../features/gallery/HoverableImage.scss';
-@use '../features/gallery/InvokePopover.scss';
 @use '../features/gallery/ImageMetaDataViewer/ImageMetadataViewer.scss';
 
 // Tabs
@@ -39,13 +39,15 @@
 @use '../features/tabs/InvokeOptionsPanel.scss';
 @use '../features/tabs/TextToImage/TextToImage.scss';
 @use '../features/tabs/ImageToImage/ImageToImage.scss';
-@use '../features/tabs/Inpainting/Inpainting.scss';
 @use '../features/tabs/FloatingButton.scss';
+@use '../features/tabs/Inpainting/Inpainting.scss';
+@use '../features/tabs/Inpainting/InpaintingCanvasStatusIcons.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';
 @use '../common/components/IAIInput.scss';
 @use '../common/components/IAIIconButton.scss';
+@use '../common/components/IAIButton.scss';
 @use '../common/components/IAISwitch.scss';
 @use '../common/components/IAISelect.scss';
 @use '../common/components/IAISlider.scss';

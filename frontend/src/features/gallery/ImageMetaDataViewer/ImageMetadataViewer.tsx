@@ -32,10 +32,12 @@ import {
   setUpscalingStrength,
   setWidth,
   setInitialImage,
+  setShouldShowImageDetails,
 } from '../../options/optionsSlice';
 import promptToString from '../../../common/util/promptToString';
 import { seedWeightsToString } from '../../../common/util/seedWeightPairs';
 import { FaCopy } from 'react-icons/fa';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -107,7 +109,10 @@ const memoEqualityCheck = (
 const ImageMetadataViewer = memo(
   ({ image, styleClass }: ImageMetadataViewerProps) => {
     const dispatch = useAppDispatch();
-    // const jsonBgColor = useColorModeValue('blackAlpha.100', 'whiteAlpha.100');
+
+    useHotkeys('esc', () => {
+      dispatch(setShouldShowImageDetails(false));
+    });
 
     const metadata = image?.metadata?.image || {};
     const {
