@@ -2,36 +2,39 @@ import {
   IconButtonProps,
   IconButton,
   Tooltip,
-  PlacementWithLogical,
+  TooltipProps,
+  ResponsiveValue,
+  ThemingProps,
+  isChakraTheme,
 } from '@chakra-ui/react';
+import { Variant } from 'framer-motion';
 
 interface Props extends IconButtonProps {
-  tooltip?: string;
-  tooltipPlacement?: PlacementWithLogical | undefined;
   styleClass?: string;
+  tooltip?: string;
+  tooltipProps?: Omit<TooltipProps, 'children'>;
+  asCheckbox?: boolean;
+  isChecked?: boolean;
 }
 
-/**
- * Reusable customized button component. Originally was more customized - now probably unecessary.
- */
 const IAIIconButton = (props: Props) => {
   const {
     tooltip = '',
-    tooltipPlacement = 'bottom',
     styleClass,
-    onClick,
-    cursor,
+    tooltipProps,
+    asCheckbox,
+    isChecked,
     ...rest
   } = props;
 
   return (
-    <Tooltip label={tooltip} hasArrow placement={tooltipPlacement}>
+    <Tooltip label={tooltip} hasArrow {...tooltipProps}>
       <IconButton
-        className={`icon-button ${styleClass}`}
-        data-variant={props.variant}
+        className={`invokeai__icon-button ${styleClass}`}
+        data-as-checkbox={asCheckbox}
+        data-selected={isChecked !== undefined ? isChecked : undefined}
+        style={props.onClick ? { cursor: 'pointer' } : {}}
         {...rest}
-        cursor={cursor ? cursor : onClick ? 'pointer' : 'unset'}
-        onClick={onClick}
       />
     </Tooltip>
   );

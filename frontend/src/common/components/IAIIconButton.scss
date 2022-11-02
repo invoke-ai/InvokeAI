@@ -1,6 +1,6 @@
 @use '../../styles/Mixins/' as *;
 
-.icon-button {
+.invokeai__icon-button {
   background-color: var(--btn-grey);
   cursor: pointer;
 
@@ -14,15 +14,33 @@
       background-color: var(--accent-color-hover);
     }
   }
+
   &[disabled] {
     cursor: not-allowed;
   }
 
   &[data-variant='link'] {
-    background-color: none !important;
+    background: none !important;
+  }
+
+  &[data-as-checkbox='true'] {
+    border: 2px solid var(--switch-bg-color);
+    background: none !important;
+    svg {
+      fill: var(--input-checkbox-bg);
+    }
     &:hover {
-      background-color: none !important;
-      background: none !important;
+      svg {
+        fill: var(--text-color-secondary);
+      }
+      border-color: var(--accent-color);
+    }
+
+    &[data-selected='true'] {
+      border-color: var(--accent-color);
+      &:hover {
+        border-color: var(--accent-color-hover);
+      }
     }
   }
 }
