@@ -8,6 +8,7 @@ const inpaintingCanvasStatusIconsSelector = createSelector(
       shouldInvertMask,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
+      boundingBoxDimensions,
     } = inpainting;
 
     return {
@@ -15,6 +16,8 @@ const inpaintingCanvasStatusIconsSelector = createSelector(
       shouldInvertMask,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
+      isBoundingBoxTooSmall:
+        boundingBoxDimensions.width < 512 || boundingBoxDimensions.height < 512,
     };
   },
   {
@@ -24,9 +27,10 @@ const inpaintingCanvasStatusIconsSelector = createSelector(
   }
 );
 
-import { IconButton } from '@chakra-ui/react';
+import { ButtonGroup, IconButton } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { BiHide, BiShow } from 'react-icons/bi';
+import { GiResize } from 'react-icons/gi';
 import { BsBoundingBox } from 'react-icons/bs';
 import { FaLock, FaUnlock } from 'react-icons/fa';
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
@@ -39,11 +43,12 @@ const InpaintingCanvasStatusIcons = () => {
     shouldInvertMask,
     shouldLockBoundingBox,
     shouldShowBoundingBox,
+    isBoundingBoxTooSmall,
   } = useAppSelector(inpaintingCanvasStatusIconsSelector);
 
   return (
     <div className="inpainting-alerts">
-      <div style={{ pointerEvents: 'none' }}>
+      <ButtonGroup isAttached>
         <IconButton
           aria-label="Show/HideMask"
           size="xs"
@@ -52,8 +57,6 @@ const InpaintingCanvasStatusIcons = () => {
           data-selected={!shouldShowMask}
           icon={shouldShowMask ? <BiShow /> : <BiHide />}
         />
-      </div>
-      <div style={{ pointerEvents: 'none' }}>
         <IconButton
           aria-label="Invert Mask"
           variant={'ghost'}
@@ -62,8 +65,6 @@ const InpaintingCanvasStatusIcons = () => {
           data-selected={shouldInvertMask}
           icon={shouldInvertMask ? <MdInvertColors /> : <MdInvertColorsOff />}
         />
-      </div>
-      <div style={{ pointerEvents: 'none' }}>
         <IconButton
           aria-label="Bounding Box Lock"
           size="xs"
@@ -71,8 +72,6 @@ const InpaintingCanvasStatusIcons = () => {
           data-selected={shouldLockBoundingBox}
           icon={shouldLockBoundingBox ? <FaLock /> : <FaUnlock />}
         />
-      </div>
-      <div style={{ pointerEvents: 'none' }}>
         <IconButton
           aria-label="Bounding Box Lock"
           size="xs"
@@ -80,7 +79,14 @@ const InpaintingCanvasStatusIcons = () => {
           data-alert={!shouldShowBoundingBox}
           icon={<BsBoundingBox />}
         />
-      </div>
+        <IconButton
+          aria-label="Under 512x512"
+          size="xs"
+          variant={'ghost'}
+          data-alert={isBoundingBoxTooSmall}
+          icon={<GiResize />}
+        />
+      </ButtonGroup>
     </div>
   );
 };
