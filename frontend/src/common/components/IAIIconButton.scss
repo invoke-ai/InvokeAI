@@ -8,7 +8,7 @@
     background-color: var(--btn-grey-hover);
   }
 
-  &[data-selected=true] {
+  &[data-selected='true'] {
     background-color: var(--accent-color);
     &:hover {
       background-color: var(--accent-color-hover);
@@ -16,5 +16,13 @@
   }
   &[disabled] {
     cursor: not-allowed;
+  }
+
+  &[data-variant='link'] {
+    background-color: none !important;
+    &:hover {
+      background-color: none !important;
+      background: none !important;
+    }
   }
 }

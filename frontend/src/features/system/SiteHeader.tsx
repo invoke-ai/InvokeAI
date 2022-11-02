@@ -2,10 +2,11 @@ import { IconButton, Link, Tooltip, useColorMode } from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 
-import { FaSun, FaMoon, FaGithub, FaDiscord } from 'react-icons/fa';
+import { FaSun, FaMoon, FaGithub, FaDiscord, FaBug } from 'react-icons/fa';
 import { MdHelp, MdKeyboard, MdSettings } from 'react-icons/md';
 
 import InvokeAILogo from '../../assets/images/logo.png';
+import IAIIconButton from '../../common/components/IAIIconButton';
 
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 
@@ -44,64 +45,55 @@ const SiteHeader = () => {
         <StatusIndicator />
 
         <HotkeysModal>
-          <div>
-            <Tooltip hasArrow label="Hotkeys" placement={'bottom'}>
-              <IconButton
-                aria-label="Hotkeys"
-                variant="link"
-                fontSize={24}
-                size={'sm'}
-                icon={<MdKeyboard />}
-              />
-            </Tooltip>
-          </div>
+          <IAIIconButton
+            aria-label="Hotkeys"
+            tooltip="Hotkeys"
+            fontSize={24}
+            size={'sm'}
+            variant="link"
+            icon={<MdKeyboard />}
+          />
         </HotkeysModal>
 
-        <Tooltip hasArrow label="Theme" placement={'bottom'}>
-          <IconButton
-            aria-label="Toggle Dark Mode"
-            onClick={toggleColorMode}
-            variant="link"
-            size={'sm'}
-            fontSize={colorModeIconFontSize}
-            icon={colorModeIcon}
-          />
-        </Tooltip>
+        <IAIIconButton
+          aria-label="Toggle Dark Mode"
+          tooltip="Dark Mode"
+          onClick={toggleColorMode}
+          variant="link"
+          size={'sm'}
+          fontSize={colorModeIconFontSize}
+          icon={colorModeIcon}
+        />
 
-        <Tooltip hasArrow label="Report Bug" placement={'bottom'}>
-          <IconButton
-            aria-label="Link to Github Issues"
-            variant="link"
-            fontSize={23}
-            size={'sm'}
-            icon={
-              <Link
-                isExternal
-                href="http://github.com/invoke-ai/InvokeAI/issues"
-              >
-                <MdHelp />
-              </Link>
-            }
-          />
-        </Tooltip>
+        <IAIIconButton
+          aria-label="Report Bug"
+          tooltip="Report Bug"
+          variant="link"
+          fontSize={19}
+          size={'sm'}
+          icon={
+            <Link isExternal href="http://github.com/invoke-ai/InvokeAI/issues">
+              <FaBug />
+            </Link>
+          }
+        />
 
-        <Tooltip hasArrow label="Github" placement={'bottom'}>
-          <IconButton
-            aria-label="Link to Github Repo"
-            variant="link"
-            fontSize={20}
-            size={'sm'}
-            icon={
-              <Link isExternal href="http://github.com/invoke-ai/InvokeAI">
-                <FaGithub />
-              </Link>
-            }
-          />
-        </Tooltip>
+        <IAIIconButton
+          aria-label="Link to Github Repo"
+          tooltip="Github"
+          variant="link"
+          fontSize={20}
+          size={'sm'}
+          icon={
+            <Link isExternal href="http://github.com/invoke-ai/InvokeAI">
+              <FaGithub />
+            </Link>
+          }
+        />
 
-        <Tooltip hasArrow label="Discord" placement={'bottom'}>
-          <IconButton
+          <IAIIconButton
             aria-label="Link to Discord Server"
+            tooltip="Discord"
             variant="link"
             fontSize={20}
             size={'sm'}
@@ -111,20 +103,16 @@ const SiteHeader = () => {
               </Link>
             }
           />
-        </Tooltip>
 
         <SettingsModal>
-          <div>
-            <Tooltip label="Settings">
-              <IconButton
-                aria-label="Settings"
-                variant="link"
-                fontSize={24}
-                size={'sm'}
-                icon={<MdSettings />}
-              />
-            </Tooltip>
-          </div>
+          <IAIIconButton
+            aria-label="Settings"
+            tooltip="Settings"
+            variant="link"
+            fontSize={24}
+            size={'sm'}
+            icon={<MdSettings />}
+          />
         </SettingsModal>
       </div>
     </div>

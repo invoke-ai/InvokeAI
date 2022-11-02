@@ -28,6 +28,7 @@ const IAIIconButton = (props: Props) => {
     <Tooltip label={tooltip} hasArrow placement={tooltipPlacement}>
       <IconButton
         className={`icon-button ${styleClass}`}
+        data-variant={props.variant}
         {...rest}
         cursor={cursor ? cursor : onClick ? 'pointer' : 'unset'}
         onClick={onClick}
