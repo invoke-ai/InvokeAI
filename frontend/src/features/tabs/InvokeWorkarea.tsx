@@ -1,6 +1,7 @@
 import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { ReactNode } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { VscSplitHorizontal } from 'react-icons/vsc';
 import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
 import ImageGallery from '../gallery/ImageGallery';
@@ -26,6 +27,23 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const { optionsPanel, children, styleClass } = props;
   const { showDualDisplay, activeTabName } = useAppSelector(workareaSelector);
 
+  const handleDualDisplay = () => {
+    dispatch(setShowDualDisplay(!showDualDisplay));
+  };
+
+  // Hotkeys
+  // Toggle split view
+  useHotkeys(
+    'shift+j',
+    () => {
+      handleDualDisplay();
+    },
+    {
+      enabled: activeTabName === 'inpainting',
+    },
+    [showDualDisplay]
+  );
+
   return (
     <div
       className={
@@ -41,7 +59,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
               <div
                 className="workarea-split-button"
                 data-selected={showDualDisplay}
-                onClick={() => dispatch(setShowDualDisplay(!showDualDisplay))}
+                onClick={handleDualDisplay}
               >
                 <VscSplitHorizontal />
               </div>
