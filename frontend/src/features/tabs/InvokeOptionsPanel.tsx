@@ -68,13 +68,21 @@ const InvokeOptionsPanel = (props: Props) => {
   );
 
   useHotkeys(
+    'esc',
+    () => {
+      if (shouldPinOptionsPanel) return;
+      dispatch(setShouldShowOptionsPanel(false));
+    },
+    [shouldPinOptionsPanel]
+  );
+
+  useHotkeys(
     'shift+o',
     () => {
       handleClickPinOptionsPanel();
     },
     [shouldPinOptionsPanel]
   );
-  //
 
   const handleCloseOptionsPanel = useCallback(() => {
     if (shouldPinOptionsPanel) return;
