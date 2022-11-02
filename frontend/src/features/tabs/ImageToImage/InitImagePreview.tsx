@@ -31,6 +31,14 @@ export default function InitImagePreview() {
   return (
     <>
       <div className="init-image-preview-header">
+      {/* <div className="init-image-preview-header"> */}
+        <h2>Initial Image</h2>
+        {/* <IconButton
+          isDisabled={!initialImage}
+          aria-label={'Reset Initial Image'}
+          onClick={handleClickResetInitialImage}
+          icon={<MdClear />}
+        /> */}
         <ImageUploaderIconButton />
       </div>
       {initialImage && (
