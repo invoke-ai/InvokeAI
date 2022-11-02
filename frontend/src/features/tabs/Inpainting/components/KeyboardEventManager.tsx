@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useEffect, useRef } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import {
   RootState,
   useAppDispatch,
@@ -12,6 +13,7 @@ import {
   InpaintingState,
   setIsSpacebarHeld,
   setShouldLockBoundingBox,
+  toggleShouldLockBoundingBox,
   toggleTool,
 } from '../inpaintingSlice';
 
@@ -56,6 +58,20 @@ const KeyboardEventManager = () => {
   const wasLastEventOverCanvas = useRef<boolean>(false);
   const lastEvent = useRef<KeyboardEvent | null>(null);
 
+  //  Toggle lock bounding box
+  useHotkeys(
+    'shift+q',
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      dispatch(toggleShouldLockBoundingBox());
+    },
+    {
+      enabled: activeTabName === 'inpainting' && shouldShowMask,
+    },
+    [activeTabName, shouldShowMask]
+  );
+
+  // Manages hold-style keyboard shortcuts
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (

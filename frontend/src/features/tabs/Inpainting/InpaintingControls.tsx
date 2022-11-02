@@ -7,29 +7,6 @@ import InpaintingClearImageControl from './InpaintingControls/InpaintingClearIma
 import InpaintingSplitLayoutControl from './InpaintingControls/InpaintingSplitLayoutControl';
 
 const InpaintingControls = () => {
-  // const { shouldShowMask, activeTabName } = useAppSelector(
-  //   inpaintingControlsSelector
-  // );
-
-  // const dispatch = useAppDispatch();
-
-  /**
-   * Hotkeys
-   */
-
-  // Toggle lock bounding box
-  // useHotkeys(
-  //   'shift+q',
-  //   (e: KeyboardEvent) => {
-  //     e.preventDefault();
-  //     dispatch(toggleShouldLockBoundingBox());
-  //   },
-  //   {
-  //     enabled: activeTabName === 'inpainting' && shouldShowMask,
-  //   },
-  //   [activeTabName, shouldShowMask]
-  // );
-
   return (
     <div className="inpainting-settings">
       <div className="inpainting-buttons-group">
