@@ -8,6 +8,12 @@ if exist ".git" (
     call git pull
 )
 
-conda env update
 
+conda env update
+conda activate invokeai
+python scripts/preload_models.py
+
+echo "Press any key to continue"
 pause
+exit 0
+

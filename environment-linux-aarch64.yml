@@ -11,6 +11,7 @@ dependencies:
   - numpy=1.19
   - imageio=2.9.0
   - opencv=4.6.0
+  - getpass_asterisk
   - pillow=8.*
   - flask=2.1.*
   - flask_cors=3.0.10

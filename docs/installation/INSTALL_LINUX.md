@@ -43,6 +43,7 @@ title: Manual Installation, Linux
    environment named `invokeai` and activate the environment.
 
     ```bash
+    (base) rm -rf src      # (this is a precaution in case there is already a src directory)
     (base) ~/InvokeAI$ conda env create
     (base) ~/InvokeAI$ conda activate invokeai
     (invokeai) ~/InvokeAI$
@@ -51,50 +52,54 @@ title: Manual Installation, Linux
     After these steps, your command prompt will be prefixed by `(invokeai)` as shown
     above.
 
-6. Load a couple of small machine-learning models required by stable diffusion:
+6. Load the big stable diffusion weights files and a couple of smaller machine-learning models:
 
     ```bash
     (invokeai) ~/InvokeAI$ python3 scripts/preload_models.py
     ```
 
     !!! note
+    	This script will lead you through the process of creating an account on Hugging Face,
+	accepting the terms and conditions of the Stable Diffusion model license, and
+	obtaining an access token for downloading. It will then download and install the
+	weights files for you.
 
-        This step is necessary because I modified the original just-in-time
-        model loading scheme to allow the script to work on GPU machines that are not
-        internet connected. See [Preload Models](../features/OTHER.md#preload-models)
+	Please see [../features/INSTALLING_MODELS.md] for a manual process for doing the
+	same thing.
 
-7. Install the weights for the stable diffusion model.
+7. Start generating images!
 
-- Sign up at https://huggingface.co
-- Go to the [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
-- Accept the terms and click Access Repository
-- Download [v1-5-pruned-emaonly.ckpt (4.27 GB)](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned-emaonly.ckpt)
-and move it into this directory under `models/ldm/stable_diffusion_v1/v1-5-pruned-emaonly.ckpt`
+    # Command-line interface
+    (invokeai) python scripts/invoke.py
 
-There are many other models that you can use. Please see [../features/INSTALLING_MODELS.md]
-for details.
+    # or run the web interface on localhost:9090!
+    (invokeai) python scripts/invoke.py --web
 
-8. Start generating images!
+    # or run the web interface on your machine's network interface!
+    (invokeai) python scripts/invoke.py --web --host 0.0.0.0
 
-    ```bash
-    # for the pre-release weights use the -l or --liaon400m switch
-    (invokeai) ~/InvokeAI$ python3 scripts/invoke.py -l
+To use an alternative model you may invoke the `!switch` command in
+the CLI, or pass `--model <model_name>` during `invoke.py` launch for
+either the CLI or the Web UI. See [Command Line
+Client](../features/CLI.md#model-selection-and-importation). The
+model names are defined in `configs/models.yaml`.
 
-    # for the post-release weights do not use the switch
-    (invokeai) ~/InvokeAI$ python3 scripts/invoke.py
-
-    # for additional configuration switches and arguments, use -h or --help
-    (invokeai) ~/InvokeAI$ python3 scripts/invoke.py -h
-    ```
-
-9. Subsequently, to relaunch the script, be sure to run "conda activate invokeai" (step 5, second command), enter the `InvokeAI` directory, and then launch the invoke script (step 8). If you forget to activate the 'invokeai' environment, the script will fail with multiple `ModuleNotFound` errors.
+9. Subsequently, to relaunch the script, be sure to run "conda
+activate invokeai" (step 5, second command), enter the `InvokeAI`
+directory, and then launch the invoke script (step 8). If you forget
+to activate the 'invokeai' environment, the script will fail with
+multiple `ModuleNotFound` errors.
 
 ## Updating to newer versions of the script
 
-This distribution is changing rapidly. If you used the `git clone` method (step 5) to download the InvokeAI directory, then to update to the latest and greatest version, launch the Anaconda window, enter `InvokeAI` and type:
+This distribution is changing rapidly. If you used the `git clone`
+method (step 5) to download the InvokeAI directory, then to update to
+the latest and greatest version, launch the Anaconda window, enter
+`InvokeAI` and type:
 
 ```bash
 (invokeai) ~/InvokeAI$ git pull
+(invokeai) ~/InvokeAI$ rm -rf src   # prevents conda freezing errors
 (invokeai) ~/InvokeAI$ conda env update -f environment.yml
 ```
 
