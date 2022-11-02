@@ -648,6 +648,15 @@ class InvokeAIWebServer:
                 step_index = 1
                 nonlocal prior_variations
 
+
+                # paste the inpainting image back onto the original
+                if "init_mask" in generation_parameters:
+                    image = paste_image_into_bounding_box(
+                        Image.open(init_img_path),
+                        image,
+                        **generation_parameters["bounding_box"],
+                    )
+
                 progress.set_current_status("Generation Complete")
 
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
@@ -735,14 +744,6 @@ class InvokeAIWebServer:
                 progress.set_current_status("Saving Image")
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
-
-                # paste the inpainting image back onto the original
-                if "init_mask" in generation_parameters:
-                    image = paste_image_into_bounding_box(
-                        Image.open(init_img_path),
-                        image,
-                        **generation_parameters["bounding_box"],
-                    )
 
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
                 if "init_img" in all_parameters:
