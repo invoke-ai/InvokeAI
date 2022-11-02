@@ -20,6 +20,7 @@ import { persistor } from '../../../main';
 import {
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
+  setShouldDisplayInProgressType,
   SystemState,
 } from '../systemSlice';
 import ModelList from './ModelList';
@@ -112,6 +113,9 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 label={'Display In-Progress Images'}
                 validValues={IN_PROGRESS_IMAGE_TYPES}
                 value={shouldDisplayInProgressType}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                  dispatch(setShouldDisplayInProgressType(e.target.value))
+                }
               />
 
               <IAISwitch
