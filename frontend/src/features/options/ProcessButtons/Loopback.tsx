@@ -17,6 +17,7 @@ const LoopbackButton = () => {
     <IAIIconButton
       aria-label="Toggle Loopback"
       tooltip="Toggle Loopback"
+      styleClass="loopback-btn"
       asCheckbox={true}
       isChecked={shouldLoopback}
       icon={<FaRecycle />}
