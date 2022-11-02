@@ -1,9 +1,9 @@
-import { IconButton, Link, Tooltip, useColorMode } from '@chakra-ui/react';
+import { Link, useColorMode } from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { FaSun, FaMoon, FaGithub, FaDiscord, FaBug } from 'react-icons/fa';
-import { MdHelp, MdKeyboard, MdSettings } from 'react-icons/md';
+import { MdKeyboard, MdSettings } from 'react-icons/md';
 
 import InvokeAILogo from '../../assets/images/logo.png';
 import IAIIconButton from '../../common/components/IAIIconButton';
@@ -91,18 +91,18 @@ const SiteHeader = () => {
           }
         />
 
-          <IAIIconButton
-            aria-label="Link to Discord Server"
-            tooltip="Discord"
-            variant="link"
-            fontSize={20}
-            size={'sm'}
-            icon={
-              <Link isExternal href="https://discord.gg/ZmtBAhwWhy">
-                <FaDiscord />
-              </Link>
-            }
-          />
+        <IAIIconButton
+          aria-label="Link to Discord Server"
+          tooltip="Discord"
+          variant="link"
+          fontSize={20}
+          size={'sm'}
+          icon={
+            <Link isExternal href="https://discord.gg/ZmtBAhwWhy">
+              <FaDiscord />
+            </Link>
+          }
+        />
 
         <SettingsModal>
           <IAIIconButton

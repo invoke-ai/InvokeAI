@@ -261,6 +261,7 @@ export default function ImageGallery() {
     >
       <div
         className="image-gallery-wrapper"
+        style={{ zIndex: shouldPinGallery ? 1 : 100 }}
         data-pinned={shouldPinGallery}
         ref={galleryRef}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}

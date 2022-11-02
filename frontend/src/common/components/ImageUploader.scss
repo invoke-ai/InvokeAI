@@ -16,6 +16,7 @@
     row-gap: 1rem;
     align-items: center;
     justify-content: center;
+    background-color: var(--background-color);
 
     &.is-drag-accept {
       box-shadow: inset 0 0 20rem 1rem var(--accent-color);

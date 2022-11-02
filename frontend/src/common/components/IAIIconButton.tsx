@@ -3,11 +3,7 @@ import {
   IconButton,
   Tooltip,
   TooltipProps,
-  ResponsiveValue,
-  ThemingProps,
-  isChakraTheme,
 } from '@chakra-ui/react';
-import { Variant } from 'framer-motion';
 
 interface Props extends IconButtonProps {
   styleClass?: string;
