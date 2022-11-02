@@ -3,17 +3,18 @@ import {
   IconButton,
   Tooltip,
   TooltipProps,
+  forwardRef,
 } from '@chakra-ui/react';
 
-interface Props extends IconButtonProps {
+export type IAIIconButtonProps = IconButtonProps & {
   styleClass?: string;
   tooltip?: string;
   tooltipProps?: Omit<TooltipProps, 'children'>;
   asCheckbox?: boolean;
   isChecked?: boolean;
-}
+};
 
-const IAIIconButton = (props: Props) => {
+const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
   const {
     tooltip = '',
     styleClass,
@@ -26,6 +27,7 @@ const IAIIconButton = (props: Props) => {
   return (
     <Tooltip label={tooltip} hasArrow {...tooltipProps}>
       <IconButton
+        ref={forwardedRef}
         className={`invokeai__icon-button ${styleClass}`}
         data-as-checkbox={asCheckbox}
         data-selected={isChecked !== undefined ? isChecked : undefined}
@@ -34,6 +36,6 @@ const IAIIconButton = (props: Props) => {
       />
     </Tooltip>
   );
-};
+});
 
 export default IAIIconButton;
