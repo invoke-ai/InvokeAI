@@ -62,7 +62,8 @@ export const frontendToBackendParameters = (
     shouldRandomizeSeed,
   } = optionsState;
 
-  const { shouldDisplayInProgressType } = systemState;
+  const { shouldDisplayInProgressType, saveIntermediatesInterval } =
+    systemState;
 
   const generationParameters: { [k: string]: any } = {
     prompt,
@@ -78,6 +79,7 @@ export const frontendToBackendParameters = (
     seed,
     progress_images: shouldDisplayInProgressType === 'full-res',
     progress_latents: shouldDisplayInProgressType === 'latents',
+    save_intermediates: saveIntermediatesInterval,
   };
 
   generationParameters.seed = shouldRandomizeSeed

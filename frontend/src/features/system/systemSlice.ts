@@ -43,6 +43,7 @@ export interface SystemState
   shouldDisplayGuides: boolean;
   wasErrorSeen: boolean;
   isCancelable: boolean;
+  saveIntermediatesInterval: number;
 }
 
 const initialSystemState: SystemState = {
@@ -72,6 +73,7 @@ const initialSystemState: SystemState = {
   hasError: false,
   wasErrorSeen: true,
   isCancelable: true,
+  saveIntermediatesInterval: 5,
 };
 
 export const systemSlice = createSlice({
@@ -186,6 +188,9 @@ export const systemSlice = createSlice({
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
     },
+    setSaveIntermediatesInterval: (state, action: PayloadAction<number>) => {
+      state.saveIntermediatesInterval = action.payload;
+    },
   },
 });
 
@@ -208,6 +213,7 @@ export const {
   setModelList,
   setIsCancelable,
   modelChangeRequested,
+  setSaveIntermediatesInterval,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
