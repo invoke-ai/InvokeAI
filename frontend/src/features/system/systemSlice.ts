@@ -20,10 +20,12 @@ export type ReadinessPayload = {
   reasonsWhyNotReady: string[];
 };
 
+export type InProgressImageType = 'none' | 'full-res' | 'latents';
+
 export interface SystemState
   extends InvokeAI.SystemStatus,
     InvokeAI.SystemConfig {
-  shouldDisplayInProgressType: string;
+  shouldDisplayInProgressType: InProgressImageType;
   log: Array<LogEntry>;
   shouldShowLogViewer: boolean;
   isGFPGANAvailable: boolean;
@@ -43,12 +45,12 @@ export interface SystemState
   isCancelable: boolean;
 }
 
-const initialSystemState = {
+const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
   log: [],
   shouldShowLogViewer: false,
-  shouldDisplayInProgressType: "none",
+  shouldDisplayInProgressType: 'none',
   shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
@@ -70,17 +72,16 @@ const initialSystemState = {
   hasError: false,
   wasErrorSeen: true,
   isCancelable: true,
-  isReady: false,
-  reasonsWhyNotReady: [],
 };
-
-const initialState: SystemState = initialSystemState;
 
 export const systemSlice = createSlice({
   name: 'system',
-  initialState,
+  initialState: initialSystemState,
   reducers: {
-    setShouldDisplayInProgressType: (state, action: PayloadAction<string>) => {
+    setShouldDisplayInProgressType: (
+      state,
+      action: PayloadAction<InProgressImageType>
+    ) => {
       state.shouldDisplayInProgressType = action.payload;
     },
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
