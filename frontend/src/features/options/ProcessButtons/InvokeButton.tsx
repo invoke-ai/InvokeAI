@@ -47,7 +47,7 @@ export default function InvokeButton(props: InvokeButton) {
           icon={<FaPlay />}
           isDisabled={!isReady}
           onClick={handleClickGenerate}
-          className="invoke-btn invoke"
+          className="invoke-btn"
           tooltip="Invoke"
           tooltipProps={{ placement: 'bottom' }}
           {...rest}
@@ -80,20 +80,4 @@ export default function InvokeButton(props: InvokeButton) {
       )}
     </IAIPopover>
   );
-
-  // return isReady ? (
-  //   buttonComponent
-  // ) : (
-  //   <IAIPopover trigger="hover" triggerComponent={buttonComponent}>
-  //     {reasonsWhyNotReady ? (
-  //       <UnorderedList>
-  //         {reasonsWhyNotReady.map((reason, i) => (
-  //           <ListItem key={i}>{reason}</ListItem>
-  //         ))}
-  //       </UnorderedList>
-  //     ) : (
-  //       'test'
-  //     )}
-  //   </IAIPopover>
-  // );
 }

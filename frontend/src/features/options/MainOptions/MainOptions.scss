@@ -26,7 +26,7 @@
   .invokeai__number-input-form-label,
   .invokeai__select-label {
     width: 100%;
-    font-size: 0.9rem !important;
+    font-size: 0.9rem;
     font-weight: bold;
   }
 
@@ -42,6 +42,8 @@
 }
 
 .advanced-options-checkbox {
-  padding: 1rem;
+  background-color: var(--background-color-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
   font-weight: bold;
 }
