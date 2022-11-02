@@ -378,7 +378,9 @@ const CurrentImageButtons = () => {
             </IAIButton>
           </div>
         </IAIPopover>
+      </ButtonGroup>
 
+      <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaQuoteRight />}
           tooltip="Use Prompt"
@@ -406,7 +408,9 @@ const CurrentImageButtons = () => {
           }
           onClick={handleClickUseAllParameters}
         />
+      </ButtonGroup>
 
+      <ButtonGroup isAttached={true}>
         <IAIPopover
           trigger="hover"
           triggerComponent={
@@ -450,24 +454,25 @@ const CurrentImageButtons = () => {
             </IAIButton>
           </div>
         </IAIPopover>
-
-        <IAIIconButton
-          icon={<FaCode />}
-          tooltip="Details"
-          aria-label="Details"
-          data-selected={shouldShowImageDetails}
-          onClick={handleClickShowImageDetails}
-        />
-
-        <DeleteImageModal image={currentImage}>
-          <IAIIconButton
-            icon={<FaTrash />}
-            tooltip="Delete Image"
-            aria-label="Delete Image"
-            isDisabled={!currentImage || !isConnected || isProcessing}
-          />
-        </DeleteImageModal>
       </ButtonGroup>
+
+      <IAIIconButton
+        icon={<FaCode />}
+        tooltip="Details"
+        aria-label="Details"
+        data-selected={shouldShowImageDetails}
+        onClick={handleClickShowImageDetails}
+      />
+
+      <DeleteImageModal image={currentImage}>
+        <IAIIconButton
+          icon={<FaTrash />}
+          tooltip="Delete Image"
+          aria-label="Delete Image"
+          isDisabled={!currentImage || !isConnected || isProcessing}
+          className="delete-image-btn"
+        />
+      </DeleteImageModal>
     </div>
   );
 };
