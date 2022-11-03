@@ -133,6 +133,19 @@ you can try starting `invoke.py` with the `--precision=float32` flag:
 
 ### Latest Changes
 
+### v2.1.0 major changes <small>(2 November 2022)</small> 
+
+    - [Inpainting](https://invoke-ai.github.io/InvokeAI/features/INPAINTING/) support in the WebGUI
+    - Greatly improved navigation and user experience in the [WebGUI](https://invoke-ai.github.io/InvokeAI/features/WEB/)
+    - The prompt syntax has been enhanced with [prompt weighting, cross-attention and prompt merging](https://invoke-ai.github.io/InvokeAI/features/PROMPTS/).
+    - You can now load [multiple models and switch among them quickly](https://docs.google.com/presentation/d/1WywGA1rny7bpFh7CLSdTr4nNpVKdlUeT0Bj0jCsILyU/edit?usp=sharing) without leaving the CLI.
+    - The installation process (via `scripts/preload_models.py`) now lets you select among several popular [Stable Diffusion models](https://invoke-ai.github.io/InvokeAI/installation/INSTALLING_MODELS/) and downloads and installs them on your behalf. Among other models, this script will install the current Stable Diffusion 1.5 model as well as a StabilityAI variable autoencoder (VAE) which improves face generation.
+    -  Tired of struggling with photoeditors to get the masked region of for inpainting just right? Let the AI make the mask for you using [text masking](https://docs.google.com/presentation/d/1pWoY510hCVjz0M6X9CBbTznZgW2W5BYNKrmZm7B45q8/edit#slide=id.p). This feature allows you to specify the part of the image to paint over using just English-language phrases.
+    -  Tired of seeing the head of your subjects cropped off? Uncrop them in the CLI with the [outcrop feature](https://invoke-ai.github.io/InvokeAI/features/OUTPAINTING/#outcrop).
+    - Tired of seeing your subject's bodies duplicated or mangled when generating larger-dimension images? Check out the `--hires` option in the CLI, or select the corresponding toggle in the WebGUI.
+    - We now support textual inversion and fine-tune .bin styles and subjects from the Hugging Face archive of [SD Concepts](https://huggingface.co/sd-concepts-library). Load the .bin file using the `--embedding_path` option. (The next version will support merging and loading of multiple simultaneous models).
+    <a href="https://invoke-ai.github.io/InvokeAI/CHANGELOG/>Complete Changelog</a>
+
 - v2.0.1 (13 October 2022)
   - fix noisy images at high step count when using k* samplers
   - dream.py script now calls invoke.py module directly rather than
