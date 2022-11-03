@@ -8,6 +8,7 @@
     margin: 0;
     font-weight: bold;
     font-size: 0.9rem;
+    color: var(--text-color-secondary);
   }
 
   .invokeai__slider_track {
@@ -27,14 +28,6 @@
     font-weight: bold;
     color: var(--slider-color);
     margin-top: 0.3rem;
-  }
-
-  .invokeai__slider-mark-start {
-    margin-left: 0.2rem;
-  }
-
-  .invokeai__slider-mark-end {
-    margin-left: -2rem;
   }
 
   .invokeai__slider-number-input {

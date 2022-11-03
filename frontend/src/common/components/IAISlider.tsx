@@ -27,6 +27,8 @@ interface IAIFullSliderProps {
   step?: number;
   onChange: (v: number) => void;
   withSliderMarks?: boolean;
+  sliderMarkLeftOffset?: number;
+  sliderMarkRightOffset?: number;
   withInput?: boolean;
   isInteger?: boolean;
   inputWidth?: string | number;
@@ -52,6 +54,8 @@ export default function IAISlider(props: IAIFullSliderProps) {
     onChange,
     tooltipSuffix = '',
     withSliderMarks = false,
+    sliderMarkLeftOffset = 0,
+    sliderMarkRightOffset = -7,
     withInput = false,
     isInteger = false,
     inputWidth = '5rem',
@@ -106,7 +110,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
         {label}
       </FormLabel>
 
-      <HStack w={'100%'} gap={1}>
+      <HStack w={'100%'} gap={2}>
         <Slider
           aria-label={label}
           value={value}
@@ -124,12 +128,14 @@ export default function IAISlider(props: IAIFullSliderProps) {
               <SliderMark
                 value={min}
                 className="invokeai__slider-mark invokeai__slider-mark-start"
+                ml={sliderMarkLeftOffset}
               >
                 {min}
               </SliderMark>
               <SliderMark
                 value={max}
                 className="invokeai__slider-mark invokeai__slider-mark-end"
+                ml={sliderMarkRightOffset}
               >
                 {max}
               </SliderMark>
