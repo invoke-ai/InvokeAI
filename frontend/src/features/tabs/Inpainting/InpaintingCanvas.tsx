@@ -46,7 +46,7 @@ export let stageRef: MutableRefObject<StageType | null>;
 export let maskLayerRef: MutableRefObject<Konva.Layer | null>;
 export let inpaintingImageElementRef: MutableRefObject<HTMLImageElement | null>;
 
-const SCALE_BY = 1.02;
+const SCALE_BY = 0.999;
 
 const InpaintingCanvas = () => {
   const dispatch = useAppDispatch();
@@ -267,17 +267,15 @@ const InpaintingCanvas = () => {
       y: (cursorPos.y - stageRef.current.y()) / stageScale,
     };
 
-    // how to scale? Zoom in? Or zoom out?
-    let direction = e.evt.deltaY > 0 ? 1 : -1;
-
+    let delta = e.evt.deltaY
+    
     // when we zoom on trackpad, e.evt.ctrlKey is true
     // in that case lets revert direction
     if (e.evt.ctrlKey) {
-      direction = -direction;
+      delta = -delta;
     }
 
-    const newScale =
-      direction > 0 ? stageScale * SCALE_BY : stageScale / SCALE_BY;
+    const newScale = stageScale * SCALE_BY ** delta;
 
     const newPos = {
       x: cursorPos.x - mousePointTo.x * newScale,
