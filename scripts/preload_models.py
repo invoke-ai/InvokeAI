@@ -17,6 +17,7 @@ from omegaconf import OmegaConf
 from huggingface_hub import HfFolder, hf_hub_url
 from pathlib import Path
 from getpass_asterisk import getpass_asterisk
+from transformers import CLIPTokenizer, CLIPTextModel
 import traceback
 import requests
 import clip
@@ -223,12 +224,7 @@ This involves a few easy steps.
 '''
     )
     input('Press <enter> when you are ready to continue:')
-<<<<<<< HEAD
-
-    from huggingface_hub import HfFolder
-=======
     print('(Fetching Hugging Face token from cache...',end='')
->>>>>>> spezialspezial-patch-9
     access_token = HfFolder.get_token()
     if access_token is not None:
         print('found')
@@ -293,11 +289,6 @@ def download_weight_datasets(models:dict, access_token:str):
     
 #---------------------------------------------
 def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
-<<<<<<< HEAD
-    from huggingface_hub import hf_hub_url
-
-=======
->>>>>>> spezialspezial-patch-9
     model_dest = os.path.join(Model_dir, model_name)
     os.makedirs(os.path.dirname(model_dest), exist_ok=True)
     url = hf_hub_url(repo_id, model_name)
@@ -353,11 +344,7 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
 
     try:
         if os.path.exists(Config_file):
-<<<<<<< HEAD
             print(f'** {Config_file} exists. Renaming to {Config_file}.orig')
-=======
-            print(f'* {Config_file} exists. Renaming to {Config_file}.orig')
->>>>>>> spezialspezial-patch-9
             os.rename(Config_file,f'{Config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(Config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
@@ -411,11 +398,7 @@ def new_config_file_contents(successfully_downloaded:dict, Config_file:str)->str
 # this will preload the Bert tokenizer fles
 def download_bert():
     print('Installing bert tokenizer (ignore deprecation errors)...', end='')
-<<<<<<< HEAD
-    from transformers import BertTokenizerFast, AutoFeatureExtractor
-=======
     sys.stdout.flush()
->>>>>>> spezialspezial-patch-9
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=DeprecationWarning)
         from transformers import BertTokenizerFast, AutoFeatureExtractor
@@ -433,13 +416,6 @@ def download_kornia():
 #---------------------------------------------
 def download_clip():
     print('Loading CLIP model...',end='')
-<<<<<<< HEAD
-    from transformers import CLIPTokenizer, CLIPTextModel
-=======
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=DeprecationWarning)
-        from transformers import CLIPTokenizer, CLIPTextModel
->>>>>>> spezialspezial-patch-9
     sys.stdout.flush()
     version = 'openai/clip-vit-large-patch14'
     tokenizer = CLIPTokenizer.from_pretrained(version)
