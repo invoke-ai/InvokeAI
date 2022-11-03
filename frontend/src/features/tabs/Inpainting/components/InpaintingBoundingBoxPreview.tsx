@@ -3,6 +3,7 @@ import Konva from 'konva';
 import { Context } from 'konva/lib/Context';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Box } from 'konva/lib/shapes/Transformer';
+import { stages } from 'konva/lib/Stage';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useCallback, useEffect, useRef } from 'react';
@@ -43,6 +44,7 @@ const boundingBoxPreviewSelector = createSelector(
       isMovingBoundingBox,
       isMouseOverBoundingBox,
       isSpacebarHeld,
+      stageCoordinate,
     } = inpainting;
     return {
       boundingBoxCoordinate,
@@ -59,6 +61,7 @@ const boundingBoxPreviewSelector = createSelector(
       isMouseOverBoundingBox,
       isMovingBoundingBox,
       isSpacebarHeld,
+      stageCoordinate,
     };
   },
   {
@@ -77,15 +80,16 @@ export const InpaintingBoundingBoxPreviewOverlay = () => {
     boundingBoxDimensions,
     boundingBoxPreviewFillString,
     canvasDimensions,
+    stageScale,
+    stageCoordinate,
   } = useAppSelector(boundingBoxPreviewSelector);
-
   return (
     <Group>
       <Rect
-        x={0}
-        y={0}
-        height={canvasDimensions.height}
-        width={canvasDimensions.width}
+        offsetX={stageCoordinate.x / stageScale}
+        offsetY={stageCoordinate.y / stageScale}
+        height={canvasDimensions.height / stageScale}
+        width={canvasDimensions.width / stageScale}
         fill={boundingBoxPreviewFillString}
       />
       <Rect
@@ -114,6 +118,7 @@ const InpaintingBoundingBoxPreview = () => {
     isMovingBoundingBox,
     isMouseOverBoundingBox,
     isSpacebarHeld,
+    canvasDimensions,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -139,21 +144,30 @@ const InpaintingBoundingBoxPreview = () => {
     [dispatch]
   );
 
+  // OK
   const dragBoundFunc = useCallback(
     (position: Vector2d) => {
       if (!imageToInpaint) return boundingBoxCoordinate;
 
       const { x, y } = position;
 
-      const maxX = imageToInpaint.width - boundingBoxDimensions.width;
-      const maxY = imageToInpaint.height - boundingBoxDimensions.height;
+      const maxX =
+        canvasDimensions.width - boundingBoxDimensions.width * stageScale;
+      const maxY =
+        canvasDimensions.height - boundingBoxDimensions.height * stageScale;
 
-      const clampedX = Math.floor(_.clamp(x, 0, maxX * stageScale));
-      const clampedY = Math.floor(_.clamp(y, 0, maxY * stageScale));
+      const clampedX = Math.floor(_.clamp(x, 0, maxX));
+      const clampedY = Math.floor(_.clamp(y, 0, maxY));
 
       return { x: clampedX, y: clampedY };
     },
-    [boundingBoxCoordinate, boundingBoxDimensions, imageToInpaint, stageScale]
+    [
+      boundingBoxCoordinate,
+      boundingBoxDimensions,
+      imageToInpaint,
+      stageScale,
+      canvasDimensions,
+    ]
   );
 
   const handleOnTransform = useCallback(() => {
@@ -195,6 +209,7 @@ const InpaintingBoundingBoxPreview = () => {
     rect.scaleY(1);
   }, [dispatch]);
 
+  // OK
   const anchorDragBoundFunc = useCallback(
     (
       oldPos: Vector2d, // old absolute position of anchor point
@@ -253,6 +268,7 @@ const InpaintingBoundingBoxPreview = () => {
     [scaledStep]
   );
 
+  // OK
   const boundBoxFunc = useCallback(
     (oldBoundBox: Box, newBoundBox: Box) => {
       /**
@@ -261,11 +277,9 @@ const InpaintingBoundingBoxPreview = () => {
        * the logic to constrain the size of the bounding box is very simple.
        */
       if (!imageToInpaint) return oldBoundBox;
-
       if (
-        newBoundBox.width + newBoundBox.x > imageToInpaint.width * stageScale ||
-        newBoundBox.height + newBoundBox.y >
-          imageToInpaint.height * stageScale ||
+        newBoundBox.width + newBoundBox.x > canvasDimensions.width ||
+        newBoundBox.height + newBoundBox.y > canvasDimensions.height ||
         newBoundBox.x < 0 ||
         newBoundBox.y < 0
       ) {
@@ -274,13 +288,12 @@ const InpaintingBoundingBoxPreview = () => {
 
       return newBoundBox;
     },
-    [imageToInpaint, stageScale]
+    [imageToInpaint, canvasDimensions]
   );
 
   const handleStartedTransforming = (e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     e.evt.stopImmediatePropagation();
-    console.log("Started transform")
     dispatch(setIsTransformingBoundingBox(true));
   };
 
@@ -350,6 +363,7 @@ const InpaintingBoundingBoxPreview = () => {
         flipEnabled={false}
         ignoreStroke={true}
         keepRatio={false}
+        draggable={false}
         listening={!isDrawing && !shouldLockBoundingBox}
         onMouseDown={handleStartedTransforming}
         onMouseUp={handleEndedTransforming}

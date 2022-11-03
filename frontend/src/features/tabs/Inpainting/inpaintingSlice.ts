@@ -34,6 +34,7 @@ export interface InpaintingState {
   maskColor: RgbaColor;
   cursorPosition: Vector2d | null;
   canvasDimensions: Dimensions;
+  stageCoordinate: Vector2d;
   boundingBoxDimensions: Dimensions;
   boundingBoxCoordinate: Vector2d;
   boundingBoxPreviewFill: RgbaColor;
@@ -65,6 +66,7 @@ const initialInpaintingState: InpaintingState = {
   brushSize: 50,
   maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
   canvasDimensions: { width: 0, height: 0 },
+  stageCoordinate: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxCoordinate: { x: 0, y: 0 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
@@ -171,38 +173,34 @@ export const inpaintingSlice = createSlice({
       state.imageToInpaint = undefined;
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
-      const { width: imageWidth, height: imageHeight } = action.payload;
+      const { width: canvasWidth, height: canvasHeight } =
+        state.canvasDimensions;
       const { width, height } = state.boundingBoxDimensions;
       const { x, y } = state.boundingBoxCoordinate;
 
       const newCoordinates: Vector2d = { x, y };
       const newDimensions: Dimensions = { width, height };
 
-      if (width + x > imageWidth) {
+      if (width + x > canvasWidth) {
         // Bounding box at least needs to be translated
-        if (width > imageWidth) {
+        if (width > canvasWidth) {
           // Bounding box also needs to be resized
-          newDimensions.width = roundDownToMultiple(imageWidth, 64);
+          newDimensions.width = roundDownToMultiple(canvasWidth, 64);
         }
-        newCoordinates.x = imageWidth - newDimensions.width;
+        newCoordinates.x = canvasWidth - newDimensions.width;
       }
 
-      if (height + y > imageHeight) {
+      if (height + y > canvasHeight) {
         // Bounding box at least needs to be translated
-        if (height > imageHeight) {
+        if (height > canvasHeight) {
           // Bounding box also needs to be resized
-          newDimensions.height = roundDownToMultiple(imageHeight, 64);
+          newDimensions.height = roundDownToMultiple(canvasHeight, 64);
         }
-        newCoordinates.y = imageHeight - newDimensions.height;
+        newCoordinates.y = canvasHeight - newDimensions.height;
       }
 
       state.boundingBoxDimensions = newDimensions;
       state.boundingBoxCoordinate = newCoordinates;
-
-      state.canvasDimensions = {
-        width: imageWidth,
-        height: imageHeight,
-      };
 
       state.imageToInpaint = action.payload;
       state.needsCache = true;
@@ -216,11 +214,11 @@ export const inpaintingSlice = createSlice({
         state.boundingBoxDimensions;
 
       const newBoundingBoxWidth = roundDownToMultiple(
-        _.clamp(boundingBoxWidth, 64, canvasWidth),
+        _.clamp(boundingBoxWidth, 64, canvasWidth / state.stageScale),
         64
       );
       const newBoundingBoxHeight = roundDownToMultiple(
-        _.clamp(boundingBoxHeight, 64, canvasHeight),
+        _.clamp(boundingBoxHeight, 64, canvasHeight / state.stageScale),
         64
       );
 
@@ -237,8 +235,11 @@ export const inpaintingSlice = createSlice({
       const { width: canvasWidth, height: canvasHeight } =
         state.canvasDimensions;
 
-      const roundedCanvasWidth = roundDownToMultiple(canvasWidth, 64);
-      const roundedCanvasHeight = roundDownToMultiple(canvasHeight, 64);
+      const scaledCanvasWidth = canvasWidth / state.stageScale;
+      const scaledCanvasHeight = canvasHeight / state.stageScale;
+
+      const roundedCanvasWidth = roundDownToMultiple(scaledCanvasWidth, 64);
+      const roundedCanvasHeight = roundDownToMultiple(scaledCanvasHeight, 64);
 
       const roundedBoundingBoxWidth = roundDownToMultiple(boundingBoxWidth, 64);
       const roundedBoundingBoxHeight = roundDownToMultiple(
@@ -246,8 +247,8 @@ export const inpaintingSlice = createSlice({
         64
       );
 
-      const overflowX = boundingBoxX + boundingBoxWidth - canvasWidth;
-      const overflowY = boundingBoxY + boundingBoxHeight - canvasHeight;
+      const overflowX = boundingBoxX + boundingBoxWidth - scaledCanvasWidth;
+      const overflowY = boundingBoxY + boundingBoxHeight - scaledCanvasHeight;
 
       const newBoundingBoxWidth = _.clamp(
         roundedBoundingBoxWidth,
@@ -269,13 +270,13 @@ export const inpaintingSlice = createSlice({
 
       const clampedX = _.clamp(
         overflowCorrectedX,
-        0,
+        state.stageCoordinate.x,
         roundedCanvasWidth - newBoundingBoxWidth
       );
 
       const clampedY = _.clamp(
         overflowCorrectedY,
-        0,
+        state.stageCoordinate.y,
         roundedCanvasHeight - newBoundingBoxHeight
       );
 
@@ -291,6 +292,9 @@ export const inpaintingSlice = createSlice({
     },
     setBoundingBoxCoordinate: (state, action: PayloadAction<Vector2d>) => {
       state.boundingBoxCoordinate = action.payload;
+    },
+    setStageCoordinate: (state, action: PayloadAction<Vector2d>) => {
+      state.stageCoordinate = action.payload;
     },
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
       state.boundingBoxPreviewFill = action.payload;
@@ -378,6 +382,7 @@ export const {
   setIsTransformingBoundingBox,
   setIsMouseOverBoundingBox,
   setIsSpacebarHeld,
+  setStageCoordinate,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;

@@ -81,6 +81,8 @@ export const inpaintingCanvasSelector = createSelector(
       isTransformingBoundingBox,
       isMouseOverBoundingBox,
       isMovingBoundingBox,
+      canvasDimensions,
+      stageCoordinate,
     } = inpainting;
 
     let stageCursor: string | undefined = '';
@@ -113,6 +115,8 @@ export const inpaintingCanvasSelector = createSelector(
       isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       stageCursor,
       isMouseOverBoundingBox,
+      canvasDimensions,
+      stageCoordinate,
     };
   },
   {

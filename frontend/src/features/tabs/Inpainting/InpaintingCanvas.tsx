@@ -19,6 +19,8 @@ import {
   clearImageToInpaint,
   setCursorPosition,
   setIsDrawing,
+  setStageCoordinate,
+  setStageScale,
 } from './inpaintingSlice';
 import { inpaintingCanvasSelector } from './inpaintingSliceSelectors';
 
@@ -41,6 +43,8 @@ export let stageRef: MutableRefObject<StageType | null>;
 export let maskLayerRef: MutableRefObject<Konva.Layer | null>;
 export let inpaintingImageElementRef: MutableRefObject<HTMLImageElement | null>;
 
+const SCALE_BY = 1.02;
+
 const InpaintingCanvas = () => {
   const dispatch = useAppDispatch();
 
@@ -58,6 +62,8 @@ const InpaintingCanvas = () => {
     isDrawing,
     isModifyingBoundingBox,
     stageCursor,
+    canvasDimensions,
+    stageCoordinate,
   } = useAppSelector(inpaintingCanvasSelector);
 
   const toast = useToast();
@@ -105,7 +111,7 @@ const InpaintingCanvas = () => {
    * Canvas onMouseDown
    *
    */
-  const handleMouseDown = useCallback(() => {
+  const handleMouseDown = useCallback((e:KonvaEventObject<MouseEvent>) => {
     if (!stageRef.current) return;
 
     const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
@@ -116,7 +122,7 @@ const InpaintingCanvas = () => {
       isModifyingBoundingBox
     )
       return;
-
+    e.evt.preventDefault()
     dispatch(setIsDrawing(true));
 
     // Add a new line starting from the current cursor position.
@@ -233,20 +239,64 @@ const InpaintingCanvas = () => {
     [dispatch, brushSize, tool, isModifyingBoundingBox]
   );
 
+  const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
+    // stop default scrolling
+    e.evt.preventDefault();
+
+    // const oldScale = stageRef.current.scaleX();
+    if (!stageRef.current) return;
+
+    const cursorPos = stageRef.current.getPointerPosition();
+
+    if (!cursorPos) return;
+
+    const mousePointTo = {
+      x: (cursorPos.x - stageRef.current.x()) / stageScale,
+      y: (cursorPos.y - stageRef.current.y()) / stageScale,
+    };
+
+    // how to scale? Zoom in? Or zoom out?
+    let direction = e.evt.deltaY > 0 ? 1 : -1;
+
+    // when we zoom on trackpad, e.evt.ctrlKey is true
+    // in that case lets revert direction
+    if (e.evt.ctrlKey) {
+      direction = -direction;
+    }
+
+    const newScale =
+      direction > 0 ? stageScale * SCALE_BY : stageScale / SCALE_BY;
+
+    // stageRef.current.scale({ x: newScale, y: newScale });
+    dispatch(setStageScale(newScale));
+
+    const newPos = {
+      x: cursorPos.x - mousePointTo.x * newScale,
+      y: cursorPos.y - mousePointTo.y * newScale,
+    };
+    console.log(newPos);
+    dispatch(setStageCoordinate(newPos));
+    // stageRef.current.position(newPos);
+  };
+
   return (
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
         {canvasBgImage && (
           <Stage
-            width={Math.floor(canvasBgImage.width * stageScale)}
-            height={Math.floor(canvasBgImage.height * stageScale)}
+            width={canvasDimensions.width}
+            height={canvasDimensions.height}
             scale={{ x: stageScale, y: stageScale }}
+            x={stageCoordinate.x}
+            y={stageCoordinate.y}
+            // scale={{ x: stageScale, y: stageScale }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseEnter={handleMouseEnter}
             onMouseUp={handleMouseUp}
             onMouseOut={handleMouseOutCanvas}
             onMouseLeave={handleMouseOutCanvas}
+            onWheel={handleWheel}
             style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
             className="inpainting-canvas-stage checkerboard"
             ref={stageRef}

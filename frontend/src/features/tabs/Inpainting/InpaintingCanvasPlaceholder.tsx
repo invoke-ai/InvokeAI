@@ -1,7 +1,7 @@
 import { Spinner } from '@chakra-ui/react';
 import { useLayoutEffect, useRef } from 'react';
 import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import { setStageScale } from './inpaintingSlice';
+import { setCanvasDimensions, setStageScale } from './inpaintingSlice';
 
 const InpaintingCanvasPlaceholder = () => {
   const dispatch = useAppDispatch();
@@ -17,6 +17,9 @@ const InpaintingCanvasPlaceholder = () => {
       const width = ref.current.clientWidth;
       const height = ref.current.clientHeight;
 
+      dispatch(setCanvasDimensions({ width, height }));
+
+      // dispatch(setStageScale(1));
       const scale = Math.min(
         1,
         Math.min(width / imageToInpaint.width, height / imageToInpaint.height)
