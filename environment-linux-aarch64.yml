@@ -3,8 +3,8 @@ channels:
   - pytorch
   - conda-forge
 dependencies:
-  - python>=3.9
-  - pip>=20.3
+  - python=3.9.*
+  - pip>=22.2.2
   - cudatoolkit
   - pytorch
   - torchvision
