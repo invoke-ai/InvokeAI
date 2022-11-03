@@ -36,7 +36,7 @@ import {
 } from 'react-icons/fa';
 import {
   setImageToInpaint,
-  setNeedsCache,
+  setDoesCanvasNeedScaling,
 } from '../tabs/Inpainting/inpaintingSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from '../options/optionsSelectors';
@@ -312,7 +312,7 @@ const CurrentImageButtons = () => {
     dispatch(setImageToInpaint(currentImage));
 
     dispatch(setActiveTab('inpainting'));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
 
     toast({
       title: 'Sent to Inpainting',

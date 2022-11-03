@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
-import { Circle } from 'react-konva';
+import { Circle, Group } from 'react-konva';
 import { RootState, useAppSelector } from '../../../../app/store';
 import { InpaintingState } from '../inpaintingSlice';
 import { rgbaColorToRgbString } from '../util/colorToString';
@@ -10,7 +11,7 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
   (inpainting: InpaintingState) => {
     const {
       cursorPosition,
-      canvasDimensions: { width, height },
+      stageDimensions: { width, height },
       brushSize,
       maskColor,
       tool,
@@ -45,7 +46,8 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
 /**
  * Draws a black circle around the canvas brush preview.
  */
-const InpaintingCanvasBrushPreview = () => {
+const InpaintingCanvasBrushPreview = (props: GroupConfig) => {
+  const { ...rest } = props;
   const {
     cursorPosition,
     width,
@@ -59,16 +61,18 @@ const InpaintingCanvasBrushPreview = () => {
   if (!shouldDrawBrushPreview) return null;
 
   return (
-    <Circle
-      x={cursorPosition ? cursorPosition.x : width / 2}
-      y={cursorPosition ? cursorPosition.y : height / 2}
-      radius={brushSize / 2}
-      fill={maskColorString}
-      listening={false}
-      globalCompositeOperation={
-        tool === 'eraser' ? 'destination-out' : 'source-over'
-      }
-    />
+    <Group {...rest}>
+      <Circle
+        x={cursorPosition ? cursorPosition.x : width / 2}
+        y={cursorPosition ? cursorPosition.y : height / 2}
+        radius={brushSize / 2}
+        fill={maskColorString}
+        listening={false}
+        globalCompositeOperation={
+          tool === 'eraser' ? 'destination-out' : 'source-over'
+        }
+      />
+    </Group>
   );
 };
 

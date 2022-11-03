@@ -15,7 +15,7 @@ import TextToImageIcon from '../../common/icons/TextToImageIcon';
 import { setActiveTab } from '../options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
 import InpaintingWorkarea from './Inpainting';
-import { setNeedsCache } from './Inpainting/inpaintingSlice';
+import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
 import TextToImageWorkarea from './TextToImage';
 
 export const tabDict = {
@@ -74,7 +74,7 @@ export default function InvokeTabs() {
 
   useHotkeys('3', () => {
     dispatch(setActiveTab(2));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   });
 
   useHotkeys('4', () => {
@@ -127,7 +127,7 @@ export default function InvokeTabs() {
       index={activeTab}
       onChange={(index: number) => {
         dispatch(setActiveTab(index));
-        dispatch(setNeedsCache(true));
+        dispatch(setDoesCanvasNeedScaling(true));
       }}
     >
       <div className="app-tabs-list">{renderTabs()}</div>

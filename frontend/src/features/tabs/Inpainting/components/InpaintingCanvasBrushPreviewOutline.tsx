@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
-import { Circle } from 'react-konva';
+import { Circle, Group } from 'react-konva';
 import { RootState, useAppSelector } from '../../../../app/store';
 import { InpaintingState } from '../inpaintingSlice';
 
@@ -9,7 +10,7 @@ const inpaintingCanvasBrushPrevieOutlineSelector = createSelector(
   (inpainting: InpaintingState) => {
     const {
       cursorPosition,
-      canvasDimensions: { width, height },
+      stageDimensions: { width, height },
       brushSize,
       tool,
       shouldShowBrush,
@@ -44,20 +45,13 @@ const inpaintingCanvasBrushPrevieOutlineSelector = createSelector(
 /**
  * Draws the canvas brush preview outline.
  */
-const InpaintingCanvasBrushPreviewOutline = () => {
-  const {
-    cursorPosition,
-    width,
-    height,
-    brushSize,
-    shouldDrawBrushPreview,
-    strokeWidth,
-    radius,
-  } = useAppSelector(inpaintingCanvasBrushPrevieOutlineSelector);
+const InpaintingCanvasBrushPreviewOutline = (props: GroupConfig) => {
+  const { ...rest } = props;
+  const { cursorPosition, width, height, brushSize, strokeWidth, radius } =
+    useAppSelector(inpaintingCanvasBrushPrevieOutlineSelector);
 
-  if (!shouldDrawBrushPreview) return null;
   return (
-    <>
+    <Group {...rest}>
       <Circle
         x={cursorPosition ? cursorPosition.x : width / 2}
         y={cursorPosition ? cursorPosition.y : height / 2}
@@ -74,7 +68,7 @@ const InpaintingCanvasBrushPreviewOutline = () => {
         fill={'rgba(0,0,0,1)'}
         listening={false}
       />
-    </>
+    </Group>
   );
 };
 export default InpaintingCanvasBrushPreviewOutline;

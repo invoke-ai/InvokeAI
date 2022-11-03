@@ -8,12 +8,13 @@ import { OptionsState } from '../../options/optionsSlice';
 import {
   InpaintingState,
   setIsMoveBoundingBoxKeyHeld,
+  setIsMoveStageKeyHeld,
   setShouldLockBoundingBox,
   toggleShouldLockBoundingBox,
   toggleTool,
 } from './inpaintingSlice';
 
-const keyboardEventManagerSelector = createSelector(
+const canvasHotkeysSelector = createSelector(
   [
     (state: RootState) => state.options,
     (state: RootState) => state.inpainting,
@@ -41,7 +42,7 @@ const keyboardEventManagerSelector = createSelector(
   }
 );
 
-const KeyboardEventManager = () => {
+const useCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
   const {
     shouldShowMask,
@@ -49,7 +50,7 @@ const KeyboardEventManager = () => {
     isCursorOnCanvas,
     shouldLockBoundingBox,
     shouldShowBoundingBox,
-  } = useAppSelector(keyboardEventManagerSelector);
+  } = useAppSelector(canvasHotkeysSelector);
 
   const wasLastEventOverCanvas = useRef<boolean>(false);
   const lastEvent = useRef<KeyboardEvent | null>(null);
@@ -71,7 +72,7 @@ const KeyboardEventManager = () => {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (
-        !['x', 'q'].includes(e.key) ||
+        !['x', 'q', 'w'].includes(e.key) ||
         activeTabName !== 'inpainting' ||
         !shouldShowMask
       ) {
@@ -87,10 +88,11 @@ const KeyboardEventManager = () => {
         wasLastEventOverCanvas.current = false;
         return;
       }
+
+      // cursor is over canvas, we can preventDefault now
       e.stopPropagation();
       e.preventDefault();
       if (e.repeat) return;
-      // cursor is over canvas, we can preventDefault now
 
       // if this is the first event
       if (!lastEvent.current) {
@@ -115,6 +117,10 @@ const KeyboardEventManager = () => {
           dispatch(setShouldLockBoundingBox(e.type !== 'keydown'));
           break;
         }
+        case 'w': {
+          if (!shouldShowMask) break;
+          dispatch(setIsMoveStageKeyHeld(e.type === 'keydown'));
+        }
       }
 
       lastEvent.current = e;
@@ -136,8 +142,6 @@ const KeyboardEventManager = () => {
     shouldLockBoundingBox,
     shouldShowBoundingBox,
   ]);
-
-  return null;
 };
 
-export default KeyboardEventManager;
+export default useCanvasHotkeys;

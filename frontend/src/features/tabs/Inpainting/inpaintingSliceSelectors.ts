@@ -4,15 +4,19 @@ import { RootState } from '../../../app/store';
 import { activeTabNameSelector } from '../../options/optionsSelectors';
 import { OptionsState } from '../../options/optionsSlice';
 import { InpaintingState } from './inpaintingSlice';
-import { rgbaColorToRgbString } from './util/colorToString';
+import { rgbaColorToRgbString, rgbaColorToString } from './util/colorToString';
 
 export const inpaintingCanvasLinesSelector = createSelector(
   (state: RootState) => state.inpainting,
   (inpainting: InpaintingState) => {
-    const { lines, maskColor } = inpainting;
+    const { lines, maskColor, stageCoordinates, stageDimensions, stageScale } =
+      inpainting;
     return {
       lines,
-      maskColorString: rgbaColorToRgbString(maskColor),
+      stageCoordinates,
+      stageDimensions,
+      stageScale,
+      maskColorString: rgbaColorToString(maskColor),
     };
   }
 );
@@ -81,15 +85,20 @@ export const inpaintingCanvasSelector = createSelector(
       isTransformingBoundingBox,
       isMouseOverBoundingBox,
       isMovingBoundingBox,
-      canvasDimensions,
-      stageCoordinate,
+      stageDimensions,
+      stageCoordinates,
+      isMoveStageKeyHeld,
     } = inpainting;
 
     let stageCursor: string | undefined = '';
 
     if (isTransformingBoundingBox) {
       stageCursor = undefined;
-    } else if (isMovingBoundingBox || isMouseOverBoundingBox) {
+    } else if (
+      isMovingBoundingBox ||
+      isMouseOverBoundingBox ||
+      isMoveStageKeyHeld
+    ) {
       stageCursor = 'move';
     } else if (shouldShowMask) {
       stageCursor = 'none';
@@ -115,8 +124,9 @@ export const inpaintingCanvasSelector = createSelector(
       isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       stageCursor,
       isMouseOverBoundingBox,
-      canvasDimensions,
-      stageCoordinate,
+      stageDimensions,
+      stageCoordinates,
+      isMoveStageKeyHeld,
     };
   },
   {

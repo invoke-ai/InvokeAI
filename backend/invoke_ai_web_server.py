@@ -569,10 +569,11 @@ class InvokeAIWebServer:
             if "init_mask" in generation_parameters:
                 # grab an Image of the init image
                 original_image = Image.open(init_img_path)
+                rgba_image = original_image.convert('RGBA')
 
                 # copy a region from it which we will inpaint
                 cropped_init_image = copy_image_from_bounding_box(
-                    original_image, **generation_parameters["bounding_box"]
+                    rgba_image, **generation_parameters["bounding_box"]
                 )
                 generation_parameters["init_img"] = cropped_init_image
 
@@ -686,12 +687,12 @@ class InvokeAIWebServer:
                 nonlocal prior_variations
 
                 # paste the inpainting image back onto the original
-                if "init_mask" in generation_parameters:
-                    image = paste_image_into_bounding_box(
-                        Image.open(init_img_path),
-                        image,
-                        **generation_parameters["bounding_box"],
-                    )
+                # if "init_mask" in generation_parameters:
+                #     image = paste_image_into_bounding_box(
+                #         Image.open(init_img_path),
+                #         image,
+                #         **generation_parameters["bounding_box"],
+                #     )
 
                 progress.set_current_status("Generation Complete")
 

@@ -80,3 +80,11 @@
 .inpainting-options-btn {
   min-height: 2rem;
 }
+
+.canvas-status-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: var(--background-color);
+  opacity: 0.5;
+}

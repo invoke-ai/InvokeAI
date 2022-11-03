@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react';
 import Konva from 'konva';
-import { Layer, Stage } from 'react-konva';
+import { Group, Layer, Rect, Stage } from 'react-konva';
 import { Image as KonvaImage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
@@ -19,7 +19,7 @@ import {
   clearImageToInpaint,
   setCursorPosition,
   setIsDrawing,
-  setStageCoordinate,
+  setStageCoordinates,
   setStageScale,
 } from './inpaintingSlice';
 import { inpaintingCanvasSelector } from './inpaintingSliceSelectors';
@@ -37,6 +37,9 @@ import InpaintingBoundingBoxPreview, {
 import { KonvaEventObject } from 'konva/lib/Node';
 import KeyboardEventManager from './KeyboardEventManager';
 import { useToast } from '@chakra-ui/react';
+import useCacher from './components/useCacher';
+import { rgbaColorToRgbString, rgbaColorToString } from './util/colorToString';
+import useCanvasHotkeys from './useCanvasHotkeys';
 
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
@@ -62,12 +65,15 @@ const InpaintingCanvas = () => {
     isDrawing,
     isModifyingBoundingBox,
     stageCursor,
-    canvasDimensions,
-    stageCoordinate,
+    stageDimensions,
+    stageCoordinates,
+    isMoveStageKeyHeld,
+    boundingBoxDimensions,
   } = useAppSelector(inpaintingCanvasSelector);
+  useCanvasHotkeys();
 
   const toast = useToast();
-
+  // useCacher();
   // set the closure'd refs
   stageRef = useRef<StageType>(null);
   maskLayerRef = useRef<Konva.Layer>(null);
@@ -111,29 +117,33 @@ const InpaintingCanvas = () => {
    * Canvas onMouseDown
    *
    */
-  const handleMouseDown = useCallback((e:KonvaEventObject<MouseEvent>) => {
-    if (!stageRef.current) return;
+  const handleMouseDown = useCallback(
+    (e: KonvaEventObject<MouseEvent>) => {
+      if (!stageRef.current) return;
 
-    const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
+      const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-    if (
-      !scaledCursorPosition ||
-      !maskLayerRef.current ||
-      isModifyingBoundingBox
-    )
-      return;
-    e.evt.preventDefault()
-    dispatch(setIsDrawing(true));
+      if (
+        !scaledCursorPosition ||
+        !maskLayerRef.current ||
+        isModifyingBoundingBox ||
+        isMoveStageKeyHeld
+      )
+        return;
+      e.evt.preventDefault();
+      dispatch(setIsDrawing(true));
 
-    // Add a new line starting from the current cursor position.
-    dispatch(
-      addLine({
-        tool,
-        strokeWidth: brushSize / 2,
-        points: [scaledCursorPosition.x, scaledCursorPosition.y],
-      })
-    );
-  }, [dispatch, brushSize, tool, isModifyingBoundingBox]);
+      // Add a new line starting from the current cursor position.
+      dispatch(
+        addLine({
+          tool,
+          strokeWidth: brushSize / 2,
+          points: [scaledCursorPosition.x, scaledCursorPosition.y],
+        })
+      );
+    },
+    [dispatch, brushSize, tool, isModifyingBoundingBox, isMoveStageKeyHeld]
+  );
 
   /**
    *
@@ -155,14 +165,14 @@ const InpaintingCanvas = () => {
 
     lastCursorPosition.current = scaledCursorPosition;
 
-    if (!isDrawing || isModifyingBoundingBox) return;
+    if (!isDrawing || isModifyingBoundingBox || isMoveStageKeyHeld) return;
 
     didMouseMoveRef.current = true;
     // Extend the current line
     dispatch(
       addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
     );
-  }, [dispatch, isDrawing, isModifyingBoundingBox]);
+  }, [dispatch, isDrawing, isModifyingBoundingBox, isMoveStageKeyHeld]);
 
   /**
    *
@@ -176,7 +186,8 @@ const InpaintingCanvas = () => {
       if (
         !scaledCursorPosition ||
         !maskLayerRef.current ||
-        isModifyingBoundingBox
+        isModifyingBoundingBox ||
+        isMoveStageKeyHeld
       )
         return;
 
@@ -193,7 +204,7 @@ const InpaintingCanvas = () => {
       didMouseMoveRef.current = false;
     }
     dispatch(setIsDrawing(false));
-  }, [dispatch, isDrawing, isModifyingBoundingBox]);
+  }, [dispatch, isDrawing, isModifyingBoundingBox, isMoveStageKeyHeld]);
 
   /**
    *
@@ -220,7 +231,8 @@ const InpaintingCanvas = () => {
         if (
           !scaledCursorPosition ||
           !maskLayerRef.current ||
-          isModifyingBoundingBox
+          isModifyingBoundingBox ||
+          isMoveStageKeyHeld
         )
           return;
 
@@ -236,7 +248,7 @@ const InpaintingCanvas = () => {
         );
       }
     },
-    [dispatch, brushSize, tool, isModifyingBoundingBox]
+    [dispatch, brushSize, tool, isModifyingBoundingBox, isMoveStageKeyHeld]
   );
 
   const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
@@ -244,7 +256,7 @@ const InpaintingCanvas = () => {
     e.evt.preventDefault();
 
     // const oldScale = stageRef.current.scaleX();
-    if (!stageRef.current) return;
+    if (!stageRef.current || isMoveStageKeyHeld) return;
 
     const cursorPos = stageRef.current.getPointerPosition();
 
@@ -267,90 +279,88 @@ const InpaintingCanvas = () => {
     const newScale =
       direction > 0 ? stageScale * SCALE_BY : stageScale / SCALE_BY;
 
-    // stageRef.current.scale({ x: newScale, y: newScale });
-    dispatch(setStageScale(newScale));
-
     const newPos = {
       x: cursorPos.x - mousePointTo.x * newScale,
       y: cursorPos.y - mousePointTo.y * newScale,
     };
-    console.log(newPos);
-    dispatch(setStageCoordinate(newPos));
-    // stageRef.current.position(newPos);
+
+    dispatch(setStageScale(newScale));
+    dispatch(setStageCoordinates(newPos));
+  };
+
+  const handleDragStage = (e: KonvaEventObject<MouseEvent>) => {
+    if (!isMoveStageKeyHeld) return;
+    dispatch(setStageCoordinates(e.target.getPosition()));
   };
 
   return (
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
+        <div className="canvas-status-text">{`${boundingBoxDimensions.width}x${boundingBoxDimensions.height}`}</div>
         {canvasBgImage && (
           <Stage
-            width={canvasDimensions.width}
-            height={canvasDimensions.height}
+            width={stageDimensions.width}
+            height={stageDimensions.height}
             scale={{ x: stageScale, y: stageScale }}
-            x={stageCoordinate.x}
-            y={stageCoordinate.y}
-            // scale={{ x: stageScale, y: stageScale }}
+            x={stageCoordinates.x}
+            y={stageCoordinates.y}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseEnter={handleMouseEnter}
             onMouseUp={handleMouseUp}
             onMouseOut={handleMouseOutCanvas}
             onMouseLeave={handleMouseOutCanvas}
+            onDragMove={handleDragStage}
+            draggable={isMoveStageKeyHeld}
             onWheel={handleWheel}
             style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
             className="inpainting-canvas-stage checkerboard"
             ref={stageRef}
           >
-            {!shouldInvertMask && !shouldShowCheckboardTransparency && (
-              <Layer name={'image-layer'} listening={false}>
-                <KonvaImage listening={false} image={canvasBgImage} />
-              </Layer>
-            )}
-            {shouldShowMask && (
-              <>
-                <Layer
-                  name={'mask-layer'}
-                  listening={false}
-                  opacity={
-                    shouldShowCheckboardTransparency || shouldInvertMask
-                      ? 1
-                      : maskColor.a
-                  }
-                  ref={maskLayerRef}
-                >
-                  <InpaintingCanvasLines />
+            <Layer
+              name={'image-layer'}
+              listening={false}
+              visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
+            >
+              <KonvaImage listening={false} image={canvasBgImage} />
+            </Layer>
+            <Layer
+              name={'mask-layer'}
+              listening={false}
+              ref={maskLayerRef}
+              visible={shouldShowMask}
+            >
+              <InpaintingCanvasBrushPreview
+                visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+              />
 
-                  <InpaintingCanvasBrushPreview />
+              <InpaintingCanvasLines visible={true} />
 
-                  {shouldInvertMask && (
-                    <KonvaImage
-                      image={canvasBgImage}
-                      listening={false}
-                      globalCompositeOperation="source-in"
-                    />
-                  )}
-                  {!shouldInvertMask && shouldShowCheckboardTransparency && (
-                    <KonvaImage
-                      image={canvasBgImage}
-                      listening={false}
-                      globalCompositeOperation="source-out"
-                    />
-                  )}
-                </Layer>
-                <Layer>
-                  {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
-                    <InpaintingBoundingBoxPreviewOverlay />
-                  )}
-                  {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
+              <KonvaImage
+                image={canvasBgImage}
+                listening={false}
+                globalCompositeOperation="source-in"
+                visible={shouldInvertMask}
+              />
+              <KonvaImage
+                image={canvasBgImage}
+                listening={false}
+                globalCompositeOperation="source-out"
+                visible={!shouldInvertMask && shouldShowCheckboardTransparency}
+              />
+            </Layer>
+            <Layer visible={shouldShowMask}>
+              {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
+                <InpaintingBoundingBoxPreviewOverlay />
+              )}
+              {shouldShowBoundingBox && <InpaintingBoundingBoxPreview />}
 
-                  <InpaintingCanvasBrushPreviewOutline />
-                </Layer>
-              </>
-            )}
+              <InpaintingCanvasBrushPreviewOutline
+                visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+              />
+            </Layer>
           </Stage>
         )}
-        <Cacher />
-        <KeyboardEventManager />
       </div>
     </div>
   );

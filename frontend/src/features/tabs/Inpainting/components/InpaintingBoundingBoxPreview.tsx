@@ -16,7 +16,7 @@ import {
 import { roundToMultiple } from '../../../../common/util/roundDownToMultiple';
 import {
   InpaintingState,
-  setBoundingBoxCoordinate,
+  setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setIsMouseOverBoundingBox,
   setIsMovingBoundingBox,
@@ -32,10 +32,10 @@ const boundingBoxPreviewSelector = createSelector(
   (state: RootState) => state.inpainting,
   (inpainting: InpaintingState) => {
     const {
-      boundingBoxCoordinate,
+      boundingBoxCoordinates,
       boundingBoxDimensions,
       boundingBoxPreviewFill,
-      canvasDimensions,
+      stageDimensions,
       stageScale,
       imageToInpaint,
       shouldLockBoundingBox,
@@ -43,14 +43,14 @@ const boundingBoxPreviewSelector = createSelector(
       isTransformingBoundingBox,
       isMovingBoundingBox,
       isMouseOverBoundingBox,
-      isSpacebarHeld,
-      stageCoordinate,
+      isMoveBoundingBoxKeyHeld,
+      stageCoordinates,
     } = inpainting;
     return {
-      boundingBoxCoordinate,
+      boundingBoxCoordinates,
       boundingBoxDimensions,
       boundingBoxPreviewFillString: rgbaColorToString(boundingBoxPreviewFill),
-      canvasDimensions,
+      stageDimensions,
       stageScale,
       imageToInpaint,
       dash: DASH_WIDTH / stageScale, // scale dash lengths
@@ -60,8 +60,8 @@ const boundingBoxPreviewSelector = createSelector(
       isTransformingBoundingBox,
       isMouseOverBoundingBox,
       isMovingBoundingBox,
-      isSpacebarHeld,
-      stageCoordinate,
+      isMoveBoundingBoxKeyHeld,
+      stageCoordinates,
     };
   },
   {
@@ -76,25 +76,25 @@ const boundingBoxPreviewSelector = createSelector(
  */
 export const InpaintingBoundingBoxPreviewOverlay = () => {
   const {
-    boundingBoxCoordinate,
+    boundingBoxCoordinates,
     boundingBoxDimensions,
     boundingBoxPreviewFillString,
-    canvasDimensions,
+    stageDimensions,
     stageScale,
-    stageCoordinate,
+    stageCoordinates,
   } = useAppSelector(boundingBoxPreviewSelector);
   return (
     <Group>
       <Rect
-        offsetX={stageCoordinate.x / stageScale}
-        offsetY={stageCoordinate.y / stageScale}
-        height={canvasDimensions.height / stageScale}
-        width={canvasDimensions.width / stageScale}
+        offsetX={stageCoordinates.x / stageScale}
+        offsetY={stageCoordinates.y / stageScale}
+        height={stageDimensions.height / stageScale}
+        width={stageDimensions.width / stageScale}
         fill={boundingBoxPreviewFillString}
       />
       <Rect
-        x={boundingBoxCoordinate.x}
-        y={boundingBoxCoordinate.y}
+        x={boundingBoxCoordinates.x}
+        y={boundingBoxCoordinates.y}
         width={boundingBoxDimensions.width}
         height={boundingBoxDimensions.height}
         fill={'rgb(255,255,255)'}
@@ -108,7 +108,7 @@ export const InpaintingBoundingBoxPreviewOverlay = () => {
 const InpaintingBoundingBoxPreview = () => {
   const dispatch = useAppDispatch();
   const {
-    boundingBoxCoordinate,
+    boundingBoxCoordinates,
     boundingBoxDimensions,
     stageScale,
     imageToInpaint,
@@ -117,8 +117,8 @@ const InpaintingBoundingBoxPreview = () => {
     isTransformingBoundingBox,
     isMovingBoundingBox,
     isMouseOverBoundingBox,
-    isSpacebarHeld,
-    canvasDimensions,
+    isMoveBoundingBoxKeyHeld,
+    stageDimensions,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -135,7 +135,7 @@ const InpaintingBoundingBoxPreview = () => {
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
       dispatch(
-        setBoundingBoxCoordinate({
+        setBoundingBoxCoordinates({
           x: Math.floor(e.target.x()),
           y: Math.floor(e.target.y()),
         })
@@ -147,14 +147,14 @@ const InpaintingBoundingBoxPreview = () => {
   // OK
   const dragBoundFunc = useCallback(
     (position: Vector2d) => {
-      if (!imageToInpaint) return boundingBoxCoordinate;
+      if (!imageToInpaint) return boundingBoxCoordinates;
 
       const { x, y } = position;
 
       const maxX =
-        canvasDimensions.width - boundingBoxDimensions.width * stageScale;
+        stageDimensions.width - boundingBoxDimensions.width * stageScale;
       const maxY =
-        canvasDimensions.height - boundingBoxDimensions.height * stageScale;
+        stageDimensions.height - boundingBoxDimensions.height * stageScale;
 
       const clampedX = Math.floor(_.clamp(x, 0, maxX));
       const clampedY = Math.floor(_.clamp(y, 0, maxY));
@@ -162,11 +162,11 @@ const InpaintingBoundingBoxPreview = () => {
       return { x: clampedX, y: clampedY };
     },
     [
-      boundingBoxCoordinate,
+      boundingBoxCoordinates,
       boundingBoxDimensions,
       imageToInpaint,
       stageScale,
-      canvasDimensions,
+      stageDimensions,
     ]
   );
 
@@ -198,7 +198,7 @@ const InpaintingBoundingBoxPreview = () => {
     );
 
     dispatch(
-      setBoundingBoxCoordinate({
+      setBoundingBoxCoordinates({
         x,
         y,
       })
@@ -278,8 +278,8 @@ const InpaintingBoundingBoxPreview = () => {
        */
       if (!imageToInpaint) return oldBoundBox;
       if (
-        newBoundBox.width + newBoundBox.x > canvasDimensions.width ||
-        newBoundBox.height + newBoundBox.y > canvasDimensions.height ||
+        newBoundBox.width + newBoundBox.x > stageDimensions.width ||
+        newBoundBox.height + newBoundBox.y > stageDimensions.height ||
         newBoundBox.x < 0 ||
         newBoundBox.y < 0
       ) {
@@ -288,7 +288,7 @@ const InpaintingBoundingBoxPreview = () => {
 
       return newBoundBox;
     },
-    [imageToInpaint, canvasDimensions]
+    [imageToInpaint, stageDimensions]
   );
 
   const handleStartedTransforming = (e: KonvaEventObject<MouseEvent>) => {
@@ -322,15 +322,15 @@ const InpaintingBoundingBoxPreview = () => {
   return (
     <>
       <Rect
-        x={boundingBoxCoordinate.x}
-        y={boundingBoxCoordinate.y}
+        x={boundingBoxCoordinates.x}
+        y={boundingBoxCoordinates.y}
         width={boundingBoxDimensions.width}
         height={boundingBoxDimensions.height}
         ref={shapeRef}
         stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.3)' : 'white'}
         strokeWidth={Math.floor((isMouseOverBoundingBox ? 8 : 1) / stageScale)}
-        fillEnabled={isSpacebarHeld}
-        hitFunc={isSpacebarHeld ? spacebarHeldHitFunc : undefined}
+        fillEnabled={isMoveBoundingBoxKeyHeld}
+        hitFunc={isMoveBoundingBoxKeyHeld ? spacebarHeldHitFunc : undefined}
         hitStrokeWidth={Math.floor(13 / stageScale)}
         listening={!isDrawing && !shouldLockBoundingBox}
         onMouseOver={() => {

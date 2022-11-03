@@ -8,7 +8,7 @@ import {
 } from '../../../../app/store';
 import IAIIconButton from '../../../../common/components/IAIIconButton';
 import { setShowDualDisplay } from '../../../options/optionsSlice';
-import { setNeedsCache } from '../inpaintingSlice';
+import { setDoesCanvasNeedScaling } from '../inpaintingSlice';
 
 export default function InpaintingSplitLayoutControl() {
   const dispatch = useAppDispatch();
@@ -18,7 +18,7 @@ export default function InpaintingSplitLayoutControl() {
 
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   // Hotkeys

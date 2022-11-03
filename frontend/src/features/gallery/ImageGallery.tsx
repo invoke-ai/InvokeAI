@@ -31,7 +31,7 @@ import IAIPopover from '../../common/components/IAIPopover';
 import IAISlider from '../../common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
 import IAICheckbox from '../../common/components/IAICheckbox';
-import { setNeedsCache } from '../tabs/Inpainting/inpaintingSlice';
+import { setDoesCanvasNeedScaling } from '../tabs/Inpainting/inpaintingSlice';
 import _ from 'lodash';
 import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
 
@@ -83,7 +83,7 @@ export default function ImageGallery() {
       );
       setGalleryMaxWidth(590);
     }
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   }, [dispatch, activeTabName, shouldPinGallery, galleryWidth]);
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export default function ImageGallery() {
 
   const handleSetShouldPinGallery = () => {
     dispatch(setShouldPinGallery(!shouldPinGallery));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleToggleGallery = () => {
@@ -107,7 +107,7 @@ export default function ImageGallery() {
 
   const handleOpenGallery = () => {
     dispatch(setShouldShowGallery(true));
-    shouldPinGallery && dispatch(setNeedsCache(true));
+    shouldPinGallery && dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleCloseGallery = () => {
@@ -119,7 +119,7 @@ export default function ImageGallery() {
       )
     );
     dispatch(setShouldHoldGalleryOpen(false));
-    // dispatch(setNeedsCache(true));
+    // dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleClickLoadMore = () => {
@@ -128,7 +128,7 @@ export default function ImageGallery() {
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const setCloseGalleryTimer = () => {

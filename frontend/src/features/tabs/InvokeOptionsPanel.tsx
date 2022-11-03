@@ -14,7 +14,7 @@ import {
   setShouldPinOptionsPanel,
   setShouldShowOptionsPanel,
 } from '../options/optionsSlice';
-import { setNeedsCache } from './Inpainting/inpaintingSlice';
+import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
 import InvokeAILogo from '../../assets/images/logo.png';
 
 type Props = { children: ReactNode };
@@ -95,7 +95,7 @@ const InvokeOptionsPanel = (props: Props) => {
     );
     dispatch(setShouldShowOptionsPanel(false));
     dispatch(setShouldHoldOptionsPanelOpen(false));
-    // dispatch(setNeedsCache(true));
+    // dispatch(setDoesCanvasNeedScaling(true));
   }, [dispatch, shouldPinOptionsPanel]);
 
   useClickOutsideWatcher(
@@ -117,7 +117,7 @@ const InvokeOptionsPanel = (props: Props) => {
 
   const handleClickPinOptionsPanel = () => {
     dispatch(setShouldPinOptionsPanel(!shouldPinOptionsPanel));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   return (

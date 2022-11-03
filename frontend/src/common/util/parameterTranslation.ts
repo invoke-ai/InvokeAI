@@ -104,14 +104,14 @@ export const frontendToBackendParameters = (
   if (generationMode === 'inpainting' && maskImageElement) {
     const {
       lines,
-      boundingBoxCoordinate,
+      boundingBoxCoordinates,
       boundingBoxDimensions,
       inpaintReplace,
       shouldUseInpaintReplace,
     } = inpaintingState;
 
     const boundingBox = {
-      ...boundingBoxCoordinate,
+      ...boundingBoxCoordinates,
       ...boundingBoxDimensions,
     };
 
@@ -126,7 +126,7 @@ export const frontendToBackendParameters = (
     );
 
     generationParameters.is_mask_empty = isMaskEmpty;
-
+    console.log(maskDataURL);
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'
     )[1];
@@ -139,6 +139,13 @@ export const frontendToBackendParameters = (
 
     // TODO: The server metadata generation needs to be changed to fix this.
     generationParameters.progress_images = false;
+
+    generationParameters.seam_size = 96;
+    generationParameters.seam_blur = 16;
+    generationParameters.seam_strength = 0.7;
+    generationParameters.seam_steps = 10;
+    generationParameters.tile_size = 32;
+    generationParameters.force_outpaint = false;
   }
 
   if (shouldGenerateVariations) {

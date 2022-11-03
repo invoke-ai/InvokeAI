@@ -1,24 +1,32 @@
-import { Line } from 'react-konva';
+import { GroupConfig } from 'konva/lib/Group';
+import { Group, Line, Rect } from 'react-konva';
 import { useAppSelector } from '../../../../app/store';
 import { inpaintingCanvasLinesSelector } from '../inpaintingSliceSelectors';
+
+type InpaintingCanvasLinesProps = GroupConfig;
 
 /**
  * Draws the lines which comprise the mask.
  *
  * Uses globalCompositeOperation to handle the brush and eraser tools.
  */
-const InpaintingCanvasLines = () => {
-  const { lines, maskColorString } = useAppSelector(
-    inpaintingCanvasLinesSelector
-  );
+const InpaintingCanvasLines = (props: InpaintingCanvasLinesProps) => {
+  const { ...rest } = props;
+  const {
+    lines,
+    maskColorString,
+    stageCoordinates,
+    stageDimensions,
+    stageScale,
+  } = useAppSelector(inpaintingCanvasLinesSelector);
 
   return (
-    <>
+    <Group {...rest}>
       {lines.map((line, i) => (
         <Line
           key={i}
           points={line.points}
-          stroke={maskColorString}
+          stroke={'rgb(0,0,0)'}
           strokeWidth={line.strokeWidth * 2}
           tension={0}
           lineCap="round"
@@ -30,7 +38,15 @@ const InpaintingCanvasLines = () => {
           }
         />
       ))}
-    </>
+      <Rect
+        offsetX={stageCoordinates.x / stageScale}
+        offsetY={stageCoordinates.y / stageScale}
+        height={stageDimensions.height / stageScale}
+        width={stageDimensions.width / stageScale}
+        fill={maskColorString}
+        globalCompositeOperation={'source-in'}
+      />
+    </Group>
   );
 };
 

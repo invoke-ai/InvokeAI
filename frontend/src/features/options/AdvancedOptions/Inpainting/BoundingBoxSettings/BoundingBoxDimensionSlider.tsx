@@ -21,10 +21,10 @@ import _ from 'lodash';
 const boundingBoxDimensionsSelector = createSelector(
   (state: RootState) => state.inpainting,
   (inpainting: InpaintingState) => {
-    const { canvasDimensions, boundingBoxDimensions, shouldLockBoundingBox } =
+    const { stageDimensions, boundingBoxDimensions, shouldLockBoundingBox } =
       inpainting;
     return {
-      canvasDimensions,
+      stageDimensions,
       boundingBoxDimensions,
       shouldLockBoundingBox,
     };
@@ -45,10 +45,10 @@ export default function BoundingBoxDimensionSlider(
 ) {
   const { dimension } = props;
   const dispatch = useAppDispatch();
-  const { shouldLockBoundingBox, canvasDimensions, boundingBoxDimensions } =
+  const { shouldLockBoundingBox, stageDimensions, boundingBoxDimensions } =
     useAppSelector(boundingBoxDimensionsSelector);
 
-  const canvasDimension = canvasDimensions[dimension];
+  const canvasDimension = stageDimensions[dimension];
   const boundingBoxDimension = boundingBoxDimensions[dimension];
 
   const handleBoundingBoxDimension = (v: number) => {

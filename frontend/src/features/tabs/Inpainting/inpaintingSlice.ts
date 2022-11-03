@@ -33,10 +33,10 @@ export interface InpaintingState {
   brushSize: number;
   maskColor: RgbaColor;
   cursorPosition: Vector2d | null;
-  canvasDimensions: Dimensions;
-  stageCoordinate: Vector2d;
+  stageDimensions: Dimensions;
+  stageCoordinates: Vector2d;
   boundingBoxDimensions: Dimensions;
-  boundingBoxCoordinate: Vector2d;
+  boundingBoxCoordinates: Vector2d;
   boundingBoxPreviewFill: RgbaColor;
   shouldShowBoundingBox: boolean;
   shouldShowBoundingBoxFill: boolean;
@@ -49,7 +49,7 @@ export interface InpaintingState {
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;
   imageToInpaint?: InvokeAI.Image;
-  needsCache: boolean;
+  doesCanvasNeedScaling: boolean;
   stageScale: number;
   isDrawing: boolean;
   isTransformingBoundingBox: boolean;
@@ -58,17 +58,18 @@ export interface InpaintingState {
   shouldUseInpaintReplace: boolean;
   inpaintReplace: number;
   shouldLockBoundingBox: boolean;
-  isSpacebarHeld: boolean;
+  isMoveBoundingBoxKeyHeld: boolean;
+  isMoveStageKeyHeld: boolean;
 }
 
 const initialInpaintingState: InpaintingState = {
   tool: 'brush',
   brushSize: 50,
   maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
-  canvasDimensions: { width: 0, height: 0 },
-  stageCoordinate: { x: 0, y: 0 },
+  stageDimensions: { width: 0, height: 0 },
+  stageCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
-  boundingBoxCoordinate: { x: 0, y: 0 },
+  boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
   shouldShowBoundingBox: true,
   shouldShowBoundingBoxFill: true,
@@ -81,7 +82,7 @@ const initialInpaintingState: InpaintingState = {
   shouldShowCheckboardTransparency: false,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
-  needsCache: false,
+  doesCanvasNeedScaling: false,
   isDrawing: false,
   isTransformingBoundingBox: false,
   isMouseOverBoundingBox: false,
@@ -90,7 +91,8 @@ const initialInpaintingState: InpaintingState = {
   shouldUseInpaintReplace: false,
   inpaintReplace: 0.1,
   shouldLockBoundingBox: true,
-  isSpacebarHeld: false,
+  isMoveBoundingBoxKeyHeld: false,
+  isMoveStageKeyHeld: false,
 };
 
 const initialState: InpaintingState = initialInpaintingState;
@@ -174,9 +176,9 @@ export const inpaintingSlice = createSlice({
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
       const { width: canvasWidth, height: canvasHeight } =
-        state.canvasDimensions;
+        state.stageDimensions;
       const { width, height } = state.boundingBoxDimensions;
-      const { x, y } = state.boundingBoxCoordinate;
+      const { x, y } = state.boundingBoxCoordinates;
 
       const newCoordinates: Vector2d = { x, y };
       const newDimensions: Dimensions = { width, height };
@@ -200,13 +202,13 @@ export const inpaintingSlice = createSlice({
       }
 
       state.boundingBoxDimensions = newDimensions;
-      state.boundingBoxCoordinate = newCoordinates;
+      state.boundingBoxCoordinates = newCoordinates;
 
       state.imageToInpaint = action.payload;
-      state.needsCache = true;
+      state.doesCanvasNeedScaling = true;
     },
-    setCanvasDimensions: (state, action: PayloadAction<Dimensions>) => {
-      state.canvasDimensions = action.payload;
+    setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
+      state.stageDimensions = action.payload;
 
       const { width: canvasWidth, height: canvasHeight } = action.payload;
 
@@ -231,9 +233,9 @@ export const inpaintingSlice = createSlice({
       state.boundingBoxDimensions = action.payload;
       const { width: boundingBoxWidth, height: boundingBoxHeight } =
         action.payload;
-      const { x: boundingBoxX, y: boundingBoxY } = state.boundingBoxCoordinate;
+      const { x: boundingBoxX, y: boundingBoxY } = state.boundingBoxCoordinates;
       const { width: canvasWidth, height: canvasHeight } =
-        state.canvasDimensions;
+        state.stageDimensions;
 
       const scaledCanvasWidth = canvasWidth / state.stageScale;
       const scaledCanvasHeight = canvasHeight / state.stageScale;
@@ -270,13 +272,13 @@ export const inpaintingSlice = createSlice({
 
       const clampedX = _.clamp(
         overflowCorrectedX,
-        state.stageCoordinate.x,
+        state.stageCoordinates.x,
         roundedCanvasWidth - newBoundingBoxWidth
       );
 
       const clampedY = _.clamp(
         overflowCorrectedY,
-        state.stageCoordinate.y,
+        state.stageCoordinates.y,
         roundedCanvasHeight - newBoundingBoxHeight
       );
 
@@ -285,26 +287,26 @@ export const inpaintingSlice = createSlice({
         height: newBoundingBoxHeight,
       };
 
-      state.boundingBoxCoordinate = {
+      state.boundingBoxCoordinates = {
         x: clampedX,
         y: clampedY,
       };
     },
-    setBoundingBoxCoordinate: (state, action: PayloadAction<Vector2d>) => {
-      state.boundingBoxCoordinate = action.payload;
+    setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
+      state.boundingBoxCoordinates = action.payload;
     },
-    setStageCoordinate: (state, action: PayloadAction<Vector2d>) => {
-      state.stageCoordinate = action.payload;
+    setStageCoordinates: (state, action: PayloadAction<Vector2d>) => {
+      state.stageCoordinates = action.payload;
     },
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
       state.boundingBoxPreviewFill = action.payload;
     },
-    setNeedsCache: (state, action: PayloadAction<boolean>) => {
-      state.needsCache = action.payload;
+    setDoesCanvasNeedScaling: (state, action: PayloadAction<boolean>) => {
+      state.doesCanvasNeedScaling = action.payload;
     },
     setStageScale: (state, action: PayloadAction<number>) => {
       state.stageScale = action.payload;
-      state.needsCache = false;
+      state.doesCanvasNeedScaling = false;
     },
     setShouldShowBoundingBoxFill: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBoxFill = action.payload;
@@ -340,8 +342,11 @@ export const inpaintingSlice = createSlice({
     setIsMouseOverBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.isMouseOverBoundingBox = action.payload;
     },
-    setIsSpacebarHeld: (state, action: PayloadAction<boolean>) => {
-      state.isSpacebarHeld = action.payload;
+    setIsMoveBoundingBoxKeyHeld: (state, action: PayloadAction<boolean>) => {
+      state.isMoveBoundingBoxKeyHeld = action.payload;
+    },
+    setIsMoveStageKeyHeld: (state, action: PayloadAction<boolean>) => {
+      state.isMoveStageKeyHeld = action.payload;
     },
   },
 });
@@ -361,12 +366,12 @@ export const {
   undo,
   redo,
   setCursorPosition,
-  setCanvasDimensions,
+  setStageDimensions,
   setImageToInpaint,
   setBoundingBoxDimensions,
-  setBoundingBoxCoordinate,
+  setBoundingBoxCoordinates,
   setBoundingBoxPreviewFill,
-  setNeedsCache,
+  setDoesCanvasNeedScaling,
   setStageScale,
   toggleTool,
   setShouldShowBoundingBox,
@@ -381,8 +386,9 @@ export const {
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
   setIsMouseOverBoundingBox,
-  setIsSpacebarHeld,
-  setStageCoordinate,
+  setIsMoveBoundingBoxKeyHeld,
+  setIsMoveStageKeyHeld,
+  setStageCoordinates,
 } = inpaintingSlice.actions;
 
 export default inpaintingSlice.reducer;
