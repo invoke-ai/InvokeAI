@@ -4,7 +4,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
+import IAIFullSlider from '../../../../common/components/IAIFullSlider';
 import { setImg2imgStrength } from '../../optionsSlice';
 
 interface ImageToImageStrengthProps {
@@ -22,16 +22,23 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
 
   const handleChangeStrength = (v: number) => dispatch(setImg2imgStrength(v));
 
+  const handleChangeStrengthReset = () => {
+    dispatch(setImg2imgStrength(0.5));
+  };
+
   return (
-    <IAINumberInput
+    <IAIFullSlider
       label={label}
       step={0.01}
       min={0.01}
       max={0.99}
-      onChange={handleChangeStrength}
       value={img2imgStrength}
-      width="100%"
-      isInteger={false}
+      onChange={handleChangeStrength}
+      handleReset={handleChangeStrengthReset}
+      withSliderMarks
+      withReset
+      withInput
+      inputWidth={'5.5rem'}
       styleClass={styleClass}
     />
   );
