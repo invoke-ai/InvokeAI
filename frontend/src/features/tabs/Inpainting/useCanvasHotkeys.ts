@@ -57,7 +57,7 @@ const useCanvasHotkeys = () => {
 
   //  Toggle lock bounding box
   useHotkeys(
-    'shift+q',
+    'shift+w',
     (e: KeyboardEvent) => {
       e.preventDefault();
       dispatch(toggleShouldLockBoundingBox());
@@ -111,13 +111,13 @@ const useCanvasHotkeys = () => {
           dispatch(toggleTool());
           break;
         }
-        case 'q': {
+        case 'w': {
           if (!shouldShowMask || !shouldShowBoundingBox) break;
           dispatch(setIsMoveBoundingBoxKeyHeld(e.type === 'keydown'));
           dispatch(setShouldLockBoundingBox(e.type !== 'keydown'));
           break;
         }
-        case 'w': {
+        case 'q': {
           if (!shouldShowMask) break;
           dispatch(setIsMoveStageKeyHeld(e.type === 'keydown'));
         }

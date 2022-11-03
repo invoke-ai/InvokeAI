@@ -56,7 +56,7 @@ const KeyboardEventManager = () => {
 
   //  Toggle lock bounding box
   useHotkeys(
-    'shift+q',
+    'shift+w',
     (e: KeyboardEvent) => {
       e.preventDefault();
       dispatch(toggleShouldLockBoundingBox());

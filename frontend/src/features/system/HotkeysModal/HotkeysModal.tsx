@@ -200,12 +200,12 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Lock Bounding Box',
       desc: 'Locks the bounding box',
-      hotkey: 'Shift+Q',
+      hotkey: 'Shift+W',
     },
     {
       title: 'Quick Toggle Lock Bounding Box',
       desc: 'Hold to toggle locking the bounding box',
-      hotkey: 'Q',
+      hotkey: 'W',
     },
     {
       title: 'Expand Inpainting Area',
