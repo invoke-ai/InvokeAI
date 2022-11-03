@@ -80,14 +80,36 @@ if not exist ".git" (
 call conda activate
 
 @rem create the environment
+call conda env remove -n invokeai
 call conda env create
-call conda activate invokeai
+if "%ERRORLEVEL%" NEQ "0" (
+   echo ""
+   echo "Something went wrong while installing Python libraries and cannot continue.
+   echo "Please visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
+   echo "installation methods."
+   echo "Press any key to continue"
+   pause
+   exit /b
+)
 
+call conda activate invokeai
 @rem preload the models
 call python scripts\preload_models.py
+if "%ERRORLEVEL%" NEQ "0" (
+   echo ""
+   echo "The preload_models.py script crashed or was cancelled."
+   echo "InvokeAI is not ready to run. To run preload_models.py again,"
+   echo "run the command 'update.bat' in this directory."
+   echo "Press any key to continue"
+   pause
+   exit /b
+)
 
 @rem tell the user their next steps
-echo.
+echo ""
+echo "* InvokeAI installed successfully *"
 echo "You can now start generating images by double-clicking the 'invoke.bat' file (inside this folder)
-
+echo "Press any key to continue"
 pause
+exit 0
+

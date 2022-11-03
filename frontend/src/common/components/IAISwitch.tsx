@@ -22,8 +22,6 @@ const IAISwitch = (props: Props) => {
   const {
     label,
     isDisabled = false,
-    // fontSize = 'md',
-    // size = 'md',
     width = 'auto',
     formControlProps,
     formLabelProps,
@@ -39,17 +37,11 @@ const IAISwitch = (props: Props) => {
     >
       <FormLabel
         className="invokeai__switch-form-label"
-        // fontSize={fontSize}
         whiteSpace="nowrap"
         {...formLabelProps}
       >
         {label}
-        <Switch
-          className="invokeai__switch-root"
-          // size={size}
-          // className="switch-button"
-          {...rest}
-        />
+        <Switch className="invokeai__switch-root" {...rest} />
       </FormLabel>
     </FormControl>
   );

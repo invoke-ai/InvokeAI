@@ -13,3 +13,17 @@ export const activeTabNameSelector = createSelector(
     },
   }
 );
+
+export const mayGenerateMultipleImagesSelector = createSelector(
+  (state: RootState) => state.options,
+  (options: OptionsState) => {
+    const { shouldRandomizeSeed, shouldGenerateVariations } = options;
+
+    return shouldRandomizeSeed || shouldGenerateVariations;
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
+  }
+);

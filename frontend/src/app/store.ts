@@ -5,12 +5,16 @@ import type { TypedUseSelectorHook } from 'react-redux';
 import { persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
 
-import optionsReducer from '../features/options/optionsSlice';
-import galleryReducer from '../features/gallery/gallerySlice';
-import inpaintingReducer from '../features/tabs/Inpainting/inpaintingSlice';
+import optionsReducer, { OptionsState } from '../features/options/optionsSlice';
+import galleryReducer, { GalleryState } from '../features/gallery/gallerySlice';
+import inpaintingReducer, {
+  InpaintingState,
+} from '../features/tabs/Inpainting/inpaintingSlice';
 
-import systemReducer from '../features/system/systemSlice';
+import systemReducer, { SystemState } from '../features/system/systemSlice';
 import { socketioMiddleware } from './socketio/middleware';
+import autoMergeLevel2 from 'redux-persist/es/stateReconciler/autoMergeLevel2';
+import { PersistPartial } from 'redux-persist/es/persistReducer';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -33,12 +37,14 @@ import { socketioMiddleware } from './socketio/middleware';
 const rootPersistConfig = {
   key: 'root',
   storage,
+  stateReconciler: autoMergeLevel2,
   blacklist: ['gallery', 'system', 'inpainting'],
 };
 
 const systemPersistConfig = {
   key: 'system',
   storage,
+  stateReconciler: autoMergeLevel2,
   blacklist: [
     'isCancelable',
     'isConnected',
@@ -58,6 +64,7 @@ const systemPersistConfig = {
 const galleryPersistConfig = {
   key: 'gallery',
   storage,
+  stateReconciler: autoMergeLevel2,
   whitelist: [
     'galleryWidth',
     'shouldPinGallery',
@@ -71,17 +78,26 @@ const galleryPersistConfig = {
 const inpaintingPersistConfig = {
   key: 'inpainting',
   storage,
+  stateReconciler: autoMergeLevel2,
   blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
 };
 
 const reducers = combineReducers({
   options: optionsReducer,
-  gallery: persistReducer(galleryPersistConfig, galleryReducer),
-  system: persistReducer(systemPersistConfig, systemReducer),
-  inpainting: persistReducer(inpaintingPersistConfig, inpaintingReducer),
+  gallery: persistReducer<GalleryState>(galleryPersistConfig, galleryReducer),
+  system: persistReducer<SystemState>(systemPersistConfig, systemReducer),
+  inpainting: persistReducer<InpaintingState>(
+    inpaintingPersistConfig,
+    inpaintingReducer
+  ),
 });
 
-const persistedReducer = persistReducer(rootPersistConfig, reducers);
+const persistedReducer = persistReducer<{
+  options: OptionsState;
+  gallery: GalleryState & PersistPartial;
+  system: SystemState & PersistPartial;
+  inpainting: InpaintingState & PersistPartial;
+}>(rootPersistConfig, reducers);
 
 // Continue with store setup
 export const store = configureStore({

@@ -14,18 +14,22 @@ import warnings
 from urllib import request
 from tqdm import tqdm
 from omegaconf import OmegaConf
+from huggingface_hub import HfFolder, hf_hub_url
 from pathlib import Path
+from getpass_asterisk import getpass_asterisk
+from transformers import CLIPTokenizer, CLIPTextModel
 import traceback
-import getpass
 import requests
 import clip
 import transformers
 import torch
 transformers.logging.set_verbosity_error()
 
-# deferred loading so that help message can be printed quickly
-def load_libs():
-    pass
+import warnings
+warnings.filterwarnings('ignore')
+#warnings.simplefilter('ignore')
+#warnings.filterwarnings('ignore',category=DeprecationWarning)
+#warnings.filterwarnings('ignore',category=UserWarning)
 
 #--------------------------globals--
 Model_dir = './models/ldm/stable-diffusion-v1/'
@@ -98,7 +102,7 @@ this program and resume later.\n'''
 #--------------------------------------------
 def postscript():
     print(
-        '''You're all set! You may now launch InvokeAI using one of these two commands:
+        '''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
 Web version: 
 
     python scripts/invoke.py --web  (connect to http://localhost:9090)
@@ -220,10 +224,13 @@ This involves a few easy steps.
 '''
     )
     input('Press <enter> when you are ready to continue:')
-
-    from huggingface_hub import HfFolder
+    print('(Fetching Hugging Face token from cache...',end='')
     access_token = HfFolder.get_token()
+    if access_token is not None:
+        print('found')
+    
     if access_token is None:
+        print('not found')
         print('''
 4. Thank you! The last step is to enter your HuggingFace access token so that
    this script is authorized to initiate the download. Go to the access tokens
@@ -237,8 +244,7 @@ This involves a few easy steps.
 
    Now copy the token to your clipboard and paste it here: '''
         )
-        access_token = getpass.getpass()
-        HfFolder.save_token(access_token)
+        access_token = getpass_asterisk.getpass_asterisk()
     return access_token
 
 #---------------------------------------------
@@ -268,14 +274,21 @@ def download_weight_datasets(models:dict, access_token:str):
         )
         if success:
             successful[mod] = True
+    if len(successful) < len(models):
+        print(f'\n\n** There were errors downloading one or more files. **')
+        print('Please double-check your license agreements, and your access token.')
+        HfFolder.delete_token()
+        print('Press any key to try again. Type ^C to quit.\n')
+        input()
+        return None
+
+    HfFolder.save_token(access_token)
     keys = ', '.join(successful.keys())
     print(f'Successfully installed {keys}') 
     return successful
     
 #---------------------------------------------
 def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
-    from huggingface_hub import hf_hub_url
-
     model_dest = os.path.join(Model_dir, model_name)
     os.makedirs(os.path.dirname(model_dest), exist_ok=True)
     url = hf_hub_url(repo_id, model_name)
@@ -295,6 +308,8 @@ def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
     if resp.status_code==416:  # "range not satisfiable", which means nothing to return
         print(f'* {model_name}: complete file found. Skipping.')
         return True
+    elif resp.status_code != 200:
+        print(f'** An error occurred during downloading {model_name}: {resp.reason}')
     elif exist_size > 0:
         print(f'* {model_name}: partial file found. Resuming...')
     else:
@@ -302,7 +317,7 @@ def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
 
     try:
         if total < 2000:
-            print(f'* {model_name}: {resp.text}')
+            print(f'*** ERROR DOWNLOADING {model_name}: {resp.text}')
             return False
 
         with open(model_dest, open_mode) as file, tqdm(
@@ -383,26 +398,24 @@ def new_config_file_contents(successfully_downloaded:dict, Config_file:str)->str
 # this will preload the Bert tokenizer fles
 def download_bert():
     print('Installing bert tokenizer (ignore deprecation errors)...', end='')
-    from transformers import BertTokenizerFast, AutoFeatureExtractor
+    sys.stdout.flush()
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=DeprecationWarning)
+        from transformers import BertTokenizerFast, AutoFeatureExtractor
         tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
         print('...success')
-        sys.stdout.flush()
 
 #---------------------------------------------
 # this will download requirements for Kornia
 def download_kornia():
-    print('Installing Kornia requirements...', end='')
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=DeprecationWarning)
-        import kornia
+    print('Installing Kornia requirements (ignore deprecation errors)...', end='')
+    sys.stdout.flush()
+    import kornia
     print('...success')
 
 #---------------------------------------------
 def download_clip():
     print('Loading CLIP model...',end='')
-    from transformers import CLIPTokenizer, CLIPTextModel
     sys.stdout.flush()
     version = 'openai/clip-vit-large-patch14'
     tokenizer = CLIPTokenizer.from_pretrained(version)
@@ -531,7 +544,6 @@ if __name__ == '__main__':
                         default='./configs/models.yaml',
                         help='path to configuration file to create')
     opt = parser.parse_args()
-    load_libs()
     
     try:
         if opt.interactive:

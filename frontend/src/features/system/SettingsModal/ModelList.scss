@@ -1,22 +1,35 @@
-.model-list {
-  .chakra-accordion {
-    display: grid;
-    row-gap: 0.5rem;
-  }
+// .chakra-accordion {
+//   display: grid;
+//   row-gap: 0.5rem;
+// }
 
-  .chakra-accordion__item {
-    border: none;
-    border-radius: 0.3rem;
-    background-color: var(--tab-hover-color);
-  }
+// .chakra-accordion__item {
+//   border: none;
+// }
+
+// button {
+//   border-radius: 0.3rem !important;
+
+//   &[aria-expanded='true'] {
+//     // background-color: var(--tab-hover-color);
+//     border-radius: 0.3rem;
+//   }
+// }
+
+.model-list-accordion {
+  outline: none;
+  padding: 0.25rem;
 
   button {
-    border-radius: 0.3rem !important;
-
-    &[aria-expanded='true'] {
-      background-color: var(--tab-hover-color);
-      border-radius: 0.3rem;
+    padding: 0;
+    margin: 0;
+    &:hover {
+      background-color: unset;
     }
+  }
+
+  div {
+    border: none !important;
   }
 
   .model-list-button {
@@ -64,6 +77,9 @@
         }
       }
       .model-list-item-load-btn {
+        button {
+          padding: 0.5rem;
+        }
       }
     }
   }

@@ -19,24 +19,9 @@ an issue on Github and we will do our best to help.
 
 ## Installation
 
-First you need to download a large checkpoint file.
-
-1. Sign up at https://huggingface.co
-2. Go to the [Stable diffusion diffusion model page](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)
-3. Accept the terms and click Access Repository
-4. Download [v1-5-pruned-emaonly.ckpt (4.27 GB)](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned-emaonly.ckpt)
-and move it into this directory under `models/ldm/stable_diffusion_v1/v1-5-pruned-emaonly.ckpt`
-
-There are many other models that you can try. Please see [../features/INSTALLING_MODELS.md]
-for details.
-
-While that is downloading, open Terminal and run the following
-commands one at a time, reading the comments and taking care to run
-the appropriate command for your Mac's architecture (Intel or M1).
-
 !!! todo "Homebrew"
 
-    If you have no brew installation yet (otherwise skip):
+    First you will install the "brew" package manager. Skip this if brew is already installed.
 
     ```bash title="install brew (and Xcode command line tools)"
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -100,25 +85,6 @@ the appropriate command for your Mac's architecture (Intel or M1).
     cd InvokeAI
     ```
 
-!!! todo "Wait until the checkpoint-file download finished, then proceed"
-
-    We will leave the big checkpoint wherever you stashed it for long-term storage,
-    and make a link to it from the repo's folder. This allows you to use it for
-    other repos, or if you need to delete Invoke AI, you won't have to download it again.
-
-    ```{.bash .annotate}
-    # Make the directory in the repo for the symlink
-    mkdir -p models/ldm/stable-diffusion-v1/
-
-    # This is the folder where you put the checkpoint file `sd-v1-4.ckpt`
-    PATH_TO_CKPT="$HOME/Downloads" # (1)!
-
-    # Create a link to the checkpoint
-    ln -s "$PATH_TO_CKPT/sd-v1-4.ckpt" models/ldm/stable-diffusion-v1/model.ckpt
-    ```
-
-    1. replace `$HOME/Downloads` with the Location where you actually stored the Checkppoint (`sd-v1-4.ckpt`)
-
 !!! todo "Create the environment & install packages"
 
     === "M1 Mac"
@@ -137,25 +103,40 @@ the appropriate command for your Mac's architecture (Intel or M1).
     # Activate the environment (you need to do this every time you want to run SD)
     conda activate invokeai
 
-    # This will download some bits and pieces and make take a while
-    (invokeai) python scripts/preload_models.py
-
-    # Run SD!
-    (invokeai) python scripts/dream.py
-
-    # or run the web interface!
-    (invokeai) python scripts/invoke.py --web
-
-    # The original scripts should work as well.
-    (invokeai) python scripts/orig_scripts/txt2img.py \
-        --prompt "a photograph of an astronaut riding a horse" \
-        --plms
-    ```
     !!! info
 
         `export PIP_EXISTS_ACTION=w` is a precaution to fix `conda env
         create -f environment-mac.yml` never finishing in some situations. So
-        it isn't required but wont hurt.
+        it isn't required but won't hurt.
+
+!!! todo "Download the model weight files"
+
+The `preload_models.py` script downloads and installs the model weight
+files for you. It will lead you through the process of getting a Hugging Face
+account, accepting the Stable Diffusion model weight license agreement, and
+creating a download token:
+
+    # This will take some time, depending on the speed of your internet connection
+    # and will consume about 10GB of space
+    (invokeai) python scripts/preload_models.py
+
+!! todo "Run InvokeAI!"
+
+    # Command-line interface
+    (invokeai) python scripts/invoke.py
+
+    # or run the web interface on localhost:9090!
+    (invokeai) python scripts/invoke.py --web
+
+    # or run the web interface on your machine's network interface!
+    (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+
+To use an alternative model you may invoke the `!switch` command in
+the CLI, or pass `--model <model_name>` during `invoke.py` launch for
+either the CLI or the Web UI. See [Command Line
+Client](../features/CLI.md#model-selection-and-importation). The
+model names are defined in `configs/models.yaml`.
+
 ---
 
 ## Common problems

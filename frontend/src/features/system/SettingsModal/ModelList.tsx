@@ -73,31 +73,33 @@ const ModelList = () => {
   const { models } = useAppSelector(modelListSelector);
 
   return (
-    <div className="model-list">
-      <Accordion allowToggle>
-        <AccordionItem>
-          <AccordionButton>
-            <div className="model-list-button">
-              <h2>Models</h2>
-              <AccordionIcon />
-            </div>
-          </AccordionButton>
+    <Accordion
+      allowToggle
+      className="model-list-accordion"
+      variant={'unstyled'}
+    >
+      <AccordionItem>
+        <AccordionButton>
+          <div className="model-list-button">
+            <h2>Models</h2>
+            <AccordionIcon />
+          </div>
+        </AccordionButton>
 
-          <AccordionPanel>
-            <div className="model-list-list">
-              {models.map((model, i) => (
-                <ModelListItem
-                  key={i}
-                  name={model.name}
-                  status={model.status}
-                  description={model.description}
-                />
-              ))}
-            </div>
-          </AccordionPanel>
-        </AccordionItem>
-      </Accordion>
-    </div>
+        <AccordionPanel>
+          <div className="model-list-list">
+            {models.map((model, i) => (
+              <ModelListItem
+                key={i}
+                name={model.name}
+                status={model.status}
+                description={model.description}
+              />
+            ))}
+          </div>
+        </AccordionPanel>
+      </AccordionItem>
+    </Accordion>
   );
 };
 

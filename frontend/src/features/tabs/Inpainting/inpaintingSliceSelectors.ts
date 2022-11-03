@@ -78,7 +78,23 @@ export const inpaintingCanvasSelector = createSelector(
       isDrawing,
       shouldLockBoundingBox,
       boundingBoxDimensions,
+      isTransformingBoundingBox,
+      isMouseOverBoundingBox,
+      isMovingBoundingBox,
     } = inpainting;
+
+    let stageCursor: string | undefined = '';
+
+    if (isTransformingBoundingBox) {
+      stageCursor = undefined;
+    } else if (isMovingBoundingBox || isMouseOverBoundingBox) {
+      stageCursor = 'move';
+    } else if (shouldShowMask) {
+      stageCursor = 'none';
+    } else {
+      stageCursor = 'default';
+    }
+
     return {
       tool,
       brushSize,
@@ -93,6 +109,10 @@ export const inpaintingCanvasSelector = createSelector(
       isDrawing,
       shouldLockBoundingBox,
       boundingBoxDimensions,
+      isTransformingBoundingBox,
+      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
+      stageCursor,
+      isMouseOverBoundingBox,
     };
   },
   {

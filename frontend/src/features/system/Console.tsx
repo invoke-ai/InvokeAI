@@ -75,6 +75,10 @@ const Console = () => {
     [shouldShowLogViewer]
   );
 
+  useHotkeys('esc', () => {
+    dispatch(setShouldShowLogViewer(false));
+  });
+
   const handleOnScroll = () => {
     if (!viewerRef.current) return;
     if (
@@ -99,7 +103,7 @@ const Console = () => {
             position: 'fixed',
             left: 0,
             bottom: 0,
-            zIndex: 20,
+            zIndex: 9999,
           }}
           maxHeight={'90vh'}
         >

@@ -22,6 +22,7 @@ dependencies:
   - diffusers=0.6.0
   - einops=0.4.1
   - grpcio=1.46.4
+  - getpass_asterisk
   - humanfriendly=10.0
   - imageio=2.21.2
   - imageio-ffmpeg=0.4.7

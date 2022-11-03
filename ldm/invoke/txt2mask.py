@@ -36,6 +36,7 @@ from torchvision import transforms
 
 CLIP_VERSION = 'ViT-B/16'
 CLIPSEG_WEIGHTS = 'src/clipseg/weights/rd64-uni.pth'
+CLIPSEG_WEIGHTS_REFINED = 'src/clipseg/weights/rd64-uni-refined.pth'
 CLIPSEG_SIZE = 352
 
 class SegmentedGrayscale(object):
@@ -43,8 +44,8 @@ class SegmentedGrayscale(object):
         self.heatmap = heatmap
         self.image = image
         
-    def to_grayscale(self)->Image:
-        return self._rescale(Image.fromarray(np.uint8(self.heatmap*255)))
+    def to_grayscale(self,invert:bool=False)->Image:
+        return self._rescale(Image.fromarray(np.uint8(255 - self.heatmap * 255 if invert else self.heatmap * 255)))
 
     def to_mask(self,threshold:float=0.5)->Image:
         discrete_heatmap = self.heatmap.lt(threshold).int()
@@ -52,11 +53,9 @@ class SegmentedGrayscale(object):
 
     def to_transparent(self,invert:bool=False)->Image:
         transparent_image = self.image.copy()
-        gs = self.to_grayscale()
-        # The following line looks like a bug, but isn't.
         # For img2img, we want the selected regions to be transparent,
-        # but to_grayscale() returns the opposite.
-        gs = ImageOps.invert(gs) if not invert else gs
+        # but to_grayscale() returns the opposite. Thus invert.
+        gs = self.to_grayscale(not invert)
         transparent_image.putalpha(gs)
         return transparent_image
 
@@ -74,14 +73,14 @@ class Txt2Mask(object):
     Create new Txt2Mask object. The optional device argument can be one of
     'cuda', 'mps' or 'cpu'.
     '''
-    def __init__(self,device='cpu'):
+    def __init__(self,device='cpu',refined=False):
         print('>> Initializing clipseg model for text to mask inference')
         self.device = device
-        self.model = CLIPDensePredT(version=CLIP_VERSION, reduce_dim=64, )
+        self.model = CLIPDensePredT(version=CLIP_VERSION, reduce_dim=64, complex_trans_conv=refined)
         self.model.eval()
         # initially we keep everything in cpu to conserve space
         self.model.to('cpu')
-        self.model.load_state_dict(torch.load(CLIPSEG_WEIGHTS, map_location=torch.device('cpu')), strict=False)
+        self.model.load_state_dict(torch.load(CLIPSEG_WEIGHTS_REFINED if refined else CLIPSEG_WEIGHTS, map_location=torch.device('cpu')), strict=False)
 
     @torch.no_grad()
     def segment(self, image, prompt:str) -> SegmentedGrayscale:
