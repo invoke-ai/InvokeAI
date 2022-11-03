@@ -162,9 +162,7 @@ cleanup, testing, or code reviews, is very much encouraged to do so. If you are 
 to contribute to GitHub projects, here is a
 [Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github).
 
-A full set of contribution guidelines, along with templates, are in progress, but for now the most
-important thing is to **make your pull request against the "development" branch**, and not against
-"main". This will help keep public breakage to a minimum and will allow you to propose more radical
+The most important thing is to know about contributing code is to **make your pull request against the "development" branch**, and not against "main". This will help keep public breakage to a minimum and will allow you to propose more radical
 changes.
 
 ## :octicons-person-24: Contributors
@@ -175,10 +173,9 @@ time, hard work and effort.
 
 ## :octicons-question-24: Support
 
-For support, please use this repository's GitHub Issues tracking service. Feel free to send me an
-email if you use and like the script.
+For support, please use this repository's GitHub [Issues tracking service](https://github.com/invoke-ai/InvokeAI/issues). Live support is also available on the [InvokeAI Discord server](https://discord.gg/ZmtBAhwWhy).
 
-Original portions of the software are Copyright (c) 2020
+Original portions of the software are Copyright (c) 2022
 [Lincoln D. Stein](https://github.com/lstein)
 
 ## :octicons-book-24: Further Reading
