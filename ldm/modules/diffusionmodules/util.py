@@ -66,7 +66,12 @@ def make_ddim_timesteps(
         c = num_ddpm_timesteps // num_ddim_timesteps
         if c < 1:
           c = 1
-        ddim_timesteps = (np.arange(0, num_ddim_timesteps) * c).astype(int)
+        
+        # remove 1 final step when num_ddim_timesteps is multiple of 3 to prevent index out of bound error
+        if num_ddim_timesteps % 3 == 0:
+            ddim_timesteps = np.asarray(list(range(0, num_ddpm_timesteps, c)))[:-1]
+        else:
+            ddim_timesteps = np.asarray(list(range(0, num_ddpm_timesteps, c)))
     elif ddim_discr_method == 'quad':
         ddim_timesteps = (
             (
