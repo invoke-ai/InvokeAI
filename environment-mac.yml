@@ -22,7 +22,6 @@ dependencies:
   - diffusers=0.6.0
   - einops=0.4.1
   - grpcio=1.46.4
-  - getpass_asterisk
   - humanfriendly=10.0
   - imageio=2.21.2
   - imageio-ffmpeg=0.4.7
@@ -52,6 +51,7 @@ dependencies:
   - transformers=4.23.1
   - torch-fidelity=0.3.0
   - pip:
+      - getpass_asterisk
       - dependency_injector==4.40.0
       - realesrgan==0.2.5.0
       - test-tube==0.7.5
