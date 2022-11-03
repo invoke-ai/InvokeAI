@@ -6,10 +6,23 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'update-docker-debug'
 
 jobs:
   docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - aarch64
+        include:
+          - arch: x86_64
+            conda-env-file: environment.yml
+          - arch: aarch64
+            conda-env-file: environment-linux-aarch64.yml
     runs-on: ubuntu-latest
+    name: build ${{ matrix.arch }}
     steps:
       - name: prepare docker-tag
         env:
@@ -26,9 +39,11 @@ jobs:
         with:
           context: .
           file: docker-build/Dockerfile
-          platforms: linux/amd64
+          platforms: Linux/${{ matrix.arch }}
           push: false
-          tags: ${{ env.dockertag }}:latest
+          tags: ${{ env.dockertag }}:${{ matrix.arch }}
           build-args: |
+            conda_env_file=${{ matrix.conda-env-file }}
+            conda_version=py39_4.12.0-Linux-${{ matrix.arch }}
             invokeai_git=${{ github.repository }}
             invokeai_branch=${{ github.ref_name }}
