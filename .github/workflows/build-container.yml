@@ -6,7 +6,6 @@ on:
     branches:
       - 'main'
       - 'development'
-      - 'update-docker-debug'
 
 jobs:
   docker:
@@ -22,7 +21,7 @@ jobs:
           - arch: aarch64
             conda-env-file: environment-linux-aarch64.yml
     runs-on: ubuntu-latest
-    name: build ${{ matrix.arch }}
+    name: ${{ matrix.arch }}
     steps:
       - name: prepare docker-tag
         env:
