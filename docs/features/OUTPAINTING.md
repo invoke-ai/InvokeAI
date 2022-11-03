@@ -72,23 +72,24 @@ Pretty nice, but it's annoying that the top of her head is cut
 off. She's also a bit off center. Let's fix that!
 
 ```bash
-invoke> !fix images/curly.png --outcrop top 64 right 64
+invoke> !fix images/curly.png --outcrop top 128 right 64 bottom 64
 ```
 
 This is saying to apply the `outcrop` extension by extending the top
-of the image by 64 pixels, and the right of the image by the same
-amount. You can use any combination of top|left|right|bottom, and
+of the image by 128 pixels, and the right and bottom of the image by
+64 pixels. You can use any combination of top|left|right|bottom, and
 specify any number of pixels to extend. You can also abbreviate
 `--outcrop` to `-c`.
 
 The result looks like this:
 
 <figure markdown>
-![curly_woman_outcrop](../assets/outpainting/curly-outcrop.png)
+![curly_woman_outcrop](../assets/outpainting/curly-outcrop-2.png)
 </figure>
 
-The new image is actually slightly larger than the original (576x576,
-because 64 pixels were added to the top and right sides.)
+The new image is larger than the original (576x704)
+because 64 pixels were added to the top and right sides. You will
+need enough VRAM to process an image of this size.
 
 A number of caveats:
 
@@ -102,6 +103,17 @@ image.
 you'll get a slightly different result. You can run it repeatedly
 until you get an image you like. Unfortunately `!fix` does not
 currently respect the `-n` (`--iterations`) argument.
+
+3. Your results will be _much_ better if you use the `inpaint-1.5`
+model released by runwayML and installed by default by
+`scripts/preload_models.py`. This model was trained specifically to
+harmoniously fill in image gaps. The standard model will work as well,
+but you may notice color discontinuities at the border.
+
+4. When using the `inpaint-1.5` model, you may notice subtle changes
+to the area within the original image. This is because the model
+performs an encoding/decoding on the image as a whole. This does not
+occur with the standard model.
 
 ## Outpaint
 
