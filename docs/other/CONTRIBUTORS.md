@@ -59,6 +59,8 @@ We thank them for all of their time and hard work.
 - [Dominic Letz](https://github.com/dominicletz)
 - [Dmitry T.](https://github.com/ArDiouscuros)
 - [Kent Keirsey](https://github.com/hipsterusername)
+- [psychedelicious](https://github.com/psychedelicious)
+- [damian0815](https://github.com/damian0815)
 
 ## **Original CompVis Authors:**
 

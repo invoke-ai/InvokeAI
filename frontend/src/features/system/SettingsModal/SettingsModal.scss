@@ -2,11 +2,13 @@
 
 .settings-modal {
   background-color: var(--settings-modal-bg) !important;
+  max-height: 36rem;
   font-family: Inter;
 
   .settings-modal-content {
     display: grid;
     row-gap: 2rem;
+    overflow-y: scroll;
   }
 
   .settings-modal-header {
@@ -23,8 +25,8 @@
       background-color: var(--background-color);
       padding: 0.4rem 1rem;
       border-radius: 0.5rem;
-      justify-content: space-between;
       align-items: center;
+      width: 100%;
     }
   }
 
@@ -34,8 +36,8 @@
 
     button {
       @include Button(
-        $btn-color: var(--btn-red),
-        $btn-color-hover: var(--btn-red-hover)
+        $btn-color: var(--destructive-color),
+        $btn-color-hover: var(--destructive-color-hover)
       );
     }
   }

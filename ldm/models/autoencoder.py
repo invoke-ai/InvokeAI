@@ -66,7 +66,7 @@ class VQModel(pl.LightningModule):
         self.use_ema = use_ema
         if self.use_ema:
             self.model_ema = LitEma(self)
-            print(f'Keeping EMAs of {len(list(self.model_ema.buffers()))}.')
+            print(f'>> Keeping EMAs of {len(list(self.model_ema.buffers()))}.')
 
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)

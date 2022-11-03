@@ -12,6 +12,8 @@
  * 'gfpgan'.
  */
 
+import { Category as GalleryCategory } from '../features/gallery/gallerySlice';
+
 /**
  * TODO:
  * Once an image has been generated, if it is postprocessed again,
@@ -89,27 +91,32 @@ export declare type ESRGANMetadata = CommonPostProcessedImageMetadata & {
   strength: number;
 };
 
-export declare type GFPGANMetadata = CommonPostProcessedImageMetadata & {
-  type: 'gfpgan';
+export declare type FacetoolMetadata = CommonPostProcessedImageMetadata & {
+  type: 'gfpgan' | 'codeformer';
   strength: number;
+  fidelity?: number;
 };
 
 // Superset of all postprocessed image metadata types..
 export declare type PostProcessedImageMetadata =
   | ESRGANMetadata
-  | GFPGANMetadata;
+  | FacetoolMetadata;
 
 // Metadata includes the system config and image metadata.
 export declare type Metadata = SystemConfig & {
   image: GeneratedImageMetadata | PostProcessedImageMetadata;
 };
 
-// An Image has a UUID, url (path?) and Metadata.
+// An Image has a UUID, url, modified timestamp, width, height and maybe metadata
 export declare type Image = {
   uuid: string;
   url: string;
   mtime: number;
-  metadata: Metadata;
+  metadata?: Metadata;
+  width: number;
+  height: number;
+  category: GalleryCategory; 
+  isBase64: boolean; 
 };
 
 // GalleryImages is an array of Image.
@@ -139,20 +146,35 @@ export declare type SystemConfig = {
   model_hash: string;
   app_id: string;
   app_version: string;
+  model_list: ModelList;
 };
+
+export declare type ModelStatus = 'active' | 'cached' | 'not loaded';
+
+export declare type Model = {
+  status: ModelStatus;
+  description: string;
+};
+
+export declare type ModelList = Record<string, Model>;
 
 /**
  * These types type data received from the server via socketio.
  */
 
+export declare type ModelChangeResponse = {
+  model_name: string;
+  model_list: ModelList;
+};
+
 export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;
 
-export declare type ImageResultResponse = {
-  url: string;
-  mtime: number;
-  metadata: Metadata;
+export declare type ImageResultResponse = Omit<Image, 'uuid'>;
+
+export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
+  destination: 'img2img' | 'inpainting';
 };
 
 export declare type ErrorResponse = {
@@ -163,13 +185,22 @@ export declare type ErrorResponse = {
 export declare type GalleryImagesResponse = {
   images: Array<Omit<Image, 'uuid'>>;
   areMoreImagesAvailable: boolean;
+  category: GalleryCategory;
 };
 
-export declare type ImageUrlAndUuidResponse = {
+export declare type ImageDeletedResponse = {
   uuid: string;
   url: string;
+  category: GalleryCategory;
 };
 
 export declare type ImageUrlResponse = {
   url: string;
+};
+
+export declare type ImageUploadDestination = 'img2img' | 'inpainting';
+
+export declare type UploadImagePayload = {
+  file: File;
+  destination?: ImageUploadDestination;
 };

@@ -4,12 +4,14 @@
   display: grid !important;
   grid-template-columns: min-content auto;
   column-gap: 1rem;
+  // height: 100%;
+  height: $app-content-height;
 }
 
 .app-tabs-list {
   display: grid;
   row-gap: 0.3rem;
-  grid-auto-rows: max-content;
+  grid-auto-rows: min-content;
   color: var(--tab-list-text-inactive);
 
   button {
@@ -39,5 +41,6 @@
 .app-tabs-panels {
   .app-tabs-panel {
     padding: 0;
+    height: 100%;
   }
 }

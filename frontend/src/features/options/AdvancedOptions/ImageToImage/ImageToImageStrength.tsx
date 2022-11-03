@@ -30,7 +30,7 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
       max={0.99}
       onChange={handleChangeStrength}
       value={img2imgStrength}
-      width="90px"
+      width="100%"
       isInteger={false}
       styleClass={styleClass}
     />

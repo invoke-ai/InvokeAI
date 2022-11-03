@@ -1,0 +1,26 @@
+.invokeai__checkbox {
+  .chakra-checkbox__label {
+    margin-top: 1px;
+    color: var(--text-color-secondary);
+    font-size: 0.9rem;
+  }
+
+  .chakra-checkbox__control {
+    width: 1rem;
+    height: 1rem;
+    border: none;
+    border-radius: 0.2rem;
+    background-color: var(--input-checkbox-bg);
+
+    svg {
+      width: 0.6rem;
+      height: 0.6rem;
+      stroke-width: 3px !important;
+    }
+
+    &[data-checked] {
+      color: var(--text-color);
+      background-color: var(--input-checkbox-checked-bg);
+    }
+  }
+}

@@ -14,11 +14,12 @@ import { useAppDispatch } from '../../../app/store';
 import * as InvokeAI from '../../../app/invokeai';
 import {
   setCfgScale,
-  setGfpganStrength,
+  setFacetoolStrength,
+  setCodeformerFidelity,
+  setFacetoolType,
   setHeight,
   setHiresFix,
   setImg2imgStrength,
-  setInitialImagePath,
   setMaskPath,
   setPrompt,
   setSampler,
@@ -30,10 +31,13 @@ import {
   setUpscalingLevel,
   setUpscalingStrength,
   setWidth,
+  setInitialImage,
+  setShouldShowImageDetails,
 } from '../../options/optionsSlice';
 import promptToString from '../../../common/util/promptToString';
 import { seedWeightsToString } from '../../../common/util/seedWeightPairs';
 import { FaCopy } from 'react-icons/fa';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -105,7 +109,10 @@ const memoEqualityCheck = (
 const ImageMetadataViewer = memo(
   ({ image, styleClass }: ImageMetadataViewerProps) => {
     const dispatch = useAppDispatch();
-    // const jsonBgColor = useColorModeValue('blackAlpha.100', 'whiteAlpha.100');
+
+    useHotkeys('esc', () => {
+      dispatch(setShouldShowImageDetails(false));
+    });
 
     const metadata = image?.metadata?.image || {};
     const {
@@ -151,7 +158,7 @@ const ImageMetadataViewer = memo(
                 <MetadataItem
                   label="Fix faces strength"
                   value={strength}
-                  onClick={() => dispatch(setGfpganStrength(strength))}
+                  onClick={() => dispatch(setFacetoolStrength(strength))}
                 />
               )}
               {type === 'esrgan' && scale !== undefined && (
@@ -246,7 +253,7 @@ const ImageMetadataViewer = memo(
                   label="Initial image"
                   value={init_image_path}
                   isLink
-                  onClick={() => dispatch(setInitialImagePath(init_image_path))}
+                  onClick={() => dispatch(setInitialImage(init_image_path))}
                 />
               )}
               {mask_image_path && (
@@ -321,10 +328,44 @@ const ImageMetadataViewer = memo(
                             <MetadataItem
                               label="Strength"
                               value={strength}
-                              onClick={() =>
-                                dispatch(setGfpganStrength(strength))
-                              }
+                              onClick={() => {
+                                dispatch(setFacetoolStrength(strength));
+                                dispatch(setFacetoolType('gfpgan'));
+                              }}
                             />
+                          </Flex>
+                        );
+                      } else if (postprocess.type === 'codeformer') {
+                        const { strength, fidelity } = postprocess;
+                        return (
+                          <Flex
+                            key={i}
+                            pl={'2rem'}
+                            gap={1}
+                            direction={'column'}
+                          >
+                            <Text size={'md'}>{`${
+                              i + 1
+                            }: Face restoration (Codeformer)`}</Text>
+
+                            <MetadataItem
+                              label="Strength"
+                              value={strength}
+                              onClick={() => {
+                                dispatch(setFacetoolStrength(strength));
+                                dispatch(setFacetoolType('codeformer'));
+                              }}
+                            />
+                            {fidelity && (
+                              <MetadataItem
+                                label="Fidelity"
+                                value={fidelity}
+                                onClick={() => {
+                                  dispatch(setCodeformerFidelity(fidelity));
+                                  dispatch(setFacetoolType('codeformer'));
+                                }}
+                              />
+                            )}
                           </Flex>
                         );
                       }

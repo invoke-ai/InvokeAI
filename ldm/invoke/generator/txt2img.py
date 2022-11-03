@@ -5,6 +5,8 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 import torch
 import numpy as  np
 from ldm.invoke.generator.base import Generator
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+
 
 class Txt2Img(Generator):
     def __init__(self, model, precision):
@@ -19,7 +21,7 @@ class Txt2Img(Generator):
         kwargs are 'width' and 'height'
         """
         self.perlin = perlin
-        uc, c   = conditioning
+        uc, c, extra_conditioning_info   = conditioning
 
         @torch.no_grad()
         def make_image(x_T):
@@ -43,6 +45,7 @@ class Txt2Img(Generator):
                 verbose                      = False,
                 unconditional_guidance_scale = cfg_scale,
                 unconditional_conditioning   = uc,
+                extra_conditioning_info      = extra_conditioning_info,
                 eta                          = ddim_eta,
                 img_callback                 = step_callback,
                 threshold                    = threshold,
@@ -59,7 +62,7 @@ class Txt2Img(Generator):
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height):
         device         = self.model.device
-        if device.type == 'mps':
+        if self.use_mps_noise or device.type == 'mps':
             x = torch.randn([1,
                                 self.latent_channels,
                                 height // self.downsampling_factor,
@@ -74,3 +77,4 @@ class Txt2Img(Generator):
         if self.perlin > 0.0:
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(width  // self.downsampling_factor, height // self.downsampling_factor)
         return x
+

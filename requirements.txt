@@ -2,6 +2,7 @@
 
 albumentations
 einops
+getpass_asterisk
 huggingface-hub
 imageio-ffmpeg
 imageio
@@ -13,7 +14,7 @@ opencv-python
 pillow
 pip>=22
 pudb
-pytorch-lightning
+pytorch-lightning==1.7.7
 scikit-image>=0.19
 streamlit
 pyreadline3
@@ -32,6 +33,8 @@ send2trash
 dependency_injector==4.40.0
 eventlet
 realesrgan
+diffusers
 git+https://github.com/openai/CLIP.git@main#egg=clip
 git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
 git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
+-e git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg

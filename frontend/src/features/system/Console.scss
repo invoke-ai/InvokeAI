@@ -1,4 +1,5 @@
 .console {
+  width: 100vw;
   display: flex;
   flex-direction: column;
   background: var(--console-bg-color);
@@ -7,7 +8,7 @@
   font-family: monospace;
   padding: 0 1rem 1rem 3rem;
   border-top-width: 0.3rem;
-  border-color: var(--console-border-color);
+  border-color: var(--resizeable-handle-border-color);
 
   .console-info-color {
     color: var(--error-level-info);
@@ -40,12 +41,13 @@
   position: fixed !important;
   left: 0.5rem;
   bottom: 0.5rem;
+  z-index: 10000;
 
   &:hover {
     background: var(--console-icon-button-bg-color-hover) !important;
   }
 
-  &.error-seen {
+  &[data-error-seen='true'] {
     background: var(--status-bad-color) !important;
     &:hover {
       background: var(--status-bad-color) !important;
@@ -58,15 +60,16 @@
   position: fixed !important;
   left: 0.5rem;
   bottom: 3rem;
+  z-index: 10000;
 
   &:hover {
     background: var(--console-icon-button-bg-color-hover) !important;
   }
 
-  &.autoscroll-enabled {
-    background: var(--btn-purple) !important;
+  &[data-autoscroll-enabled='true'] {
+    background: var(--accent-color) !important;
     &:hover {
-      background: var(--btn-purple-hover) !important;
+      background: var(--accent-color-hover) !important;
     }
   }
 }

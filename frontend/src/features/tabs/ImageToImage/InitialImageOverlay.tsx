@@ -3,14 +3,14 @@ import React from 'react';
 import { RootState, useAppSelector } from '../../../app/store';
 
 export default function InitialImageOverlay() {
-  const initialImagePath = useAppSelector(
-    (state: RootState) => state.options.initialImagePath
+  const initialImage = useAppSelector(
+    (state: RootState) => state.options.initialImage
   );
 
-  return initialImagePath ? (
+  return initialImage ? (
     <Image
       fit={'contain'}
-      src={initialImagePath}
+      src={typeof initialImage === 'string' ? initialImage : initialImage.url}
       rounded={'md'}
       className={'checkerboard'}
     />

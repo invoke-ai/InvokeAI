@@ -32,7 +32,7 @@ class Outcrop(object):
 
         result= self.generate.prompt2image(
             orig_opt.prompt,
-#            seed        = orig_opt.seed,    # uncomment to make it deterministic
+            seed        = orig_opt.seed,    # uncomment to make it deterministic
             sampler     = self.generate.sampler,
             steps       = opt.steps,
             cfg_scale   = opt.cfg_scale,
@@ -40,8 +40,15 @@ class Outcrop(object):
             width       = extended_image.width,
             height      = extended_image.height,
             init_img    = extended_image,
-            strength    = opt.strength,
-            image_callback = wrapped_callback,
+            strength    = 0.90,
+            image_callback = wrapped_callback if image_callback else None,
+            seam_size = opt.seam_size or 96,
+            seam_blur = opt.seam_blur or 16,
+            seam_strength = opt.seam_strength or 0.7,
+            seam_steps = 20,
+            tile_size = 32,
+            color_match = True,
+            force_outpaint = True,  # this just stops the warning about erased regions
         )
         
         # swap sampler back
@@ -89,23 +96,12 @@ class Outcrop(object):
     def _extend(self,image:Image,pixels:int)-> Image:
         extended_img = Image.new('RGBA',(image.width,image.height+pixels))
 
-        # first paste places old image at top of extended image, stretch
-        # it, and applies a gaussian blur to it
-        # take the top half region, stretch and paste it
-        top_slice = image.crop(box=(0,0,image.width,pixels//2))
-        top_slice = top_slice.resize((image.width,pixels))
-        extended_img.paste(top_slice,box=(0,0))
+        extended_img.paste((0,0,0),[0,0,image.width,image.height+pixels])
+        extended_img.paste(image,box=(0,pixels))
 
-        # second paste creates a copy of the image displaced pixels downward;
-        # The overall effect is to create a blurred duplicate of the top portion of
-        # the image.
-        extended_img.paste(image,box=(0,pixels))
-        extended_img = extended_img.filter(filter=ImageFilter.GaussianBlur(radius=pixels//2))
-        extended_img.paste(image,box=(0,pixels))
-        
         # now make the top part transparent to use as a mask
         alpha = extended_img.getchannel('A')
-        alpha.paste(0,(0,0,extended_img.width,pixels*2))
+        alpha.paste(0,(0,0,extended_img.width,pixels))
         extended_img.putalpha(alpha)
 
         return extended_img

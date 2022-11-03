@@ -36,20 +36,6 @@ another environment with NVIDIA GPUs on-premises or in the cloud.
 
 ### Prerequisites
 
-#### Get the data files
-
-Go to
-[Hugging Face](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original),
-and click "Access repository" to Download the model file `sd-v1-4.ckpt` (~4 GB)
-to `~/Downloads`. You'll need to create an account but it's quick and free.
-
-Also download the face restoration model.
-
-```Shell
-cd ~/Downloads
-wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth
-```
-
 #### Install [Docker](https://github.com/santisbon/guides#docker)
 
 On the Docker Desktop app, go to Preferences, Resources, Advanced. Increase the
@@ -57,86 +43,61 @@ CPUs and Memory to avoid this
 [Issue](https://github.com/invoke-ai/InvokeAI/issues/342). You may need to
 increase Swap and Disk image size too.
 
+#### Get a Huggingface-Token
+
+Go to [Hugging Face](https://huggingface.co/settings/tokens), create a token and
+temporary place it somewhere like a open texteditor window (but dont save it!,
+only keep it open, we need it in the next step)
+
 ### Setup
 
 Set the fork you want to use and other variables.
 
-```Shell
-TAG_STABLE_DIFFUSION="santisbon/stable-diffusion"
-PLATFORM="linux/arm64"
-GITHUB_STABLE_DIFFUSION="-b orig-gfpgan https://github.com/santisbon/stable-diffusion.git"
-REQS_STABLE_DIFFUSION="requirements-linux-arm64.txt"
-CONDA_SUBDIR="osx-arm64"
+!!! tip
 
-echo $TAG_STABLE_DIFFUSION
-echo $PLATFORM
-echo $GITHUB_STABLE_DIFFUSION
-echo $REQS_STABLE_DIFFUSION
-echo $CONDA_SUBDIR
+    I preffer to save my env vars
+    in the repository root in a `.env` (or `.envrc`) file to automatically re-apply
+    them when I come back.
+
+The build- and run- scripts contain default values for almost everything,
+besides the [Hugging Face Token](https://huggingface.co/settings/tokens) you
+created in the last step.
+
+Some Suggestions of variables you may want to change besides the Token:
+
+| Environment-Variable                                                | Description                                                              |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `HUGGINGFACE_TOKEN="hg_aewirhghlawrgkjbarug2"`                      | This is the only required variable, without you can't get the checkpoint |
+| `ARCH=aarch64`                                                      | if you are using a ARM based CPU                                         |
+| `INVOKEAI_TAG=yourname/invokeai:latest`                             | the Container Repository / Tag which will be used                        |
+| `INVOKEAI_CONDA_ENV_FILE=environment-linux-aarch64.yml`             | since environment.yml wouldn't work with aarch                           |
+| `INVOKEAI_GIT="-b branchname https://github.com/username/reponame"` | if you want to use your own fork                                         |
+
+#### Build the Image
+
+I provided a build script, which is located in `docker-build/build.sh` but still
+needs to be executed from the Repository root.
+
+```bash
+docker-build/build.sh
 ```
 
-Create a Docker volume for the downloaded model files.
+The build Script not only builds the container, but also creates the docker
+volume if not existing yet, or if empty it will just download the models. When
+it is done you can run the container via the run script
 
-```Shell
-docker volume create my-vol
+```bash
+docker-build/run.sh
 ```
 
-Copy the data files to the Docker volume using a lightweight Linux container.
-We'll need the models at run time. You just need to create the container with
-the mountpoint; no need to run this dummy container.
+When used without arguments, the container will start the website and provide
+you the link to open it. But if you want to use some other parameters you can
+also do so.
 
-```Shell
-cd ~/Downloads # or wherever you saved the files
+!!! warning "Deprecated"
 
-docker create --platform $PLATFORM --name dummy --mount source=my-vol,target=/data alpine
-
-docker cp sd-v1-4.ckpt dummy:/data
-docker cp GFPGANv1.4.pth dummy:/data
-```
-
-Get the repo and download the Miniconda installer (we'll need it at build time).
-Replace the URL with the version matching your container OS and the architecture
-it will run on.
-
-```Shell
-cd ~
-git clone $GITHUB_STABLE_DIFFUSION
-
-cd stable-diffusion/docker-build
-chmod +x entrypoint.sh
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O anaconda.sh && chmod +x anaconda.sh
-```
-
-Build the Docker image. Give it any tag `-t` that you want.  
-Choose the Linux container's host platform: x86-64/Intel is `amd64`. Apple
-silicon is `arm64`. If deploying the container to the cloud to leverage powerful
-GPU instances you'll be on amd64 hardware but if you're just trying this out
-locally on Apple silicon choose arm64.  
-The application uses libraries that need to match the host environment so use
-the appropriate requirements file.  
-Tip: Check that your shell session has the env variables set above.
-
-```Shell
-docker build -t $TAG_STABLE_DIFFUSION \
---platform $PLATFORM \
---build-arg gsd=$GITHUB_STABLE_DIFFUSION \
---build-arg rsd=$REQS_STABLE_DIFFUSION \
---build-arg cs=$CONDA_SUBDIR \
-.
-```
-
-Run a container using your built image.  
-Tip: Make sure you've created and populated the Docker volume (above).
-
-```Shell
-docker run -it \
---rm \
---platform $PLATFORM \
---name stable-diffusion \
---hostname stable-diffusion \
---mount source=my-vol,target=/data \
-$TAG_STABLE_DIFFUSION
-```
+    From here on it is the rest of the previous Docker-Docs, which will still
+    provide usefull informations for one or the other.
 
 ## Usage (time to have fun)
 
@@ -240,7 +201,8 @@ server with:
 python3 scripts/invoke.py --full_precision --web
 ```
 
-If it's running on your Mac point your Mac web browser to http://127.0.0.1:9090
+If it's running on your Mac point your Mac web browser to
+<http://127.0.0.1:9090>
 
 Press Control-C at the command line to stop the web server.
 

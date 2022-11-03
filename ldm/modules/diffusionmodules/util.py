@@ -64,7 +64,8 @@ def make_ddim_timesteps(
 ):
     if ddim_discr_method == 'uniform':
         c = num_ddpm_timesteps // num_ddim_timesteps
-        # ddim_timesteps = np.asarray(list(range(0, num_ddpm_timesteps, c)))
+        if c < 1:
+          c = 1
         ddim_timesteps = (np.arange(0, num_ddim_timesteps) * c).astype(int)
     elif ddim_discr_method == 'quad':
         ddim_timesteps = (

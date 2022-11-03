@@ -1,24 +1,32 @@
-import { Button, ButtonProps, Tooltip } from '@chakra-ui/react';
+import {
+  Button,
+  ButtonProps,
+  forwardRef,
+  Tooltip,
+  TooltipProps,
+} from '@chakra-ui/react';
+import { ReactNode } from 'react';
 
-interface Props extends ButtonProps {
-  label: string;
+export interface IAIButtonProps extends ButtonProps {
   tooltip?: string;
+  tooltipProps?: Omit<TooltipProps, 'children'>;
+  styleClass?: string;
+  children: ReactNode;
 }
 
-/**
- * Reusable customized button component. Originally was more customized - now probably unecessary.
- *
- * TODO: Get rid of this.
- */
-const IAIButton = (props: Props) => {
-  const { label, tooltip = '', size = 'sm', ...rest } = props;
+const IAIButton = forwardRef((props: IAIButtonProps, forwardedRef) => {
+  const { children, tooltip = '', tooltipProps, styleClass, ...rest } = props;
   return (
-    <Tooltip label={tooltip}>
-      <Button size={size} {...rest}>
-        {label}
+    <Tooltip label={tooltip} {...tooltipProps}>
+      <Button
+        ref={forwardedRef}
+        className={['invokeai__button', styleClass].join(' ')}
+        {...rest}
+      >
+        {children}
       </Button>
     </Tooltip>
   );
-};
+});
 
 export default IAIButton;

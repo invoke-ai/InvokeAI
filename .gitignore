@@ -3,6 +3,10 @@ outputs/
 models/ldm/stable-diffusion-v1/model.ckpt
 **/restoration/codeformer/weights
 
+# ignore user models config
+configs/models.user.yaml
+config/models.user.yml
+
 # ignore the Anaconda/Miniconda installer used while building Docker image
 anaconda.sh
 
@@ -195,7 +199,13 @@ checkpoints
 .scratch/
 .vscode/
 gfpgan/
-models/ldm/stable-diffusion-v1/model.sha256
+models/ldm/stable-diffusion-v1/*.sha256
 
 # GFPGAN model files
 gfpgan/
+
+# config file (will be created by installer)
+configs/models.yaml
+
+# weights (will be created by installer)
+models/ldm/stable-diffusion-v1/*.ckpt

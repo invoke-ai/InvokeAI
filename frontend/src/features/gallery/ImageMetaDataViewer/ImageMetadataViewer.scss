@@ -1,12 +1,15 @@
 @use '../../../styles/Mixins/' as *;
 
 .image-metadata-viewer {
+  position: absolute;
+  top: 0;
   width: 100%;
   border-radius: 0.5rem;
   padding: 1rem;
   background-color: var(--metadata-bg-color);
   overflow: scroll;
   max-height: $app-metadata-height;
+  height: 100%;
   z-index: 10;
 }
 

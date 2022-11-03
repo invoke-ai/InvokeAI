@@ -1,37 +1,79 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import * as InvokeAI from '../../app/invokeai';
-
 import { useAppDispatch, useAppSelector } from '../../app/store';
 import { RootState } from '../../app/store';
 import {
+  OptionsState,
   setActiveTab,
   setAllParameters,
-  setInitialImagePath,
+  setInitialImage,
+  setPrompt,
   setSeed,
   setShouldShowImageDetails,
 } from '../options/optionsSlice';
 import DeleteImageModal from './DeleteImageModal';
 import { SystemState } from '../system/systemSlice';
 import IAIButton from '../../common/components/IAIButton';
-import { runESRGAN, runGFPGAN } from '../../app/socketio/actions';
+import { runESRGAN, runFacetool } from '../../app/socketio/actions';
 import IAIIconButton from '../../common/components/IAIIconButton';
-import { MdDelete, MdFace, MdHd, MdImage, MdInfo } from 'react-icons/md';
-import InvokePopover from './InvokePopover';
 import UpscaleOptions from '../options/AdvancedOptions/Upscale/UpscaleOptions';
 import FaceRestoreOptions from '../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useToast } from '@chakra-ui/react';
+import { ButtonGroup, Link, useClipboard, useToast } from '@chakra-ui/react';
+import {
+  FaAsterisk,
+  FaCode,
+  FaCopy,
+  FaDownload,
+  FaExpandArrowsAlt,
+  FaGrinStars,
+  FaQuoteRight,
+  FaSeedling,
+  FaShare,
+  FaShareAlt,
+  FaTrash,
+} from 'react-icons/fa';
+import {
+  setImageToInpaint,
+  setNeedsCache,
+} from '../tabs/Inpainting/inpaintingSlice';
+import { GalleryState } from './gallerySlice';
+import { activeTabNameSelector } from '../options/optionsSelectors';
+import IAIPopover from '../../common/components/IAIPopover';
 
 const systemSelector = createSelector(
-  (state: RootState) => state.system,
-  (system: SystemState) => {
+  [
+    (state: RootState) => state.system,
+    (state: RootState) => state.options,
+    (state: RootState) => state.gallery,
+    activeTabNameSelector,
+  ],
+  (
+    system: SystemState,
+    options: OptionsState,
+    gallery: GalleryState,
+    activeTabName
+  ) => {
+    const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
+      system;
+
+    const { upscalingLevel, facetoolStrength, shouldShowImageDetails } =
+      options;
+
+    const { intermediateImage, currentImage } = gallery;
+
     return {
-      isProcessing: system.isProcessing,
-      isConnected: system.isConnected,
-      isGFPGANAvailable: system.isGFPGANAvailable,
-      isESRGANAvailable: system.isESRGANAvailable,
+      isProcessing,
+      isConnected,
+      isGFPGANAvailable,
+      isESRGANAvailable,
+      upscalingLevel,
+      facetoolStrength,
+      shouldDisableToolbarButtons: Boolean(intermediateImage) || !currentImage,
+      currentImage,
+      shouldShowImageDetails,
+      activeTabName,
     };
   },
   {
@@ -41,47 +83,50 @@ const systemSelector = createSelector(
   }
 );
 
-type CurrentImageButtonsProps = {
-  image: InvokeAI.Image;
-};
-
 /**
  * Row of buttons for common actions:
  * Use as init image, use all params, use seed, upscale, fix faces, details, delete.
  */
-const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
+const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
+  const {
+    isProcessing,
+    isConnected,
+    isGFPGANAvailable,
+    isESRGANAvailable,
+    upscalingLevel,
+    facetoolStrength,
+    shouldDisableToolbarButtons,
+    shouldShowImageDetails,
+    currentImage,
+  } = useAppSelector(systemSelector);
 
-  const shouldShowImageDetails = useAppSelector(
-    (state: RootState) => state.options.shouldShowImageDetails
+  const { onCopy } = useClipboard(
+    currentImage ? window.location.toString() + currentImage.url : ''
   );
 
   const toast = useToast();
 
-  const intermediateImage = useAppSelector(
-    (state: RootState) => state.gallery.intermediateImage
-  );
-
-  const upscalingLevel = useAppSelector(
-    (state: RootState) => state.options.upscalingLevel
-  );
-
-  const gfpganStrength = useAppSelector(
-    (state: RootState) => state.options.gfpganStrength
-  );
-
-  const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
-    useAppSelector(systemSelector);
-
   const handleClickUseAsInitialImage = () => {
-    dispatch(setInitialImagePath(image.url));
-    dispatch(setActiveTab(1));
+    if (!currentImage) return;
+    dispatch(setInitialImage(currentImage));
+    dispatch(setActiveTab('img2img'));
+  };
+
+  const handleCopyImageLink = () => {
+    onCopy();
+    toast({
+      title: 'Image Link Copied',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
   };
 
   useHotkeys(
     'shift+i',
     () => {
-      if (image) {
+      if (currentImage) {
         handleClickUseAsInitialImage();
         toast({
           title: 'Sent To Image To Image',
@@ -99,15 +144,20 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image]
+    [currentImage]
   );
 
-  const handleClickUseAllParameters = () =>
-    dispatch(setAllParameters(image.metadata));
+  const handleClickUseAllParameters = () => {
+    if (!currentImage) return;
+    currentImage.metadata && dispatch(setAllParameters(currentImage.metadata));
+  };
+
   useHotkeys(
     'a',
     () => {
-      if (['txt2img', 'img2img'].includes(image?.metadata?.image?.type)) {
+      if (
+        ['txt2img', 'img2img'].includes(currentImage?.metadata?.image?.type)
+      ) {
         handleClickUseAllParameters();
         toast({
           title: 'Parameters Set',
@@ -125,16 +175,18 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image]
+    [currentImage]
   );
 
-  // Non-null assertion: this button is disabled if there is no seed.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const handleClickUseSeed = () => dispatch(setSeed(image.metadata.image.seed));
+  const handleClickUseSeed = () => {
+    currentImage?.metadata &&
+      dispatch(setSeed(currentImage.metadata.image.seed));
+  };
+
   useHotkeys(
     's',
     () => {
-      if (image?.metadata?.image?.seed) {
+      if (currentImage?.metadata?.image?.seed) {
         handleClickUseSeed();
         toast({
           title: 'Seed Set',
@@ -152,16 +204,47 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image]
+    [currentImage]
   );
 
-  const handleClickUpscale = () => dispatch(runESRGAN(image));
+  const handleClickUsePrompt = () =>
+    currentImage?.metadata?.image?.prompt &&
+    dispatch(setPrompt(currentImage.metadata.image.prompt));
+
+  useHotkeys(
+    'p',
+    () => {
+      if (currentImage?.metadata?.image?.prompt) {
+        handleClickUsePrompt();
+        toast({
+          title: 'Prompt Set',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: 'Prompt Not Set',
+          description: 'Could not find prompt for this image.',
+          status: 'error',
+          duration: 2500,
+          isClosable: true,
+        });
+      }
+    },
+    [currentImage]
+  );
+
+  const handleClickUpscale = () => {
+    currentImage && dispatch(runESRGAN(currentImage));
+  };
+
   useHotkeys(
     'u',
     () => {
       if (
         isESRGANAvailable &&
-        Boolean(!intermediateImage) &&
+        !shouldDisableToolbarButtons &&
         isConnected &&
         !isProcessing &&
         upscalingLevel
@@ -177,25 +260,28 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
       }
     },
     [
-      image,
+      currentImage,
       isESRGANAvailable,
-      intermediateImage,
+      shouldDisableToolbarButtons,
       isConnected,
       isProcessing,
       upscalingLevel,
     ]
   );
 
-  const handleClickFixFaces = () => dispatch(runGFPGAN(image));
+  const handleClickFixFaces = () => {
+    currentImage && dispatch(runFacetool(currentImage));
+  };
+
   useHotkeys(
     'r',
     () => {
       if (
         isGFPGANAvailable &&
-        Boolean(!intermediateImage) &&
+        !shouldDisableToolbarButtons &&
         isConnected &&
         !isProcessing &&
-        gfpganStrength
+        facetoolStrength
       ) {
         handleClickFixFaces();
       } else {
@@ -208,22 +294,38 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
       }
     },
     [
-      image,
+      currentImage,
       isGFPGANAvailable,
-      intermediateImage,
+      shouldDisableToolbarButtons,
       isConnected,
       isProcessing,
-      gfpganStrength,
+      facetoolStrength,
     ]
   );
 
   const handleClickShowImageDetails = () =>
     dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
 
+  const handleSendToInpainting = () => {
+    if (!currentImage) return;
+
+    dispatch(setImageToInpaint(currentImage));
+
+    dispatch(setActiveTab('inpainting'));
+    dispatch(setNeedsCache(true));
+
+    toast({
+      title: 'Sent to Inpainting',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
   useHotkeys(
     'i',
     () => {
-      if (image) {
+      if (currentImage) {
         handleClickShowImageDetails();
       } else {
         toast({
@@ -234,84 +336,141 @@ const CurrentImageButtons = ({ image }: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image, shouldShowImageDetails]
+    [currentImage, shouldShowImageDetails]
   );
 
   return (
     <div className="current-image-options">
+      <ButtonGroup isAttached={true}>
+        <IAIPopover
+          trigger="hover"
+          triggerComponent={
+            <IAIIconButton aria-label="Send to..." icon={<FaShareAlt />} />
+          }
+        >
+          <div className="current-image-send-to-popover">
+            <IAIButton
+              size={'sm'}
+              onClick={handleClickUseAsInitialImage}
+              leftIcon={<FaShare />}
+            >
+              Send to Image to Image
+            </IAIButton>
+            <IAIButton
+              size={'sm'}
+              onClick={handleSendToInpainting}
+              leftIcon={<FaShare />}
+            >
+              Send to Inpainting
+            </IAIButton>
+            <IAIButton
+              size={'sm'}
+              onClick={handleCopyImageLink}
+              leftIcon={<FaCopy />}
+            >
+              Copy Link to Image
+            </IAIButton>
+
+            <IAIButton leftIcon={<FaDownload />} size={'sm'}>
+              <Link download={true} href={currentImage?.url}>
+                Download Image
+              </Link>
+            </IAIButton>
+          </div>
+        </IAIPopover>
+      </ButtonGroup>
+
+      <ButtonGroup isAttached={true}>
+        <IAIIconButton
+          icon={<FaQuoteRight />}
+          tooltip="Use Prompt"
+          aria-label="Use Prompt"
+          isDisabled={!currentImage?.metadata?.image?.prompt}
+          onClick={handleClickUsePrompt}
+        />
+
+        <IAIIconButton
+          icon={<FaSeedling />}
+          tooltip="Use Seed"
+          aria-label="Use Seed"
+          isDisabled={!currentImage?.metadata?.image?.seed}
+          onClick={handleClickUseSeed}
+        />
+
+        <IAIIconButton
+          icon={<FaAsterisk />}
+          tooltip="Use All"
+          aria-label="Use All"
+          isDisabled={
+            !['txt2img', 'img2img'].includes(
+              currentImage?.metadata?.image?.type
+            )
+          }
+          onClick={handleClickUseAllParameters}
+        />
+      </ButtonGroup>
+
+      <ButtonGroup isAttached={true}>
+        <IAIPopover
+          trigger="hover"
+          triggerComponent={
+            <IAIIconButton icon={<FaGrinStars />} aria-label="Restore Faces" />
+          }
+        >
+          <div className="current-image-postprocessing-popover">
+            <FaceRestoreOptions />
+            <IAIButton
+              isDisabled={
+                !isGFPGANAvailable ||
+                !currentImage ||
+                !(isConnected && !isProcessing) ||
+                !facetoolStrength
+              }
+              onClick={handleClickFixFaces}
+            >
+              Restore Faces
+            </IAIButton>
+          </div>
+        </IAIPopover>
+
+        <IAIPopover
+          trigger="hover"
+          triggerComponent={
+            <IAIIconButton icon={<FaExpandArrowsAlt />} aria-label="Upscale" />
+          }
+        >
+          <div className="current-image-postprocessing-popover">
+            <UpscaleOptions />
+            <IAIButton
+              isDisabled={
+                !isESRGANAvailable ||
+                !currentImage ||
+                !(isConnected && !isProcessing) ||
+                !upscalingLevel
+              }
+              onClick={handleClickUpscale}
+            >
+              Upscale Image
+            </IAIButton>
+          </div>
+        </IAIPopover>
+      </ButtonGroup>
+
       <IAIIconButton
-        icon={<MdImage />}
-        tooltip="Send To Image To Image"
-        aria-label="Send To Image To Image"
-        onClick={handleClickUseAsInitialImage}
-      />
-
-      <IAIButton
-        label="Use All"
-        isDisabled={
-          !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
-        }
-        onClick={handleClickUseAllParameters}
-      />
-
-      <IAIButton
-        label="Use Seed"
-        isDisabled={!image?.metadata?.image?.seed}
-        onClick={handleClickUseSeed}
-      />
-
-      <InvokePopover
-        title="Restore Faces"
-        popoverOptions={<FaceRestoreOptions />}
-        actionButton={
-          <IAIButton
-            label={'Restore Faces'}
-            isDisabled={
-              !isGFPGANAvailable ||
-              Boolean(intermediateImage) ||
-              !(isConnected && !isProcessing) ||
-              !gfpganStrength
-            }
-            onClick={handleClickFixFaces}
-          />
-        }
-      >
-        <IAIIconButton icon={<MdFace />} aria-label="Restore Faces" />
-      </InvokePopover>
-
-      <InvokePopover
-        title="Upscale"
-        styleClass="upscale-popover"
-        popoverOptions={<UpscaleOptions />}
-        actionButton={
-          <IAIButton
-            label={'Upscale Image'}
-            isDisabled={
-              !isESRGANAvailable ||
-              Boolean(intermediateImage) ||
-              !(isConnected && !isProcessing) ||
-              !upscalingLevel
-            }
-            onClick={handleClickUpscale}
-          />
-        }
-      >
-        <IAIIconButton icon={<MdHd />} aria-label="Upscale" />
-      </InvokePopover>
-
-      <IAIIconButton
-        icon={<MdInfo />}
+        icon={<FaCode />}
         tooltip="Details"
         aria-label="Details"
+        data-selected={shouldShowImageDetails}
         onClick={handleClickShowImageDetails}
       />
 
-      <DeleteImageModal image={image}>
+      <DeleteImageModal image={currentImage}>
         <IAIIconButton
-          icon={<MdDelete />}
+          icon={<FaTrash />}
           tooltip="Delete Image"
           aria-label="Delete Image"
-          isDisabled={Boolean(intermediateImage)}
+          isDisabled={!currentImage || !isConnected || isProcessing}
+          className="delete-image-btn"
         />
       </DeleteImageModal>
     </div>

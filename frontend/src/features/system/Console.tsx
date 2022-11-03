@@ -75,6 +75,21 @@ const Console = () => {
     [shouldShowLogViewer]
   );
 
+  useHotkeys('esc', () => {
+    dispatch(setShouldShowLogViewer(false));
+  });
+
+  const handleOnScroll = () => {
+    if (!viewerRef.current) return;
+    if (
+      shouldAutoscroll &&
+      viewerRef.current.scrollTop <
+        viewerRef.current.scrollHeight - viewerRef.current.clientHeight
+    ) {
+      setShouldAutoscroll(false);
+    }
+  };
+
   return (
     <>
       {shouldShowLogViewer && (
@@ -83,10 +98,16 @@ const Console = () => {
             width: '100%',
             height: 200,
           }}
-          style={{ display: 'flex', position: 'fixed', left: 0, bottom: 0 }}
+          style={{
+            display: 'flex',
+            position: 'fixed',
+            left: 0,
+            bottom: 0,
+            zIndex: 9999,
+          }}
           maxHeight={'90vh'}
         >
-          <div className="console" ref={viewerRef}>
+          <div className="console" ref={viewerRef} onScroll={handleOnScroll}>
             {log.map((entry, i) => {
               const { timestamp, message, level } = entry;
               return (
@@ -100,11 +121,13 @@ const Console = () => {
         </Resizable>
       )}
       {shouldShowLogViewer && (
-        <Tooltip hasArrow label={shouldAutoscroll ? 'Autoscroll On' : 'Autoscroll Off'}>
+        <Tooltip
+          hasArrow
+          label={shouldAutoscroll ? 'Autoscroll On' : 'Autoscroll Off'}
+        >
           <IconButton
-            className={`console-autoscroll-icon-button ${
-              shouldAutoscroll && 'autoscroll-enabled'
-            }`}
+            className={'console-autoscroll-icon-button'}
+            data-autoscroll-enabled={shouldAutoscroll}
             size="sm"
             aria-label="Toggle autoscroll"
             variant={'solid'}
@@ -113,16 +136,17 @@ const Console = () => {
           />
         </Tooltip>
       )}
-      <Tooltip hasArrow label={shouldShowLogViewer ? 'Hide Console' : 'Show Console'}>
+      <Tooltip
+        hasArrow
+        label={shouldShowLogViewer ? 'Hide Console' : 'Show Console'}
+      >
         <IconButton
-          className={`console-toggle-icon-button ${
-            (hasError || !wasErrorSeen) && 'error-seen'
-          }`}
+          className={'console-toggle-icon-button'}
+          data-error-seen={hasError || !wasErrorSeen}
           size="sm"
           position={'fixed'}
           variant={'solid'}
           aria-label="Toggle Log Viewer"
-          // colorScheme={hasError || !wasErrorSeen ? 'red' : 'gray'}
           icon={shouldShowLogViewer ? <FaMinus /> : <FaCode />}
           onClick={handleClickLogViewerToggle}
         />

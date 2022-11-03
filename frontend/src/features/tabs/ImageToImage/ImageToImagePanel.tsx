@@ -1,22 +1,23 @@
-import { Box } from '@chakra-ui/react';
-import React from 'react';
 import { Feature } from '../../../app/features';
 import { RootState, useAppSelector } from '../../../app/store';
-import FaceRestore from '../../options/AdvancedOptions/FaceRestore/FaceRestore';
+import FaceRestoreHeader from '../../options/AdvancedOptions/FaceRestore/FaceRestoreHeader';
 import FaceRestoreOptions from '../../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import ImageFit from '../../options/AdvancedOptions/ImageToImage/ImageFit';
 import ImageToImageStrength from '../../options/AdvancedOptions/ImageToImage/ImageToImageStrength';
+import OutputHeader from '../../options/AdvancedOptions/Output/OutputHeader';
+import OutputOptions from '../../options/AdvancedOptions/Output/OutputOptions';
+import SeedHeader from '../../options/AdvancedOptions/Seed/SeedHeader';
 import SeedOptions from '../../options/AdvancedOptions/Seed/SeedOptions';
-import Upscale from '../../options/AdvancedOptions/Upscale/Upscale';
+import UpscaleHeader from '../../options/AdvancedOptions/Upscale/UpscaleHeader';
 import UpscaleOptions from '../../options/AdvancedOptions/Upscale/UpscaleOptions';
-import Variations from '../../options/AdvancedOptions/Variations/Variations';
+import VariationsHeader from '../../options/AdvancedOptions/Variations/VariationsHeader';
 import VariationsOptions from '../../options/AdvancedOptions/Variations/VariationsOptions';
-import MainAdvancedOptions from '../../options/MainOptions/MainAdvancedOptions';
+import MainAdvancedOptionsCheckbox from '../../options/MainOptions/MainAdvancedOptionsCheckbox';
 import MainOptions from '../../options/MainOptions/MainOptions';
 import OptionsAccordion from '../../options/OptionsAccordion';
-import OutputOptions from '../../options/OutputOptions';
 import ProcessButtons from '../../options/ProcessButtons/ProcessButtons';
 import PromptInput from '../../options/PromptInput/PromptInput';
+import InvokeOptionsPanel from '../InvokeOptionsPanel';
 
 export default function ImageToImagePanel() {
   const showAdvancedOptions = useAppSelector(
@@ -25,42 +26,34 @@ export default function ImageToImagePanel() {
 
   const imageToImageAccordions = {
     seed: {
-      header: (
-        <Box flex="1" textAlign="left">
-          Seed
-        </Box>
-      ),
+      header: <SeedHeader />,
       feature: Feature.SEED,
       options: <SeedOptions />,
     },
     variations: {
-      header: <Variations />,
+      header: <VariationsHeader />,
       feature: Feature.VARIATIONS,
       options: <VariationsOptions />,
     },
     face_restore: {
-      header: <FaceRestore />,
+      header: <FaceRestoreHeader />,
       feature: Feature.FACE_CORRECTION,
       options: <FaceRestoreOptions />,
     },
     upscale: {
-      header: <Upscale />,
+      header: <UpscaleHeader />,
       feature: Feature.UPSCALE,
       options: <UpscaleOptions />,
     },
     other: {
-      header: (
-        <Box flex="1" textAlign="left">
-          Other
-        </Box>
-      ),
+      header: <OutputHeader />,
       feature: Feature.OTHER,
       options: <OutputOptions />,
     },
   };
 
   return (
-    <div className="image-to-image-panel">
+    <InvokeOptionsPanel>
       <PromptInput />
       <ProcessButtons />
       <MainOptions />
@@ -69,10 +62,10 @@ export default function ImageToImagePanel() {
         styleClass="main-option-block image-to-image-strength-main-option"
       />
       <ImageFit />
-      <MainAdvancedOptions />
+      <MainAdvancedOptionsCheckbox />
       {showAdvancedOptions ? (
         <OptionsAccordion accordionInfo={imageToImageAccordions} />
       ) : null}
-    </div>
+    </InvokeOptionsPanel>
   );
 }

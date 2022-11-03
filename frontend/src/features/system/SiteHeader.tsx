@@ -1,10 +1,20 @@
-import { IconButton, Link, Tooltip, useColorMode } from '@chakra-ui/react';
+import { Link, useColorMode } from '@chakra-ui/react';
+
 import { useHotkeys } from 'react-hotkeys-hook';
 
-import { FaSun, FaMoon, FaGithub, FaDiscord } from 'react-icons/fa';
-import { MdHelp, MdKeyboard, MdSettings } from 'react-icons/md';
+import {
+  FaSun,
+  FaMoon,
+  FaGithub,
+  FaDiscord,
+  FaBug,
+  FaKeyboard,
+  FaWrench,
+} from 'react-icons/fa';
 
 import InvokeAILogo from '../../assets/images/logo.png';
+import IAIIconButton from '../../common/components/IAIIconButton';
+
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 
 import SettingsModal from './SettingsModal/SettingsModal';
@@ -24,11 +34,6 @@ const SiteHeader = () => {
     [colorMode, toggleColorMode]
   );
 
-  const colorModeIcon = colorMode == 'light' ? <FaMoon /> : <FaSun />;
-
-  // Make FaMoon and FaSun icon apparent size consistent
-  const colorModeIconFontSize = colorMode == 'light' ? 18 : 20;
-
   return (
     <div className="site-header">
       <div className="site-header-left-side">
@@ -41,81 +46,82 @@ const SiteHeader = () => {
       <div className="site-header-right-side">
         <StatusIndicator />
 
-        <SettingsModal>
-          <IconButton
-            aria-label="Settings"
-            variant="link"
-            fontSize={24}
-            size={'sm'}
-            icon={<MdSettings />}
-          />
-        </SettingsModal>
-
         <HotkeysModal>
-          <IconButton
+          <IAIIconButton
             aria-label="Hotkeys"
-            variant="link"
-            fontSize={24}
+            tooltip="Hotkeys"
             size={'sm'}
-            icon={<MdKeyboard />}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            icon={<FaKeyboard />}
           />
         </HotkeysModal>
 
-        <Tooltip hasArrow label="Report Bug" placement={'bottom'}>
-          <IconButton
-            aria-label="Link to Github Issues"
-            variant="link"
-            fontSize={23}
-            size={'sm'}
-            icon={
-              <Link
-                isExternal
-                href="http://github.com/invoke-ai/InvokeAI/issues"
-              >
-                <MdHelp />
-              </Link>
-            }
-          />
-        </Tooltip>
+        <IAIIconButton
+          aria-label="Toggle Dark Mode"
+          tooltip="Dark Mode"
+          onClick={toggleColorMode}
+          variant="link"
+          data-variant="link"
+          fontSize={20}
+          size={'sm'}
+          icon={colorMode === 'light' ? <FaMoon /> : <FaSun />}
+        />
 
-        <Tooltip hasArrow label="Github" placement={'bottom'}>
-          <IconButton
-            aria-label="Link to Github Repo"
+        <IAIIconButton
+          aria-label="Report Bug"
+          tooltip="Report Bug"
+          variant="link"
+          data-variant="link"
+          fontSize={20}
+          size={'sm'}
+          icon={
+            <Link isExternal href="http://github.com/invoke-ai/InvokeAI/issues">
+              <FaBug />
+            </Link>
+          }
+        />
+
+        <IAIIconButton
+          aria-label="Link to Github Repo"
+          tooltip="Github"
+          variant="link"
+          data-variant="link"
+          fontSize={20}
+          size={'sm'}
+          icon={
+            <Link isExternal href="http://github.com/invoke-ai/InvokeAI">
+              <FaGithub />
+            </Link>
+          }
+        />
+
+        <IAIIconButton
+          aria-label="Link to Discord Server"
+          tooltip="Discord"
+          variant="link"
+          data-variant="link"
+          fontSize={20}
+          size={'sm'}
+          icon={
+            <Link isExternal href="https://discord.gg/ZmtBAhwWhy">
+              <FaDiscord />
+            </Link>
+          }
+        />
+
+        <SettingsModal>
+          <IAIIconButton
+            aria-label="Settings"
+            tooltip="Settings"
             variant="link"
+            data-variant="link"
             fontSize={20}
             size={'sm'}
-            icon={
-              <Link isExternal href="http://github.com/invoke-ai/InvokeAI">
-                <FaGithub />
-              </Link>
-            }
+            icon={<FaWrench />}
           />
-        </Tooltip>
-
-        <Tooltip hasArrow label="Discord" placement={'bottom'}>
-          <IconButton
-            aria-label="Link to Discord Server"
-            variant="link"
-            fontSize={20}
-            size={'sm'}
-            icon={
-              <Link isExternal href="https://discord.gg/ZmtBAhwWhy">
-                <FaDiscord />
-              </Link>
-            }
-          />
-        </Tooltip>
-
-        <Tooltip hasArrow label="Theme" placement={'bottom'}>
-          <IconButton
-            aria-label="Toggle Dark Mode"
-            onClick={toggleColorMode}
-            variant="link"
-            size={'sm'}
-            fontSize={colorModeIconFontSize}
-            icon={colorModeIcon}
-          />
-        </Tooltip>
+        </SettingsModal>
       </div>
     </div>
   );

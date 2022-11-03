@@ -1,6 +1,6 @@
 -r requirements.txt
 
 protobuf==3.19.6
-torch
-torchvision
+torch<1.13.0
+torchvision<0.14.0
 -e .

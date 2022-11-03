@@ -54,27 +54,10 @@ jobs:
           [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
           [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
-            || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
-
-      - name: Use cached Conda Environment
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
-          conda-env-file: ${{ matrix.environment-file }}
-        with:
-          path: ${{ env.CONDA_ROOT }}/envs/${{ env.CONDA_ENV_NAME }}
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.conda-env-file) }}
-
-      - name: Use cached Conda Packages
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
-          conda-env-file: ${{ matrix.environment-file }}
-        with:
-          path: ${{ env.CONDA_PKGS_DIR }}
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.conda-env-file) }}
+            || curl \
+              -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
+              -o models/ldm/stable-diffusion-v1/model.ckpt \
+              -L https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
 
       - name: Activate Conda Env
         uses: conda-incubator/setup-miniconda@v2

@@ -1,57 +1,30 @@
 @use '../../styles/Mixins/' as *;
 
-.current-image-display {
-  display: grid;
-  grid-template-areas:
-    'current-image-tools'
-    'current-image-preview';
-  grid-template-rows: auto 1fr;
-  justify-items: center;
+.current-image-area {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  row-gap: 1rem;
   background-color: var(--background-color-secondary);
   border-radius: 0.5rem;
 }
 
-.current-image-tools {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  justify-content: center;
-}
-
-.current-image-options {
-  display: grid;
-  grid-auto-flow: column;
-  padding: 1rem;
-  height: fit-content;
-  gap: 0.5rem;
-
-  button {
-    @include Button(
-      $btn-width: 3rem,
-      $icon-size: 22px,
-      $btn-color: var(--btn-grey),
-      $btn-color-hover: var(--btn-grey-hover)
-    );
-  }
-}
-
 .current-image-preview {
-  grid-area: current-image-preview;
   position: relative;
   justify-content: center;
   align-items: center;
-  display: grid;
+  display: flex;
   width: 100%;
-  grid-template-areas: 'current-image-content';
+  height: 100%;
 
   img {
-    grid-area: current-image-content;
     background-color: var(--img2img-img-bg-color);
     border-radius: 0.5rem;
     object-fit: contain;
-    width: auto;
-    height: $app-gallery-height;
-    max-height: $app-gallery-height;
+    max-width: 100%;
+    max-height: 100%;
+    height: auto;
+    position: absolute;
   }
 }
 
@@ -65,6 +38,7 @@
   justify-content: space-between;
   z-index: 1;
   height: 100%;
+  width: 100%;
   pointer-events: none;
 }
 

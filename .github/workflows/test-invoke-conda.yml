@@ -1,4 +1,4 @@
-name: Test Invoke with Conda
+name: Test invoke.py
 on:
   push:
     branches:
@@ -11,31 +11,57 @@ on:
       - 'development'
 
 jobs:
-  os_matrix:
+  matrix:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        stable-diffusion-model:
+          # - 'https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt'
+          - 'https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt'
+        os:
+          - ubuntu-latest
+          - macOS-12
         include:
           - os: ubuntu-latest
             environment-file: environment.yml
             default-shell: bash -l {0}
-          - os: macos-latest
+          - os: macOS-12
             environment-file: environment-mac.yml
             default-shell: bash -l {0}
-    name: Test invoke.py on ${{ matrix.os }} with conda
+          # - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
+          #   stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
+          #   stable-diffusion-model-switch: stable-diffusion-1.4
+          - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-switch: stable-diffusion-1.5
+    name: ${{ matrix.os }} with ${{ matrix.stable-diffusion-model-switch }}
     runs-on: ${{ matrix.os }}
+    env:
+      CONDA_ENV_NAME: invokeai
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
     steps:
       - name: Checkout sources
+        id: checkout-sources
         uses: actions/checkout@v3
 
-      - name: setup miniconda
+      - name: create models.yaml from example
+        run: cp configs/models.yaml.example configs/models.yaml
+
+      - name: Use cached conda packages
+        id: use-cached-conda-packages
+        uses: actions/cache@v3
+        with:
+          path: ~/conda_pkgs_dir
+          key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
+
+      - name: Activate Conda Env
+        id: activate-conda-env
         uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-activate-base: false
-          auto-update-conda: false
+          activate-environment: ${{ env.CONDA_ENV_NAME }}
+          environment-file: ${{ matrix.environment-file }}
           miniconda-version: latest
 
       - name: set test prompt to main branch validation
@@ -48,79 +74,40 @@ jobs:
 
       - name: set test prompt to Pull Request validation
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/pr_prompt.txt" >> $GITHUB_ENV
+        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
-      - name: set conda environment name
-        run: echo "CONDA_ENV_NAME=invokeai" >> $GITHUB_ENV
-
-      - name: Use Cached Stable Diffusion v1.4 Model
-        id: cache-sd-v1-4
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-sd-v1-4
-        with:
-          path: models/ldm/stable-diffusion-v1/model.ckpt
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}
-
-      - name: Download Stable Diffusion v1.4 Model
-        if: ${{ steps.cache-sd-v1-4.outputs.cache-hit != 'true' }}
+      - name: Download ${{ matrix.stable-diffusion-model-switch }}
+        id: download-stable-diffusion-model
         run: |
           [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1
-          [[ -r models/ldm/stable-diffusion-v1/model.ckpt ]] \
-            || curl -o models/ldm/stable-diffusion-v1/model.ckpt ${{ secrets.SD_V1_4_URL }}
-
-      - name: Use cached Conda Environment
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-conda-env-${{ env.CONDA_ENV_NAME }}
-          conda-env-file: ${{ matrix.environment-file }}
-        with:
-          path: ${{ env.CONDA }}/envs/${{ env.CONDA_ENV_NAME }}
-          key: env-${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.conda-env-file) }}
-
-      - name: Use cached Conda Packages
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-conda-pkgs-${{ env.CONDA_ENV_NAME }}
-          conda-env-file: ${{ matrix.environment-file }}
-        with:
-          path: ${{ env.CONDA_PKGS_DIR }}
-          key: pkgs-${{ env.cache-name }}-${{ runner.os }}-${{ hashFiles(env.conda-env-file) }}
-
-      - name: Activate Conda Env
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          activate-environment: ${{ env.CONDA_ENV_NAME }}
-          environment-file: ${{ matrix.environment-file }}
-
-      - name: Use Cached Huggingface and Torch models
-        id: cache-hugginface-torch
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-hugginface-torch
-        with:
-          path: ~/.cache
-          key: ${{ env.cache-name }}
-          restore-keys: |
-            ${{ env.cache-name }}-${{ hashFiles('scripts/preload_models.py') }}
+          curl \
+            -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
+            -o ${{ matrix.stable-diffusion-model-dl-path }} \
+            -L ${{ matrix.stable-diffusion-model }}
 
       - name: run preload_models.py
-        run: python scripts/preload_models.py
+        id: run-preload-models
+        run: |
+          python scripts/preload_models.py \
+            --no-interactive
 
       - name: Run the tests
+        id: run-tests
         run: |
           time python scripts/invoke.py \
+            --model ${{ matrix.stable-diffusion-model-switch }} \
             --from_file ${{ env.TEST_PROMPTS }}
 
       - name: export conda env
+        id: export-conda-env
         run: |
           mkdir -p outputs/img-samples
-          conda env export --name ${{ env.CONDA_ENV_NAME }} > outputs/img-samples/environment-${{ runner.os }}.yml
+          conda env export --name ${{ env.CONDA_ENV_NAME }} > outputs/img-samples/environment-${{ runner.os }}-${{ runner.arch }}.yml
 
       - name: Archive results
+        id: archive-results
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ matrix.os }}
+          name: results_${{ matrix.os }}_${{ matrix.stable-diffusion-model-switch }}
           path: outputs/img-samples

@@ -28,7 +28,20 @@ import { RootState } from '../../app/store';
 import { setShouldConfirmOnDelete, SystemState } from '../system/systemSlice';
 import * as InvokeAI from '../../app/invokeai';
 import { useHotkeys } from 'react-hotkeys-hook';
+import _ from 'lodash';
 
+const systemSelector = createSelector(
+  (state: RootState) => state.system,
+  (system: SystemState) => {
+    const { shouldConfirmOnDelete, isConnected, isProcessing } = system;
+    return { shouldConfirmOnDelete, isConnected, isProcessing };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
+  }
+);
 interface DeleteImageModalProps {
   /**
    *  Component which, on click, should delete the image/open the modal.
@@ -37,13 +50,8 @@ interface DeleteImageModalProps {
   /**
    * The image to delete.
    */
-  image: InvokeAI.Image;
+  image?: InvokeAI.Image;
 }
-
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
-  (system: SystemState) => system.shouldConfirmOnDelete
-);
 
 /**
  * Needs a child, which will act as the button to delete an image.
@@ -55,7 +63,8 @@ const DeleteImageModal = forwardRef(
   ({ image, children }: DeleteImageModalProps, ref) => {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const dispatch = useAppDispatch();
-    const shouldConfirmOnDelete = useAppSelector(systemSelector);
+    const { shouldConfirmOnDelete, isConnected, isProcessing } =
+      useAppSelector(systemSelector);
     const cancelRef = useRef<HTMLButtonElement>(null);
 
     const handleClickDelete = (e: SyntheticEvent) => {
@@ -64,7 +73,9 @@ const DeleteImageModal = forwardRef(
     };
 
     const handleDelete = () => {
-      dispatch(deleteImage(image));
+      if (isConnected && !isProcessing && image) {
+        dispatch(deleteImage(image));
+      }
       onClose();
     };
 
@@ -84,7 +95,7 @@ const DeleteImageModal = forwardRef(
       <>
         {cloneElement(children, {
           // TODO: This feels wrong.
-          onClick: handleClickDelete,
+          onClick: image ? handleClickDelete : undefined,
           ref: ref,
         })}
 

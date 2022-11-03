@@ -15,10 +15,17 @@ export interface Log {
   [index: number]: LogEntry;
 }
 
+export type ReadinessPayload = {
+  isReady: boolean;
+  reasonsWhyNotReady: string[];
+};
+
+export type InProgressImageType = 'none' | 'full-res' | 'latents';
+
 export interface SystemState
   extends InvokeAI.SystemStatus,
     InvokeAI.SystemConfig {
-  shouldDisplayInProgress: boolean;
+  shouldDisplayInProgressType: InProgressImageType;
   log: Array<LogEntry>;
   shouldShowLogViewer: boolean;
   isGFPGANAvailable: boolean;
@@ -35,14 +42,16 @@ export interface SystemState
   currentStatusHasSteps: boolean;
   shouldDisplayGuides: boolean;
   wasErrorSeen: boolean;
+  isCancelable: boolean;
+  saveIntermediatesInterval: number;
 }
 
-const initialSystemState = {
+const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
   log: [],
   shouldShowLogViewer: false,
-  shouldDisplayInProgress: false,
+  shouldDisplayInProgressType: 'latents',
   shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
@@ -60,18 +69,22 @@ const initialSystemState = {
   model_hash: '',
   app_id: '',
   app_version: '',
+  model_list: {},
   hasError: false,
   wasErrorSeen: true,
+  isCancelable: true,
+  saveIntermediatesInterval: 5,
 };
-
-const initialState: SystemState = initialSystemState;
 
 export const systemSlice = createSlice({
   name: 'system',
-  initialState,
+  initialState: initialSystemState,
   reducers: {
-    setShouldDisplayInProgress: (state, action: PayloadAction<boolean>) => {
-      state.shouldDisplayInProgress = action.payload;
+    setShouldDisplayInProgressType: (
+      state,
+      action: PayloadAction<InProgressImageType>
+    ) => {
+      state.shouldDisplayInProgressType = action.payload;
     },
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
@@ -85,12 +98,13 @@ export const systemSlice = createSlice({
     errorOccurred: (state) => {
       state.hasError = true;
       state.isProcessing = false;
+      state.isCancelable = true;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Server error';
+      state.currentStatus = 'Error';
       state.wasErrorSeen = false;
     },
     errorSeen: (state) => {
@@ -123,6 +137,7 @@ export const systemSlice = createSlice({
     setIsConnected: (state, action: PayloadAction<boolean>) => {
       state.isConnected = action.payload;
       state.isProcessing = false;
+      state.isCancelable = true;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.currentIteration = 0;
@@ -140,13 +155,17 @@ export const systemSlice = createSlice({
       state.openAccordions = action.payload;
     },
     setSystemConfig: (state, action: PayloadAction<InvokeAI.SystemConfig>) => {
-      return { ...state, ...action.payload };
+      return {
+        ...state,
+        ...action.payload,
+      };
     },
     setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
       state.shouldDisplayGuides = action.payload;
     },
     processingCanceled: (state) => {
       state.isProcessing = false;
+      state.isCancelable = true;
       state.currentStep = 0;
       state.totalSteps = 0;
       state.currentIteration = 0;
@@ -154,11 +173,29 @@ export const systemSlice = createSlice({
       state.currentStatusHasSteps = false;
       state.currentStatus = 'Processing canceled';
     },
+    setModelList: (
+      state,
+      action: PayloadAction<InvokeAI.ModelList | Record<string, never>>
+    ) => {
+      state.model_list = action.payload;
+    },
+    setIsCancelable: (state, action: PayloadAction<boolean>) => {
+      state.isCancelable = action.payload;
+    },
+    modelChangeRequested: (state) => {
+      state.currentStatus = 'Loading Model';
+      state.isCancelable = false;
+      state.isProcessing = true;
+      state.currentStatusHasSteps = false;
+    },
+    setSaveIntermediatesInterval: (state, action: PayloadAction<number>) => {
+      state.saveIntermediatesInterval = action.payload;
+    },
   },
 });
 
 export const {
-  setShouldDisplayInProgress,
+  setShouldDisplayInProgressType,
   setIsProcessing,
   addLogEntry,
   setShouldShowLogViewer,
@@ -173,6 +210,10 @@ export const {
   processingCanceled,
   errorOccurred,
   errorSeen,
+  setModelList,
+  setIsCancelable,
+  modelChangeRequested,
+  setSaveIntermediatesInterval,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

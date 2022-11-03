@@ -6,6 +6,12 @@ import {
   NumberDecrementStepper,
   NumberInputProps,
   FormLabel,
+  NumberInputFieldProps,
+  NumberInputStepperProps,
+  FormControlProps,
+  FormLabelProps,
+  TooltipProps,
+  Tooltip,
 } from '@chakra-ui/react';
 import _ from 'lodash';
 import { FocusEvent, useEffect, useState } from 'react';
@@ -23,6 +29,12 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
   max: number;
   clamp?: boolean;
   isInteger?: boolean;
+  formControlProps?: FormControlProps;
+  formLabelProps?: FormLabelProps;
+  numberInputProps?: NumberInputProps;
+  numberInputFieldProps?: NumberInputFieldProps;
+  numberInputStepperProps?: NumberInputStepperProps;
+  tooltipProps?: Omit<TooltipProps, 'children'>;
 }
 
 /**
@@ -34,8 +46,6 @@ const IAINumberInput = (props: Props) => {
     styleClass,
     isDisabled = false,
     showStepper = true,
-    fontSize = '1rem',
-    size = 'sm',
     width,
     textAlign,
     isInvalid,
@@ -44,6 +54,11 @@ const IAINumberInput = (props: Props) => {
     min,
     max,
     isInteger = true,
+    formControlProps,
+    formLabelProps,
+    numberInputFieldProps,
+    numberInputStepperProps,
+    tooltipProps,
     ...rest
   } = props;
 
@@ -65,7 +80,10 @@ const IAINumberInput = (props: Props) => {
    * from the current value.
    */
   useEffect(() => {
-    if (!valueAsString.match(numberStringRegex) && value !== Number(valueAsString)) {
+    if (
+      !valueAsString.match(numberStringRegex) &&
+      value !== Number(valueAsString)
+    ) {
       setValueAsString(String(value));
     }
   }, [value, valueAsString]);
@@ -94,47 +112,56 @@ const IAINumberInput = (props: Props) => {
   };
 
   return (
-    <FormControl
-      isDisabled={isDisabled}
-      isInvalid={isInvalid}
-      className={`number-input ${styleClass}`}
-    >
-      {label && (
-        <FormLabel
-          fontSize={fontSize}
-          marginBottom={1}
-          flexGrow={2}
-          whiteSpace="nowrap"
-          className="number-input-label"
-        >
-          {label}
-        </FormLabel>
-      )}
-      <NumberInput
-        size={size}
-        {...rest}
-        className="number-input-field"
-        value={valueAsString}
-        keepWithinRange={true}
-        clampValueOnBlur={false}
-        onChange={handleOnChange}
-        onBlur={handleBlur}
+    <Tooltip {...tooltipProps}>
+      <FormControl
+        isDisabled={isDisabled}
+        isInvalid={isInvalid}
+        className={
+          styleClass
+            ? `invokeai__number-input-form-control ${styleClass}`
+            : `invokeai__number-input-form-control`
+        }
+        {...formControlProps}
       >
-        <NumberInputField
-          fontSize={fontSize}
-          className="number-input-entry"
+        {label && (
+          <FormLabel
+            className="invokeai__number-input-form-label"
+            style={{ display: label ? 'block' : 'none' }}
+            {...formLabelProps}
+          >
+            {label}
+          </FormLabel>
+        )}
+        <NumberInput
+          className="invokeai__number-input-root"
+          value={valueAsString}
+          keepWithinRange={true}
+          clampValueOnBlur={false}
+          onChange={handleOnChange}
+          onBlur={handleBlur}
           width={width}
-          textAlign={textAlign}
-        />
-        <div
-          className="number-input-stepper"
-          style={showStepper ? { display: 'block' } : { display: 'none' }}
+          {...rest}
         >
-          <NumberIncrementStepper className="number-input-stepper-button" />
-          <NumberDecrementStepper className="number-input-stepper-button" />
-        </div>
-      </NumberInput>
-    </FormControl>
+          <NumberInputField
+            className="invokeai__number-input-field"
+            textAlign={textAlign}
+            {...numberInputFieldProps}
+          />
+          {showStepper && (
+            <div className="invokeai__number-input-stepper">
+              <NumberIncrementStepper
+                {...numberInputStepperProps}
+                className="invokeai__number-input-stepper-button"
+              />
+              <NumberDecrementStepper
+                {...numberInputStepperProps}
+                className="invokeai__number-input-stepper-button"
+              />
+            </div>
+          )}
+        </NumberInput>
+      </FormControl>
+    </Tooltip>
   );
 };
 

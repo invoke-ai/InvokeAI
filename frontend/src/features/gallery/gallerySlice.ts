@@ -3,20 +3,67 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import _, { clamp } from 'lodash';
 import * as InvokeAI from '../../app/invokeai';
 
+export type GalleryCategory = 'user' | 'result';
+
+export type AddImagesPayload = {
+  images: Array<InvokeAI.Image>;
+  areMoreImagesAvailable: boolean;
+  category: GalleryCategory;
+};
+
+type GalleryImageObjectFitType = 'contain' | 'cover';
+
+export type Gallery = {
+  images: InvokeAI.Image[];
+  latest_mtime?: number;
+  earliest_mtime?: number;
+  areMoreImagesAvailable: boolean;
+};
+
 export interface GalleryState {
   currentImage?: InvokeAI.Image;
   currentImageUuid: string;
-  images: Array<InvokeAI.Image>;
   intermediateImage?: InvokeAI.Image;
-  areMoreImagesAvailable: boolean;
-  latest_mtime?: number;
-  earliest_mtime?: number;
+  shouldPinGallery: boolean;
+  shouldShowGallery: boolean;
+  galleryScrollPosition: number;
+  galleryImageMinimumWidth: number;
+  galleryImageObjectFit: GalleryImageObjectFitType;
+  shouldHoldGalleryOpen: boolean;
+  shouldAutoSwitchToNewImages: boolean;
+  categories: {
+    user: Gallery;
+    result: Gallery;
+  };
+  currentCategory: GalleryCategory;
+  galleryWidth: number;
 }
 
 const initialState: GalleryState = {
   currentImageUuid: '',
-  images: [],
-  areMoreImagesAvailable: true,
+  shouldPinGallery: true,
+  shouldShowGallery: true,
+  galleryScrollPosition: 0,
+  galleryImageMinimumWidth: 64,
+  galleryImageObjectFit: 'cover',
+  shouldHoldGalleryOpen: false,
+  shouldAutoSwitchToNewImages: true,
+  currentCategory: 'result',
+  categories: {
+    user: {
+      images: [],
+      latest_mtime: undefined,
+      earliest_mtime: undefined,
+      areMoreImagesAvailable: true,
+    },
+    result: {
+      images: [],
+      latest_mtime: undefined,
+      earliest_mtime: undefined,
+      areMoreImagesAvailable: true,
+    },
+  },
+  galleryWidth: 300,
 };
 
 export const gallerySlice = createSlice({
@@ -27,10 +74,15 @@ export const gallerySlice = createSlice({
       state.currentImage = action.payload;
       state.currentImageUuid = action.payload.uuid;
     },
-    removeImage: (state, action: PayloadAction<string>) => {
-      const uuid = action.payload;
+    removeImage: (
+      state,
+      action: PayloadAction<InvokeAI.ImageDeletedResponse>
+    ) => {
+      const { uuid, category } = action.payload;
 
-      const newImages = state.images.filter((image) => image.uuid !== uuid);
+      const tempImages = state.categories[category as GalleryCategory].images;
+
+      const newImages = tempImages.filter((image) => image.uuid !== uuid);
 
       if (uuid === state.currentImageUuid) {
         /**
@@ -42,7 +94,7 @@ export const gallerySlice = createSlice({
          *
          * Get the currently selected image's index.
          */
-        const imageToDeleteIndex = state.images.findIndex(
+        const imageToDeleteIndex = tempImages.findIndex(
           (image) => image.uuid === uuid
         );
 
@@ -68,16 +120,33 @@ export const gallerySlice = createSlice({
           : '';
       }
 
-      state.images = newImages;
+      state.categories[category as GalleryCategory].images = newImages;
     },
-    addImage: (state, action: PayloadAction<InvokeAI.Image>) => {
-      const newImage = action.payload;
-      const { uuid, mtime } = newImage;
-      state.images.unshift(newImage);
-      state.currentImageUuid = uuid;
+    addImage: (
+      state,
+      action: PayloadAction<{
+        image: InvokeAI.Image;
+        category: GalleryCategory;
+      }>
+    ) => {
+      const { image: newImage, category } = action.payload;
+      const { uuid, url, mtime } = newImage;
+
+      const tempCategory = state.categories[category as GalleryCategory];
+
+      // Do not add duplicate images
+      if (tempCategory.images.find((i) => i.url === url && i.mtime === mtime)) {
+        return;
+      }
+
+      tempCategory.images.unshift(newImage);
+      if (state.shouldAutoSwitchToNewImages) {
+        state.currentImageUuid = uuid;
+        state.currentImage = newImage;
+        state.currentCategory = category;
+      }
       state.intermediateImage = undefined;
-      state.currentImage = newImage;
-      state.latest_mtime = mtime;
+      tempCategory.latest_mtime = mtime;
     },
     setIntermediateImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       state.intermediateImage = action.payload;
@@ -86,42 +155,55 @@ export const gallerySlice = createSlice({
       state.intermediateImage = undefined;
     },
     selectNextImage: (state) => {
-      const { images, currentImage } = state;
+      const { currentImage } = state;
+      if (!currentImage) return;
+      const tempImages =
+        state.categories[currentImage.category as GalleryCategory].images;
+
       if (currentImage) {
-        const currentImageIndex = images.findIndex(
+        const currentImageIndex = tempImages.findIndex(
           (i) => i.uuid === currentImage.uuid
         );
-        if (_.inRange(currentImageIndex, 0, images.length)) {
-          const newCurrentImage = images[currentImageIndex + 1];
+        if (_.inRange(currentImageIndex, 0, tempImages.length)) {
+          const newCurrentImage = tempImages[currentImageIndex + 1];
           state.currentImage = newCurrentImage;
           state.currentImageUuid = newCurrentImage.uuid;
         }
       }
     },
     selectPrevImage: (state) => {
-      const { images, currentImage } = state;
+      const { currentImage } = state;
+      if (!currentImage) return;
+      const tempImages =
+        state.categories[currentImage.category as GalleryCategory].images;
+
       if (currentImage) {
-        const currentImageIndex = images.findIndex(
+        const currentImageIndex = tempImages.findIndex(
           (i) => i.uuid === currentImage.uuid
         );
-        if (_.inRange(currentImageIndex, 1, images.length + 1)) {
-          const newCurrentImage = images[currentImageIndex - 1];
+        if (_.inRange(currentImageIndex, 1, tempImages.length + 1)) {
+          const newCurrentImage = tempImages[currentImageIndex - 1];
           state.currentImage = newCurrentImage;
           state.currentImageUuid = newCurrentImage.uuid;
         }
       }
     },
-    addGalleryImages: (
-      state,
-      action: PayloadAction<{
-        images: Array<InvokeAI.Image>;
-        areMoreImagesAvailable: boolean;
-      }>
-    ) => {
-      const { images, areMoreImagesAvailable } = action.payload;
+    addGalleryImages: (state, action: PayloadAction<AddImagesPayload>) => {
+      const { images, areMoreImagesAvailable, category } = action.payload;
+      const tempImages = state.categories[category].images;
+
+      // const prevImages = category === 'user' ? state.userImages : state.resultImages
+
       if (images.length > 0) {
-        state.images = state.images
-          .concat(images)
+        // Filter images that already exist in the gallery
+        const newImages = images.filter(
+          (newImage) =>
+            !tempImages.find(
+              (i) => i.url === newImage.url && i.mtime === newImage.mtime
+            )
+        );
+        state.categories[category].images = tempImages
+          .concat(newImages)
           .sort((a, b) => b.mtime - a.mtime);
 
         if (!state.currentImage) {
@@ -131,12 +213,45 @@ export const gallerySlice = createSlice({
         }
 
         // keep track of the timestamps of latest and earliest images received
-        state.latest_mtime = images[0].mtime;
-        state.earliest_mtime = images[images.length - 1].mtime;
+        state.categories[category].latest_mtime = images[0].mtime;
+        state.categories[category].earliest_mtime =
+          images[images.length - 1].mtime;
       }
+
       if (areMoreImagesAvailable !== undefined) {
-        state.areMoreImagesAvailable = areMoreImagesAvailable;
+        state.categories[category].areMoreImagesAvailable =
+          areMoreImagesAvailable;
       }
+    },
+    setShouldPinGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldPinGallery = action.payload;
+    },
+    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowGallery = action.payload;
+    },
+    setGalleryScrollPosition: (state, action: PayloadAction<number>) => {
+      state.galleryScrollPosition = action.payload;
+    },
+    setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
+      state.galleryImageMinimumWidth = action.payload;
+    },
+    setGalleryImageObjectFit: (
+      state,
+      action: PayloadAction<GalleryImageObjectFitType>
+    ) => {
+      state.galleryImageObjectFit = action.payload;
+    },
+    setShouldHoldGalleryOpen: (state, action: PayloadAction<boolean>) => {
+      state.shouldHoldGalleryOpen = action.payload;
+    },
+    setShouldAutoSwitchToNewImages: (state, action: PayloadAction<boolean>) => {
+      state.shouldAutoSwitchToNewImages = action.payload;
+    },
+    setCurrentCategory: (state, action: PayloadAction<GalleryCategory>) => {
+      state.currentCategory = action.payload;
+    },
+    setGalleryWidth: (state, action: PayloadAction<number>) => {
+      state.galleryWidth = action.payload;
     },
   },
 });
@@ -150,6 +265,15 @@ export const {
   setIntermediateImage,
   selectNextImage,
   selectPrevImage,
+  setShouldPinGallery,
+  setShouldShowGallery,
+  setGalleryScrollPosition,
+  setGalleryImageMinimumWidth,
+  setGalleryImageObjectFit,
+  setShouldHoldGalleryOpen,
+  setShouldAutoSwitchToNewImages,
+  setCurrentCategory,
+  setGalleryWidth,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
