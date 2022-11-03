@@ -72,7 +72,7 @@ in the wiki
 7. Load the big stable diffusion weights files and a couple of smaller machine-learning models:
 
     ```bash
-    (invokeai) ~/InvokeAI$ python3 scripts/preload_models.py
+    (invokeai) ~/InvokeAI$ python scripts\preload_models.py
     ```
 
     !!! note
