@@ -9,12 +9,7 @@
 }
 
 .image-to-image-strength-main-option {
-  display: grid;
-  grid-template-columns: none !important;
-
-  .number-input-entry {
-    padding: 0 1rem;
-  }
+  display: flex;
 }
 
 .init-image-preview-header {
