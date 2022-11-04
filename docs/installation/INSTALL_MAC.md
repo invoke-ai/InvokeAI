@@ -4,17 +4,18 @@ title: Manual Installation, macOS
 
 # :fontawesome-brands-apple: macOS
 
-Invoke AI runs quite well on M1 Macs and we have a number of M1 users
-in the community.
+Invoke AI runs quite well on M1 Macs and we have a number of M1 users in the
+community.
 
-While the repo does run on Intel Macs, we only have a couple
-reports. If you have an Intel Mac and run into issues, please create
-an issue on Github and we will do our best to help.
+While the repo does run on Intel Macs, we only have a couple reports. If you
+have an Intel Mac and run into issues, please create an issue on Github and we
+will do our best to help.
 
 ## Requirements
 
 - macOS 12.3 Monterey or later
-- About 10GB of storage (and 10GB of data if your internet connection has data caps)
+- About 10GB of storage (and 10GB of data if your internet connection has data
+  caps)
 - Any M1 Macs or an Intel Macs with 4GB+ of VRAM (ideally more)
 
 ## Installation
@@ -42,15 +43,13 @@ an issue on Github and we will do our best to help.
         brew install cmake protobuf rust
         ```
 
-        Then clone the InvokeAI repository:
-        
-        ```bash title="Clone the InvokeAI repository:
-         # Clone the Invoke AI repo
-         git clone https://github.com/invoke-ai/InvokeAI.git
-         cd InvokeAI
-         ```
-  
-      Choose the appropriate architecture for your system and install miniconda:
+        ```bash title="Clone the InvokeAI repository"
+        # Clone the Invoke AI repo
+        git clone https://github.com/invoke-ai/InvokeAI.git
+        cd InvokeAI
+        ```
+
+        Choose the appropriate architecture for your system and install miniconda:
 
         === "M1 arm64"
 
@@ -80,7 +79,7 @@ an issue on Github and we will do our best to help.
 
 !!! todo "Clone the Invoke AI repo"
 
-```bash 
+    ```bash
     git clone https://github.com/invoke-ai/InvokeAI.git
     cd InvokeAI
     ```
@@ -102,6 +101,7 @@ an issue on Github and we will do our best to help.
     ```bash
     # Activate the environment (you need to do this every time you want to run SD)
     conda activate invokeai
+    ```
 
     !!! info
 
@@ -111,38 +111,49 @@ an issue on Github and we will do our best to help.
 
 !!! todo "Download the model weight files"
 
-The `preload_models.py` script downloads and installs the model weight
-files for you. It will lead you through the process of getting a Hugging Face
-account, accepting the Stable Diffusion model weight license agreement, and
-creating a download token:
+    The `preload_models.py` script downloads and installs the model weight
+    files for you. It will lead you through the process of getting a Hugging Face
+    account, accepting the Stable Diffusion model weight license agreement, and
+    creating a download token:
 
+    ```bash
     # This will take some time, depending on the speed of your internet connection
     # and will consume about 10GB of space
-    (invokeai) python scripts/preload_models.py
+    (invokeai) python scripts/preload_models.py --no-interactive
+    ```
 
-!! todo "Run InvokeAI!"
+!!! todo "Run InvokeAI!"
 
-    # Command-line interface
-    (invokeai) python scripts/invoke.py
+    === "CLI"
 
-    # or run the web interface on localhost:9090!
-    (invokeai) python scripts/invoke.py --web
+        ```bash
+        (invokeai) python scripts/invoke.py
+        ```
 
-    # or run the web interface on your machine's network interface!
-    (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+    === "local Webserver"
 
-To use an alternative model you may invoke the `!switch` command in
-the CLI, or pass `--model <model_name>` during `invoke.py` launch for
-either the CLI or the Web UI. See [Command Line
-Client](../features/CLI.md#model-selection-and-importation). The
-model names are defined in `configs/models.yaml`.
+        ```bash
+        (invokeai) python scripts/invoke.py --web
+        ```
+
+    === "Public Webserver"
+
+        ```bash
+        (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+        ```
+
+    To use an alternative model you may invoke the `!switch` command in
+    the CLI, or pass `--model <model_name>` during `invoke.py` launch for
+    either the CLI or the Web UI. See [Command Line
+    Client](../features/CLI.md#model-selection-and-importation). The
+    model names are defined in `configs/models.yaml`.
 
 ---
 
 ## Common problems
 
-After you followed all the instructions and try to run invoke.py, you might
-get several errors. Here's the errors I've seen and found solutions for.
+After you followed all the instructions and try to run invoke.py, you might get
+several errors. Here's the errors I've seen and found solutions for.
 
 ### Is it slow?
 
@@ -158,13 +169,12 @@ python ./scripts/orig_scripts/txt2img.py \
 
 ### Doesn't work anymore?
 
-PyTorch nightly includes support for MPS. Because of this, this setup
-is inherently unstable. One morning I woke up and it no longer worked
-no matter what I did until I switched to miniforge. However, I have
-another Mac that works just fine with Anaconda. If you can't get it to
-work, please search a little first because many of the errors will get
-posted and solved. If you can't find a solution please [create an
-issue](https://github.com/invoke-ai/InvokeAI/issues).
+PyTorch nightly includes support for MPS. Because of this, this setup is
+inherently unstable. One morning I woke up and it no longer worked no matter
+what I did until I switched to miniforge. However, I have another Mac that works
+just fine with Anaconda. If you can't get it to work, please search a little
+first because many of the errors will get posted and solved. If you can't find a
+solution please [create an issue](https://github.com/invoke-ai/InvokeAI/issues).
 
 One debugging step is to update to the latest version of PyTorch nightly.
 
@@ -201,9 +211,9 @@ conda update \
 
 There are several causes of these errors:
 
-1. Did you remember to `conda activate invokeai`? If your terminal prompt begins with
-   "(invokeai)" then you activated it. If it begins with "(base)" or something else
-   you haven't.
+1. Did you remember to `conda activate invokeai`? If your terminal prompt begins
+   with "(invokeai)" then you activated it. If it begins with "(base)" or
+   something else you haven't.
 
 2. You might've run `./scripts/preload_models.py` or `./scripts/invoke.py`
    instead of `python ./scripts/preload_models.py` or
@@ -214,21 +224,21 @@ There are several causes of these errors:
 3. if it says you're missing taming you need to rebuild your virtual
    environment.
 
-    ```bash
-    conda deactivate
-    conda env remove -n invokeai
-    conda env create -f environment-mac.yml
-    ```
+   ```bash
+   conda deactivate
+   conda env remove -n invokeai
+   conda env create -f environment-mac.yml
+   ```
 
-4. If you have activated the invokeai virtual environment and tried rebuilding it,
-   maybe the problem could be that I have something installed that you don't and
-   you'll just need to manually install it. Make sure you activate the virtual
-   environment so it installs there instead of globally.
+4. If you have activated the invokeai virtual environment and tried rebuilding
+   it, maybe the problem could be that I have something installed that you don't
+   and you'll just need to manually install it. Make sure you activate the
+   virtual environment so it installs there instead of globally.
 
-    ```bash
-    conda activate invokeai
-    pip install <package name>
-    ```
+   ```bash
+   conda activate invokeai
+   pip install <package name>
+   ```
 
 You might also need to install Rust (I mention this again below).
 
@@ -382,11 +392,11 @@ curl \
 
 ### How come `--seed` doesn't work?
 
-First this:
+!!! Information
 
-> Completely reproducible results are not guaranteed across PyTorch releases,
-> individual commits, or different platforms. Furthermore, results may not be
-> reproducible between CPU and GPU executions, even when using identical seeds.
+    Completely reproducible results are not guaranteed across PyTorch releases,
+    individual commits, or different platforms. Furthermore, results may not be
+    reproducible between CPU and GPU executions, even when using identical seeds.
 
 [PyTorch docs](https://pytorch.org/docs/stable/notes/randomness.html)
 
@@ -447,11 +457,11 @@ C.
 ### I just got Rickrolled! Do I have a virus?
 
 You don't have a virus. It's part of the project. Here's
-[Rick](https://github.com/invoke-ai/InvokeAI/blob/main/assets/rick.jpeg)
-and here's [the
-code](https://github.com/invoke-ai/InvokeAI/blob/69ae4b35e0a0f6ee1af8bb9a5d0016ccb27e36dc/scripts/txt2img.py#L79)
-that swaps him in. It's a NSFW filter, which IMO, doesn't work very
-good (and we call this "computer vision", sheesh).
+[Rick](https://github.com/invoke-ai/InvokeAI/blob/main/assets/rick.jpeg) and
+here's
+[the code](https://github.com/invoke-ai/InvokeAI/blob/69ae4b35e0a0f6ee1af8bb9a5d0016ccb27e36dc/scripts/txt2img.py#L79)
+that swaps him in. It's a NSFW filter, which IMO, doesn't work very good (and we
+call this "computer vision", sheesh).
 
 ---
 
@@ -474,9 +484,9 @@ return torch.layer_norm(input, normalized_shape, weight, bias, eps, torch.backen
 RuntimeError: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Use .reshape(...) instead.
 ```
 
-Update to the latest version of invoke-ai/InvokeAI. We were
-patching pytorch but we found a file in stable-diffusion that we could
-change instead. This is a 32-bit vs 16-bit problem.
+Update to the latest version of invoke-ai/InvokeAI. We were patching pytorch but
+we found a file in stable-diffusion that we could change instead. This is a
+32-bit vs 16-bit problem.
 
 ### The processor must support the Intel bla bla bla
 
@@ -508,4 +518,3 @@ Abort trap: 6
 /Users/[...]/opt/anaconda3/envs/invokeai/lib/python3.9/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
   warnings.warn('resource_tracker: There appear to be %d '
 ```
-
