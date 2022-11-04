@@ -56,7 +56,7 @@ const KeyboardEventManager = () => {
 
   //  Toggle lock bounding box
   useHotkeys(
-    'shift+q',
+    'shift+w',
     (e: KeyboardEvent) => {
       e.preventDefault();
       dispatch(toggleShouldLockBoundingBox());
@@ -71,7 +71,7 @@ const KeyboardEventManager = () => {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (
-        !['x', 'q'].includes(e.key) ||
+        !['x', 'w'].includes(e.key) ||
         activeTabName !== 'inpainting' ||
         !shouldShowMask
       ) {
@@ -109,7 +109,7 @@ const KeyboardEventManager = () => {
           dispatch(toggleTool());
           break;
         }
-        case 'q': {
+        case 'w': {
           if (!shouldShowMask || !shouldShowBoundingBox) break;
           dispatch(setIsSpacebarHeld(e.type === 'keydown'));
           dispatch(setShouldLockBoundingBox(e.type !== 'keydown'));
