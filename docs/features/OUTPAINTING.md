@@ -64,31 +64,32 @@ model](INPAINTING.md#using-the-runwayml-inpainting-model).
 
 Consider this image:
 
-<div align="center" markdown>
+<figure markdown>
 ![curly_woman](../assets/outpainting/curly.png)
-</div>
+</figure>
 
 Pretty nice, but it's annoying that the top of her head is cut
 off. She's also a bit off center. Let's fix that!
 
 ```bash
-invoke> !fix images/curly.png --outcrop top 64 right 64
+invoke> !fix images/curly.png --outcrop top 128 right 64 bottom 64
 ```
 
 This is saying to apply the `outcrop` extension by extending the top
-of the image by 64 pixels, and the right of the image by the same
-amount. You can use any combination of top|left|right|bottom, and
+of the image by 128 pixels, and the right and bottom of the image by
+64 pixels. You can use any combination of top|left|right|bottom, and
 specify any number of pixels to extend. You can also abbreviate
 `--outcrop` to `-c`.
 
 The result looks like this:
 
-<div align="center" markdown>
-![curly_woman_outcrop](../assets/outpainting/curly-outcrop.png)
-</div>
+<figure markdown>
+![curly_woman_outcrop](../assets/outpainting/curly-outcrop-2.png)
+</figure>
 
-The new image is actually slightly larger than the original (576x576,
-because 64 pixels were added to the top and right sides.)
+The new image is larger than the original (576x704)
+because 64 pixels were added to the top and right sides. You will
+need enough VRAM to process an image of this size.
 
 A number of caveats:
 
@@ -103,3 +104,53 @@ you'll get a slightly different result. You can run it repeatedly
 until you get an image you like. Unfortunately `!fix` does not
 currently respect the `-n` (`--iterations`) argument.
 
+3. Your results will be _much_ better if you use the `inpaint-1.5`
+model released by runwayML and installed by default by
+`scripts/preload_models.py`. This model was trained specifically to
+harmoniously fill in image gaps. The standard model will work as well,
+but you may notice color discontinuities at the border.
+
+4. When using the `inpaint-1.5` model, you may notice subtle changes
+to the area within the original image. This is because the model
+performs an encoding/decoding on the image as a whole. This does not
+occur with the standard model.
+
+## Outpaint
+
+The `outpaint` extension does the same thing, but with subtle
+differences. Starting with the same image, here is how we would add an
+additional 64 pixels to the top of the image:
+
+```bash
+invoke> !fix images/curly.png --out_direction top 64
+```
+
+(you can abbreviate `--out_direction` as `-D`.
+
+The result is shown here:
+
+<figure markdown>
+![curly_woman_outpaint](../assets/outpainting/curly-outpaint.png)
+</figure>
+
+Although the effect is similar, there are significant differences from
+outcropping:
+
+- You can only specify one direction to extend at a time.
+- The image is **not** resized. Instead, the image is shifted by the specified
+number of pixels. If you look carefully, you'll see that less of the lady's
+torso is visible in the image.
+- Because the image dimensions remain the same, there's no rounding
+to multiples of 64.
+- Attempting to outpaint larger areas will frequently give rise to ugly
+   ghosting effects.
+- For best results, try increasing the step number.
+- If you don't specify a pixel value in `-D`, it will default to half
+   of the whole image, which is likely not what you want.
+
+!!! tip
+
+    Neither `outpaint` nor `outcrop` are perfect, but we continue to tune
+    and improve them. If one doesn't work, try the other. You may also
+    wish to experiment with other `img2img` arguments, such as `-C`, `-f`
+    and `-s`.
