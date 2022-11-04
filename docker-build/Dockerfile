@@ -39,12 +39,13 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# clone repository and create symlinks
-ARG invokeai_git=https://github.com/invoke-ai/InvokeAI.git
+# clone repository, create models.yaml and create symlinks
+ARG invokeai_git=invoke-ai/InvokeAI
+ARG invokeai_branch=main
 ARG project_name=invokeai
-RUN git clone ${invokeai_git} /${project_name} \
-  && mkdir /${project_name}/models/ldm/stable-diffusion-v1 \
-  && ln -s /data/models/sd-v1-4.ckpt /${project_name}/models/ldm/stable-diffusion-v1/model.ckpt \
+RUN git clone -b ${invokeai_branch} https://github.com/${invokeai_git}.git /${project_name} \
+  && cp /${project_name}/configs/models.yaml.example /${project_name}/configs/models.yaml \
+  && ln -s /data/models/v1-5-pruned-emaonly.ckpt /${project_name}/models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt \
   && ln -s /data/outputs/ /${project_name}/outputs
 
 # set workdir
@@ -63,9 +64,9 @@ RUN source ${conda_prefix}/etc/profile.d/conda.sh \
   && rm -Rf ~/.cache \
   && conda clean -afy \
   && echo "conda activate ${project_name}" >> ~/.bashrc \
-  && ln -s /data/models/GFPGANv1.4.pth ./src/gfpgan/experiments/pretrained_models/GFPGANv1.4.pth \
   && conda activate ${project_name} \
-  && python scripts/preload_models.py
+  && python scripts/preload_models.py \
+    --no-interactive
 
 # Copy entrypoint and set env
 ENV CONDA_PREFIX=${conda_prefix}

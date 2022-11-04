@@ -17,6 +17,7 @@ from omegaconf import OmegaConf
 from huggingface_hub import HfFolder, hf_hub_url
 from pathlib import Path
 from getpass_asterisk import getpass_asterisk
+from transformers import CLIPTokenizer, CLIPTextModel
 import traceback
 import requests
 import clip
@@ -29,10 +30,6 @@ warnings.filterwarnings('ignore')
 #warnings.simplefilter('ignore')
 #warnings.filterwarnings('ignore',category=DeprecationWarning)
 #warnings.filterwarnings('ignore',category=UserWarning)
-
-# deferred loading so that help message can be printed quickly
-def load_libs():
-    pass
 
 #--------------------------globals--
 Model_dir = './models/ldm/stable-diffusion-v1/'
@@ -347,7 +344,7 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
 
     try:
         if os.path.exists(Config_file):
-            print(f'* {Config_file} exists. Renaming to {Config_file}.orig')
+            print(f'** {Config_file} exists. Renaming to {Config_file}.orig')
             os.rename(Config_file,f'{Config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(Config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
@@ -419,9 +416,6 @@ def download_kornia():
 #---------------------------------------------
 def download_clip():
     print('Loading CLIP model...',end='')
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=DeprecationWarning)
-        from transformers import CLIPTokenizer, CLIPTextModel
     sys.stdout.flush()
     version = 'openai/clip-vit-large-patch14'
     tokenizer = CLIPTokenizer.from_pretrained(version)
@@ -550,7 +544,6 @@ if __name__ == '__main__':
                         default='./configs/models.yaml',
                         help='path to configuration file to create')
     opt = parser.parse_args()
-    load_libs()
     
     try:
         if opt.interactive:
@@ -562,16 +555,11 @@ if __name__ == '__main__':
                 if models is None:
                     if yes_or_no('Quit?',default_yes=False):
                         sys.exit(0)
-
-                done = False
-                while not done:
-                    print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
-                    access_token = authenticate()
-                    print('\n** DOWNLOADING WEIGHTS **')
-                    successfully_downloaded = download_weight_datasets(models, access_token)
-                    done = successfully_downloaded is not None
+                print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+                access_token = authenticate()
+                print('\n** DOWNLOADING WEIGHTS **')
+                successfully_downloaded = download_weight_datasets(models, access_token)
                 update_config_file(successfully_downloaded,opt)
-
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
         download_kornia()
