@@ -1,8 +1,5 @@
 import React from 'react';
 import IAISlider from '../../../../../common/components/IAISlider';
-import IAINumberInput from '../../../../../common/components/IAINumberInput';
-import IAIIconButton from '../../../../../common/components/IAIIconButton';
-import { BiReset } from 'react-icons/bi';
 
 import {
   RootState,
@@ -17,7 +14,6 @@ import {
 
 import { roundDownToMultiple } from '../../../../../common/util/roundDownToMultiple';
 import _ from 'lodash';
-import IAIFullSlider from '../../../../../common/components/IAIFullSlider';
 
 const boundingBoxDimensionsSelector = createSelector(
   (state: RootState) => state.inpainting,
@@ -127,7 +123,7 @@ export default function BoundingBoxDimensionSlider(
           }
         />
       </div> */}
-      <IAIFullSlider
+      <IAISlider
         label={label}
         value={boundingBoxDimension}
         min={64}

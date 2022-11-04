@@ -4,7 +4,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../../app/store';
-import IAIFullSlider from '../../../../common/components/IAIFullSlider';
+import IAISlider from '../../../../common/components/IAISlider';
 import { setImg2imgStrength } from '../../optionsSlice';
 
 interface ImageToImageStrengthProps {
@@ -27,7 +27,7 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
   };
 
   return (
-    <IAIFullSlider
+    <IAISlider
       label={label}
       step={0.01}
       min={0.01}

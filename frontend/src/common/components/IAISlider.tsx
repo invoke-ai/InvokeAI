@@ -1,87 +1,191 @@
 import {
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
   FormControl,
   FormLabel,
+  HStack,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  Slider,
+  SliderFilledTrack,
+  SliderMark,
+  SliderThumb,
+  SliderTrack,
   Tooltip,
-  SliderProps,
-  FormControlProps,
-  FormLabelProps,
-  SliderTrackProps,
-  SliderThumbProps,
-  TooltipProps,
-  SliderInnerTrackProps,
 } from '@chakra-ui/react';
+import React, { FocusEvent, useEffect, useState } from 'react';
+import { BiReset } from 'react-icons/bi';
+import IAIIconButton from './IAIIconButton';
+import _ from 'lodash';
 
-type IAISliderProps = SliderProps & {
-  label?: string;
+interface IAIFullSliderProps {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (v: number) => void;
+  withSliderMarks?: boolean;
+  withInput?: boolean;
+  isInteger?: boolean;
+  inputWidth?: string | number;
+  inputReadOnly?: boolean;
+  withReset?: boolean;
+  handleReset?: () => void;
+  isResetDisabled?: boolean;
+  isSliderDisabled?: boolean;
+  isInputDisabled?: boolean;
+  tooltipSuffix?: string;
+  hideTooltip?: boolean;
   styleClass?: string;
-  formControlProps?: FormControlProps;
-  formLabelProps?: FormLabelProps;
-  sliderTrackProps?: SliderTrackProps;
-  sliderInnerTrackProps?: SliderInnerTrackProps;
-  sliderThumbProps?: SliderThumbProps;
-  sliderThumbTooltipProps?: Omit<TooltipProps, 'children'>;
-};
+}
 
-const IAISlider = (props: IAISliderProps) => {
+export default function IAISlider(props: IAIFullSliderProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
   const {
     label,
+    value,
+    min = 1,
+    max = 100,
+    step = 1,
+    onChange,
+    tooltipSuffix = '',
+    withSliderMarks = false,
+    withInput = false,
+    isInteger = false,
+    inputWidth = '5rem',
+    inputReadOnly = true,
+    withReset = false,
+    hideTooltip = false,
+    handleReset,
+    isResetDisabled,
+    isSliderDisabled,
+    isInputDisabled,
     styleClass,
-    formControlProps,
-    formLabelProps,
-    sliderTrackProps,
-    sliderInnerTrackProps,
-    sliderThumbProps,
-    sliderThumbTooltipProps,
-    ...rest
   } = props;
+
+  const [localInputValue, setLocalInputValue] = useState<string>(String(value));
+
+  useEffect(() => {
+    if (String(value) !== localInputValue && localInputValue !== '') {
+      setLocalInputValue(String(value));
+    }
+  }, [value, localInputValue, setLocalInputValue]);
+
+  const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
+    const clamped = _.clamp(
+      isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
+      min,
+      max
+    );
+    setLocalInputValue(String(clamped));
+    onChange(clamped);
+  };
+
+  const handleInputChange = (v: any) => {
+    setLocalInputValue(v);
+    onChange(Number(v));
+  };
+
+  const handleResetDisable = () => {
+    if (!handleReset) return;
+    handleReset();
+  };
+
   return (
     <FormControl
-      className={`invokeai__slider-form-control ${styleClass}`}
-      {...formControlProps}
+      className={
+        styleClass
+          ? `invokeai__slider-component ${styleClass}`
+          : `invokeai__slider-component`
+      }
+      data-markers={withSliderMarks}
     >
-      <div className="invokeai__slider-inner-container">
-        <FormLabel
-          className={`invokeai__slider-form-label`}
-          whiteSpace="nowrap"
-          {...formLabelProps}
-        >
-          {label}
-        </FormLabel>
+      <FormLabel className="invokeai__slider-component-label">
+        {label}
+      </FormLabel>
 
+      <HStack w={'100%'} gap={1}>
         <Slider
-          className={`invokeai__slider-root`}
           aria-label={label}
-          {...rest}
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={handleInputChange}
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+          focusThumbOnChange={false}
+          isDisabled={isSliderDisabled}
         >
-          <SliderTrack
-            className={`invokeai__slider-track`}
-            {...sliderTrackProps}
-          >
-            <SliderFilledTrack
-              className={`invokeai__slider-filled-track`}
-              {...sliderInnerTrackProps}
-            />
+          {withSliderMarks && (
+            <>
+              <SliderMark
+                value={min}
+                className="invokeai__slider-mark invokeai__slider-mark-start"
+              >
+                {min}
+              </SliderMark>
+              <SliderMark
+                value={max}
+                className="invokeai__slider-mark invokeai__slider-mark-end"
+              >
+                {max}
+              </SliderMark>
+            </>
+          )}
+
+          <SliderTrack className="invokeai__slider_track">
+            <SliderFilledTrack className="invokeai__slider_track-filled" />
           </SliderTrack>
 
           <Tooltip
-            className={`invokeai__slider-thumb-tooltip`}
-            placement="top"
             hasArrow
-            {...sliderThumbTooltipProps}
+            className="invokeai__slider-component-tooltip"
+            placement="top"
+            isOpen={showTooltip}
+            label={`${value}${tooltipSuffix}`}
+            hidden={hideTooltip}
           >
-            <SliderThumb
-              className={`invokeai__slider-thumb`}
-              {...sliderThumbProps}
-            />
+            <SliderThumb className="invokeai__slider-thumb" />
           </Tooltip>
         </Slider>
-      </div>
+
+        {withInput && (
+          <NumberInput
+            min={min}
+            max={max}
+            step={step}
+            value={localInputValue}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            className="invokeai__slider-number-field"
+            isDisabled={isInputDisabled}
+          >
+            <NumberInputField
+              className="invokeai__slider-number-input"
+              width={inputWidth}
+              readOnly={inputReadOnly}
+            />
+            <NumberInputStepper>
+              <NumberIncrementStepper className="invokeai__slider-number-stepper" />
+              <NumberDecrementStepper className="invokeai__slider-number-stepper" />
+            </NumberInputStepper>
+          </NumberInput>
+        )}
+
+        {withReset && (
+          <IAIIconButton
+            size={'sm'}
+            aria-label={'Reset'}
+            tooltip={'Reset'}
+            icon={<BiReset />}
+            onClick={handleResetDisable}
+            isDisabled={isResetDisabled}
+          />
+        )}
+      </HStack>
     </FormControl>
   );
-};
-
-export default IAISlider;
+}
