@@ -28,6 +28,12 @@
     &:hover {
       background-color: var(--btn-base-color-hover);
     }
+
+    &:disabled {
+      &:hover {
+        background-color: var(--btn-base-color);
+      }
+    }
   }
 }
 
