@@ -4,7 +4,6 @@ import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
 import IAISelect from '../../../common/components/IAISelect';
 import { activeTabNameSelector } from '../optionsSelectors';
 import { setHeight } from '../optionsSlice';
-import { fontSize } from './MainOptions';
 
 export default function MainHeight() {
   const height = useAppSelector((state: RootState) => state.options.height);
@@ -22,7 +21,6 @@ export default function MainHeight() {
       flexGrow={1}
       onChange={handleChangeHeight}
       validValues={HEIGHTS}
-      fontSize={fontSize}
       styleClass="main-option-block"
     />
   );
