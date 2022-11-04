@@ -89,57 +89,22 @@ export default function BoundingBoxDimensionSlider(
   };
 
   return (
-    <>
-      {/* <div className="inpainting-bounding-box-dimensions-slider-numberinput">
-        <IAISlider
-          isDisabled={shouldLockBoundingBox}
-          label={label}
-          min={64}
-          max={roundDownToMultiple(canvasDimension, 64)}
-          step={64}
-          value={boundingBoxDimension}
-          onChange={handleBoundingBoxDimension}
-          width={'5rem'}
-        />
-        <IAINumberInput
-          isDisabled={shouldLockBoundingBox}
-          value={boundingBoxDimension}
-          onChange={handleBoundingBoxDimension}
-          min={64}
-          max={roundDownToMultiple(canvasDimension, 64)}
-          step={64}
-          padding="0"
-          width={'5rem'}
-        />
-        <IAIIconButton
-          size={'sm'}
-          aria-label={'Reset Height'}
-          tooltip={'Reset Height'}
-          onClick={handleResetDimension}
-          icon={<BiReset />}
-          styleClass="inpainting-bounding-box-reset-icon-btn"
-          isDisabled={
-            shouldLockBoundingBox || canvasDimension === boundingBoxDimension
-          }
-        />
-      </div> */}
-      <IAISlider
-        label={label}
-        value={boundingBoxDimension}
-        min={64}
-        max={roundDownToMultiple(canvasDimension, 64)}
-        step={64}
-        onChange={handleBoundingBoxDimension}
-        withReset
-        handleReset={handleResetDimension}
-        isResetDisabled={
-          shouldLockBoundingBox || canvasDimension === boundingBoxDimension
-        }
-        withSliderMarks
-        withInput
-        isInteger
-        inputReadOnly
-      />
-    </>
+    <IAISlider
+      label={label}
+      min={64}
+      max={roundDownToMultiple(canvasDimension, 64)}
+      step={64}
+      value={boundingBoxDimension}
+      onChange={handleBoundingBoxDimension}
+      handleReset={handleResetDimension}
+      isSliderDisabled={shouldLockBoundingBox}
+      isInputDisabled={shouldLockBoundingBox}
+      isResetDisabled={
+        shouldLockBoundingBox || canvasDimension === boundingBoxDimension
+      }
+      withSliderMarks
+      withInput
+      withReset
+    />
   );
 }

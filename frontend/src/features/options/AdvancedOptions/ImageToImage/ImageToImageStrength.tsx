@@ -22,7 +22,7 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
 
   const handleChangeStrength = (v: number) => dispatch(setImg2imgStrength(v));
 
-  const handleChangeStrengthReset = () => {
+  const handleImg2ImgStrengthReset = () => {
     dispatch(setImg2imgStrength(0.5));
   };
 
@@ -32,14 +32,15 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
       step={0.01}
       min={0.01}
       max={0.99}
-      value={img2imgStrength}
       onChange={handleChangeStrength}
-      handleReset={handleChangeStrengthReset}
-      withSliderMarks
-      withReset
-      withInput
-      inputWidth={'5.5rem'}
+      value={img2imgStrength}
+      isInteger={false}
       styleClass={styleClass}
+      withInput
+      withReset
+      withSliderMarks
+      inputWidth={'5.5rem'}
+      handleReset={handleImg2ImgStrengthReset}
     />
   );
 }
