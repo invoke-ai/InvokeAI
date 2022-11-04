@@ -119,27 +119,32 @@ will do our best to help.
     ```bash
     # This will take some time, depending on the speed of your internet connection
     # and will consume about 10GB of space
-    (invokeai) python scripts/preload_models.py --no-interactive
+    python scripts/preload_models.py --no-interactive
     ```
 
 !!! todo "Run InvokeAI!"
 
+    !!! warning "IMPORTANT"
+
+        Make sure that the conda environment is activated, which should create
+        `(invokeai)` in front of your prompt!
+
     === "CLI"
 
         ```bash
-        (invokeai) python scripts/invoke.py
+        python scripts/invoke.py
         ```
 
     === "local Webserver"
 
         ```bash
-        (invokeai) python scripts/invoke.py --web
+        python scripts/invoke.py --web
         ```
 
     === "Public Webserver"
 
         ```bash
-        (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+        python scripts/invoke.py --web --host 0.0.0.0
         ```
 
     To use an alternative model you may invoke the `!switch` command in
