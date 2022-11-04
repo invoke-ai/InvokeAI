@@ -2,26 +2,30 @@
   // General Colors
   --white: rgb(255, 255, 255);
 
+  // Accent Colors
+  --accent-color-dim: rgb(186, 146, 0); // done
+  --accent-color: rgb(235, 185, 5); // done
+  --accent-color-bright: rgb(255, 200, 0); // done
+  --accent-color-hover: var(--accent-color-bright); // done
+
   // App Colors
   --root-bg-color: rgb(255, 255, 255);
   --background-color: rgb(220, 222, 224);
+  --background-color-light: rgb(40, 44, 48); // done
   --background-color-secondary: rgb(204, 206, 208);
 
   --text-color: rgb(0, 0, 0);
   --text-color-secondary: rgb(40, 40, 40);
-
   --subtext-color: rgb(24, 24, 34);
   --subtext-color-bright: rgb(142, 144, 146);
 
   --border-color: rgb(200, 200, 200);
   --border-color-light: rgb(147, 147, 147);
 
+  --svg-color: rgb(50, 50, 50);
+
   --invalid: rgb(255, 75, 75);
   --invalid-secondary: rgb(120, 5, 5);
-
-  --accent-color-dim: rgb(186, 146, 0);
-  --accent-color: rgb(235, 185, 5);
-  --accent-color-hover: rgb(255, 200, 0);
 
   --destructive-color: rgb(237, 51, 51);
   --destructive-color-hover: rgb(255, 55, 55);
@@ -33,28 +37,31 @@
   --border-color-invalid: rgb(255, 80, 50);
   --box-shadow-color-invalid: none;
 
-  --svg-color: rgb(186, 188, 190);
-
-  // Progress Bar Color
-  --progress-bar-color: rgb(235, 185, 5);
-
-  // Prompt Box Colors
-  --prompt-bg-color: rgb(225, 227, 229);
+  // Tabs
+  --tab-color: rgb(202, 204, 206);
+  --tab-hover-color: rgb(206, 208, 210);
+  --tab-panel-bg: rgb(214, 216, 218);
+  --tab-list-bg: rgb(235, 185, 5);
+  --tab-list-text: rgb(0, 0, 0);
+  --tab-list-text-inactive: rgb(106, 108, 110);
 
   // Button Colors
-  --btn-svg-color: rgb(0, 0, 0);
-
-  --btn-base-color: rgb(220, 222, 224);
+  --btn-base-color: rgb(184, 186, 188);
   --btn-base-color-hover: rgb(230, 232, 234);
 
   --btn-load-more: rgb(202, 204, 206);
   --btn-load-more-hover: rgb(178, 180, 182);
+  --btn-svg-color: rgb(0, 0, 0);
 
   --btn-delete-image: rgb(213, 49, 49);
 
   // IAI Button Colors
   --btn-checkbox-border-hover: rgb(176, 178, 182);
+  // Progress Bar Color
+  --progress-bar-color: rgb(235, 185, 5);
 
+  // Prompt Box Colors
+  --prompt-bg-color: rgb(225, 227, 229);
   // Switch
   --switch-bg-color: rgb(178, 180, 182);
   --switch-bg-active-color: rgb(235, 185, 5);
@@ -64,14 +71,6 @@
 
   // Resizable
   --resizeable-handle-border-color: rgb(160, 162, 164);
-
-  // Tabs
-  --tab-color: rgb(202, 204, 206);
-  --tab-hover-color: rgb(206, 208, 210);
-  --tab-list-bg: rgb(235, 185, 5);
-  --tab-list-text: rgb(0, 0, 0);
-  --tab-list-text-inactive: rgb(106, 108, 110);
-  --tab-panel-bg: rgb(214, 216, 218);
 
   // Metadata Viewer
   --metadata-bg-color: rgba(230, 230, 230, 0.9);
