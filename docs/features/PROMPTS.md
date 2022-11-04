@@ -92,12 +92,12 @@ The InvokeAI prompting language has the following features:
 Append a word or phrase with `-` or `+`, or a weight between `0` and `2` (`1`=default), to decrease or increase "attention" (= a mix of per-token CFG weighting multiplier and, for `-`, a weighted blend with the prompt without the term).
 
 The following syntax is recognised:
-  * single words without parentheses: `a tall thin man picking apricots+`
-  * single or multiple words with parentheses: `a tall thin man picking (apricots)+` `a tall thin man picking (apricots)-` `a tall thin man (picking apricots)+` `a tall thin man (picking apricots)-` 
-  * more effect with more symbols `a tall thin man (picking apricots)++`
-  * nesting `a tall thin man (picking apricots+)++` (`apricots` effectively gets `+++`)
-  * all of the above with explicit numbers `a tall thin man picking (apricots)1.1` `a tall thin man (picking (apricots)1.3)1.1`. (`+` is equivalent to 1.1, `++` is pow(1.1,2), `+++` is pow(1.1,3), etc; `-` means 0.9, `--` means pow(0.9,2), etc.)
-  * attention also applies to `[unconditioning]` so `a tall thin man picking apricots [(ladder)0.01]` will *very gently* nudge SD away from trying to draw the man on a ladder
+* single words without parentheses: `a tall thin man picking apricots+`
+* single or multiple words with parentheses: `a tall thin man picking (apricots)+` `a tall thin man picking (apricots)-` `a tall thin man (picking apricots)+` `a tall thin man (picking apricots)-` 
+* more effect with more symbols `a tall thin man (picking apricots)++`
+* nesting `a tall thin man (picking apricots+)++` (`apricots` effectively gets `+++`)
+* all of the above with explicit numbers `a tall thin man picking (apricots)1.1` `a tall thin man (picking (apricots)1.3)1.1`. (`+` is equivalent to 1.1, `++` is pow(1.1,2), `+++` is pow(1.1,3), etc; `-` means 0.9, `--` means pow(0.9,2), etc.)
+* attention also applies to `[unconditioning]` so `a tall thin man picking apricots [(ladder)0.01]` will *very gently* nudge SD away from trying to draw the man on a ladder
 
 You can use this to increase or decrease the amount of something. Starting from this prompt of `a man picking apricots from a tree`, let's see what happens if we increase and decrease how much attention we want Stable Diffusion to pay to the word `apricots`:
 
