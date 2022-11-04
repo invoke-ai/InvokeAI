@@ -36,13 +36,17 @@ import IAICanvasBoundingBoxPreview, {
 import { KonvaEventObject } from 'konva/lib/Node';
 import { useToast } from '@chakra-ui/react';
 import useCanvasHotkeys from './hooks/useCanvasHotkeys';
+import {
+  CANVAS_SCALE_BY,
+  MAX_CANVAS_SCALE,
+  MIN_CANVAS_SCALE,
+} from './util/constants';
+import _ from 'lodash';
 
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
 export let maskLayerRef: MutableRefObject<Konva.Layer | null>;
 export let inpaintingImageElementRef: MutableRefObject<HTMLImageElement | null>;
-
-const SCALE_BY = 0.999;
 
 const IAICanvas = () => {
   const dispatch = useAppDispatch();
@@ -65,6 +69,7 @@ const IAICanvas = () => {
     stageCoordinates,
     isMoveStageKeyHeld,
     boundingBoxDimensions,
+    activeTabName,
   } = useAppSelector(inpaintingCanvasSelector);
 
   useCanvasHotkeys();
@@ -272,7 +277,11 @@ const IAICanvas = () => {
       delta = -delta;
     }
 
-    const newScale = stageScale * SCALE_BY ** delta;
+    const newScale = _.clamp(
+      stageScale * CANVAS_SCALE_BY ** delta,
+      activeTabName === 'inpainting' ? 1 : MIN_CANVAS_SCALE,
+      MAX_CANVAS_SCALE
+    );
 
     const newPos = {
       x: cursorPos.x - mousePointTo.x * newScale,

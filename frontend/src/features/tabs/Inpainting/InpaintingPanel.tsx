@@ -57,9 +57,9 @@ export default function InpaintingPanel() {
       />
       <InpaintingSettings />
       <MainAdvancedOptionsCheckbox />
-      {showAdvancedOptions ? (
+      {showAdvancedOptions && (
         <OptionsAccordion accordionInfo={imageToImageAccordions} />
-      ) : null}
+      )}
     </InvokeOptionsPanel>
   );
 }
