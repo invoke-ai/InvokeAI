@@ -13,14 +13,12 @@ import { InpaintingState, setDoesCanvasNeedScaling } from './inpaintingSlice';
 const inpaintingDisplaySelector = createSelector(
   [(state: RootState) => state.inpainting, (state: RootState) => state.options],
   (inpainting: InpaintingState, options: OptionsState) => {
-    const { doesCanvasNeedScaling, imageToInpaint, boundingBoxDimensions } =
-      inpainting;
+    const { doesCanvasNeedScaling, imageToInpaint } = inpainting;
     const { showDualDisplay } = options;
     return {
       doesCanvasNeedScaling,
       showDualDisplay,
       imageToInpaint,
-      boundingBoxDimensions,
     };
   },
   {
@@ -32,11 +30,8 @@ const inpaintingDisplaySelector = createSelector(
 
 const InpaintingDisplay = () => {
   const dispatch = useAppDispatch();
-  const {
-    showDualDisplay,
-    doesCanvasNeedScaling,
-    imageToInpaint,
-  } = useAppSelector(inpaintingDisplaySelector);
+  const { showDualDisplay, doesCanvasNeedScaling, imageToInpaint } =
+    useAppSelector(inpaintingDisplaySelector);
 
   useLayoutEffect(() => {
     const resizeCallback = _.debounce(
@@ -51,11 +46,7 @@ const InpaintingDisplay = () => {
     <div className="inpainting-main-area">
       <IAICanvasControls />
       <div className="inpainting-canvas-area">
-        {doesCanvasNeedScaling ? (
-          <IAICanvasResizer />
-        ) : (
-          <IAICanvas />
-        )}
+        {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
       </div>
     </div>
   ) : (
@@ -68,7 +59,7 @@ const InpaintingDisplay = () => {
         showDualDisplay ? 'workarea-split-view' : 'workarea-single-view'
       }
     >
-      <div className="workarea-split-view-left">{inpaintingComponent} </div>
+      <div className="workarea-split-view-left">{inpaintingComponent}</div>
       {showDualDisplay && (
         <div className="workarea-split-view-right">
           <CurrentImageDisplay />
