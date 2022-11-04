@@ -86,20 +86,31 @@ in the wiki
 
 8. Start generating images!
 
-    # Command-line interface
-    (invokeai) python scripts/invoke.py
+    !!! Example ""
 
-    # or run the web interface on localhost:9090!
-    (invokeai) python scripts/invoke.py --web
+        === "CLI"
 
-    # or run the web interface on your machine's network interface!
-    (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+            ```bash
+            (invokeai) python scripts/invoke.py
+            ```
 
-To use an alternative model you may invoke the `!switch` command in
-the CLI, or pass `--model <model_name>` during `invoke.py` launch for
-either the CLI or the Web UI. See [Command Line
-Client](../features/CLI.md#model-selection-and-importation). The
-model names are defined in `configs/models.yaml`.
+        === "local Webserver"
+
+            ```bash
+            (invokeai) python scripts/invoke.py --web
+            ```
+
+        === "Public Webserver"
+
+            ```bash
+            (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+            ```
+
+        To use an alternative model you may invoke the `!switch` command in the CLI, or
+        pass `--model <model_name>` during `invoke.py` launch for either the CLI or the
+        Web UI. See
+        [Command Line Client](../features/CLI.md#model-selection-and-importation). The
+        model names are defined in `configs/models.yaml`.
 
 9. Subsequently, to relaunch the script, first activate the Anaconda
 command window (step 3),enter the InvokeAI directory (step 5, `cd
