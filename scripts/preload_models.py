@@ -17,6 +17,7 @@ from omegaconf import OmegaConf
 from huggingface_hub import HfFolder, hf_hub_url
 from pathlib import Path
 from getpass_asterisk import getpass_asterisk
+from transformers import CLIPTokenizer, CLIPTextModel
 import traceback
 import requests
 import clip
@@ -343,7 +344,7 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
 
     try:
         if os.path.exists(Config_file):
-            print(f'* {Config_file} exists. Renaming to {Config_file}.orig')
+            print(f'** {Config_file} exists. Renaming to {Config_file}.orig')
             os.rename(Config_file,f'{Config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(Config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
@@ -415,9 +416,6 @@ def download_kornia():
 #---------------------------------------------
 def download_clip():
     print('Loading CLIP model...',end='')
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=DeprecationWarning)
-        from transformers import CLIPTokenizer, CLIPTextModel
     sys.stdout.flush()
     version = 'openai/clip-vit-large-patch14'
     tokenizer = CLIPTokenizer.from_pretrained(version)

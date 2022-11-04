@@ -222,4 +222,3 @@ class InvokeAIDiffuserComponent:
         # assert(0 == len(torch.nonzero(old_return_value - (uncond_latents + deltas_merged * cond_scale))))
 
         return uncond_latents + deltas_merged * global_guidance_scale
-

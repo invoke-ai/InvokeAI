@@ -10,6 +10,12 @@
 
 .image-to-image-strength-main-option {
   display: flex;
+  row-gap: 0.5rem !important;
+
+  .invokeai__slider-component-label {
+    color: var(--text-color-secondary);
+    font-size: 0.9rem !important;
+  }
 }
 
 .init-image-preview-header {

@@ -143,7 +143,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
         ])
     """
     def __init__(self, original: list, edited: list, options: dict=None):
-        self.original = original
+        self.original = original if len(original)>0 else [Fragment('')]
         self.edited = edited if len(edited)>0 else [Fragment('')]
 
         default_options = {

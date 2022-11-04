@@ -339,49 +339,48 @@ export default function ImageGallery() {
           }}
         >
           <div className="image-gallery-header">
-            <div>
-              <ButtonGroup
-                size="sm"
-                isAttached
-                variant="solid"
-                className="image-gallery-category-btn-group"
-              >
-                {shouldShowButtons ? (
-                  <>
-                    <Button
-                      data-selected={currentCategory === 'result'}
-                      onClick={() => dispatch(setCurrentCategory('result'))}
-                    >
-                      Invocations
-                    </Button>
-                    <Button
-                      data-selected={currentCategory === 'user'}
-                      onClick={() => dispatch(setCurrentCategory('user'))}
-                    >
-                      User
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <IAIIconButton
-                      aria-label="Show Invocations"
-                      tooltip="Show Invocations"
-                      data-selected={currentCategory === 'result'}
-                      icon={<FaImage />}
-                      onClick={() => dispatch(setCurrentCategory('result'))}
-                    />
-                    <IAIIconButton
-                      aria-label="Show Uploads"
-                      tooltip="Show Uploads"
-                      data-selected={currentCategory === 'user'}
-                      icon={<FaUser />}
-                      onClick={() => dispatch(setCurrentCategory('user'))}
-                    />
-                  </>
-                )}
-              </ButtonGroup>
-            </div>
-            <div>
+            <ButtonGroup
+              size="sm"
+              isAttached
+              variant="solid"
+              className="image-gallery-category-btn-group"
+            >
+              {shouldShowButtons ? (
+                <>
+                  <Button
+                    data-selected={currentCategory === 'result'}
+                    onClick={() => dispatch(setCurrentCategory('result'))}
+                  >
+                    Invocations
+                  </Button>
+                  <Button
+                    data-selected={currentCategory === 'user'}
+                    onClick={() => dispatch(setCurrentCategory('user'))}
+                  >
+                    User
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <IAIIconButton
+                    aria-label="Show Invocations"
+                    tooltip="Show Invocations"
+                    data-selected={currentCategory === 'result'}
+                    icon={<FaImage />}
+                    onClick={() => dispatch(setCurrentCategory('result'))}
+                  />
+                  <IAIIconButton
+                    aria-label="Show Uploads"
+                    tooltip="Show Uploads"
+                    data-selected={currentCategory === 'user'}
+                    icon={<FaUser />}
+                    onClick={() => dispatch(setCurrentCategory('user'))}
+                  />
+                </>
+              )}
+            </ButtonGroup>
+
+            <div className="image-gallery-header-right-icons">
               <IAIPopover
                 isLazy
                 trigger="hover"

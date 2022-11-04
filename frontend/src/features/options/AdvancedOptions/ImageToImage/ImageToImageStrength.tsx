@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAISlider from 'common/components/IAISlider';
 import { setImg2imgStrength } from 'features/options/optionsSlice';
 

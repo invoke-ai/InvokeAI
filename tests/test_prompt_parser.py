@@ -274,6 +274,9 @@ class PromptParserTestCase(unittest.TestCase):
                          parse_prompt('a forest landscape "".swap("in winter")'))
         self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a forest landscape', 1),
                                                                    CrossAttentionControlSubstitute([Fragment('',1)], [Fragment('in winter',1)])])]),
+                         parse_prompt('a forest landscape ().swap(in winter)'))
+        self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a forest landscape', 1),
+                                                                   CrossAttentionControlSubstitute([Fragment('',1)], [Fragment('in winter',1)])])]),
                          parse_prompt('a forest landscape " ".swap("in winter")'))
 
         self.assertEqual(Conjunction([FlattenedPrompt([Fragment('a forest landscape', 1),

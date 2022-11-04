@@ -77,7 +77,7 @@ const useInpaintingCanvasHotkeys = () => {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (
-        !['x', 'q', 'w'].includes(e.key) ||
+        !['x', 'w'].includes(e.key) ||
         activeTabName !== 'inpainting' ||
         !shouldShowMask
       ) {

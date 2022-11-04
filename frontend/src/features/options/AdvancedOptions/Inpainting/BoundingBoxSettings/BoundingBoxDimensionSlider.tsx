@@ -1,11 +1,7 @@
 import React from 'react';
 import IAISlider from 'common/components/IAISlider';
 
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   InpaintingState,

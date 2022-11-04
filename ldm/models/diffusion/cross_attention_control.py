@@ -198,4 +198,3 @@ class CrossAttentionControl:
             module_name = type(module).__name__
             if module_name == "CrossAttention":
                 module.set_attention_slice_wrangler(None)
-

@@ -59,11 +59,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       desc: 'Switch to another workspace',
       hotkey: '1-6',
     },
-    {
-      title: 'Theme Toggle',
-      desc: 'Switch between dark and light modes',
-      hotkey: 'Shift+D',
-    },
+
     {
       title: 'Console Toggle',
       desc: 'Open and close console',

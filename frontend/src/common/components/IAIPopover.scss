@@ -1,10 +1,10 @@
 .invokeai__popover-content {
   min-width: unset;
-  width: unset !important;
+  width: unset;
   padding: 1rem;
-  border-radius: 0.5rem !important;
-  background-color: var(--background-color) !important;
-  border: 2px solid var(--border-color) !important;
+  border-radius: 0.5rem;
+  background-color: var(--background-color);
+  border: 2px solid var(--border-color);
 
   .invokeai__popover-arrow {
     background-color: var(--background-color) !important;

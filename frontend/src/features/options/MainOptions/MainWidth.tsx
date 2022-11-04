@@ -4,7 +4,6 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAISelect from 'common/components/IAISelect';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { setWidth } from 'features/options/optionsSlice';
-import { fontSize } from './MainOptions';
 
 export default function MainWidth() {
   const width = useAppSelector((state: RootState) => state.options.width);
@@ -23,7 +22,6 @@ export default function MainWidth() {
       flexGrow={1}
       onChange={handleChangeWidth}
       validValues={WIDTHS}
-      fontSize={fontSize}
       styleClass="main-option-block"
     />
   );

@@ -1,9 +1,12 @@
 // General Imports
-@use 'Colors_Dark';
-@use 'Colors_Light';
 @use 'Fonts';
 @use 'Animations';
 @use 'Misc';
+
+// Themes
+@use './Themes/Colors_Dark';
+@use './Themes/Colors_Light';
+@use './Themes/Colors_Green';
 
 // Component Styles
 //app
