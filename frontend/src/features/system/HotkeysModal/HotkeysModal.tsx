@@ -236,7 +236,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       })}
       <Modal isOpen={isHotkeyModalOpen} onClose={onHotkeysModalClose}>
         <ModalOverlay />
-        <ModalContent className="hotkeys-modal">
+        <ModalContent className=" modal hotkeys-modal">
           <ModalCloseButton />
 
           <h1>Keyboard Shorcuts</h1>

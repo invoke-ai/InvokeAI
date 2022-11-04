@@ -115,7 +115,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
 
       <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
         <ModalOverlay />
-        <ModalContent className="settings-modal">
+        <ModalContent className="modal settings-modal">
           <ModalHeader className="settings-modal-header">Settings</ModalHeader>
           <ModalCloseButton />
           <ModalBody className="settings-modal-content">
