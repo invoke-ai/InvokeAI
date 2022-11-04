@@ -21,7 +21,7 @@
 .advanced-settings-panel {
   background-color: var(--tab-panel-bg);
   border-radius: 0 0 0.4rem 0.4rem;
-  border: 2px solid var(--tab-hover-color);
+  padding: 1rem;
 }
 
 .advanced-settings-header {
@@ -33,6 +33,6 @@
   }
 
   &:hover {
-    background-color: var(--tab-hover-color) !important;
+    background-color: var(--tab-hover-color);
   }
 }

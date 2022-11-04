@@ -17,6 +17,7 @@ import {
 
 import { roundDownToMultiple } from '../../../../../common/util/roundDownToMultiple';
 import _ from 'lodash';
+import IAIFullSlider from '../../../../../common/components/IAIFullSlider';
 
 const boundingBoxDimensionsSelector = createSelector(
   (state: RootState) => state.inpainting,
@@ -38,12 +39,13 @@ const boundingBoxDimensionsSelector = createSelector(
 
 type BoundingBoxDimensionSlidersType = {
   dimension: 'width' | 'height';
+  label: string;
 };
 
 export default function BoundingBoxDimensionSlider(
   props: BoundingBoxDimensionSlidersType
 ) {
-  const { dimension } = props;
+  const { dimension, label } = props;
   const dispatch = useAppDispatch();
   const { shouldLockBoundingBox, canvasDimensions, boundingBoxDimensions } =
     useAppSelector(boundingBoxDimensionsSelector);
@@ -91,38 +93,57 @@ export default function BoundingBoxDimensionSlider(
   };
 
   return (
-    <div className="inpainting-bounding-box-dimensions-slider-numberinput">
-      <IAISlider
-        isDisabled={shouldLockBoundingBox}
-        label="Box H"
+    <>
+      {/* <div className="inpainting-bounding-box-dimensions-slider-numberinput">
+        <IAISlider
+          isDisabled={shouldLockBoundingBox}
+          label={label}
+          min={64}
+          max={roundDownToMultiple(canvasDimension, 64)}
+          step={64}
+          value={boundingBoxDimension}
+          onChange={handleBoundingBoxDimension}
+          width={'5rem'}
+        />
+        <IAINumberInput
+          isDisabled={shouldLockBoundingBox}
+          value={boundingBoxDimension}
+          onChange={handleBoundingBoxDimension}
+          min={64}
+          max={roundDownToMultiple(canvasDimension, 64)}
+          step={64}
+          padding="0"
+          width={'5rem'}
+        />
+        <IAIIconButton
+          size={'sm'}
+          aria-label={'Reset Height'}
+          tooltip={'Reset Height'}
+          onClick={handleResetDimension}
+          icon={<BiReset />}
+          styleClass="inpainting-bounding-box-reset-icon-btn"
+          isDisabled={
+            shouldLockBoundingBox || canvasDimension === boundingBoxDimension
+          }
+        />
+      </div> */}
+      <IAIFullSlider
+        label={label}
+        value={boundingBoxDimension}
         min={64}
         max={roundDownToMultiple(canvasDimension, 64)}
         step={64}
-        value={boundingBoxDimension}
         onChange={handleBoundingBoxDimension}
-        width={'5rem'}
-      />
-      <IAINumberInput
-        isDisabled={shouldLockBoundingBox}
-        value={boundingBoxDimension}
-        onChange={handleBoundingBoxDimension}
-        min={64}
-        max={roundDownToMultiple(canvasDimension, 64)}
-        step={64}
-        padding="0"
-        width={'5rem'}
-      />
-      <IAIIconButton
-        size={'sm'}
-        aria-label={'Reset Height'}
-        tooltip={'Reset Height'}
-        onClick={handleResetDimension}
-        icon={<BiReset />}
-        styleClass="inpainting-bounding-box-reset-icon-btn"
-        isDisabled={
+        withReset
+        handleReset={handleResetDimension}
+        isResetDisabled={
           shouldLockBoundingBox || canvasDimension === boundingBoxDimension
         }
+        withSliderMarks
+        withInput
+        isInteger
+        inputReadOnly
       />
-    </div>
+    </>
   );
 }

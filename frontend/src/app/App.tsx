@@ -51,10 +51,9 @@ const appSelector = createSelector(
       ''
     );
 
-    const shouldShowGalleryButton = !(
-      shouldShowGallery ||
-      (shouldHoldGalleryOpen && !shouldPinGallery)
-    );
+    const shouldShowGalleryButton =
+      !(shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)) &&
+      ['txt2img', 'img2img', 'inpainting'].includes(activeTabName);
 
     const shouldShowOptionsPanelButton =
       !(

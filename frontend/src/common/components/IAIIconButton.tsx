@@ -28,10 +28,13 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
     <Tooltip label={tooltip} hasArrow {...tooltipProps}>
       <IconButton
         ref={forwardedRef}
-        className={`invokeai__icon-button ${styleClass}`}
+        className={
+          styleClass
+            ? `invokeai__icon-button ${styleClass}`
+            : `invokeai__icon-button`
+        }
         data-as-checkbox={asCheckbox}
         data-selected={isChecked !== undefined ? isChecked : undefined}
-        style={props.onClick ? { cursor: 'pointer' } : {}}
         {...rest}
       />
     </Tooltip>
