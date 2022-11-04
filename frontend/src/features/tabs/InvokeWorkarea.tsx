@@ -3,10 +3,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { ReactNode } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { VscSplitHorizontal } from 'react-icons/vsc';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import ImageGallery from '../gallery/ImageGallery';
-import { activeTabNameSelector } from '../options/optionsSelectors';
-import { OptionsState, setShowDualDisplay } from '../options/optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import ImageGallery from 'features/gallery/ImageGallery';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { OptionsState, setShowDualDisplay } from 'features/options/optionsSlice';
 
 const workareaSelector = createSelector(
   [(state: RootState) => state.options, activeTabNameSelector],

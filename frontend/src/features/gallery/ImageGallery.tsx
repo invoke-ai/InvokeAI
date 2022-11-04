@@ -5,9 +5,9 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { requestImages } from '../../app/socketio/actions';
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import IAIIconButton from '../../common/components/IAIIconButton';
+import { requestImages } from 'app/socketio/actions';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import IAIIconButton from 'common/components/IAIIconButton';
 import {
   selectNextImage,
   selectPrevImage,
@@ -21,19 +21,19 @@ import {
   setShouldPinGallery,
 } from './gallerySlice';
 import HoverableImage from './HoverableImage';
-import { setShouldShowGallery } from '../gallery/gallerySlice';
+import { setShouldShowGallery } from 'features/gallery/gallerySlice';
 import { ButtonGroup, useToast } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
 import { imageGallerySelector } from './gallerySliceSelectors';
 import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
-import IAIPopover from '../../common/components/IAIPopover';
-import IAISlider from '../../common/components/IAISlider';
+import IAIPopover from 'common/components/IAIPopover';
+import IAISlider from 'common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
-import IAICheckbox from '../../common/components/IAICheckbox';
-import { setDoesCanvasNeedScaling } from '../tabs/Inpainting/inpaintingSlice';
+import IAICheckbox from 'common/components/IAICheckbox';
+import { setDoesCanvasNeedScaling } from 'features/tabs/Inpainting/inpaintingSlice';
 import _ from 'lodash';
-import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
+import useClickOutsideWatcher from 'common/hooks/useClickOutsideWatcher';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 
@@ -403,12 +403,12 @@ export default function ImageGallery() {
                       onChange={handleChangeGalleryImageMinimumWidth}
                       min={32}
                       max={256}
-                      width={100}
+                      // width={100}
                       label={'Image Size'}
-                      formLabelProps={{ style: { fontSize: '0.9rem' } }}
-                      sliderThumbTooltipProps={{
-                        label: `${galleryImageMinimumWidth}px`,
-                      }}
+                      // formLabelProps={{ style: { fontSize: '0.9rem' } }}
+                      // sliderThumbTooltipProps={{
+                      //   label: `${galleryImageMinimumWidth}px`,
+                      // }}
                     />
                     <IAIIconButton
                       size={'sm'}

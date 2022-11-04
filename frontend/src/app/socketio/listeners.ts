@@ -2,7 +2,7 @@ import { AnyAction, MiddlewareAPI, Dispatch } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 import dateFormat from 'dateformat';
 
-import * as InvokeAI from '../invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 import {
   addLogEntry,
@@ -15,7 +15,7 @@ import {
   errorOccurred,
   setModelList,
   setIsCancelable,
-} from '../../features/system/systemSlice';
+} from 'features/system/systemSlice';
 
 import {
   addGalleryImages,
@@ -25,19 +25,19 @@ import {
   removeImage,
   setCurrentImage,
   setIntermediateImage,
-} from '../../features/gallery/gallerySlice';
+} from 'features/gallery/gallerySlice';
 
 import {
   clearInitialImage,
   setInitialImage,
   setMaskPath,
-} from '../../features/options/optionsSlice';
+} from 'features/options/optionsSlice';
 import { requestImages, requestNewImages } from './actions';
 import {
   clearImageToInpaint,
   setImageToInpaint,
-} from '../../features/tabs/Inpainting/inpaintingSlice';
-import { tabMap } from '../../features/tabs/InvokeTabs';
+} from 'features/tabs/Inpainting/inpaintingSlice';
+import { tabMap } from 'features/tabs/InvokeTabs';
 
 /**
  * Returns an object containing listener callbacks for socketio events.

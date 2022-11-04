@@ -1,10 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import React from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAINumberInput from '../../../common/components/IAINumberInput';
-import { mayGenerateMultipleImagesSelector } from '../optionsSelectors';
-import { OptionsState, setIterations } from '../optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAINumberInput from 'common/components/IAINumberInput';
+import { mayGenerateMultipleImagesSelector } from 'features/options/optionsSelectors';
+import { OptionsState, setIterations } from 'features/options/optionsSlice';
 import { fontSize, inputWidth } from './MainOptions';
 
 const mainIterationsSelector = createSelector(

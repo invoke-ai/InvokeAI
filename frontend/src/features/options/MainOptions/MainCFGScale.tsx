@@ -1,7 +1,7 @@
 import React from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAINumberInput from '../../../common/components/IAINumberInput';
-import { setCfgScale } from '../optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAINumberInput from 'common/components/IAINumberInput';
+import { setCfgScale } from 'features/options/optionsSlice';
 import { fontSize, inputWidth } from './MainOptions';
 
 export default function MainCFGScale() {

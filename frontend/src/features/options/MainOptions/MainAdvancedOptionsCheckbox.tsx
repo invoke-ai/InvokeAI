@@ -1,7 +1,7 @@
 import React, { ChangeEvent } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAICheckbox from '../../../common/components/IAICheckbox';
-import { setShowAdvancedOptions } from '../optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAICheckbox from 'common/components/IAICheckbox';
+import { setShowAdvancedOptions } from 'features/options/optionsSlice';
 
 export default function MainAdvancedOptionsCheckbox() {
   const showAdvancedOptions = useAppSelector(

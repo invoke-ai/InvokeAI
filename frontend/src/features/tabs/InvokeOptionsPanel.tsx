@@ -5,17 +5,17 @@ import { MouseEvent, ReactNode, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { CSSTransition } from 'react-transition-group';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import useClickOutsideWatcher from 'common/hooks/useClickOutsideWatcher';
 import {
   OptionsState,
   setOptionsPanelScrollPosition,
   setShouldHoldOptionsPanelOpen,
   setShouldPinOptionsPanel,
   setShouldShowOptionsPanel,
-} from '../options/optionsSlice';
+} from 'features/options/optionsSlice';
 import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
-import InvokeAILogo from '../../assets/images/logo.png';
+import InvokeAILogo from 'assets/images/logo.png';
 
 type Props = { children: ReactNode };
 

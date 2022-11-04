@@ -1,9 +1,9 @@
 import React, { ChangeEvent } from 'react';
-import { HEIGHTS } from '../../../app/constants';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAISelect from '../../../common/components/IAISelect';
-import { activeTabNameSelector } from '../optionsSelectors';
-import { setHeight } from '../optionsSlice';
+import { HEIGHTS } from 'app/constants';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAISelect from 'common/components/IAISelect';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { setHeight } from 'features/options/optionsSlice';
 import { fontSize } from './MainOptions';
 
 export default function MainHeight() {

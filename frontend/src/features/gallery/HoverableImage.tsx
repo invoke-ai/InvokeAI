@@ -6,7 +6,7 @@ import {
   Tooltip,
   useToast,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { setCurrentImage } from './gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
@@ -18,10 +18,10 @@ import {
   setInitialImage,
   setPrompt,
   setSeed,
-} from '../options/optionsSlice';
-import * as InvokeAI from '../../app/invokeai';
+} from 'features/options/optionsSlice';
+import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
+import { setImageToInpaint } from 'features/tabs/Inpainting/inpaintingSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
 interface HoverableImageProps {

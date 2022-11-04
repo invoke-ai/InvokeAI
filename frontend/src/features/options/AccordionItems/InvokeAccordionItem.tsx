@@ -5,8 +5,8 @@ import {
   AccordionPanel,
 } from '@chakra-ui/react';
 import React, { ReactElement } from 'react';
-import { Feature } from '../../../app/features';
-import GuideIcon from '../../../common/components/GuideIcon';
+import { Feature } from 'app/features';
+import GuideIcon from 'common/components/GuideIcon';
 
 export interface InvokeAccordionItemProps {
   header: ReactElement;

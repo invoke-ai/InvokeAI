@@ -3,16 +3,16 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
+} from 'app/store';
+import IAINumberInput from 'common/components/IAINumberInput';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   InpaintingState,
   setInpaintReplace,
   setShouldUseInpaintReplace,
-} from '../../../tabs/Inpainting/inpaintingSlice';
-import IAISwitch from '../../../../common/components/IAISwitch';
+} from 'features/tabs/Inpainting/inpaintingSlice';
+import IAISwitch from 'common/components/IAISwitch';
 
 const inpaintReplaceSelector = createSelector(
   (state: RootState) => state.inpainting,

@@ -1,8 +1,8 @@
 import { Image, useToast } from '@chakra-ui/react';
 import { SyntheticEvent } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import ImageUploaderIconButton from '../../../common/components/ImageUploaderIconButton';
-import { clearInitialImage } from '../../options/optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
+import { clearInitialImage } from 'features/options/optionsSlice';
 
 export default function InitImagePreview() {
   const initialImage = useAppSelector(

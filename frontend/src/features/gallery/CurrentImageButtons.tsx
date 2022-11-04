@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import { RootState } from '../../app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
 import {
   OptionsState,
   setActiveTab,
@@ -11,14 +11,14 @@ import {
   setPrompt,
   setSeed,
   setShouldShowImageDetails,
-} from '../options/optionsSlice';
+} from 'features/options/optionsSlice';
 import DeleteImageModal from './DeleteImageModal';
-import { SystemState } from '../system/systemSlice';
-import IAIButton from '../../common/components/IAIButton';
-import { runESRGAN, runFacetool } from '../../app/socketio/actions';
-import IAIIconButton from '../../common/components/IAIIconButton';
-import UpscaleOptions from '../options/AdvancedOptions/Upscale/UpscaleOptions';
-import FaceRestoreOptions from '../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
+import { SystemState } from 'features/system/systemSlice';
+import IAIButton from 'common/components/IAIButton';
+import { runESRGAN, runFacetool } from 'app/socketio/actions';
+import IAIIconButton from 'common/components/IAIIconButton';
+import UpscaleOptions from 'features/options/AdvancedOptions/Upscale/UpscaleOptions';
+import FaceRestoreOptions from 'features/options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { ButtonGroup, Link, useClipboard, useToast } from '@chakra-ui/react';
 import {
@@ -37,10 +37,10 @@ import {
 import {
   setImageToInpaint,
   setDoesCanvasNeedScaling,
-} from '../tabs/Inpainting/inpaintingSlice';
+} from 'features/tabs/Inpainting/inpaintingSlice';
 import { GalleryState } from './gallerySlice';
-import { activeTabNameSelector } from '../options/optionsSelectors';
-import IAIPopover from '../../common/components/IAIPopover';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import IAIPopover from 'common/components/IAIPopover';
 
 const systemSelector = createSelector(
   [

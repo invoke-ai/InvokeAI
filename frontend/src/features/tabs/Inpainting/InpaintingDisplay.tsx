@@ -1,13 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
+import IAICanvas from 'features/canvas/IAICanvas';
+import IAICanvasControls from 'features/canvas/IAICanvasControls';
+import IAICanvasResizer from 'features/canvas/IAICanvasResizer';
 import _ from 'lodash';
 import { useLayoutEffect } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import ImageUploadButton from '../../../common/components/ImageUploaderButton';
-import CurrentImageDisplay from '../../gallery/CurrentImageDisplay';
-import { OptionsState } from '../../options/optionsSlice';
-import InpaintingCanvas from './InpaintingCanvas';
-import InpaintingCanvasPlaceholder from './InpaintingCanvasPlaceholder';
-import InpaintingControls from './InpaintingControls';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import ImageUploadButton from 'common/components/ImageUploaderButton';
+import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
+import { OptionsState } from 'features/options/optionsSlice';
 import { InpaintingState, setDoesCanvasNeedScaling } from './inpaintingSlice';
 
 const inpaintingDisplaySelector = createSelector(
@@ -49,12 +49,12 @@ const InpaintingDisplay = () => {
 
   const inpaintingComponent = imageToInpaint ? (
     <div className="inpainting-main-area">
-      <InpaintingControls />
+      <IAICanvasControls />
       <div className="inpainting-canvas-area">
         {doesCanvasNeedScaling ? (
-          <InpaintingCanvasPlaceholder />
+          <IAICanvasResizer />
         ) : (
-          <InpaintingCanvas />
+          <IAICanvas />
         )}
       </div>
     </div>

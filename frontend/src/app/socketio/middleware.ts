@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import makeSocketIOListeners from './listeners';
 import makeSocketIOEmitters from './emitters';
 
-import * as InvokeAI from '../invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 /**
  * Creates a socketio middleware to handle communication with server.

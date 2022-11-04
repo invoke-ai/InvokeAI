@@ -1,12 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { RootState } from '../store';
-import { activeTabNameSelector } from '../../features/options/optionsSelectors';
-import { OptionsState } from '../../features/options/optionsSlice';
+import { RootState } from 'app/store';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { OptionsState } from 'features/options/optionsSlice';
 
-import { SystemState } from '../../features/system/systemSlice';
-import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice';
-import { validateSeedWeights } from '../../common/util/seedWeightPairs';
+import { SystemState } from 'features/system/systemSlice';
+import { InpaintingState } from 'features/tabs/Inpainting/inpaintingSlice';
+import { validateSeedWeights } from 'common/util/seedWeightPairs';
 
 export const readinessSelector = createSelector(
   [

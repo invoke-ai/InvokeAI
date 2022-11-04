@@ -10,8 +10,8 @@ import {
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { memo } from 'react';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { useAppDispatch } from '../../../app/store';
-import * as InvokeAI from '../../../app/invokeai';
+import { useAppDispatch } from 'app/store';
+import * as InvokeAI from 'app/invokeai';
 import {
   setCfgScale,
   setFacetoolStrength,
@@ -33,9 +33,9 @@ import {
   setWidth,
   setInitialImage,
   setShouldShowImageDetails,
-} from '../../options/optionsSlice';
-import promptToString from '../../../common/util/promptToString';
-import { seedWeightsToString } from '../../../common/util/seedWeightPairs';
+} from 'features/options/optionsSlice';
+import promptToString from 'common/util/promptToString';
+import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { FaCopy } from 'react-icons/fa';
 import { useHotkeys } from 'react-hotkeys-hook';
 

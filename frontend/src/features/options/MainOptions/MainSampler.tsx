@@ -1,8 +1,8 @@
 import React, { ChangeEvent } from 'react';
-import { SAMPLERS } from '../../../app/constants';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAISelect from '../../../common/components/IAISelect';
-import { setSampler } from '../optionsSlice';
+import { SAMPLERS } from 'app/constants';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAISelect from 'common/components/IAISelect';
+import { setSampler } from 'features/options/optionsSlice';
 import { fontSize } from './MainOptions';
 
 export default function MainSampler() {

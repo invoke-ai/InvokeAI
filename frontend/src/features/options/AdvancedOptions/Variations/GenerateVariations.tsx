@@ -3,9 +3,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAISwitch from '../../../../common/components/IAISwitch';
-import { setShouldGenerateVariations } from '../../optionsSlice';
+} from 'app/store';
+import IAISwitch from 'common/components/IAISwitch';
+import { setShouldGenerateVariations } from 'features/options/optionsSlice';
 
 export default function GenerateVariations() {
   const shouldGenerateVariations = useAppSelector(

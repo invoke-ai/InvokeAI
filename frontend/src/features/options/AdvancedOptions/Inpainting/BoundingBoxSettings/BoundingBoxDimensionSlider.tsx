@@ -1,18 +1,18 @@
 import React from 'react';
-import IAISlider from '../../../../../common/components/IAISlider';
+import IAISlider from 'common/components/IAISlider';
 
 import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../../app/store';
+} from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   InpaintingState,
   setBoundingBoxDimensions,
-} from '../../../../tabs/Inpainting/inpaintingSlice';
+} from 'features/tabs/Inpainting/inpaintingSlice';
 
-import { roundDownToMultiple } from '../../../../../common/util/roundDownToMultiple';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import _ from 'lodash';
 
 const boundingBoxDimensionsSelector = createSelector(

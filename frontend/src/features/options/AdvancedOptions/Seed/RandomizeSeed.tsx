@@ -4,9 +4,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAISwitch from '../../../../common/components/IAISwitch';
-import { setShouldRandomizeSeed } from '../../optionsSlice';
+} from 'app/store';
+import IAISwitch from 'common/components/IAISwitch';
+import { setShouldRandomizeSeed } from 'features/options/optionsSlice';
 
 export default function RandomizeSeed() {
   const dispatch = useAppDispatch();

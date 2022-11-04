@@ -5,13 +5,13 @@ import type { TypedUseSelectorHook } from 'react-redux';
 import { persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
 
-import optionsReducer, { OptionsState } from '../features/options/optionsSlice';
-import galleryReducer, { GalleryState } from '../features/gallery/gallerySlice';
+import optionsReducer, { OptionsState } from 'features/options/optionsSlice';
+import galleryReducer, { GalleryState } from 'features/gallery/gallerySlice';
 import inpaintingReducer, {
   InpaintingState,
-} from '../features/tabs/Inpainting/inpaintingSlice';
+} from 'features/tabs/Inpainting/inpaintingSlice';
 
-import systemReducer, { SystemState } from '../features/system/systemSlice';
+import systemReducer, { SystemState } from 'features/system/systemSlice';
 import { socketioMiddleware } from './socketio/middleware';
 import autoMergeLevel2 from 'redux-persist/es/stateReconciler/autoMergeLevel2';
 import { PersistPartial } from 'redux-persist/es/persistReducer';

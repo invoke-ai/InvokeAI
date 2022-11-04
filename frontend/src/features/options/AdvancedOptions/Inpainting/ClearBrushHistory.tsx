@@ -4,12 +4,12 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAIButton from '../../../../common/components/IAIButton';
+} from 'app/store';
+import IAIButton from 'common/components/IAIButton';
 import {
   InpaintingState,
   setClearBrushHistory,
-} from '../../../tabs/Inpainting/inpaintingSlice';
+} from 'features/tabs/Inpainting/inpaintingSlice';
 import _ from 'lodash';
 
 const clearBrushHistorySelector = createSelector(

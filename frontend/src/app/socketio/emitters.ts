@@ -4,23 +4,23 @@ import { Socket } from 'socket.io-client';
 import {
   frontendToBackendParameters,
   FrontendToBackendParametersConfig,
-} from '../../common/util/parameterTranslation';
+} from 'common/util/parameterTranslation';
 import {
   GalleryCategory,
   GalleryState,
   removeImage,
-} from '../../features/gallery/gallerySlice';
-import { OptionsState } from '../../features/options/optionsSlice';
+} from 'features/gallery/gallerySlice';
+import { OptionsState } from 'features/options/optionsSlice';
 import {
   addLogEntry,
   errorOccurred,
   modelChangeRequested,
   setIsProcessing,
-} from '../../features/system/systemSlice';
-import { inpaintingImageElementRef } from '../../features/tabs/Inpainting/InpaintingCanvas';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import * as InvokeAI from '../invokeai';
-import { RootState } from '../store';
+} from 'features/system/systemSlice';
+import { inpaintingImageElementRef } from 'features/canvas/IAICanvas';
+import { InvokeTabName } from 'features/tabs/InvokeTabs';
+import * as InvokeAI from 'app/invokeai';
+import { RootState } from 'app/store';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.

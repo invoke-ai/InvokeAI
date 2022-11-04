@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from '../../app/store';
-import { activeTabNameSelector } from '../options/optionsSelectors';
-import { OptionsState } from '../options/optionsSlice';
-import { SystemState } from '../system/systemSlice';
+import { RootState } from 'app/store';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { OptionsState } from 'features/options/optionsSlice';
+import { SystemState } from 'features/system/systemSlice';
 import { GalleryState } from './gallerySlice';
 import _ from 'lodash';
 

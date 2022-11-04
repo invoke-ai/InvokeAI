@@ -1,13 +1,13 @@
 import { Button } from '@chakra-ui/react';
 import React from 'react';
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../../../app/constants';
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import randomInt from '../../../../common/util/randomInt';
-import { setSeed } from '../../optionsSlice';
+} from 'app/store';
+import randomInt from 'common/util/randomInt';
+import { setSeed } from 'features/options/optionsSlice';
 
 export default function ShuffleSeed() {
   const dispatch = useAppDispatch();

@@ -3,9 +3,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../../app/store';
-import IAICheckbox from '../../../../../common/components/IAICheckbox';
-import { setShouldShowBoundingBoxFill } from '../../../../tabs/Inpainting/inpaintingSlice';
+} from 'app/store';
+import IAICheckbox from 'common/components/IAICheckbox';
+import { setShouldShowBoundingBoxFill } from 'features/tabs/Inpainting/inpaintingSlice';
 
 export default function BoundingBoxDarkenOutside() {
   const dispatch = useAppDispatch();

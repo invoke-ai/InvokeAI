@@ -12,7 +12,7 @@
  * 'gfpgan'.
  */
 
-import { Category as GalleryCategory } from '../features/gallery/gallerySlice';
+import { Category as GalleryCategory } from 'features/gallery/gallerySlice';
 
 /**
  * TODO:
