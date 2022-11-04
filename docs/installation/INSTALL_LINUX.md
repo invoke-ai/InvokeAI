@@ -68,7 +68,7 @@ title: Manual Installation, Linux
         and obtaining an access token for downloading. It will then download and
         install the weights files for you.
 
-        Please look [here](../features/INSTALLING_MODELS.md) for a manual process for doing
+        Please look [here](INSTALLING_MODELS.md) for a manual process for doing
         the same thing.
 
 7.  Start generating images!
