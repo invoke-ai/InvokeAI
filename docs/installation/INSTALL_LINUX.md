@@ -73,30 +73,35 @@ title: Manual Installation, Linux
 
 7.  Start generating images!
 
-    !!! Example ""
+    !!! todo "Run InvokeAI!"
+
+        !!! warning "IMPORTANT"
+
+            Make sure that the conda environment is activated, which should create
+            `(invokeai)` in front of your prompt!
 
         === "CLI"
 
             ```bash
-            (invokeai) python scripts/invoke.py
+            python scripts/invoke.py
             ```
 
         === "local Webserver"
 
             ```bash
-            (invokeai) python scripts/invoke.py --web
+            python scripts/invoke.py --web
             ```
 
         === "Public Webserver"
 
             ```bash
-            (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+            python scripts/invoke.py --web --host 0.0.0.0
             ```
 
-        To use an alternative model you may invoke the `!switch` command in the CLI, or
-        pass `--model <model_name>` during `invoke.py` launch for either the CLI or the
-        Web UI. See
-        [Command Line Client](../features/CLI.md#model-selection-and-importation). The
+        To use an alternative model you may invoke the `!switch` command in
+        the CLI, or pass `--model <model_name>` during `invoke.py` launch for
+        either the CLI or the Web UI. See [Command Line
+        Client](../features/CLI.md#model-selection-and-importation). The
         model names are defined in `configs/models.yaml`.
 
 8. Subsequently, to relaunch the script, be sure to run "conda activate

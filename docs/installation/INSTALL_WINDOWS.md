@@ -72,44 +72,50 @@ in the wiki
 7. Load the big stable diffusion weights files and a couple of smaller machine-learning models:
 
     ```bash
-    (invokeai) ~/InvokeAI$ python scripts\preload_models.py
+    python scripts/preload_models.py
     ```
 
     !!! note
-    	This script will lead you through the process of creating an account on Hugging Face,
-	accepting the terms and conditions of the Stable Diffusion model license, and
-	obtaining an access token for downloading. It will then download and install the
-	weights files for you.
 
-	Please see [../features/INSTALLING_MODELS.md] for a manual process for doing the
-	same thing.
+          This script will lead you through the process of creating an account on Hugging Face,
+          accepting the terms and conditions of the Stable Diffusion model license, and
+          obtaining an access token for downloading. It will then download and install the
+          weights files for you.
+
+          Please look [here](INSTALLING_MODELS.md) for a manual process for doing the
+          same thing.
 
 8. Start generating images!
 
-    !!! Example ""
+    !!! example ""
+
+        !!! warning "IMPORTANT"
+
+            Make sure that the conda environment is activated, which should create
+            `(invokeai)` in front of your prompt!
 
         === "CLI"
 
             ```bash
-            (invokeai) python scripts/invoke.py
+            python scripts/invoke.py
             ```
 
         === "local Webserver"
 
             ```bash
-            (invokeai) python scripts/invoke.py --web
+            python scripts/invoke.py --web
             ```
 
         === "Public Webserver"
 
             ```bash
-            (invokeai) python scripts/invoke.py --web --host 0.0.0.0
+            python scripts/invoke.py --web --host 0.0.0.0
             ```
 
-        To use an alternative model you may invoke the `!switch` command in the CLI, or
-        pass `--model <model_name>` during `invoke.py` launch for either the CLI or the
-        Web UI. See
-        [Command Line Client](../features/CLI.md#model-selection-and-importation). The
+        To use an alternative model you may invoke the `!switch` command in
+        the CLI, or pass `--model <model_name>` during `invoke.py` launch for
+        either the CLI or the Web UI. See [Command Line
+        Client](../features/CLI.md#model-selection-and-importation). The
         model names are defined in `configs/models.yaml`.
 
 9. Subsequently, to relaunch the script, first activate the Anaconda
