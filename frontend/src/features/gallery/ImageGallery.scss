@@ -141,6 +141,10 @@
   justify-content: stretch;
 
   button {
+    background-color: var(--btn-base-color);
+    &:hover {
+      background-color: var(--btn-base-color-hover);
+    }
     flex-grow: 1;
     &[data-selected='true'] {
       background-color: var(--accent-color);

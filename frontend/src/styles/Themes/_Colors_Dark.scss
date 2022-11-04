@@ -6,7 +6,7 @@
   --accent-color-dim: rgb(57, 25, 153);
   --accent-color: rgb(80, 40, 200);
   --accent-color-bright: rgb(104, 60, 230);
-  --accent-color-hover: var(--accent-color-bright); // done
+  --accent-color-hover: var(--accent-color-bright);
 
   // App Colors
   --root-bg-color: rgb(10, 10, 10);
@@ -59,17 +59,17 @@
   --btn-checkbox-border-hover: rgb(46, 48, 68);
 
   // Progress Bar Color
-  --progress-bar-color: var(--accent-color); // done
+  --progress-bar-color: var(--accent-color);
 
   // Prompt Box Colors
   --prompt-bg-color: rgb(10, 10, 10);
 
   // Switch
   --switch-bg-color: rgb(100, 102, 110);
-  --switch-bg-active-color: var(--accent-color); // done
+  --switch-bg-active-color: var(--accent-color);
 
   // Slider
-  --slider-color: var(--accent-color);
+  --slider-color: var(--accent-color-bright);
 
   // Slider
   --slider-color: rgb(151, 113, 255);
@@ -94,11 +94,11 @@
 
   // Input
   --input-checkbox-bg: rgb(60, 64, 68);
-  --input-checkbox-checked-bg: var(--accent-color); // done
+  --input-checkbox-checked-bg: var(--accent-color);
   --input-checkbox-checked-tick: rgb(0, 0, 0);
 
-  --input-border-color: var(--accent-color-bright); // done
-  --input-box-shadow-color: var(--accent-color); // done
+  --input-border-color: var(--accent-color-bright);
+  --input-box-shadow-color: var(--accent-color);
 
   // Console
   --error-level-info: rgb(200, 202, 224);

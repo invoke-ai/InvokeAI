@@ -79,6 +79,13 @@
       .model-list-item-load-btn {
         button {
           padding: 0.5rem;
+          background-color: var(--btn-base-color);
+          color: var(--text-color);
+          border-radius: 0.2rem;
+
+          &:hover {
+            background-color: var(--btn-base-color-hover);
+          }
         }
       }
     }

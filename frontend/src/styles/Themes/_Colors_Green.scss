@@ -3,29 +3,29 @@
   --white: rgb(255, 255, 255);
 
   // Accent Colors
-  --accent-color-dim: rgb(10, 60, 40); // done
-  --accent-color: rgb(20, 110, 70); // done
-  --accent-color-bright: rgb(30, 180, 100); // done
-  --accent-color-hover: var(--accent-color-bright); // done
+  --accent-color-dim: rgb(10, 60, 40);
+  --accent-color: rgb(20, 110, 70);
+  --accent-color-bright: rgb(30, 180, 100);
+  --accent-color-hover: var(--accent-color-bright);
 
   // App Colors
-  --root-bg-color: rgb(10, 10, 14); // done
-  --background-color: rgb(30, 32, 37); // done
-  --background-color-light: rgb(40, 44, 48); // done
-  --background-color-secondary: rgb(22, 24, 28); // done
+  --root-bg-color: rgb(10, 10, 14);
+  --background-color: rgb(30, 32, 37);
+  --background-color-light: rgb(40, 44, 48);
+  --background-color-secondary: rgb(22, 24, 28);
 
-  --text-color: rgb(255, 255, 255); // done
-  --text-color-secondary: rgb(160, 164, 168); // done
-  --subtext-color: rgb(24, 24, 28); // done
-  --subtext-color-bright: rgb(68, 72, 76); // done
+  --text-color: rgb(255, 255, 255);
+  --text-color-secondary: rgb(160, 164, 168);
+  --subtext-color: rgb(24, 24, 28);
+  --subtext-color-bright: rgb(68, 72, 76);
 
-  --border-color: rgb(40, 44, 48); // done
-  --border-color-light: rgb(60, 60, 64); // done
+  --border-color: rgb(40, 44, 48);
+  --border-color-light: rgb(60, 60, 64);
 
   --svg-color: rgb(220, 224, 228);
 
-  --invalid: rgb(255, 75, 75); // done
-  --invalid-secondary: rgb(120, 5, 5); // done
+  --invalid: rgb(255, 75, 75);
+  --invalid-secondary: rgb(120, 5, 5);
 
   --destructive-color: rgb(185, 55, 55);
   --destructive-color-hover: rgb(255, 75, 75);
@@ -38,11 +38,11 @@
   --box-shadow-color-invalid: rgb(210, 30, 10);
 
   // Tabs
-  --tab-color: rgb(40, 44, 48); // done
+  --tab-color: rgb(40, 44, 48);
   --tab-hover-color: rgb(48, 52, 56); //done
-  --tab-panel-bg: var(--background-color-secondary); // done
-  --tab-list-bg: var(--accent-color); // done
-  --tab-list-text: rgb(202, 204, 206); // done
+  --tab-panel-bg: var(--background-color-secondary);
+  --tab-list-bg: var(--accent-color);
+  --tab-list-text: rgb(202, 204, 206);
   --tab-list-text-inactive: rgb(92, 94, 96); //done
 
   // Button Colors
@@ -60,17 +60,17 @@
   --btn-checkbox-border-hover: rgb(46, 48, 68);
 
   // Progress Bar Color
-  --progress-bar-color: var(--accent-color); // done
+  --progress-bar-color: var(--accent-color);
 
   // Prompt Box Colors
-  --prompt-bg-color: rgb(10, 10, 14); // done
+  --prompt-bg-color: rgb(10, 10, 14);
 
   // Switch
   --switch-bg-color: rgb(100, 102, 110);
-  --switch-bg-active-color: var(--accent-color); // done
+  --switch-bg-active-color: var(--accent-color);
 
   // Slider
-  --slider-color: var(--accent-color);
+  --slider-color: var(--accent-color-bright);
 
   // Resizable
   --resizeable-handle-border-color: var(--accent-color);
@@ -92,11 +92,11 @@
 
   // Input
   --input-checkbox-bg: rgb(60, 64, 68);
-  --input-checkbox-checked-bg: var(--accent-color); // done
+  --input-checkbox-checked-bg: var(--accent-color);
   --input-checkbox-checked-tick: rgb(0, 0, 0);
 
-  --input-border-color: var(--accent-color-bright); // done
-  --input-box-shadow-color: var(--accent-color); // done
+  --input-border-color: var(--accent-color-bright);
+  --input-box-shadow-color: var(--accent-color);
 
   // Console
   --error-level-info: rgb(200, 202, 224);
