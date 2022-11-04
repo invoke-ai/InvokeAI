@@ -46,9 +46,9 @@ import {
 //   isMoveStageKeyHeld: boolean;
 // }
 
-export type InpaintingState = GenericCanvasState;
+export type OutpaintingState = GenericCanvasState;
 
-const initialInpaintingState: InpaintingState = {
+const initialOutpaintingState: GenericCanvasState = {
   tool: 'brush',
   brushSize: 50,
   maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
@@ -81,11 +81,9 @@ const initialInpaintingState: InpaintingState = {
   isMoveStageKeyHeld: false,
 };
 
-const initialState: InpaintingState = initialInpaintingState;
-
-const inpaintingSlice = createGenericCanvasSlice({
-  name: 'inpainting',
-  initialState: initialState as GenericCanvasState,
+const outpaintingSlice = createGenericCanvasSlice({
+  name: 'outpainting',
+  initialState: initialOutpaintingState as GenericCanvasState,
   reducers: {
     // magic(state) {
     //   state.status = 'finished';
@@ -386,6 +384,6 @@ export const {
   setIsMoveBoundingBoxKeyHeld,
   setIsMoveStageKeyHeld,
   setStageCoordinates,
-} = inpaintingSlice.actions;
+} = outpaintingSlice.actions;
 
-export default inpaintingSlice.reducer;
+export default outpaintingSlice.reducer;

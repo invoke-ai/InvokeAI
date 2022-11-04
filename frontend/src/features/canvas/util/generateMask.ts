@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import { IRect } from 'konva/lib/types';
-import { MaskLine } from 'features/tabs/Inpainting/inpaintingSlice';
+import { MaskLine } from 'features/canvas/genericCanvasSlice';
 
 /**
  * Re-draws the mask canvas onto a new Konva stage.
