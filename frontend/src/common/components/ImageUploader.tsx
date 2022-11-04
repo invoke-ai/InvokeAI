@@ -1,12 +1,12 @@
 import { useCallback, ReactNode, useState, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useToast } from '@chakra-ui/react';
-import { uploadImage } from '../../app/socketio/actions';
-import { ImageUploadDestination, UploadImagePayload } from '../../app/invokeai';
-import { ImageUploaderTriggerContext } from '../../app/contexts/ImageUploaderTriggerContext';
-import { activeTabNameSelector } from '../../features/options/optionsSelectors';
-import { tabDict } from '../../features/tabs/InvokeTabs';
+import { uploadImage } from 'app/socketio/actions';
+import { ImageUploadDestination, UploadImagePayload } from 'app/invokeai';
+import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { tabDict } from 'features/tabs/InvokeTabs';
 import ImageUploadOverlay from './ImageUploadOverlay';
 
 type ImageUploaderProps = {

@@ -5,16 +5,19 @@ import type { TypedUseSelectorHook } from 'react-redux';
 import { persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
 
-import optionsReducer, { OptionsState } from '../features/options/optionsSlice';
-import galleryReducer, { GalleryState } from '../features/gallery/gallerySlice';
+import optionsReducer, { OptionsState } from 'features/options/optionsSlice';
+import galleryReducer, { GalleryState } from 'features/gallery/gallerySlice';
 import inpaintingReducer, {
   InpaintingState,
-} from '../features/tabs/Inpainting/inpaintingSlice';
+} from 'features/tabs/Inpainting/inpaintingSlice';
 
-import systemReducer, { SystemState } from '../features/system/systemSlice';
+import systemReducer, { SystemState } from 'features/system/systemSlice';
 import { socketioMiddleware } from './socketio/middleware';
 import autoMergeLevel2 from 'redux-persist/es/stateReconciler/autoMergeLevel2';
 import { PersistPartial } from 'redux-persist/es/persistReducer';
+import outpaintingReducer, {
+  OutpaintingState,
+} from 'features/tabs/Outpainting/outpaintingSlice';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -38,7 +41,7 @@ const rootPersistConfig = {
   key: 'root',
   storage,
   stateReconciler: autoMergeLevel2,
-  blacklist: ['gallery', 'system', 'inpainting'],
+  blacklist: ['gallery', 'system', 'inpainting', 'outpainting'],
 };
 
 const systemPersistConfig = {
@@ -82,6 +85,13 @@ const inpaintingPersistConfig = {
   blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
 };
 
+const outpaintingPersistConfig = {
+  key: 'outpainting',
+  storage,
+  stateReconciler: autoMergeLevel2,
+  blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
+};
+
 const reducers = combineReducers({
   options: optionsReducer,
   gallery: persistReducer<GalleryState>(galleryPersistConfig, galleryReducer),
@@ -90,6 +100,10 @@ const reducers = combineReducers({
     inpaintingPersistConfig,
     inpaintingReducer
   ),
+  outpainting: persistReducer<OutpaintingState>(
+    outpaintingPersistConfig,
+    outpaintingReducer
+  ),
 });
 
 const persistedReducer = persistReducer<{
@@ -97,6 +111,7 @@ const persistedReducer = persistReducer<{
   gallery: GalleryState & PersistPartial;
   system: SystemState & PersistPartial;
   inpainting: InpaintingState & PersistPartial;
+  outpainting: OutpaintingState & PersistPartial;
 }>(rootPersistConfig, reducers);
 
 // Continue with store setup

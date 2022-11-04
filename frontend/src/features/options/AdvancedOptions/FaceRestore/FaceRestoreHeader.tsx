@@ -4,9 +4,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAISwitch from '../../../../common/components/IAISwitch';
-import { setShouldRunFacetool } from '../../optionsSlice';
+} from 'app/store';
+import IAISwitch from 'common/components/IAISwitch';
+import { setShouldRunFacetool } from 'features/options/optionsSlice';
 
 export default function FaceRestoreHeader() {
   const isGFPGANAvailable = useAppSelector(

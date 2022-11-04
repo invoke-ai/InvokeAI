@@ -55,6 +55,7 @@
     "tsc-watch": "^5.0.3",
     "typescript": "^4.6.4",
     "vite": "^3.0.7",
-    "vite-plugin-eslint": "^1.8.1"
+    "vite-plugin-eslint": "^1.8.1",
+    "vite-tsconfig-paths": "^3.5.2"
   }
 }

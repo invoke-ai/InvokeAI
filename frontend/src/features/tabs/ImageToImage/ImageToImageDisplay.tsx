@@ -1,6 +1,6 @@
-import { RootState, useAppSelector } from '../../../app/store';
-import ImageUploadButton from '../../../common/components/ImageUploaderButton';
-import CurrentImageDisplay from '../../gallery/CurrentImageDisplay';
+import { RootState, useAppSelector } from 'app/store';
+import ImageUploadButton from 'common/components/ImageUploaderButton';
+import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
 import InitImagePreview from './InitImagePreview';
 
 const ImageToImageDisplay = () => {

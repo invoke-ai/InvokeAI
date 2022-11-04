@@ -1,20 +1,20 @@
-import { RootState } from '../../../../app/store';
-import { useAppDispatch, useAppSelector } from '../../../../app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 
 import {
   setUpscalingLevel,
   setUpscalingStrength,
   UpscalingLevel,
   OptionsState,
-} from '../../optionsSlice';
+} from 'features/options/optionsSlice';
 
-import { UPSCALING_LEVELS } from '../../../../app/constants';
+import { UPSCALING_LEVELS } from 'app/constants';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
-import { SystemState } from '../../../system/systemSlice';
+import { SystemState } from 'features/system/systemSlice';
 import { ChangeEvent } from 'react';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
-import IAISelect from '../../../../common/components/IAISelect';
+import IAINumberInput from 'common/components/IAINumberInput';
+import IAISelect from 'common/components/IAISelect';
 
 const optionsSelector = createSelector(
   (state: RootState) => state.options,

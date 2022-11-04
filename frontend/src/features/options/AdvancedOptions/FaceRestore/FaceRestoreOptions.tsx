@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 
-import { RootState } from '../../../../app/store';
-import { useAppDispatch, useAppSelector } from '../../../../app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 
 import {
   FacetoolType,
@@ -9,14 +9,14 @@ import {
   setCodeformerFidelity,
   setFacetoolStrength,
   setFacetoolType,
-} from '../../optionsSlice';
+} from 'features/options/optionsSlice';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
-import { SystemState } from '../../../system/systemSlice';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
-import IAISelect from '../../../../common/components/IAISelect';
-import { FACETOOL_TYPES } from '../../../../app/constants';
+import { SystemState } from 'features/system/systemSlice';
+import IAINumberInput from 'common/components/IAINumberInput';
+import IAISelect from 'common/components/IAISelect';
+import { FACETOOL_TYPES } from 'app/constants';
 import { ChangeEvent } from 'react';
 
 const optionsSelector = createSelector(

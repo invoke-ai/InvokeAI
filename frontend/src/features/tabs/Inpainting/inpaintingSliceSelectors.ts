@@ -1,10 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import _ from 'lodash';
-import { RootState } from '../../../app/store';
-import { activeTabNameSelector } from '../../options/optionsSelectors';
-import { OptionsState } from '../../options/optionsSlice';
+import { RootState } from 'app/store';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { OptionsState } from 'features/options/optionsSlice';
 import { InpaintingState } from './inpaintingSlice';
-import { rgbaColorToRgbString, rgbaColorToString } from './util/colorToString';
 
 export const inpaintingCanvasLinesSelector = createSelector(
   (state: RootState) => state.inpainting,
@@ -66,8 +66,8 @@ export const inpaintingControlsSelector = createSelector(
 );
 
 export const inpaintingCanvasSelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => {
+  [(state: RootState) => state.inpainting, activeTabNameSelector],
+  (inpainting: InpaintingState, activeTabName) => {
     const {
       tool,
       brushSize,
@@ -127,6 +127,7 @@ export const inpaintingCanvasSelector = createSelector(
       stageDimensions,
       stageCoordinates,
       isMoveStageKeyHeld,
+      activeTabName,
     };
   },
   {

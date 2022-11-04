@@ -1,15 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { IoMdOptions } from 'react-icons/io';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import IAIIconButton from '../../common/components/IAIIconButton';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAIIconButton from 'common/components/IAIIconButton';
 import {
   OptionsState,
   setShouldShowOptionsPanel,
-} from '../options/optionsSlice';
-import CancelButton from '../options/ProcessButtons/CancelButton';
-import InvokeButton from '../options/ProcessButtons/InvokeButton';
+} from 'features/options/optionsSlice';
+import CancelButton from 'features/options/ProcessButtons/CancelButton';
+import InvokeButton from 'features/options/ProcessButtons/InvokeButton';
 import _ from 'lodash';
-import LoopbackButton from '../options/ProcessButtons/Loopback';
+import LoopbackButton from 'features/options/ProcessButtons/Loopback';
 
 const canInvokeSelector = createSelector(
   (state: RootState) => state.options,

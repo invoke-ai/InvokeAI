@@ -40,8 +40,7 @@
 @use '../features/tabs/TextToImage/TextToImage.scss';
 @use '../features/tabs/ImageToImage/ImageToImage.scss';
 @use '../features/tabs/FloatingButton.scss';
-@use '../features/tabs/Inpainting/Inpainting.scss';
-@use '../features/tabs/Inpainting/InpaintingCanvasStatusIcons.scss';
+@use '../features/tabs/Inpainting/InpaintingWorkarea.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';
@@ -59,8 +58,8 @@
 @use '../common/components/GuidePopover.scss';
 
 // Component Shared - Radix UI
-// @use '../common/components/radix-ui/IAISlider.scss';
-// @use '../common/components/radix-ui/IAITooltip.scss';
+// @use 'common/components/radix-ui/IAISlider.scss';
+// @use 'common/components/radix-ui/IAITooltip.scss';
 
 // Shared Styles
 @use './Mixins/' as *;

@@ -3,9 +3,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../../app/store';
-import IAICheckbox from '../../../../../common/components/IAICheckbox';
-import { setShouldLockBoundingBox } from '../../../../tabs/Inpainting/inpaintingSlice';
+} from 'app/store';
+import IAICheckbox from 'common/components/IAICheckbox';
+import { setShouldLockBoundingBox } from 'features/tabs/Inpainting/inpaintingSlice';
 
 export default function BoundingBoxLock() {
   const shouldLockBoundingBox = useAppSelector(

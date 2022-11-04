@@ -3,9 +3,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
-import { setVariationAmount } from '../../optionsSlice';
+} from 'app/store';
+import IAINumberInput from 'common/components/IAINumberInput';
+import { setVariationAmount } from 'features/options/optionsSlice';
 
 export default function VariationAmount() {
   const variationAmount = useAppSelector(

@@ -1,7 +1,7 @@
 import { MdPhotoLibrary } from 'react-icons/md';
-import { useAppDispatch } from '../../app/store';
-import IAIIconButton from '../../common/components/IAIIconButton';
-import { setShouldShowGallery } from '../gallery/gallerySlice';
+import { useAppDispatch } from 'app/store';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { setShouldShowGallery } from 'features/gallery/gallerySlice';
 
 const FloatingGalleryButton = () => {
   const dispatch = useAppDispatch();

@@ -12,8 +12,8 @@ import {
   FaWrench,
 } from 'react-icons/fa';
 
-import InvokeAILogo from '../../assets/images/logo.png';
-import IAIIconButton from '../../common/components/IAIIconButton';
+import InvokeAILogo from 'assets/images/logo.png';
+import IAIIconButton from 'common/components/IAIIconButton';
 
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 

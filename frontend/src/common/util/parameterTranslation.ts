@@ -1,12 +1,12 @@
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
-import { OptionsState } from '../../features/options/optionsSlice';
-import { SystemState } from '../../features/system/systemSlice';
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
+import { OptionsState } from 'features/options/optionsSlice';
+import { SystemState } from 'features/system/systemSlice';
 
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice';
-import generateMask from '../../features/tabs/Inpainting/util/generateMask';
+import { InvokeTabName } from 'features/tabs/InvokeTabs';
+import { InpaintingState } from 'features/tabs/Inpainting/inpaintingSlice';
+import generateMask from 'features/canvas/util/generateMask';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;

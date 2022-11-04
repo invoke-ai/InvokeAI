@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { ExpandedIndex } from '@chakra-ui/react';
-import * as InvokeAI from '../../app/invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 

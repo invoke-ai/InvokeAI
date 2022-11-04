@@ -1,17 +1,17 @@
 import { ListItem, UnorderedList } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaPlay } from 'react-icons/fa';
-import { readinessSelector } from '../../../app/selectors/readinessSelector';
-import { generateImage } from '../../../app/socketio/actions';
-import { useAppDispatch, useAppSelector } from '../../../app/store';
+import { readinessSelector } from 'app/selectors/readinessSelector';
+import { generateImage } from 'app/socketio/actions';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIButton, {
   IAIButtonProps,
-} from '../../../common/components/IAIButton';
+} from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
-} from '../../../common/components/IAIIconButton';
-import IAIPopover from '../../../common/components/IAIPopover';
-import { activeTabNameSelector } from '../optionsSelectors';
+} from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {

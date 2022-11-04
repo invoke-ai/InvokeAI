@@ -4,9 +4,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAISwitch from '../../../../common/components/IAISwitch';
-import { setHiresFix } from '../../optionsSlice';
+} from 'app/store';
+import IAISwitch from 'common/components/IAISwitch';
+import { setHiresFix } from 'features/options/optionsSlice';
 
 /**
  * Hires Fix Toggle

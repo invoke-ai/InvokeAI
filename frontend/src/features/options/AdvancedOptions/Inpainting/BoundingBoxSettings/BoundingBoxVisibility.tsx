@@ -4,9 +4,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../../app/store';
-import IAIIconButton from '../../../../../common/components/IAIIconButton';
-import { setShouldShowBoundingBox } from '../../../../tabs/Inpainting/inpaintingSlice';
+} from 'app/store';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { setShouldShowBoundingBox } from 'features/tabs/Inpainting/inpaintingSlice';
 
 export default function BoundingBoxVisibility() {
   const shouldShowBoundingBox = useAppSelector(
