@@ -617,7 +617,7 @@ class InvokeAIWebServer:
                 if (
                     generation_parameters["progress_images"]
                     and step % generation_parameters['save_intermediates'] == 0
-                    and step < generation_parameters["steps"] - 1
+                    and step < generation_parameters["steps"]
                 ):
                     image = self.generate.sample_to_image(sample)
                     metadata = self.parameters_to_generated_image_metadata(
