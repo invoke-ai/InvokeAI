@@ -117,7 +117,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         <ModalOverlay />
         <ModalContent className="modal settings-modal">
           <ModalHeader className="settings-modal-header">Settings</ModalHeader>
-          <ModalCloseButton />
+          <ModalCloseButton className="modal-close-btn" />
           <ModalBody className="settings-modal-content">
             <div className="settings-modal-items">
               <div className="settings-modal-item">
@@ -189,7 +189,9 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           </ModalBody>
 
           <ModalFooter>
-            <Button onClick={onSettingsModalClose}>Close</Button>
+            <Button onClick={onSettingsModalClose} className="modal-close-btn">
+              Close
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
