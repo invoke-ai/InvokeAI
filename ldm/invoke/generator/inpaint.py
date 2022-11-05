@@ -150,7 +150,10 @@ class Inpaint(Img2Img):
                        seam_steps: int = 10,
                        tile_size: int = 32,
                        step_callback=None,
-                       inpaint_replace=False, **kwargs):
+                       inpaint_replace=False,
+                       inpaint_width=None,
+                       inpaint_height=None,
+                       **kwargs):
         """
         Returns a function returning an image derived from the prompt and
         the initial image + mask.  Return value depends on the seed at
@@ -168,11 +171,20 @@ class Inpaint(Img2Img):
             )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
 
+            # Resize if requested for inpainting
+            if inpaint_width and inpaint_height:
+                init_filled = init_filled.resize((inpaint_width, inpaint_height))
+
             # Create init tensor
             init_image = self._image_to_tensor(init_filled.convert('RGB'))
 
         if isinstance(mask_image, PIL.Image.Image):
             self.pil_mask = mask_image
+
+            # Resize if requested for inpainting
+            if inpaint_width and inpaint_height:
+                mask_image = mask_image.resize((inpaint_width, inpaint_height))
+
             mask_image = mask_image.resize(
                 (
                     mask_image.width // downsampling,
@@ -240,6 +252,10 @@ class Inpaint(Img2Img):
             )
 
             result = self.sample_to_image(samples)
+
+            # Resize if necessary
+            if inpaint_width and inpaint_height:
+                result = result.resize(self.pil_image.size)
 
             # Seam paint if this is our first pass (seam_size set to 0 during seam painting)
             if seam_size > 0:
