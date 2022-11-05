@@ -32,6 +32,7 @@
     "react-dropzone": "^14.2.2",
     "react-hotkeys-hook": "^3.4.7",
     "react-icons": "^4.4.0",
+    "react-image-pan-zoom-rotate": "^1.6.0",
     "react-konva": "^18.2.3",
     "react-redux": "^8.0.2",
     "react-transition-group": "^4.4.5",

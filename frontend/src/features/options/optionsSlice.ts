@@ -48,6 +48,7 @@ export interface OptionsState {
   shouldHoldOptionsPanelOpen: boolean;
   shouldLoopback: boolean;
   currentTheme: string;
+  isLightBoxOpen: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -87,6 +88,7 @@ const initialOptionsState: OptionsState = {
   shouldHoldOptionsPanelOpen: false,
   shouldLoopback: false,
   currentTheme: 'dark',
+  isLightBoxOpen: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -354,6 +356,9 @@ export const optionsSlice = createSlice({
     setCurrentTheme: (state, action: PayloadAction<string>) => {
       state.currentTheme = action.payload;
     },
+    setIsLightBoxOpen: (state, action: PayloadAction<boolean>) => {
+      state.isLightBoxOpen = action.payload;
+    },
   },
 });
 
@@ -402,6 +407,7 @@ export const {
   setShouldHoldOptionsPanelOpen,
   setShouldLoopback,
   setCurrentTheme,
+  setIsLightBoxOpen,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

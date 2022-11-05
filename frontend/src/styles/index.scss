@@ -36,6 +36,9 @@
 @use '../features/gallery/HoverableImage.scss';
 @use '../features/gallery/ImageMetaDataViewer/ImageMetadataViewer.scss';
 
+// Lightbox
+@use '../features/lightbox//Lightbox.scss';
+
 // Tabs
 @use '../features/tabs/InvokeTabs.scss';
 @use '../features/tabs/InvokeWorkarea.scss';

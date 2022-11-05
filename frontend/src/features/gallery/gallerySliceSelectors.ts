@@ -27,6 +27,8 @@ export const imageGallerySelector = createSelector(
       galleryWidth,
     } = gallery;
 
+    const { isLightBoxOpen } = options;
+
     return {
       currentImageUuid,
       shouldPinGallery,
@@ -43,6 +45,7 @@ export const imageGallerySelector = createSelector(
         categories[currentCategory].areMoreImagesAvailable,
       currentCategory,
       galleryWidth,
+      isLightBoxOpen,
     };
   },
   {

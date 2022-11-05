@@ -6,13 +6,21 @@ import { VscSplitHorizontal } from 'react-icons/vsc';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import ImageGallery from 'features/gallery/ImageGallery';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { OptionsState, setShowDualDisplay } from 'features/options/optionsSlice';
+import {
+  OptionsState,
+  setShowDualDisplay,
+} from 'features/options/optionsSlice';
 
 const workareaSelector = createSelector(
   [(state: RootState) => state.options, activeTabNameSelector],
   (options: OptionsState, activeTabName) => {
-    const { showDualDisplay, shouldPinOptionsPanel } = options;
-    return { showDualDisplay, shouldPinOptionsPanel, activeTabName };
+    const { showDualDisplay, shouldPinOptionsPanel, isLightBoxOpen } = options;
+    return {
+      showDualDisplay,
+      shouldPinOptionsPanel,
+      activeTabName,
+      isLightBoxOpen,
+    };
   }
 );
 
@@ -25,7 +33,8 @@ type InvokeWorkareaProps = {
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const dispatch = useAppDispatch();
   const { optionsPanel, children, styleClass } = props;
-  const { showDualDisplay, activeTabName } = useAppSelector(workareaSelector);
+  const { showDualDisplay, activeTabName, isLightBoxOpen } =
+    useAppSelector(workareaSelector);
 
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
@@ -66,7 +75,8 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
             </Tooltip>
           )}
         </div>
-        <ImageGallery />
+
+        {!isLightBoxOpen && <ImageGallery />}
       </div>
     </div>
   );

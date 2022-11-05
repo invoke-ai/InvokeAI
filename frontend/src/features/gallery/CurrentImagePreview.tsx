@@ -12,6 +12,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { OptionsState } from 'features/options/optionsSlice';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
+import Lightbox from 'features/lightbox/Lightbox';
 
 export const imagesSelector = createSelector(
   [(state: RootState) => state.gallery, (state: RootState) => state.options],
@@ -81,11 +82,13 @@ export default function CurrentImagePreview() {
   return (
     <div className={'current-image-preview'}>
       {imageToDisplay && (
-        <Image
-          src={imageToDisplay.url}
-          width={isIntermediate ? imageToDisplay.width : undefined}
-          height={isIntermediate ? imageToDisplay.height : undefined}
-        />
+        <Lightbox>
+          <Image
+            src={imageToDisplay.url}
+            width={isIntermediate ? imageToDisplay.width : undefined}
+            height={isIntermediate ? imageToDisplay.height : undefined}
+          />
+        </Lightbox>
       )}
       {!shouldShowImageDetails && (
         <div className="current-image-next-prev-buttons">

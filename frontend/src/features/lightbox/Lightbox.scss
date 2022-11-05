@@ -1,0 +1,68 @@
+@use '../../styles/Mixins/' as *;
+
+.lightbox-container {
+  color: var(--text-color);
+  max-height: $app-content-height-cutoff;
+  overflow: hidden;
+  padding: 0;
+
+  .chakra-modal__body {
+    padding: 0;
+  }
+
+  .image-gallery-wrapper {
+    max-height: 100% !important;
+
+    .image-gallery-container {
+      max-height: calc(100vh - 5rem);
+    }
+  }
+}
+
+.lightbox-close-btn {
+  z-index: 2;
+  position: absolute;
+  left: 0;
+  margin-left: 1rem;
+  margin-top: 0.5rem;
+}
+
+.lightbox-display-container {
+  display: flex;
+  flex-direction: row;
+}
+
+.lightbox-preview-wrapper {
+  overflow: hidden;
+  background-color: red;
+  background-color: var(--background-color-secondary);
+  display: grid;
+  grid-template-columns: auto max-content;
+
+  place-items: center;
+  width: 100vw;
+  height: 100vh;
+
+  .current-image-next-prev-buttons {
+    position: absolute;
+  }
+
+  .lightbox-image {
+    grid-area: lightbox-content;
+    border-radius: 0.5rem;
+  }
+
+  .lightbox-image-options {
+    position: absolute;
+    margin-left: 1rem;
+    z-index: 2;
+    top: 30vh;
+    left: 0;
+    user-select: none;
+    border-radius: 0.5rem;
+
+    display: flex;
+    flex-direction: column;
+    row-gap: 0.5rem;
+  }
+}

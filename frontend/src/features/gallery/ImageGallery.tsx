@@ -56,6 +56,7 @@ export default function ImageGallery() {
     shouldAutoSwitchToNewImages,
     areMoreImagesAvailable,
     galleryWidth,
+    isLightBoxOpen,
   } = useAppSelector(imageGallerySelector);
 
   const [galleryMinWidth, setGalleryMinWidth] = useState<number>(300);
@@ -67,6 +68,13 @@ export default function ImageGallery() {
 
   useEffect(() => {
     if (!shouldPinGallery) return;
+
+    if (isLightBoxOpen) {
+      dispatch(setGalleryWidth(400));
+      setGalleryMinWidth(400);
+      setGalleryMaxWidth(400);
+      return;
+    }
 
     if (activeTabName === 'inpainting') {
       dispatch(setGalleryWidth(190));
@@ -84,13 +92,13 @@ export default function ImageGallery() {
       setGalleryMaxWidth(590);
     }
     dispatch(setDoesCanvasNeedScaling(true));
-  }, [dispatch, activeTabName, shouldPinGallery, galleryWidth]);
+  }, [dispatch, activeTabName, shouldPinGallery, galleryWidth, isLightBoxOpen]);
 
   useEffect(() => {
     if (!shouldPinGallery) {
       setGalleryMaxWidth(window.innerWidth);
     }
-  }, [shouldPinGallery]);
+  }, [shouldPinGallery, isLightBoxOpen]);
 
   const galleryRef = useRef<HTMLDivElement>(null);
   const galleryContainerRef = useRef<HTMLDivElement>(null);
