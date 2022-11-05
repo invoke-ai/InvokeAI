@@ -1,7 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import React from 'react';
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   areHotkeysEnabledSelector,

@@ -1,8 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaUndo } from 'react-icons/fa';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   areHotkeysEnabledSelector,

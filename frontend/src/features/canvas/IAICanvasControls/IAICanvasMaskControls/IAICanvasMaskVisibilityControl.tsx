@@ -1,15 +1,12 @@
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BiHide, BiShow } from 'react-icons/bi';
 import { createSelector } from 'reselect';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
-  areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
-  // InpaintingState,
   setShouldShowMask,
 } from 'features/canvas/canvasSlice';
 

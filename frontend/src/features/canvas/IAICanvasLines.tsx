@@ -1,7 +1,6 @@
 import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line, Rect } from 'react-konva';
 import { useAppSelector } from 'app/store';
-// import { inpaintingCanvasLinesSelector } from 'features/canvas/canvasSliceSelectors';
 import { createSelector } from '@reduxjs/toolkit';
 import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
 import { rgbaColorToString } from './util/colorToString';

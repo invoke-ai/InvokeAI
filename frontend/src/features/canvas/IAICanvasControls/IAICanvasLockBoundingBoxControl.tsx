@@ -1,5 +1,5 @@
 import { FaLock, FaUnlock } from 'react-icons/fa';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   currentCanvasSelector,

@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { Circle, Group } from 'react-konva';
-import { RootState, useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/store';
 import {
   currentCanvasSelector,
   GenericCanvasState,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { FaMask } from 'react-icons/fa';
 
 import IAIPopover from 'common/components/IAIPopover';

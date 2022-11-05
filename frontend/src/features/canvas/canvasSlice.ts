@@ -6,8 +6,6 @@ import * as InvokeAI from 'app/invokeai';
 import _ from 'lodash';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { RootState } from 'app/store';
-import { OptionsState } from 'features/options/optionsSlice';
-import { tabMap } from 'features/tabs/InvokeTabs';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 export type InpaintingTool = 'brush' | 'eraser';
@@ -102,7 +100,7 @@ const initialGenericCanvasState: GenericCanvasState = {
   stageScale: 1,
   shouldUseInpaintReplace: false,
   inpaintReplace: 0.1,
-  shouldLockBoundingBox: true,
+  shouldLockBoundingBox: false,
   isMoveBoundingBoxKeyHeld: false,
   isMoveStageKeyHeld: false,
 };

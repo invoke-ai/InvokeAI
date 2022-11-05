@@ -57,6 +57,7 @@ const makeSocketIOEmitters = (
       if (['inpainting', 'outpainting'].includes(generationMode)) {
         const imageUrl =
           canvasState[canvasState.currentCanvas].imageToInpaint?.url;
+
         if (!inpaintingImageElementRef.current || !imageUrl) {
           dispatch(
             addLogEntry({

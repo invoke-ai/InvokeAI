@@ -24,7 +24,6 @@ import {
   setStageCoordinates,
   setStageScale,
 } from 'features/canvas/canvasSlice';
-// import { inpaintingCanvasSelector } from 'features/canvas/canvasSliceSelectors';
 
 // component
 import IAICanvasLines from './IAICanvasLines';

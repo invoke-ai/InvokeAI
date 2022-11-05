@@ -3,17 +3,15 @@ import Konva from 'konva';
 import { Context } from 'konva/lib/Context';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Box } from 'konva/lib/shapes/Transformer';
-import { stages } from 'konva/lib/Stage';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useCallback, useEffect, useRef } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
   currentCanvasSelector,
   GenericCanvasState,
-  // InpaintingState,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setIsMouseOverBoundingBox,

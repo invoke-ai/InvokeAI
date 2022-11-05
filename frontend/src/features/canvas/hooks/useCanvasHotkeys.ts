@@ -2,16 +2,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useEffect, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-// import {
-//   RootState,
-//   useAppDispatch,
-//   useAppSelector,
-// } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import {
   areHotkeysEnabledSelector,
-  // InpaintingState,
   setIsMoveBoundingBoxKeyHeld,
   setIsMoveStageKeyHeld,
   setShouldLockBoundingBox,
@@ -152,6 +146,7 @@ const useInpaintingCanvasHotkeys = () => {
     isCursorOnCanvas,
     shouldLockBoundingBox,
     shouldShowBoundingBox,
+    areHotkeysEnabled,
   ]);
 };
 

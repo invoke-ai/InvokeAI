@@ -38,6 +38,7 @@ import {
 import {
   setImageToInpaint,
   setDoesCanvasNeedScaling,
+  setImageToOutpaint,
 } from 'features/canvas/canvasSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
@@ -330,6 +331,22 @@ const CurrentImageButtons = () => {
     });
   };
 
+  const handleSendToOutpainting = () => {
+    if (!currentImage) return;
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+    
+    dispatch(setImageToOutpaint(currentImage));
+    dispatch(setActiveTab('outpainting'));
+    dispatch(setDoesCanvasNeedScaling(true));
+
+    toast({
+      title: 'Sent to Inpainting',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
   useHotkeys(
     'i',
     () => {
@@ -370,6 +387,13 @@ const CurrentImageButtons = () => {
               leftIcon={<FaShare />}
             >
               Send to Inpainting
+            </IAIButton>
+            <IAIButton
+              size={'sm'}
+              onClick={handleSendToOutpainting}
+              leftIcon={<FaShare />}
+            >
+              Send to Outpainting
             </IAIButton>
             <IAIButton
               size={'sm'}

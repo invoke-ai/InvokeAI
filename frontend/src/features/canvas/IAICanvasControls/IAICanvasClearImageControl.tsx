@@ -1,4 +1,3 @@
-import React from 'react';
 import { FaTrash } from 'react-icons/fa';
 import { useAppDispatch } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';

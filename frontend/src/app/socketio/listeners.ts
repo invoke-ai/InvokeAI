@@ -36,6 +36,7 @@ import { requestImages, requestNewImages } from './actions';
 import {
   clearImageToInpaint,
   setImageToInpaint,
+  setImageToOutpaint,
 } from 'features/canvas/canvasSlice';
 import { tabMap } from 'features/tabs/InvokeTabs';
 
@@ -120,6 +121,10 @@ const makeSocketIOListeners = (
             }
             case 'inpainting': {
               dispatch(setImageToInpaint(newImage));
+              break;
+            }
+            case 'outpainting': {
+              dispatch(setImageToOutpaint(newImage));
               break;
             }
           }

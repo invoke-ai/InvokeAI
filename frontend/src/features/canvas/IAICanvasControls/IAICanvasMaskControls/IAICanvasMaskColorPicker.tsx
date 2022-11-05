@@ -1,7 +1,7 @@
 import React from 'react';
 import { RgbaColor } from 'react-colorful';
 import { FaPalette } from 'react-icons/fa';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
@@ -9,7 +9,6 @@ import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
-  // InpaintingState,
   setMaskColor,
 } from 'features/canvas/canvasSlice';
 

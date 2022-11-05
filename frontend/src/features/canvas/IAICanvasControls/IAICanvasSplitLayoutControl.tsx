@@ -1,11 +1,6 @@
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { VscSplitHorizontal } from 'react-icons/vsc';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setShowDualDisplay } from 'features/options/optionsSlice';
 import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';

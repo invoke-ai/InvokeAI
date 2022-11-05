@@ -1,15 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaRedo } from 'react-icons/fa';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
-  // InpaintingState,
   redo,
 } from 'features/canvas/canvasSlice';
 
