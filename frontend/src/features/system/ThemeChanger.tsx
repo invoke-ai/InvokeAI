@@ -23,6 +23,7 @@ export default function ThemeChanger() {
       validValues={THEMES}
       value={currentTheme}
       onChange={themeChangeHandler}
+      styleClass="theme-changer-dropdown"
     ></IAISelect>
   );
 }
