@@ -3398,6 +3398,11 @@ recrawl-sync@^2.0.3:
     sucrase "^3.20.3"
     tslib "^1.9.3"
 
+redux-deep-persist@^1.0.6:
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/redux-deep-persist/-/redux-deep-persist-1.0.6.tgz#f7f0d15c76463a9c9f31269ea8e612ca7c058980"
+  integrity sha512-WL/u8MxJGsm0fpywW4zSOWOY3caGi1xx04aYz9UP7QXcqzStVq7fKFf/9g4JYAZ3YRPvukZw0m6O+vt4hTDn9g==
+
 redux-persist@^6.0.0:
   version "6.0.0"
   resolved "https://registry.npmjs.org/redux-persist/-/redux-persist-6.0.0.tgz"

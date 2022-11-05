@@ -36,6 +36,7 @@
     "react-konva": "^18.2.3",
     "react-redux": "^8.0.2",
     "react-transition-group": "^4.4.5",
+    "redux-deep-persist": "^1.0.6",
     "redux-persist": "^6.0.0",
     "socket.io": "^4.5.2",
     "socket.io-client": "^4.5.2",
