@@ -118,7 +118,7 @@ gr = Generate(
           safety_checker:bool = activate safety checker [False]
 
           # this value is sticky and maintained between generation calls
-          sampler_name:str  = ['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms']  // k_lms
+          sampler_name:str  = ['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_dpmpp_2', 'k_dpmpp_2_a', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms']  // k_lms
 
           # these are deprecated - use conf and model instead
           weights     = path to model weights ('models/ldm/stable-diffusion-v1/model.ckpt')
@@ -928,6 +928,10 @@ class Generate:
             self.sampler = KSampler(self.model, 'dpm_2_ancestral', device=self.device)
         elif self.sampler_name == 'k_dpm_2':
             self.sampler = KSampler(self.model, 'dpm_2', device=self.device)
+        elif self.sampler_name == 'k_dpmpp_2_a':
+            self.sampler = KSampler(self.model, 'dpmpp_2s_ancestral', device=self.device)
+        elif self.sampler_name == 'k_dpmpp_2':
+            self.sampler = KSampler(self.model, 'dpmpp_2m', device=self.device)
         elif self.sampler_name == 'k_euler_a':
             self.sampler = KSampler(self.model, 'euler_ancestral', device=self.device)
         elif self.sampler_name == 'k_euler':
