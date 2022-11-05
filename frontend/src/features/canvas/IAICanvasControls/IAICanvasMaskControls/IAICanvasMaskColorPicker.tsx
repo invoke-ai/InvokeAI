@@ -1,27 +1,34 @@
 import React from 'react';
 import { RgbaColor } from 'react-colorful';
 import { FaPalette } from 'react-icons/fa';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import { InpaintingState, setMaskColor } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  areHotkeysEnabledSelector,
+  currentCanvasSelector,
+  GenericCanvasState,
+  // InpaintingState,
+  setMaskColor,
+} from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 
-const inpaintingMaskColorPickerSelector = createSelector(
-  [(state: RootState) => state.inpainting, activeTabNameSelector],
-  (inpainting: InpaintingState, activeTabName) => {
-    const { shouldShowMask, maskColor } = inpainting;
+const maskColorPickerSelector = createSelector(
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { shouldShowMask, maskColor } = currentCanvas;
 
-    return { shouldShowMask, maskColor, activeTabName };
+    return {
+      shouldShowMask,
+      maskColor,
+      activeTabName,
+      areHotkeysEnabled,
+    };
   },
   {
     memoizeOptions: {
@@ -31,9 +38,8 @@ const inpaintingMaskColorPickerSelector = createSelector(
 );
 
 export default function IAICanvasMaskColorPicker() {
-  const { shouldShowMask, maskColor, activeTabName } = useAppSelector(
-    inpaintingMaskColorPickerSelector
-  );
+  const { shouldShowMask, maskColor, activeTabName, areHotkeysEnabled } =
+    useAppSelector(maskColorPickerSelector);
   const dispatch = useAppDispatch();
   const handleChangeMaskColor = (newColor: RgbaColor) => {
     dispatch(setMaskColor(newColor));
@@ -51,7 +57,7 @@ export default function IAICanvasMaskColorPicker() {
       });
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldShowMask, maskColor.a]
   );
@@ -67,7 +73,7 @@ export default function IAICanvasMaskColorPicker() {
       });
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldShowMask, maskColor.a]
   );

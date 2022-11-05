@@ -2,26 +2,28 @@ import { createSelector } from '@reduxjs/toolkit';
 import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaUndo } from 'react-icons/fa';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { InpaintingState, undo } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  areHotkeysEnabledSelector,
+  currentCanvasSelector,
+  GenericCanvasState,
+  undo,
+} from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
-const inpaintingUndoSelector = createSelector(
-  [(state: RootState) => state.inpainting, activeTabNameSelector],
-  (inpainting: InpaintingState, activeTabName) => {
-    const { pastLines, shouldShowMask } = inpainting;
+const canvasUndoSelector = createSelector(
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (canvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { pastLines, shouldShowMask } = canvas;
 
     return {
       canUndo: pastLines.length > 0,
       shouldShowMask,
       activeTabName,
+      areHotkeysEnabled,
     };
   },
   {
@@ -34,9 +36,8 @@ const inpaintingUndoSelector = createSelector(
 export default function IAICanvasUndoControl() {
   const dispatch = useAppDispatch();
 
-  const { canUndo, shouldShowMask, activeTabName } = useAppSelector(
-    inpaintingUndoSelector
-  );
+  const { canUndo, shouldShowMask, activeTabName, areHotkeysEnabled } =
+    useAppSelector(canvasUndoSelector);
 
   const handleUndo = () => dispatch(undo());
 
@@ -49,7 +50,7 @@ export default function IAICanvasUndoControl() {
       handleUndo();
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask && canUndo,
+      enabled: areHotkeysEnabled && canUndo,
     },
     [activeTabName, shouldShowMask, canUndo]
   );

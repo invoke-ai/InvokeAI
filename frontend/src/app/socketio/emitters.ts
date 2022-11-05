@@ -42,7 +42,7 @@ const makeSocketIOEmitters = (
       const {
         options: optionsState,
         system: systemState,
-        inpainting: inpaintingState,
+        canvas: canvasState,
         gallery: galleryState,
       } = state;
 
@@ -50,15 +50,14 @@ const makeSocketIOEmitters = (
         {
           generationMode,
           optionsState,
-          inpaintingState,
+          canvasState,
           systemState,
         };
 
-      if (generationMode === 'inpainting') {
-        if (
-          !inpaintingImageElementRef.current ||
-          !inpaintingState.imageToInpaint?.url
-        ) {
+      if (['inpainting', 'outpainting'].includes(generationMode)) {
+        const imageUrl =
+          canvasState[canvasState.currentCanvas].imageToInpaint?.url;
+        if (!inpaintingImageElementRef.current || !imageUrl) {
           dispatch(
             addLogEntry({
               timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -70,8 +69,7 @@ const makeSocketIOEmitters = (
           return;
         }
 
-        frontendToBackendParametersConfig.imageToProcessUrl =
-          inpaintingState.imageToInpaint.url;
+        frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
 
         frontendToBackendParametersConfig.maskImageElement =
           inpaintingImageElementRef.current;

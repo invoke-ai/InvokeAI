@@ -8,20 +8,18 @@ import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useCallback, useEffect, useRef } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
-  InpaintingState,
+  currentCanvasSelector,
+  GenericCanvasState,
+  // InpaintingState,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setIsMouseOverBoundingBox,
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
-} from 'features/tabs/Inpainting/inpaintingSlice';
+} from 'features/canvas/canvasSlice';
 import { rgbaColorToString } from './util/colorToString';
 import {
   DASH_WIDTH,
@@ -29,8 +27,8 @@ import {
 } from './util/constants';
 
 const boundingBoxPreviewSelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => {
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -45,7 +43,7 @@ const boundingBoxPreviewSelector = createSelector(
       isMouseOverBoundingBox,
       isMoveBoundingBoxKeyHeld,
       stageCoordinates,
-    } = inpainting;
+    } = currentCanvas;
     return {
       boundingBoxCoordinates,
       boundingBoxDimensions,

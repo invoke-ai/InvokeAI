@@ -10,6 +10,7 @@ import {
   OptionsState,
   setShowDualDisplay,
 } from 'features/options/optionsSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
 
 const workareaSelector = createSelector(
   [(state: RootState) => state.options, activeTabNameSelector],
@@ -20,6 +21,9 @@ const workareaSelector = createSelector(
       shouldPinOptionsPanel,
       activeTabName,
       isLightBoxOpen,
+      shouldShowDualDisplayButton: ['inpainting', 'outpainting'].includes(
+        activeTabName
+      ),
     };
   }
 );
@@ -33,11 +37,16 @@ type InvokeWorkareaProps = {
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const dispatch = useAppDispatch();
   const { optionsPanel, children, styleClass } = props;
-  const { showDualDisplay, activeTabName, isLightBoxOpen } =
-    useAppSelector(workareaSelector);
+  const {
+    showDualDisplay,
+    activeTabName,
+    isLightBoxOpen,
+    shouldShowDualDisplayButton,
+  } = useAppSelector(workareaSelector);
 
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
+    dispatch(setDoesCanvasNeedScaling(true))
   };
 
   // Hotkeys
@@ -48,7 +57,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
       handleDualDisplay();
     },
     {
-      enabled: activeTabName === 'inpainting',
+      enabled: shouldShowDualDisplayButton,
     },
     [showDualDisplay]
   );
@@ -63,7 +72,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
         {optionsPanel}
         <div className="workarea-children-wrapper">
           {children}
-          {activeTabName === 'inpainting' && (
+          {shouldShowDualDisplayButton && (
             <Tooltip label="Toggle Split View">
               <div
                 className="workarea-split-button"

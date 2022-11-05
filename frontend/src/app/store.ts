@@ -7,9 +7,9 @@ import storage from 'redux-persist/lib/storage'; // defaults to localStorage for
 
 import optionsReducer, { OptionsState } from 'features/options/optionsSlice';
 import galleryReducer, { GalleryState } from 'features/gallery/gallerySlice';
-import inpaintingReducer, {
-  InpaintingState,
-} from 'features/tabs/Inpainting/inpaintingSlice';
+// import inpaintingReducer, {
+//   InpaintingState,
+// } from 'features/canvas/canvasSlice';
 
 import systemReducer, { SystemState } from 'features/system/systemSlice';
 import { socketioMiddleware } from './socketio/middleware';
@@ -18,6 +18,7 @@ import { PersistPartial } from 'redux-persist/es/persistReducer';
 import outpaintingReducer, {
   OutpaintingState,
 } from 'features/tabs/Outpainting/outpaintingSlice';
+import canvasReducer, { CanvasState } from 'features/canvas/canvasSlice';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -78,40 +79,40 @@ const galleryPersistConfig = {
   ],
 };
 
-const inpaintingPersistConfig = {
-  key: 'inpainting',
+const canvasPersistConfig = {
+  key: 'canvas',
   storage,
   stateReconciler: autoMergeLevel2,
-  blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
+  // blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
 };
 
-const outpaintingPersistConfig = {
-  key: 'outpainting',
-  storage,
-  stateReconciler: autoMergeLevel2,
-  blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
-};
+// const outpaintingPersistConfig = {
+//   key: 'outpainting',
+//   storage,
+//   stateReconciler: autoMergeLevel2,
+//   blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
+// };
 
 const reducers = combineReducers({
   options: optionsReducer,
   gallery: persistReducer<GalleryState>(galleryPersistConfig, galleryReducer),
   system: persistReducer<SystemState>(systemPersistConfig, systemReducer),
-  inpainting: persistReducer<InpaintingState>(
-    inpaintingPersistConfig,
-    inpaintingReducer
+  canvas: persistReducer<CanvasState>(
+    canvasPersistConfig,
+    canvasReducer
   ),
-  outpainting: persistReducer<OutpaintingState>(
-    outpaintingPersistConfig,
-    outpaintingReducer
-  ),
+  // outpainting: persistReducer<OutpaintingState>(
+  //   outpaintingPersistConfig,
+  //   outpaintingReducer
+  // ),
 });
 
 const persistedReducer = persistReducer<{
   options: OptionsState;
   gallery: GalleryState & PersistPartial;
   system: SystemState & PersistPartial;
-  inpainting: InpaintingState & PersistPartial;
-  outpainting: OutpaintingState & PersistPartial;
+  canvas: CanvasState & PersistPartial;
+  // outpainting: OutpaintingState & PersistPartial;
 }>(rootPersistConfig, reducers);
 
 // Continue with store setup

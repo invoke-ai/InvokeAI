@@ -15,9 +15,14 @@ import TextToImageIcon from 'common/icons/TextToImageIcon';
 import { setActiveTab, setIsLightBoxOpen } from 'features/options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
 import InpaintingWorkarea from './Inpainting/InpaintingWorkarea';
-import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
+// import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
 import TextToImageWorkarea from './TextToImage';
 import Lightbox from 'features/lightbox/Lightbox';
+import {
+  setCurrentCanvas,
+  setDoesCanvasNeedScaling,
+} from 'features/canvas/canvasSlice';
+import OutpaintingWorkarea from './Outpainting/OutpaintingWorkarea';
 
 export const tabDict = {
   txt2img: {
@@ -37,7 +42,7 @@ export const tabDict = {
   },
   outpainting: {
     title: <OutpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    workarea: <OutpaintingWIP />,
+    workarea: <OutpaintingWorkarea />,
     tooltip: 'Outpainting',
   },
   nodes: {
@@ -78,7 +83,6 @@ export default function InvokeTabs() {
 
   useHotkeys('3', () => {
     dispatch(setActiveTab(2));
-    dispatch(setDoesCanvasNeedScaling(true));
   });
 
   useHotkeys('4', () => {

@@ -6,19 +6,20 @@ import {
 } from '../../../../app/store';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
-import {
-  InpaintingState,
-  setInpaintReplace,
-  setShouldUseInpaintReplace,
-} from '../../../tabs/Inpainting/inpaintingSlice';
 import IAISwitch from '../../../../common/components/IAISwitch';
 import IAISlider from '../../../../common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  setInpaintReplace,
+  setShouldUseInpaintReplace,
+} from 'features/canvas/canvasSlice';
 
-const inpaintReplaceSelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => {
-    const { inpaintReplace, shouldUseInpaintReplace } = inpainting;
+const canvasInpaintReplaceSelector = createSelector(
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => {
+    const { inpaintReplace, shouldUseInpaintReplace } = currentCanvas;
     return {
       inpaintReplace,
       shouldUseInpaintReplace,
@@ -33,7 +34,7 @@ const inpaintReplaceSelector = createSelector(
 
 export default function InpaintReplace() {
   const { inpaintReplace, shouldUseInpaintReplace } = useAppSelector(
-    inpaintReplaceSelector
+    canvasInpaintReplaceSelector
   );
 
   const dispatch = useAppDispatch();

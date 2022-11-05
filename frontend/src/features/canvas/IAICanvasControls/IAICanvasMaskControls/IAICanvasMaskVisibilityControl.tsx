@@ -6,16 +6,19 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
-  InpaintingState,
+  areHotkeysEnabledSelector,
+  currentCanvasSelector,
+  GenericCanvasState,
+  // InpaintingState,
   setShouldShowMask,
-} from 'features/tabs/Inpainting/inpaintingSlice';
+} from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 
-const inpaintingMaskVisibilitySelector = createSelector(
-  [(state: RootState) => state.inpainting, activeTabNameSelector],
-  (inpainting: InpaintingState, activeTabName) => {
-    const { shouldShowMask } = inpainting;
+const canvasMaskVisibilitySelector = createSelector(
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas: GenericCanvasState, activeTabName) => {
+    const { shouldShowMask } = currentCanvas;
 
     return { shouldShowMask, activeTabName };
   },
@@ -30,7 +33,7 @@ export default function IAICanvasMaskVisibilityControl() {
   const dispatch = useAppDispatch();
 
   const { shouldShowMask, activeTabName } = useAppSelector(
-    inpaintingMaskVisibilitySelector
+    canvasMaskVisibilitySelector
   );
 
   const handleToggleShouldShowMask = () =>

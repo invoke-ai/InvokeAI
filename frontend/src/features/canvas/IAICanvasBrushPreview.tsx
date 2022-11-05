@@ -3,12 +3,15 @@ import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { Circle, Group } from 'react-konva';
 import { RootState, useAppSelector } from 'app/store';
-import { InpaintingState } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+} from 'features/canvas/canvasSlice';
 import { rgbaColorToRgbString } from './util/colorToString';
 
-const inpaintingCanvasBrushPreviewSelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => {
+const canvasBrushPreviewSelector = createSelector(
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => {
     const {
       cursorPosition,
       stageDimensions: { width, height },
@@ -18,7 +21,7 @@ const inpaintingCanvasBrushPreviewSelector = createSelector(
       shouldShowBrush,
       isMovingBoundingBox,
       isTransformingBoundingBox,
-    } = inpainting;
+    } = currentCanvas;
 
     return {
       cursorPosition,
@@ -56,7 +59,7 @@ const IAICanvasBrushPreview = (props: GroupConfig) => {
     maskColorString,
     tool,
     shouldDrawBrushPreview,
-  } = useAppSelector(inpaintingCanvasBrushPreviewSelector);
+  } = useAppSelector(canvasBrushPreviewSelector);
 
   if (!shouldDrawBrushPreview) return null;
 

@@ -17,12 +17,14 @@ import {
   addLine,
   addPointToCurrentLine,
   clearImageToInpaint,
+  currentCanvasSelector,
+  GenericCanvasState,
   setCursorPosition,
   setIsDrawing,
   setStageCoordinates,
   setStageScale,
-} from 'features/tabs/Inpainting/inpaintingSlice';
-import { inpaintingCanvasSelector } from 'features/tabs/Inpainting/inpaintingSliceSelectors';
+} from 'features/canvas/canvasSlice';
+// import { inpaintingCanvasSelector } from 'features/canvas/canvasSliceSelectors';
 
 // component
 import IAICanvasLines from './IAICanvasLines';
@@ -42,6 +44,86 @@ import {
   MIN_CANVAS_SCALE,
 } from './util/constants';
 import _ from 'lodash';
+import { createSelector } from '@reduxjs/toolkit';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+
+const canvasSelector = createSelector(
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas: GenericCanvasState, activeTabName) => {
+    const {
+      tool,
+      brushSize,
+      maskColor,
+      shouldInvertMask,
+      shouldShowMask,
+      shouldShowCheckboardTransparency,
+      imageToInpaint,
+      stageScale,
+      shouldShowBoundingBox,
+      shouldShowBoundingBoxFill,
+      isDrawing,
+      shouldLockBoundingBox,
+      boundingBoxDimensions,
+      isTransformingBoundingBox,
+      isMouseOverBoundingBox,
+      isMovingBoundingBox,
+      stageDimensions,
+      stageCoordinates,
+      isMoveStageKeyHeld,
+    } = currentCanvas;
+
+    let stageCursor: string | undefined = '';
+
+    if (isTransformingBoundingBox) {
+      stageCursor = undefined;
+    } else if (
+      isMovingBoundingBox ||
+      isMouseOverBoundingBox ||
+      isMoveStageKeyHeld
+    ) {
+      stageCursor = 'move';
+    } else if (shouldShowMask) {
+      stageCursor = 'none';
+    } else {
+      stageCursor = 'default';
+    }
+
+    return {
+      tool,
+      brushSize,
+      shouldInvertMask,
+      shouldShowMask,
+      shouldShowCheckboardTransparency,
+      maskColor,
+      imageToInpaint,
+      stageScale,
+      shouldShowBoundingBox,
+      shouldShowBoundingBoxFill,
+      isDrawing,
+      shouldLockBoundingBox,
+      boundingBoxDimensions,
+      isTransformingBoundingBox,
+      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
+      stageCursor,
+      isMouseOverBoundingBox,
+      stageDimensions,
+      stageCoordinates,
+      isMoveStageKeyHeld,
+      activeTabName,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: (a, b) => {
+        const { imageToInpaint: a_imageToInpaint, ...a_rest } = a;
+        const { imageToInpaint: b_imageToInpaint, ...b_rest } = b;
+        return (
+          _.isEqual(a_rest, b_rest) && a_imageToInpaint == b_imageToInpaint
+        );
+      },
+    },
+  }
+);
 
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
@@ -70,7 +152,7 @@ const IAICanvas = () => {
     isMoveStageKeyHeld,
     boundingBoxDimensions,
     activeTabName,
-  } = useAppSelector(inpaintingCanvasSelector);
+  } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
 

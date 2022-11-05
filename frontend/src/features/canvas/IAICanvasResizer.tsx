@@ -2,14 +2,31 @@ import { Spinner } from '@chakra-ui/react';
 import { useLayoutEffect, useRef } from 'react';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { setStageDimensions, setStageScale } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  setStageDimensions,
+  setStageScale,
+} from 'features/canvas/canvasSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+const canvasResizerSelector = createSelector(
+  currentCanvasSelector,
+  activeTabNameSelector,
+  (currentCanvas: GenericCanvasState, activeTabName) => {
+    const { doesCanvasNeedScaling, imageToInpaint } = currentCanvas;
+    return {
+      doesCanvasNeedScaling,
+      imageToInpaint,
+      activeTabName,
+    };
+  }
+);
 
 const IAICanvasResizer = () => {
   const dispatch = useAppDispatch();
-  const { doesCanvasNeedScaling, imageToInpaint } = useAppSelector(
-    (state: RootState) => state.inpainting
-  );
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const { doesCanvasNeedScaling, imageToInpaint, activeTabName } =
+    useAppSelector(canvasResizerSelector);
 
   const ref = useRef<HTMLDivElement>(null);
 

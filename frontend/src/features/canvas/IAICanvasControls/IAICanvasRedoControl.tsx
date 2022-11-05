@@ -2,26 +2,29 @@ import { createSelector } from '@reduxjs/toolkit';
 import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaRedo } from 'react-icons/fa';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { InpaintingState, redo } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  areHotkeysEnabledSelector,
+  currentCanvasSelector,
+  GenericCanvasState,
+  // InpaintingState,
+  redo,
+} from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 
-const inpaintingRedoSelector = createSelector(
-  [(state: RootState) => state.inpainting, activeTabNameSelector],
-  (inpainting: InpaintingState, activeTabName) => {
-    const { futureLines, shouldShowMask } = inpainting;
+const canvasRedoSelector = createSelector(
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { futureLines, shouldShowMask } = currentCanvas;
 
     return {
       canRedo: futureLines.length > 0,
       shouldShowMask,
       activeTabName,
+      areHotkeysEnabled,
     };
   },
   {
@@ -33,9 +36,8 @@ const inpaintingRedoSelector = createSelector(
 
 export default function IAICanvasRedoControl() {
   const dispatch = useAppDispatch();
-  const { canRedo, shouldShowMask, activeTabName } = useAppSelector(
-    inpaintingRedoSelector
-  );
+  const { canRedo, shouldShowMask, activeTabName, areHotkeysEnabled } =
+    useAppSelector(canvasRedoSelector);
 
   const handleRedo = () => dispatch(redo());
 
@@ -49,7 +51,7 @@ export default function IAICanvasRedoControl() {
       handleRedo();
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask && canRedo,
+      enabled: areHotkeysEnabled && canRedo,
     },
     [activeTabName, shouldShowMask, canRedo]
   );

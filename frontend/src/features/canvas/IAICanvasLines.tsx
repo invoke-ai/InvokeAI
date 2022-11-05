@@ -1,7 +1,25 @@
 import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line, Rect } from 'react-konva';
 import { useAppSelector } from 'app/store';
-import { inpaintingCanvasLinesSelector } from 'features/tabs/Inpainting/inpaintingSliceSelectors';
+// import { inpaintingCanvasLinesSelector } from 'features/canvas/canvasSliceSelectors';
+import { createSelector } from '@reduxjs/toolkit';
+import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
+import { rgbaColorToString } from './util/colorToString';
+
+export const canvasLinesSelector = createSelector(
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => {
+    const { lines, maskColor, stageCoordinates, stageDimensions, stageScale } =
+      currentCanvas;
+    return {
+      lines,
+      stageCoordinates,
+      stageDimensions,
+      stageScale,
+      maskColorString: rgbaColorToString(maskColor),
+    };
+  }
+);
 
 type InpaintingCanvasLinesProps = GroupConfig;
 
@@ -18,7 +36,7 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
     stageCoordinates,
     stageDimensions,
     stageScale,
-  } = useAppSelector(inpaintingCanvasLinesSelector);
+  } = useAppSelector(canvasLinesSelector);
 
   return (
     <Group {...rest}>

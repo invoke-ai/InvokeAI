@@ -1,21 +1,19 @@
 import { useToast } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIButton from 'common/components/IAIButton';
 import {
-  InpaintingState,
+  currentCanvasSelector,
+  GenericCanvasState,
+  // InpaintingState,
   setClearBrushHistory,
-} from 'features/tabs/Inpainting/inpaintingSlice';
+} from 'features/canvas/canvasSlice';
 import _ from 'lodash';
 
 const clearBrushHistorySelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => {
-    const { pastLines, futureLines } = inpainting;
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => {
+    const { pastLines, futureLines } = currentCanvas;
     return {
       mayClearBrushHistory:
         futureLines.length > 0 || pastLines.length > 0 ? false : true,

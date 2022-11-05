@@ -5,13 +5,17 @@ import { SystemState } from 'features/system/systemSlice';
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
-import { InpaintingState } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  CanvasState,
+  GenericCanvasState,
+  ValidCanvasName,
+} from 'features/canvas/canvasSlice';
 import generateMask from 'features/canvas/util/generateMask';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
   optionsState: OptionsState;
-  inpaintingState: InpaintingState;
+  canvasState: CanvasState;
   systemState: SystemState;
   imageToProcessUrl?: string;
   maskImageElement?: HTMLImageElement;
@@ -27,7 +31,7 @@ export const frontendToBackendParameters = (
   const {
     generationMode,
     optionsState,
-    inpaintingState,
+    canvasState,
     systemState,
     imageToProcessUrl,
     maskImageElement,
@@ -101,14 +105,17 @@ export const frontendToBackendParameters = (
   }
 
   // inpainting exclusive parameters
-  if (generationMode === 'inpainting' && maskImageElement) {
+  if (
+    ['inpainting', 'outpainting'].includes(generationMode) &&
+    maskImageElement
+  ) {
     const {
       lines,
       boundingBoxCoordinates,
       boundingBoxDimensions,
       inpaintReplace,
       shouldUseInpaintReplace,
-    } = inpaintingState;
+    } = canvasState[canvasState.currentCanvas];
 
     const boundingBox = {
       ...boundingBoxCoordinates,
@@ -137,15 +144,17 @@ export const frontendToBackendParameters = (
 
     generationParameters.bounding_box = boundingBox;
 
-    // TODO: The server metadata generation needs to be changed to fix this.
-    generationParameters.progress_images = false;
+    if (generationMode === 'outpainting') {
+      // TODO: The server metadata generation needs to be changed to fix this.
+      generationParameters.progress_images = false;
 
-    generationParameters.seam_size = 96;
-    generationParameters.seam_blur = 16;
-    generationParameters.seam_strength = 0.7;
-    generationParameters.seam_steps = 10;
-    generationParameters.tile_size = 32;
-    generationParameters.force_outpaint = false;
+      generationParameters.seam_size = 96;
+      generationParameters.seam_blur = 16;
+      generationParameters.seam_strength = 0.7;
+      generationParameters.seam_steps = 10;
+      generationParameters.tile_size = 32;
+      generationParameters.force_outpaint = false;
+    }
   }
 
   if (shouldGenerateVariations) {

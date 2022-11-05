@@ -3,11 +3,12 @@ import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { Circle, Group } from 'react-konva';
 import { RootState, useAppSelector } from 'app/store';
-import { InpaintingState } from 'features/tabs/Inpainting/inpaintingSlice';
+import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
+// import { InpaintingState } from 'features/canvas/canvasSlice';
 
-const inpaintingCanvasBrushPrevieOutlineSelector = createSelector(
-  (state: RootState) => state.inpainting,
-  (inpainting: InpaintingState) => {
+const canvasBrushPreviewOutlineSelector = createSelector(
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => {
     const {
       cursorPosition,
       stageDimensions: { width, height },
@@ -17,7 +18,7 @@ const inpaintingCanvasBrushPrevieOutlineSelector = createSelector(
       isMovingBoundingBox,
       isTransformingBoundingBox,
       stageScale,
-    } = inpainting;
+    } = currentCanvas;
 
     return {
       cursorPosition,
@@ -48,7 +49,7 @@ const inpaintingCanvasBrushPrevieOutlineSelector = createSelector(
 const IAICanvasBrushPreviewOutline = (props: GroupConfig) => {
   const { ...rest } = props;
   const { cursorPosition, width, height, brushSize, strokeWidth, radius } =
-    useAppSelector(inpaintingCanvasBrushPrevieOutlineSelector);
+    useAppSelector(canvasBrushPreviewOutlineSelector);
 
   return (
     <Group {...rest}>

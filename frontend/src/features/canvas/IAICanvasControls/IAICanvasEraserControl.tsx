@@ -2,26 +2,29 @@ import { createSelector } from '@reduxjs/toolkit';
 import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEraser } from 'react-icons/fa';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { InpaintingState, setTool } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  areHotkeysEnabledSelector,
+  currentCanvasSelector,
+  GenericCanvasState,
+  // InpaintingState,
+  setTool,
+} from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
-const inpaintingEraserSelector = createSelector(
-  [(state: RootState) => state.inpainting, activeTabNameSelector],
-  (inpainting: InpaintingState, activeTabName) => {
-    const { tool, shouldShowMask } = inpainting;
+const eraserSelector = createSelector(
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { tool, shouldShowMask } = currentCanvas;
 
     return {
       tool,
       shouldShowMask,
       activeTabName,
+      areHotkeysEnabled,
     };
   },
   {
@@ -32,9 +35,8 @@ const inpaintingEraserSelector = createSelector(
 );
 
 export default function IAICanvasEraserControl() {
-  const { tool, shouldShowMask, activeTabName } = useAppSelector(
-    inpaintingEraserSelector
-  );
+  const { tool, shouldShowMask, activeTabName, areHotkeysEnabled } =
+    useAppSelector(eraserSelector);
   const dispatch = useAppDispatch();
 
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
@@ -45,11 +47,10 @@ export default function IAICanvasEraserControl() {
     'e',
     (e: KeyboardEvent) => {
       e.preventDefault();
-      if (activeTabName !== 'inpainting' || !shouldShowMask) return;
       handleSelectEraserTool();
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldShowMask]
   );

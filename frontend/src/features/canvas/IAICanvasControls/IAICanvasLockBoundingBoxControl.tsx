@@ -1,16 +1,34 @@
 import { FaLock, FaUnlock } from 'react-icons/fa';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { setShouldLockBoundingBox } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  setShouldLockBoundingBox,
+} from 'features/canvas/canvasSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import _ from 'lodash';
+
+const canvasLockBoundingBoxSelector = createSelector(
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => {
+    const { shouldLockBoundingBox } = currentCanvas;
+
+    return {
+      shouldLockBoundingBox,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
+  }
+);
 
 const IAICanvasLockBoundingBoxControl = () => {
   const dispatch = useAppDispatch();
-  const shouldLockBoundingBox = useAppSelector(
-    (state: RootState) => state.inpainting.shouldLockBoundingBox
+  const { shouldLockBoundingBox } = useAppSelector(
+    canvasLockBoundingBoxSelector
   );
 
   return (

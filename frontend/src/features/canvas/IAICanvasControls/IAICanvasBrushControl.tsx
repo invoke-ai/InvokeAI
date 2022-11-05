@@ -2,11 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaPaintBrush } from 'react-icons/fa';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAIPopover from 'common/components/IAIPopover';
@@ -14,25 +10,29 @@ import IAISlider from 'common/components/IAISlider';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 import {
-  InpaintingState,
+  areHotkeysEnabledSelector,
+  currentCanvasSelector,
+  GenericCanvasState,
+  // InpaintingState,
   setBrushSize,
   setShouldShowBrushPreview,
   setTool,
-} from 'features/tabs/Inpainting/inpaintingSlice';
+} from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import IAICanvasMaskColorPicker from './IAICanvasMaskControls/IAICanvasMaskColorPicker';
 
 const inpaintingBrushSelector = createSelector(
-  [(state: RootState) => state.inpainting, activeTabNameSelector],
-  (inpainting: InpaintingState, activeTabName) => {
-    const { tool, brushSize, shouldShowMask } = inpainting;
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { tool, brushSize, shouldShowMask } = currentCanvas;
 
     return {
       tool,
       brushSize,
       shouldShowMask,
       activeTabName,
+      areHotkeysEnabled,
     };
   },
   {
@@ -44,9 +44,8 @@ const inpaintingBrushSelector = createSelector(
 
 export default function IAICanvasBrushControl() {
   const dispatch = useAppDispatch();
-  const { tool, brushSize, shouldShowMask, activeTabName } = useAppSelector(
-    inpaintingBrushSelector
-  );
+  const { tool, brushSize, shouldShowMask, activeTabName, areHotkeysEnabled } =
+    useAppSelector(inpaintingBrushSelector);
 
   const handleSelectBrushTool = () => dispatch(setTool('brush'));
 
@@ -77,7 +76,7 @@ export default function IAICanvasBrushControl() {
       }
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldShowMask, brushSize]
   );
@@ -90,7 +89,7 @@ export default function IAICanvasBrushControl() {
       handleChangeBrushSize(brushSize + 5);
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldShowMask, brushSize]
   );
@@ -103,7 +102,7 @@ export default function IAICanvasBrushControl() {
       handleSelectBrushTool();
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldShowMask]
   );

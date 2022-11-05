@@ -8,7 +8,7 @@ import {
 } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setShowDualDisplay } from 'features/options/optionsSlice';
-import { setDoesCanvasNeedScaling } from 'features/tabs/Inpainting/inpaintingSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
 
 export default function IAICanvasSplitLayoutControl() {
   const dispatch = useAppDispatch();

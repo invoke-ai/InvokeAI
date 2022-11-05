@@ -38,7 +38,7 @@ import {
 import {
   setImageToInpaint,
   setDoesCanvasNeedScaling,
-} from 'features/tabs/Inpainting/inpaintingSlice';
+} from 'features/canvas/canvasSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import IAIPopover from 'common/components/IAIPopover';

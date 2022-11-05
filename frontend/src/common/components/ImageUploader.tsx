@@ -41,7 +41,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     (file: File) => {
       setIsHandlingUpload(true);
       const payload: UploadImagePayload = { file };
-      if (['img2img', 'inpainting'].includes(activeTabName)) {
+      if (['img2img', 'inpainting', 'outpainting'].includes(activeTabName)) {
         payload.destination = activeTabName as ImageUploadDestination;
       }
       dispatch(uploadImage(payload));

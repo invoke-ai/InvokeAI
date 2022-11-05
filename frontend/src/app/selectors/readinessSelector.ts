@@ -5,20 +5,23 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 
 import { SystemState } from 'features/system/systemSlice';
-import { InpaintingState } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+} from 'features/canvas/canvasSlice';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 
 export const readinessSelector = createSelector(
   [
     (state: RootState) => state.options,
     (state: RootState) => state.system,
-    (state: RootState) => state.inpainting,
+    currentCanvasSelector,
     activeTabNameSelector,
   ],
   (
     options: OptionsState,
     system: SystemState,
-    inpainting: InpaintingState,
+    currentCanvas: GenericCanvasState,
     activeTabName
   ) => {
     const {
@@ -32,7 +35,7 @@ export const readinessSelector = createSelector(
 
     const { isProcessing, isConnected } = system;
 
-    const { imageToInpaint } = inpainting;
+    const { imageToInpaint } = currentCanvas;
 
     let isReady = true;
     const reasonsWhyNotReady: string[] = [];

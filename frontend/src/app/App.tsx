@@ -53,13 +53,18 @@ const appSelector = createSelector(
 
     const shouldShowGalleryButton =
       !(shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)) &&
-      ['txt2img', 'img2img', 'inpainting'].includes(activeTabName);
+      ['txt2img', 'img2img', 'inpainting', 'outpainting'].includes(
+        activeTabName
+      );
 
     const shouldShowOptionsPanelButton =
       !(
         shouldShowOptionsPanel ||
         (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
-      ) && ['txt2img', 'img2img', 'inpainting'].includes(activeTabName);
+      ) &&
+      ['txt2img', 'img2img', 'inpainting', 'outpainting'].includes(
+        activeTabName
+      );
 
     return {
       modelStatusText,

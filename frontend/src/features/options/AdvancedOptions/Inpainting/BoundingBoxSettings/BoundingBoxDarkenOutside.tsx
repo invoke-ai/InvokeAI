@@ -1,16 +1,22 @@
 import React from 'react';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAICheckbox from 'common/components/IAICheckbox';
-import { setShouldShowBoundingBoxFill } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  setShouldShowBoundingBoxFill,
+} from 'features/canvas/canvasSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+const boundingBoxDarkenOutsideSelector = createSelector(
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => currentCanvas.shouldShowBoundingBoxFill
+);
 
 export default function BoundingBoxDarkenOutside() {
   const dispatch = useAppDispatch();
   const shouldShowBoundingBoxFill = useAppSelector(
-    (state: RootState) => state.inpainting.shouldShowBoundingBoxFill
+    boundingBoxDarkenOutsideSelector
   );
 
   const handleChangeShouldShowBoundingBoxFill = () => {

@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import IAICanvas from 'features/canvas/IAICanvas';
+// import IAICanvas from 'features/canvas/IAICanvas';
 import IAICanvasControls from 'features/canvas/IAICanvasControls';
 import IAICanvasResizer from 'features/canvas/IAICanvasResizer';
 import _ from 'lodash';
@@ -8,12 +8,17 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import ImageUploadButton from 'common/components/ImageUploaderButton';
 import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
 import { OptionsState } from 'features/options/optionsSlice';
-import { InpaintingState, setDoesCanvasNeedScaling } from './inpaintingSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  setDoesCanvasNeedScaling,
+} from 'features/canvas/canvasSlice';
+import IAICanvas from 'features/canvas/IAICanvas';
 
 const inpaintingDisplaySelector = createSelector(
-  [(state: RootState) => state.inpainting, (state: RootState) => state.options],
-  (inpainting: InpaintingState, options: OptionsState) => {
-    const { doesCanvasNeedScaling, imageToInpaint } = inpainting;
+  [currentCanvasSelector, (state: RootState) => state.options],
+  (currentCanvas: GenericCanvasState, options: OptionsState) => {
+    const { doesCanvasNeedScaling, imageToInpaint } = currentCanvas;
     const { showDualDisplay } = options;
     return {
       doesCanvasNeedScaling,

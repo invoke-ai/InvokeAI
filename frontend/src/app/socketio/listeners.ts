@@ -36,7 +36,7 @@ import { requestImages, requestNewImages } from './actions';
 import {
   clearImageToInpaint,
   setImageToInpaint,
-} from 'features/tabs/Inpainting/inpaintingSlice';
+} from 'features/canvas/canvasSlice';
 import { tabMap } from 'features/tabs/InvokeTabs';
 
 /**

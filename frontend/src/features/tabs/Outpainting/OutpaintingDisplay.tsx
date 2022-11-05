@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import IAICanvas from 'features/canvas/IAICanvas';
+// import IAICanvas from 'features/canvas/IAICanvas';
 import IAICanvasControls from 'features/canvas/IAICanvasControls';
 import IAICanvasResizer from 'features/canvas/IAICanvasResizer';
 import _ from 'lodash';
@@ -8,19 +8,22 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import ImageUploadButton from 'common/components/ImageUploaderButton';
 import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
 import { OptionsState } from 'features/options/optionsSlice';
-import { OutpaintingState, setDoesCanvasNeedScaling } from './outpaintingSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  setDoesCanvasNeedScaling,
+} from 'features/canvas/canvasSlice';
+import IAICanvas from 'features/canvas/IAICanvas';
 
-const inpaintingDisplaySelector = createSelector(
-  [(state: RootState) => state.outpainting, (state: RootState) => state.options],
-  (outpainting: OutpaintingState, options: OptionsState) => {
-    const { doesCanvasNeedScaling, imageToInpaint, boundingBoxDimensions } =
-      outpainting;
+const outpaintingDisplaySelector = createSelector(
+  [currentCanvasSelector, (state: RootState) => state.options],
+  (currentCanvas: GenericCanvasState, options: OptionsState) => {
+    const { doesCanvasNeedScaling, imageToInpaint } = currentCanvas;
     const { showDualDisplay } = options;
     return {
       doesCanvasNeedScaling,
       showDualDisplay,
       imageToInpaint,
-      boundingBoxDimensions,
     };
   },
   {
@@ -32,11 +35,8 @@ const inpaintingDisplaySelector = createSelector(
 
 const OutpaintingDisplay = () => {
   const dispatch = useAppDispatch();
-  const {
-    showDualDisplay,
-    doesCanvasNeedScaling,
-    imageToInpaint,
-  } = useAppSelector(inpaintingDisplaySelector);
+  const { showDualDisplay, doesCanvasNeedScaling, imageToInpaint } =
+    useAppSelector(outpaintingDisplaySelector);
 
   useLayoutEffect(() => {
     const resizeCallback = _.debounce(
@@ -47,15 +47,11 @@ const OutpaintingDisplay = () => {
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
 
-  const inpaintingComponent = imageToInpaint ? (
+  const outpaintingComponent = imageToInpaint ? (
     <div className="inpainting-main-area">
       <IAICanvasControls />
       <div className="inpainting-canvas-area">
-        {doesCanvasNeedScaling ? (
-          <IAICanvasResizer />
-        ) : (
-          <IAICanvas />
-        )}
+        {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
       </div>
     </div>
   ) : (
@@ -68,7 +64,7 @@ const OutpaintingDisplay = () => {
         showDualDisplay ? 'workarea-split-view' : 'workarea-single-view'
       }
     >
-      <div className="workarea-split-view-left">{inpaintingComponent} </div>
+      <div className="workarea-split-view-left">{outpaintingComponent}</div>
       {showDualDisplay && (
         <div className="workarea-split-view-right">
           <CurrentImageDisplay />

@@ -1,24 +1,30 @@
 import { createSelector } from '@reduxjs/toolkit';
 import React from 'react';
 import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { InpaintingState, setShouldInvertMask } from 'features/tabs/Inpainting/inpaintingSlice';
+import {
+  areHotkeysEnabledSelector,
+  currentCanvasSelector,
+  GenericCanvasState,
+  setShouldInvertMask,
+} from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 
-const inpaintingMaskInvertSelector = createSelector(
-  [(state: RootState) => state.inpainting, activeTabNameSelector],
-  (inpainting: InpaintingState, activeTabName) => {
-    const { shouldShowMask, shouldInvertMask } = inpainting;
+const canvasMaskInvertSelector = createSelector(
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { shouldShowMask, shouldInvertMask } = currentCanvas;
 
-    return { shouldInvertMask, shouldShowMask, activeTabName };
+    return {
+      shouldInvertMask,
+      shouldShowMask,
+      activeTabName,
+      areHotkeysEnabled,
+    };
   },
   {
     memoizeOptions: {
@@ -28,9 +34,8 @@ const inpaintingMaskInvertSelector = createSelector(
 );
 
 export default function IAICanvasMaskInvertControl() {
-  const { shouldInvertMask, shouldShowMask, activeTabName } = useAppSelector(
-    inpaintingMaskInvertSelector
-  );
+  const { shouldInvertMask, shouldShowMask, activeTabName, areHotkeysEnabled } =
+    useAppSelector(canvasMaskInvertSelector);
   const dispatch = useAppDispatch();
 
   const handleToggleShouldInvertMask = () =>
@@ -44,7 +49,7 @@ export default function IAICanvasMaskInvertControl() {
       handleToggleShouldInvertMask();
     },
     {
-      enabled: activeTabName === 'inpainting' && shouldShowMask,
+      enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldInvertMask, shouldShowMask]
   );
