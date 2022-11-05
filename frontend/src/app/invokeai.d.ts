@@ -13,6 +13,7 @@
  */
 
 import { Category as GalleryCategory } from 'features/gallery/gallerySlice';
+import { IRect } from 'konva/lib/types';
 
 /**
  * TODO:
@@ -115,8 +116,8 @@ export declare type Image = {
   metadata?: Metadata;
   width: number;
   height: number;
-  category: GalleryCategory; 
-  isBase64: boolean; 
+  category: GalleryCategory;
+  isBase64: boolean;
 };
 
 // GalleryImages is an array of Image.
@@ -171,7 +172,10 @@ export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;
 
-export declare type ImageResultResponse = Omit<Image, 'uuid'>;
+export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
+  outpaintingRegionUuid?: string;
+  boundingBox?: IRect;
+};
 
 export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
   destination: 'img2img' | 'inpainting';

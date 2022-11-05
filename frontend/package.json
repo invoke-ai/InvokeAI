@@ -40,6 +40,7 @@
     "redux-persist": "^6.0.0",
     "socket.io": "^4.5.2",
     "socket.io-client": "^4.5.2",
+    "use-image": "^1.1.0",
     "uuid": "^9.0.0",
     "yarn": "^1.22.19"
   },

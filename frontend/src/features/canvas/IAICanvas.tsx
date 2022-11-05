@@ -12,10 +12,11 @@ import { Image as KonvaImage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
 // app
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import {
   addLine,
   addPointToCurrentLine,
+  CanvasState,
   clearImageToInpaint,
   currentCanvasSelector,
   GenericCanvasState,
@@ -45,10 +46,15 @@ import {
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import IAICanvasImage from './IAICanvasImage';
 
 const canvasSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas: GenericCanvasState, activeTabName) => {
+  [
+    currentCanvasSelector,
+    activeTabNameSelector,
+    (state: RootState) => state.canvas,
+  ],
+  (currentCanvas: GenericCanvasState, activeTabName, canvas: CanvasState) => {
     const {
       tool,
       brushSize,
@@ -109,6 +115,10 @@ const canvasSelector = createSelector(
       stageCoordinates,
       isMoveStageKeyHeld,
       activeTabName,
+      outpaintingSession:
+        canvas.currentCanvas === 'outpainting'
+          ? canvas.outpainting.session
+          : undefined,
     };
   },
   {
@@ -151,6 +161,7 @@ const IAICanvas = () => {
     isMoveStageKeyHeld,
     boundingBoxDimensions,
     activeTabName,
+    outpaintingSession,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
@@ -433,6 +444,12 @@ const IAICanvas = () => {
                 globalCompositeOperation="source-out"
                 visible={!shouldInvertMask && shouldShowCheckboardTransparency}
               />
+              {outpaintingSession &&
+                _.map(outpaintingSession, (region) =>
+                  region.images.map((image) => (
+                    <IAICanvasImage x={region.x} y={region.y} url={image.url} />
+                  ))
+                )}
             </Layer>
             <Layer visible={shouldShowMask}>
               {shouldShowBoundingBoxFill && shouldShowBoundingBox && (

@@ -34,6 +34,7 @@ import {
 } from 'features/options/optionsSlice';
 import { requestImages, requestNewImages } from './actions';
 import {
+  addImageToOutpaintingSesion,
   clearImageToInpaint,
   setImageToInpaint,
   setImageToOutpaint,
@@ -112,6 +113,16 @@ const makeSocketIOListeners = (
           })
         );
 
+        if (data.boundingBox) {
+          const { boundingBox } = data;
+          dispatch(
+            addImageToOutpaintingSesion({
+              image: newImage,
+              boundingBox,
+            })
+          );
+        }
+
         if (shouldLoopback) {
           const activeTabName = tabMap[activeTab];
           switch (activeTabName) {
@@ -121,10 +132,6 @@ const makeSocketIOListeners = (
             }
             case 'inpainting': {
               dispatch(setImageToInpaint(newImage));
-              break;
-            }
-            case 'outpainting': {
-              dispatch(setImageToOutpaint(newImage));
               break;
             }
           }

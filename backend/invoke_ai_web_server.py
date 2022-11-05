@@ -824,6 +824,7 @@ class InvokeAIWebServer:
                         "metadata": metadata,
                         "width": width,
                         "height": height,
+                        "boundingBox": generation_parameters["bounding_box"] if "bounding_box" in generation_parameters else None
                     },
                 )
                 eventlet.sleep(0)

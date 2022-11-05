@@ -1,6 +1,6 @@
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { Vector2d } from 'konva/lib/types';
+import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 import * as InvokeAI from 'app/invokeai';
 import _ from 'lodash';
@@ -64,12 +64,27 @@ export interface GenericCanvasState {
   isMoveStageKeyHeld: boolean;
 }
 
+export type OutpaintingRegion = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  images: InvokeAI.Image[];
+  selectedImageIndex: number;
+};
+
+// export type Outpainting = Record<string, OutpaintingRegion>;
+
+export type OutpaintingCanvasState = GenericCanvasState & {
+  session: OutpaintingRegion[];
+};
+
 export type ValidCanvasName = 'inpainting' | 'outpainting';
 
 export interface CanvasState {
   currentCanvas: ValidCanvasName;
   inpainting: GenericCanvasState;
-  outpainting: GenericCanvasState;
+  outpainting: OutpaintingCanvasState;
 }
 
 const initialGenericCanvasState: GenericCanvasState = {
@@ -108,7 +123,7 @@ const initialGenericCanvasState: GenericCanvasState = {
 const initialCanvasState: CanvasState = {
   currentCanvas: 'inpainting',
   inpainting: initialGenericCanvasState,
-  outpainting: initialGenericCanvasState,
+  outpainting: { session: [], ...initialGenericCanvasState },
 };
 
 const setCanvasImage = (
@@ -403,6 +418,37 @@ export const canvasSlice = createSlice({
     setCurrentCanvas: (state, action: PayloadAction<ValidCanvasName>) => {
       state.currentCanvas = action.payload;
     },
+    addImageToOutpaintingSesion: (
+      state,
+      action: PayloadAction<{
+        boundingBox: IRect;
+        image: InvokeAI.Image;
+      }>
+    ) => {
+      const { boundingBox, image } = action.payload;
+      if (!boundingBox || !image) return;
+
+      const { x, y, width, height } = boundingBox;
+
+      const index = state.outpainting.session.findIndex(
+        (region) =>
+          region.x === x &&
+          region.y === y &&
+          region.width === width &&
+          region.height === height
+      );
+
+      if (index < 0) {
+        state.outpainting.session.push({
+          ...boundingBox,
+          images: [image],
+          selectedImageIndex: 0,
+        });
+      } else {
+        state.outpainting.session[index].images.push(image);
+        state.outpainting.session[index].selectedImageIndex = index;
+      }
+    },
   },
 });
 
@@ -446,6 +492,7 @@ export const {
   setIsMoveStageKeyHeld,
   setStageCoordinates,
   setCurrentCanvas,
+  addImageToOutpaintingSesion,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
