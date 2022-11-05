@@ -6,13 +6,14 @@ import { MaskLine } from 'features/canvas/canvasSlice';
  * Re-draws the mask canvas onto a new Konva stage.
  */
 export const generateMaskCanvas = (
-  image: HTMLImageElement,
-  lines: MaskLine[]
+  // image: HTMLImageElement,
+  lines: MaskLine[],
+  boundingBox: IRect
 ): {
   stage: Konva.Stage;
   layer: Konva.Layer;
 } => {
-  const { width, height } = image;
+  const { width, height } = boundingBox;
 
   const offscreenContainer = document.createElement('div');
 
@@ -86,20 +87,26 @@ export const checkIsRegionEmpty = (
  * mask image.
  */
 const generateMask = (
-  image: HTMLImageElement,
   lines: MaskLine[],
   boundingBox: IRect
 ): { maskDataURL: string; isMaskEmpty: boolean } => {
   // create an offscreen canvas and add the mask to it
-  const { stage, layer } = generateMaskCanvas(image, lines);
+  const { stage, layer } = generateMaskCanvas(lines, boundingBox);
 
   // check if the mask layer is empty
   const isMaskEmpty = checkIsRegionEmpty(stage, boundingBox);
 
   // composite the image onto the mask layer
   layer.add(
-    new Konva.Image({ image: image, globalCompositeOperation: 'source-out' })
+    new Konva.Rect({
+      ...boundingBox,
+      fill: 'white',
+      globalCompositeOperation: 'source-out',
+    })
   );
+  // layer.add(
+  //   new Konva.Image({ image: image, globalCompositeOperation: 'source-out' })
+  // );
 
   const maskDataURL = stage.toDataURL({ ...boundingBox });
 

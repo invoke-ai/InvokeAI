@@ -11,6 +11,7 @@ import {
   ValidCanvasName,
 } from 'features/canvas/canvasSlice';
 import generateMask from 'features/canvas/util/generateMask';
+import { canvasImageLayerRef } from 'features/canvas/IAICanvas';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
@@ -18,7 +19,6 @@ export type FrontendToBackendParametersConfig = {
   canvasState: CanvasState;
   systemState: SystemState;
   imageToProcessUrl?: string;
-  maskImageElement?: HTMLImageElement;
 };
 
 /**
@@ -34,7 +34,6 @@ export const frontendToBackendParameters = (
     canvasState,
     systemState,
     imageToProcessUrl,
-    maskImageElement,
   } = config;
 
   const {
@@ -107,7 +106,7 @@ export const frontendToBackendParameters = (
   // inpainting exclusive parameters
   if (
     ['inpainting', 'outpainting'].includes(generationMode) &&
-    maskImageElement
+    canvasImageLayerRef.current
   ) {
     const {
       lines,
@@ -125,15 +124,25 @@ export const frontendToBackendParameters = (
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = false;
-
-    const { maskDataURL, isMaskEmpty } = generateMask(
-      maskImageElement,
-      lines,
-      boundingBox
-    );
-
+    const scale = canvasImageLayerRef.current.getAbsoluteScale().x;
+    console.log(boundingBox);
+    console.log(canvasImageLayerRef.current.getAttrs());
+    console.log(canvasImageLayerRef.current.getSize().width / scale);
+    console.log(canvasImageLayerRef.current.getAbsoluteScale());
+    const { maskDataURL, isMaskEmpty } = generateMask(lines, boundingBox);
+    canvasImageLayerRef.current.scale({ x: 1, y: 1 });
+    const absPos = canvasImageLayerRef.current.getAbsolutePosition();
+    const imageDataURL = canvasImageLayerRef.current.toDataURL({
+      x: boundingBox.x + absPos.x,
+      y: boundingBox.y + absPos.y,
+      ...canvasImageLayerRef.current.getSize(),
+    });
     generationParameters.is_mask_empty = isMaskEmpty;
-    console.log(maskDataURL);
+
+    generationParameters.init_img = imageDataURL.split(
+      'data:image/png;base64,'
+    )[1];
+    console.log(imageDataURL);
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'
     )[1];

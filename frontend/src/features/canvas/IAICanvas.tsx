@@ -137,6 +137,7 @@ const canvasSelector = createSelector(
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
 export let maskLayerRef: MutableRefObject<Konva.Layer | null>;
+export let canvasImageLayerRef: MutableRefObject<Konva.Layer | null>;
 export let inpaintingImageElementRef: MutableRefObject<HTMLImageElement | null>;
 
 const IAICanvas = () => {
@@ -171,6 +172,7 @@ const IAICanvas = () => {
   // set the closure'd refs
   stageRef = useRef<StageType>(null);
   maskLayerRef = useRef<Konva.Layer>(null);
+  canvasImageLayerRef = useRef<Konva.Layer>(null);
   inpaintingImageElementRef = useRef<HTMLImageElement>(null);
 
   const lastCursorPosition = useRef<Vector2d>({ x: 0, y: 0 });
@@ -415,10 +417,23 @@ const IAICanvas = () => {
           >
             <Layer
               name={'image-layer'}
+              ref={canvasImageLayerRef}
               listening={false}
               visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
             >
               <KonvaImage listening={false} image={canvasBgImage} />
+              <>
+                {outpaintingSession &&
+                  _.map(outpaintingSession, (region) =>
+                    region.images.length > 0 ? (
+                      <IAICanvasImage
+                        x={region.x}
+                        y={region.y}
+                        url={region.images[region.selectedImageIndex].url}
+                      />
+                    ) : null
+                  )}
+              </>
             </Layer>
             <Layer
               name={'mask-layer'}
@@ -444,12 +459,6 @@ const IAICanvas = () => {
                 globalCompositeOperation="source-out"
                 visible={!shouldInvertMask && shouldShowCheckboardTransparency}
               />
-              {outpaintingSession &&
-                _.map(outpaintingSession, (region) =>
-                  region.images.map((image) => (
-                    <IAICanvasImage x={region.x} y={region.y} url={image.url} />
-                  ))
-                )}
             </Layer>
             <Layer visible={shouldShowMask}>
               {shouldShowBoundingBoxFill && shouldShowBoundingBox && (

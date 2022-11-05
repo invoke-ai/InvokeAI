@@ -72,8 +72,8 @@ const makeSocketIOEmitters = (
 
         frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
 
-        frontendToBackendParametersConfig.maskImageElement =
-          inpaintingImageElementRef.current;
+        // frontendToBackendParametersConfig.maskImageElement =
+        //   inpaintingImageElementRef.current;
       } else if (!['txt2img', 'img2img'].includes(generationMode)) {
         if (!galleryState.currentImage?.url) return;
 
