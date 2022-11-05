@@ -1,0 +1,75 @@
+@use '../../styles/Mixins/' as *;
+
+.invokeai__icon-button {
+  background-color: var(--btn-grey);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--btn-grey-hover);
+  }
+
+  &[data-selected='true'] {
+    background-color: var(--accent-color);
+    &:hover {
+      background-color: var(--accent-color-hover);
+    }
+  }
+
+  &[disabled] {
+    cursor: not-allowed;
+  }
+
+  &[data-variant='link'] {
+    background: none !important;
+    &:hover {
+      background: none !important;
+    }
+  }
+
+  &[data-selected='true'] {
+    border-color: var(--accent-color);
+    &:hover {
+      border-color: var(--accent-color-hover);
+    }
+  }
+
+  &[data-alert='true'] {
+    animation-name: pulseColor;
+    animation-duration: 1s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    &:hover {
+      animation: none;
+      background-color: var(--accent-color-hover);
+    }
+  }
+
+  &[data-as-checkbox='true'] {
+    background-color: var(--btn-grey);
+    border: 3px solid var(--btn-grey);
+
+    svg {
+      fill: var(--text-color);
+    }
+
+    &:hover {
+      background-color: var(--btn-grey);
+      border-color: var(--btn-checkbox-border-hover);
+      svg {
+        fill: var(--text-color);
+      }
+    }
+  }
+}
+
+@keyframes pulseColor {
+  0% {
+    background-color: var(--accent-color);
+  }
+  50% {
+    background-color: var(--accent-color-dim);
+  }
+  100% {
+    background-color: var(--accent-color);
+  }
+}

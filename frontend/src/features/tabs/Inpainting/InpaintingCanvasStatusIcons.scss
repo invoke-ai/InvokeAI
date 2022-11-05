@@ -1,0 +1,29 @@
+.inpainting-alerts {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  margin: 0.5rem;
+
+  button {
+    background-color: var(--inpainting-alerts-bg);
+
+    svg {
+      fill: var(--inpainting-alerts-icon-color);
+    }
+
+    &[data-selected='true'] {
+      background-color: var(--inpainting-alerts-bg-active);
+      svg {
+        fill: var(--inpainting-alerts-icon-active);
+      }
+    }
+
+    &[data-alert='true'] {
+      background-color: var(--inpainting-alerts-bg-alert);
+      svg {
+        fill: var(--inpainting-alerts-icon-alert);
+      }
+    }
+  }
+}

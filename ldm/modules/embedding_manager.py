@@ -82,7 +82,9 @@ class EmbeddingManager(nn.Module):
                 get_embedding_for_clip_token,
                 embedder.transformer.text_model.embeddings,
             )
-            token_dim = 1280
+            # per bug report #572
+            #token_dim = 1280
+            token_dim = 768
         else:   # using LDM's BERT encoder
             self.is_clip = False
             get_token_for_string = partial(
@@ -167,9 +169,14 @@ class EmbeddingManager(nn.Module):
                     placeholder_embedding.shape[0], max_step_tokens
                 )
 
-                placeholder_rows, placeholder_cols = torch.where(
-                    tokenized_text == placeholder_token.to(device)
-                )
+                if torch.cuda.is_available():
+                    placeholder_rows, placeholder_cols = torch.where(
+                        tokenized_text == placeholder_token.to(device)
+                    )
+                else:
+                    placeholder_rows, placeholder_cols = torch.where(
+                        tokenized_text == placeholder_token
+                    )
 
                 if placeholder_rows.nelement() == 0:
                     continue

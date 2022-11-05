@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='latent-diffusion',
-    version='0.0.1',
+    name='invoke-ai',
+    version='2.0.2',
     description='',
     packages=find_packages(),
     install_requires=[

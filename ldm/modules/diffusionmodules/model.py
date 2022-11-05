@@ -3,6 +3,7 @@ import gc
 import math
 import torch
 import torch.nn as nn
+from torch.nn.functional import silu
 import numpy as np
 from einops import rearrange
 
@@ -32,11 +33,6 @@ def get_timestep_embedding(timesteps, embedding_dim):
     return emb
 
 
-def nonlinearity(x):
-    # swish
-    return x*torch.sigmoid(x)
-
-
 def Normalize(in_channels, num_groups=32):
     return torch.nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-6, affine=True)
 
@@ -53,9 +49,15 @@ class Upsample(nn.Module):
                                         padding=1)
 
     def forward(self, x):
+        cpu_m1_cond = True if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() and \
+                              x.size()[0] * x.size()[1] * x.size()[2] * x.size()[3] % 2**27 == 0 else False
+        if cpu_m1_cond:
+            x = x.to('cpu')  # send to cpu
         x = torch.nn.functional.interpolate(x, scale_factor=2.0, mode="nearest")
         if self.with_conv:
             x = self.conv(x)
+        if cpu_m1_cond:
+            x = x.to('mps')  # return to mps
         return x
 
 
@@ -121,30 +123,25 @@ class ResnetBlock(nn.Module):
                                                     padding=0)
 
     def forward(self, x, temb):
-        h1 = x
-        h2 = self.norm1(h1)
-        del h1
-
-        h3 = nonlinearity(h2)
-        del h2
-
-        h4 = self.conv1(h3)
-        del h3
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            x_size = x.size()
+            if (x_size[0] * x_size[1] * x_size[2] * x_size[3]) % 2**29 == 0:
+                self.to('cpu')
+                x = x.to('cpu')
+            else:
+                self.to('mps')
+                x = x.to('mps')
+        h = self.norm1(x)
+        h = silu(h)
+        h = self.conv1(h)
 
         if temb is not None:
-            h4 = h4 + self.temb_proj(nonlinearity(temb))[:,:,None,None]
+            h = h + self.temb_proj(silu(temb))[:,:,None,None]
 
-        h5 = self.norm2(h4)
-        del h4
-
-        h6 = nonlinearity(h5)
-        del h5
-
-        h7 = self.dropout(h6)
-        del h6
-
-        h8 = self.conv2(h7)
-        del h7
+        h = self.norm2(h)
+        h = silu(h)
+        h = self.dropout(h)
+        h = self.conv2(h)
 
         if self.in_channels != self.out_channels:
             if self.use_conv_shortcut:
@@ -152,7 +149,7 @@ class ResnetBlock(nn.Module):
             else:
                 x = self.nin_shortcut(x)
 
-        return x + h8
+        return x + h
 
 class LinAttnBlock(LinearAttention):
     """to match AttnBlock usage"""
@@ -209,8 +206,7 @@ class AttnBlock(nn.Module):
 
         h_ = torch.zeros_like(k, device=q.device)
 
-        device_type = 'mps' if q.device.type == 'mps' else 'cuda'
-        if device_type == 'cuda':
+        if q.device.type == 'cuda':
             stats = torch.cuda.memory_stats(q.device)
             mem_active = stats['active_bytes.all.current']
             mem_reserved = stats['reserved_bytes.all.current']
@@ -263,7 +259,7 @@ class AttnBlock(nn.Module):
 
 def make_attn(in_channels, attn_type="vanilla"):
     assert attn_type in ["vanilla", "linear", "none"], f'attn_type {attn_type} unknown'
-    print(f"making attention of type '{attn_type}' with {in_channels} in_channels")
+    print(f"   | Making attention of type '{attn_type}' with {in_channels} in_channels")
     if attn_type == "vanilla":
         return AttnBlock(in_channels)
     elif attn_type == "none":
@@ -382,7 +378,7 @@ class Model(nn.Module):
             assert t is not None
             temb = get_timestep_embedding(t, self.ch)
             temb = self.temb.dense[0](temb)
-            temb = nonlinearity(temb)
+            temb = silu(temb)
             temb = self.temb.dense[1](temb)
         else:
             temb = None
@@ -416,7 +412,7 @@ class Model(nn.Module):
 
         # end
         h = self.norm_out(h)
-        h = nonlinearity(h)
+        h = silu(h)
         h = self.conv_out(h)
         return h
 
@@ -513,7 +509,7 @@ class Encoder(nn.Module):
 
         # end
         h = self.norm_out(h)
-        h = nonlinearity(h)
+        h = silu(h)
         h = self.conv_out(h)
         return h
 
@@ -539,7 +535,7 @@ class Decoder(nn.Module):
         block_in = ch*ch_mult[self.num_resolutions-1]
         curr_res = resolution // 2**(self.num_resolutions-1)
         self.z_shape = (1,z_channels,curr_res,curr_res)
-        print("Working with z of shape {} = {} dimensions.".format(
+        print("   | Working with z of shape {} = {} dimensions.".format(
             self.z_shape, np.prod(self.z_shape)))
 
         # z to block_in
@@ -599,22 +595,16 @@ class Decoder(nn.Module):
         temb = None
 
         # z to block_in
-        h1 = self.conv_in(z)
+        h = self.conv_in(z)
 
         # middle
-        h2 = self.mid.block_1(h1, temb)
-        del h1
-
-        h3 = self.mid.attn_1(h2)
-        del h2
-
-        h = self.mid.block_2(h3, temb)
-        del h3
+        h = self.mid.block_1(h, temb)
+        h = self.mid.attn_1(h)
+        h = self.mid.block_2(h, temb)
 
         # prepare for up sampling
-        device_type = 'mps' if h.device.type == 'mps' else 'cuda'
         gc.collect()
-        if device_type == 'cuda':
+        if h.device.type == 'cuda':
             torch.cuda.empty_cache()
 
         # upsampling
@@ -622,33 +612,19 @@ class Decoder(nn.Module):
             for i_block in range(self.num_res_blocks+1):
                 h = self.up[i_level].block[i_block](h, temb)
                 if len(self.up[i_level].attn) > 0:
-                    t = h
-                    h = self.up[i_level].attn[i_block](t)
-                    del t
-
+                    h = self.up[i_level].attn[i_block](h)
             if i_level != 0:
-                t = h
-                h = self.up[i_level].upsample(t)
-                del t
+                h = self.up[i_level].upsample(h)
 
         # end
         if self.give_pre_end:
             return h
 
-        h1 = self.norm_out(h)
-        del h
-
-        h2 = nonlinearity(h1)
-        del h1
-
-        h = self.conv_out(h2)
-        del h2
-
+        h = self.norm_out(h)
+        h = silu(h)
+        h = self.conv_out(h)
         if self.tanh_out:
-            t = h
-            h = torch.tanh(t)
-            del t
-
+            h = torch.tanh(h)
         return h
 
 
@@ -683,7 +659,7 @@ class SimpleDecoder(nn.Module):
                 x = layer(x)
 
         h = self.norm_out(x)
-        h = nonlinearity(h)
+        h = silu(h)
         x = self.conv_out(h)
         return x
 
@@ -731,7 +707,7 @@ class UpsampleDecoder(nn.Module):
             if i_level != self.num_resolutions - 1:
                 h = self.upsample_blocks[k](h)
         h = self.norm_out(h)
-        h = nonlinearity(h)
+        h = silu(h)
         h = self.conv_out(h)
         return h
 
@@ -907,7 +883,7 @@ class FirstStagePostProcessor(nn.Module):
         z_fs = self.encode_with_pretrained(x)
         z = self.proj_norm(z_fs)
         z = self.proj(z)
-        z = nonlinearity(z)
+        z = silu(z)
 
         for submodel, downmodel in zip(self.model,self.downsampler):
             z = submodel(z,temb=None)

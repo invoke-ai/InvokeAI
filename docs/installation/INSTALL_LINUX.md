@@ -1,89 +1,124 @@
-# **Linux Installation**
+---
+title: Manual Installation, Linux
+---
 
-1. You will need to install the following prerequisites if they are not already available. Use your operating system's preferred installer
+# :fontawesome-brands-linux: Linux
 
-- Python (version 3.8.5 recommended; higher may work)
-- git
+## Installation
 
-2. Install the Python Anaconda environment manager.
+1.  You will need to install the following prerequisites if they are not already
+    available. Use your operating system's preferred installer.
 
-```
-~$  wget https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-x86_64.sh
-~$  chmod +x Anaconda3-2022.05-Linux-x86_64.sh
-~$  ./Anaconda3-2022.05-Linux-x86_64.sh
-```
+    - Python (version 3.8.5 recommended; higher may work)
+    - git
 
-After installing anaconda, you should log out of your system and log back in. If the installation
-worked, your command prompt will be prefixed by the name of the current anaconda environment - `(base)`.
+2.  Install the Python Anaconda environment manager.
 
-3. Copy the InvokeAI source code from GitHub:
+    ```bash
+    ~$  wget https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-x86_64.sh
+    ~$  chmod +x Anaconda3-2022.05-Linux-x86_64.sh
+    ~$  ./Anaconda3-2022.05-Linux-x86_64.sh
+    ```
 
-```
-(base) ~$ git clone https://github.com/invoke-ai/InvokeAI.git
-```
+    After installing anaconda, you should log out of your system and log back
+    in. If the installation worked, your command prompt will be prefixed by the
+    name of the current anaconda environment - `(base)`.
 
-This will create InvokeAI folder where you will follow the rest of the steps.
+3.  Copy the InvokeAI source code from GitHub:
 
-4. Enter the newly-created InvokeAI folder. From this step forward make sure that you are working in the InvokeAI directory!
+    ```bash
+    (base) ~$ git clone https://github.com/invoke-ai/InvokeAI.git
+    ```
 
-```
-(base) ~$ cd InvokeAI
-(base) ~/InvokeAI$
-```
+    This will create InvokeAI folder where you will follow the rest of the
+    steps.
 
-5. Use anaconda to copy necessary python packages, create a new python environment named `ldm` and activate the environment.
+4.  Enter the newly-created InvokeAI folder. From this step forward make sure
+    that you are working in the InvokeAI directory!
 
-```
-(base) ~/InvokeAI$ conda env create -f environment.yaml
-(base) ~/InvokeAI$ conda activate ldm
-(ldm) ~/InvokeAI$
-```
+    ```bash
+    (base) ~$ cd InvokeAI
+    (base) ~/InvokeAI$
+    ```
 
-After these steps, your command prompt will be prefixed by `(ldm)` as shown above.
+5.  Use anaconda to copy necessary python packages, create a new python
+    environment named `invokeai` and activate the environment.
 
-6. Load a couple of small machine-learning models required by stable diffusion:
+    ```bash
+    (base) rm -rf src      # (this is a precaution in case there is already a src directory)
+    (base) ~/InvokeAI$ conda env create
+    (base) ~/InvokeAI$ conda activate invokeai
+    (invokeai) ~/InvokeAI$
+    ```
 
-```
-(ldm) ~/InvokeAI$ python3 scripts/preload_models.py
-```
+    After these steps, your command prompt will be prefixed by `(invokeai)` as
+    shown above.
 
-Note that this step is necessary because I modified the original just-in-time model loading scheme to allow the script to work on GPU machines that are not internet connected. See [Preload Models](../features/OTHER.md#preload-models)
+6.  Load the big stable diffusion weights files and a couple of smaller
+    machine-learning models:
 
-7. Now you need to install the weights for the stable diffusion model.
+    ```bash
+    (invokeai) ~/InvokeAI$ python3 scripts/preload_models.py
+    ```
 
-- For running with the released weights, you will first need to set up an acount with Hugging Face (https://huggingface.co).
-- Use your credentials to log in, and then point your browser at https://huggingface.co/CompVis/stable-diffusion-v-1-4-original.
-- You may be asked to sign a license agreement at this point.
-- Click on "Files and versions" near the top of the page, and then click on the file named "sd-v1-4.ckpt". You'll be taken to a page that prompts you to click the "download" link. Save the file somewhere safe on your local machine.
+    !!! note
 
-Now run the following commands from within the stable-diffusion directory. This will create a symbolic link from the stable-diffusion model.ckpt file, to the true location of the sd-v1-4.ckpt file.
+        This script will lead you through the process of creating an account on Hugging Face,
+        accepting the terms and conditions of the Stable Diffusion model license,
+        and obtaining an access token for downloading. It will then download and
+        install the weights files for you.
 
-```
-(ldm) ~/InvokeAI$ mkdir -p models/ldm/stable-diffusion-v1
-(ldm) ~/InvokeAI$ ln -sf /path/to/sd-v1-4.ckpt models/ldm/stable-diffusion-v1/model.ckpt
-```
+        Please look [here](INSTALLING_MODELS.md) for a manual process for doing
+        the same thing.
 
-8. Start generating images!
+7.  Start generating images!
 
-```
-# for the pre-release weights use the -l or --liaon400m switch
-(ldm) ~/InvokeAI$ python3 scripts/dream.py -l
+    !!! todo "Run InvokeAI!"
 
-# for the post-release weights do not use the switch
-(ldm) ~/InvokeAI$ python3 scripts/dream.py
+        !!! warning "IMPORTANT"
 
-# for additional configuration switches and arguments, use -h or --help
-(ldm) ~/InvokeAI$ python3 scripts/dream.py -h
-```
+            Make sure that the conda environment is activated, which should create
+            `(invokeai)` in front of your prompt!
 
-9. Subsequently, to relaunch the script, be sure to run "conda activate ldm" (step 5, second command), enter the `InvokeAI` directory, and then launch the dream script (step 8). If you forget to activate the ldm environment, the script will fail with multiple `ModuleNotFound` errors.
+        === "CLI"
 
-### Updating to newer versions of the script
+            ```bash
+            python scripts/invoke.py
+            ```
 
-This distribution is changing rapidly. If you used the `git clone` method (step 5) to download the InvokeAI directory, then to update to the latest and greatest version, launch the Anaconda window, enter `InvokeAI` and type:
+        === "local Webserver"
 
-```
-(ldm) ~/InvokeAI$ git pull
+            ```bash
+            python scripts/invoke.py --web
+            ```
+
+        === "Public Webserver"
+
+            ```bash
+            python scripts/invoke.py --web --host 0.0.0.0
+            ```
+
+        To use an alternative model you may invoke the `!switch` command in
+        the CLI, or pass `--model <model_name>` during `invoke.py` launch for
+        either the CLI or the Web UI. See [Command Line
+        Client](../features/CLI.md#model-selection-and-importation). The
+        model names are defined in `configs/models.yaml`.
+
+8. Subsequently, to relaunch the script, be sure to run "conda activate
+   invokeai" (step 5, second command), enter the `InvokeAI` directory, and then
+   launch the invoke script (step 8). If you forget to activate the 'invokeai'
+   environment, the script will fail with multiple `ModuleNotFound` errors.
+
+## Updating to newer versions of the script
+
+This distribution is changing rapidly. If you used the `git clone` method
+(step 5) to download the InvokeAI directory, then to update to the latest and
+greatest version, launch the Anaconda window, enter `InvokeAI` and type:
+
+```bash
+(invokeai) ~/InvokeAI$ git pull
+(invokeai) ~/InvokeAI$ rm -rf src   # prevents conda freezing errors
+(invokeai) ~/InvokeAI$ conda env update -f environment.yml
 ```
 
 This will bring your local copy into sync with the remote one.

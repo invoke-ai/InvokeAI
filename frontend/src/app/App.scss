@@ -1,0 +1,17 @@
+@use '../styles/Mixins/' as *;
+
+.App {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--background-color);
+}
+
+.app-content {
+  display: grid;
+  row-gap: 1rem;
+  padding: $app-padding;
+  grid-auto-rows: min-content auto;
+  width: $app-width;
+  height: $app-height;
+}

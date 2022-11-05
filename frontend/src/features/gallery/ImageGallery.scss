@@ -1,0 +1,182 @@
+@use '../../styles/Mixins/' as *;
+
+.image-gallery-wrapper-enter {
+  transform: translateX(150%);
+}
+
+.image-gallery-wrapper-enter-active {
+  transform: translateX(0);
+  transition: all 120ms ease-out;
+}
+
+.image-gallery-wrapper-exit {
+  transform: translateX(0);
+}
+
+.image-gallery-wrapper-exit-active {
+  transform: translateX(150%);
+  transition: all 120ms ease-out;
+}
+
+.image-gallery-wrapper {
+  &[data-pinned='false'] {
+    position: fixed;
+    height: 100vh;
+    top: 0;
+    right: 0;
+
+    .image-gallery-popup {
+      border-radius: 0;
+      box-shadow: 0 0 1rem var(--text-color-a3);
+      .image-gallery-container {
+        max-height: calc($app-height + 5rem);
+      }
+    }
+  }
+
+  .image-gallery-popup {
+    background-color: var(--tab-color);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    row-gap: 1rem;
+    border-radius: 0.5rem;
+    border-left-width: 0.3rem;
+
+    border-color: var(--resizeable-handle-border-color);
+
+    &[data-resize-alert='true'] {
+      border-color: var(--status-bad-color);
+    }
+
+    .image-gallery-header {
+      display: flex;
+      align-items: center;
+      column-gap: 0.5rem;
+      justify-content: space-between;
+
+      div {
+        display: flex;
+        column-gap: 0.5rem;
+        column-gap: 0.5rem;
+      }
+
+      .image-gallery-icon-btn {
+        background-color: var(--btn-load-more) !important;
+        &:hover {
+          background-color: var(--btn-load-more-hover) !important;
+        }
+      }
+
+      .image-gallery-settings-popover {
+        display: flex;
+        flex-direction: column;
+        row-gap: 0.5rem;
+
+        div {
+          display: flex;
+          column-gap: 0.5rem;
+          align-items: center;
+          justify-content: space-between;
+        }
+      }
+
+      h1 {
+        font-weight: bold;
+      }
+    }
+
+    .image-gallery-container {
+      display: flex;
+      flex-direction: column;
+      max-height: $app-gallery-popover-height;
+      overflow-y: scroll;
+      @include HideScrollbar;
+
+      .image-gallery-container-placeholder {
+        display: flex;
+        flex-direction: column;
+        background-color: var(--background-color-secondary);
+        border-radius: 0.5rem;
+        place-items: center;
+        padding: 2rem;
+        text-align: center;
+
+        p {
+          color: var(--subtext-color-bright);
+          font-family: Inter;
+        }
+
+        svg {
+          width: 5rem;
+          height: 5rem;
+          color: var(--svg-color);
+        }
+      }
+
+      .image-gallery-load-more-btn {
+        background-color: var(--btn-load-more) !important;
+        font-size: 0.85rem !important;
+        padding: 0.5rem;
+        margin-top: 1rem;
+
+        &:disabled {
+          &:hover {
+            background-color: var(--btn-load-more) !important;
+          }
+        }
+
+        &:hover {
+          background-color: var(--btn-load-more-hover) !important;
+        }
+      }
+    }
+  }
+}
+
+.image-gallery-category-btn-group {
+  width: 100% !important;
+  column-gap: 0 !important;
+  justify-content: stretch !important;
+
+  button {
+    flex-grow: 1;
+    &[data-selected='true'] {
+      background-color: var(--accent-color);
+      &:hover {
+        background-color: var(--accent-color-hover);
+      }
+    }
+  }
+}
+
+// from https://css-tricks.com/a-grid-of-logos-in-squares/
+.image-gallery {
+  display: grid;
+  grid-gap: 0.5rem;
+  .hoverable-image {
+    padding: 0.5rem;
+    position: relative;
+    &::before {
+      // for apsect ratio
+      content: '';
+      display: block;
+      padding-bottom: 100%;
+    }
+    .hoverable-image-image {
+      position: absolute;
+      max-width: 100%;
+
+      // Alternate Version
+      // top: 0;
+      // bottom: 0;
+      // right: 0;
+      // left: 0;
+      // margin: auto;
+
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+}

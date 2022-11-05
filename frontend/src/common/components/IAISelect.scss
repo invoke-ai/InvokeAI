@@ -1,0 +1,31 @@
+@use '../../styles/Mixins/' as *;
+
+.invokeai__select {
+  display: flex;
+  column-gap: 1rem;
+  align-items: center;
+  width: max-content;
+
+  .invokeai__select-label {
+    color: var(--text-color-secondary);
+    margin-right: 0;
+  }
+
+  .invokeai__select-picker {
+    border: 2px solid var(--border-color);
+    background-color: var(--background-color-secondary);
+    font-weight: bold;
+    height: 2rem;
+    border-radius: 0.2rem;
+
+    &:focus {
+      outline: none;
+      border: 2px solid var(--input-border-color);
+      box-shadow: 0 0 10px 0 var(--input-box-shadow-color);
+    }
+  }
+
+  .invokeai__select-option {
+    background-color: var(--background-color-secondary);
+  }
+}

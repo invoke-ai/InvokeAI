@@ -1,0 +1,49 @@
+@use '../../../styles/Mixins/' as *;
+
+.image-to-image-area {
+  display: flex;
+  flex-direction: column;
+  row-gap: 1rem;
+  width: 100%;
+  height: 100%;
+}
+
+.image-to-image-strength-main-option {
+  display: grid;
+  grid-template-columns: none !important;
+
+  .number-input-entry {
+    padding: 0 1rem;
+  }
+}
+
+.init-image-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+
+  h2 {
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+}
+
+.init-image-preview {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    border-radius: 0.5rem;
+    object-fit: contain;
+    position: absolute;
+  }
+}
+
+.image-to-image-current-image-display {
+  position: relative;
+}

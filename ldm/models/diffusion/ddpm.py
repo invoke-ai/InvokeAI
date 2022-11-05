@@ -19,6 +19,7 @@ from functools import partial
 from tqdm import tqdm
 from torchvision.utils import make_grid
 from pytorch_lightning.utilities.distributed import rank_zero_only
+from omegaconf import ListConfig
 import urllib
 
 from ldm.util import (
@@ -106,7 +107,7 @@ class DDPM(pl.LightningModule):
         ], 'currently only supporting "eps" and "x0"'
         self.parameterization = parameterization
         print(
-            f'{self.__class__.__name__}: Running in {self.parameterization}-prediction mode'
+            f'   | {self.__class__.__name__}: Running in {self.parameterization}-prediction mode'
         )
         self.cond_stage_model = None
         self.clip_denoised = clip_denoised
@@ -120,7 +121,7 @@ class DDPM(pl.LightningModule):
         self.use_ema = use_ema
         if self.use_ema:
             self.model_ema = LitEma(self.model)
-            print(f'Keeping EMAs of {len(list(self.model_ema.buffers()))}.')
+            print(f'   | Keeping EMAs of {len(list(self.model_ema.buffers()))}.')
 
         self.use_scheduler = scheduler_config is not None
         if self.use_scheduler:
@@ -701,7 +702,7 @@ class LatentDiffusion(DDPM):
 
     @rank_zero_only
     @torch.no_grad()
-    def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
+    def on_train_batch_start(self, batch, batch_idx, dataloader_idx=None):
         # only for very first batch
         if (
             self.scale_by_std
@@ -820,21 +821,21 @@ class LatentDiffusion(DDPM):
             )
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c):
+    def get_learned_conditioning(self, c, **kwargs):
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(
                 self.cond_stage_model.encode
             ):
                 c = self.cond_stage_model.encode(
-                    c, embedding_manager=self.embedding_manager
+                    c, embedding_manager=self.embedding_manager,**kwargs
                 )
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()
             else:
-                c = self.cond_stage_model(c)
+                c = self.cond_stage_model(c, **kwargs)
         else:
             assert hasattr(self.cond_stage_model, self.cond_stage_forward)
-            c = getattr(self.cond_stage_model, self.cond_stage_forward)(c)
+            c = getattr(self.cond_stage_model, self.cond_stage_forward)(c, **kwargs)
         return c
 
     def meshgrid(self, h, w):
@@ -1353,7 +1354,7 @@ class LatentDiffusion(DDPM):
                 num_downs = self.first_stage_model.encoder.num_resolutions - 1
                 rescale_latent = 2 ** (num_downs)
 
-                # get top left postions of patches as conforming for the bbbox tokenizer, therefore we
+                # get top left positions of patches as conforming for the bbbox tokenizer, therefore we
                 # need to rescale the tl patch coordinates to be in between (0,1)
                 tl_patch_coordinates = [
                     (
@@ -1884,13 +1885,31 @@ class LatentDiffusion(DDPM):
         return samples, intermediates
 
     @torch.no_grad()
+    def get_unconditional_conditioning(self, batch_size, null_label=None):
+        if null_label is not None:
+            xc = null_label
+            if isinstance(xc, ListConfig):
+                xc = list(xc)
+            if isinstance(xc, dict) or isinstance(xc, list):
+                c = self.get_learned_conditioning(xc)
+            else:
+                if hasattr(xc, "to"):
+                    xc = xc.to(self.device)
+                c = self.get_learned_conditioning(xc)
+        else:
+            # todo: get null label from cond_stage_model
+            raise NotImplementedError()
+        c = repeat(c, "1 ... -> b ...", b=batch_size).to(self.device)
+        return c
+
+    @torch.no_grad()
     def log_images(
         self,
         batch,
         N=8,
         n_row=4,
         sample=True,
-        ddim_steps=200,
+        ddim_steps=50,
         ddim_eta=1.0,
         return_keys=None,
         quantize_denoised=True,
@@ -2147,8 +2166,8 @@ class DiffusionWrapper(pl.LightningModule):
             cc = torch.cat(c_crossattn, 1)
             out = self.diffusion_model(x, t, context=cc)
         elif self.conditioning_key == 'hybrid':
-            xc = torch.cat([x] + c_concat, dim=1)
             cc = torch.cat(c_crossattn, 1)
+            xc = torch.cat([x] + c_concat, dim=1)
             out = self.diffusion_model(xc, t, context=cc)
         elif self.conditioning_key == 'adm':
             cc = c_crossattn[0]
@@ -2187,3 +2206,58 @@ class Layout2ImgDiffusion(LatentDiffusion):
         cond_img = torch.stack(bbox_imgs, dim=0)
         logs['bbox_image'] = cond_img
         return logs
+
+class LatentInpaintDiffusion(LatentDiffusion):
+    def __init__(
+        self,
+        concat_keys=("mask", "masked_image"),
+        masked_image_key="masked_image",
+        finetune_keys=None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.masked_image_key = masked_image_key
+        assert self.masked_image_key in concat_keys
+        self.concat_keys = concat_keys
+
+
+    @torch.no_grad()
+    def get_input(
+        self, batch, k, cond_key=None, bs=None, return_first_stage_outputs=False
+    ):
+        # note: restricted to non-trainable encoders currently
+        assert (
+            not self.cond_stage_trainable
+        ), "trainable cond stages not yet supported for inpainting"
+        z, c, x, xrec, xc = super().get_input(
+            batch,
+            self.first_stage_key,
+            return_first_stage_outputs=True,
+            force_c_encode=True,
+            return_original_cond=True,
+            bs=bs,
+        )
+
+        assert exists(self.concat_keys)
+        c_cat = list()
+        for ck in self.concat_keys:
+            cc = (
+                rearrange(batch[ck], "b h w c -> b c h w")
+                .to(memory_format=torch.contiguous_format)
+                .float()
+            )
+            if bs is not None:
+                cc = cc[:bs]
+                cc = cc.to(self.device)
+            bchw = z.shape
+            if ck != self.masked_image_key:
+                cc = torch.nn.functional.interpolate(cc, size=bchw[-2:])
+            else:
+                cc = self.get_first_stage_encoding(self.encode_first_stage(cc))
+            c_cat.append(cc)
+        c_cat = torch.cat(c_cat, dim=1)
+        all_conds = {"c_concat": [c_cat], "c_crossattn": [c]}
+        if return_first_stage_outputs:
+            return z, all_conds, x, xrec, xc
+        return z, all_conds

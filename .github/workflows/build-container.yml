@@ -1,0 +1,48 @@
+# Building the Image without pushing to confirm it is still buildable
+# confirum functionality would unfortunately need way more resources
+name: build container image
+on:
+  push:
+    branches:
+      - 'main'
+      - 'development'
+
+jobs:
+  docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - aarch64
+        include:
+          - arch: x86_64
+            conda-env-file: environment.yml
+          - arch: aarch64
+            conda-env-file: environment-linux-aarch64.yml
+    runs-on: ubuntu-latest
+    name: ${{ matrix.arch }}
+    steps:
+      - name: prepare docker-tag
+        env:
+          repository: ${{ github.repository }}
+        run: echo "dockertag=${repository,,}" >> $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build container
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: docker-build/Dockerfile
+          platforms: Linux/${{ matrix.arch }}
+          push: false
+          tags: ${{ env.dockertag }}:${{ matrix.arch }}
+          build-args: |
+            conda_env_file=${{ matrix.conda-env-file }}
+            conda_version=py39_4.12.0-Linux-${{ matrix.arch }}
+            invokeai_git=${{ github.repository }}
+            invokeai_branch=${{ github.ref_name }}

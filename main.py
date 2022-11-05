@@ -25,6 +25,23 @@ from pytorch_lightning.utilities import rank_zero_info
 from ldm.data.base import Txt2ImgIterableBaseDataset
 from ldm.util import instantiate_from_config
 
+def fix_func(orig):
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        def new_func(*args, **kw):
+            device = kw.get("device", "mps")
+            kw["device"]="cpu"
+            return orig(*args, **kw).to(device)
+        return new_func
+    return orig
+
+torch.rand = fix_func(torch.rand)
+torch.rand_like = fix_func(torch.rand_like)
+torch.randn = fix_func(torch.randn)
+torch.randn_like = fix_func(torch.randn_like)
+torch.randint = fix_func(torch.randint)
+torch.randint_like = fix_func(torch.randint_like)
+torch.bernoulli = fix_func(torch.bernoulli)
+torch.multinomial = fix_func(torch.multinomial)
 
 def load_model_from_config(config, ckpt, verbose=False):
     print(f'Loading model from {ckpt}')
@@ -40,7 +57,8 @@ def load_model_from_config(config, ckpt, verbose=False):
         print('unexpected keys:')
         print(u)
 
-    model.cuda()
+    if torch.cuda.is_available():
+        model.cuda()
     return model
 
 
@@ -421,9 +439,7 @@ class ImageLogger(Callback):
         self.rescale = rescale
         self.batch_freq = batch_frequency
         self.max_images = max_images
-        self.logger_log_images = {
-            pl.loggers.TestTubeLogger: self._testtube,
-        }
+        self.logger_log_images = { }
         self.log_steps = [
             2**n for n in range(int(np.log2(self.batch_freq)) + 1)
         ]
@@ -434,17 +450,6 @@ class ImageLogger(Callback):
         self.log_on_batch_idx = log_on_batch_idx
         self.log_images_kwargs = log_images_kwargs if log_images_kwargs else {}
         self.log_first_step = log_first_step
-
-    @rank_zero_only
-    def _testtube(self, pl_module, images, batch_idx, split):
-        for k in images:
-            grid = torchvision.utils.make_grid(images[k])
-            grid = (grid + 1.0) / 2.0  # -1,1 -> 0,1; c,h,w
-
-            tag = f'{split}/{k}'
-            pl_module.logger.experiment.add_image(
-                tag, grid, global_step=pl_module.global_step
-            )
 
     @rank_zero_only
     def log_local(
@@ -526,7 +531,7 @@ class ImageLogger(Callback):
         return False
 
     def on_train_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None
     ):
         if not self.disabled and (
             pl_module.global_step > 0 or self.log_first_step
@@ -534,7 +539,7 @@ class ImageLogger(Callback):
             self.log_img(pl_module, batch, batch_idx, split='train')
 
     def on_validation_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None
     ):
         if not self.disabled and pl_module.global_step > 0:
             self.log_img(pl_module, batch, batch_idx, split='val')
@@ -549,23 +554,26 @@ class CUDACallback(Callback):
     # see https://github.com/SeanNaren/minGPT/blob/master/mingpt/callback.py
     def on_train_epoch_start(self, trainer, pl_module):
         # Reset the memory use counter
-        torch.cuda.reset_peak_memory_stats(trainer.root_gpu)
-        torch.cuda.synchronize(trainer.root_gpu)
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats(trainer.root_gpu)
+            torch.cuda.synchronize(trainer.root_gpu)
         self.start_time = time.time()
 
-    def on_train_epoch_end(self, trainer, pl_module, outputs):
-        torch.cuda.synchronize(trainer.root_gpu)
-        max_memory = (
-            torch.cuda.max_memory_allocated(trainer.root_gpu) / 2**20
-        )
+    def on_train_epoch_end(self, trainer, pl_module, outputs=None):
+        if torch.cuda.is_available():
+            torch.cuda.synchronize(trainer.root_gpu)
         epoch_time = time.time() - self.start_time
 
         try:
-            max_memory = trainer.training_type_plugin.reduce(max_memory)
             epoch_time = trainer.training_type_plugin.reduce(epoch_time)
-
             rank_zero_info(f'Average Epoch time: {epoch_time:.2f} seconds')
-            rank_zero_info(f'Average Peak memory {max_memory:.2f}MiB')
+
+            if torch.cuda.is_available():
+                max_memory = (
+                    torch.cuda.max_memory_allocated(trainer.root_gpu) / 2**20
+                )
+                max_memory = trainer.training_type_plugin.reduce(max_memory)
+                rank_zero_info(f'Average Peak memory {max_memory:.2f}MiB')
         except AttributeError:
             pass
 
@@ -695,7 +703,7 @@ if __name__ == '__main__':
         # merge trainer cli with config
         trainer_config = lightning_config.get('trainer', OmegaConf.create())
         # default to ddp
-        trainer_config['accelerator'] = 'ddp'
+        trainer_config['accelerator'] = 'auto'
         for k in nondefault_trainer_args(opt):
             trainer_config[k] = getattr(opt, k)
         if not 'gpus' in trainer_config:
@@ -732,6 +740,8 @@ if __name__ == '__main__':
         trainer_kwargs = dict()
 
         # default logger configs
+        def_logger = 'csv'
+        def_logger_target = 'CSVLogger'
         default_logger_cfgs = {
             'wandb': {
                 'target': 'pytorch_lightning.loggers.WandbLogger',
@@ -742,15 +752,15 @@ if __name__ == '__main__':
                     'id': nowname,
                 },
             },
-            'testtube': {
-                'target': 'pytorch_lightning.loggers.TestTubeLogger',
+            def_logger: {
+                'target': 'pytorch_lightning.loggers.' + def_logger_target,
                 'params': {
-                    'name': 'testtube',
+                    'name': def_logger,
                     'save_dir': logdir,
                 },
             },
         }
-        default_logger_cfg = default_logger_cfgs['testtube']
+        default_logger_cfg = default_logger_cfgs[def_logger]
         if 'logger' in lightning_config:
             logger_cfg = lightning_config.logger
         else:
@@ -864,6 +874,10 @@ if __name__ == '__main__':
         ]
         trainer_kwargs['max_steps'] = trainer_opt.max_steps
 
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            trainer_opt.accelerator = 'mps'
+            trainer_opt.detect_anomaly = False
+        
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
         trainer.logdir = logdir  ###
 
@@ -872,7 +886,6 @@ if __name__ == '__main__':
         config.data.params.validation.params.data_root = opt.data_root
         data = instantiate_from_config(config.data)
 
-        data = instantiate_from_config(config.data)
         # NOTE according to https://pytorch-lightning.readthedocs.io/en/latest/datamodules.html
         # calling these ourselves should not be necessary but it is.
         # lightning still takes care of proper multiprocessing though
@@ -890,7 +903,8 @@ if __name__ == '__main__':
             config.model.base_learning_rate,
         )
         if not cpu:
-            ngpu = len(lightning_config.trainer.gpus.strip(',').split(','))
+            gpus = str(lightning_config.trainer.gpus).strip(', ').split(',')
+            ngpu = len(gpus)
         else:
             ngpu = 1
         if 'accumulate_grad_batches' in lightning_config.trainer:

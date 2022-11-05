@@ -1,0 +1,44 @@
+@use '../../../styles/Mixins/' as *;
+
+.settings-modal {
+  background-color: var(--settings-modal-bg) !important;
+  max-height: 36rem;
+  font-family: Inter;
+
+  .settings-modal-content {
+    display: grid;
+    row-gap: 2rem;
+    overflow-y: scroll;
+  }
+
+  .settings-modal-header {
+    font-weight: bold;
+  }
+
+  .settings-modal-items {
+    display: grid;
+    row-gap: 0.5rem;
+
+    .settings-modal-item {
+      display: grid;
+      grid-auto-flow: column;
+      background-color: var(--background-color);
+      padding: 0.4rem 1rem;
+      border-radius: 0.5rem;
+      align-items: center;
+      width: 100%;
+    }
+  }
+
+  .settings-modal-reset {
+    display: grid;
+    row-gap: 1rem;
+
+    button {
+      @include Button(
+        $btn-color: var(--destructive-color),
+        $btn-color-hover: var(--destructive-color-hover)
+      );
+    }
+  }
+}
