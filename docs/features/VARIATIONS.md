@@ -16,12 +16,10 @@ You are able to do the following:
 2. Given two or more variations that you like, you can combine them in a
    weighted fashion.
 
----
+!!! Information ""
 
-This cheat sheet provides a quick guide for how this works in practice, using
-variations to create the desired image of Xena, Warrior Princess.
-
----
+    This cheat sheet provides a quick guide for how this works in practice, using
+    variations to create the desired image of Xena, Warrior Princess.
 
 ## Step 1 -- Find a base image that you like
 
