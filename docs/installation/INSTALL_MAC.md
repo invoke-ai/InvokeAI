@@ -119,7 +119,7 @@ will do our best to help.
     ```bash
     # This will take some time, depending on the speed of your internet connection
     # and will consume about 10GB of space
-    python scripts/preload_models.py --no-interactive
+    python scripts/preload_models.py
     ```
 
 !!! todo "Run InvokeAI!"
