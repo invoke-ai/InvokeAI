@@ -12,11 +12,12 @@ import NodesIcon from 'common/icons/NodesIcon';
 import OutpaintIcon from 'common/icons/OutpaintIcon';
 import PostprocessingIcon from 'common/icons/PostprocessingIcon';
 import TextToImageIcon from 'common/icons/TextToImageIcon';
-import { setActiveTab } from 'features/options/optionsSlice';
+import { setActiveTab, setIsLightBoxOpen } from 'features/options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
 import InpaintingWorkarea from './Inpainting/InpaintingWorkarea';
 import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
 import TextToImageWorkarea from './TextToImage';
+import Lightbox from 'features/lightbox/Lightbox';
 
 export const tabDict = {
   txt2img: {
@@ -62,6 +63,9 @@ export default function InvokeTabs() {
   const activeTab = useAppSelector(
     (state: RootState) => state.options.activeTab
   );
+  const isLightBoxOpen = useAppSelector(
+    (state: RootState) => state.options.isLightBoxOpen
+  );
   const dispatch = useAppDispatch();
 
   useHotkeys('1', () => {
@@ -88,6 +92,15 @@ export default function InvokeTabs() {
   useHotkeys('6', () => {
     dispatch(setActiveTab(5));
   });
+
+  // Lightbox Hotkey
+  useHotkeys(
+    'v',
+    () => {
+      dispatch(setIsLightBoxOpen(!isLightBoxOpen));
+    },
+    [isLightBoxOpen]
+  );
 
   const renderTabs = () => {
     const tabsToRender: ReactElement[] = [];
@@ -131,7 +144,9 @@ export default function InvokeTabs() {
       }}
     >
       <div className="app-tabs-list">{renderTabs()}</div>
-      <TabPanels className="app-tabs-panels">{renderTabPanels()}</TabPanels>
+      <TabPanels className="app-tabs-panels">
+        {isLightBoxOpen ? <Lightbox /> : renderTabPanels()}
+      </TabPanels>
     </Tabs>
   );
 }

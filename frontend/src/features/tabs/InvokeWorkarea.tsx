@@ -75,7 +75,6 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
             </Tooltip>
           )}
         </div>
-
         {!isLightBoxOpen && <ImageGallery />}
       </div>
     </div>

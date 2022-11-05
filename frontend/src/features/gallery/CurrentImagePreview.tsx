@@ -10,9 +10,8 @@ import {
 } from './gallerySlice';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { OptionsState } from 'features/options/optionsSlice';
+import { OptionsState, setIsLightBoxOpen } from 'features/options/optionsSlice';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
-import Lightbox from 'features/lightbox/Lightbox';
 
 export const imagesSelector = createSelector(
   [(state: RootState) => state.gallery, (state: RootState) => state.options],
@@ -79,16 +78,19 @@ export default function CurrentImagePreview() {
     dispatch(selectNextImage());
   };
 
+  const handleLightBox = () => {
+    dispatch(setIsLightBoxOpen(true));
+  };
+
   return (
     <div className={'current-image-preview'}>
       {imageToDisplay && (
-        <Lightbox>
-          <Image
-            src={imageToDisplay.url}
-            width={isIntermediate ? imageToDisplay.width : undefined}
-            height={isIntermediate ? imageToDisplay.height : undefined}
-          />
-        </Lightbox>
+        <Image
+          src={imageToDisplay.url}
+          width={isIntermediate ? imageToDisplay.width : undefined}
+          height={isIntermediate ? imageToDisplay.height : undefined}
+          onClick={handleLightBox}
+        />
       )}
       {!shouldShowImageDetails && (
         <div className="current-image-next-prev-buttons">

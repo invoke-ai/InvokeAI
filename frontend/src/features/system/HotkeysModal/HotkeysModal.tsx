@@ -50,6 +50,11 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Shift+O',
     },
     {
+      title: 'Toggle Viewer',
+      desc: 'Open and close Image Viewer',
+      hotkey: 'V',
+    },
+    {
       title: 'Toggle Gallery',
       desc: 'Open and close the gallery drawer',
       hotkey: 'G',

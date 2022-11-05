@@ -16,6 +16,7 @@ import {
   setAllImageToImageParameters,
   setAllTextToImageParameters,
   setInitialImage,
+  setIsLightBoxOpen,
   setPrompt,
   setSeed,
 } from 'features/options/optionsSlice';
@@ -44,6 +45,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     galleryImageObjectFit,
     galleryImageMinimumWidth,
     mayDeleteImage,
+    isLightBoxOpen,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, uuid, metadata } = image;
@@ -77,6 +79,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToImageToImage = () => {
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setInitialImage(image));
     if (activeTabName !== 'img2img') {
       dispatch(setActiveTab('img2img'));
@@ -90,6 +93,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToInpainting = () => {
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setImageToInpaint(image));
     if (activeTabName !== 'inpainting') {
       dispatch(setActiveTab('inpainting'));
@@ -214,14 +218,14 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         >
           Use All Parameters
         </ContextMenu.Item>
-        <Tooltip label="Load initial image used for this generation">
+        {/* <Tooltip label="Load initial image used for this generation">
           <ContextMenu.Item
             onClickCapture={handleUseInitialImage}
             disabled={image?.metadata?.image?.type !== 'img2img'}
           >
             Use Initial Image
           </ContextMenu.Item>
-        </Tooltip>
+        </Tooltip> */}
         <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
           Send to Image To Image
         </ContextMenu.Item>

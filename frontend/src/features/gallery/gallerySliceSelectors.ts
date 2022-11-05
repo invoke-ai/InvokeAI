@@ -73,6 +73,7 @@ export const hoverableImageSelector = createSelector(
       galleryImageObjectFit: gallery.galleryImageObjectFit,
       galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
       activeTabName,
+      isLightBoxOpen: options.isLightBoxOpen,
     };
   },
   {
