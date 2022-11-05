@@ -2,15 +2,15 @@
 ldm.invoke.generator.img2img descends from ldm.invoke.generator
 '''
 
-import torch
-import numpy as  np
 import PIL
-from torch import Tensor
+import numpy as np
+import torch
 from PIL import Image
+from torch import Tensor
+
 from ldm.invoke.devices import choose_autocast
 from ldm.invoke.generator.base import Generator
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+
 
 class Img2Img(Generator):
     def __init__(self, model, precision):

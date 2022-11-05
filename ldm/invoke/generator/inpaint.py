@@ -3,19 +3,20 @@ ldm.invoke.generator.inpaint descends from ldm.invoke.generator
 '''
 
 import math
-import torch
-import torchvision.transforms as T
-import numpy as  np
-import cv2 as cv
+
 import PIL
+import cv2 as cv
+import numpy as np
+import torch
 from PIL import Image, ImageFilter, ImageOps
-from skimage.exposure.histogram_matching import match_histograms
-from einops import rearrange, repeat
-from ldm.invoke.devices             import choose_autocast
-from ldm.invoke.generator.img2img   import Img2Img
-from ldm.models.diffusion.ddim     import DDIMSampler
-from ldm.models.diffusion.ksampler import KSampler
+from einops import repeat
+
+from ldm.invoke.devices import choose_autocast
 from ldm.invoke.generator.base import downsampling
+from ldm.invoke.generator.img2img import Img2Img
+from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.ksampler import KSampler
+
 
 class Inpaint(Img2Img):
     def __init__(self, model, precision):
@@ -187,7 +188,7 @@ class Inpaint(Img2Img):
         # klms samplers not supported yet, so ignore previous sampler
         if isinstance(sampler,KSampler):
             print(
-                f">> Using recommended DDIM sampler for inpainting."
+                ">> Using recommended DDIM sampler for inpainting."
             )
             sampler = DDIMSampler(self.model, device=self.model.device)
         

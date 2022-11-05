@@ -3,14 +3,16 @@ ldm.invoke.generator.embiggen descends from ldm.invoke.generator
 and generates with ldm.invoke.generator.img2img
 '''
 
+import numpy as np
 import torch
-import numpy as  np
+from PIL import Image
 from tqdm import trange
-from PIL               import Image
-from ldm.invoke.generator.base      import Generator
-from ldm.invoke.generator.img2img   import Img2Img
+
 from ldm.invoke.devices import choose_autocast
-from ldm.models.diffusion.ddim     import DDIMSampler
+from ldm.invoke.generator.base import Generator
+from ldm.invoke.generator.img2img import Img2Img
+from ldm.models.diffusion.ddim import DDIMSampler
+
 
 class Embiggen(Generator):
     def __init__(self, model, precision):
@@ -493,7 +495,7 @@ class Embiggen(Generator):
                     # Layer tile onto final image
                     outputsuperimage.alpha_composite(intileimage, (left, top))
             else:
-                print(f'Error: could not find all Embiggen output tiles in memory? Something must have gone wrong with img2img generation.')
+                print('Error: could not find all Embiggen output tiles in memory? Something must have gone wrong with img2img generation.')
 
             # after internal loops and patching up return Embiggen image
             return outputsuperimage
