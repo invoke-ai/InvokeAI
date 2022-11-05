@@ -54,9 +54,11 @@ I got off the web.
 You can selectively mask out the orange and replace it with a baseball in this
 way:
 
-<figure markdown>
-`#!bash invoke> a baseball -I /path/to/still_life.png -tm orange`
+```bash
+invoke> a baseball -I /path/to/still_life.png -tm orange
+```
 
+<figure markdown>
 ![](../assets/still-life-inpainted.png)
 </figure>
 
