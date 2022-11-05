@@ -142,6 +142,7 @@ class Generate:
             ddim_eta = 0.0,  # deterministic
             full_precision = False,
             precision = 'auto',
+            outdir = 'outputs/img-samples',
             gfpgan=None,
             codeformer=None,
             esrgan=None,
@@ -175,7 +176,7 @@ class Generate:
         self.generators     = {}
         self.base_generator = None
         self.seed           = None
-        self.outdir                   = outdir
+        self.outdir = outdir
         self.gfpgan = gfpgan
         self.codeformer = codeformer
         self.esrgan = esrgan
@@ -291,7 +292,6 @@ class Generate:
             embiggen_tiles =    None,
             # these are specific to GFPGAN/ESRGAN
             gfpgan_strength=    0,
-            save_original  =    False,
             facetool         = None,
             facetool_strength  = 0,
             codeformer_fidelity = None,
