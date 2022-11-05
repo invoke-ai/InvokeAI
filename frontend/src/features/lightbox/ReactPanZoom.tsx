@@ -41,7 +41,7 @@ export default function ReactPanZoom({
   };
 
   const zoomOut = () => {
-    if (zoom >= 1) {
+    if (zoom >= 0.5) {
       setZoom(zoom - 0.2);
     }
   };

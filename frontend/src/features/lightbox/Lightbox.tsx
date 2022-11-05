@@ -1,6 +1,7 @@
 import { IconButton } from '@chakra-ui/react';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
+import CurrentImageButtons from 'features/gallery/CurrentImageButtons';
 import { imagesSelector } from 'features/gallery/CurrentImagePreview';
 import {
   selectNextImage,
@@ -9,6 +10,7 @@ import {
 import ImageGallery from 'features/gallery/ImageGallery';
 import { setIsLightBoxOpen } from 'features/options/optionsSlice';
 import React, { useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { BiExit } from 'react-icons/bi';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import ReactPanZoom from './ReactPanZoom';
@@ -59,6 +61,7 @@ export default function Lightbox() {
 
       <div className="lightbox-display-container">
         <div className="lightbox-preview-wrapper">
+          <CurrentImageButtons />
           {!shouldShowImageDetails && (
             <div className="current-image-next-prev-buttons">
               <div
@@ -98,7 +101,7 @@ export default function Lightbox() {
             />
           )}
         </div>
-        {isLightBoxOpen && <ImageGallery />}
+        <ImageGallery />
       </div>
     </div>
   );

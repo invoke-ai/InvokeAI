@@ -8,6 +8,7 @@
   position: absolute;
   left: 0;
   top: 0;
+  background-color: var(--background-color-secondary);
 
   .image-gallery-wrapper {
     max-height: 100% !important;
@@ -16,10 +17,16 @@
       max-height: calc(100vh - 5rem);
     }
   }
+
+  .current-image-options {
+    z-index: 2;
+    position: absolute;
+    top: 1rem;
+  }
 }
 
 .lightbox-close-btn {
-  z-index: 2;
+  z-index: 3;
   position: absolute;
   left: 1rem;
   top: 1rem;

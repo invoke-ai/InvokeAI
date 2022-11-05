@@ -8,6 +8,7 @@ import {
   setActiveTab,
   setAllParameters,
   setInitialImage,
+  setIsLightBoxOpen,
   setPrompt,
   setSeed,
   setShouldShowImageDetails,
@@ -58,8 +59,12 @@ const systemSelector = createSelector(
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
       system;
 
-    const { upscalingLevel, facetoolStrength, shouldShowImageDetails } =
-      options;
+    const {
+      upscalingLevel,
+      facetoolStrength,
+      shouldShowImageDetails,
+      isLightBoxOpen,
+    } = options;
 
     const { intermediateImage, currentImage } = gallery;
 
@@ -74,6 +79,7 @@ const systemSelector = createSelector(
       currentImage,
       shouldShowImageDetails,
       activeTabName,
+      isLightBoxOpen,
     };
   },
   {
@@ -99,6 +105,7 @@ const CurrentImageButtons = () => {
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
     currentImage,
+    isLightBoxOpen,
   } = useAppSelector(systemSelector);
 
   const { onCopy } = useClipboard(
@@ -109,6 +116,7 @@ const CurrentImageButtons = () => {
 
   const handleClickUseAsInitialImage = () => {
     if (!currentImage) return;
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setInitialImage(currentImage));
     dispatch(setActiveTab('img2img'));
   };
@@ -308,9 +316,9 @@ const CurrentImageButtons = () => {
 
   const handleSendToInpainting = () => {
     if (!currentImage) return;
-
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+    
     dispatch(setImageToInpaint(currentImage));
-
     dispatch(setActiveTab('inpainting'));
     dispatch(setDoesCanvasNeedScaling(true));
 
