@@ -1,13 +1,13 @@
 """omnibus module to be used with the runwayml 9-channel custom inpainting model"""
 
 import torch
-import numpy as  np
+from PIL import Image, ImageOps
 from einops import repeat
-from PIL import Image, ImageOps, ImageChops
+
 from ldm.invoke.devices import choose_autocast
-from ldm.invoke.generator.base import downsampling
 from ldm.invoke.generator.img2img import Img2Img
 from ldm.invoke.generator.txt2img import Txt2Img
+
 
 class Omnibus(Img2Img,Txt2Img):
     def __init__(self, model, precision):
@@ -58,11 +58,9 @@ class Omnibus(Img2Img,Txt2Img):
 
         self.mask_blur_radius = mask_blur_radius
 
-        t_enc = steps
-
         if init_image is not None and mask_image is not None: # inpainting
             masked_image = init_image * (1 - mask_image)  # masked image is the image masked by mask - masked regions zero
-            
+
         elif init_image is not None: # img2img
             scope = choose_autocast(self.precision)
 
@@ -99,7 +97,7 @@ class Omnibus(Img2Img,Txt2Img):
                         device=model.device,
                         num_samples=num_samples,
                     )
-                    
+
                     c = model.cond_stage_model.encode(batch["txt"])
                     c_cat = list()
                     for ck in model.concat_keys:
@@ -164,10 +162,10 @@ class Omnibus(Img2Img,Txt2Img):
 
     def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
-        
+
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
 
         corrected_result = super(Img2Img, self).repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
-        
+
         return corrected_result

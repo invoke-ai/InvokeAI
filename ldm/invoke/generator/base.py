@@ -2,17 +2,19 @@
 Base class for ldm.invoke.generator.*
 including img2img, txt2img, and inpaint
 '''
-import torch
-import numpy as  np
-import random
 import os
 import os.path as osp
+import random
 import traceback
-from tqdm import tqdm, trange
+
+import numpy as np
+import torch
 from PIL import Image, ImageFilter, ImageChops
 import cv2 as cv
-from einops import rearrange, repeat
+from einops import rearrange
 from pytorch_lightning import seed_everything
+from tqdm import trange
+
 from ldm.invoke.devices import choose_autocast
 from ldm.util import rand_perlin_2d
 
@@ -103,7 +105,7 @@ class Generator():
                 seed = self.new_seed()
 
         return results
-    
+
     def sample_to_image(self,samples)->Image.Image:
         """
         Given samples returned from a sampler, converts
@@ -166,12 +168,12 @@ class Generator():
             blurred_init_mask = pil_init_mask
 
         multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, self.pil_image.split()[-1])
-        
+
         # Paste original on color-corrected generation (using blurred mask)
         matched_result.paste(init_image, (0,0), mask = multiplied_blurred_init_mask)
         return matched_result
 
-        
+
 
     def sample_to_lowres_estimated_image(self,samples):
         # origingally adapted from code by @erucipe and @keturn here:
@@ -219,11 +221,11 @@ class Generator():
         (txt2img) or from the latent image (img2img, inpaint)
         """
         raise NotImplementedError("get_noise() must be implemented in a descendent class")
-    
+
     def get_perlin_noise(self,width,height):
         fixdevice = 'cpu' if (self.model.device.type == 'mps') else self.model.device
         return torch.stack([rand_perlin_2d((height, width), (8, 8), device = self.model.device).to(fixdevice) for _ in range(self.latent_channels)], dim=0).to(self.model.device)
-    
+
     def new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
         return self.seed
@@ -325,4 +327,4 @@ class Generator():
             os.makedirs(dirname, exist_ok=True)
         image.save(filepath,'PNG')
 
-        
+

@@ -3,9 +3,8 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 '''
 
 import torch
-import numpy as  np
+
 from ldm.invoke.generator.base import Generator
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 
 class Txt2Img(Generator):
