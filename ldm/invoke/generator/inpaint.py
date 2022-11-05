@@ -160,6 +160,9 @@ class Inpaint(Img2Img):
         the time you call it.  kwargs are 'init_latent' and 'strength'
         """
 
+        self.inpaint_width = inpaint_width
+        self.inpaint_height = inpaint_height
+
         if isinstance(init_image, PIL.Image.Image):
             self.pil_image = init_image
 
@@ -253,10 +256,6 @@ class Inpaint(Img2Img):
 
             result = self.sample_to_image(samples)
 
-            # Resize if necessary
-            if inpaint_width and inpaint_height:
-                result = result.resize(self.pil_image.size)
-
             # Seam paint if this is our first pass (seam_size set to 0 during seam painting)
             if seam_size > 0:
                 result = self.seam_paint(
@@ -322,6 +321,10 @@ class Inpaint(Img2Img):
 
     def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
+
+        # Resize if necessary
+        if self.inpaint_width and self.inpaint_height:
+            gen_result = gen_result.resize(self.pil_image.size)
 
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
