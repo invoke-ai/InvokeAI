@@ -47,6 +47,14 @@ export default function Lightbox() {
     dispatch(selectNextImage());
   };
 
+  useHotkeys(
+    'Esc',
+    () => {
+      if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+    },
+    [isLightBoxOpen]
+  );
+
   return (
     <div className="lightbox-container">
       <IAIIconButton
