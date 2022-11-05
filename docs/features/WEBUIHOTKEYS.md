@@ -1,3 +1,7 @@
+---
+title: WebUI Hotkey List
+---
+
 # **WebUI Hotkey List**
 
 ## General
