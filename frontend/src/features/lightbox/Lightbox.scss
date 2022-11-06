@@ -9,6 +9,7 @@
   left: 0;
   top: 0;
   background-color: var(--background-color-secondary);
+  z-index: 30;
 
   .image-gallery-wrapper {
     max-height: 100% !important;
