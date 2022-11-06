@@ -1,7 +1,5 @@
 ---
 title: CLI
-hide:
-  - toc
 ---
 
 # :material-bash: CLI
