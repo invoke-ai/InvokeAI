@@ -430,7 +430,7 @@ export const canvasSlice = createSlice({
 
       const { x, y, width, height } = boundingBox;
 
-      const index = state.outpainting.session.findIndex(
+      const sessionIndex = state.outpainting.session.findIndex(
         (region) =>
           region.x === x &&
           region.y === y &&
@@ -438,15 +438,16 @@ export const canvasSlice = createSlice({
           region.height === height
       );
 
-      if (index < 0) {
+      if (sessionIndex < 0) {
         state.outpainting.session.push({
           ...boundingBox,
           images: [image],
           selectedImageIndex: 0,
         });
       } else {
-        state.outpainting.session[index].images.push(image);
-        state.outpainting.session[index].selectedImageIndex = index;
+        state.outpainting.session[sessionIndex].images.push(image);
+        state.outpainting.session[sessionIndex].selectedImageIndex =
+          state.outpainting.session[sessionIndex].images.length - 1;
       }
     },
   },

@@ -422,18 +422,17 @@ const IAICanvas = () => {
               visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
             >
               <KonvaImage listening={false} image={canvasBgImage} />
-              <>
-                {outpaintingSession &&
-                  _.map(outpaintingSession, (region) =>
-                    region.images.length > 0 ? (
-                      <IAICanvasImage
-                        x={region.x}
-                        y={region.y}
-                        url={region.images[region.selectedImageIndex].url}
-                      />
-                    ) : null
-                  )}
-              </>
+              {outpaintingSession &&
+                _.map(outpaintingSession, (region, i) =>
+                  region.images.length > 0 ? (
+                    <IAICanvasImage
+                      key={i}
+                      x={region.x}
+                      y={region.y}
+                      url={region.images[region.selectedImageIndex].url}
+                    />
+                  ) : null
+                )}
             </Layer>
             <Layer
               name={'mask-layer'}

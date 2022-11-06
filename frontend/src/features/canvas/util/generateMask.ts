@@ -100,7 +100,7 @@ const generateMask = (
   layer.add(
     new Konva.Rect({
       ...boundingBox,
-      fill: 'white',
+      fill: 'red',
       globalCompositeOperation: 'source-out',
     })
   );

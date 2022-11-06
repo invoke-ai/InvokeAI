@@ -95,7 +95,12 @@ const makeSocketIOEmitters = (
       // TODO: handle maintaining masks for reproducibility in future
       if (generationParameters.init_mask) {
         generationParameters.init_mask = generationParameters.init_mask
-          .substr(0, 20)
+          .substr(0, 64)
+          .concat('...');
+      }
+      if (generationParameters.init_img) {
+        generationParameters.init_img = generationParameters.init_img
+          .substr(0, 64)
           .concat('...');
       }
 

@@ -305,19 +305,16 @@ class InvokeAIWebServer:
             generation_parameters, esrgan_parameters, facetool_parameters
         ):
             try:
-                # truncate long init_mask base64 if needed
-                if "init_mask" in generation_parameters:
-                    printable_parameters = {
-                        **generation_parameters,
-                        "init_mask": generation_parameters["init_mask"][:20] + "...",
-                    }
-                    print(
-                        f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
-                    )
-                else:
-                    print(
-                        f">> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
-                    )
+                # truncate long init_mask/init_img base64 if needed
+                printable_parameters = {
+                    **generation_parameters,
+                    "init_mask": generation_parameters["init_mask"][:64] + "...",
+                    "init_img": generation_parameters["init_img"][:64] + "...",
+                }
+
+                print(
+                    f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
+                )
                 self.generate_images(
                     generation_parameters,
                     esrgan_parameters,
@@ -552,31 +549,58 @@ class InvokeAIWebServer:
             # We need to give absolute paths to the generator, stash the URLs for later
             init_img_url = None
             mask_img_url = None
+            if generation_parameters["generation_mode"] == "outpainting":
+                bounding_box = generation_parameters["bounding_box"].copy()
+                # generation_parameters["init_img"] is a base64 image
+                # generation_parameters["init_mask"] is a base64 image
+                init_img_url = generation_parameters["init_img"][:32]
+                init_image = Image.open(
+                    io.BytesIO(
+                        base64.decodebytes(
+                            bytes(generation_parameters["init_img"], "utf-8")
+                        )
+                    )
+                )
+                generation_parameters["init_img"] = init_image
+                generation_parameters["bounding_box"]["x"] = 0
+                generation_parameters["bounding_box"]["y"] = 0
 
-            if "init_img" in generation_parameters:
-                init_img_url = generation_parameters["init_img"]
-                init_img_path = self.get_image_path_from_url(init_img_url)
-                generation_parameters["init_img"] = init_img_path
+                if generation_parameters["is_mask_empty"]:
+                    generation_parameters["init_mask"] = None
+                    generation_parameters["force_outpaint"] = True
+                else:
+                    # grab an Image of the mask
+                    mask_image = Image.open(
+                        io.BytesIO(
+                            base64.decodebytes(
+                                bytes(generation_parameters["init_mask"], "utf-8")
+                            )
+                        )
+                    )
+                    generation_parameters["init_mask"] = mask_image
 
-            # if 'init_mask' in generation_parameters:
-            #     mask_img_url = generation_parameters['init_mask']
-            #     generation_parameters[
-            #         'init_mask'
-            #     ] = self.get_image_path_from_url(
-            #         generation_parameters['init_mask']
-            #     )
-
-            if "init_mask" in generation_parameters:
+            elif generation_parameters["generation_mode"] == "inpainting":
                 # grab an Image of the init image
-                original_image = Image.open(init_img_path)
-                rgba_image = original_image.convert('RGBA')
+                # init_img_url = generation_parameters["init_img"]
+                # init_img_path = self.get_image_path_from_url(init_img_url)
+                # generation_parameters["init_img"] = init_img_path
+                # original_image = Image.open(init_img_path)
+                # rgba_image = original_image.convert("RGBA")
 
                 # copy a region from it which we will inpaint
-                cropped_init_image = copy_image_from_bounding_box(
-                    rgba_image, **generation_parameters["bounding_box"]
+                # cropped_init_image = copy_image_from_bounding_box(
+                #     rgba_image, **generation_parameters["bounding_box"]
+                # )
+                # generation_parameters["init_img"] = cropped_init_image
+                init_img_url = generation_parameters["init_img"][:32]
+                init_image = Image.open(
+                    io.BytesIO(
+                        base64.decodebytes(
+                            bytes(generation_parameters["init_img"], "utf-8")
+                        )
+                    )
                 )
-                generation_parameters["init_img"] = cropped_init_image
-
+                generation_parameters["init_img"] = init_image
                 if generation_parameters["is_mask_empty"]:
                     generation_parameters["init_mask"] = None
                 else:
@@ -589,6 +613,18 @@ class InvokeAIWebServer:
                         )
                     )
                     generation_parameters["init_mask"] = mask_image
+            elif generation_parameters["generation_mode"] == "img2img":
+                init_img_url = generation_parameters["init_img"]
+                init_img_path = self.get_image_path_from_url(init_img_url)
+                generation_parameters["init_img"] = init_img_path
+
+            # if 'init_mask' in generation_parameters:
+            #     mask_img_url = generation_parameters['init_mask']
+            #     generation_parameters[
+            #         'init_mask'
+            #     ] = self.get_image_path_from_url(
+            #         generation_parameters['init_mask']
+            #     )
 
             totalSteps = self.calculate_real_steps(
                 steps=generation_parameters["steps"],
@@ -617,7 +653,7 @@ class InvokeAIWebServer:
 
                 if (
                     generation_parameters["progress_images"]
-                    and step % generation_parameters['save_intermediates'] == 0
+                    and step % generation_parameters["save_intermediates"] == 0
                     and step < generation_parameters["steps"] - 1
                 ):
                     image = self.generate.sample_to_image(sample)
@@ -687,7 +723,7 @@ class InvokeAIWebServer:
                 nonlocal prior_variations
 
                 # paste the inpainting image back onto the original
-                # if "init_mask" in generation_parameters:
+                # if generation_parameters["generation_mode"] == "inpainting":
                 #     image = paste_image_into_bounding_box(
                 #         Image.open(init_img_path),
                 #         image,
@@ -784,10 +820,13 @@ class InvokeAIWebServer:
 
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
                 if "init_img" in all_parameters:
-                    all_parameters["init_img"] = init_img_url
+                    all_parameters["init_img"] = ""
 
                 if "init_mask" in all_parameters:
                     all_parameters["init_mask"] = ""  # TODO: store the mask in metadata
+
+                if (generation_parameters["generation_mode"] == 'outpainting'):
+                    all_parameters["bounding_box"] = bounding_box
 
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)
 
@@ -824,13 +863,18 @@ class InvokeAIWebServer:
                         "metadata": metadata,
                         "width": width,
                         "height": height,
-                        "boundingBox": generation_parameters["bounding_box"] if "bounding_box" in generation_parameters else None
+                        "boundingBox": generation_parameters["bounding_box"]
+                        if "bounding_box" in generation_parameters
+                        else None,
                     },
                 )
                 eventlet.sleep(0)
 
                 progress.set_current_iteration(progress.current_iteration + 1)
 
+            print(generation_parameters)
+            # generation_parameters["init_img"].show()
+            # generation_parameters["init_mask"].show()
             self.generate.prompt2image(
                 **generation_parameters,
                 step_callback=image_progress,
@@ -932,25 +976,25 @@ class InvokeAIWebServer:
 
             rfc_dict["variations"] = variations
 
-            if "init_img" in parameters:
-                rfc_dict["type"] = "img2img"
-                rfc_dict["strength"] = parameters["strength"]
-                rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
-                rfc_dict["orig_hash"] = calculate_init_img_hash(
-                    self.get_image_path_from_url(parameters["init_img"])
-                )
-                rfc_dict["init_image_path"] = parameters[
-                    "init_img"
-                ]  # TODO: Noncompliant
-                # if 'init_mask' in parameters:
-                #     rfc_dict['mask_hash'] = calculate_init_img_hash(
-                #         self.get_image_path_from_url(parameters['init_mask'])
-                #     )  # TODO: Noncompliant
-                #     rfc_dict['mask_image_path'] = parameters[
-                #         'init_mask'
-                #     ]  # TODO: Noncompliant
-            else:
-                rfc_dict["type"] = "txt2img"
+            # if "init_img" in parameters:
+            #     rfc_dict["type"] = "img2img"
+            #     rfc_dict["strength"] = parameters["strength"]
+            #     rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
+            #     rfc_dict["orig_hash"] = calculate_init_img_hash(
+            #         self.get_image_path_from_url(parameters["init_img"])
+            #     )
+            #     rfc_dict["init_image_path"] = parameters[
+            #         "init_img"
+            #     ]  # TODO: Noncompliant
+            #     # if 'init_mask' in parameters:
+            #     #     rfc_dict['mask_hash'] = calculate_init_img_hash(
+            #     #         self.get_image_path_from_url(parameters['init_mask'])
+            #     #     )  # TODO: Noncompliant
+            #     #     rfc_dict['mask_image_path'] = parameters[
+            #     #         'init_mask'
+            #     #     ]  # TODO: Noncompliant
+            # else:
+            #     rfc_dict["type"] = "txt2img"
 
             metadata["image"] = rfc_dict
 

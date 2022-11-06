@@ -83,6 +83,7 @@ export const frontendToBackendParameters = (
     progress_images: shouldDisplayInProgressType === 'full-res',
     progress_latents: shouldDisplayInProgressType === 'latents',
     save_intermediates: saveIntermediatesInterval,
+    generation_mode: generationMode,
   };
 
   generationParameters.seed = shouldRandomizeSeed
@@ -114,6 +115,7 @@ export const frontendToBackendParameters = (
       boundingBoxDimensions,
       inpaintReplace,
       shouldUseInpaintReplace,
+      stageScale,
     } = canvasState[canvasState.currentCanvas];
 
     const boundingBox = {
@@ -124,25 +126,29 @@ export const frontendToBackendParameters = (
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
     generationParameters.fit = false;
-    const scale = canvasImageLayerRef.current.getAbsoluteScale().x;
-    console.log(boundingBox);
-    console.log(canvasImageLayerRef.current.getAttrs());
-    console.log(canvasImageLayerRef.current.getSize().width / scale);
-    console.log(canvasImageLayerRef.current.getAbsoluteScale());
+    const tempScale = canvasImageLayerRef.current.scale()
+    canvasImageLayerRef.current.scale({ x: 1 / stageScale, y: 1 / stageScale });
+
     const { maskDataURL, isMaskEmpty } = generateMask(lines, boundingBox);
-    canvasImageLayerRef.current.scale({ x: 1, y: 1 });
+
     const absPos = canvasImageLayerRef.current.getAbsolutePosition();
+
     const imageDataURL = canvasImageLayerRef.current.toDataURL({
       x: boundingBox.x + absPos.x,
       y: boundingBox.y + absPos.y,
-      ...canvasImageLayerRef.current.getSize(),
+      width: boundingBox.width,
+      height: boundingBox.height,
     });
+
+    console.log(imageDataURL, maskDataURL);
+    canvasImageLayerRef.current.scale(tempScale);
+
+
     generationParameters.is_mask_empty = isMaskEmpty;
 
     generationParameters.init_img = imageDataURL.split(
       'data:image/png;base64,'
     )[1];
-    console.log(imageDataURL);
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'
     )[1];
