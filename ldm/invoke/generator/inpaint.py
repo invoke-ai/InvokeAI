@@ -8,7 +8,7 @@ import torchvision.transforms as T
 import numpy as  np
 import cv2 as cv
 import PIL
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageFilter, ImageOps, ImageChops
 from skimage.exposure.histogram_matching import match_histograms
 from einops import rearrange, repeat
 from ldm.invoke.devices             import choose_autocast
@@ -173,6 +173,8 @@ class Inpaint(Img2Img):
 
         if isinstance(mask_image, PIL.Image.Image):
             self.pil_mask = mask_image
+
+            mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert('RGB'))
             mask_image = mask_image.resize(
                 (
                     mask_image.width // downsampling,
@@ -299,8 +301,10 @@ class Inpaint(Img2Img):
         else:
             blurred_init_mask = pil_init_mask
 
+        multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, self.pil_image.split()[-1])
+        
         # Paste original on color-corrected generation (using blurred mask)
-        matched_result.paste(base_image, (0,0), mask = blurred_init_mask)
+        matched_result.paste(base_image, (0,0), mask = multiplied_blurred_init_mask)
         return matched_result
 
 
