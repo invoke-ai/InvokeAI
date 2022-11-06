@@ -570,18 +570,15 @@ class InvokeAIWebServer:
 
                 generation_parameters["init_img"] = outpaint_image
 
-                if generation_parameters["is_mask_empty"] == True:
-                    generation_parameters["init_mask"] = None
-                else:
-                    outpaint_mask = Image.open(
-                        io.BytesIO(
-                            base64.decodebytes(
-                                bytes(generation_parameters["init_mask"], "utf-8")
-                            )
+                outpaint_mask = Image.open(
+                    io.BytesIO(
+                        base64.decodebytes(
+                            bytes(generation_parameters["init_mask"], "utf-8")
                         )
-                    ).convert("RGBA")
+                    )
+                ).convert("RGBA")
 
-                    generation_parameters["init_mask"] = outpaint_mask
+                generation_parameters["init_mask"] = outpaint_mask
 
                 """
                 The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 

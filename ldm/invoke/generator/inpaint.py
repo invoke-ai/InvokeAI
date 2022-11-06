@@ -16,6 +16,7 @@ from ldm.invoke.generator.img2img   import Img2Img
 from ldm.models.diffusion.ddim     import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.invoke.generator.base import downsampling
+from ldm.util import copy_image_and_add_text
 
 class Inpaint(Img2Img):
     def __init__(self, model, precision):
@@ -167,14 +168,19 @@ class Inpaint(Img2Img):
                 tile_size = tile_size
             )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
-
+            
+            copy_image_and_add_text(init_filled, "init_filled").show()
+            
             # Create init tensor
             init_image = self._image_to_tensor(init_filled.convert('RGB'))
 
         if isinstance(mask_image, PIL.Image.Image):
             self.pil_mask = mask_image
+            
+            copy_image_and_add_text(mask_image, "mask_image BEFORE multiply with pil_image").show()
 
             mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert('RGB'))
+            copy_image_and_add_text(mask_image, "mask_image AFTER multiply with pil_image").show()
             mask_image = mask_image.resize(
                 (
                     mask_image.width // downsampling,
@@ -310,10 +316,12 @@ class Inpaint(Img2Img):
 
     def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
+        copy_image_and_add_text(gen_result, "gen_result").show()
 
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
         
         corrected_result = self.color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
+        copy_image_and_add_text(corrected_result, "corrected_result").show()
 
         return corrected_result

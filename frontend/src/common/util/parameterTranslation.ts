@@ -12,6 +12,7 @@ import {
 } from 'features/canvas/canvasSlice';
 import generateMask from 'features/canvas/util/generateMask';
 import { canvasImageLayerRef } from 'features/canvas/IAICanvas';
+import openBase64ImageInTab from './openBase64ImageInTab';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
@@ -130,7 +131,6 @@ export const frontendToBackendParameters = (
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
 
-    generationParameters.is_mask_empty = isMaskEmpty;
     // generationParameters.is_mask_empty = isMaskEmpty;
 
     generationParameters.init_mask = maskDataURL.split(
@@ -160,7 +160,10 @@ export const frontendToBackendParameters = (
         height: boundingBox.height,
       });
 
-      console.log(imageDataURL);
+      openBase64ImageInTab([
+        { base64: maskDataURL, caption: 'mask sent as init_mask' },
+        { base64: imageDataURL, caption: 'image sent as init_img' },
+      ]);
 
       canvasImageLayerRef.current.scale(tempScale);
 
