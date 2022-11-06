@@ -85,6 +85,7 @@ export const frontendToBackendParameters = (
     progress_latents: shouldDisplayInProgressType === 'latents',
     save_intermediates: saveIntermediatesInterval,
     generation_mode: generationMode,
+    init_mask: '',
   };
 
   generationParameters.seed = shouldRandomizeSeed
@@ -131,7 +132,7 @@ export const frontendToBackendParameters = (
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
 
-    // generationParameters.is_mask_empty = isMaskEmpty;
+    generationParameters.is_mask_empty = isMaskEmpty;
 
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'
