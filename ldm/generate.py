@@ -308,6 +308,7 @@ class Generate:
             seam_steps: int  = 10,
             tile_size: int   = 32,
             force_outpaint: bool = False,
+            enable_image_debugging = False,
             **args,
     ):   # eat up additional cruft
         """
@@ -485,7 +486,8 @@ class Generate:
                 seam_strength = seam_strength,
                 seam_steps = seam_steps,
                 tile_size = tile_size,
-                force_outpaint = force_outpaint
+                force_outpaint = force_outpaint,
+                enable_image_debugging = enable_image_debugging
             )
 
             if init_color:

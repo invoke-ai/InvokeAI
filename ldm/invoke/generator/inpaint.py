@@ -16,7 +16,7 @@ from ldm.invoke.generator.img2img   import Img2Img
 from ldm.models.diffusion.ddim     import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.invoke.generator.base import downsampling
-from ldm.util import copy_image_and_add_text
+from ldm.util import debug_image
 
 class Inpaint(Img2Img):
     def __init__(self, model, precision):
@@ -151,12 +151,15 @@ class Inpaint(Img2Img):
                        seam_steps: int = 10,
                        tile_size: int = 32,
                        step_callback=None,
-                       inpaint_replace=False, **kwargs):
+                       inpaint_replace=False, enable_image_debugging=False,
+                       **kwargs):
         """
         Returns a function returning an image derived from the prompt and
         the initial image + mask.  Return value depends on the seed at
         the time you call it.  kwargs are 'init_latent' and 'strength'
         """
+
+        self.enable_image_debugging = enable_image_debugging
 
         if isinstance(init_image, PIL.Image.Image):
             self.pil_image = init_image
@@ -168,19 +171,17 @@ class Inpaint(Img2Img):
                 tile_size = tile_size
             )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
-            
-            copy_image_and_add_text(init_filled, "init_filled").show()
+            debug_image(init_filled, "init_filled", debug_status=self.enable_image_debugging)
             
             # Create init tensor
             init_image = self._image_to_tensor(init_filled.convert('RGB'))
 
         if isinstance(mask_image, PIL.Image.Image):
             self.pil_mask = mask_image
-            
-            copy_image_and_add_text(mask_image, "mask_image BEFORE multiply with pil_image").show()
+            debug_image(mask_image, "mask_image BEFORE multiply with pil_image", debug_status=self.enable_image_debugging)
 
             mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert('RGB'))
-            copy_image_and_add_text(mask_image, "mask_image AFTER multiply with pil_image").show()
+            debug_image(mask_image, "mask_image AFTER multiply with pil_image", debug_status=self.enable_image_debugging)
             mask_image = mask_image.resize(
                 (
                     mask_image.width // downsampling,
@@ -316,12 +317,12 @@ class Inpaint(Img2Img):
 
     def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
-        copy_image_and_add_text(gen_result, "gen_result").show()
+        debug_image(gen_result, "gen_result", debug_status=self.enable_image_debugging)
 
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
         
         corrected_result = self.color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
-        copy_image_and_add_text(corrected_result, "corrected_result").show()
+        debug_image(corrected_result, "corrected_result", debug_status=self.enable_image_debugging)
 
         return corrected_result

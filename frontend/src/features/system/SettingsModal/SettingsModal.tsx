@@ -19,6 +19,7 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { persistor } from 'main';
 import {
   InProgressImageType,
+  setEnableImageDebugging,
   setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
@@ -39,12 +40,16 @@ const systemSelector = createSelector(
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       model_list,
+      saveIntermediatesInterval,
+      enableImageDebugging,
     } = system;
     return {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       models: _.map(model_list, (_model, key) => key),
+      saveIntermediatesInterval,
+      enableImageDebugging,
     };
   },
   {
@@ -66,10 +71,6 @@ type SettingsModalProps = {
 const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
 
-  const saveIntermediatesInterval = useAppSelector(
-    (state: RootState) => state.system.saveIntermediatesInterval
-  );
-
   const steps = useAppSelector((state: RootState) => state.options.steps);
 
   const {
@@ -88,6 +89,8 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldDisplayInProgressType,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
+    saveIntermediatesInterval,
+    enableImageDebugging,
   } = useAppSelector(systemSelector);
 
   /**
@@ -166,6 +169,18 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 isChecked={shouldDisplayGuides}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldDisplayGuides(e.target.checked))
+                }
+              />
+            </div>
+
+            <div className="settings-modal-items">
+              <h2 style={{ fontWeight: 'bold' }}>Developer</h2>
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={'Enable Image Debugging'}
+                isChecked={enableImageDebugging}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(setEnableImageDebugging(e.target.checked))
                 }
               />
             </div>

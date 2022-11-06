@@ -66,8 +66,11 @@ export const frontendToBackendParameters = (
     shouldRandomizeSeed,
   } = optionsState;
 
-  const { shouldDisplayInProgressType, saveIntermediatesInterval } =
-    systemState;
+  const {
+    shouldDisplayInProgressType,
+    saveIntermediatesInterval,
+    enableImageDebugging,
+  } = systemState;
 
   const generationParameters: { [k: string]: any } = {
     prompt,
@@ -161,10 +164,12 @@ export const frontendToBackendParameters = (
         height: boundingBox.height,
       });
 
-      openBase64ImageInTab([
-        { base64: maskDataURL, caption: 'mask sent as init_mask' },
-        { base64: imageDataURL, caption: 'image sent as init_img' },
-      ]);
+      if (enableImageDebugging) {
+        openBase64ImageInTab([
+          { base64: maskDataURL, caption: 'mask sent as init_mask' },
+          { base64: imageDataURL, caption: 'image sent as init_img' },
+        ]);
+      }
 
       canvasImageLayerRef.current.scale(tempScale);
 
@@ -212,6 +217,10 @@ export const frontendToBackendParameters = (
     if (facetoolType === 'codeformer') {
       facetoolParameters.codeformer_fidelity = codeformerFidelity;
     }
+  }
+
+  if (enableImageDebugging) {
+    generationParameters.enable_image_debugging = enableImageDebugging;
   }
 
   return {
