@@ -22,7 +22,11 @@ import {
 } from 'features/options/optionsSlice';
 import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { setImageToInpaint, setImageToOutpaint } from 'features/canvas/canvasSlice';
+import {
+  clearOutpaintingSession,
+  setImageToInpaint,
+  setImageToOutpaint,
+} from 'features/canvas/canvasSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
 interface HoverableImageProps {
@@ -109,6 +113,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleSendToOutpainting = () => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setImageToOutpaint(image));
+    dispatch(clearOutpaintingSession());
     if (activeTabName !== 'outpainting') {
       dispatch(setActiveTab('outpainting'));
     }

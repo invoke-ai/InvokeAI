@@ -39,6 +39,7 @@ import {
   setImageToInpaint,
   setDoesCanvasNeedScaling,
   setImageToOutpaint,
+  clearOutpaintingSession,
 } from 'features/canvas/canvasSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
@@ -339,6 +340,7 @@ const CurrentImageButtons = () => {
     dispatch(setImageToOutpaint(currentImage));
     dispatch(setActiveTab('outpainting'));
     dispatch(setDoesCanvasNeedScaling(true));
+    dispatch(clearOutpaintingSession());
 
     toast({
       title: 'Sent to Inpainting',

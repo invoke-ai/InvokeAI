@@ -136,8 +136,8 @@ const setCanvasImage = (
   const { width, height } = state[canvas].boundingBoxDimensions;
   const { x, y } = state[canvas].boundingBoxCoordinates;
 
-  const maxWidth = Math.min(action.payload.width, canvasWidth)
-  const maxHeight = Math.min(action.payload.height, canvasHeight)
+  const maxWidth = Math.min(action.payload.width, canvasWidth);
+  const maxHeight = Math.min(action.payload.height, canvasHeight);
 
   const newCoordinates: Vector2d = { x, y };
   const newDimensions: Dimensions = { width, height };
@@ -453,6 +453,9 @@ export const canvasSlice = createSlice({
           state.outpainting.session[sessionIndex].images.length - 1;
       }
     },
+    clearOutpaintingSession: (state) => {
+      state.outpainting.session = [];
+    },
   },
 });
 
@@ -497,6 +500,7 @@ export const {
   setStageCoordinates,
   setCurrentCanvas,
   addImageToOutpaintingSesion,
+  clearOutpaintingSession,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
