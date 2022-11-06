@@ -546,38 +546,61 @@ class InvokeAIWebServer:
             able to use it as an init image in the future. Need to handle this case.
             """
 
-            # We need to give absolute paths to the generator, stash the URLs for later
-            init_img_url = None
-            mask_img_url = None
+            """
+            Prepare for generation based on generation_mode
+            """
             if generation_parameters["generation_mode"] == "outpainting":
-                bounding_box = generation_parameters["bounding_box"].copy()
-                # generation_parameters["init_img"] is a base64 image
-                # generation_parameters["init_mask"] is a base64 image
-                init_img_url = generation_parameters["init_img"][:32]
-                init_image = Image.open(
+                """
+                generation_parameters["init_img"] is a base64 image
+                generation_parameters["init_mask"] is a base64 image
+
+                So we need to convert each into a PIL Image.
+                """
+
+                truncated_outpaint_image_b64 = generation_parameters["init_img"][:32]
+                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:32]
+
+                outpaint_image = Image.open(
                     io.BytesIO(
                         base64.decodebytes(
                             bytes(generation_parameters["init_img"], "utf-8")
                         )
                     )
-                )
-                generation_parameters["init_img"] = init_image
-                generation_parameters["bounding_box"]["x"] = 0
-                generation_parameters["bounding_box"]["y"] = 0
+                ).convert("RGBA")
 
-                if generation_parameters["is_mask_empty"]:
+                generation_parameters["init_img"] = outpaint_image
+
+                if generation_parameters["is_mask_empty"] == True:
                     generation_parameters["init_mask"] = None
-                    generation_parameters["force_outpaint"] = True
                 else:
-                    # grab an Image of the mask
-                    mask_image = Image.open(
+                    outpaint_mask = Image.open(
                         io.BytesIO(
                             base64.decodebytes(
                                 bytes(generation_parameters["init_mask"], "utf-8")
                             )
                         )
-                    )
-                    generation_parameters["init_mask"] = mask_image
+                    ).convert("RGBA")
+
+                    generation_parameters["init_mask"] = outpaint_mask
+
+                """
+                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
+                to the generator should be:
+                    {
+                        "x": 0, 
+                        "y": 0,
+                        "width": original_bounding_box["width"],
+                        "height": original_bounding_box["height"]
+                    }
+                
+                Save the original bounding box, we need to give it back to the UI when finished,
+                because the UI needs to know where to put the inpainted image on the canvas.
+                """
+
+                original_bounding_box = generation_parameters["bounding_box"].copy()
+
+                generation_parameters["bounding_box"]["x"] = 0
+                generation_parameters["bounding_box"]["y"] = 0
 
             elif generation_parameters["generation_mode"] == "inpainting":
                 # grab an Image of the init image
@@ -592,15 +615,31 @@ class InvokeAIWebServer:
                 #     rgba_image, **generation_parameters["bounding_box"]
                 # )
                 # generation_parameters["init_img"] = cropped_init_image
-                init_img_url = generation_parameters["init_img"][:32]
-                init_image = Image.open(
-                    io.BytesIO(
-                        base64.decodebytes(
-                            bytes(generation_parameters["init_img"], "utf-8")
-                        )
-                    )
+
+                """
+                generation_parameters["init_img"] is a url
+                generation_parameters["init_mask"] is a base64 image
+
+                So we need to convert each into a PIL Image.
+                """
+                init_img_url = generation_parameters["init_img"]
+                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:32]
+
+                init_img_url = generation_parameters["init_img"]
+
+                init_img_path = self.get_image_path_from_url(init_img_url)
+
+                original_image = Image.open(init_img_path)
+
+                rgba_image = original_image.convert("RGBA")
+
+                # copy a region from it which we will inpaint
+                cropped_init_image = copy_image_from_bounding_box(
+                    rgba_image, **generation_parameters["bounding_box"]
                 )
-                generation_parameters["init_img"] = init_image
+
+                generation_parameters["init_img"] = cropped_init_image
+
                 if generation_parameters["is_mask_empty"]:
                     generation_parameters["init_mask"] = None
                 else:
@@ -722,13 +761,16 @@ class InvokeAIWebServer:
                 step_index = 1
                 nonlocal prior_variations
 
+                """
+                Tidy up after generation based on generation_mode
+                """
                 # paste the inpainting image back onto the original
-                # if generation_parameters["generation_mode"] == "inpainting":
-                #     image = paste_image_into_bounding_box(
-                #         Image.open(init_img_path),
-                #         image,
-                #         **generation_parameters["bounding_box"],
-                #     )
+                if generation_parameters["generation_mode"] == "inpainting":
+                    image = paste_image_into_bounding_box(
+                        Image.open(init_img_path),
+                        image,
+                        **generation_parameters["bounding_box"],
+                    )
 
                 progress.set_current_status("Generation Complete")
 
@@ -825,8 +867,8 @@ class InvokeAIWebServer:
                 if "init_mask" in all_parameters:
                     all_parameters["init_mask"] = ""  # TODO: store the mask in metadata
 
-                if (generation_parameters["generation_mode"] == 'outpainting'):
-                    all_parameters["bounding_box"] = bounding_box
+                if generation_parameters["generation_mode"] == "outpainting":
+                    all_parameters["bounding_box"] = original_bounding_box
 
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)
 
@@ -866,15 +908,13 @@ class InvokeAIWebServer:
                         "boundingBox": generation_parameters["bounding_box"]
                         if "bounding_box" in generation_parameters
                         else None,
+                        "generationMode": generation_parameters["generation_mode"]
                     },
                 )
                 eventlet.sleep(0)
 
                 progress.set_current_iteration(progress.current_iteration + 1)
 
-            print(generation_parameters)
-            # generation_parameters["init_img"].show()
-            # generation_parameters["init_mask"].show()
             self.generate.prompt2image(
                 **generation_parameters,
                 step_callback=image_progress,

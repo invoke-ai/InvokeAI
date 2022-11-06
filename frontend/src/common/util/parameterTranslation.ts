@@ -123,32 +123,16 @@ export const frontendToBackendParameters = (
       ...boundingBoxDimensions,
     };
 
-    generationParameters.init_img = imageToProcessUrl;
-    generationParameters.strength = img2imgStrength;
-    generationParameters.fit = false;
-    const tempScale = canvasImageLayerRef.current.scale()
-    canvasImageLayerRef.current.scale({ x: 1 / stageScale, y: 1 / stageScale });
-
     const { maskDataURL, isMaskEmpty } = generateMask(lines, boundingBox);
 
-    const absPos = canvasImageLayerRef.current.getAbsolutePosition();
+    generationParameters.fit = false;
 
-    const imageDataURL = canvasImageLayerRef.current.toDataURL({
-      x: boundingBox.x + absPos.x,
-      y: boundingBox.y + absPos.y,
-      width: boundingBox.width,
-      height: boundingBox.height,
-    });
-
-    console.log(imageDataURL, maskDataURL);
-    canvasImageLayerRef.current.scale(tempScale);
-
+    generationParameters.init_img = imageToProcessUrl;
+    generationParameters.strength = img2imgStrength;
 
     generationParameters.is_mask_empty = isMaskEmpty;
+    // generationParameters.is_mask_empty = isMaskEmpty;
 
-    generationParameters.init_img = imageDataURL.split(
-      'data:image/png;base64,'
-    )[1];
     generationParameters.init_mask = maskDataURL.split(
       'data:image/png;base64,'
     )[1];
@@ -160,6 +144,30 @@ export const frontendToBackendParameters = (
     generationParameters.bounding_box = boundingBox;
 
     if (generationMode === 'outpainting') {
+      const tempScale = canvasImageLayerRef.current.scale();
+
+      canvasImageLayerRef.current.scale({
+        x: 1 / stageScale,
+        y: 1 / stageScale,
+      });
+
+      const absPos = canvasImageLayerRef.current.getAbsolutePosition();
+
+      const imageDataURL = canvasImageLayerRef.current.toDataURL({
+        x: boundingBox.x + absPos.x,
+        y: boundingBox.y + absPos.y,
+        width: boundingBox.width,
+        height: boundingBox.height,
+      });
+
+      console.log(imageDataURL);
+
+      canvasImageLayerRef.current.scale(tempScale);
+
+      generationParameters.init_img = imageDataURL.split(
+        'data:image/png;base64,'
+      )[1];
+
       // TODO: The server metadata generation needs to be changed to fix this.
       generationParameters.progress_images = false;
 

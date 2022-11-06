@@ -136,25 +136,28 @@ const setCanvasImage = (
   const { width, height } = state[canvas].boundingBoxDimensions;
   const { x, y } = state[canvas].boundingBoxCoordinates;
 
+  const maxWidth = Math.min(action.payload.width, canvasWidth)
+  const maxHeight = Math.min(action.payload.height, canvasHeight)
+
   const newCoordinates: Vector2d = { x, y };
   const newDimensions: Dimensions = { width, height };
 
-  if (width + x > canvasWidth) {
+  if (width + x > maxWidth) {
     // Bounding box at least needs to be translated
-    if (width > canvasWidth) {
+    if (width > maxWidth) {
       // Bounding box also needs to be resized
-      newDimensions.width = roundDownToMultiple(canvasWidth, 64);
+      newDimensions.width = roundDownToMultiple(maxWidth, 64);
     }
-    newCoordinates.x = canvasWidth - newDimensions.width;
+    newCoordinates.x = maxWidth - newDimensions.width;
   }
 
-  if (height + y > canvasHeight) {
+  if (height + y > maxHeight) {
     // Bounding box at least needs to be translated
-    if (height > canvasHeight) {
+    if (height > maxHeight) {
       // Bounding box also needs to be resized
-      newDimensions.height = roundDownToMultiple(canvasHeight, 64);
+      newDimensions.height = roundDownToMultiple(maxHeight, 64);
     }
-    newCoordinates.y = canvasHeight - newDimensions.height;
+    newCoordinates.y = maxHeight - newDimensions.height;
   }
 
   state[canvas].boundingBoxDimensions = newDimensions;

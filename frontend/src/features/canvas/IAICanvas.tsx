@@ -349,6 +349,8 @@ const IAICanvas = () => {
 
   const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
     // stop default scrolling
+    if (activeTabName !== 'outpainting') return;
+
     e.evt.preventDefault();
 
     // const oldScale = stageRef.current.scaleX();
@@ -373,7 +375,7 @@ const IAICanvas = () => {
 
     const newScale = _.clamp(
       stageScale * CANVAS_SCALE_BY ** delta,
-      activeTabName === 'inpainting' ? 1 : MIN_CANVAS_SCALE,
+      MIN_CANVAS_SCALE,
       MAX_CANVAS_SCALE
     );
 
@@ -409,7 +411,7 @@ const IAICanvas = () => {
             onMouseOut={handleMouseOutCanvas}
             onMouseLeave={handleMouseOutCanvas}
             onDragMove={handleDragStage}
-            draggable={isMoveStageKeyHeld}
+            draggable={isMoveStageKeyHeld && activeTabName === 'outpainting'}
             onWheel={handleWheel}
             style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
             className="inpainting-canvas-stage checkerboard"

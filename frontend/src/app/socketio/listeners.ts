@@ -113,7 +113,7 @@ const makeSocketIOListeners = (
           })
         );
 
-        if (data.boundingBox) {
+        if (data.generationMode === 'outpainting' && data.boundingBox) {
           const { boundingBox } = data;
           dispatch(
             addImageToOutpaintingSesion({

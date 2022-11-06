@@ -13,6 +13,7 @@
  */
 
 import { Category as GalleryCategory } from 'features/gallery/gallerySlice';
+import { InvokeTabName } from 'features/tabs/InvokeTabs';
 import { IRect } from 'konva/lib/types';
 
 /**
@@ -173,8 +174,8 @@ export declare type SystemStatusResponse = SystemStatus;
 export declare type SystemConfigResponse = SystemConfig;
 
 export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
-  outpaintingRegionUuid?: string;
   boundingBox?: IRect;
+  generationMode: InvokeTabName;
 };
 
 export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
