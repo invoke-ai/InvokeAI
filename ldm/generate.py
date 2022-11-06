@@ -299,6 +299,9 @@ class Generate:
             upscale          = None,
             # this is specific to inpainting and causes more extreme inpainting
             inpaint_replace  = 0.0,
+            # This controls the size at which inpaint occurs (scaled up for inpaint, then back down for the result)
+            inpaint_width    = None,
+            inpaint_height   = None,
             # This will help match inpainted areas to the original image more smoothly
             mask_blur_radius: int = 8,
             # Set this True to handle KeyboardInterrupt internally
@@ -490,7 +493,9 @@ class Generate:
                 seam_strength = seam_strength,
                 seam_steps = seam_steps,
                 tile_size = tile_size,
-                force_outpaint = force_outpaint
+                force_outpaint = force_outpaint,
+                inpaint_width  = inpaint_width,
+                inpaint_height = inpaint_height
             )
 
             if init_color:
