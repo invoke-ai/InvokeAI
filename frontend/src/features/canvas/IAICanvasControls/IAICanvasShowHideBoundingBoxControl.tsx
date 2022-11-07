@@ -32,8 +32,8 @@ const IAICanvasShowHideBoundingBoxControl = () => {
 
   return (
     <IAIIconButton
-      aria-label="Hide Inpainting Box"
-      tooltip="Hide Inpainting Box"
+      aria-label="Hide Inpainting Box (Shift+H)"
+      tooltip="Hide Inpainting Box (Shift+H)"
       icon={<FaVectorSquare />}
       data-alert={!shouldShowBoundingBox}
       onClick={() => {
