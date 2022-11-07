@@ -468,6 +468,10 @@ export const canvasSlice = createSlice({
         state.outpainting.session[sessionIndex].selectedImageIndex =
           state.outpainting.session[sessionIndex].images.length - 1;
       }
+
+      state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
+      state.outpainting.eraserLines = [];
+      state.outpainting.futureEraserLines = [];
     },
     clearOutpaintingSession: (state) => {
       state.outpainting.session = [];
