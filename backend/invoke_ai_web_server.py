@@ -11,6 +11,7 @@ import base64
 from flask import Flask, redirect, send_from_directory
 from flask_socketio import SocketIO
 from PIL import Image
+from PIL.Image import Image as ImageType
 from uuid import uuid4
 from threading import Event
 
@@ -311,9 +312,17 @@ class InvokeAIWebServer:
                 # truncate long init_mask/init_img base64 if needed
                 printable_parameters = {
                     **generation_parameters,
-                    "init_mask": generation_parameters["init_mask"][:64] + "...",
-                    "init_img": generation_parameters["init_img"][:64] + "...",
                 }
+
+                if "init_img" in generation_parameters:
+                    printable_parameters["init_img"] = (
+                        printable_parameters["init_img"][:64] + "..."
+                    )
+
+                if "init_mask" in generation_parameters:
+                    printable_parameters["init_mask"] = (
+                        printable_parameters["init_mask"][:64] + "..."
+                    )
 
                 print(
                     f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
@@ -563,30 +572,13 @@ class InvokeAIWebServer:
                 truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
                 truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
 
-                outpaint_image = Image.open(
-                    io.BytesIO(
-                        base64.decodebytes(
-                            bytes(
-                                generation_parameters["init_img"].split(
-                                    "data:image/png;base64,"
-                                )[1],
-                                "utf-8",
-                            )
-                        )
-                    )
+                outpaint_image = dataURL_to_image(
+                    generation_parameters["init_img"]
                 ).convert("RGBA")
 
-                outpaint_mask = Image.open(
-                    io.BytesIO(
-                        base64.decodebytes(
-                            bytes(
-                                generation_parameters["init_mask"].split(
-                                    "data:image/png;base64,"
-                                )[1],
-                                "utf-8",
-                            )
-                        )
-                    )
+                # Convert mask dataURL to an image and convert to greyscale
+                outpaint_mask = dataURL_to_image(
+                    generation_parameters["init_mask"]
                 ).convert("L")
 
                 outpaint_generation_mode = get_outpainting_generation_mode(
@@ -611,6 +603,11 @@ class InvokeAIWebServer:
                 generation_parameters["bounding_box"]["x"] = 0
                 generation_parameters["bounding_box"]["y"] = 0
 
+                """
+                Apply the mask to the init image, creating a "mask" image with 
+                transparency where inpainting should occur. This is the kind of
+                mask that prompt2image() needs.
+                """
                 alpha_mask = outpaint_image.copy()
                 alpha_mask.putalpha(outpaint_mask)
 
@@ -657,7 +654,7 @@ class InvokeAIWebServer:
                 So we need to convert each into a PIL Image.
                 """
                 init_img_url = generation_parameters["init_img"]
-                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:32]
+                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
 
                 init_img_url = generation_parameters["init_img"]
 
@@ -674,15 +671,21 @@ class InvokeAIWebServer:
 
                 generation_parameters["init_img"] = cropped_init_image
 
-                # grab an Image of the mask
-                mask_image = Image.open(
-                    io.BytesIO(
-                        base64.decodebytes(
-                            bytes(generation_parameters["init_mask"], "utf-8")
-                        )
-                    )
-                )
-                generation_parameters["init_mask"] = mask_image
+                # Convert mask dataURL to an image and convert to greyscale
+                mask_image = dataURL_to_image(
+                    generation_parameters["init_mask"]
+                ).convert("L")
+
+                """
+                Apply the mask to the init image, creating a "mask" image with 
+                transparency where inpainting should occur. This is the kind of
+                mask that prompt2image() needs.
+                """
+                alpha_mask = cropped_init_image.copy()
+                alpha_mask.putalpha(mask_image)
+
+                generation_parameters["init_mask"] = alpha_mask
+
             elif generation_parameters["generation_mode"] == "img2img":
                 init_img_url = generation_parameters["init_img"]
                 init_img_path = self.get_image_path_from_url(init_img_url)
@@ -1342,11 +1345,13 @@ class CanceledException(Exception):
 
 
 """
-Crops an image to a bounding box.
+Returns a copy an image, cropped to a bounding box.
 """
 
 
-def copy_image_from_bounding_box(image, x, y, width, height):
+def copy_image_from_bounding_box(
+    image: ImageType, x: int, y: int, width: int, height: int
+) -> ImageType:
     with image as im:
         bounds = (x, y, x + width, y + height)
         im_cropped = im.crop(bounds)
@@ -1354,11 +1359,38 @@ def copy_image_from_bounding_box(image, x, y, width, height):
 
 
 """
+Converts a base64 image dataURL into an image.
+The dataURL is split on the first commma.
+"""
+
+
+def dataURL_to_image(dataURL: str) -> ImageType:
+    image = Image.open(
+        io.BytesIO(
+            base64.decodebytes(
+                bytes(
+                    dataURL.split(",", 1)[1],
+                    "utf-8",
+                )
+            )
+        )
+    )
+    return image
+
+
+"""
 Pastes an image onto another with a bounding box.
 """
 
 
-def paste_image_into_bounding_box(recipient_image, donor_image, x, y, width, height):
+def paste_image_into_bounding_box(
+    recipient_image: ImageType,
+    donor_image: ImageType,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+) -> ImageType:
     with recipient_image as im:
         bounds = (x, y, x + width, y + height)
         im.paste(donor_image, bounds)
