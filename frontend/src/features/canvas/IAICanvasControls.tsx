@@ -24,34 +24,8 @@ export const canvasControlsSelector = createSelector(
     activeTabNameSelector,
   ],
   (currentCanvas: GenericCanvasState, options: OptionsState, activeTabName) => {
-    const {
-      tool,
-      toolSize: brushSize,
-      maskColor,
-      shouldInvertMask,
-      shouldShowMask,
-      shouldShowCheckboardTransparency,
-      lines,
-      pastLines,
-      futureLines,
-      shouldShowBoundingBoxFill,
-    } = currentCanvas;
-
-    const { showDualDisplay } = options;
-
     return {
-      tool,
-      brushSize,
-      maskColor,
-      shouldInvertMask,
-      shouldShowMask,
-      shouldShowCheckboardTransparency,
-      canUndo: pastLines.length > 0,
-      canRedo: futureLines.length > 0,
-      isMaskEmpty: lines.length === 0,
       activeTabName,
-      showDualDisplay,
-      shouldShowBoundingBoxFill,
     };
   },
   {
