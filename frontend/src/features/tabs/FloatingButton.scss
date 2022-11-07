@@ -6,6 +6,7 @@
   transform: translate(0, -50%);
   z-index: 20;
   padding: 0;
+  background-color: red !important;
 
   &.left {
     left: 0;
@@ -44,4 +45,8 @@
   button {
     border-radius: 0 0.3rem 0.3rem 0;
   }
+}
+
+.show-hide-button-gallery {
+  background-color: var(--background-color) !important;
 }
