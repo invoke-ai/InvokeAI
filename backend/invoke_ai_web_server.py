@@ -19,6 +19,9 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
+from backend.modules.get_outpainting_generation_mode import (
+    get_outpainting_generation_mode,
+)
 
 
 # Loading Arguments
@@ -559,6 +562,7 @@ class InvokeAIWebServer:
 
                 truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
                 truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
+
                 outpaint_image = Image.open(
                     io.BytesIO(
                         base64.decodebytes(
@@ -572,8 +576,6 @@ class InvokeAIWebServer:
                     )
                 ).convert("RGBA")
 
-                generation_parameters["init_img"] = outpaint_image
-
                 outpaint_mask = Image.open(
                     io.BytesIO(
                         base64.decodebytes(
@@ -585,9 +587,11 @@ class InvokeAIWebServer:
                             )
                         )
                     )
-                ).convert("RGBA")
+                ).convert("L")
 
-                generation_parameters["init_mask"] = outpaint_mask
+                outpaint_generation_mode = get_outpainting_generation_mode(
+                    outpaint_image, outpaint_mask
+                )
 
                 """
                 The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
@@ -602,11 +606,48 @@ class InvokeAIWebServer:
                 Save the original bounding box, we need to give it back to the UI when finished,
                 because the UI needs to know where to put the inpainted image on the canvas.
                 """
-
                 original_bounding_box = generation_parameters["bounding_box"].copy()
 
                 generation_parameters["bounding_box"]["x"] = 0
                 generation_parameters["bounding_box"]["y"] = 0
+
+                alpha_mask = outpaint_image.copy()
+                alpha_mask.putalpha(outpaint_mask)
+
+                generation_parameters["init_img"] = outpaint_image
+                generation_parameters["init_mask"] = alpha_mask
+
+                # Remove the unneeded parameters for whichever mode we are doing
+                if outpaint_generation_mode == "inpainting":
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+                elif outpaint_generation_mode == "img2img":
+                    generation_parameters["height"] = original_bounding_box["height"]
+                    generation_parameters["width"] = original_bounding_box["width"]
+                    generation_parameters.pop("init_mask", None)
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+                elif outpaint_generation_mode == "txt2img":
+                    generation_parameters["height"] = original_bounding_box["height"]
+                    generation_parameters["width"] = original_bounding_box["width"]
+                    generation_parameters.pop("strength", None)
+                    generation_parameters.pop("fit", None)
+                    generation_parameters.pop("init_img", None)
+                    generation_parameters.pop("init_mask", None)
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
 
             elif generation_parameters["generation_mode"] == "inpainting":
                 """
@@ -646,22 +687,6 @@ class InvokeAIWebServer:
                 init_img_url = generation_parameters["init_img"]
                 init_img_path = self.get_image_path_from_url(init_img_url)
                 generation_parameters["init_img"] = init_img_path
-
-            # if 'init_mask' in generation_parameters:
-            #     mask_img_url = generation_parameters['init_mask']
-            #     generation_parameters[
-            #         'init_mask'
-            #     ] = self.get_image_path_from_url(
-            #         generation_parameters['init_mask']
-            #     )
-
-            totalSteps = self.calculate_real_steps(
-                steps=generation_parameters["steps"],
-                strength=generation_parameters["strength"]
-                if "strength" in generation_parameters
-                else None,
-                has_init_image="init_img" in generation_parameters,
-            )
 
             progress = Progress(generation_parameters=generation_parameters)
 

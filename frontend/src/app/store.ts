@@ -58,6 +58,7 @@ const galleryBlacklist = [
   'categories',
   'currentCategory',
   'currentImageUuid',
+  'currentImage',
   'shouldAutoSwitchToNewImages',
   'shouldHoldGalleryOpen',
 ].map((blacklistItem) => `gallery.${blacklistItem}`);
