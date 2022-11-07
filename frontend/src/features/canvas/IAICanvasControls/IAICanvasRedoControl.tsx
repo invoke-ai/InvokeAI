@@ -1,28 +1,44 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaRedo } from 'react-icons/fa';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
+  OutpaintingCanvasState,
   redo,
+  redoEraser,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 
 const canvasRedoSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { futureLines, shouldShowMask } = currentCanvas;
+  [
+    (state: RootState) => state.canvas.outpainting,
+    currentCanvasSelector,
+    activeTabNameSelector,
+    areHotkeysEnabledSelector,
+  ],
+  (
+    outpainting: OutpaintingCanvasState,
+    currentCanvas: GenericCanvasState,
+    activeTabName,
+    areHotkeysEnabled
+  ) => {
+    const { futureLines, shouldShowMask, tool } = currentCanvas;
 
     return {
-      canRedo: futureLines.length > 0,
+      canRedo:
+        tool === 'imageEraser'
+          ? outpainting.futureEraserLines.length > 0
+          : futureLines.length > 0,
       shouldShowMask,
       activeTabName,
       areHotkeysEnabled,
+      tool,
     };
   },
   {
@@ -34,10 +50,16 @@ const canvasRedoSelector = createSelector(
 
 export default function IAICanvasRedoControl() {
   const dispatch = useAppDispatch();
-  const { canRedo, shouldShowMask, activeTabName, areHotkeysEnabled } =
+  const { canRedo, shouldShowMask, activeTabName, tool, areHotkeysEnabled } =
     useAppSelector(canvasRedoSelector);
 
-  const handleRedo = () => dispatch(redo());
+  const handleRedo = () => {
+    if (tool === 'imageEraser') {
+      dispatch(redoEraser());
+    } else {
+      dispatch(redo());
+    }
+  };
 
   // Hotkeys
 
@@ -51,7 +73,7 @@ export default function IAICanvasRedoControl() {
     {
       enabled: areHotkeysEnabled && canRedo,
     },
-    [activeTabName, shouldShowMask, canRedo]
+    [activeTabName, shouldShowMask, canRedo, tool]
   );
 
   return (

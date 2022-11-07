@@ -1,28 +1,44 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaUndo } from 'react-icons/fa';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
+  OutpaintingCanvasState,
   undo,
+  undoEraser,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const canvasUndoSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (canvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { pastLines, shouldShowMask } = canvas;
+  [
+    (state: RootState) => state.canvas.outpainting,
+    currentCanvasSelector,
+    activeTabNameSelector,
+    areHotkeysEnabledSelector,
+  ],
+  (
+    outpainting: OutpaintingCanvasState,
+    canvas: GenericCanvasState,
+    activeTabName,
+    areHotkeysEnabled
+  ) => {
+    const { pastLines, shouldShowMask, tool } = canvas;
 
     return {
-      canUndo: pastLines.length > 0,
+      canUndo:
+        tool === 'imageEraser'
+          ? outpainting.pastEraserLines.length > 0
+          : pastLines.length > 0,
       shouldShowMask,
       activeTabName,
       areHotkeysEnabled,
+      tool,
     };
   },
   {
@@ -35,10 +51,16 @@ const canvasUndoSelector = createSelector(
 export default function IAICanvasUndoControl() {
   const dispatch = useAppDispatch();
 
-  const { canUndo, shouldShowMask, activeTabName, areHotkeysEnabled } =
+  const { canUndo, shouldShowMask, activeTabName, areHotkeysEnabled, tool } =
     useAppSelector(canvasUndoSelector);
 
-  const handleUndo = () => dispatch(undo());
+  const handleUndo = () => {
+    if (tool === 'imageEraser') {
+      dispatch(undoEraser());
+    } else {
+      dispatch(undo());
+    }
+  };
 
   // Hotkeys
   // Undo
@@ -51,7 +73,7 @@ export default function IAICanvasUndoControl() {
     {
       enabled: areHotkeysEnabled && canUndo,
     },
-    [activeTabName, shouldShowMask, canUndo]
+    [activeTabName, shouldShowMask, canUndo, tool]
   );
 
   return (
