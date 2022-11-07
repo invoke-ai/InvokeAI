@@ -60,6 +60,11 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'G',
     },
     {
+      title: 'Maximize Workspace',
+      desc: 'Close panels and maximize work area',
+      hotkey: 'F',
+    },
+    {
       title: 'Change Tabs',
       desc: 'Switch to another workspace',
       hotkey: '1-6',
@@ -202,6 +207,11 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       title: 'Lock Bounding Box',
       desc: 'Locks the bounding box',
       hotkey: 'Shift+W',
+    },
+    {
+      title: 'Show/Hide Bounding Box',
+      desc: 'Toggle visibility of bounding box',
+      hotkey: 'Shift+H',
     },
     {
       title: 'Quick Toggle Lock Bounding Box',

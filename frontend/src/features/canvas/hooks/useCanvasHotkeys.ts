@@ -9,6 +9,7 @@ import {
   setIsMoveBoundingBoxKeyHeld,
   setIsMoveStageKeyHeld,
   setShouldLockBoundingBox,
+  setShouldShowBoundingBox,
   toggleShouldLockBoundingBox,
   toggleTool,
 } from 'features/canvas/canvasSlice';
@@ -75,6 +76,18 @@ const useInpaintingCanvasHotkeys = () => {
       enabled: areHotkeysEnabled,
     },
     [activeTabName, shouldShowMask]
+  );
+
+  useHotkeys(
+    'shift+h',
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      dispatch(setShouldShowBoundingBox(!shouldShowBoundingBox));
+    },
+    {
+      enabled: areHotkeysEnabled,
+    },
+    [activeTabName, shouldShowBoundingBox]
   );
 
   // Manages hold-style keyboard shortcuts

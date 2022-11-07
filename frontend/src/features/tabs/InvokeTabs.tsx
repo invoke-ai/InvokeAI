@@ -12,7 +12,11 @@ import NodesIcon from 'common/icons/NodesIcon';
 import OutpaintIcon from 'common/icons/OutpaintIcon';
 import PostprocessingIcon from 'common/icons/PostprocessingIcon';
 import TextToImageIcon from 'common/icons/TextToImageIcon';
-import { setActiveTab, setIsLightBoxOpen } from 'features/options/optionsSlice';
+import {
+  setActiveTab,
+  setIsLightBoxOpen,
+  setShouldShowOptionsPanel,
+} from 'features/options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
 import InpaintingWorkarea from './Inpainting/InpaintingWorkarea';
 // import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
@@ -23,6 +27,7 @@ import {
   setDoesCanvasNeedScaling,
 } from 'features/canvas/canvasSlice';
 import OutpaintingWorkarea from './Outpainting/OutpaintingWorkarea';
+import { setShouldShowGallery } from 'features/gallery/gallerySlice';
 
 export const tabDict = {
   txt2img: {
@@ -71,6 +76,12 @@ export default function InvokeTabs() {
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.options.isLightBoxOpen
   );
+  const shouldShowGallery = useAppSelector(
+    (state: RootState) => state.gallery.shouldShowGallery
+  );
+  const shouldShowOptionsPanel = useAppSelector(
+    (state: RootState) => state.options.shouldShowOptionsPanel
+  );
   const dispatch = useAppDispatch();
 
   useHotkeys('1', () => {
@@ -104,6 +115,21 @@ export default function InvokeTabs() {
       dispatch(setIsLightBoxOpen(!isLightBoxOpen));
     },
     [isLightBoxOpen]
+  );
+
+  useHotkeys(
+    'f',
+    () => {
+      if (shouldShowGallery || shouldShowOptionsPanel) {
+        dispatch(setShouldShowOptionsPanel(false));
+        dispatch(setShouldShowGallery(false));
+      } else {
+        dispatch(setShouldShowOptionsPanel(true));
+        dispatch(setShouldShowGallery(true));
+      }
+      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+    },
+    [shouldShowGallery, shouldShowOptionsPanel]
   );
 
   const renderTabs = () => {
