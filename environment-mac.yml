@@ -8,7 +8,7 @@ dependencies:
   - pip>=22.2
   - pytorch=1.12
   - pytorch-lightning=1.7
-  - torchvision
+  - torchvision=0.13
   - torchmetrics=0.10
   - torch-fidelity=0.3
 
@@ -37,7 +37,7 @@ dependencies:
   - mpmath=1.2
   - nomkl=3
   - numpy=1.23
-  - omegaconf
+  - omegaconf=2.1
   - openh264=2.3
   - onnx=1.12
   - onnxruntime=1.12
