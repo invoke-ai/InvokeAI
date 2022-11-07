@@ -57,6 +57,7 @@ const systemBlacklist = [
 const galleryBlacklist = [
   'categories',
   'currentCategory',
+  'currentImage',
   'currentImageUuid',
   'shouldAutoSwitchToNewImages',
   'shouldHoldGalleryOpen',
