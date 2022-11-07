@@ -63,8 +63,10 @@ const InvokeOptionsPanel = (props: Props) => {
     'o',
     () => {
       dispatch(setShouldShowOptionsPanel(!shouldShowOptionsPanel));
+      shouldPinOptionsPanel &&
+        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
     },
-    [shouldShowOptionsPanel]
+    [shouldShowOptionsPanel, shouldPinOptionsPanel]
   );
 
   useHotkeys(
@@ -72,6 +74,7 @@ const InvokeOptionsPanel = (props: Props) => {
     () => {
       if (shouldPinOptionsPanel) return;
       dispatch(setShouldShowOptionsPanel(false));
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinOptionsPanel]
   );
@@ -80,6 +83,7 @@ const InvokeOptionsPanel = (props: Props) => {
     'shift+o',
     () => {
       handleClickPinOptionsPanel();
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinOptionsPanel]
   );

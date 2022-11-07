@@ -151,8 +151,10 @@ export default function ImageGallery() {
     'g',
     () => {
       handleToggleGallery();
+      shouldPinGallery &&
+        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
     },
-    [shouldShowGallery]
+    [shouldShowGallery, shouldPinGallery]
   );
 
   useHotkeys('left', () => {
@@ -167,6 +169,7 @@ export default function ImageGallery() {
     'shift+g',
     () => {
       handleSetShouldPinGallery();
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinGallery]
   );
@@ -176,6 +179,7 @@ export default function ImageGallery() {
     () => {
       if (shouldPinGallery) return;
       dispatch(setShouldShowGallery(false));
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinGallery]
   );
