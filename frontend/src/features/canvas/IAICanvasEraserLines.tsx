@@ -1,33 +1,33 @@
 import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line } from 'react-konva';
-import { useAppSelector } from 'app/store';
+import { RootState, useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
-import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
+import { OutpaintingCanvasState } from './canvasSlice';
 
-export const canvasLinesSelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas: GenericCanvasState) => {
-    const { lines } = currentCanvas;
+export const canvasEraserLinesSelector = createSelector(
+  (state: RootState) => state.canvas.outpainting,
+  (outpainting: OutpaintingCanvasState) => {
+    const { eraserLines } = outpainting;
     return {
-      lines,
+      eraserLines,
     };
   }
 );
 
-type InpaintingCanvasLinesProps = GroupConfig;
+type IAICanvasEraserLinesProps = GroupConfig;
 
 /**
  * Draws the lines which comprise the mask.
  *
  * Uses globalCompositeOperation to handle the brush and eraser tools.
  */
-const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
+const IAICanvasEraserLines = (props: IAICanvasEraserLinesProps) => {
   const { ...rest } = props;
-  const { lines } = useAppSelector(canvasLinesSelector);
+  const { eraserLines } = useAppSelector(canvasEraserLinesSelector);
 
   return (
-    <Group {...rest}>
-      {lines.map((line, i) => (
+    <Group {...rest} globalCompositeOperation={'destination-out'}>
+      {eraserLines.map((line, i) => (
         <Line
           key={i}
           points={line.points}
@@ -38,13 +38,11 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
           lineJoin="round"
           shadowForStrokeEnabled={false}
           listening={false}
-          globalCompositeOperation={
-            line.tool === 'brush' ? 'source-over' : 'destination-out'
-          }
+          globalCompositeOperation={'source-over'}
         />
       ))}
     </Group>
   );
 };
 
-export default IAICanvasLines;
+export default IAICanvasEraserLines;

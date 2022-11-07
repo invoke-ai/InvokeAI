@@ -12,7 +12,7 @@ import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
-  setBrushSize,
+  setToolSize,
   setShouldShowBrushPreview,
   setTool,
 } from 'features/canvas/canvasSlice';
@@ -23,7 +23,7 @@ import IAICanvasMaskColorPicker from './IAICanvasMaskControls/IAICanvasMaskColor
 const inpaintingBrushSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
   (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { tool, brushSize, shouldShowMask } = currentCanvas;
+    const { tool, toolSize: brushSize, shouldShowMask } = currentCanvas;
 
     return {
       tool,
@@ -45,7 +45,7 @@ export default function IAICanvasBrushControl() {
   const { tool, brushSize, shouldShowMask, activeTabName, areHotkeysEnabled } =
     useAppSelector(inpaintingBrushSelector);
 
-  const handleSelectBrushTool = () => dispatch(setTool('brush'));
+  const handleSelectBrushTool = () => dispatch(setTool('maskBrush'));
 
   const handleShowBrushPreview = () => {
     dispatch(setShouldShowBrushPreview(true));
@@ -57,7 +57,7 @@ export default function IAICanvasBrushControl() {
 
   const handleChangeBrushSize = (v: number) => {
     dispatch(setShouldShowBrushPreview(true));
-    dispatch(setBrushSize(v));
+    dispatch(setToolSize(v));
   };
 
   // Hotkeys
@@ -116,7 +116,7 @@ export default function IAICanvasBrushControl() {
           tooltip="Brush (B)"
           icon={<FaPaintBrush />}
           onClick={handleSelectBrushTool}
-          data-selected={tool === 'brush'}
+          data-selected={tool === 'maskBrush'}
           isDisabled={!shouldShowMask}
         />
       }

@@ -14,7 +14,9 @@ import { Stage as StageType } from 'konva/lib/Stage';
 // app
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import {
+  addEraserLine,
   addLine,
+  addPointToCurrentEraserLine,
   addPointToCurrentLine,
   CanvasState,
   clearImageToInpaint,
@@ -27,9 +29,9 @@ import {
 } from 'features/canvas/canvasSlice';
 
 // component
-import IAICanvasLines from './IAICanvasLines';
-import IAICanvasBrushPreview from './IAICanvasBrushPreview';
-import IAICanvasBrushPreviewOutline from './IAICanvasBrushPreviewOutline';
+import IAICanvasMaskLines from './IAICanvasMaskLines';
+import IAICanvasMaskBrushPreview from './IAICanvasMaskBrushPreview';
+import IAICanvasMaskBrushPreviewOutline from './IAICanvasMaskBrushPreviewOutline';
 import { Vector2d } from 'konva/lib/types';
 import getScaledCursorPosition from './util/getScaledCursorPosition';
 import IAICanvasBoundingBoxPreview from './IAICanvasBoundingBoxPreview';
@@ -47,6 +49,7 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import IAICanvasImage from './IAICanvasImage';
 import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
 import IAICanvasBoundingBoxPreviewOverlay from './IAICanvasBoundingBoxPreviewOverlay';
+import IAICanvasEraserLines from './IAICanvasEraserLines';
 
 const canvasSelector = createSelector(
   [
@@ -57,7 +60,7 @@ const canvasSelector = createSelector(
   (currentCanvas: GenericCanvasState, activeTabName, canvas: CanvasState) => {
     const {
       tool,
-      brushSize,
+      toolSize: brushSize,
       maskColor,
       shouldInvertMask,
       shouldShowMask,
@@ -228,15 +231,24 @@ const IAICanvas = () => {
         return;
       e.evt.preventDefault();
       dispatch(setIsDrawing(true));
-
-      // Add a new line starting from the current cursor position.
-      dispatch(
-        addLine({
-          tool,
-          strokeWidth: brushSize / 2,
-          points: [scaledCursorPosition.x, scaledCursorPosition.y],
-        })
-      );
+      if (tool === 'imageEraser') {
+        // Add a new line starting from the current cursor position.
+        dispatch(
+          addEraserLine({
+            strokeWidth: brushSize / 2,
+            points: [scaledCursorPosition.x, scaledCursorPosition.y],
+          })
+        );
+      } else {
+        // Add a new line starting from the current cursor position.
+        dispatch(
+          addLine({
+            tool,
+            strokeWidth: brushSize / 2,
+            points: [scaledCursorPosition.x, scaledCursorPosition.y],
+          })
+        );
+      }
     },
     [dispatch, brushSize, tool, isModifyingBoundingBox, isMoveStageKeyHeld]
   );
@@ -264,11 +276,21 @@ const IAICanvas = () => {
     if (!isDrawing || isModifyingBoundingBox || isMoveStageKeyHeld) return;
 
     didMouseMoveRef.current = true;
+
     // Extend the current line
-    dispatch(
-      addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-    );
-  }, [dispatch, isDrawing, isModifyingBoundingBox, isMoveStageKeyHeld]);
+    if (tool === 'imageEraser') {
+      dispatch(
+        addPointToCurrentEraserLine([
+          scaledCursorPosition.x,
+          scaledCursorPosition.y,
+        ])
+      );
+    } else {
+      dispatch(
+        addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
+      );
+    }
+  }, [dispatch, isDrawing, isModifyingBoundingBox, isMoveStageKeyHeld, tool]);
 
   /**
    *
@@ -293,14 +315,26 @@ const IAICanvas = () => {
        * the line's existing points. This allows the line to render as a circle
        * centered on that point.
        */
-      dispatch(
-        addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-      );
+      if (tool === 'imageEraser') {
+        dispatch(
+          addPointToCurrentEraserLine([
+            scaledCursorPosition.x,
+            scaledCursorPosition.y,
+          ])
+        );
+      } else {
+        dispatch(
+          addPointToCurrentLine([
+            scaledCursorPosition.x,
+            scaledCursorPosition.y,
+          ])
+        );
+      }
     } else {
       didMouseMoveRef.current = false;
     }
     dispatch(setIsDrawing(false));
-  }, [dispatch, isDrawing, isModifyingBoundingBox, isMoveStageKeyHeld]);
+  }, [dispatch, isDrawing, isModifyingBoundingBox, isMoveStageKeyHeld, tool]);
 
   /**
    *
@@ -334,14 +368,23 @@ const IAICanvas = () => {
 
         dispatch(setIsDrawing(true));
 
-        // Add a new line starting from the current cursor position.
-        dispatch(
-          addLine({
-            tool,
-            strokeWidth: brushSize / 2,
-            points: [scaledCursorPosition.x, scaledCursorPosition.y],
-          })
-        );
+        if (tool === 'imageEraser') {
+          // Add a new line starting from the current cursor position.
+          dispatch(
+            addEraserLine({
+              strokeWidth: brushSize / 2,
+              points: [scaledCursorPosition.x, scaledCursorPosition.y],
+            })
+          );
+        } else {
+          dispatch(
+            addLine({
+              tool,
+              strokeWidth: brushSize / 2,
+              points: [scaledCursorPosition.x, scaledCursorPosition.y],
+            })
+          );
+        }
       }
     },
     [dispatch, brushSize, tool, isModifyingBoundingBox, isMoveStageKeyHeld]
@@ -435,6 +478,7 @@ const IAICanvas = () => {
                     />
                   ) : null
                 )}
+              <IAICanvasEraserLines />
             </Layer>
             <Layer
               id={'mask-layer'}
@@ -442,14 +486,14 @@ const IAICanvas = () => {
               ref={maskLayerRef}
               visible={shouldShowMask}
             >
-              <IAICanvasLines visible={true} />
+              <IAICanvasMaskLines visible={true} />
 
-              <IAICanvasBrushPreview
+              <IAICanvasMaskBrushPreview
                 visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
               />
               <IAICanvasMaskCompositer />
 
-              <IAICanvasBrushPreviewOutline
+              <IAICanvasMaskBrushPreviewOutline
                 visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
               />
 

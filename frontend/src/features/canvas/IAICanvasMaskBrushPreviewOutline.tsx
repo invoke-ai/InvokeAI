@@ -3,24 +3,20 @@ import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { Circle, Group } from 'react-konva';
 import { useAppSelector } from 'app/store';
-import {
-  currentCanvasSelector,
-  GenericCanvasState,
-} from 'features/canvas/canvasSlice';
-import { rgbaColorToRgbString } from './util/colorToString';
+import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
 
-const canvasBrushPreviewSelector = createSelector(
+const canvasBrushPreviewOutlineSelector = createSelector(
   currentCanvasSelector,
   (currentCanvas: GenericCanvasState) => {
     const {
       cursorPosition,
       stageDimensions: { width, height },
-      brushSize,
-      maskColor,
+      toolSize: brushSize,
       tool,
       shouldShowBrush,
       isMovingBoundingBox,
       isTransformingBoundingBox,
+      stageScale,
     } = currentCanvas;
 
     return {
@@ -28,9 +24,9 @@ const canvasBrushPreviewSelector = createSelector(
       width,
       height,
       brushSize,
-      maskColorString: rgbaColorToRgbString(maskColor),
       tool,
-      shouldShowBrush,
+      strokeWidth: 1 / stageScale, // scale stroke thickness
+      radius: 1 / stageScale, // scale stroke thickness
       shouldDrawBrushPreview:
         !(
           isMovingBoundingBox ||
@@ -47,21 +43,12 @@ const canvasBrushPreviewSelector = createSelector(
 );
 
 /**
- * Draws a black circle around the canvas brush preview.
+ * Draws the canvas brush preview outline.
  */
-const IAICanvasBrushPreview = (props: GroupConfig) => {
+const IAICanvasBrushPreviewOutline = (props: GroupConfig) => {
   const { ...rest } = props;
-  const {
-    cursorPosition,
-    width,
-    height,
-    brushSize,
-    maskColorString,
-    tool,
-    shouldDrawBrushPreview,
-  } = useAppSelector(canvasBrushPreviewSelector);
-
-  if (!shouldDrawBrushPreview) return null;
+  const { cursorPosition, width, height, brushSize, strokeWidth, radius } =
+    useAppSelector(canvasBrushPreviewOutlineSelector);
 
   return (
     <Group {...rest}>
@@ -69,14 +56,19 @@ const IAICanvasBrushPreview = (props: GroupConfig) => {
         x={cursorPosition ? cursorPosition.x : width / 2}
         y={cursorPosition ? cursorPosition.y : height / 2}
         radius={brushSize / 2}
-        fill={maskColorString}
+        stroke={'rgba(0,0,0,1)'}
+        strokeWidth={strokeWidth}
+        strokeEnabled={true}
         listening={false}
-        globalCompositeOperation={
-          tool === 'eraser' ? 'destination-out' : 'source-over'
-        }
+      />
+      <Circle
+        x={cursorPosition ? cursorPosition.x : width / 2}
+        y={cursorPosition ? cursorPosition.y : height / 2}
+        radius={radius}
+        fill={'rgba(0,0,0,1)'}
+        listening={false}
       />
     </Group>
   );
 };
-
-export default IAICanvasBrushPreview;
+export default IAICanvasBrushPreviewOutline;

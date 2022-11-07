@@ -8,10 +8,15 @@ import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { RootState } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
-export type InpaintingTool = 'brush' | 'eraser';
+export type InpaintingTool = 'maskBrush' | 'maskEraser' | 'imageEraser';
 
 export type MaskLine = {
   tool: InpaintingTool;
+  strokeWidth: number;
+  points: number[];
+};
+
+export type EraserLine = {
   strokeWidth: number;
   points: number[];
 };
@@ -31,8 +36,8 @@ export type Dimensions = {
 export type BoundingBoxPreviewType = 'overlay' | 'ants' | 'marchingAnts';
 
 export interface GenericCanvasState {
-  tool: 'brush' | 'eraser';
-  brushSize: number;
+  tool: InpaintingTool;
+  toolSize: number;
   maskColor: RgbaColor;
   cursorPosition: Vector2d | null;
   stageDimensions: Dimensions;
@@ -76,6 +81,9 @@ export type OutpaintingRegion = {
 // export type Outpainting = Record<string, OutpaintingRegion>;
 
 export type OutpaintingCanvasState = GenericCanvasState & {
+  eraserLines: EraserLine[];
+  pastEraserLines: EraserLine[][];
+  futureEraserLines: EraserLine[][];
   session: OutpaintingRegion[];
 };
 
@@ -88,8 +96,8 @@ export interface CanvasState {
 }
 
 const initialGenericCanvasState: GenericCanvasState = {
-  tool: 'brush',
-  brushSize: 50,
+  tool: 'maskBrush',
+  toolSize: 50,
   maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
   stageDimensions: { width: 0, height: 0 },
   stageCoordinates: { x: 0, y: 0 },
@@ -123,7 +131,13 @@ const initialGenericCanvasState: GenericCanvasState = {
 const initialCanvasState: CanvasState = {
   currentCanvas: 'inpainting',
   inpainting: initialGenericCanvasState,
-  outpainting: { session: [], ...initialGenericCanvasState },
+  outpainting: {
+    session: [],
+    eraserLines: [],
+    pastEraserLines: [],
+    futureEraserLines: [],
+    ...initialGenericCanvasState,
+  },
 };
 
 const setCanvasImage = (
@@ -176,10 +190,12 @@ export const canvasSlice = createSlice({
     },
     toggleTool: (state) => {
       state[state.currentCanvas].tool =
-        state[state.currentCanvas].tool === 'brush' ? 'eraser' : 'brush';
+        state[state.currentCanvas].tool === 'maskBrush'
+          ? 'maskEraser'
+          : 'maskBrush';
     },
-    setBrushSize: (state, action: PayloadAction<number>) => {
-      state[state.currentCanvas].brushSize = action.payload;
+    setToolSize: (state, action: PayloadAction<number>) => {
+      state[state.currentCanvas].toolSize = action.payload;
     },
     addLine: (state, action: PayloadAction<MaskLine>) => {
       state[state.currentCanvas].pastLines.push(
@@ -456,12 +472,38 @@ export const canvasSlice = createSlice({
     clearOutpaintingSession: (state) => {
       state.outpainting.session = [];
     },
+    addEraserLine: (state, action: PayloadAction<EraserLine>) => {
+      state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
+      state.outpainting.eraserLines.push(action.payload);
+      state.outpainting.futureEraserLines = [];
+    },
+    addPointToCurrentEraserLine: (state, action: PayloadAction<number[]>) => {
+      state.outpainting.eraserLines[
+        state.outpainting.eraserLines.length - 1
+      ].points.push(...action.payload);
+    },
+    undoEraser: (state) => {
+      if (state.outpainting.pastEraserLines.length === 0) return;
+      const newLines = state.outpainting.pastEraserLines.pop();
+      if (!newLines) return;
+      state.outpainting.futureEraserLines.unshift(
+        state.outpainting.eraserLines
+      );
+      state.outpainting.eraserLines = newLines;
+    },
+    redoEraser: (state) => {
+      if (state.outpainting.futureEraserLines.length === 0) return;
+      const newLines = state.outpainting.futureEraserLines.shift();
+      if (!newLines) return;
+      state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
+      state.outpainting.eraserLines = newLines;
+    },
   },
 });
 
 export const {
   setTool,
-  setBrushSize,
+  setToolSize,
   addLine,
   addPointToCurrentLine,
   setShouldInvertMask,
@@ -501,6 +543,10 @@ export const {
   setCurrentCanvas,
   addImageToOutpaintingSesion,
   clearOutpaintingSession,
+  addEraserLine,
+  addPointToCurrentEraserLine,
+  undoEraser,
+  redoEraser,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
