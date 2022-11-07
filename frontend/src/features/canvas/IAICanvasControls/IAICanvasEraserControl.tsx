@@ -55,8 +55,10 @@ export default function IAICanvasEraserControl() {
 
   return (
     <IAIIconButton
-      aria-label="Eraser (E)"
-      tooltip="Eraser (E)"
+      aria-label={
+        activeTabName === 'inpainting' ? 'Eraser (E)' : 'Erase Mask (E)'
+      }
+      tooltip={activeTabName === 'inpainting' ? 'Eraser (E)' : 'Erase Mask (E)'}
       icon={<FaEraser />}
       onClick={handleSelectEraserTool}
       data-selected={tool === 'maskEraser'}

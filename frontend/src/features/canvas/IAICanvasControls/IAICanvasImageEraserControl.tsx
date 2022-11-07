@@ -1,6 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { FaCircle, FaEraser } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
@@ -12,6 +11,7 @@ import {
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { BsEraser } from 'react-icons/bs';
 
 const imageEraserSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
@@ -40,24 +40,24 @@ export default function IAICanvasImageEraserControl() {
   const handleSelectEraserTool = () => dispatch(setTool('imageEraser'));
 
   // Hotkeys
-  // Set tool to maskEraser
-  // useHotkeys(
-  //   'e',
-  //   (e: KeyboardEvent) => {
-  //     e.preventDefault();
-  //     handleSelectEraserTool();
-  //   },
-  //   {
-  //     enabled: areHotkeysEnabled,
-  //   },
-  //   [activeTabName, shouldShowMask]
-  // );
+  useHotkeys(
+    'shift+e',
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      handleSelectEraserTool();
+    },
+    {
+      enabled: areHotkeysEnabled,
+    },
+    [activeTabName, shouldShowMask]
+  );
 
   return (
     <IAIIconButton
-      aria-label="Eraser (E)"
-      tooltip="Eraser (E)"
-      icon={<FaCircle />}
+      aria-label="Erase Canvas (Shift+E)"
+      tooltip="Erase Canvas (Shift+E)"
+      icon={<BsEraser />}
+      fontSize={18}
       onClick={handleSelectEraserTool}
       data-selected={tool === 'imageEraser'}
       isDisabled={!shouldShowMask}

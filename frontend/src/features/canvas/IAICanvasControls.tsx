@@ -15,8 +15,6 @@ import { RootState, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import _ from 'lodash';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaCircle } from 'react-icons/fa';
 import IAICanvasImageEraserControl from './IAICanvasControls/IAICanvasImageEraserControl';
 
 export const canvasControlsSelector = createSelector(
@@ -65,17 +63,14 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasControls = () => {
   const { activeTabName } = useAppSelector(canvasControlsSelector);
+
   return (
     <div className="inpainting-settings">
       <ButtonGroup isAttached={true}>
         <IAICanvasBrushControl />
         <IAICanvasEraserControl />
+        {activeTabName === 'outpainting' && <IAICanvasImageEraserControl />}
       </ButtonGroup>
-      {activeTabName === 'outpainting' && (
-        <ButtonGroup isAttached={true}>
-          <IAICanvasImageEraserControl />
-        </ButtonGroup>
-      )}
       <ButtonGroup isAttached={true}>
         <IAICanvasMaskVisibilityControl />
         <IAICanvasMaskInvertControl />

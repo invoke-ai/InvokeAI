@@ -225,6 +225,14 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     },
   ];
 
+  const outpaintingHotkeys = [
+    {
+      title: 'Erase Canvas',
+      desc: 'Erase the images on the canvas',
+      hotkey: 'Shift+E',
+    },
+  ];
+
   const renderHotkeyModalItems = (hotkeys: HotkeyList[]) => {
     const hotkeyModalItemsToRender: ReactElement[] = [];
 
@@ -294,6 +302,16 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(inpaintingHotkeys)}
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <AccordionButton className="hotkeys-modal-button">
+                  <h2>Outpainting Hotkeys</h2>
+                  <AccordionIcon />
+                </AccordionButton>
+                <AccordionPanel>
+                  {renderHotkeyModalItems(outpaintingHotkeys)}
                 </AccordionPanel>
               </AccordionItem>
             </Accordion>
