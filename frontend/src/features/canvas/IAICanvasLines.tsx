@@ -1,21 +1,15 @@
 import { GroupConfig } from 'konva/lib/Group';
-import { Group, Line, Rect } from 'react-konva';
+import { Group, Line } from 'react-konva';
 import { useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
-import { rgbaColorToString } from './util/colorToString';
 
 export const canvasLinesSelector = createSelector(
   currentCanvasSelector,
   (currentCanvas: GenericCanvasState) => {
-    const { lines, maskColor, stageCoordinates, stageDimensions, stageScale } =
-      currentCanvas;
+    const { lines } = currentCanvas;
     return {
       lines,
-      stageCoordinates,
-      stageDimensions,
-      stageScale,
-      maskColorString: rgbaColorToString(maskColor),
     };
   }
 );
@@ -29,13 +23,7 @@ type InpaintingCanvasLinesProps = GroupConfig;
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
   const { ...rest } = props;
-  const {
-    lines,
-    maskColorString,
-    stageCoordinates,
-    stageDimensions,
-    stageScale,
-  } = useAppSelector(canvasLinesSelector);
+  const { lines } = useAppSelector(canvasLinesSelector);
 
   return (
     <Group {...rest}>
@@ -43,7 +31,7 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
         <Line
           key={i}
           points={line.points}
-          stroke={'rgb(0,0,0)'}
+          stroke={'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
           strokeWidth={line.strokeWidth * 2}
           tension={0}
           lineCap="round"
@@ -55,14 +43,6 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
           }
         />
       ))}
-      <Rect
-        offsetX={stageCoordinates.x / stageScale}
-        offsetY={stageCoordinates.y / stageScale}
-        height={stageDimensions.height / stageScale}
-        width={stageDimensions.width / stageScale}
-        fill={maskColorString}
-        globalCompositeOperation={'source-in'}
-      />
     </Group>
   );
 };

@@ -18,11 +18,7 @@ import {
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
 } from 'features/canvas/canvasSlice';
-import { rgbaColorToString } from './util/colorToString';
-import {
-  DASH_WIDTH,
-  // MARCHING_ANTS_SPEED,
-} from './util/constants';
+import { GroupConfig } from 'konva/lib/Group';
 
 const boundingBoxPreviewSelector = createSelector(
   currentCanvasSelector,
@@ -30,7 +26,6 @@ const boundingBoxPreviewSelector = createSelector(
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
-      boundingBoxPreviewFill,
       stageDimensions,
       stageScale,
       imageToInpaint,
@@ -40,24 +35,19 @@ const boundingBoxPreviewSelector = createSelector(
       isMovingBoundingBox,
       isMouseOverBoundingBox,
       isMoveBoundingBoxKeyHeld,
-      stageCoordinates,
     } = currentCanvas;
     return {
       boundingBoxCoordinates,
       boundingBoxDimensions,
-      boundingBoxPreviewFillString: rgbaColorToString(boundingBoxPreviewFill),
+      imageToInpaint,
+      isDrawing,
+      isMouseOverBoundingBox,
+      isMoveBoundingBoxKeyHeld,
+      isMovingBoundingBox,
+      isTransformingBoundingBox,
+      shouldLockBoundingBox,
       stageDimensions,
       stageScale,
-      imageToInpaint,
-      dash: DASH_WIDTH / stageScale, // scale dash lengths
-      strokeWidth: 1 / stageScale, // scale stroke thickness
-      shouldLockBoundingBox,
-      isDrawing,
-      isTransformingBoundingBox,
-      isMouseOverBoundingBox,
-      isMovingBoundingBox,
-      isMoveBoundingBoxKeyHeld,
-      stageCoordinates,
     };
   },
   {
@@ -67,54 +57,26 @@ const boundingBoxPreviewSelector = createSelector(
   }
 );
 
-/**
- * Shades the area around the mask.
- */
-export const IAICanvasBoundingBoxPreviewOverlay = () => {
-  const {
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    boundingBoxPreviewFillString,
-    stageDimensions,
-    stageScale,
-    stageCoordinates,
-  } = useAppSelector(boundingBoxPreviewSelector);
-  return (
-    <Group>
-      <Rect
-        offsetX={stageCoordinates.x / stageScale}
-        offsetY={stageCoordinates.y / stageScale}
-        height={stageDimensions.height / stageScale}
-        width={stageDimensions.width / stageScale}
-        fill={boundingBoxPreviewFillString}
-      />
-      <Rect
-        x={boundingBoxCoordinates.x}
-        y={boundingBoxCoordinates.y}
-        width={boundingBoxDimensions.width}
-        height={boundingBoxDimensions.height}
-        fill={'rgb(255,255,255)'}
-        listening={false}
-        globalCompositeOperation={'destination-out'}
-      />
-    </Group>
-  );
-};
+type IAICanvasBoundingBoxPreviewProps = GroupConfig;
 
-const IAICanvasBoundingBoxPreview = () => {
+const IAICanvasBoundingBoxPreview = (
+  props: IAICanvasBoundingBoxPreviewProps
+) => {
+  const { ...rest } = props;
+
   const dispatch = useAppDispatch();
   const {
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    stageScale,
     imageToInpaint,
-    shouldLockBoundingBox,
     isDrawing,
-    isTransformingBoundingBox,
-    isMovingBoundingBox,
     isMouseOverBoundingBox,
     isMoveBoundingBoxKeyHeld,
+    isMovingBoundingBox,
+    isTransformingBoundingBox,
+    shouldLockBoundingBox,
     stageDimensions,
+    stageScale,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -316,7 +278,7 @@ const IAICanvasBoundingBoxPreview = () => {
   };
 
   return (
-    <>
+    <Group {...rest}>
       <Rect
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
@@ -377,7 +339,7 @@ const IAICanvasBoundingBoxPreview = () => {
             dispatch(setIsMouseOverBoundingBox(false));
         }}
       />
-    </>
+    </Group>
   );
 };
 

@@ -557,13 +557,17 @@ class InvokeAIWebServer:
                 So we need to convert each into a PIL Image.
                 """
 
-                truncated_outpaint_image_b64 = generation_parameters["init_img"][:32]
-                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:32]
-
+                truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
+                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
                 outpaint_image = Image.open(
                     io.BytesIO(
                         base64.decodebytes(
-                            bytes(generation_parameters["init_img"], "utf-8")
+                            bytes(
+                                generation_parameters["init_img"].split(
+                                    "data:image/png;base64,"
+                                )[1],
+                                "utf-8",
+                            )
                         )
                     )
                 ).convert("RGBA")
@@ -573,7 +577,12 @@ class InvokeAIWebServer:
                 outpaint_mask = Image.open(
                     io.BytesIO(
                         base64.decodebytes(
-                            bytes(generation_parameters["init_mask"], "utf-8")
+                            bytes(
+                                generation_parameters["init_mask"].split(
+                                    "data:image/png;base64,"
+                                )[1],
+                                "utf-8",
+                            )
                         )
                     )
                 ).convert("RGBA")
@@ -600,19 +609,6 @@ class InvokeAIWebServer:
                 generation_parameters["bounding_box"]["y"] = 0
 
             elif generation_parameters["generation_mode"] == "inpainting":
-                # grab an Image of the init image
-                # init_img_url = generation_parameters["init_img"]
-                # init_img_path = self.get_image_path_from_url(init_img_url)
-                # generation_parameters["init_img"] = init_img_path
-                # original_image = Image.open(init_img_path)
-                # rgba_image = original_image.convert("RGBA")
-
-                # copy a region from it which we will inpaint
-                # cropped_init_image = copy_image_from_bounding_box(
-                #     rgba_image, **generation_parameters["bounding_box"]
-                # )
-                # generation_parameters["init_img"] = cropped_init_image
-
                 """
                 generation_parameters["init_img"] is a url
                 generation_parameters["init_mask"] is a base64 image
@@ -637,18 +633,15 @@ class InvokeAIWebServer:
 
                 generation_parameters["init_img"] = cropped_init_image
 
-                if generation_parameters["is_mask_empty"]:
-                    generation_parameters["init_mask"] = None
-                else:
-                    # grab an Image of the mask
-                    mask_image = Image.open(
-                        io.BytesIO(
-                            base64.decodebytes(
-                                bytes(generation_parameters["init_mask"], "utf-8")
-                            )
+                # grab an Image of the mask
+                mask_image = Image.open(
+                    io.BytesIO(
+                        base64.decodebytes(
+                            bytes(generation_parameters["init_mask"], "utf-8")
                         )
                     )
-                    generation_parameters["init_mask"] = mask_image
+                )
+                generation_parameters["init_mask"] = mask_image
             elif generation_parameters["generation_mode"] == "img2img":
                 init_img_url = generation_parameters["init_img"]
                 init_img_path = self.get_image_path_from_url(init_img_url)
@@ -905,7 +898,7 @@ class InvokeAIWebServer:
                         "boundingBox": generation_parameters["bounding_box"]
                         if "bounding_box" in generation_parameters
                         else None,
-                        "generationMode": generation_parameters["generation_mode"]
+                        "generationMode": generation_parameters["generation_mode"],
                     },
                 )
                 eventlet.sleep(0)

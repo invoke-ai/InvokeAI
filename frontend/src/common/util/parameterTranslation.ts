@@ -128,18 +128,14 @@ export const frontendToBackendParameters = (
       ...boundingBoxDimensions,
     };
 
-    const { maskDataURL, isMaskEmpty } = generateMask(lines, boundingBox);
+    const maskDataURL = generateMask(lines, boundingBox);
 
     generationParameters.fit = false;
 
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
 
-    generationParameters.is_mask_empty = isMaskEmpty;
-
-    generationParameters.init_mask = maskDataURL.split(
-      'data:image/png;base64,'
-    )[1];
+    generationParameters.init_mask = maskDataURL;
 
     if (shouldUseInpaintReplace) {
       generationParameters.inpaint_replace = inpaintReplace;
@@ -173,9 +169,7 @@ export const frontendToBackendParameters = (
 
       canvasImageLayerRef.current.scale(tempScale);
 
-      generationParameters.init_img = imageDataURL.split(
-        'data:image/png;base64,'
-      )[1];
+      generationParameters.init_img = imageDataURL;
 
       // TODO: The server metadata generation needs to be changed to fix this.
       generationParameters.progress_images = false;

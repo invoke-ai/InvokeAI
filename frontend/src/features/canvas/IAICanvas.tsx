@@ -32,9 +32,7 @@ import IAICanvasBrushPreview from './IAICanvasBrushPreview';
 import IAICanvasBrushPreviewOutline from './IAICanvasBrushPreviewOutline';
 import { Vector2d } from 'konva/lib/types';
 import getScaledCursorPosition from './util/getScaledCursorPosition';
-import IAICanvasBoundingBoxPreview, {
-  IAICanvasBoundingBoxPreviewOverlay,
-} from './IAICanvasBoundingBoxPreview';
+import IAICanvasBoundingBoxPreview from './IAICanvasBoundingBoxPreview';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { useToast } from '@chakra-ui/react';
 import useCanvasHotkeys from './hooks/useCanvasHotkeys';
@@ -47,6 +45,8 @@ import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import IAICanvasImage from './IAICanvasImage';
+import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
+import IAICanvasBoundingBoxPreviewOverlay from './IAICanvasBoundingBoxPreviewOverlay';
 
 const canvasSelector = createSelector(
   [
@@ -418,7 +418,7 @@ const IAICanvas = () => {
             ref={stageRef}
           >
             <Layer
-              name={'image-layer'}
+              id={'image-layer'}
               ref={canvasImageLayerRef}
               listening={false}
               visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
@@ -437,16 +437,21 @@ const IAICanvas = () => {
                 )}
             </Layer>
             <Layer
-              name={'mask-layer'}
+              id={'mask-layer'}
               listening={false}
               ref={maskLayerRef}
               visible={shouldShowMask}
             >
+              <IAICanvasLines visible={true} />
+
               <IAICanvasBrushPreview
                 visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
               />
+              <IAICanvasMaskCompositer />
 
-              <IAICanvasLines visible={true} />
+              <IAICanvasBrushPreviewOutline
+                visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+              />
 
               <KonvaImage
                 image={canvasBgImage}
@@ -454,6 +459,7 @@ const IAICanvas = () => {
                 globalCompositeOperation="source-in"
                 visible={shouldInvertMask}
               />
+
               <KonvaImage
                 image={canvasBgImage}
                 listening={false}
@@ -461,15 +467,11 @@ const IAICanvas = () => {
                 visible={!shouldInvertMask && shouldShowCheckboardTransparency}
               />
             </Layer>
-            <Layer visible={shouldShowMask}>
-              {shouldShowBoundingBoxFill && shouldShowBoundingBox && (
-                <IAICanvasBoundingBoxPreviewOverlay />
-              )}
-              {shouldShowBoundingBox && <IAICanvasBoundingBoxPreview />}
-
-              <IAICanvasBrushPreviewOutline
-                visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+            <Layer id={'bounding-box-layer'} visible={shouldShowMask}>
+              <IAICanvasBoundingBoxPreviewOverlay
+                visible={shouldShowBoundingBoxFill && shouldShowBoundingBox}
               />
+              <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
             </Layer>
           </Stage>
         )}
