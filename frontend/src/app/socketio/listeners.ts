@@ -32,7 +32,7 @@ import {
   setInitialImage,
   setMaskPath,
 } from 'features/options/optionsSlice';
-import { requestImages, requestNewImages } from './actions';
+import { requestImages, requestNewImages, requestSystemConfig } from './actions';
 import {
   addImageToOutpaintingSesion,
   clearImageToInpaint,
@@ -58,6 +58,7 @@ const makeSocketIOListeners = (
       try {
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus('Connected'));
+        dispatch(requestSystemConfig());
         const gallery: GalleryState = getState().gallery;
 
         if (gallery.categories.user.latest_mtime) {

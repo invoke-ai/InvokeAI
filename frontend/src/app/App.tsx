@@ -85,10 +85,6 @@ const App = () => {
   const { shouldShowGalleryButton, shouldShowOptionsPanelButton } =
     useAppSelector(appSelector);
 
-  useEffect(() => {
-    dispatch(requestSystemConfig());
-  }, [dispatch]);
-
   return (
     <div className="App">
       <ImageUploader>
