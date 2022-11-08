@@ -52,22 +52,28 @@ in the wiki
     cd InvokeAI
     ```
 
-6. Run the following two commands:
+6. Run the following commands:
 
-    ```batch title="step 6a"
-    conda env create
-    ```
+    !!! todo "For systems with a CUDA (Nvidia) card:"
 
-    ```batch title="step 6b"
-    conda activate invokeai
-    ```
+       ```bash
+       rmdir src      # (this is a precaution in case there is already a src directory)
+       conda env create -f environments/environment-cuda.yml
+       conda activate invokeai
+       (invokeai)>
+       ```
+
+    !!! todo "For systems with an AMD card (using ROCm driver):"
+
+       ```bash
+       rmdir src      # (this is a precaution in case there is already a src directory)
+       conda env create -f environments/environment-rocm.yml
+       conda activate invokeai
+       (invokeai)>
+       ```
 
     This will install all python requirements and activate the "invokeai" environment
     which sets PATH and other environment variables properly.
-
-    Note that the long form of the first command is `conda env create -f environment.yml`. If the
-    environment file isn't specified, conda will default to `environment.yml`. You will need
-    to provide the `-f` option if you wish to load a different environment file at any point.
 
 7. Load the big stable diffusion weights files and a couple of smaller machine-learning models:
 

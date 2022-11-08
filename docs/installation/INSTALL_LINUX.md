@@ -42,14 +42,25 @@ title: Manual Installation, Linux
     ```
 
 5.  Use anaconda to copy necessary python packages, create a new python
-    environment named `invokeai` and activate the environment.
+    environment named `invokeai` and then activate the environment.
 
-    ```bash
-    (base) rm -rf src      # (this is a precaution in case there is already a src directory)
-    (base) ~/InvokeAI$ conda env create
-    (base) ~/InvokeAI$ conda activate invokeai
-    (invokeai) ~/InvokeAI$
-    ```
+    !!! todo "For systems with a CUDA (Nvidia) card:"
+
+       ```bash
+       (base) rm -rf src      # (this is a precaution in case there is already a src directory)
+       (base) ~/InvokeAI$ conda env create -f environments/environment-cuda.yml
+       (base) ~/InvokeAI$ conda activate invokeai
+       (invokeai) ~/InvokeAI$
+       ```
+
+    !!! todo "For systems with an AMD card (using ROCm driver):"
+
+       ```bash
+       (base) rm -rf src      # (this is a precaution in case there is already a src directory)
+       (base) ~/InvokeAI$ conda env create -f environments/environment-rocm.yml
+       (base) ~/InvokeAI$ conda activate invokeai
+       (invokeai) ~/InvokeAI$
+       ```
 
     After these steps, your command prompt will be prefixed by `(invokeai)` as
     shown above.

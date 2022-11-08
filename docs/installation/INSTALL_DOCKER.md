@@ -70,7 +70,7 @@ Some Suggestions of variables you may want to change besides the Token:
 | `HUGGINGFACE_TOKEN="hg_aewirhghlawrgkjbarug2"`                      | This is the only required variable, without you can't get the checkpoint |
 | `ARCH=aarch64`                                                      | if you are using a ARM based CPU                                         |
 | `INVOKEAI_TAG=yourname/invokeai:latest`                             | the Container Repository / Tag which will be used                        |
-| `INVOKEAI_CONDA_ENV_FILE=environment-linux-aarch64.yml`             | since environment.yml wouldn't work with aarch                           |
+| `INVOKEAI_CONDA_ENV_FILE=environments/environment-linux-aarch64.yml`| since environment.yml wouldn't work with aarch                           |
 | `INVOKEAI_GIT="-b branchname https://github.com/username/reponame"` | if you want to use your own fork                                         |
 
 #### Build the Image

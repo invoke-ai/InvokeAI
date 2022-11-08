@@ -111,7 +111,7 @@ A number of caveats:
    the border.
 
 4. When using the `inpaint-1.5` model, you may notice subtle changes to the area
-   within the original image. This is because the model performs an
+   outside the masked region. This is because the model performs an
    encoding/decoding on the image as a whole. This does not occur with the
    standard model.
 
