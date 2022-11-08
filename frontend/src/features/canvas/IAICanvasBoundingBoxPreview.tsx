@@ -93,41 +93,57 @@ const IAICanvasBoundingBoxPreview = (
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
+      const { x: oldX, y: oldY } = boundingBoxCoordinates;
+
+      const transformerX = e.target.x();
+      const transformerY = e.target.y();
+
+      const newX = roundToMultiple(
+        Math.floor(transformerX / 64) < 10 ? transformerX : oldX,
+        64
+      );
+      const newY = roundToMultiple(
+        Math.floor(transformerY / 64) < 10 ? transformerY : oldY,
+        64
+      );
+
+      e.target.x(newX);
+      e.target.y(newY);
+
       dispatch(
         setBoundingBoxCoordinates({
-          x: Math.floor(e.target.x()),
-          y: Math.floor(e.target.y()),
+          x: newX,
+          y: newY,
         })
       );
     },
-    [dispatch]
+    [boundingBoxCoordinates, dispatch]
   );
 
-  // OK
-  const dragBoundFunc = useCallback(
-    (position: Vector2d) => {
-      if (!baseCanvasImage) return boundingBoxCoordinates;
+  // const dragBoundFunc = useCallback(
+  //   (position: Vector2d) => {
+  //     if (!baseCanvasImage) return boundingBoxCoordinates;
 
-      const { x, y } = position;
+  //     const { x, y } = position;
 
-      const maxX =
-        stageDimensions.width - boundingBoxDimensions.width * stageScale;
-      const maxY =
-        stageDimensions.height - boundingBoxDimensions.height * stageScale;
+  //     const maxX =
+  //       stageDimensions.width - boundingBoxDimensions.width * stageScale;
+  //     const maxY =
+  //       stageDimensions.height - boundingBoxDimensions.height * stageScale;
 
-      const clampedX = Math.floor(_.clamp(x, 0, maxX));
-      const clampedY = Math.floor(_.clamp(y, 0, maxY));
+  //     const clampedX = Math.floor(_.clamp(x, 0, maxX));
+  //     const clampedY = Math.floor(_.clamp(y, 0, maxY));
 
-      return { x: clampedX, y: clampedY };
-    },
-    [
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      baseCanvasImage,
-      stageScale,
-      stageDimensions,
-    ]
-  );
+  //     return { x: clampedX, y: clampedY };
+  //   },
+  //   [
+  //     boundingBoxCoordinates,
+  //     boundingBoxDimensions,
+  //     baseCanvasImage,
+  //     stageScale,
+  //     stageDimensions,
+  //   ]
+  // );
 
   const handleOnTransform = useCallback(() => {
     /**
@@ -304,7 +320,7 @@ const IAICanvasBoundingBoxPreview = (
         onMouseUp={handleEndedModifying}
         draggable={true}
         onDragMove={handleOnDragMove}
-        dragBoundFunc={dragBoundFunc}
+        // dragBoundFunc={dragBoundFunc}
         onTransform={handleOnTransform}
         onDragEnd={handleEndedModifying}
         onTransformEnd={handleEndedTransforming}
