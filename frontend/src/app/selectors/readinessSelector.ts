@@ -3,27 +3,20 @@ import _ from 'lodash';
 import { RootState } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
-
 import { SystemState } from 'features/system/systemSlice';
-import {
-  baseCanvasImageSelector,
-  currentCanvasSelector,
-  GenericCanvasState,
-} from 'features/canvas/canvasSlice';
+import { baseCanvasImageSelector } from 'features/canvas/canvasSlice';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 
 export const readinessSelector = createSelector(
   [
     (state: RootState) => state.options,
     (state: RootState) => state.system,
-    currentCanvasSelector,
     baseCanvasImageSelector,
     activeTabNameSelector,
   ],
   (
     options: OptionsState,
     system: SystemState,
-    currentCanvas: GenericCanvasState,
     baseCanvasImage,
     activeTabName
   ) => {
@@ -55,15 +48,6 @@ export const readinessSelector = createSelector(
       isReady = false;
       reasonsWhyNotReady.push('No inpainting image selected');
     }
-
-    // // We don't use mask paths now.
-    // //  Cannot generate with a mask without img2img
-    // if (maskPath && !initialImage) {
-    //   isReady = false;
-    //   reasonsWhyNotReady.push(
-    //     'On ImageToImage tab, but no mask is provided.'
-    //   );
-    // }
 
     // TODO: job queue
     // Cannot generate if already processing an image
