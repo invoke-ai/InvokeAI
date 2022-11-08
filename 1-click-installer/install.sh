@@ -97,12 +97,12 @@ source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains abou
 conda activate
 
 if [ "$OS_NAME" == "mac" ]; then
-    environment_file=environment-mac.yml
+    environment_file="environment-mac.yml"
 else
-    environment_file=environment.yml
+    environment_file="environment.yml"
 fi
 
-conda env update -f $environment_file
+conda env update -f "${environment_file}"
 
 status=$?
 
