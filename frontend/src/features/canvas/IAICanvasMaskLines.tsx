@@ -40,7 +40,7 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
   const { objects } = useAppSelector(canvasLinesSelector);
 
   return (
-    <Group {...rest}>
+    <Group listening={false} {...rest}>
       {objects.filter(isCanvasMaskLine).map((line, i) => (
         <Line
           key={i}

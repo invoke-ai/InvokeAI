@@ -55,13 +55,14 @@ const IAICanvasBoundingBoxPreviewOverlay = (
     stageCoordinates,
   } = useAppSelector(boundingBoxPreviewSelector);
   return (
-    <Group {...rest}>
+    <Group listening={false} {...rest}>
       <Rect
         offsetX={stageCoordinates.x / stageScale}
         offsetY={stageCoordinates.y / stageScale}
         height={stageDimensions.height / stageScale}
         width={stageDimensions.width / stageScale}
         fill={boundingBoxPreviewFillString}
+        listening={false}
       />
       <Rect
         x={boundingBoxCoordinates.x}

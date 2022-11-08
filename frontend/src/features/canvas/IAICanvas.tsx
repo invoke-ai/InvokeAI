@@ -212,16 +212,18 @@ const IAICanvas = () => {
             )}
             <IAICanvasOutpaintingObjects />
           </Layer>
-          <Layer id={'mask-layer'} listening={false} visible={shouldShowMask}>
-            <IAICanvasMaskLines visible={true} />
+          <Layer id={'mask-layer'} visible={shouldShowMask} listening={false}>
+            <IAICanvasMaskLines visible={true} listening={false} />
 
             <IAICanvasMaskBrushPreview
               visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+              listening={false}
             />
-            <IAICanvasMaskCompositer />
+            <IAICanvasMaskCompositer listening={false} />
 
             <IAICanvasMaskBrushPreviewOutline
               visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+              listening={false}
             />
 
             {canvasBgImage && (
@@ -247,6 +249,7 @@ const IAICanvas = () => {
           <Layer id={'bounding-box-layer'} visible={shouldShowMask}>
             <IAICanvasBoundingBoxPreviewOverlay
               visible={shouldShowBoundingBoxFill && shouldShowBoundingBox}
+              listening={false}
             />
             <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
           </Layer>

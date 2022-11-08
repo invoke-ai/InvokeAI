@@ -28,7 +28,7 @@ const IAICanvasOutpaintingObjects = () => {
   if (!objects) return null;
 
   return (
-    <Group name="outpainting-objects">
+    <Group name="outpainting-objects" listening={false}>
       {objects.map((obj, i) => {
         if (obj.type === 'image') {
           return (

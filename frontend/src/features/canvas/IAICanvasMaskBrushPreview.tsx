@@ -64,7 +64,7 @@ const IAICanvasBrushPreview = (props: GroupConfig) => {
   if (!shouldDrawBrushPreview) return null;
 
   return (
-    <Group {...rest}>
+    <Group listening={false} {...rest}>
       <Circle
         x={cursorPosition ? cursorPosition.x : width / 2}
         y={cursorPosition ? cursorPosition.y : height / 2}

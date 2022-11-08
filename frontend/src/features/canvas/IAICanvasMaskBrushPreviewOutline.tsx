@@ -51,7 +51,7 @@ const IAICanvasBrushPreviewOutline = (props: GroupConfig) => {
     useAppSelector(canvasBrushPreviewOutlineSelector);
 
   return (
-    <Group {...rest}>
+    <Group listening={false} {...rest}>
       <Circle
         x={cursorPosition ? cursorPosition.x : width / 2}
         y={cursorPosition ? cursorPosition.y : height / 2}
