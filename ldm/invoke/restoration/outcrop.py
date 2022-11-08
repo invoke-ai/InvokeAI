@@ -32,8 +32,8 @@ class Outcrop(object):
             image_callback(img,preferred_seed,use_prefix=prefix,**kwargs)
 
         result= self.generate.prompt2image(
-            orig_opt.prompt,
-            seed        = orig_opt.seed if orig_opt.seed>0 else opt.seed,
+            opt.prompt,
+            seed        = opt.seed if opt.seed else orig_opt.seed,
             sampler     = self.generate.sampler,
             steps       = opt.steps,
             cfg_scale   = opt.cfg_scale,
