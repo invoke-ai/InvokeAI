@@ -97,10 +97,9 @@ source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains abou
 conda activate
 
 if [ "$OS_NAME" == "mac" ]; then
-    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-${OS_ARCH} conda env create -f environment-mac.yml
+    PIP_EXISTS_ACTION=w CONDA_SUBDIR=osx-${OS_ARCH} conda env update -f environment-mac.yml
 else
-    conda env remove -n invokeai
-    conda env create -f environment.yml
+    conda env update -f environment.yml
 fi
 
 status=$?
