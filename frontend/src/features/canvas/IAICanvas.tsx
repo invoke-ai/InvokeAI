@@ -464,6 +464,7 @@ const IAICanvas = () => {
             ref={canvasImageLayerRef}
             listening={false}
             visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
+            imageSmoothingEnabled={false}
           >
             {canvasBgImage && (
               <KonvaImage listening={false} image={canvasBgImage} />
