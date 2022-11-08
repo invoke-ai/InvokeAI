@@ -10,8 +10,9 @@ from PIL import Image
 class GFPGAN():
     def __init__(
             self,
-            gfpgan_dir='src/gfpgan',
-            gfpgan_model_path='experiments/pretrained_models/GFPGANv1.4.pth') -> None:
+            gfpgan_dir='models/gfpgan',
+            gfpgan_model_path='GFPGANv1.4.pth'
+    ) -> None:
 
         self.model_path = os.path.join(gfpgan_dir, gfpgan_model_path)
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
@@ -73,6 +74,7 @@ class GFPGAN():
             if restored_img.size != image.size:
                 image = image.resize(res.size)
             res = Image.blend(image, res, strength)
+
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

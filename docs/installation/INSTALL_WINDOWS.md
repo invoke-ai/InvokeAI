@@ -45,7 +45,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
 
        ```bash
        rmdir src      # (this is a precaution in case there is already a src directory)
-       conda env create -f environments/environment-cuda.yml
+       conda env create -f environment-cuda.yml
        conda activate invokeai
        (invokeai)>
        ```
@@ -54,7 +54,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
 
        ```bash
        rmdir src      # (this is a precaution in case there is already a src directory)
-       conda env create -f environments/environment-rocm.yml
+       conda env create -f environment-AMD.yml
        conda activate invokeai
        (invokeai)>
        ```

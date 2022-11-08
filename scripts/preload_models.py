@@ -415,7 +415,7 @@ def download_kornia():
 
 #---------------------------------------------
 def download_clip():
-    print('Loading CLIP model...',end='')
+    print('Loading CLIP model (ignore deprecation errors)...',end='')
     sys.stdout.flush()
     version = 'openai/clip-vit-large-patch14'
     tokenizer = CLIPTokenizer.from_pretrained(version)
@@ -424,7 +424,7 @@ def download_clip():
 
 #---------------------------------------------
 def download_gfpgan():
-    print('Installing models from RealESRGAN and facexlib...',end='')
+    print('Installing models from RealESRGAN and facexlib  (ignore deprecation errors)...',end='')
     try:
         from realesrgan import RealESRGANer
         from realesrgan.archs.srvgg_arch import SRVGGNetCompact
@@ -442,19 +442,19 @@ def download_gfpgan():
         print('Error loading ESRGAN:')
         print(traceback.format_exc())
 
-    print('Loading models from GFPGAN')
+    print('Loading models from GFPGAN...',end='')
     for model in (
             [
                 'https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth',
-                'src/gfpgan/experiments/pretrained_models/GFPGANv1.4.pth'
+                'models/gfpgan/GFPGANv1.4.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth',
-                './gfpgan/weights/detection_Resnet50_Final.pth'
+                'models/gfpgan/weights/detection_Resnet50_Final.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth',
-                './gfpgan/weights/parsing_parsenet.pth'
+                'models/gfpgan/weights/parsing_parsenet.pth'
             ],
     ):
         model_url,model_dest  = model
@@ -489,22 +489,23 @@ def download_clipseg():
     import zipfile
     try:
         model_url  = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
-        model_dest = 'src/clipseg/clipseg_weights.zip'
-        weights_dir = 'src/clipseg/weights'
-        if not os.path.exists(weights_dir):
+        model_dest = 'models/clipseg/clipseg_weights'
+        weights_zip = 'models/clipseg/weights.zip'
+        
+        if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-        if not os.path.exists('src/clipseg/weights/rd64-uni-refined.pth'):
-            request.urlretrieve(model_url,model_dest)
-            with zipfile.ZipFile(model_dest,'r') as zip:
-                zip.extractall('src/clipseg')
-                os.rename('src/clipseg/clipseg_weights','src/clipseg/weights')
-            os.remove(model_dest)
-            from clipseg_models.clipseg import CLIPDensePredT
+        if not os.path.exists(f'{model_dest}/rd64-uni-refined.pth'):
+            request.urlretrieve(model_url,weights_zip)
+            with zipfile.ZipFile(weights_zip,'r') as zip:
+                zip.extractall('models/clipseg')
+            os.remove(weights_zip)
+
+            from clipseg.clipseg import CLIPDensePredT
             model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
             model.eval()
             model.load_state_dict(
                 torch.load(
-                    'src/clipseg/weights/rd64-uni-refined.pth',
+                    'models/clipseg/clipseg_weights/rd64-uni-refined.pth',
                     map_location=torch.device('cpu')
                     ),
                 strict=False,

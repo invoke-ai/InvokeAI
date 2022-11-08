@@ -48,7 +48,7 @@ title: Manual Installation, Linux
 
        ```bash
        (base) rm -rf src      # (this is a precaution in case there is already a src directory)
-       (base) ~/InvokeAI$ conda env create -f environments/environment-cuda.yml
+       (base) ~/InvokeAI$ conda env create -f environment-cuda.yml
        (base) ~/InvokeAI$ conda activate invokeai
        (invokeai) ~/InvokeAI$
        ```
@@ -57,7 +57,7 @@ title: Manual Installation, Linux
 
        ```bash
        (base) rm -rf src      # (this is a precaution in case there is already a src directory)
-       (base) ~/InvokeAI$ conda env create -f environments/environment-rocm.yml
+       (base) ~/InvokeAI$ conda env create -f environment-AMD.yml
        (base) ~/InvokeAI$ conda activate invokeai
        (invokeai) ~/InvokeAI$
        ```
