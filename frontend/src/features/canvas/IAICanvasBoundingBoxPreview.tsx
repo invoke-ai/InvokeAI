@@ -20,11 +20,13 @@ import {
   setIsTransformingBoundingBox,
 } from 'features/canvas/canvasSlice';
 import { GroupConfig } from 'konva/lib/Group';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const boundingBoxPreviewSelector = createSelector(
   currentCanvasSelector,
   baseCanvasImageSelector,
-  (currentCanvas: GenericCanvasState, baseCanvasImage) => {
+  activeTabNameSelector,
+  (currentCanvas: GenericCanvasState, baseCanvasImage, activeTabName) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -49,6 +51,7 @@ const boundingBoxPreviewSelector = createSelector(
       stageDimensions,
       stageScale,
       baseCanvasImage,
+      activeTabName,
     };
   },
   {
@@ -78,6 +81,7 @@ const IAICanvasBoundingBoxPreview = (
     stageDimensions,
     stageScale,
     baseCanvasImage,
+    activeTabName,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -93,6 +97,15 @@ const IAICanvasBoundingBoxPreview = (
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
+      if (activeTabName === 'inpainting') {
+        dispatch(
+          setBoundingBoxCoordinates({
+            x: e.target.x(),
+            y: e.target.y(),
+          })
+        );
+        return;
+      }
       const { x: oldX, y: oldY } = boundingBoxCoordinates;
 
       const transformerX = e.target.x();
@@ -117,33 +130,35 @@ const IAICanvasBoundingBoxPreview = (
         })
       );
     },
-    [boundingBoxCoordinates, dispatch]
+    [activeTabName, boundingBoxCoordinates, dispatch]
   );
 
-  // const dragBoundFunc = useCallback(
-  //   (position: Vector2d) => {
-  //     if (!baseCanvasImage) return boundingBoxCoordinates;
+  const dragBoundFunc = useCallback(
+    (position: Vector2d) => {
+      if (!baseCanvasImage) return boundingBoxCoordinates;
 
-  //     const { x, y } = position;
+      const { x, y } = position;
 
-  //     const maxX =
-  //       stageDimensions.width - boundingBoxDimensions.width * stageScale;
-  //     const maxY =
-  //       stageDimensions.height - boundingBoxDimensions.height * stageScale;
+      const maxX =
+        stageDimensions.width - boundingBoxDimensions.width * stageScale;
+      const maxY =
+        stageDimensions.height - boundingBoxDimensions.height * stageScale;
 
-  //     const clampedX = Math.floor(_.clamp(x, 0, maxX));
-  //     const clampedY = Math.floor(_.clamp(y, 0, maxY));
+      const clampedX = Math.floor(_.clamp(x, 0, maxX));
+      const clampedY = Math.floor(_.clamp(y, 0, maxY));
 
-  //     return { x: clampedX, y: clampedY };
-  //   },
-  //   [
-  //     boundingBoxCoordinates,
-  //     boundingBoxDimensions,
-  //     baseCanvasImage,
-  //     stageScale,
-  //     stageDimensions,
-  //   ]
-  // );
+      return { x: clampedX, y: clampedY };
+    },
+    [
+      baseCanvasImage,
+      boundingBoxCoordinates,
+      stageDimensions.width,
+      stageDimensions.height,
+      boundingBoxDimensions.width,
+      boundingBoxDimensions.height,
+      stageScale,
+    ]
+  );
 
   const handleOnTransform = useCallback(() => {
     /**
@@ -320,7 +335,9 @@ const IAICanvasBoundingBoxPreview = (
         onMouseUp={handleEndedModifying}
         draggable={true}
         onDragMove={handleOnDragMove}
-        // dragBoundFunc={dragBoundFunc}
+        dragBoundFunc={
+          activeTabName === 'inpainting' ? dragBoundFunc : undefined
+        }
         onTransform={handleOnTransform}
         onDragEnd={handleEndedModifying}
         onTransformEnd={handleEndedTransforming}
