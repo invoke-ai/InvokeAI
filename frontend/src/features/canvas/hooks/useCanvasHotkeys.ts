@@ -136,7 +136,7 @@ const useInpaintingCanvasHotkeys = () => {
           break;
         }
         case 'q': {
-          if (!shouldShowMask) break;
+          if (!shouldShowMask || activeTabName === 'inpainting') break;
           dispatch(setIsMoveStageKeyHeld(e.type === 'keydown'));
         }
       }

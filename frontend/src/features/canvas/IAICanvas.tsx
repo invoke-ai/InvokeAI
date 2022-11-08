@@ -432,7 +432,7 @@ const IAICanvas = () => {
   };
 
   const handleDragStage = (e: KonvaEventObject<MouseEvent>) => {
-    if (!isMoveStageKeyHeld) return;
+    if (!isMoveStageKeyHeld || activeTabName === 'inpainting') return;
     dispatch(setStageCoordinates(e.target.getPosition()));
   };
 
