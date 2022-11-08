@@ -87,7 +87,7 @@ if [ ! -e ".git" ]; then
     git init
     git remote add origin "$REPO_URL"
     git fetch
-    git checkout origin/release-candidate-2-1 -ft
+    git checkout origin/release-candidate-2-1-3 -ft
 fi
 
 # create the environment
