@@ -1,4 +1,4 @@
-# --prefer-binary
+--prefer-binary
 
 # pip will resolve the version which matches torch
 albumentations
@@ -23,7 +23,6 @@ pip>=22
 pudb
 pyreadline3
 pytorch-lightning==1.7.7
-realesrgan
 scikit-image>=0.19
 send2trash
 streamlit
