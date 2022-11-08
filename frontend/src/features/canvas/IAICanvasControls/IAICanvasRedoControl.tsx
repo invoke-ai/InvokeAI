@@ -10,7 +10,7 @@ import {
   GenericCanvasState,
   OutpaintingCanvasState,
   redo,
-  redoEraser,
+  redoOutpaintingAction,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
@@ -33,7 +33,7 @@ const canvasRedoSelector = createSelector(
     return {
       canRedo:
         tool === 'imageEraser'
-          ? outpainting.futureEraserLines.length > 0
+          ? outpainting.futureObjects.length > 0
           : futureLines.length > 0,
       shouldShowMask,
       activeTabName,
@@ -55,7 +55,7 @@ export default function IAICanvasRedoControl() {
 
   const handleRedo = () => {
     if (tool === 'imageEraser') {
-      dispatch(redoEraser());
+      dispatch(redoOutpaintingAction());
     } else {
       dispatch(redo());
     }

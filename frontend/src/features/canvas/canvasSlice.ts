@@ -69,22 +69,52 @@ export interface GenericCanvasState {
   isMoveStageKeyHeld: boolean;
 }
 
-export type OutpaintingRegion = {
+// export type OutpaintingRegion = {
+//   x: number;
+//   y: number;
+//   width: number;
+//   height: number;
+//   images: InvokeAI.Image[];
+//   selectedImageIndex: number;
+// };
+
+type CanvasImage = {
+  type: 'image';
   x: number;
   y: number;
   width: number;
   height: number;
-  images: InvokeAI.Image[];
-  selectedImageIndex: number;
+  imageUrl: string; // Image URL
 };
+
+type CanvasEraserLine = {
+  type: 'eraserLine';
+  strokeWidth: number;
+  points: number[];
+};
+
+type CanvasObject = CanvasImage | CanvasEraserLine;
+
+// type OutpaintingCanvasState = {
+//   objects: CanvasObject[];
+//   pastObjects: CanvasObject[][];
+//   futureObject: CanvasObject[][];
+//   stagingArea: {
+//     images: CanvasImage[];
+//     selectedImageIndex: number;
+//   };
+// };
 
 // export type Outpainting = Record<string, OutpaintingRegion>;
 
 export type OutpaintingCanvasState = GenericCanvasState & {
-  eraserLines: EraserLine[];
-  pastEraserLines: EraserLine[][];
-  futureEraserLines: EraserLine[][];
-  session: OutpaintingRegion[];
+  objects: CanvasObject[];
+  pastObjects: CanvasObject[][];
+  futureObjects: CanvasObject[][];
+  stagingArea: {
+    images: CanvasImage[];
+    selectedImageIndex: number;
+  };
 };
 
 export type ValidCanvasName = 'inpainting' | 'outpainting';
@@ -132,10 +162,13 @@ const initialCanvasState: CanvasState = {
   currentCanvas: 'inpainting',
   inpainting: initialGenericCanvasState,
   outpainting: {
-    session: [],
-    eraserLines: [],
-    pastEraserLines: [],
-    futureEraserLines: [],
+    objects: [],
+    pastObjects: [],
+    futureObjects: [],
+    stagingArea: {
+      images: [],
+      selectedImageIndex: 0,
+    },
     ...initialGenericCanvasState,
   },
 };
@@ -276,7 +309,50 @@ export const canvasSlice = createSlice({
     },
 
     setImageToOutpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
-      setCanvasImage(state, action, 'outpainting');
+      const { width: canvasWidth, height: canvasHeight } =
+        state.outpainting.stageDimensions;
+      const { width, height } = state.outpainting.boundingBoxDimensions;
+      const { x, y } = state.outpainting.boundingBoxCoordinates;
+
+      const maxWidth = Math.min(action.payload.width, canvasWidth);
+      const maxHeight = Math.min(action.payload.height, canvasHeight);
+
+      const newCoordinates: Vector2d = { x, y };
+      const newDimensions: Dimensions = { width, height };
+
+      if (width + x > maxWidth) {
+        // Bounding box at least needs to be translated
+        if (width > maxWidth) {
+          // Bounding box also needs to be resized
+          newDimensions.width = roundDownToMultiple(maxWidth, 64);
+        }
+        newCoordinates.x = maxWidth - newDimensions.width;
+      }
+
+      if (height + y > maxHeight) {
+        // Bounding box at least needs to be translated
+        if (height > maxHeight) {
+          // Bounding box also needs to be resized
+          newDimensions.height = roundDownToMultiple(maxHeight, 64);
+        }
+        newCoordinates.y = maxHeight - newDimensions.height;
+      }
+
+      state.outpainting.boundingBoxDimensions = newDimensions;
+      state.outpainting.boundingBoxCoordinates = newCoordinates;
+
+      // state.outpainting.imageToInpaint = action.payload;
+      state.outpainting.objects = [
+        {
+          type: 'image',
+          x: 0,
+          y: 0,
+          width: action.payload.width,
+          height: action.payload.height,
+          imageUrl: action.payload.url,
+        },
+      ];
+      state.outpainting.doesCanvasNeedScaling = true;
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
       setCanvasImage(state, action, 'inpainting');
@@ -448,60 +524,102 @@ export const canvasSlice = createSlice({
       if (!boundingBox || !image) return;
 
       const { x, y, width, height } = boundingBox;
+      // state.outpainting.eraserLines = [];
+      // state.outpainting.futureEraserLines = [];
 
-      const sessionIndex = state.outpainting.session.findIndex(
-        (region) =>
-          region.x === x &&
-          region.y === y &&
-          region.width === width &&
-          region.height === height
-      );
+      state.outpainting.pastObjects.push(state.outpainting.objects);
+      state.outpainting.futureObjects = [];
 
-      if (sessionIndex < 0) {
-        state.outpainting.session.push({
-          ...boundingBox,
-          images: [image],
-          selectedImageIndex: 0,
-        });
-      } else {
-        state.outpainting.session[sessionIndex].images.push(image);
-        state.outpainting.session[sessionIndex].selectedImageIndex =
-          state.outpainting.session[sessionIndex].images.length - 1;
-      }
+      state.outpainting.objects.push({
+        type: 'image',
+        x,
+        y,
+        width,
+        height,
+        imageUrl: image.url,
+      });
 
-      state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
-      state.outpainting.eraserLines = [];
-      state.outpainting.futureEraserLines = [];
+      // const sessionIndex = state.outpainting.session.findIndex(
+      //   (region) =>
+      //     region.x === x &&
+      //     region.y === y &&
+      //     region.width === width &&
+      //     region.height === height
+      // );
+
+      // if (sessionIndex < 0) {
+      //   state.outpainting.session.push({
+      //     ...boundingBox,
+      //     images: [image],
+      //     selectedImageIndex: 0,
+      //   });
+      // } else {
+      //   state.outpainting.session[sessionIndex].images.push(image);
+      //   state.outpainting.session[sessionIndex].selectedImageIndex =
+      //     state.outpainting.session[sessionIndex].images.length - 1;
+      // }
+
+      // state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
+      // state.outpainting.eraserLines = [];
+      // state.outpainting.futureEraserLines = [];
     },
     clearOutpaintingSession: (state) => {
-      state.outpainting.session = [];
+      state.outpainting.objects = [];
     },
     addEraserLine: (state, action: PayloadAction<EraserLine>) => {
-      state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
-      state.outpainting.eraserLines.push(action.payload);
-      state.outpainting.futureEraserLines = [];
+      state.outpainting.pastObjects.push(state.outpainting.objects);
+      state.outpainting.objects.push({ type: 'eraserLine', ...action.payload });
+      state.outpainting.futureObjects = [];
+
+      // state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
+      // state.outpainting.eraserLines.push(action.payload);
+      // state.outpainting.futureEraserLines = [];
     },
     addPointToCurrentEraserLine: (state, action: PayloadAction<number[]>) => {
-      state.outpainting.eraserLines[
-        state.outpainting.eraserLines.length - 1
-      ].points.push(...action.payload);
-    },
-    undoEraser: (state) => {
-      if (state.outpainting.pastEraserLines.length === 0) return;
-      const newLines = state.outpainting.pastEraserLines.pop();
-      if (!newLines) return;
-      state.outpainting.futureEraserLines.unshift(
-        state.outpainting.eraserLines
+      // state.outpainting.pastObjects.push(state.outpainting.objects);
+      // state.outpainting.objects.push({ type: 'eraserLine', ...action.payload });
+      // state.outpainting.futureObjects = [];
+      const lastEraserLine = state.outpainting.objects.findLast(
+        (obj) => obj.type === 'eraserLine'
       );
-      state.outpainting.eraserLines = newLines;
+      if (!lastEraserLine || lastEraserLine.type !== 'eraserLine') return;
+
+      lastEraserLine.points.push(...action.payload);
+      // state.outpainting.eraserLines[
+      //   state.outpainting.eraserLines.length - 1
+      // ].points.push(...action.payload);
     },
-    redoEraser: (state) => {
-      if (state.outpainting.futureEraserLines.length === 0) return;
-      const newLines = state.outpainting.futureEraserLines.shift();
-      if (!newLines) return;
-      state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
-      state.outpainting.eraserLines = newLines;
+    undoOutpaintingAction: (state) => {
+      if (state.outpainting.objects.length === 0) return;
+
+      const newObjects = state.outpainting.pastObjects.pop();
+      if (!newObjects) return;
+      state.outpainting.futureObjects.unshift(state.outpainting.objects);
+      state.outpainting.objects = newObjects;
     },
+    redoOutpaintingAction: (state) => {
+      if (state.outpainting.futureObjects.length === 0) return;
+      const newObjects = state.outpainting.futureObjects.shift();
+      if (!newObjects) return;
+      state.outpainting.pastObjects.push(state.outpainting.objects);
+      state.outpainting.objects = newObjects;
+    },
+    // undoEraser: (state) => {
+    //   if (state.outpainting.pastEraserLines.length === 0) return;
+    //   const newLines = state.outpainting.pastEraserLines.pop();
+    //   if (!newLines) return;
+    //   state.outpainting.futureEraserLines.unshift(
+    //     state.outpainting.eraserLines
+    //   );
+    //   state.outpainting.eraserLines = newLines;
+    // },
+    // redoEraser: (state) => {
+    //   if (state.outpainting.futureEraserLines.length === 0) return;
+    //   const newLines = state.outpainting.futureEraserLines.shift();
+    //   if (!newLines) return;
+    //   state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
+    //   state.outpainting.eraserLines = newLines;
+    // },
   },
 });
 
@@ -549,8 +667,8 @@ export const {
   clearOutpaintingSession,
   addEraserLine,
   addPointToCurrentEraserLine,
-  undoEraser,
-  redoEraser,
+  undoOutpaintingAction,
+  redoOutpaintingAction,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

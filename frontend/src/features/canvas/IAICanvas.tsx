@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react';
 import Konva from 'konva';
-import { Layer, Stage } from 'react-konva';
+import { Layer, Line, Stage } from 'react-konva';
 import { Image as KonvaImage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
@@ -118,9 +118,9 @@ const canvasSelector = createSelector(
       stageCoordinates,
       isMoveStageKeyHeld,
       activeTabName,
-      outpaintingSession:
+      outpaintingObjects:
         canvas.currentCanvas === 'outpainting'
-          ? canvas.outpainting.session
+          ? canvas.outpainting.objects
           : undefined,
     };
   },
@@ -165,7 +165,7 @@ const IAICanvas = () => {
     isMoveStageKeyHeld,
     boundingBoxDimensions,
     activeTabName,
-    outpaintingSession,
+    outpaintingObjects,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
@@ -466,19 +466,35 @@ const IAICanvas = () => {
               listening={false}
               visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
             >
-              <KonvaImage listening={false} image={canvasBgImage} />
-              {outpaintingSession &&
-                _.map(outpaintingSession, (region, i) =>
-                  region.images.length > 0 ? (
+              <KonvaImage
+                listening={false}
+                image={canvasBgImage}
+                visible={activeTabName === 'inpainting'}
+              />
+              {outpaintingObjects &&
+                _.map(outpaintingObjects, (obj, i) =>
+                  obj.type === 'image' ? (
                     <IAICanvasImage
                       key={i}
-                      x={region.x}
-                      y={region.y}
-                      url={region.images[region.selectedImageIndex].url}
+                      x={obj.x}
+                      y={obj.y}
+                      url={obj.imageUrl}
                     />
-                  ) : null
+                  ) : (
+                    <Line
+                      key={i}
+                      points={obj.points}
+                      stroke={'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
+                      strokeWidth={obj.strokeWidth * 2}
+                      tension={0}
+                      lineCap="round"
+                      lineJoin="round"
+                      shadowForStrokeEnabled={false}
+                      listening={false}
+                      globalCompositeOperation={'destination-out'}
+                    />
+                  )
                 )}
-              <IAICanvasEraserLines />
             </Layer>
             <Layer
               id={'mask-layer'}

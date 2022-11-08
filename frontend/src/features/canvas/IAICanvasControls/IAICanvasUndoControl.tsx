@@ -9,7 +9,7 @@ import {
   GenericCanvasState,
   OutpaintingCanvasState,
   undo,
-  undoEraser,
+  undoOutpaintingAction,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
@@ -33,7 +33,7 @@ const canvasUndoSelector = createSelector(
     return {
       canUndo:
         tool === 'imageEraser'
-          ? outpainting.pastEraserLines.length > 0
+          ? outpainting.pastObjects.length > 0
           : pastLines.length > 0,
       shouldShowMask,
       activeTabName,
@@ -56,7 +56,7 @@ export default function IAICanvasUndoControl() {
 
   const handleUndo = () => {
     if (tool === 'imageEraser') {
-      dispatch(undoEraser());
+      dispatch(undoOutpaintingAction());
     } else {
       dispatch(undo());
     }
