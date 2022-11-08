@@ -1,4 +1,4 @@
---prefer-binary
+# --prefer-binary
 
 # pip will resolve the version which matches torch
 albumentations

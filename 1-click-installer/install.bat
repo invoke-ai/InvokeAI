@@ -68,8 +68,8 @@ set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scrip
 
 @rem get the repo (and load into the current directory)
 if not exist ".git" (
-    call git config --global init.defaultBranch main
     call git init
+    call git config --local init.defaultBranch main
     call git remote add origin %REPO_URL%
     call git fetch
 #    call git checkout origin/main -ft

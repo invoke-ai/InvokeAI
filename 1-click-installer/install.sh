@@ -83,8 +83,8 @@ if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
 
 # get the repo (and load into the current directory)
 if [ ! -e ".git" ]; then
-    git config --global init.defaultBranch main
     git init
+    git config --local init.defaultBranch main
     git remote add origin "$REPO_URL"
     git fetch
     git checkout origin/release-candidate-2-1-3 -ft
