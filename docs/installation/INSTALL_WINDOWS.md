@@ -13,22 +13,9 @@ one of the steps, so instead of cloning this repo, simply download the notebook
 from the link above and load it up in VSCode (with the appropriate extensions
 installed)/Jupyter/JupyterLab and start running the cells one-by-one.
 
-Note that you will need NVIDIA drivers, Python 3.10, and Git installed
-beforehand - simplified
-[step-by-step instructions](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
-are available in the wiki (you'll only need steps 1, 2, & 3 ).
+Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehand.
 
-## **Manual Install**
-
-### **pip**
-
-See
-[Easy-peasy Windows install](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
-in the wiki
-
----
-
-### **Conda**
+## **Manual Install with Conda**
 
 1. Install Anaconda3 (miniconda3 version) from [here](https://docs.anaconda.com/anaconda/install/windows/)
 
