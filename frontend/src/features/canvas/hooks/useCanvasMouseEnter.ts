@@ -6,7 +6,6 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
-  addEraserLine,
   addLine,
   currentCanvasSelector,
   GenericCanvasState,
@@ -61,14 +60,17 @@ const useCanvasMouseEnter = (
         if (tool === 'imageEraser') {
           // Add a new line starting from the current cursor position.
           dispatch(
-            addEraserLine({
+            addLine({
+              type: 'eraserLine',
               strokeWidth: toolSize / 2,
               points: [scaledCursorPosition.x, scaledCursorPosition.y],
             })
           );
         } else {
+          // Add a new line starting from the current cursor position.
           dispatch(
             addLine({
+              type: 'maskLine',
               tool,
               strokeWidth: toolSize / 2,
               points: [scaledCursorPosition.x, scaledCursorPosition.y],

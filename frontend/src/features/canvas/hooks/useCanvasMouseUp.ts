@@ -5,7 +5,7 @@ import Konva from 'konva';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
-  addPointToCurrentEraserLine,
+  // addPointToCurrentEraserLine,
   addPointToCurrentLine,
   currentCanvasSelector,
   GenericCanvasState,
@@ -55,21 +55,24 @@ const useCanvasMouseUp = (
        * the line's existing points. This allows the line to render as a circle
        * centered on that point.
        */
-      if (tool === 'imageEraser') {
-        dispatch(
-          addPointToCurrentEraserLine([
-            scaledCursorPosition.x,
-            scaledCursorPosition.y,
-          ])
-        );
-      } else {
-        dispatch(
-          addPointToCurrentLine([
-            scaledCursorPosition.x,
-            scaledCursorPosition.y,
-          ])
-        );
-      }
+      dispatch(
+        addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
+      );
+      // if (tool === 'imageEraser') {
+      //   dispatch(
+      //     addPointToCurrentEraserLine([
+      //       scaledCursorPosition.x,
+      //       scaledCursorPosition.y,
+      //     ])
+      //   );
+      // } else {
+      //   dispatch(
+      //     addPointToCurrentLine([
+      //       scaledCursorPosition.x,
+      //       scaledCursorPosition.y,
+      //     ])
+      //   );
+      // }
     } else {
       didMouseMoveRef.current = false;
     }
@@ -81,7 +84,6 @@ const useCanvasMouseUp = (
     isModifyingBoundingBox,
     isMoveStageKeyHeld,
     stageRef,
-    tool,
   ]);
 };
 

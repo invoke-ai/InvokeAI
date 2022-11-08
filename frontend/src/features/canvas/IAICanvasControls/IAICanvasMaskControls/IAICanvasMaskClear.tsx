@@ -7,7 +7,9 @@ import {
   areHotkeysEnabledSelector,
   clearMask,
   currentCanvasSelector,
-  GenericCanvasState,
+  InpaintingCanvasState,
+  isCanvasMaskLine,
+  OutpaintingCanvasState,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
@@ -16,13 +18,15 @@ import { useToast } from '@chakra-ui/react';
 
 const canvasMaskClearSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { shouldShowMask, lines } = currentCanvas;
+  (currentCanvas, activeTabName, areHotkeysEnabled) => {
+    const { shouldShowMask, objects } = currentCanvas as
+      | InpaintingCanvasState
+      | OutpaintingCanvasState;
 
     return {
       shouldShowMask,
       activeTabName,
-      isMaskEmpty: lines.length === 0,
+      isMaskEmpty: objects.filter(isCanvasMaskLine).length === 0,
       areHotkeysEnabled,
     };
   },

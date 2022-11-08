@@ -5,11 +5,7 @@ import { SystemState } from 'features/system/systemSlice';
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
-import {
-  CanvasState,
-  GenericCanvasState,
-  ValidCanvasName,
-} from 'features/canvas/canvasSlice';
+import { CanvasState, isCanvasMaskLine } from 'features/canvas/canvasSlice';
 import generateMask from 'features/canvas/util/generateMask';
 import { canvasImageLayerRef } from 'features/canvas/IAICanvas';
 import openBase64ImageInTab from './openBase64ImageInTab';
@@ -115,7 +111,7 @@ export const frontendToBackendParameters = (
     canvasImageLayerRef.current
   ) {
     const {
-      lines,
+      objects,
       boundingBoxCoordinates,
       boundingBoxDimensions,
       inpaintReplace,
@@ -128,7 +124,10 @@ export const frontendToBackendParameters = (
       ...boundingBoxDimensions,
     };
 
-    const maskDataURL = generateMask(lines, boundingBox);
+    const maskDataURL = generateMask(
+      objects.filter(isCanvasMaskLine),
+      boundingBox
+    );
 
     generationParameters.fit = false;
 

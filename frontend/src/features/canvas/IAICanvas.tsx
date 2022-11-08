@@ -34,7 +34,7 @@ import useCanvasMouseMove from './hooks/useCanvasMouseMove';
 import useCanvasMouseEnter from './hooks/useCanvasMouseEnter';
 import useCanvasMouseOut from './hooks/useCanvasMouseOut';
 import useCanvasDragMove from './hooks/useCanvasDragMove';
-import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingRenderer';
+import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingObjects';
 
 const canvasSelector = createSelector(
   [currentCanvasSelector, baseCanvasImageSelector, activeTabNameSelector],

@@ -6,6 +6,7 @@ import { OptionsState } from 'features/options/optionsSlice';
 
 import { SystemState } from 'features/system/systemSlice';
 import {
+  baseCanvasImageSelector,
   currentCanvasSelector,
   GenericCanvasState,
 } from 'features/canvas/canvasSlice';
@@ -16,26 +17,25 @@ export const readinessSelector = createSelector(
     (state: RootState) => state.options,
     (state: RootState) => state.system,
     currentCanvasSelector,
+    baseCanvasImageSelector,
     activeTabNameSelector,
   ],
   (
     options: OptionsState,
     system: SystemState,
     currentCanvas: GenericCanvasState,
+    baseCanvasImage,
     activeTabName
   ) => {
     const {
       prompt,
       shouldGenerateVariations,
       seedWeights,
-      // maskPath,
       initialImage,
       seed,
     } = options;
 
     const { isProcessing, isConnected } = system;
-
-    const { imageToInpaint } = currentCanvas;
 
     let isReady = true;
     const reasonsWhyNotReady: string[] = [];
@@ -51,7 +51,7 @@ export const readinessSelector = createSelector(
       reasonsWhyNotReady.push('No initial image selected');
     }
 
-    if (activeTabName === 'inpainting' && !imageToInpaint) {
+    if (activeTabName === 'inpainting' && !baseCanvasImage) {
       isReady = false;
       reasonsWhyNotReady.push('No inpainting image selected');
     }

@@ -2,15 +2,29 @@ import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line } from 'react-konva';
 import { useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
-import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  InpaintingCanvasState,
+  isCanvasMaskLine,
+  OutpaintingCanvasState,
+} from './canvasSlice';
+import _ from 'lodash';
 
 export const canvasLinesSelector = createSelector(
   currentCanvasSelector,
   (currentCanvas: GenericCanvasState) => {
-    const { lines } = currentCanvas;
+    const { objects } = currentCanvas as
+      | InpaintingCanvasState
+      | OutpaintingCanvasState;
     return {
-      lines,
+      objects,
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 
@@ -23,11 +37,11 @@ type InpaintingCanvasLinesProps = GroupConfig;
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
   const { ...rest } = props;
-  const { lines } = useAppSelector(canvasLinesSelector);
+  const { objects } = useAppSelector(canvasLinesSelector);
 
   return (
     <Group {...rest}>
-      {lines.map((line, i) => (
+      {objects.filter(isCanvasMaskLine).map((line, i) => (
         <Line
           key={i}
           points={line.points}

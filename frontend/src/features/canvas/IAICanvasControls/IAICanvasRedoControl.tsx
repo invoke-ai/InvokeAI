@@ -8,33 +8,22 @@ import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
+  InpaintingCanvasState,
   OutpaintingCanvasState,
   redo,
-  redoOutpaintingAction,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 
 const canvasRedoSelector = createSelector(
-  [
-    (state: RootState) => state.canvas.outpainting,
-    currentCanvasSelector,
-    activeTabNameSelector,
-    areHotkeysEnabledSelector,
-  ],
-  (
-    outpainting: OutpaintingCanvasState,
-    currentCanvas: GenericCanvasState,
-    activeTabName,
-    areHotkeysEnabled
-  ) => {
-    const { futureLines, shouldShowMask, tool } = currentCanvas;
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { futureObjects, shouldShowMask, tool } = currentCanvas as
+      | InpaintingCanvasState
+      | OutpaintingCanvasState;
 
     return {
-      canRedo:
-        tool === 'imageEraser'
-          ? outpainting.futureObjects.length > 0
-          : futureLines.length > 0,
+      canRedo: futureObjects.length > 0,
       shouldShowMask,
       activeTabName,
       areHotkeysEnabled,
@@ -54,11 +43,7 @@ export default function IAICanvasRedoControl() {
     useAppSelector(canvasRedoSelector);
 
   const handleRedo = () => {
-    if (tool === 'imageEraser') {
-      dispatch(redoOutpaintingAction());
-    } else {
-      dispatch(redo());
-    }
+    dispatch(redo());
   };
 
   // Hotkeys

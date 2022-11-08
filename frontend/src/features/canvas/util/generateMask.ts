@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import { IRect } from 'konva/lib/types';
-import { MaskLine } from 'features/canvas/canvasSlice';
+import { CanvasMaskLine } from 'features/canvas/canvasSlice';
 
 /**
  * Generating a mask image from InpaintingCanvas.tsx is not as simple
@@ -12,7 +12,7 @@ import { MaskLine } from 'features/canvas/canvasSlice';
  * drawing the mask and compositing everything correctly to output a valid
  * mask image.
  */
-const generateMask = (lines: MaskLine[], boundingBox: IRect): string => {
+const generateMask = (lines: CanvasMaskLine[], boundingBox: IRect): string => {
   // create an offscreen canvas and add the mask to it
   const { width, height } = boundingBox;
 

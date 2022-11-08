@@ -6,7 +6,7 @@ import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
-  addPointToCurrentEraserLine,
+  // addPointToCurrentEraserLine,
   addPointToCurrentLine,
   currentCanvasSelector,
   GenericCanvasState,
@@ -58,20 +58,22 @@ const useCanvasMouseMove = (
     if (!isDrawing || isModifyingBoundingBox || isMoveStageKeyHeld) return;
 
     didMouseMoveRef.current = true;
-
-    // Extend the current line
-    if (tool === 'imageEraser') {
-      dispatch(
-        addPointToCurrentEraserLine([
-          scaledCursorPosition.x,
-          scaledCursorPosition.y,
-        ])
-      );
-    } else {
-      dispatch(
-        addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-      );
-    }
+    dispatch(
+      addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
+    );
+    // // Extend the current line
+    // if (tool === 'imageEraser') {
+    //   dispatch(
+    //     addPointToCurrentEraserLine([
+    //       scaledCursorPosition.x,
+    //       scaledCursorPosition.y,
+    //     ])
+    //   );
+    // } else {
+    //   dispatch(
+    //     addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
+    //   );
+    // }
   }, [
     didMouseMoveRef,
     dispatch,
@@ -80,7 +82,6 @@ const useCanvasMouseMove = (
     isMoveStageKeyHeld,
     lastCursorPositionRef,
     stageRef,
-    tool,
   ]);
 };
 

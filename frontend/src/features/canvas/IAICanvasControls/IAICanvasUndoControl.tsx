@@ -7,34 +7,23 @@ import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
+  InpaintingCanvasState,
   OutpaintingCanvasState,
   undo,
-  undoOutpaintingAction,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const canvasUndoSelector = createSelector(
-  [
-    (state: RootState) => state.canvas.outpainting,
-    currentCanvasSelector,
-    activeTabNameSelector,
-    areHotkeysEnabledSelector,
-  ],
-  (
-    outpainting: OutpaintingCanvasState,
-    canvas: GenericCanvasState,
-    activeTabName,
-    areHotkeysEnabled
-  ) => {
-    const { pastLines, shouldShowMask, tool } = canvas;
+  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
+  (canvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+    const { pastObjects, shouldShowMask, tool } = canvas as
+      | InpaintingCanvasState
+      | OutpaintingCanvasState;
 
     return {
-      canUndo:
-        tool === 'imageEraser'
-          ? outpainting.pastObjects.length > 0
-          : pastLines.length > 0,
+      canUndo: pastObjects.length > 0,
       shouldShowMask,
       activeTabName,
       areHotkeysEnabled,
@@ -55,11 +44,7 @@ export default function IAICanvasUndoControl() {
     useAppSelector(canvasUndoSelector);
 
   const handleUndo = () => {
-    if (tool === 'imageEraser') {
-      dispatch(undoOutpaintingAction());
-    } else {
-      dispatch(undo());
-    }
+    dispatch(undo());
   };
 
   // Hotkeys
