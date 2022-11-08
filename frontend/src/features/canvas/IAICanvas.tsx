@@ -1,15 +1,14 @@
 // lib
 import { MutableRefObject, useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
-import { Layer, Line, Stage } from 'react-konva';
+import { Layer, Stage } from 'react-konva';
 import { Image as KonvaImage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
 // app
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import {
   baseCanvasImageSelector,
-  CanvasState,
   clearImageToInpaint,
   currentCanvasSelector,
   GenericCanvasState,
@@ -26,7 +25,6 @@ import useCanvasHotkeys from './hooks/useCanvasHotkeys';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import IAICanvasImage from './IAICanvasImage';
 import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
 import IAICanvasBoundingBoxPreviewOverlay from './IAICanvasBoundingBoxPreviewOverlay';
 import useCanvasWheel from './hooks/useCanvasZoom';
@@ -36,20 +34,11 @@ import useCanvasMouseMove from './hooks/useCanvasMouseMove';
 import useCanvasMouseEnter from './hooks/useCanvasMouseEnter';
 import useCanvasMouseOut from './hooks/useCanvasMouseOut';
 import useCanvasDragMove from './hooks/useCanvasDragMove';
+import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingRenderer';
 
 const canvasSelector = createSelector(
-  [
-    currentCanvasSelector,
-    baseCanvasImageSelector,
-    activeTabNameSelector,
-    (state: RootState) => state.canvas,
-  ],
-  (
-    currentCanvas: GenericCanvasState,
-    baseCanvasImage,
-    activeTabName,
-    canvas: CanvasState
-  ) => {
+  [currentCanvasSelector, baseCanvasImageSelector, activeTabNameSelector],
+  (currentCanvas: GenericCanvasState, baseCanvasImage, activeTabName) => {
     const {
       shouldInvertMask,
       shouldShowMask,
@@ -101,21 +90,11 @@ const canvasSelector = createSelector(
       isMoveStageKeyHeld,
       activeTabName,
       baseCanvasImage,
-      outpaintingObjects:
-        canvas.currentCanvas === 'outpainting'
-          ? canvas.outpainting.objects
-          : undefined,
     };
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: (a, b) => {
-        const { baseCanvasImage: a_baseCanvasImage, ...a_rest } = a;
-        const { baseCanvasImage: b_baseCanvasImage, ...b_rest } = b;
-        return (
-          _.isEqual(a_rest, b_rest) && a_baseCanvasImage == b_baseCanvasImage
-        );
-      },
+      resultEqualityCheck: _.isEqual,
     },
   }
 );
@@ -142,7 +121,6 @@ const IAICanvas = () => {
     isMoveStageKeyHeld,
     boundingBoxDimensions,
     activeTabName,
-    outpaintingObjects,
     baseCanvasImage,
   } = useAppSelector(canvasSelector);
 
@@ -232,30 +210,7 @@ const IAICanvas = () => {
             {canvasBgImage && (
               <KonvaImage listening={false} image={canvasBgImage} />
             )}
-            {outpaintingObjects &&
-              _.map(outpaintingObjects, (obj, i) =>
-                obj.type === 'image' ? (
-                  <IAICanvasImage
-                    key={i}
-                    x={obj.x}
-                    y={obj.y}
-                    url={obj.image.url}
-                  />
-                ) : (
-                  <Line
-                    key={i}
-                    points={obj.points}
-                    stroke={'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
-                    strokeWidth={obj.strokeWidth * 2}
-                    tension={0}
-                    lineCap="round"
-                    lineJoin="round"
-                    shadowForStrokeEnabled={false}
-                    listening={false}
-                    globalCompositeOperation={'destination-out'}
-                  />
-                )
-              )}
+            <IAICanvasOutpaintingObjects />
           </Layer>
           <Layer id={'mask-layer'} listening={false} visible={shouldShowMask}>
             <IAICanvasMaskLines visible={true} />

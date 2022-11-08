@@ -28,7 +28,7 @@ const outpaintingDisplaySelector = createSelector(
     return {
       doesCanvasNeedScaling,
       showDualDisplay,
-      objects,
+      doesOutpaintingHaveObjects: objects.length > 0,
     };
   },
   {
@@ -40,9 +40,8 @@ const outpaintingDisplaySelector = createSelector(
 
 const OutpaintingDisplay = () => {
   const dispatch = useAppDispatch();
-  const { showDualDisplay, doesCanvasNeedScaling, objects } = useAppSelector(
-    outpaintingDisplaySelector
-  );
+  const { showDualDisplay, doesCanvasNeedScaling, doesOutpaintingHaveObjects } =
+    useAppSelector(outpaintingDisplaySelector);
 
   useLayoutEffect(() => {
     const resizeCallback = _.debounce(
@@ -53,17 +52,16 @@ const OutpaintingDisplay = () => {
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
 
-  const outpaintingComponent =
-    objects.length > 0 ? (
-      <div className="inpainting-main-area">
-        <IAICanvasControls />
-        <div className="inpainting-canvas-area">
-          {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
-        </div>
+  const outpaintingComponent = doesOutpaintingHaveObjects ? (
+    <div className="inpainting-main-area">
+      <IAICanvasControls />
+      <div className="inpainting-canvas-area">
+        {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
       </div>
-    ) : (
-      <ImageUploadButton />
-    );
+    </div>
+  ) : (
+    <ImageUploadButton />
+  );
 
   return (
     <div
