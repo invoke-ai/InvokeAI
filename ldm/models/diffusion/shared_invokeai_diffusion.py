@@ -151,9 +151,11 @@ class InvokeAIDiffuserComponent:
                 context.request_apply_saved_attention_maps(ca_type)
             edited_conditioning = self.conditioning.cross_attention_control_args.edited_conditioning
             conditioned_next_x = self.model_forward_callback(x, sigma, edited_conditioning)
-
-        finally:
             context.clear_requests(cleanup=True)
+
+        except:
+            context.clear_requests(cleanup=True)
+            raise
 
         return unconditioned_next_x, conditioned_next_x
 
