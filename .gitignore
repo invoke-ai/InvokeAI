@@ -209,3 +209,6 @@ configs/models.yaml
 
 # weights (will be created by installer)
 models/ldm/stable-diffusion-v1/*.ckpt
+
+# ignore initfile
+invokeai.init
