@@ -52,7 +52,7 @@ dependencies:
   - transformers=4.23
   - pip:
       - dependency_injector==4.40.0
-      - taming-transformers-rom1504
+      - getpass_asterisk
       - realesrgan==0.2.5.0
       - test-tube==0.7.5
       - git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
