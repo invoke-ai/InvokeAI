@@ -595,6 +595,12 @@ export default canvasSlice.reducer;
 export const currentCanvasSelector = (state: RootState) =>
   state.canvas[state.canvas.currentCanvas];
 
+export const outpaintingCanvasSelector = (state: RootState) =>
+  state.canvas.outpainting;
+
+export const inpaintingCanvasSelector = (state: RootState) =>
+  state.canvas.inpainting;
+
 export const areHotkeysEnabledSelector = createSelector(
   currentCanvasSelector,
   activeTabNameSelector,
