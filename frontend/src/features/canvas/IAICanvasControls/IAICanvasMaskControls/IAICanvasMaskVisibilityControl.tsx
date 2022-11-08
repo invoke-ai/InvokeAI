@@ -44,7 +44,7 @@ export default function IAICanvasMaskVisibilityControl() {
       handleToggleShouldShowMask();
     },
     {
-      enabled: activeTabName === 'inpainting',
+      enabled: activeTabName === 'inpainting' || activeTabName == 'outpainting',
     },
     [activeTabName, shouldShowMask]
   );
