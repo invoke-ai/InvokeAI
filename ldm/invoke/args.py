@@ -865,6 +865,11 @@ class Args(object):
             help='When outpainting, the tile size to use for filling outpaint areas',
         )
         postprocessing_group.add_argument(
+            '--new_prompt',
+            type=str,
+            help='Change the text prompt applied during postprocessing (default, use original generation prompt)',
+        )
+        postprocessing_group.add_argument(
             '-ft',
             '--facetool',
             type=str,
