@@ -123,13 +123,13 @@ overridden on a per-prompt basis (see
       You can either double your slashes (ick): `C:\\path\\to\\my\\file`, or
       use Linux/Mac style forward slashes (better): `C:/path/to/my/file`.
 
-## invokeai.init initialization file
+## The .invokeai initialization file
 
-Place your preferred startup options in a file named `invokeai.init`
-to have them load automatically at startup time. The file should contain the startup
-options as you would type them on the command line (`--steps=10
---grid`), one argument per line, or a mixture of both using any of
-the accepted command switch formats:
+To start up invoke.py with your preferred settings, place your desired
+startup options in a file in your home directory named `.invokeai` The
+file should contain the startup options as you would type them on the
+command line (`--steps=10 --grid`), one argument per line, or a
+mixture of both using any of the accepted command switch formats:
 
 !!! example ""
 

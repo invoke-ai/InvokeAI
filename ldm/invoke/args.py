@@ -116,7 +116,7 @@ PRECISION_CHOICES = [
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
 APP_VERSION = 'v2.1.2'
-INITFILE = 'invokeai.init'
+INITFILE = os.path.expanduser('~/.invokeai')
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -170,7 +170,10 @@ class Args(object):
         try:
             sysargs = sys.argv[1:]
             if os.path.exists(INITFILE):
+                print(f'>> Initialization file {INITFILE} found. Loading...')
                 sysargs.insert(0,f'@{INITFILE}')
+            else:
+                print(f'>> Initialization file {INITFILE} not found. Applying default settings...')
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
