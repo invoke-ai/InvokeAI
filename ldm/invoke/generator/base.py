@@ -63,7 +63,7 @@ class Generator():
             **kwargs
         )
         results             = []
-        seed                = seed if seed is not None else self.new_seed()
+        seed                = seed if seed is not None and seed > 0 else self.new_seed()
         first_seed          = seed
         seed, initial_noise = self.generate_initial_noise(seed, width, height)
 
