@@ -1,25 +1,34 @@
 import {
   FormControl,
+  FormControlProps,
   FormLabel,
+  FormLabelProps,
   HStack,
   NumberDecrementStepper,
   NumberIncrementStepper,
   NumberInput,
   NumberInputField,
+  NumberInputFieldProps,
+  NumberInputProps,
   NumberInputStepper,
+  NumberInputStepperProps,
   Slider,
   SliderFilledTrack,
   SliderMark,
+  SliderMarkProps,
   SliderThumb,
+  SliderThumbProps,
   SliderTrack,
+  SliderTrackProps,
   Tooltip,
+  TooltipProps,
 } from '@chakra-ui/react';
 import React, { FocusEvent, useEffect, useState } from 'react';
 import { BiReset } from 'react-icons/bi';
-import IAIIconButton from './IAIIconButton';
+import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 import _ from 'lodash';
 
-interface IAIFullSliderProps {
+export type IAIFullSliderProps = {
   label: string;
   value: number;
   min?: number;
@@ -41,7 +50,17 @@ interface IAIFullSliderProps {
   tooltipSuffix?: string;
   hideTooltip?: boolean;
   styleClass?: string;
-}
+  sliderFormControlProps?: FormControlProps;
+  sliderFormLabelProps?: FormLabelProps;
+  sliderMarkProps?: Omit<SliderMarkProps, 'value'>;
+  sliderTrackProps?: SliderTrackProps;
+  sliderThumbProps?: SliderThumbProps;
+  sliderNumberInputProps?: NumberInputProps;
+  sliderNumberInputFieldProps?: NumberInputFieldProps;
+  sliderNumberInputStepperProps?: NumberInputStepperProps;
+  sliderTooltipProps?: Omit<TooltipProps, 'children'>;
+  sliderIAIIconButtonProps?: IAIIconButtonProps;
+};
 
 export default function IAISlider(props: IAIFullSliderProps) {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -67,6 +86,17 @@ export default function IAISlider(props: IAIFullSliderProps) {
     isSliderDisabled,
     isInputDisabled,
     styleClass,
+    sliderFormControlProps,
+    sliderFormLabelProps,
+    sliderMarkProps,
+    sliderTrackProps,
+    sliderThumbProps,
+    sliderNumberInputProps,
+    sliderNumberInputFieldProps,
+    sliderNumberInputStepperProps,
+    sliderTooltipProps,
+    sliderIAIIconButtonProps,
+    ...rest
   } = props;
 
   const [localInputValue, setLocalInputValue] = useState<string>(String(value));
@@ -105,8 +135,12 @@ export default function IAISlider(props: IAIFullSliderProps) {
           : `invokeai__slider-component`
       }
       data-markers={withSliderMarks}
+      {...sliderFormControlProps}
     >
-      <FormLabel className="invokeai__slider-component-label">
+      <FormLabel
+        className="invokeai__slider-component-label"
+        {...sliderFormLabelProps}
+      >
         {label}
       </FormLabel>
 
@@ -122,6 +156,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
           onMouseLeave={() => setShowTooltip(false)}
           focusThumbOnChange={false}
           isDisabled={isSliderDisabled}
+          {...rest}
         >
           {withSliderMarks && (
             <>
@@ -129,6 +164,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
                 value={min}
                 className="invokeai__slider-mark invokeai__slider-mark-start"
                 ml={sliderMarkLeftOffset}
+                {...sliderMarkProps}
               >
                 {min}
               </SliderMark>
@@ -136,13 +172,14 @@ export default function IAISlider(props: IAIFullSliderProps) {
                 value={max}
                 className="invokeai__slider-mark invokeai__slider-mark-end"
                 ml={sliderMarkRightOffset}
+                {...sliderMarkProps}
               >
                 {max}
               </SliderMark>
             </>
           )}
 
-          <SliderTrack className="invokeai__slider_track">
+          <SliderTrack className="invokeai__slider_track" {...sliderTrackProps}>
             <SliderFilledTrack className="invokeai__slider_track-filled" />
           </SliderTrack>
 
@@ -153,8 +190,12 @@ export default function IAISlider(props: IAIFullSliderProps) {
             isOpen={showTooltip}
             label={`${value}${tooltipSuffix}`}
             hidden={hideTooltip}
+            {...sliderTooltipProps}
           >
-            <SliderThumb className="invokeai__slider-thumb" />
+            <SliderThumb
+              className="invokeai__slider-thumb"
+              {...sliderThumbProps}
+            />
           </Tooltip>
         </Slider>
 
@@ -168,13 +209,15 @@ export default function IAISlider(props: IAIFullSliderProps) {
             onBlur={handleInputBlur}
             className="invokeai__slider-number-field"
             isDisabled={isInputDisabled}
+            {...sliderNumberInputProps}
           >
             <NumberInputField
               className="invokeai__slider-number-input"
               width={inputWidth}
               readOnly={inputReadOnly}
+              {...sliderNumberInputFieldProps}
             />
-            <NumberInputStepper>
+            <NumberInputStepper {...sliderNumberInputStepperProps}>
               <NumberIncrementStepper className="invokeai__slider-number-stepper" />
               <NumberDecrementStepper className="invokeai__slider-number-stepper" />
             </NumberInputStepper>
@@ -189,6 +232,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
             icon={<BiReset />}
             onClick={handleResetDisable}
             isDisabled={isResetDisabled}
+            {...sliderIAIIconButtonProps}
           />
         )}
       </HStack>
