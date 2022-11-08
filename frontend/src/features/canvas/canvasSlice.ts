@@ -55,8 +55,6 @@ export interface GenericCanvasState {
   shouldShowCheckboardTransparency: boolean;
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;
-  imageToInpaint?: InvokeAI.Image;
-  doesCanvasNeedScaling: boolean;
   stageScale: number;
   isDrawing: boolean;
   isTransformingBoundingBox: boolean;
@@ -69,22 +67,11 @@ export interface GenericCanvasState {
   isMoveStageKeyHeld: boolean;
 }
 
-// export type OutpaintingRegion = {
-//   x: number;
-//   y: number;
-//   width: number;
-//   height: number;
-//   images: InvokeAI.Image[];
-//   selectedImageIndex: number;
-// };
-
 type CanvasImage = {
   type: 'image';
   x: number;
   y: number;
-  width: number;
-  height: number;
-  imageUrl: string; // Image URL
+  image: InvokeAI.Image;
 };
 
 type CanvasEraserLine = {
@@ -94,18 +81,6 @@ type CanvasEraserLine = {
 };
 
 type CanvasObject = CanvasImage | CanvasEraserLine;
-
-// type OutpaintingCanvasState = {
-//   objects: CanvasObject[];
-//   pastObjects: CanvasObject[][];
-//   futureObject: CanvasObject[][];
-//   stagingArea: {
-//     images: CanvasImage[];
-//     selectedImageIndex: number;
-//   };
-// };
-
-// export type Outpainting = Record<string, OutpaintingRegion>;
 
 export type OutpaintingCanvasState = GenericCanvasState & {
   objects: CanvasObject[];
@@ -117,11 +92,16 @@ export type OutpaintingCanvasState = GenericCanvasState & {
   };
 };
 
+export type InpaintingCanvasState = GenericCanvasState & {
+  imageToInpaint?: InvokeAI.Image;
+};
+
 export type ValidCanvasName = 'inpainting' | 'outpainting';
 
 export interface CanvasState {
+  doesCanvasNeedScaling: boolean;
   currentCanvas: ValidCanvasName;
-  inpainting: GenericCanvasState;
+  inpainting: InpaintingCanvasState;
   outpainting: OutpaintingCanvasState;
 }
 
@@ -145,7 +125,6 @@ const initialGenericCanvasState: GenericCanvasState = {
   shouldShowCheckboardTransparency: false,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
-  doesCanvasNeedScaling: false,
   isDrawing: false,
   isTransformingBoundingBox: false,
   isMouseOverBoundingBox: false,
@@ -160,7 +139,10 @@ const initialGenericCanvasState: GenericCanvasState = {
 
 const initialCanvasState: CanvasState = {
   currentCanvas: 'inpainting',
-  inpainting: initialGenericCanvasState,
+  doesCanvasNeedScaling: false,
+  inpainting: {
+    ...initialGenericCanvasState,
+  },
   outpainting: {
     objects: [],
     pastObjects: [],
@@ -171,47 +153,6 @@ const initialCanvasState: CanvasState = {
     },
     ...initialGenericCanvasState,
   },
-};
-
-const setCanvasImage = (
-  state: CanvasState,
-  action: PayloadAction<InvokeAI.Image>,
-  canvas: ValidCanvasName
-) => {
-  const { width: canvasWidth, height: canvasHeight } =
-    state[canvas].stageDimensions;
-  const { width, height } = state[canvas].boundingBoxDimensions;
-  const { x, y } = state[canvas].boundingBoxCoordinates;
-
-  const maxWidth = Math.min(action.payload.width, canvasWidth);
-  const maxHeight = Math.min(action.payload.height, canvasHeight);
-
-  const newCoordinates: Vector2d = { x, y };
-  const newDimensions: Dimensions = { width, height };
-
-  if (width + x > maxWidth) {
-    // Bounding box at least needs to be translated
-    if (width > maxWidth) {
-      // Bounding box also needs to be resized
-      newDimensions.width = roundDownToMultiple(maxWidth, 64);
-    }
-    newCoordinates.x = maxWidth - newDimensions.width;
-  }
-
-  if (height + y > maxHeight) {
-    // Bounding box at least needs to be translated
-    if (height > maxHeight) {
-      // Bounding box also needs to be resized
-      newDimensions.height = roundDownToMultiple(maxHeight, 64);
-    }
-    newCoordinates.y = maxHeight - newDimensions.height;
-  }
-
-  state[canvas].boundingBoxDimensions = newDimensions;
-  state[canvas].boundingBoxCoordinates = newCoordinates;
-
-  state[canvas].imageToInpaint = action.payload;
-  state[canvas].doesCanvasNeedScaling = true;
 };
 
 export const canvasSlice = createSlice({
@@ -305,7 +246,7 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].cursorPosition = action.payload;
     },
     clearImageToInpaint: (state) => {
-      state[state.currentCanvas].imageToInpaint = undefined;
+      state.inpainting.imageToInpaint = undefined;
     },
 
     setImageToOutpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
@@ -347,15 +288,46 @@ export const canvasSlice = createSlice({
           type: 'image',
           x: 0,
           y: 0,
-          width: action.payload.width,
-          height: action.payload.height,
-          imageUrl: action.payload.url,
+          image: action.payload,
         },
       ];
-      state.outpainting.doesCanvasNeedScaling = true;
+      state.doesCanvasNeedScaling = true;
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
-      setCanvasImage(state, action, 'inpainting');
+      const { width: canvasWidth, height: canvasHeight } =
+        state.inpainting.stageDimensions;
+      const { width, height } = state.inpainting.boundingBoxDimensions;
+      const { x, y } = state.inpainting.boundingBoxCoordinates;
+
+      const maxWidth = Math.min(action.payload.width, canvasWidth);
+      const maxHeight = Math.min(action.payload.height, canvasHeight);
+
+      const newCoordinates: Vector2d = { x, y };
+      const newDimensions: Dimensions = { width, height };
+
+      if (width + x > maxWidth) {
+        // Bounding box at least needs to be translated
+        if (width > maxWidth) {
+          // Bounding box also needs to be resized
+          newDimensions.width = roundDownToMultiple(maxWidth, 64);
+        }
+        newCoordinates.x = maxWidth - newDimensions.width;
+      }
+
+      if (height + y > maxHeight) {
+        // Bounding box at least needs to be translated
+        if (height > maxHeight) {
+          // Bounding box also needs to be resized
+          newDimensions.height = roundDownToMultiple(maxHeight, 64);
+        }
+        newCoordinates.y = maxHeight - newDimensions.height;
+      }
+
+      state.inpainting.boundingBoxDimensions = newDimensions;
+      state.inpainting.boundingBoxCoordinates = newCoordinates;
+
+      state.inpainting.imageToInpaint = action.payload;
+      state.doesCanvasNeedScaling = true;
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
       state[state.currentCanvas].stageDimensions = action.payload;
@@ -463,11 +435,11 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].boundingBoxPreviewFill = action.payload;
     },
     setDoesCanvasNeedScaling: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].doesCanvasNeedScaling = action.payload;
+      state.doesCanvasNeedScaling = action.payload;
     },
     setStageScale: (state, action: PayloadAction<number>) => {
       state[state.currentCanvas].stageScale = action.payload;
-      state[state.currentCanvas].doesCanvasNeedScaling = false;
+      state.doesCanvasNeedScaling = false;
     },
     setShouldShowBoundingBoxFill: (state, action: PayloadAction<boolean>) => {
       state[state.currentCanvas].shouldShowBoundingBoxFill = action.payload;
@@ -523,45 +495,17 @@ export const canvasSlice = createSlice({
       const { boundingBox, image } = action.payload;
       if (!boundingBox || !image) return;
 
-      const { x, y, width, height } = boundingBox;
-      // state.outpainting.eraserLines = [];
-      // state.outpainting.futureEraserLines = [];
+      const { x, y } = boundingBox;
 
-      state.outpainting.pastObjects.push(state.outpainting.objects);
+      state.outpainting.pastObjects.push([...state.outpainting.objects]);
       state.outpainting.futureObjects = [];
 
       state.outpainting.objects.push({
         type: 'image',
         x,
         y,
-        width,
-        height,
-        imageUrl: image.url,
+        image,
       });
-
-      // const sessionIndex = state.outpainting.session.findIndex(
-      //   (region) =>
-      //     region.x === x &&
-      //     region.y === y &&
-      //     region.width === width &&
-      //     region.height === height
-      // );
-
-      // if (sessionIndex < 0) {
-      //   state.outpainting.session.push({
-      //     ...boundingBox,
-      //     images: [image],
-      //     selectedImageIndex: 0,
-      //   });
-      // } else {
-      //   state.outpainting.session[sessionIndex].images.push(image);
-      //   state.outpainting.session[sessionIndex].selectedImageIndex =
-      //     state.outpainting.session[sessionIndex].images.length - 1;
-      // }
-
-      // state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
-      // state.outpainting.eraserLines = [];
-      // state.outpainting.futureEraserLines = [];
     },
     clearOutpaintingSession: (state) => {
       state.outpainting.objects = [];
@@ -570,24 +514,15 @@ export const canvasSlice = createSlice({
       state.outpainting.pastObjects.push(state.outpainting.objects);
       state.outpainting.objects.push({ type: 'eraserLine', ...action.payload });
       state.outpainting.futureObjects = [];
-
-      // state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
-      // state.outpainting.eraserLines.push(action.payload);
-      // state.outpainting.futureEraserLines = [];
     },
     addPointToCurrentEraserLine: (state, action: PayloadAction<number[]>) => {
-      // state.outpainting.pastObjects.push(state.outpainting.objects);
-      // state.outpainting.objects.push({ type: 'eraserLine', ...action.payload });
-      // state.outpainting.futureObjects = [];
       const lastEraserLine = state.outpainting.objects.findLast(
         (obj) => obj.type === 'eraserLine'
       );
+
       if (!lastEraserLine || lastEraserLine.type !== 'eraserLine') return;
 
       lastEraserLine.points.push(...action.payload);
-      // state.outpainting.eraserLines[
-      //   state.outpainting.eraserLines.length - 1
-      // ].points.push(...action.payload);
     },
     undoOutpaintingAction: (state) => {
       if (state.outpainting.objects.length === 0) return;
@@ -604,22 +539,6 @@ export const canvasSlice = createSlice({
       state.outpainting.pastObjects.push(state.outpainting.objects);
       state.outpainting.objects = newObjects;
     },
-    // undoEraser: (state) => {
-    //   if (state.outpainting.pastEraserLines.length === 0) return;
-    //   const newLines = state.outpainting.pastEraserLines.pop();
-    //   if (!newLines) return;
-    //   state.outpainting.futureEraserLines.unshift(
-    //     state.outpainting.eraserLines
-    //   );
-    //   state.outpainting.eraserLines = newLines;
-    // },
-    // redoEraser: (state) => {
-    //   if (state.outpainting.futureEraserLines.length === 0) return;
-    //   const newLines = state.outpainting.futureEraserLines.shift();
-    //   if (!newLines) return;
-    //   state.outpainting.pastEraserLines.push(state.outpainting.eraserLines);
-    //   state.outpainting.eraserLines = newLines;
-    // },
   },
 });
 
@@ -684,5 +603,21 @@ export const areHotkeysEnabledSelector = createSelector(
       currentCanvas.shouldShowMask &&
       ['inpainting', 'outpainting'].includes(activeTabName)
     );
+  }
+);
+
+export const baseCanvasImageSelector = createSelector(
+  [(state: RootState) => state.canvas, activeTabNameSelector],
+  (canvas: CanvasState, activeTabName) => {
+    if (activeTabName === 'inpainting') {
+      return canvas.inpainting.imageToInpaint;
+    } else if (activeTabName === 'outpainting') {
+      const firstImageObject = canvas.outpainting.objects.find(
+        (obj) => obj.type === 'image'
+      );
+      if (firstImageObject && firstImageObject.type === 'image') {
+        return firstImageObject.image;
+      }
+    }
   }
 );

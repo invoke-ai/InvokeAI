@@ -340,7 +340,6 @@ const CurrentImageButtons = () => {
     dispatch(setImageToOutpaint(currentImage));
     dispatch(setActiveTab('outpainting'));
     dispatch(setDoesCanvasNeedScaling(true));
-    dispatch(clearOutpaintingSession());
 
     toast({
       title: 'Sent to Inpainting',

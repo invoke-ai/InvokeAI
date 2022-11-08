@@ -113,7 +113,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleSendToOutpainting = () => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setImageToOutpaint(image));
-    dispatch(clearOutpaintingSession());
     if (activeTabName !== 'outpainting') {
       dispatch(setActiveTab('outpainting'));
     }

@@ -18,6 +18,7 @@ import {
   addLine,
   addPointToCurrentEraserLine,
   addPointToCurrentLine,
+  baseCanvasImageSelector,
   CanvasState,
   clearImageToInpaint,
   currentCanvasSelector,
@@ -54,10 +55,11 @@ import IAICanvasEraserLines from './IAICanvasEraserLines';
 const canvasSelector = createSelector(
   [
     currentCanvasSelector,
+    baseCanvasImageSelector,
     activeTabNameSelector,
     (state: RootState) => state.canvas,
   ],
-  (currentCanvas: GenericCanvasState, activeTabName, canvas: CanvasState) => {
+  (currentCanvas: GenericCanvasState, baseCanvasImage, activeTabName, canvas: CanvasState) => {
     const {
       tool,
       toolSize: brushSize,
@@ -65,7 +67,6 @@ const canvasSelector = createSelector(
       shouldInvertMask,
       shouldShowMask,
       shouldShowCheckboardTransparency,
-      imageToInpaint,
       stageScale,
       shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
@@ -103,7 +104,6 @@ const canvasSelector = createSelector(
       shouldShowMask,
       shouldShowCheckboardTransparency,
       maskColor,
-      imageToInpaint,
       stageScale,
       shouldShowBoundingBox,
       shouldShowBoundingBoxFill,
@@ -118,6 +118,7 @@ const canvasSelector = createSelector(
       stageCoordinates,
       isMoveStageKeyHeld,
       activeTabName,
+      baseCanvasImage,
       outpaintingObjects:
         canvas.currentCanvas === 'outpainting'
           ? canvas.outpainting.objects
@@ -127,10 +128,10 @@ const canvasSelector = createSelector(
   {
     memoizeOptions: {
       resultEqualityCheck: (a, b) => {
-        const { imageToInpaint: a_imageToInpaint, ...a_rest } = a;
-        const { imageToInpaint: b_imageToInpaint, ...b_rest } = b;
+        const { baseCanvasImage: a_baseCanvasImage, ...a_rest } = a;
+        const { baseCanvasImage: b_baseCanvasImage, ...b_rest } = b;
         return (
-          _.isEqual(a_rest, b_rest) && a_imageToInpaint == b_imageToInpaint
+          _.isEqual(a_rest, b_rest) && a_baseCanvasImage == b_baseCanvasImage
         );
       },
     },
@@ -153,7 +154,6 @@ const IAICanvas = () => {
     shouldShowMask,
     shouldShowCheckboardTransparency,
     maskColor,
-    imageToInpaint,
     stageScale,
     shouldShowBoundingBox,
     shouldShowBoundingBoxFill,
@@ -166,12 +166,12 @@ const IAICanvas = () => {
     boundingBoxDimensions,
     activeTabName,
     outpaintingObjects,
+    baseCanvasImage
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
 
   const toast = useToast();
-  // useCacher();
   // set the closure'd refs
   stageRef = useRef<StageType>(null);
   maskLayerRef = useRef<Konva.Layer>(null);
@@ -190,7 +190,7 @@ const IAICanvas = () => {
 
   // Load the image and set the options panel width & height
   useEffect(() => {
-    if (imageToInpaint) {
+    if (baseCanvasImage) {
       const image = new Image();
       image.onload = () => {
         inpaintingImageElementRef.current = image;
@@ -199,17 +199,17 @@ const IAICanvas = () => {
       image.onerror = () => {
         toast({
           title: 'Unable to Load Image',
-          description: `Image ${imageToInpaint.url} failed to load`,
+          description: `Image ${baseCanvasImage.url} failed to load`,
           status: 'error',
           isClosable: true,
         });
         dispatch(clearImageToInpaint());
       };
-      image.src = imageToInpaint.url;
+      image.src = baseCanvasImage.url;
     } else {
       setCanvasBgImage(null);
     }
-  }, [imageToInpaint, dispatch, stageScale, toast]);
+  }, [baseCanvasImage, dispatch, stageScale, toast]);
 
   /**
    *
@@ -440,101 +440,103 @@ const IAICanvas = () => {
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
         <div className="canvas-status-text">{`${boundingBoxDimensions.width}x${boundingBoxDimensions.height}`}</div>
-        {canvasBgImage && (
-          <Stage
-            width={stageDimensions.width}
-            height={stageDimensions.height}
-            scale={{ x: stageScale, y: stageScale }}
-            x={stageCoordinates.x}
-            y={stageCoordinates.y}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseEnter={handleMouseEnter}
-            onMouseUp={handleMouseUp}
-            onMouseOut={handleMouseOutCanvas}
-            onMouseLeave={handleMouseOutCanvas}
-            onDragMove={handleDragStage}
-            draggable={isMoveStageKeyHeld && activeTabName === 'outpainting'}
-            onWheel={handleWheel}
-            style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
-            className="inpainting-canvas-stage checkerboard"
-            ref={stageRef}
+        <Stage
+          width={stageDimensions.width}
+          height={stageDimensions.height}
+          scale={{ x: stageScale, y: stageScale }}
+          x={stageCoordinates.x}
+          y={stageCoordinates.y}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseEnter={handleMouseEnter}
+          onMouseUp={handleMouseUp}
+          onMouseOut={handleMouseOutCanvas}
+          onMouseLeave={handleMouseOutCanvas}
+          onDragMove={handleDragStage}
+          draggable={isMoveStageKeyHeld && activeTabName === 'outpainting'}
+          onWheel={handleWheel}
+          style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
+          className="inpainting-canvas-stage checkerboard"
+          ref={stageRef}
+        >
+          <Layer
+            id={'image-layer'}
+            ref={canvasImageLayerRef}
+            listening={false}
+            visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
           >
-            <Layer
-              id={'image-layer'}
-              ref={canvasImageLayerRef}
-              listening={false}
-              visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
-            >
-              <KonvaImage
-                listening={false}
-                image={canvasBgImage}
-                visible={activeTabName === 'inpainting'}
-              />
-              {outpaintingObjects &&
-                _.map(outpaintingObjects, (obj, i) =>
-                  obj.type === 'image' ? (
-                    <IAICanvasImage
-                      key={i}
-                      x={obj.x}
-                      y={obj.y}
-                      url={obj.imageUrl}
-                    />
-                  ) : (
-                    <Line
-                      key={i}
-                      points={obj.points}
-                      stroke={'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
-                      strokeWidth={obj.strokeWidth * 2}
-                      tension={0}
-                      lineCap="round"
-                      lineJoin="round"
-                      shadowForStrokeEnabled={false}
-                      listening={false}
-                      globalCompositeOperation={'destination-out'}
-                    />
-                  )
-                )}
-            </Layer>
-            <Layer
-              id={'mask-layer'}
-              listening={false}
-              ref={maskLayerRef}
-              visible={shouldShowMask}
-            >
-              <IAICanvasMaskLines visible={true} />
+            {canvasBgImage && (
+              <KonvaImage listening={false} image={canvasBgImage} />
+            )}
+            {outpaintingObjects &&
+              _.map(outpaintingObjects, (obj, i) =>
+                obj.type === 'image' ? (
+                  <IAICanvasImage
+                    key={i}
+                    x={obj.x}
+                    y={obj.y}
+                    url={obj.image.url}
+                  />
+                ) : (
+                  <Line
+                    key={i}
+                    points={obj.points}
+                    stroke={'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
+                    strokeWidth={obj.strokeWidth * 2}
+                    tension={0}
+                    lineCap="round"
+                    lineJoin="round"
+                    shadowForStrokeEnabled={false}
+                    listening={false}
+                    globalCompositeOperation={'destination-out'}
+                  />
+                )
+              )}
+          </Layer>
+          <Layer
+            id={'mask-layer'}
+            listening={false}
+            ref={maskLayerRef}
+            visible={shouldShowMask}
+          >
+            <IAICanvasMaskLines visible={true} />
 
-              <IAICanvasMaskBrushPreview
-                visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
-              />
-              <IAICanvasMaskCompositer />
+            <IAICanvasMaskBrushPreview
+              visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+            />
+            <IAICanvasMaskCompositer />
 
-              <IAICanvasMaskBrushPreviewOutline
-                visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
-              />
+            <IAICanvasMaskBrushPreviewOutline
+              visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
+            />
 
-              <KonvaImage
-                image={canvasBgImage}
-                listening={false}
-                globalCompositeOperation="source-in"
-                visible={shouldInvertMask}
-              />
+            {canvasBgImage && (
+              <>
+                <KonvaImage
+                  image={canvasBgImage}
+                  listening={false}
+                  globalCompositeOperation="source-in"
+                  visible={shouldInvertMask}
+                />
 
-              <KonvaImage
-                image={canvasBgImage}
-                listening={false}
-                globalCompositeOperation="source-out"
-                visible={!shouldInvertMask && shouldShowCheckboardTransparency}
-              />
-            </Layer>
-            <Layer id={'bounding-box-layer'} visible={shouldShowMask}>
-              <IAICanvasBoundingBoxPreviewOverlay
-                visible={shouldShowBoundingBoxFill && shouldShowBoundingBox}
-              />
-              <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
-            </Layer>
-          </Stage>
-        )}
+                <KonvaImage
+                  image={canvasBgImage}
+                  listening={false}
+                  globalCompositeOperation="source-out"
+                  visible={
+                    !shouldInvertMask && shouldShowCheckboardTransparency
+                  }
+                />
+              </>
+            )}
+          </Layer>
+          <Layer id={'bounding-box-layer'} visible={shouldShowMask}>
+            <IAICanvasBoundingBoxPreviewOverlay
+              visible={shouldShowBoundingBoxFill && shouldShowBoundingBox}
+            />
+            <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
+          </Layer>
+        </Stage>
       </div>
     </div>
   );

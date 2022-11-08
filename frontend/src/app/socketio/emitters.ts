@@ -21,6 +21,7 @@ import { inpaintingImageElementRef } from 'features/canvas/IAICanvas';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
 import * as InvokeAI from 'app/invokeai';
 import { RootState } from 'app/store';
+import { baseCanvasImageSelector } from 'features/canvas/canvasSlice';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -55,8 +56,8 @@ const makeSocketIOEmitters = (
         };
 
       if (['inpainting', 'outpainting'].includes(generationMode)) {
-        const imageUrl =
-          canvasState[canvasState.currentCanvas].imageToInpaint?.url;
+        const baseCanvasImage = baseCanvasImageSelector(getState());
+        const imageUrl = baseCanvasImage?.url;
 
         if (!inpaintingImageElementRef.current || !imageUrl) {
           dispatch(

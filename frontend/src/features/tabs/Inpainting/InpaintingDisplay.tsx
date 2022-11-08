@@ -9,16 +9,18 @@ import ImageUploadButton from 'common/components/ImageUploaderButton';
 import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
 import { OptionsState } from 'features/options/optionsSlice';
 import {
-  currentCanvasSelector,
-  GenericCanvasState,
+  CanvasState,
   setDoesCanvasNeedScaling,
 } from 'features/canvas/canvasSlice';
 import IAICanvas from 'features/canvas/IAICanvas';
 
 const inpaintingDisplaySelector = createSelector(
-  [currentCanvasSelector, (state: RootState) => state.options],
-  (currentCanvas: GenericCanvasState, options: OptionsState) => {
-    const { doesCanvasNeedScaling, imageToInpaint } = currentCanvas;
+  [(state: RootState) => state.canvas, (state: RootState) => state.options],
+  (canvas: CanvasState, options: OptionsState) => {
+    const {
+      doesCanvasNeedScaling,
+      inpainting: { imageToInpaint },
+    } = canvas;
     const { showDualDisplay } = options;
     return {
       doesCanvasNeedScaling,

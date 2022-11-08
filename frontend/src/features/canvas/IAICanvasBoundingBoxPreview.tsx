@@ -10,6 +10,7 @@ import { Group, Rect, Transformer } from 'react-konva';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
+  baseCanvasImageSelector,
   currentCanvasSelector,
   GenericCanvasState,
   setBoundingBoxCoordinates,
@@ -22,13 +23,13 @@ import { GroupConfig } from 'konva/lib/Group';
 
 const boundingBoxPreviewSelector = createSelector(
   currentCanvasSelector,
-  (currentCanvas: GenericCanvasState) => {
+  baseCanvasImageSelector,
+  (currentCanvas: GenericCanvasState, baseCanvasImage) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
       stageDimensions,
       stageScale,
-      imageToInpaint,
       shouldLockBoundingBox,
       isDrawing,
       isTransformingBoundingBox,
@@ -39,7 +40,6 @@ const boundingBoxPreviewSelector = createSelector(
     return {
       boundingBoxCoordinates,
       boundingBoxDimensions,
-      imageToInpaint,
       isDrawing,
       isMouseOverBoundingBox,
       isMoveBoundingBoxKeyHeld,
@@ -48,6 +48,7 @@ const boundingBoxPreviewSelector = createSelector(
       shouldLockBoundingBox,
       stageDimensions,
       stageScale,
+      baseCanvasImage,
     };
   },
   {
@@ -68,7 +69,6 @@ const IAICanvasBoundingBoxPreview = (
   const {
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    imageToInpaint,
     isDrawing,
     isMouseOverBoundingBox,
     isMoveBoundingBoxKeyHeld,
@@ -77,6 +77,7 @@ const IAICanvasBoundingBoxPreview = (
     shouldLockBoundingBox,
     stageDimensions,
     stageScale,
+    baseCanvasImage,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -105,7 +106,7 @@ const IAICanvasBoundingBoxPreview = (
   // OK
   const dragBoundFunc = useCallback(
     (position: Vector2d) => {
-      if (!imageToInpaint) return boundingBoxCoordinates;
+      if (!baseCanvasImage) return boundingBoxCoordinates;
 
       const { x, y } = position;
 
@@ -122,7 +123,7 @@ const IAICanvasBoundingBoxPreview = (
     [
       boundingBoxCoordinates,
       boundingBoxDimensions,
-      imageToInpaint,
+      baseCanvasImage,
       stageScale,
       stageDimensions,
     ]
@@ -234,7 +235,7 @@ const IAICanvasBoundingBoxPreview = (
        * Unlike anchorDragBoundFunc, it does get a width and height, so
        * the logic to constrain the size of the bounding box is very simple.
        */
-      if (!imageToInpaint) return oldBoundBox;
+      if (!baseCanvasImage) return oldBoundBox;
       if (
         newBoundBox.width + newBoundBox.x > stageDimensions.width ||
         newBoundBox.height + newBoundBox.y > stageDimensions.height ||
@@ -246,7 +247,7 @@ const IAICanvasBoundingBoxPreview = (
 
       return newBoundBox;
     },
-    [imageToInpaint, stageDimensions]
+    [baseCanvasImage, stageDimensions]
   );
 
   const handleStartedTransforming = (e: KonvaEventObject<MouseEvent>) => {
@@ -273,7 +274,7 @@ const IAICanvasBoundingBoxPreview = (
   };
 
   const spacebarHeldHitFunc = (context: Context, shape: Konva.Shape) => {
-    context.rect(0, 0, imageToInpaint?.width, imageToInpaint?.height);
+    context.rect(0, 0, baseCanvasImage?.width, baseCanvasImage?.height);
     context.fillShape(shape);
   };
 

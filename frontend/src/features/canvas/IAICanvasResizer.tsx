@@ -1,45 +1,51 @@
 import { Spinner } from '@chakra-ui/react';
 import { useLayoutEffect, useRef } from 'react';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
+  baseCanvasImageSelector,
+  CanvasState,
   currentCanvasSelector,
   GenericCanvasState,
   setStageDimensions,
   setStageScale,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
+import * as InvokeAI from 'app/invokeai';
+import { first } from 'lodash';
 
 const canvasResizerSelector = createSelector(
-  currentCanvasSelector,
+  (state: RootState) => state.canvas,
+  baseCanvasImageSelector,
   activeTabNameSelector,
-  (currentCanvas: GenericCanvasState, activeTabName) => {
-    const { doesCanvasNeedScaling, imageToInpaint } = currentCanvas;
+  (canvas: CanvasState, baseCanvasImage, activeTabName) => {
+    const { doesCanvasNeedScaling } = canvas;
+
     return {
       doesCanvasNeedScaling,
-      imageToInpaint,
       activeTabName,
+      baseCanvasImage,
     };
   }
 );
 
 const IAICanvasResizer = () => {
   const dispatch = useAppDispatch();
-  const { doesCanvasNeedScaling, imageToInpaint, activeTabName } =
+  const { doesCanvasNeedScaling, activeTabName, baseCanvasImage } =
     useAppSelector(canvasResizerSelector);
 
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     window.setTimeout(() => {
-      if (!ref.current || !imageToInpaint) return;
+      if (!ref.current || !baseCanvasImage) return;
 
       const width = ref.current.clientWidth;
       const height = ref.current.clientHeight;
 
       const scale = Math.min(
         1,
-        Math.min(width / imageToInpaint.width, height / imageToInpaint.height)
+        Math.min(width / baseCanvasImage.width, height / baseCanvasImage.height)
       );
 
       dispatch(setStageScale(scale));
@@ -47,8 +53,8 @@ const IAICanvasResizer = () => {
       if (activeTabName === 'inpainting') {
         dispatch(
           setStageDimensions({
-            width: Math.floor(imageToInpaint.width * scale),
-            height: Math.floor(imageToInpaint.height * scale),
+            width: Math.floor(baseCanvasImage.width * scale),
+            height: Math.floor(baseCanvasImage.height * scale),
           })
         );
       } else if (activeTabName === 'outpainting') {
@@ -60,7 +66,7 @@ const IAICanvasResizer = () => {
         );
       }
     }, 0);
-  }, [dispatch, imageToInpaint, doesCanvasNeedScaling, activeTabName]);
+  }, [dispatch, baseCanvasImage, doesCanvasNeedScaling, activeTabName]);
 
   return (
     <div ref={ref} className="inpainting-canvas-area">
