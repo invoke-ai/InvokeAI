@@ -37,6 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
+      PIP_EXISTS_ACTION: w
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
