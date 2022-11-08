@@ -53,12 +53,12 @@ dependencies:
   - pip:
       - dependency_injector==4.40.0
       - getpass_asterisk
-      - realesrgan==0.2.5.0
+      - taming-transformers-rom1504
       - test-tube==0.7.5
-      - git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
       - git+https://github.com/openai/CLIP.git@main#egg=clip
       - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
-      - git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
+      - git+https://github.com/invoke-ai/Real-ESRGAN.git#egg=realesrgan
+      - git+https://github.com/invoke-ai/GFPGAN.git#egg=gfpgan
       - git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
       - -e .
 variables:
