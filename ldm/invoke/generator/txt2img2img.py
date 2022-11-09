@@ -6,6 +6,8 @@ import math
 
 import torch
 from PIL import Image
+from ldm.invoke.devices import choose_autocast
+from ldm.invoke.image_util import InitImageResizer
 
 from ldm.invoke.generator.base import Generator
 from ldm.invoke.generator.omnibus import Omnibus
@@ -45,16 +47,13 @@ class Txt2Img2Img(Generator):
                     ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
             )
 
-            #x = self.get_noise(init_width, init_height)
-            x = x_T
-
             if self.free_gpu_mem and self.model.model.device != self.model.device:
                 self.model.model.to(self.model.device)
 
             samples, _ = sampler.sample(
                 batch_size                   = 1,
                 S                            = steps,
-                x_T                          = x,
+                x_T                          = x_T,
                 conditioning                 = c,
                 shape                        = shape,
                 verbose                      = False,
@@ -70,11 +69,21 @@ class Txt2Img2Img(Generator):
                  )
 
             # resizing
-            samples = torch.nn.functional.interpolate(
-                samples,
-                size=(height // self.downsampling_factor, width // self.downsampling_factor),
-                mode="bilinear"
-            )
+
+            image = self.sample_to_image(samples)
+            image = InitImageResizer(image).resize(width, height)
+
+            image = np.array(image).astype(np.float32) / 255.0
+            image = image[None].transpose(0, 3, 1, 2)
+            image = torch.from_numpy(image)
+            image = 2.0 * image - 1.0
+            image = image.to(self.model.device)
+
+            scope = choose_autocast(self.precision)
+            with scope(self.model.device.type):
+                samples = self.model.get_first_stage_encoding(
+                    self.model.encode_first_stage(image)
+                ) # move back to latent space
 
             t_enc = int(strength * steps)
             ddim_sampler = DDIMSampler(self.model, device=self.model.device)

@@ -142,6 +142,7 @@ class Generate:
             ddim_eta = 0.0,  # deterministic
             full_precision = False,
             precision = 'auto',
+            outdir = 'outputs/img-samples',
             gfpgan=None,
             codeformer=None,
             esrgan=None,
@@ -175,6 +176,7 @@ class Generate:
         self.generators     = {}
         self.base_generator = None
         self.seed           = None
+        self.outdir = outdir
         self.gfpgan = gfpgan
         self.codeformer = codeformer
         self.esrgan = esrgan
@@ -243,11 +245,11 @@ class Generate:
         return outputs
 
     def txt2img(self, prompt, **kwargs):
-        outdir = kwargs.pop('outdir', 'outputs/img-samples')
+        outdir = kwargs.pop('outdir', self.outdir)
         return self.prompt2png(prompt, outdir, **kwargs)
 
     def img2img(self, prompt, **kwargs):
-        outdir = kwargs.pop('outdir', 'outputs/img-samples')
+        outdir = kwargs.pop('outdir', self.outdir)
         assert (
             'init_img' in kwargs
         ), 'call to img2img() must include the init_img argument'
@@ -276,6 +278,7 @@ class Generate:
             threshold        = 0.0,
             perlin           = 0.0,
             karras_max       = None,
+            outdir         = None,
             # these are specific to img2img and inpaint
             init_img         = None,
             init_mask        = None,
@@ -288,6 +291,7 @@ class Generate:
             embiggen       =    None,
             embiggen_tiles =    None,
             # these are specific to GFPGAN/ESRGAN
+            gfpgan_strength=    0,
             facetool         = None,
             facetool_strength  = 0,
             codeformer_fidelity = None,
@@ -295,6 +299,9 @@ class Generate:
             upscale          = None,
             # this is specific to inpainting and causes more extreme inpainting
             inpaint_replace  = 0.0,
+            # This controls the size at which inpaint occurs (scaled up for inpaint, then back down for the result)
+            inpaint_width    = None,
+            inpaint_height   = None,
             # This will help match inpainted areas to the original image more smoothly
             mask_blur_radius: int = 8,
             # Set this True to handle KeyboardInterrupt internally
@@ -364,6 +371,7 @@ class Generate:
         ddim_eta = ddim_eta or self.ddim_eta
         iterations = iterations or self.iterations
         strength = strength or self.strength
+        outdir                = outdir     or self.outdir
         self.seed = seed
         self.log_tokenization = log_tokenization
         self.step_callback = step_callback
@@ -485,7 +493,9 @@ class Generate:
                 seam_strength = seam_strength,
                 seam_steps = seam_steps,
                 tile_size = tile_size,
-                force_outpaint = force_outpaint
+                force_outpaint = force_outpaint,
+                inpaint_width  = inpaint_width,
+                inpaint_height = inpaint_height
             )
 
             if init_color:
@@ -792,6 +802,10 @@ class Generate:
 
         # the model cache does the loading and offloading
         cache = self.model_cache
+        if not cache.valid_model(model_name):
+            print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
+            return self.model
+        
         cache.print_vram_usage()
 
         # have to get rid of all references to model in order
