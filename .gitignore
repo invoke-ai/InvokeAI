@@ -219,3 +219,8 @@ models/gfpgan
 
 # ignore initfile
 invokeai.init
+
+# ignore environment.yml and requirements.txt
+# these are to be copied from environments-and-requirements
+environment.yml
+requirements.txt

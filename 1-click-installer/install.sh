@@ -94,14 +94,19 @@ CONDA_BASEPATH=$(conda info --base)
 source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains about 'shell not initialized' (needed when running in a script)
 
 conda activate
-
 if [ "$OS_NAME" == "mac" ]; then
-    environment_file="environment-mac.yml"
+    echo "Macintosh system detected. Installing MPS and CPU support."
+    ln -sf environments-and-requirements/environment-mac.yml environment.yml
 else
-    environment_file="environment.yml"
+    if (lsmod | grep amdgpu) &>/dev/null ; then
+	echo "Linux system with AMD GPU driver detected. Installing ROCm and CPU support"
+	ln -sf environments-and-requirements/environment-lin-amd.yml environment.yml
+    else
+	echo "Linux system detected. Installing CUDA and CPU support."
+	ln -sf environments-and-requirements/environment-lin-cuda.yml environment.yml
+    fi
 fi
-
-conda env update -f "${environment_file}"
+conda env update
 
 status=$?
 
