@@ -33,7 +33,7 @@ send2trash
 dependency_injector==4.40.0
 eventlet
 realesrgan
-diffusers
+diffusers[torch]~=0.7
 git+https://github.com/openai/CLIP.git@main#egg=clip
 git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
 git+https://github.com/invoke-ai/Real-ESRGAN.git#egg=realesrgan
