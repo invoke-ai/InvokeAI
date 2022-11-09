@@ -18,6 +18,7 @@ const canInvokeSelector = createSelector(
   (options: OptionsState) => {
     const { shouldPinOptionsPanel, shouldShowOptionsPanel } = options;
     return {
+      shouldPinOptionsPanel,
       shouldShowProcessButtons:
         !shouldPinOptionsPanel || !shouldShowOptionsPanel,
     };
@@ -27,11 +28,14 @@ const canInvokeSelector = createSelector(
 
 const FloatingOptionsPanelButtons = () => {
   const dispatch = useAppDispatch();
-  const { shouldShowProcessButtons } = useAppSelector(canInvokeSelector);
+  const { shouldShowProcessButtons, shouldPinOptionsPanel } =
+    useAppSelector(canInvokeSelector);
 
   const handleShowOptionsPanel = () => {
     dispatch(setShouldShowOptionsPanel(true));
-    setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+    if (shouldPinOptionsPanel) {
+      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+    }
   };
 
   return (
