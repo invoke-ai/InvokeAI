@@ -17,9 +17,9 @@ jobs:
           - aarch64
         include:
           - arch: x86_64
-            conda-env-file: environment.yml
+            conda-env-file: environments-and-requirements/environment-lin-cuda.yml
           - arch: aarch64
-            conda-env-file: environment-linux-aarch64.yml
+            conda-env-file: environments-and-requirements/environment-lin-aarch64.yml
     runs-on: ubuntu-latest
     name: ${{ matrix.arch }}
     steps:
