@@ -322,3 +322,42 @@ Here are some common issues and their suggested solutions.
    search [Issues](https://github.com/invoke-ai/InvokeAI/issues), file
    a bug report, or ask for help on [Discord](https://discord.gg/ZmtBAhwWhy)
 
+4. My renders are running very slowly!
+
+   You may have installed the wrong torch (machine learning) package,
+   and the system is running on CPU rather than the GPU. To check,
+   look at the log messages that appear when `invoke.py` is first
+   starting up. One of the earlier lines should say `Using device type
+   cuda`. On AMD systems, it will also say "cuda", and on Macintoshes,
+   it should say "mps". If instead the message says it is running on
+   "cpu", then you may need to install the correct torch library.
+
+   You may be able to fix this by installing a different torch
+   library. Here are the magic incantations for Conda and PIP.
+
+   !!! todo "For CUDA systems"
+
+   (conda)
+   ```bash
+   conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia
+   ```
+
+   (pip)
+   ```bash
+   pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+   ```
+
+   !!! todo "For AMD systems"
+
+   (conda)
+   ```bash
+   conda activate invokeai
+   pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/rocm5.2/
+   ```
+
+   (pip)
+   ```bash
+   pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/rocm5.2/
+   ```
+
+   More information and troubleshooting tips can be found at https://pytorch.org.
