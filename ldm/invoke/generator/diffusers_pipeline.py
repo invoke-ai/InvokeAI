@@ -1,6 +1,6 @@
 import secrets
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 
 import torch
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
@@ -131,6 +131,7 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
         guidance_scale: Optional[float] = 7.5,
         generator: Optional[torch.Generator] = None,
         latents: Optional[torch.FloatTensor] = None,
+        callback: Optional[Callable[[PipelineIntermediateState], None]] = None,
         **extra_step_kwargs,
     ):
         r"""
@@ -172,7 +173,22 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
                 prompt, height=height, width=width, num_inference_steps=num_inference_steps,
                 guidance_scale=guidance_scale, generator=generator, latents=latents,
                 **extra_step_kwargs):
-            pass  # discarding intermediates
+            if callback is not None:
+                callback(result)
+        if result is None:
+            raise AssertionError("why was that an empty generator?")
+        return result
+
+    def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
+                              text_embeddings: torch.Tensor, guidance_scale: float,
+                              *, callback: Callable[[PipelineIntermediateState], None]=None, run_id=None,
+                              **extra_step_kwargs) -> StableDiffusionPipelineOutput:
+        self.scheduler.set_timesteps(num_inference_steps)
+        result = None
+        for result in self.generate_from_embeddings(
+                latents, text_embeddings, guidance_scale, run_id, **extra_step_kwargs):
+            if callback is not None:
+                callback(result)
         if result is None:
             raise AssertionError("why was that an empty generator?")
         return result
@@ -199,9 +215,6 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if run_id is None:
-            run_id = secrets.token_urlsafe(self.ID_LENGTH)
-
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
@@ -209,16 +222,23 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
         text_embeddings = self.get_text_embeddings(prompt, opposing_prompt, do_classifier_free_guidance, batch_size)\
             .to(self.unet.device)
         self.scheduler.set_timesteps(num_inference_steps)
-        latents = self.prepare_latents(latents, batch_size, height, width,
-                                       generator, self.unet.dtype)
+        latents = self.prepare_latents(latents, batch_size, height, width, generator, self.unet.dtype)
 
+        yield from self.generate_from_embeddings(latents, text_embeddings, guidance_scale, run_id, **extra_step_kwargs)
+
+    def generate_from_embeddings(self, latents: torch.Tensor, text_embeddings: torch.Tensor, guidance_scale: float,
+                                 run_id: str = None, **extra_step_kwargs):
+        if run_id is None:
+            run_id = secrets.token_urlsafe(self.ID_LENGTH)
         yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
                                         latents=latents)
+        # NOTE: Depends on scheduler being already initialized!
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
             step_output = self.step(t, latents, guidance_scale, text_embeddings, **extra_step_kwargs)
             latents = step_output.prev_sample
+            predicted_original = getattr(step_output, 'pred_original_sample', None)
             yield PipelineIntermediateState(run_id=run_id, step=i, timestep=int(t), latents=latents,
-                                            predicted_original=step_output.pred_original_sample)
+                                            predicted_original=predicted_original)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
