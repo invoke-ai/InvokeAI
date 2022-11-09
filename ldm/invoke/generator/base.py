@@ -14,13 +14,19 @@ from pytorch_lightning import seed_everything
 from tqdm import trange
 
 from ldm.invoke.devices import choose_autocast
+from ldm.models.diffusion.ddpm import DiffusionWrapper
 from ldm.util import rand_perlin_2d
 
 downsampling = 8
 CAUTION_IMG = 'assets/caution.png'
 
-class Generator():
-    def __init__(self, model, precision):
+class Generator:
+    downsampling_factor: int
+    latent_channels: int
+    precision: str
+    model: DiffusionWrapper
+
+    def __init__(self, model: DiffusionWrapper, precision: str):
         self.model = model
         self.precision = precision
         self.seed = None
