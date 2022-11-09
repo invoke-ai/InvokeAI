@@ -191,8 +191,8 @@ prompting you to download the big Stable Diffusion weights files.
 To install InvokeAI with only the PIP package manager, please follow
 these steps:
 
-1. Make sure you are using Python 3.9 or higher. Some InvokeAI
-   features require this:
+1. Make sure you are using Python 3.9 or higher. The rest of the install
+   procedure depends on this:
 
    ```bash
    python -V
@@ -262,7 +262,7 @@ operating system.
    this:
 
    ```bash
-   pip install -r requirements.txt
+   pip install --prefer-binary -r requirements.txt
    ```
 
 ## Troubleshooting
