@@ -36,6 +36,8 @@ import useCanvasMouseOut from './hooks/useCanvasMouseOut';
 import useCanvasDragMove from './hooks/useCanvasDragMove';
 import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingObjects';
 import IAICanvasGrid from './IAICanvasGrid';
+import IAICanvasImage from './IAICanvasImage';
+import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 
 const canvasSelector = createSelector(
   [currentCanvasSelector, baseCanvasImageSelector, activeTabNameSelector],
@@ -213,6 +215,7 @@ const IAICanvas = () => {
             imageSmoothingEnabled={false}
           >
             <IAICanvasOutpaintingObjects />
+            <IAICanvasIntermediateImage />
           </Layer>
           <Layer id={'mask-layer'} visible={shouldShowMask} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />

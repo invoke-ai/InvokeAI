@@ -120,7 +120,7 @@ const initialGenericCanvasState: GenericCanvasState = {
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
   shouldShowBoundingBox: true,
-  shouldShowBoundingBoxFill: true,
+  shouldShowBoundingBoxFill: false,
   cursorPosition: null,
   shouldShowMask: true,
   shouldInvertMask: false,

@@ -8,7 +8,7 @@ import { stageRef } from './IAICanvas';
 const IAICanvasGrid = () => {
   const unscale = useUnscaleCanvasValue();
 
-  if (!stageRef.current) return;
+  if (!stageRef.current) return null;
 
   const stage = stageRef.current;
   const width = stage.width();

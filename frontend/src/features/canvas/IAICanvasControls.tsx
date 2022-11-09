@@ -23,7 +23,7 @@ import { OptionsState } from 'features/options/optionsSlice';
 import _ from 'lodash';
 import IAICanvasImageEraserControl from './IAICanvasControls/IAICanvasImageEraserControl';
 import { canvasImageLayerRef } from './IAICanvas';
-import { uploadImage, uploadOutpaintingMergeImage } from 'app/socketio/actions';
+import { uploadImage } from 'app/socketio/actions';
 
 export const canvasControlsSelector = createSelector(
   [
