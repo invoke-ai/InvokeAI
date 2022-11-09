@@ -36,7 +36,7 @@ dependencies:
     - eventlet
     - getpass_asterisk
     - kornia==0.6.0
-    - -e git+https://github.com/openai/CLIP.git@main#egg=clip
+    - git+https://github.com/openai/CLIP.git@main#egg=clip
     - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
     - -e git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
     - -e git+https://github.com/invoke-ai/Real-ESRGAN.git#egg=realesrgan
