@@ -30,7 +30,7 @@ experience and preferences.
    This method is recommended for users with a bit of experience using
    the `git` and `pip` tools.
 
-3. [Manual Installation](MANUAL_INSTALL.md)
+3. [Manual Installation](INSTALL_MANUAL.md)
 
    In this method you will manually run the commands needed to install
    InvokeAI and its dependencies. We offer two recipes: one suited to

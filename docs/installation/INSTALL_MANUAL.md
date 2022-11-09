@@ -136,6 +136,12 @@ download installers from the following URLs
    provide an access token that allows InvokeAI to legally download
    and install the weights files.
 
+   If you have already downloaded the weights file(s) for another
+   Stable Diffusion distribution, you may skip this step (by selecting
+   "skip" when prompted) and configure InvokeAI to use the
+   previously-downloaded files. The process for this is described in
+   [INSTALLING_MODELS.md].
+
    If you get an error message about a module not being installed,
    check that the `invokeai` environment is active and if not, repeat
    step 5.
@@ -277,8 +283,10 @@ Here are some common issues and their suggested solutions.
    incompatibility. While we have tried to minimize these, over time
    packages get updated and sometimes introduce incompatibilities.
 
-   We suggest that you search [Issues](https://github.com/invoke-ai/InvokeAI/issues) or the
-   Bug Report and Support channel of the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy).
+   We suggest that you search
+   [Issues](https://github.com/invoke-ai/InvokeAI/issues) or the
+   "bugs-and-support" channel of the [InvokeAI
+   Discord](https://discord.gg/ZmtBAhwWhy).
 
    You may also try to install the broken packages manually using PIP. To do this, activate
    the `invokeai` environment, and run `pip install` with the name and version of the
