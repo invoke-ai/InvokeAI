@@ -2,15 +2,16 @@ name: invokeai
 channels:
   - pytorch
   - conda-forge
+  - defaults
 dependencies:
   - python=3.10
   - pip>=22.2.2
   - cudatoolkit
   - pytorch
   - torchvision
-  - numpy=1.19
-  - imageio=2.9.0
-  - opencv=4.6.0
+  - numpy=1.23
+  - imageio=2.21
+  - opencv=4.6
   - pillow=8.*
   - flask=2.1.*
   - flask_cors=3.0.10
@@ -25,7 +26,7 @@ dependencies:
   - einops=0.3.0
   - kornia=0.6
   - torchmetrics=0.7.0
-  - transformers=4.21.3
+  - transformers=4.23
   - torch-fidelity=0.3.0
   - tokenizers>=0.11.1,!=0.11.3,<0.13
   - pip:
