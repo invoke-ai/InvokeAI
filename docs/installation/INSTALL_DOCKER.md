@@ -1,12 +1,12 @@
 ---
-title: Docker
+Title: Docker
 ---
 
 # :fontawesome-brands-docker: Docker
 
 ## Before you begin
 
-- For end users: Install Stable Diffusion locally using the instructions for
+- For end users: Install InvokeAI locally using the instructions for
   your OS.
 - For developers: For container-related development tasks or for enabling easy
   deployment to other environments (on-premises or cloud), follow these
@@ -14,7 +14,7 @@ title: Docker
 
 ## Why containers?
 
-They provide a flexible, reliable way to build and deploy Stable Diffusion.
+They provide a flexible, reliable way to build and deploy InvokeAI.
 You'll also use a Docker volume to store the largest model files and image
 outputs as a first step in decoupling storage and compute. Future enhancements
 can do this for other assets. See [Processes](https://12factor.net/processes)
@@ -22,7 +22,7 @@ under the Twelve-Factor App methodology for details on why running applications
 in such a stateless fashion is important.
 
 You can specify the target platform when building the image and running the
-container. You'll also need to specify the Stable Diffusion requirements file
+container. You'll also need to specify the InvokeAI requirements file
 that matches the container's OS and the architecture it will run on.
 
 Developers on Apple silicon (M1/M2): You

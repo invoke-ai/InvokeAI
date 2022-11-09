@@ -221,6 +221,9 @@ models/gfpgan
 invokeai.init
 
 # ignore environment.yml and requirements.txt
-# these are to be copied from environments-and-requirements
+# these are links to the real files in environments-and-requirements
 environment.yml
 requirements.txt
+
+# this may be present if the user created a venv
+invokeai

@@ -4,7 +4,6 @@ channels:
   - conda-forge
 dependencies:
   - albumentations=0.4.3
-  - clip
   - cudatoolkit
   - einops=0.3.0
   - eventlet
@@ -38,6 +37,7 @@ dependencies:
       - realesrgan
       - taming-transformers-rom1504
       - test-tube>=0.7.5
+      - git+https://github.com/openai/CLIP.git@main#egg=clip
       - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
       - git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
       - -e .

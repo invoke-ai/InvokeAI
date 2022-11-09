@@ -10,7 +10,6 @@ dependencies:
 
   - albumentations=1.2.1
   - coloredlogs=15.0.1
-  - clip
   - diffusers=0.6.0
   - einops=0.4.1
   - grpcio=1.46.4
@@ -48,9 +47,10 @@ dependencies:
       - dependency_injector==4.40.0
       - realesrgan==0.2.5.0
       - test-tube==0.7.5
-      -  git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
-      -  git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
-      -  git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
+      - git+https://github.com/openai/CLIP.git@main#egg=clip
+      - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
+      - git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
+      - git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
       - -e .
 variables:
   PYTORCH_ENABLE_MPS_FALLBACK: 1

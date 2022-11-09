@@ -94,6 +94,7 @@ installation instructions below.
 You wil need one of the following:
 
 - :simple-nvidia: An NVIDIA-based graphics card with 4 GB or more VRAM memory.
+- :simple-amd: An AMD-based graphics card with 4 GB or more VRAM memory (Linux only)
 - :fontawesome-brands-apple: An Apple computer with an M1 chip.
 
 ### :fontawesome-solid-memory: Memory
