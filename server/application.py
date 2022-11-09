@@ -11,7 +11,7 @@ from flask_socketio import SocketIO
 from omegaconf import OmegaConf
 from dependency_injector.wiring import inject, Provide
 from ldm.invoke.args import Args
-from server import views
+from server import views, uuu
 from server.containers import Container
 from server.services import GeneratorService, SignalService
 
@@ -56,6 +56,8 @@ def run_app(config, host, port) -> Flask:
   # API Routes
   app.add_url_rule('/api/jobs', view_func=views.ApiJobs.as_view('api_jobs'))
   app.add_url_rule('/api/cancel', view_func=views.ApiCancel.as_view('api_cancel'))
+
+  app.add_url_rule('/api/text-to-image/<string:prompt>', view_func=Custom.ApiTextToImage.as_view('text-to-image'))
 
   # TODO: Get storage root from config
   app.add_url_rule('/api/images/<string:dreamId>', view_func=views.ApiImages.as_view('api_images', '../'))
