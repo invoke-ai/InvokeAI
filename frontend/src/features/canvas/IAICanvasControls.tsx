@@ -24,6 +24,8 @@ import _ from 'lodash';
 import IAICanvasImageEraserControl from './IAICanvasControls/IAICanvasImageEraserControl';
 import { canvasImageLayerRef } from './IAICanvas';
 import { uploadImage } from 'app/socketio/actions';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { FaSave } from 'react-icons/fa';
 
 export const canvasControlsSelector = createSelector(
   [
@@ -75,14 +77,15 @@ const IAICanvasControls = () => {
         <IAICanvasShowHideBoundingBoxControl />
         <IAICanvasMaskClear />
       </ButtonGroup>
-      <Button
+      <IAIIconButton
+        aria-label="Save"
+        tooltip="Save"
+        icon={<FaSave />}
         onClick={() => {
           dispatch(uploadOutpaintingMergedImage(canvasImageLayerRef));
         }}
-      >
-        save
-      </Button>
-
+        fontSize={20}
+      />
       <ButtonGroup isAttached={true}>
         <IAICanvasUndoControl />
         <IAICanvasRedoControl />
