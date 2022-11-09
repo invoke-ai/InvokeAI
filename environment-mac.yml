@@ -5,20 +5,12 @@ channels:
 dependencies:
   - python=3.9.13
   - pip=22.2.2
-
   - pytorch=1.12.1
   - torchvision=0.13.1
 
-  # I suggest to keep the other deps sorted for convenience.
-  # To determine what the latest versions should be, run:
-  #
-  # ```shell
-  # sed -E 's/invokeai/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
-  # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
-  # ```
-
   - albumentations=1.2.1
   - coloredlogs=15.0.1
+  - clip
   - diffusers=0.6.0
   - einops=0.4.1
   - grpcio=1.46.4
@@ -38,6 +30,7 @@ dependencies:
   - pytorch-lightning=1.7.7
   - scipy=1.9.3
   - streamlit=1.12.2
+  - taming-transformers-rom1504
   - sympy=1.10.1
   - tensorboard=2.10.0
   - torchmetrics=0.10.1
@@ -55,11 +48,9 @@ dependencies:
       - dependency_injector==4.40.0
       - realesrgan==0.2.5.0
       - test-tube==0.7.5
-      - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
-      - -e git+https://github.com/openai/CLIP.git@main#egg=clip
-      - -e git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
-      - -e git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
-      - -e git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
+      -  git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
+      -  git+https://github.com/TencentARC/GFPGAN.git#egg=gfpgan
+      -  git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
       - -e .
 variables:
   PYTORCH_ENABLE_MPS_FALLBACK: 1
