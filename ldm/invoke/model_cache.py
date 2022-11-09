@@ -41,15 +41,22 @@ class ModelCache(object):
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
 
+    def valid_model(self, model_name:str)->bool:
+        '''
+        Given a model name, returns True if it is a valid
+        identifier.
+        '''
+        return model_name in self.config
+    
     def get_model(self, model_name:str):
         '''
         Given a model named identified in models.yaml, return
         the model object. If in RAM will load into GPU VRAM.
         If on disk, will load from there.
         '''
-        if model_name not in self.config:
+        if not self.valid_model(model_name):
             print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
-            return None
+            return self.current_model
 
         if self.current_model != model_name:
             if model_name not in self.models: # make room for a new one
