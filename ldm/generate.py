@@ -802,6 +802,10 @@ class Generate:
 
         # the model cache does the loading and offloading
         cache = self.model_cache
+        if not cache.valid_model(model_name):
+            print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
+            return self.model
+        
         cache.print_vram_usage()
 
         # have to get rid of all references to model in order
