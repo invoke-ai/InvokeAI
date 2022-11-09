@@ -106,19 +106,12 @@ const IAICanvasBoundingBoxPreview = (
         );
         return;
       }
-      const { x: oldX, y: oldY } = boundingBoxCoordinates;
 
-      const transformerX = e.target.x();
-      const transformerY = e.target.y();
+      const dragX = e.target.x();
+      const dragY = e.target.y();
 
-      const newX = roundToMultiple(
-        Math.floor(transformerX / 64) < 10 ? transformerX : oldX,
-        64
-      );
-      const newY = roundToMultiple(
-        Math.floor(transformerY / 64) < 10 ? transformerY : oldY,
-        64
-      );
+      const newX = roundToMultiple(dragX, 64);
+      const newY = roundToMultiple(dragY, 64);
 
       e.target.x(newX);
       e.target.y(newY);
@@ -130,7 +123,7 @@ const IAICanvasBoundingBoxPreview = (
         })
       );
     },
-    [activeTabName, boundingBoxCoordinates, dispatch]
+    [activeTabName, dispatch]
   );
 
   const dragBoundFunc = useCallback(

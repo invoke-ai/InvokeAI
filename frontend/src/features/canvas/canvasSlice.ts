@@ -1,4 +1,9 @@
-import { createSelector, createSlice } from '@reduxjs/toolkit';
+import {
+  createAsyncThunk,
+  createSelector,
+  createSlice,
+} from '@reduxjs/toolkit';
+import { v4 as uuidv4 } from 'uuid';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
@@ -7,6 +12,8 @@ import _ from 'lodash';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { RootState } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { MutableRefObject } from 'react';
+import Konva from 'konva';
 
 export interface GenericCanvasState {
   tool: InpaintingTool;
@@ -519,6 +526,20 @@ export const canvasSlice = createSlice({
       state.outpainting.objects = newObjects;
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase(uploadOutpaintingMergedImage.fulfilled, (state, action) => {
+      if (!action.payload) return;
+      state.outpainting.pastObjects.push([...state.outpainting.objects]);
+      state.outpainting.futureObjects = [];
+
+      state.outpainting.objects = [
+        {
+          type: 'image',
+          ...action.payload,
+        },
+      ];
+    });
+  },
 });
 
 export const {
@@ -566,6 +587,66 @@ export const {
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
+
+export const uploadOutpaintingMergedImage = createAsyncThunk(
+  'canvas/uploadOutpaintingMergedImage',
+  async (
+    canvasImageLayerRef: MutableRefObject<Konva.Layer | null>,
+    thunkAPI
+  ) => {
+    const { getState } = thunkAPI;
+
+    const state = getState() as RootState;
+    const stageScale = state.canvas.outpainting.stageScale;
+
+    if (!canvasImageLayerRef.current) return;
+    const tempScale = canvasImageLayerRef.current.scale();
+
+    const { x: relativeX, y: relativeY } =
+      canvasImageLayerRef.current.getClientRect({
+        relativeTo: canvasImageLayerRef.current.getParent(),
+      });
+
+    canvasImageLayerRef.current.scale({
+      x: 1 / stageScale,
+      y: 1 / stageScale,
+    });
+
+    const clientRect = canvasImageLayerRef.current.getClientRect();
+
+    const imageDataURL = canvasImageLayerRef.current.toDataURL(clientRect);
+
+    canvasImageLayerRef.current.scale(tempScale);
+
+    if (!imageDataURL) return;
+
+    const response = await fetch(window.location.origin + '/upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        dataURL: imageDataURL,
+        name: 'outpaintingmerge.png',
+      }),
+    });
+
+    const data = (await response.json()) as InvokeAI.ImageUploadResponse;
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { destination, ...rest } = data;
+    const image = {
+      uuid: uuidv4(),
+      ...rest,
+    };
+
+    return {
+      image,
+      x: relativeX,
+      y: relativeY,
+    };
+  }
+);
 
 export const currentCanvasSelector = (state: RootState) =>
   state.canvas[state.canvas.currentCanvas];

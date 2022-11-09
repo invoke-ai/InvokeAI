@@ -2,7 +2,7 @@ import IAICanvasBrushControl from './IAICanvasControls/IAICanvasBrushControl';
 import IAICanvasEraserControl from './IAICanvasControls/IAICanvasEraserControl';
 import IAICanvasUndoControl from './IAICanvasControls/IAICanvasUndoControl';
 import IAICanvasRedoControl from './IAICanvasControls/IAICanvasRedoControl';
-import { ButtonGroup } from '@chakra-ui/react';
+import { Button, ButtonGroup } from '@chakra-ui/react';
 import IAICanvasMaskClear from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskClear';
 import IAICanvasMaskVisibilityControl from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskVisibilityControl';
 import IAICanvasMaskInvertControl from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskInvertControl';
@@ -10,22 +10,39 @@ import IAICanvasLockBoundingBoxControl from './IAICanvasControls/IAICanvasLockBo
 import IAICanvasShowHideBoundingBoxControl from './IAICanvasControls/IAICanvasShowHideBoundingBoxControl';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
 import { createSelector } from '@reduxjs/toolkit';
-import { currentCanvasSelector, GenericCanvasState } from './canvasSlice';
-import { RootState, useAppSelector } from 'app/store';
+import {
+  currentCanvasSelector,
+  GenericCanvasState,
+  outpaintingCanvasSelector,
+  OutpaintingCanvasState,
+  uploadOutpaintingMergedImage,
+} from './canvasSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import _ from 'lodash';
 import IAICanvasImageEraserControl from './IAICanvasControls/IAICanvasImageEraserControl';
+import { canvasImageLayerRef } from './IAICanvas';
+import { uploadImage, uploadOutpaintingMergeImage } from 'app/socketio/actions';
 
 export const canvasControlsSelector = createSelector(
   [
-    currentCanvasSelector,
+    outpaintingCanvasSelector,
     (state: RootState) => state.options,
     activeTabNameSelector,
   ],
-  (currentCanvas: GenericCanvasState, options: OptionsState, activeTabName) => {
+  (
+    outpaintingCanvas: OutpaintingCanvasState,
+    options: OptionsState,
+    activeTabName
+  ) => {
+    const { stageScale, boundingBoxCoordinates, boundingBoxDimensions } =
+      outpaintingCanvas;
     return {
       activeTabName,
+      stageScale,
+      boundingBoxCoordinates,
+      boundingBoxDimensions,
     };
   },
   {
@@ -36,7 +53,13 @@ export const canvasControlsSelector = createSelector(
 );
 
 const IAICanvasControls = () => {
-  const { activeTabName } = useAppSelector(canvasControlsSelector);
+  const dispatch = useAppDispatch();
+  const {
+    activeTabName,
+    boundingBoxCoordinates,
+    boundingBoxDimensions,
+    stageScale,
+  } = useAppSelector(canvasControlsSelector);
 
   return (
     <div className="inpainting-settings">
@@ -52,6 +75,13 @@ const IAICanvasControls = () => {
         <IAICanvasShowHideBoundingBoxControl />
         <IAICanvasMaskClear />
       </ButtonGroup>
+      <Button
+        onClick={() => {
+          dispatch(uploadOutpaintingMergedImage(canvasImageLayerRef));
+        }}
+      >
+        save
+      </Button>
 
       <ButtonGroup isAttached={true}>
         <IAICanvasUndoControl />

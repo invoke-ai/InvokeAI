@@ -35,6 +35,7 @@ import useCanvasMouseEnter from './hooks/useCanvasMouseEnter';
 import useCanvasMouseOut from './hooks/useCanvasMouseOut';
 import useCanvasDragMove from './hooks/useCanvasDragMove';
 import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingObjects';
+import IAICanvasGrid from './IAICanvasGrid';
 
 const canvasSelector = createSelector(
   [currentCanvasSelector, baseCanvasImageSelector, activeTabNameSelector],
@@ -200,6 +201,10 @@ const IAICanvas = () => {
           onWheel={handleWheel}
           draggable={isMoveStageKeyHeld && activeTabName === 'outpainting'}
         >
+          <Layer>
+            <IAICanvasGrid />
+          </Layer>
+
           <Layer
             id={'image-layer'}
             ref={canvasImageLayerRef}
@@ -207,9 +212,6 @@ const IAICanvas = () => {
             visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
             imageSmoothingEnabled={false}
           >
-            {canvasBgImage && (
-              <KonvaImage listening={false} image={canvasBgImage} />
-            )}
             <IAICanvasOutpaintingObjects />
           </Layer>
           <Layer id={'mask-layer'} visible={shouldShowMask} listening={false}>

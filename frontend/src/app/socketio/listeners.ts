@@ -312,15 +312,15 @@ const makeSocketIOListeners = (
 
       // remove references to image in options
       const { initialImage, maskPath } = getState().options;
-      const { imageToInpaint } = getState().inpainting;
+      const { inpainting, outpainting } = getState().canvas;
 
       if (initialImage?.url === url || initialImage === url) {
         dispatch(clearInitialImage());
       }
 
-      if (imageToInpaint?.url === url) {
-        dispatch(clearImageToInpaint());
-      }
+      // if (imageToInpaint?.url === url) {
+      //   dispatch(clearImageToInpaint());
+      // }
 
       if (maskPath === url) {
         dispatch(setMaskPath(''));

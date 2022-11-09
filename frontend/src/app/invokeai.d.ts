@@ -179,7 +179,7 @@ export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
 };
 
 export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
-  destination: 'img2img' | 'inpainting';
+  destination: 'img2img' | 'inpainting' | 'outpainting' | 'outpainting_merge';
 };
 
 export declare type ErrorResponse = {
@@ -203,9 +203,17 @@ export declare type ImageUrlResponse = {
   url: string;
 };
 
-export declare type ImageUploadDestination = 'img2img' | 'inpainting';
+export declare type ImageUploadDestination =
+  | 'img2img'
+  | 'inpainting'
+  | 'outpainting_merge';
 
 export declare type UploadImagePayload = {
   file: File;
   destination?: ImageUploadDestination;
+};
+
+export declare type UploadOutpaintingMergeImagePayload = {
+  dataURL: string;
+  name: string;
 };

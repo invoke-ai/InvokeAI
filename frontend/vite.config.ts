@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/outputs/, ''),
         },
+        '/upload': {
+          target: 'http://127.0.0.1:9090/upload',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/upload/, ''),
+        },
         '/flaskwebgui-keep-server-alive': {
           target: 'http://127.0.0.1:9090/flaskwebgui-keep-server-alive',
           changeOrigin: true,

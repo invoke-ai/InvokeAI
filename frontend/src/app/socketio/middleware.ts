@@ -104,12 +104,9 @@ export const socketioMiddleware = () => {
         onImageDeleted(data);
       });
 
-      socketio.on(
-        'imageUploaded',
-        (data: InvokeAI.ImageUploadResponse) => {
-          onImageUploaded(data);
-        }
-      );
+      socketio.on('imageUploaded', (data: InvokeAI.ImageUploadResponse) => {
+        onImageUploaded(data);
+      });
 
       socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
         onMaskImageUploaded(data);

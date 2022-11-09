@@ -7,8 +7,10 @@ import traceback
 import math
 import io
 import base64
+import os
 
-from flask import Flask, redirect, send_from_directory
+from werkzeug.utils import secure_filename
+from flask import Flask, redirect, send_from_directory, flash, request, url_for, jsonify
 from flask_socketio import SocketIO
 from PIL import Image
 from PIL.Image import Image as ImageType
@@ -91,6 +93,43 @@ class InvokeAIWebServer:
                 return redirect("http://127.0.0.1:5173")
             else:
                 return send_from_directory(self.app.static_folder, "index.html")
+
+        @self.app.route("/upload", methods=["POST"])
+        def upload_base64_file():
+            try:
+                data = request.get_json()
+                dataURL = data["dataURL"]
+                name = data["name"]
+
+                print(f'>> Image upload requested "{name}"')
+
+                if dataURL is not None:
+                    bytes = dataURL_to_bytes(dataURL)
+
+                    file_path = self.save_file_unique_uuid_name(
+                        bytes=bytes, name=name, path=self.result_path
+                    )
+
+                    mtime = os.path.getmtime(file_path)
+                    (width, height) = Image.open(file_path).size
+
+                    response = {
+                        "url": self.get_url_from_image_path(file_path),
+                        "mtime": mtime,
+                        "width": width,
+                        "height": height,
+                        "category": "result",
+                        "destination": "outpainting_merge",
+                    }
+                    return response
+                else:
+                    return "No dataURL provided"
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
 
         self.load_socketio_listeners(self.socketio)
 
@@ -505,17 +544,18 @@ class InvokeAIWebServer:
                 print("\n")
 
         # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadMaskImage")
-        def handle_upload_mask_image(bytes, name):
+        @socketio.on("uploadOutpaintingMergeImage")
+        def handle_upload_outpainting_merge_image(dataURL, name):
             try:
-                print(f'>> Mask image upload requested "{name}"')
+                print(f'>> Outpainting merge image upload requested "{name}"')
 
-                file_path = self.save_file_unique_uuid_name(
-                    bytes=bytes, name=name, path=self.mask_image_path
-                )
+                image = dataURL_to_image(dataURL)
+                file_name = self.make_unique_init_image_filename(name)
+                file_path = os.path.join(self.result_path, file_name)
+                image.save(file_path)
 
                 socketio.emit(
-                    "maskImageUploaded",
+                    "outpaintingMergeImageUploaded",
                     {
                         "url": self.get_url_from_image_path(file_path),
                     },
@@ -1376,6 +1416,21 @@ def dataURL_to_image(dataURL: str) -> ImageType:
         )
     )
     return image
+
+
+"""
+Converts a base64 image dataURL into bytes.
+The dataURL is split on the first commma.
+"""
+
+
+def dataURL_to_bytes(dataURL: str) -> bytes:
+    return base64.decodebytes(
+        bytes(
+            dataURL.split(",", 1)[1],
+            "utf-8",
+        )
+    )
 
 
 """
