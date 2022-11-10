@@ -309,6 +309,18 @@ class ModelCache(object):
 
         return pipeline, width, height, model_hash
 
+    def model_name_or_path(self, model_name:str) -> str | Path:
+        if model_name not in self.config:
+            raise ValueError(f'"{model_name}" is not a known model name. Please check your models.yaml file')
+
+        mconfig = self.config[model_name]
+        if 'repo_name' in mconfig:
+            return mconfig['repo_name']
+        elif 'path' in mconfig:
+            return Path(mconfig['path'])
+        else:
+            raise ValueError("Model config must specify either repo_name or path.")
+
     def offload_model(self, model_name:str):
         '''
         Offload the indicated model to CPU. Will call
