@@ -6,7 +6,6 @@ import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import {
-  areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
   setMaskColor,
@@ -18,15 +17,14 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const maskColorPickerSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { shouldShowMask, maskColor } = currentCanvas;
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas: GenericCanvasState, activeTabName) => {
+    const { isMaskEnabled, maskColor } = currentCanvas;
 
     return {
-      shouldShowMask,
+      isMaskEnabled,
       maskColor,
       activeTabName,
-      areHotkeysEnabled,
     };
   },
   {
@@ -37,8 +35,9 @@ const maskColorPickerSelector = createSelector(
 );
 
 export default function IAICanvasMaskColorPicker() {
-  const { shouldShowMask, maskColor, activeTabName, areHotkeysEnabled } =
-    useAppSelector(maskColorPickerSelector);
+  const { isMaskEnabled, maskColor, activeTabName } = useAppSelector(
+    maskColorPickerSelector
+  );
   const dispatch = useAppDispatch();
   const handleChangeMaskColor = (newColor: RgbaColor) => {
     dispatch(setMaskColor(newColor));
@@ -56,9 +55,9 @@ export default function IAICanvasMaskColorPicker() {
       });
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
-    [activeTabName, shouldShowMask, maskColor.a]
+    [activeTabName, isMaskEnabled, maskColor.a]
   );
 
   // Increase mask opacity
@@ -72,9 +71,9 @@ export default function IAICanvasMaskColorPicker() {
       });
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
-    [activeTabName, shouldShowMask, maskColor.a]
+    [activeTabName, isMaskEnabled, maskColor.a]
   );
 
   return (
@@ -85,7 +84,7 @@ export default function IAICanvasMaskColorPicker() {
         <IAIIconButton
           aria-label="Mask Color"
           icon={<FaPalette />}
-          isDisabled={!shouldShowMask}
+          isDisabled={!isMaskEnabled}
           cursor={'pointer'}
         />
       }

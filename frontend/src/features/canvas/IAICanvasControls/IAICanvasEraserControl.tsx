@@ -3,25 +3,20 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEraser } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  areHotkeysEnabledSelector,
-  currentCanvasSelector,
-  setTool,
-} from 'features/canvas/canvasSlice';
+import { currentCanvasSelector, setTool } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const eraserSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas, activeTabName, areHotkeysEnabled) => {
-    const { tool, shouldShowMask } = currentCanvas;
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas, activeTabName) => {
+    const { tool, isMaskEnabled } = currentCanvas;
 
     return {
       tool,
-      shouldShowMask,
+      isMaskEnabled,
       activeTabName,
-      areHotkeysEnabled,
     };
   },
   {
@@ -32,8 +27,7 @@ const eraserSelector = createSelector(
 );
 
 export default function IAICanvasEraserControl() {
-  const { tool, shouldShowMask, activeTabName, areHotkeysEnabled } =
-    useAppSelector(eraserSelector);
+  const { tool, isMaskEnabled, activeTabName } = useAppSelector(eraserSelector);
   const dispatch = useAppDispatch();
 
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
@@ -47,9 +41,9 @@ export default function IAICanvasEraserControl() {
       handleSelectEraserTool();
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
-    [activeTabName, shouldShowMask]
+    [activeTabName]
   );
 
   return (
@@ -61,7 +55,7 @@ export default function IAICanvasEraserControl() {
       icon={<FaEraser />}
       onClick={handleSelectEraserTool}
       data-selected={tool === 'eraser'}
-      isDisabled={!shouldShowMask}
+      isDisabled={!isMaskEnabled}
     />
   );
 }

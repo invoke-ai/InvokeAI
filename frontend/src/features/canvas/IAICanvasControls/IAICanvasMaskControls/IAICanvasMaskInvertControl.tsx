@@ -3,7 +3,6 @@ import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
-  areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
   setShouldInvertMask,
@@ -14,15 +13,14 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const canvasMaskInvertSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { shouldShowMask, shouldInvertMask } = currentCanvas;
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas: GenericCanvasState, activeTabName) => {
+    const { isMaskEnabled, shouldInvertMask } = currentCanvas;
 
     return {
       shouldInvertMask,
-      shouldShowMask,
+      isMaskEnabled,
       activeTabName,
-      areHotkeysEnabled,
     };
   },
   {
@@ -33,8 +31,9 @@ const canvasMaskInvertSelector = createSelector(
 );
 
 export default function IAICanvasMaskInvertControl() {
-  const { shouldInvertMask, shouldShowMask, activeTabName, areHotkeysEnabled } =
-    useAppSelector(canvasMaskInvertSelector);
+  const { shouldInvertMask, isMaskEnabled, activeTabName } = useAppSelector(
+    canvasMaskInvertSelector
+  );
   const dispatch = useAppDispatch();
 
   const handleToggleShouldInvertMask = () =>
@@ -48,9 +47,9 @@ export default function IAICanvasMaskInvertControl() {
       handleToggleShouldInvertMask();
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
-    [activeTabName, shouldInvertMask, shouldShowMask]
+    [activeTabName, shouldInvertMask, isMaskEnabled]
   );
 
   return (
@@ -66,7 +65,7 @@ export default function IAICanvasMaskInvertControl() {
         )
       }
       onClick={handleToggleShouldInvertMask}
-      isDisabled={!shouldShowMask}
+      isDisabled={!isMaskEnabled}
     />
   );
 }

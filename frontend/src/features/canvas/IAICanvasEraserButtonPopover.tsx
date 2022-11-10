@@ -7,6 +7,7 @@ import { FaEraser } from 'react-icons/fa';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 export const selector = createSelector(
   [currentCanvasSelector],
@@ -27,6 +28,20 @@ export const selector = createSelector(
 const IAICanvasEraserButtonPopover = () => {
   const dispatch = useAppDispatch();
   const { tool, eraserSize } = useAppSelector(selector);
+
+  const handleSelectEraserTool = () => dispatch(setTool('eraser'));
+
+  useHotkeys(
+    'e',
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      handleSelectEraserTool();
+    },
+    {
+      enabled: true,
+    },
+    [tool]
+  );
 
   return (
     <IAIPopover

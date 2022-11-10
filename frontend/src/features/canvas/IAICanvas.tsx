@@ -17,7 +17,7 @@ import {
 
 // component
 import IAICanvasMaskLines from './IAICanvasMaskLines';
-import IAICanvasMaskBrushPreview from './IAICanvasBrushPreview';
+import IAICanvasBrushPreview from './IAICanvasBrushPreview';
 import IAICanvasMaskBrushPreviewOutline from './IAICanvasBrushPreviewOutline';
 import { Vector2d } from 'konva/lib/types';
 import IAICanvasBoundingBoxPreview from './IAICanvasBoundingBoxPreview';
@@ -51,7 +51,7 @@ const canvasSelector = createSelector(
   (currentCanvas, outpaintingCanvas, baseCanvasImage, activeTabName) => {
     const {
       shouldInvertMask,
-      shouldShowMask,
+      isMaskEnabled,
       shouldShowCheckboardTransparency,
       stageScale,
       shouldShowBoundingBox,
@@ -90,7 +90,7 @@ const canvasSelector = createSelector(
 
     return {
       shouldInvertMask,
-      shouldShowMask,
+      isMaskEnabled,
       shouldShowCheckboardTransparency,
       stageScale,
       shouldShowBoundingBox,
@@ -127,7 +127,7 @@ const IAICanvas = () => {
 
   const {
     shouldInvertMask,
-    shouldShowMask,
+    isMaskEnabled,
     shouldShowCheckboardTransparency,
     stageScale,
     shouldShowBoundingBox,
@@ -238,13 +238,12 @@ const IAICanvas = () => {
             id={'image-layer'}
             ref={canvasImageLayerRef}
             listening={false}
-            visible={!shouldInvertMask && !shouldShowCheckboardTransparency}
             imageSmoothingEnabled={false}
           >
             <IAICanvasOutpaintingObjects />
             <IAICanvasIntermediateImage />
           </Layer>
-          <Layer id={'mask-layer'} visible={shouldShowMask} listening={false}>
+          <Layer id={'mask-layer'} visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
 
             <IAICanvasMaskCompositer listening={false} />
@@ -269,13 +268,9 @@ const IAICanvas = () => {
               </>
             )}
           </Layer>
-          <Layer
-            id={'preview-layer'}
-            visible={shouldShowMask}
-            imageSmoothingEnabled={false}
-          >
+          <Layer id={'preview-layer'}>
             <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
-            <IAICanvasMaskBrushPreview
+            <IAICanvasBrushPreview
               visible={tool !== 'move'}
               listening={false}
             />

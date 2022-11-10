@@ -7,7 +7,7 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
   currentCanvasSelector,
   GenericCanvasState,
-  setShouldShowMask,
+  setIsMaskEnabled,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
@@ -15,9 +15,9 @@ import _ from 'lodash';
 const canvasMaskVisibilitySelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector],
   (currentCanvas: GenericCanvasState, activeTabName) => {
-    const { shouldShowMask } = currentCanvas;
+    const { isMaskEnabled } = currentCanvas;
 
-    return { shouldShowMask, activeTabName };
+    return { isMaskEnabled, activeTabName };
   },
   {
     memoizeOptions: {
@@ -29,12 +29,12 @@ const canvasMaskVisibilitySelector = createSelector(
 export default function IAICanvasMaskVisibilityControl() {
   const dispatch = useAppDispatch();
 
-  const { shouldShowMask, activeTabName } = useAppSelector(
+  const { isMaskEnabled, activeTabName } = useAppSelector(
     canvasMaskVisibilitySelector
   );
 
   const handleToggleShouldShowMask = () =>
-    dispatch(setShouldShowMask(!shouldShowMask));
+    dispatch(setIsMaskEnabled(!isMaskEnabled));
   // Hotkeys
   // Show/hide mask
   useHotkeys(
@@ -46,14 +46,14 @@ export default function IAICanvasMaskVisibilityControl() {
     {
       enabled: activeTabName === 'inpainting' || activeTabName == 'outpainting',
     },
-    [activeTabName, shouldShowMask]
+    [activeTabName, isMaskEnabled]
   );
   return (
     <IAIIconButton
       aria-label="Hide Mask (H)"
       tooltip="Hide Mask (H)"
-      data-alert={!shouldShowMask}
-      icon={shouldShowMask ? <BiShow size={22} /> : <BiHide size={22} />}
+      data-alert={!isMaskEnabled}
+      icon={isMaskEnabled ? <BiShow size={22} /> : <BiHide size={22} />}
       onClick={handleToggleShouldShowMask}
     />
   );

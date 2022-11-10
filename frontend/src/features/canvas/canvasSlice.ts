@@ -29,7 +29,7 @@ export interface GenericCanvasState {
   boundingBoxPreviewFill: RgbaColor;
   shouldShowBoundingBox: boolean;
   shouldDarkenOutsideBoundingBox: boolean;
-  shouldShowMask: boolean;
+  isMaskEnabled: boolean;
   shouldInvertMask: boolean;
   shouldShowCheckboardTransparency: boolean;
   shouldShowBrush: boolean;
@@ -147,7 +147,7 @@ const initialGenericCanvasState: GenericCanvasState = {
   shouldShowBoundingBox: true,
   shouldDarkenOutsideBoundingBox: false,
   cursorPosition: null,
-  shouldShowMask: true,
+  isMaskEnabled: true,
   shouldInvertMask: false,
   shouldShowCheckboardTransparency: false,
   shouldShowBrush: true,
@@ -197,7 +197,14 @@ export const canvasSlice = createSlice({
   initialState: initialCanvasState,
   reducers: {
     setTool: (state, action: PayloadAction<CanvasTool>) => {
+      const tool = action.payload;
       state[state.currentCanvas].tool = action.payload;
+      if (tool !== 'move') {
+        state[state.currentCanvas].isTransformingBoundingBox = false;
+        state[state.currentCanvas].isMouseOverBoundingBox = false;
+        state[state.currentCanvas].isMovingBoundingBox = false;
+        state[state.currentCanvas].isMovingStage = false;
+      }
     },
     setLayer: (state, action: PayloadAction<CanvasLayer>) => {
       state[state.currentCanvas].layer = action.payload;
@@ -236,17 +243,15 @@ export const canvasSlice = createSlice({
         !state[state.currentCanvas].shouldInvertMask;
     },
     toggleShouldShowMask: (state) => {
-      state[state.currentCanvas].shouldShowMask =
-        !state[state.currentCanvas].shouldShowMask;
+      state[state.currentCanvas].isMaskEnabled =
+        !state[state.currentCanvas].isMaskEnabled;
     },
     setShouldInvertMask: (state, action: PayloadAction<boolean>) => {
       state[state.currentCanvas].shouldInvertMask = action.payload;
     },
-    setShouldShowMask: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldShowMask = action.payload;
-      if (!action.payload) {
-        state[state.currentCanvas].shouldInvertMask = false;
-      }
+    setIsMaskEnabled: (state, action: PayloadAction<boolean>) => {
+      state[state.currentCanvas].isMaskEnabled = action.payload;
+      state[state.currentCanvas].layer = action.payload ? 'mask' : 'base';
     },
     setShouldShowCheckboardTransparency: (
       state,
@@ -626,7 +631,7 @@ export const {
   addLine,
   addPointToCurrentLine,
   setShouldInvertMask,
-  setShouldShowMask,
+  setIsMaskEnabled,
   setShouldShowCheckboardTransparency,
   setShouldShowBrushPreview,
   setMaskColor,
@@ -742,16 +747,16 @@ export const inpaintingCanvasSelector = (
   state: RootState
 ): InpaintingCanvasState => state.canvas.inpainting;
 
-export const areHotkeysEnabledSelector = createSelector(
-  currentCanvasSelector,
-  activeTabNameSelector,
-  (currentCanvas: GenericCanvasState, activeTabName): boolean => {
-    return (
-      currentCanvas.shouldShowMask &&
-      ['inpainting', 'outpainting'].includes(activeTabName)
-    );
-  }
-);
+// export const areHotkeysEnabledSelector = createSelector(
+//   currentCanvasSelector,
+//   activeTabNameSelector,
+//   (currentCanvas: GenericCanvasState, activeTabName): boolean => {
+//     return (
+//       currentCanvas.isMaskEnabled &&
+//       ['inpainting', 'outpainting'].includes(activeTabName)
+//     );
+//   }
+// );
 
 export const baseCanvasImageSelector = createSelector(
   [(state: RootState) => state.canvas, activeTabNameSelector],

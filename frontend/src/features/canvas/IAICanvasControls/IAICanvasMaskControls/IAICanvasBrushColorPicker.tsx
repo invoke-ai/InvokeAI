@@ -1,12 +1,7 @@
-import React from 'react';
 import { RgbaColor } from 'react-colorful';
-import { FaPalette } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
 import {
-  areHotkeysEnabledSelector,
   currentCanvasSelector,
   GenericCanvasState,
   setMaskColor,
@@ -18,14 +13,13 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const selector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas: GenericCanvasState, activeTabName) => {
     const { brushColor } = currentCanvas;
 
     return {
       brushColor,
       activeTabName,
-      areHotkeysEnabled,
     };
   },
   {
@@ -37,8 +31,7 @@ const selector = createSelector(
 
 export default function IAICanvasBrushColorPicker() {
   const dispatch = useAppDispatch();
-  const { brushColor, activeTabName, areHotkeysEnabled } =
-    useAppSelector(selector);
+  const { brushColor, activeTabName } = useAppSelector(selector);
 
   const handleChangeBrushColor = (newColor: RgbaColor) => {
     dispatch(setMaskColor(newColor));
@@ -55,7 +48,7 @@ export default function IAICanvasBrushColorPicker() {
       });
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
     [activeTabName, brushColor.a]
   );
@@ -71,7 +64,7 @@ export default function IAICanvasBrushColorPicker() {
       });
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
     [activeTabName, brushColor.a]
   );

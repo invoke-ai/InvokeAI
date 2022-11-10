@@ -4,7 +4,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import {
-  areHotkeysEnabledSelector,
   CanvasTool,
   setShouldShowBoundingBox,
   setTool,
@@ -19,16 +18,10 @@ const inpaintingCanvasHotkeysSelector = createSelector(
     (state: RootState) => state.options,
     currentCanvasSelector,
     activeTabNameSelector,
-    areHotkeysEnabledSelector,
   ],
-  (
-    options: OptionsState,
-    currentCanvas: GenericCanvasState,
-    activeTabName,
-    areHotkeysEnabled
-  ) => {
+  (options: OptionsState, currentCanvas: GenericCanvasState, activeTabName) => {
     const {
-      shouldShowMask,
+      isMaskEnabled,
       cursorPosition,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
@@ -37,11 +30,10 @@ const inpaintingCanvasHotkeysSelector = createSelector(
 
     return {
       activeTabName,
-      shouldShowMask,
+      isMaskEnabled,
       isCursorOnCanvas: Boolean(cursorPosition),
       shouldLockBoundingBox,
       shouldShowBoundingBox,
-      areHotkeysEnabled,
       tool,
     };
   },
@@ -54,13 +46,8 @@ const inpaintingCanvasHotkeysSelector = createSelector(
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const {
-    shouldShowMask,
-    activeTabName,
-    shouldShowBoundingBox,
-    areHotkeysEnabled,
-    tool,
-  } = useAppSelector(inpaintingCanvasHotkeysSelector);
+  const { isMaskEnabled, activeTabName, shouldShowBoundingBox, tool } =
+    useAppSelector(inpaintingCanvasHotkeysSelector);
 
   const previousToolRef = useRef<CanvasTool | null>(null);
   //  Toggle lock bounding box
@@ -71,9 +58,9 @@ const useInpaintingCanvasHotkeys = () => {
       dispatch(toggleShouldLockBoundingBox());
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
-    [activeTabName, shouldShowMask]
+    [activeTabName]
   );
 
   useHotkeys(
@@ -83,7 +70,7 @@ const useInpaintingCanvasHotkeys = () => {
       dispatch(setShouldShowBoundingBox(!shouldShowBoundingBox));
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
     [activeTabName, shouldShowBoundingBox]
   );

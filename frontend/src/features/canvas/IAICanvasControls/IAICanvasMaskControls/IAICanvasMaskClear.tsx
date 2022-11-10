@@ -4,7 +4,6 @@ import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
-  areHotkeysEnabledSelector,
   clearMask,
   currentCanvasSelector,
   InpaintingCanvasState,
@@ -17,17 +16,16 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useToast } from '@chakra-ui/react';
 
 const canvasMaskClearSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas, activeTabName, areHotkeysEnabled) => {
-    const { shouldShowMask, objects } = currentCanvas as
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas, activeTabName) => {
+    const { isMaskEnabled, objects } = currentCanvas as
       | InpaintingCanvasState
       | OutpaintingCanvasState;
 
     return {
-      shouldShowMask,
+      isMaskEnabled,
       activeTabName,
       isMaskEmpty: objects.filter(isCanvasMaskLine).length === 0,
-      areHotkeysEnabled,
     };
   },
   {
@@ -38,8 +36,9 @@ const canvasMaskClearSelector = createSelector(
 );
 
 export default function IAICanvasMaskClear() {
-  const { shouldShowMask, activeTabName, isMaskEmpty, areHotkeysEnabled } =
-    useAppSelector(canvasMaskClearSelector);
+  const { isMaskEnabled, activeTabName, isMaskEmpty } = useAppSelector(
+    canvasMaskClearSelector
+  );
 
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -62,9 +61,9 @@ export default function IAICanvasMaskClear() {
       });
     },
     {
-      enabled: areHotkeysEnabled && !isMaskEmpty,
+      enabled: !isMaskEmpty,
     },
-    [activeTabName, isMaskEmpty, shouldShowMask]
+    [activeTabName, isMaskEmpty, isMaskEnabled]
   );
   return (
     <IAIIconButton
@@ -72,7 +71,7 @@ export default function IAICanvasMaskClear() {
       tooltip="Clear Mask (Shift+C)"
       icon={<FaPlus size={20} style={{ transform: 'rotate(45deg)' }} />}
       onClick={handleClearMask}
-      isDisabled={isMaskEmpty || !shouldShowMask}
+      isDisabled={isMaskEmpty || !isMaskEnabled}
     />
   );
 }

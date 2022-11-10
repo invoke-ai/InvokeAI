@@ -1,4 +1,10 @@
-import { useCallback, ReactNode, useState, useEffect } from 'react';
+import {
+  useCallback,
+  ReactNode,
+  useState,
+  useEffect,
+  KeyboardEvent,
+} from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useToast } from '@chakra-ui/react';
@@ -137,7 +143,13 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   return (
     <ImageUploaderTriggerContext.Provider value={open}>
-      <div {...getRootProps({ style: {} })}>
+      <div
+        {...getRootProps({ style: {} })}
+        onKeyDown={(e: KeyboardEvent) => {
+          // Bail out if user hits spacebar - do not open the uploader
+          if (e.key === ' ') return;
+        }}
+      >
         <input {...getInputProps()} />
         {children}
         {isDragActive && isHandlingUpload && (

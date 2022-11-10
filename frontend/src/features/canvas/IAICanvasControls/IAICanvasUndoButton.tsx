@@ -3,24 +3,19 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { FaUndo } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  areHotkeysEnabledSelector,
-  currentCanvasSelector,
-  undo,
-} from 'features/canvas/canvasSlice';
+import { currentCanvasSelector, undo } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const canvasUndoSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (canvas, activeTabName, areHotkeysEnabled) => {
+  [currentCanvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
     const { pastObjects } = canvas;
 
     return {
       canUndo: pastObjects.length > 0,
       activeTabName,
-      areHotkeysEnabled,
     };
   },
   {
@@ -33,8 +28,7 @@ const canvasUndoSelector = createSelector(
 export default function IAICanvasUndoButton() {
   const dispatch = useAppDispatch();
 
-  const { canUndo, activeTabName, areHotkeysEnabled } =
-    useAppSelector(canvasUndoSelector);
+  const { canUndo, activeTabName } = useAppSelector(canvasUndoSelector);
 
   const handleUndo = () => {
     dispatch(undo());
@@ -47,7 +41,7 @@ export default function IAICanvasUndoButton() {
       handleUndo();
     },
     {
-      enabled: areHotkeysEnabled && canUndo,
+      enabled: canUndo,
     },
     [activeTabName, canUndo]
   );

@@ -4,23 +4,18 @@ import { FaRedo } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import {
-  areHotkeysEnabledSelector,
-  currentCanvasSelector,
-  redo,
-} from 'features/canvas/canvasSlice';
+import { currentCanvasSelector, redo } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 
 const canvasRedoSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas, activeTabName, areHotkeysEnabled) => {
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas, activeTabName) => {
     const { futureObjects } = currentCanvas;
 
     return {
       canRedo: futureObjects.length > 0,
       activeTabName,
-      areHotkeysEnabled,
     };
   },
   {
@@ -32,8 +27,7 @@ const canvasRedoSelector = createSelector(
 
 export default function IAICanvasRedoButton() {
   const dispatch = useAppDispatch();
-  const { canRedo, activeTabName, areHotkeysEnabled } =
-    useAppSelector(canvasRedoSelector);
+  const { canRedo, activeTabName } = useAppSelector(canvasRedoSelector);
 
   const handleRedo = () => {
     dispatch(redo());
@@ -46,7 +40,7 @@ export default function IAICanvasRedoButton() {
       handleRedo();
     },
     {
-      enabled: areHotkeysEnabled && canRedo,
+      enabled: canRedo,
     },
     [activeTabName, canRedo]
   );

@@ -9,7 +9,6 @@ import IAISlider from 'common/components/IAISlider';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 import {
-  areHotkeysEnabledSelector,
   currentCanvasSelector,
   setBrushSize,
   setShouldShowBrushPreview,
@@ -20,16 +19,14 @@ import _ from 'lodash';
 import IAICanvasMaskColorPicker from './IAICanvasMaskControls/IAICanvasMaskColorPicker';
 
 const inpaintingBrushSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas, activeTabName, areHotkeysEnabled) => {
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas, activeTabName) => {
     const { tool, brushSize } = currentCanvas;
 
     return {
       tool,
       brushSize,
-
       activeTabName,
-      areHotkeysEnabled,
     };
   },
   {
@@ -41,7 +38,7 @@ const inpaintingBrushSelector = createSelector(
 
 export default function IAICanvasBrushControl() {
   const dispatch = useAppDispatch();
-  const { tool, brushSize, activeTabName, areHotkeysEnabled } = useAppSelector(
+  const { tool, brushSize, activeTabName } = useAppSelector(
     inpaintingBrushSelector
   );
 
@@ -71,7 +68,7 @@ export default function IAICanvasBrushControl() {
       }
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
     [activeTabName, brushSize]
   );
@@ -84,7 +81,7 @@ export default function IAICanvasBrushControl() {
       handleChangeBrushSize(brushSize + 5);
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
     [activeTabName, brushSize]
   );
@@ -97,7 +94,7 @@ export default function IAICanvasBrushControl() {
       handleSelectBrushTool();
     },
     {
-      enabled: areHotkeysEnabled,
+      enabled: true,
     },
     [activeTabName]
   );

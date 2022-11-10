@@ -52,6 +52,7 @@ import IAICanvasRedoButton from './IAICanvasControls/IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
+import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
 
 export const canvasControlsSelector = createSelector(
   [currentCanvasSelector, outpaintingCanvasSelector, activeTabNameSelector],
@@ -111,28 +112,7 @@ const IAICanvasOutpaintingControls = () => {
 
   return (
     <div className="inpainting-settings">
-      <IAIPopover
-        trigger="hover"
-        triggerComponent={
-          <IAIIconButton
-            aria-label="Select Mask Layer"
-            tooltip="Select Mask Layer"
-            data-alert={layer === 'mask'}
-            onClick={() =>
-              dispatch(setLayer(layer === 'mask' ? 'base' : 'mask'))
-            }
-            icon={<FaMask />}
-          />
-        }
-      >
-        <Button onClick={() => dispatch(clearMask())}>Clear Mask</Button>
-        <IAICheckbox label="Enable Mask" />
-        <IAICheckbox label="Invert Mask" />
-        <IAIColorPicker
-          color={maskColor}
-          onChange={(newColor) => dispatch(setMaskColor(newColor))}
-        />
-      </IAIPopover>
+      <IAICanvasMaskButtonPopover />
       <ButtonGroup isAttached>
         <IAICanvasBrushButtonPopover />
         <IAICanvasEraserButtonPopover />
