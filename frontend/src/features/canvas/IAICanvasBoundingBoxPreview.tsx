@@ -12,7 +12,6 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
   baseCanvasImageSelector,
   currentCanvasSelector,
-  GenericCanvasState,
   outpaintingCanvasSelector,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
@@ -44,6 +43,7 @@ const boundingBoxPreviewSelector = createSelector(
       stageCoordinates,
     } = currentCanvas;
     const { shouldSnapToGrid } = outpaintingCanvas;
+
     return {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -60,6 +60,7 @@ const boundingBoxPreviewSelector = createSelector(
       shouldSnapToGrid,
       tool,
       stageCoordinates,
+      boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
     };
   },
   {
@@ -93,6 +94,7 @@ const IAICanvasBoundingBoxPreview = (
     activeTabName,
     shouldSnapToGrid,
     tool,
+    boundingBoxStrokeWidth,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -353,7 +355,7 @@ const IAICanvasBoundingBoxPreview = (
         onTransformEnd={handleEndedTransforming}
         ref={shapeRef}
         stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.7)' : 'white'}
-        strokeWidth={Math.floor((isMouseOverBoundingBox ? 8 : 1) / stageScale)}
+        strokeWidth={boundingBoxStrokeWidth}
         width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
