@@ -1,29 +1,28 @@
 ---
-Title: Docker
+title: Docker
 ---
 
 # :fontawesome-brands-docker: Docker
 
 ## Before you begin
 
-- For end users: Install InvokeAI locally using the instructions for
-  your OS.
+- For end users: Install InvokeAI locally using the instructions for your OS.
 - For developers: For container-related development tasks or for enabling easy
   deployment to other environments (on-premises or cloud), follow these
   instructions. For general use, install locally to leverage your machine's GPU.
 
 ## Why containers?
 
-They provide a flexible, reliable way to build and deploy InvokeAI.
-You'll also use a Docker volume to store the largest model files and image
-outputs as a first step in decoupling storage and compute. Future enhancements
-can do this for other assets. See [Processes](https://12factor.net/processes)
-under the Twelve-Factor App methodology for details on why running applications
-in such a stateless fashion is important.
+They provide a flexible, reliable way to build and deploy InvokeAI. You'll also
+use a Docker volume to store the largest model files and image outputs as a
+first step in decoupling storage and compute. Future enhancements can do this
+for other assets. See [Processes](https://12factor.net/processes) under the
+Twelve-Factor App methodology for details on why running applications in such a
+stateless fashion is important.
 
 You can specify the target platform when building the image and running the
-container. You'll also need to specify the InvokeAI requirements file
-that matches the container's OS and the architecture it will run on.
+container. You'll also need to specify the InvokeAI requirements file that
+matches the container's OS and the architecture it will run on.
 
 Developers on Apple silicon (M1/M2): You
 [can't access your GPU cores from Docker containers](https://github.com/pytorch/pytorch/issues/81224)
@@ -65,13 +64,14 @@ created in the last step.
 
 Some Suggestions of variables you may want to change besides the Token:
 
-| Environment-Variable                                                | Description                                                              |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `HUGGINGFACE_TOKEN="hg_aewirhghlawrgkjbarug2"`                      | This is the only required variable, without you can't get the checkpoint |
-| `ARCH=aarch64`                                                      | if you are using a ARM based CPU                                         |
-| `INVOKEAI_TAG=yourname/invokeai:latest`                             | the Container Repository / Tag which will be used                        |
-| `INVOKEAI_CONDA_ENV_FILE=environment-linux-aarch64.yml`             | since environment.yml wouldn't work with aarch                           |
-| `INVOKEAI_GIT="-b branchname https://github.com/username/reponame"` | if you want to use your own fork                                         |
+| Environment-Variable      | Default value                 | Description                                                                  |
+| ------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `HUGGINGFACE_TOKEN`       | No default, but **required**! | This is the only **required** variable, without you can't get the checkpoint |
+| `ARCH`                    | x86_64                        | if you are using a ARM based CPU                                             |
+| `INVOKEAI_TAG`            | invokeai-x86_64               | the Container Repository / Tag which will be used                            |
+| `INVOKEAI_CONDA_ENV_FILE` | environment-lin-cuda.yml      | since environment.yml wouldn't work with aarch                               |
+| `INVOKEAI_GIT`            | invoke-ai/InvokeAI            | the repository to use                                                        |
+| `INVOKEAI_BRANCH`         | main                          | the branch to checkout                                                       |
 
 #### Build the Image
 
@@ -79,25 +79,41 @@ I provided a build script, which is located in `docker-build/build.sh` but still
 needs to be executed from the Repository root.
 
 ```bash
-docker-build/build.sh
+./docker-build/build.sh
 ```
 
 The build Script not only builds the container, but also creates the docker
-volume if not existing yet, or if empty it will just download the models. When
-it is done you can run the container via the run script
+volume if not existing yet, or if empty it will just download the models.
+
+#### Run the Container
+
+After the build process is done, you can run the container via the provided
+`docker-build/run.sh` script
 
 ```bash
-docker-build/run.sh
+./docker-build/run.sh
 ```
 
 When used without arguments, the container will start the website and provide
 you the link to open it. But if you want to use some other parameters you can
 also do so.
 
+!!! example
+
+    ```bash
+    docker-build/run.sh --from_file tests/validate_pr_prompt.txt
+    ```
+
+    The output folder is located on the volume which is also used to store the model.
+
+    Find out more about available CLI-Parameter at [features/CLI.md](../features/CLI.md)
+
+---
+
 !!! warning "Deprecated"
 
-    From here on it is the rest of the previous Docker-Docs, which will still
-    provide usefull informations for one or the other.
+    From here on you will find the rest of the previous Docker-Docs, which will still
+    provide some usefull informations.
 
 ## Usage (time to have fun)
 

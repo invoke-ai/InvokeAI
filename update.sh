@@ -22,3 +22,5 @@ case "${OS_NAME}" in
 esac
 
 python scripts/preload_models.py
+
+
