@@ -40,7 +40,7 @@ export default function IAICanvasRedoButton() {
   };
 
   useHotkeys(
-    'cmd+shift+z, control+shift+z, control+y, cmd+y',
+    ['meta+shift+z', 'control+shift+z', 'control+y', 'meta+y'],
     (e: KeyboardEvent) => {
       e.preventDefault();
       handleRedo();

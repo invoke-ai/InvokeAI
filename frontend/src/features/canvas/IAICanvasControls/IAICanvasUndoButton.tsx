@@ -41,7 +41,7 @@ export default function IAICanvasUndoButton() {
   };
 
   useHotkeys(
-    'cmd+z, control+z',
+    ['meta+z', 'control+z'],
     (e: KeyboardEvent) => {
       e.preventDefault();
       handleUndo();

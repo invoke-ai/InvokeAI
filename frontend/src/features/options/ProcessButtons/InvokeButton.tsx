@@ -4,9 +4,7 @@ import { FaPlay } from 'react-icons/fa';
 import { readinessSelector } from 'app/selectors/readinessSelector';
 import { generateImage } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import IAIButton, {
-  IAIButtonProps,
-} from 'common/components/IAIButton';
+import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
@@ -29,7 +27,7 @@ export default function InvokeButton(props: InvokeButton) {
   };
 
   useHotkeys(
-    'ctrl+enter, cmd+enter',
+    ['ctrl+enter', 'meta+enter'],
     () => {
       if (isReady) {
         dispatch(generateImage(activeTabName));
