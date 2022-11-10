@@ -19,6 +19,7 @@ from uuid import uuid4
 from threading import Event
 
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 from ldm.invoke.generator.inpaint import infill_methods
@@ -847,7 +848,9 @@ class InvokeAIWebServer:
                 init_img_path = self.get_image_path_from_url(init_img_url)
                 generation_parameters["init_img"] = Image.open(init_img_path).convert('RGB')
 
-            def image_progress(sample, step):
+            def image_progress(progress_state: PipelineIntermediateState):
+                step = progress_state.step
+                sample = progress_state.latents
                 if self.canceled.is_set():
                     raise CanceledException
 
