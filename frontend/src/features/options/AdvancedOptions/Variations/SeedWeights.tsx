@@ -3,10 +3,10 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAIInput from '../../../../common/components/IAIInput';
-import { validateSeedWeights } from '../../../../common/util/seedWeightPairs';
-import { setSeedWeights } from '../../optionsSlice';
+} from 'app/store';
+import IAIInput from 'common/components/IAIInput';
+import { validateSeedWeights } from 'common/util/seedWeightPairs';
+import { setSeedWeights } from 'features/options/optionsSlice';
 
 export default function SeedWeights() {
   const seedWeights = useAppSelector(

@@ -1,5 +1,5 @@
 import React from 'react';
-import Img2ImgPlaceHolder from '../../../assets/images/image2img.png';
+import Img2ImgPlaceHolder from 'assets/images/image2img.png';
 
 export const ImageToImageWIP = () => {
   return (

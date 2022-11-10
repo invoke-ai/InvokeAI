@@ -50,20 +50,26 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Shift+O',
     },
     {
+      title: 'Toggle Viewer',
+      desc: 'Open and close Image Viewer',
+      hotkey: 'V',
+    },
+    {
       title: 'Toggle Gallery',
       desc: 'Open and close the gallery drawer',
       hotkey: 'G',
+    },
+    {
+      title: 'Maximize Workspace',
+      desc: 'Close panels and maximize work area',
+      hotkey: 'F',
     },
     {
       title: 'Change Tabs',
       desc: 'Switch to another workspace',
       hotkey: '1-6',
     },
-    {
-      title: 'Theme Toggle',
-      desc: 'Switch between dark and light modes',
-      hotkey: 'Shift+D',
-    },
+
     {
       title: 'Console Toggle',
       desc: 'Open and close console',
@@ -200,17 +206,30 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Lock Bounding Box',
       desc: 'Locks the bounding box',
-      hotkey: 'Shift+Q',
+      hotkey: 'Shift+W',
+    },
+    {
+      title: 'Show/Hide Bounding Box',
+      desc: 'Toggle visibility of bounding box',
+      hotkey: 'Shift+H',
     },
     {
       title: 'Quick Toggle Lock Bounding Box',
       desc: 'Hold to toggle locking the bounding box',
-      hotkey: 'Q',
+      hotkey: 'W',
     },
     {
       title: 'Expand Inpainting Area',
       desc: 'Expand your inpainting work area',
       hotkey: 'Shift+J',
+    },
+  ];
+
+  const outpaintingHotkeys = [
+    {
+      title: 'Erase Canvas',
+      desc: 'Erase the images on the canvas',
+      hotkey: 'Shift+E',
     },
   ];
 
@@ -240,8 +259,8 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       })}
       <Modal isOpen={isHotkeyModalOpen} onClose={onHotkeysModalClose}>
         <ModalOverlay />
-        <ModalContent className="hotkeys-modal">
-          <ModalCloseButton />
+        <ModalContent className=" modal hotkeys-modal">
+          <ModalCloseButton className="modal-close-btn" />
 
           <h1>Keyboard Shorcuts</h1>
           <div className="hotkeys-modal-items">
@@ -283,6 +302,16 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
                 </AccordionButton>
                 <AccordionPanel>
                   {renderHotkeyModalItems(inpaintingHotkeys)}
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <AccordionButton className="hotkeys-modal-button">
+                  <h2>Outpainting Hotkeys</h2>
+                  <AccordionIcon />
+                </AccordionButton>
+                <AccordionPanel>
+                  {renderHotkeyModalItems(outpaintingHotkeys)}
                 </AccordionPanel>
               </AccordionItem>
             </Accordion>

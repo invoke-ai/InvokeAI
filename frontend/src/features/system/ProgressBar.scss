@@ -2,7 +2,7 @@
 
 .progress-bar {
   background-color: var(--root-bg-color);
-  height: $progress-bar-thickness !important;
+  height: $progress-bar-thickness;
   z-index: 99;
 
   div {

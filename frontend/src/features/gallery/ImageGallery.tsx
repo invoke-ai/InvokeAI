@@ -5,9 +5,9 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { requestImages } from '../../app/socketio/actions';
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import IAIIconButton from '../../common/components/IAIIconButton';
+import { requestImages } from 'app/socketio/actions';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import IAIIconButton from 'common/components/IAIIconButton';
 import {
   selectNextImage,
   selectPrevImage,
@@ -21,19 +21,19 @@ import {
   setShouldPinGallery,
 } from './gallerySlice';
 import HoverableImage from './HoverableImage';
-import { setShouldShowGallery } from '../gallery/gallerySlice';
+import { setShouldShowGallery } from 'features/gallery/gallerySlice';
 import { ButtonGroup, useToast } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
 import { imageGallerySelector } from './gallerySliceSelectors';
 import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
-import IAIPopover from '../../common/components/IAIPopover';
-import IAISlider from '../../common/components/IAISlider';
+import IAIPopover from 'common/components/IAIPopover';
+import IAISlider from 'common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
-import IAICheckbox from '../../common/components/IAICheckbox';
-import { setNeedsCache } from '../tabs/Inpainting/inpaintingSlice';
+import IAICheckbox from 'common/components/IAICheckbox';
+import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
 import _ from 'lodash';
-import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
+import useClickOutsideWatcher from 'common/hooks/useClickOutsideWatcher';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 
@@ -56,6 +56,7 @@ export default function ImageGallery() {
     shouldAutoSwitchToNewImages,
     areMoreImagesAvailable,
     galleryWidth,
+    isLightBoxOpen,
   } = useAppSelector(imageGallerySelector);
 
   const [galleryMinWidth, setGalleryMinWidth] = useState<number>(300);
@@ -67,6 +68,13 @@ export default function ImageGallery() {
 
   useEffect(() => {
     if (!shouldPinGallery) return;
+
+    if (isLightBoxOpen) {
+      dispatch(setGalleryWidth(400));
+      setGalleryMinWidth(400);
+      setGalleryMaxWidth(400);
+      return;
+    }
 
     if (activeTabName === 'inpainting') {
       dispatch(setGalleryWidth(190));
@@ -83,14 +91,14 @@ export default function ImageGallery() {
       );
       setGalleryMaxWidth(590);
     }
-    dispatch(setNeedsCache(true));
-  }, [dispatch, activeTabName, shouldPinGallery, galleryWidth]);
+    dispatch(setDoesCanvasNeedScaling(true));
+  }, [dispatch, activeTabName, shouldPinGallery, galleryWidth, isLightBoxOpen]);
 
   useEffect(() => {
     if (!shouldPinGallery) {
       setGalleryMaxWidth(window.innerWidth);
     }
-  }, [shouldPinGallery]);
+  }, [shouldPinGallery, isLightBoxOpen]);
 
   const galleryRef = useRef<HTMLDivElement>(null);
   const galleryContainerRef = useRef<HTMLDivElement>(null);
@@ -98,7 +106,7 @@ export default function ImageGallery() {
 
   const handleSetShouldPinGallery = () => {
     dispatch(setShouldPinGallery(!shouldPinGallery));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleToggleGallery = () => {
@@ -107,7 +115,7 @@ export default function ImageGallery() {
 
   const handleOpenGallery = () => {
     dispatch(setShouldShowGallery(true));
-    shouldPinGallery && dispatch(setNeedsCache(true));
+    shouldPinGallery && dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleCloseGallery = () => {
@@ -119,7 +127,7 @@ export default function ImageGallery() {
       )
     );
     dispatch(setShouldHoldGalleryOpen(false));
-    // dispatch(setNeedsCache(true));
+    // dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleClickLoadMore = () => {
@@ -128,7 +136,7 @@ export default function ImageGallery() {
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const setCloseGalleryTimer = () => {
@@ -143,8 +151,10 @@ export default function ImageGallery() {
     'g',
     () => {
       handleToggleGallery();
+      shouldPinGallery &&
+        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
     },
-    [shouldShowGallery]
+    [shouldShowGallery, shouldPinGallery]
   );
 
   useHotkeys('left', () => {
@@ -159,6 +169,7 @@ export default function ImageGallery() {
     'shift+g',
     () => {
       handleSetShouldPinGallery();
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinGallery]
   );
@@ -168,6 +179,7 @@ export default function ImageGallery() {
     () => {
       if (shouldPinGallery) return;
       dispatch(setShouldShowGallery(false));
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinGallery]
   );
@@ -339,49 +351,48 @@ export default function ImageGallery() {
           }}
         >
           <div className="image-gallery-header">
-            <div>
-              <ButtonGroup
-                size="sm"
-                isAttached
-                variant="solid"
-                className="image-gallery-category-btn-group"
-              >
-                {shouldShowButtons ? (
-                  <>
-                    <Button
-                      data-selected={currentCategory === 'result'}
-                      onClick={() => dispatch(setCurrentCategory('result'))}
-                    >
-                      Invocations
-                    </Button>
-                    <Button
-                      data-selected={currentCategory === 'user'}
-                      onClick={() => dispatch(setCurrentCategory('user'))}
-                    >
-                      User
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <IAIIconButton
-                      aria-label="Show Invocations"
-                      tooltip="Show Invocations"
-                      data-selected={currentCategory === 'result'}
-                      icon={<FaImage />}
-                      onClick={() => dispatch(setCurrentCategory('result'))}
-                    />
-                    <IAIIconButton
-                      aria-label="Show Uploads"
-                      tooltip="Show Uploads"
-                      data-selected={currentCategory === 'user'}
-                      icon={<FaUser />}
-                      onClick={() => dispatch(setCurrentCategory('user'))}
-                    />
-                  </>
-                )}
-              </ButtonGroup>
-            </div>
-            <div>
+            <ButtonGroup
+              size="sm"
+              isAttached
+              variant="solid"
+              className="image-gallery-category-btn-group"
+            >
+              {shouldShowButtons ? (
+                <>
+                  <Button
+                    data-selected={currentCategory === 'result'}
+                    onClick={() => dispatch(setCurrentCategory('result'))}
+                  >
+                    Invocations
+                  </Button>
+                  <Button
+                    data-selected={currentCategory === 'user'}
+                    onClick={() => dispatch(setCurrentCategory('user'))}
+                  >
+                    User
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <IAIIconButton
+                    aria-label="Show Invocations"
+                    tooltip="Show Invocations"
+                    data-selected={currentCategory === 'result'}
+                    icon={<FaImage />}
+                    onClick={() => dispatch(setCurrentCategory('result'))}
+                  />
+                  <IAIIconButton
+                    aria-label="Show Uploads"
+                    tooltip="Show Uploads"
+                    data-selected={currentCategory === 'user'}
+                    icon={<FaUser />}
+                    onClick={() => dispatch(setCurrentCategory('user'))}
+                  />
+                </>
+              )}
+            </ButtonGroup>
+
+            <div className="image-gallery-header-right-icons">
               <IAIPopover
                 isLazy
                 trigger="hover"
@@ -403,12 +414,12 @@ export default function ImageGallery() {
                       onChange={handleChangeGalleryImageMinimumWidth}
                       min={32}
                       max={256}
-                      width={100}
+                      // width={100}
                       label={'Image Size'}
-                      formLabelProps={{ style: { fontSize: '0.9rem' } }}
-                      sliderThumbTooltipProps={{
-                        label: `${galleryImageMinimumWidth}px`,
-                      }}
+                      // formLabelProps={{ style: { fontSize: '0.9rem' } }}
+                      // sliderThumbTooltipProps={{
+                      //   label: `${galleryImageMinimumWidth}px`,
+                      // }}
                     />
                     <IAIIconButton
                       size={'sm'}

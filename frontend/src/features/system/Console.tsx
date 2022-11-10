@@ -1,6 +1,6 @@
 import { IconButton, Tooltip } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import { RootState } from '../../app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
 import { errorSeen, setShouldShowLogViewer, SystemState } from './systemSlice';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';

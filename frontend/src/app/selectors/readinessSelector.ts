@@ -1,38 +1,34 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { RootState } from '../store';
-import { activeTabNameSelector } from '../../features/options/optionsSelectors';
-import { OptionsState } from '../../features/options/optionsSlice';
-
-import { SystemState } from '../../features/system/systemSlice';
-import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice';
-import { validateSeedWeights } from '../../common/util/seedWeightPairs';
+import { RootState } from 'app/store';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { OptionsState } from 'features/options/optionsSlice';
+import { SystemState } from 'features/system/systemSlice';
+import { baseCanvasImageSelector } from 'features/canvas/canvasSlice';
+import { validateSeedWeights } from 'common/util/seedWeightPairs';
 
 export const readinessSelector = createSelector(
   [
     (state: RootState) => state.options,
     (state: RootState) => state.system,
-    (state: RootState) => state.inpainting,
+    baseCanvasImageSelector,
     activeTabNameSelector,
   ],
   (
     options: OptionsState,
     system: SystemState,
-    inpainting: InpaintingState,
+    baseCanvasImage,
     activeTabName
   ) => {
     const {
       prompt,
       shouldGenerateVariations,
       seedWeights,
-      // maskPath,
       initialImage,
       seed,
     } = options;
 
     const { isProcessing, isConnected } = system;
-
-    const { imageToInpaint } = inpainting;
 
     let isReady = true;
     const reasonsWhyNotReady: string[] = [];
@@ -48,19 +44,10 @@ export const readinessSelector = createSelector(
       reasonsWhyNotReady.push('No initial image selected');
     }
 
-    if (activeTabName === 'inpainting' && !imageToInpaint) {
+    if (activeTabName === 'inpainting' && !baseCanvasImage) {
       isReady = false;
       reasonsWhyNotReady.push('No inpainting image selected');
     }
-
-    // // We don't use mask paths now.
-    // //  Cannot generate with a mask without img2img
-    // if (maskPath && !initialImage) {
-    //   isReady = false;
-    //   reasonsWhyNotReady.push(
-    //     'On ImageToImage tab, but no mask is provided.'
-    //   );
-    // }
 
     // TODO: job queue
     // Cannot generate if already processing an image

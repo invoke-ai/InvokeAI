@@ -8,7 +8,7 @@
 // }
 
 // button {
-//   border-radius: 0.3rem !important;
+//   border-radius: 0.3rem;
 
 //   &[aria-expanded='true'] {
 //     // background-color: var(--tab-hover-color);
@@ -29,7 +29,7 @@
   }
 
   div {
-    border: none !important;
+    border: none;
   }
 
   .model-list-button {
@@ -79,6 +79,13 @@
       .model-list-item-load-btn {
         button {
           padding: 0.5rem;
+          background-color: var(--btn-base-color);
+          color: var(--text-color);
+          border-radius: 0.2rem;
+
+          &:hover {
+            background-color: var(--btn-base-color-hover);
+          }
         }
       }
     }

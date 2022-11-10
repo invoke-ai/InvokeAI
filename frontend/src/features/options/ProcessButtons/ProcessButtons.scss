@@ -8,14 +8,11 @@
 .invoke-btn {
   flex-grow: 1;
   width: 100%;
-  svg {
-    width: 18px !important;
-    height: 18px !important;
-  }
+
   @include Button(
     $btn-color: var(--accent-color),
     $btn-color-hover: var(--accent-color-hover),
-    // $btn-width: 5rem
+    $icon-size: 16px
   );
 }
 
@@ -23,19 +20,19 @@
   @include Button(
     $btn-color: var(--destructive-color),
     $btn-color-hover: var(--destructive-color-hover),
-    // $btn-width: 3rem
+    $btn-width: 3rem
   );
 }
 
 .loopback-btn {
   &[data-as-checkbox='true'] {
-    background-color: var(--btn-grey);
-    border: 3px solid var(--btn-grey);
+    background-color: var(--btn-btn-base-color);
+    border: 3px solid var(--btn-btn-base-color);
     svg {
       fill: var(--text-color);
     }
     &:hover {
-      background-color: var(--btn-grey);
+      background-color: var(--btn-btn-base-color);
       border-color: var(--btn-checkbox-border-hover);
       svg {
         fill: var(--text-color);
@@ -43,13 +40,13 @@
     }
     &[data-selected='true'] {
       border-color: var(--accent-color);
-      background-color: var(--btn-grey);
+      background-color: var(--btn-btn-base-color);
       svg {
         fill: var(--text-color);
       }
       &:hover {
         border-color: var(--accent-color);
-        background-color: var(--btn-grey);
+        background-color: var(--btn-btn-base-color);
         svg {
           fill: var(--text-color);
         }

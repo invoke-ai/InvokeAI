@@ -13,7 +13,7 @@
 .main-options-row {
   display: grid;
   grid-template-columns: repeat(3, auto);
-  column-gap: 1rem;
+  column-gap: 0.5rem;
   max-width: $options-bar-max-width;
 }
 
@@ -21,27 +21,22 @@
   border-radius: 0.5rem;
   display: grid !important;
   grid-template-columns: auto !important;
-  row-gap: 0.4rem;
+  row-gap: 0.5rem;
 
   .invokeai__number-input-form-label,
   .invokeai__select-label {
-    width: 100%;
-    font-size: 0.9rem !important;
     font-weight: bold;
+    font-size: 0.9rem !important;
   }
 
-  .number-input-entry {
-    padding: 0;
-    height: 2.4rem;
-  }
-
-  .iai-select-picker {
-    height: 2.4rem;
-    border-radius: 0.3rem;
+  .invokeai__select-label {
+    margin: 0;
   }
 }
 
 .advanced-options-checkbox {
-  padding: 1rem;
+  background-color: var(--background-color-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
   font-weight: bold;
 }

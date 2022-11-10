@@ -324,6 +324,7 @@ class Generate:
             seam_steps: int  = 10,
             tile_size: int   = 32,
             force_outpaint: bool = False,
+            enable_image_debugging = False,
             **args,
     ):   # eat up additional cruft
         """
@@ -462,7 +463,7 @@ class Generate:
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            generator = self.select_generator(init_image, mask_image, embiggen, hires_fix)
+            generator = self.select_generator(init_image, mask_image, embiggen, hires_fix, force_outpaint)
 
             generator.set_variation(
                 self.seed, variation_amount, with_variations
@@ -505,8 +506,9 @@ class Generate:
                 seam_steps = seam_steps,
                 tile_size = tile_size,
                 force_outpaint = force_outpaint,
-                inpaint_width  = inpaint_width,
-                inpaint_height = inpaint_height
+                inpaint_height = inpaint_height,
+                inpaint_width = inpaint_width,
+                enable_image_debugging = enable_image_debugging,
             )
 
             if init_color:

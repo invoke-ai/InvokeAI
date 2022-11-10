@@ -1,4 +1,4 @@
-import CurrentImageDisplay from '../../gallery/CurrentImageDisplay';
+import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
 
 const TextToImageDisplay = () => {
   return (

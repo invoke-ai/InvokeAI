@@ -22,11 +22,11 @@ import {
   SyntheticEvent,
   useRef,
 } from 'react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import { deleteImage } from '../../app/socketio/actions';
-import { RootState } from '../../app/store';
-import { setShouldConfirmOnDelete, SystemState } from '../system/systemSlice';
-import * as InvokeAI from '../../app/invokeai';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import { deleteImage } from 'app/socketio/actions';
+import { RootState } from 'app/store';
+import { setShouldConfirmOnDelete, SystemState } from 'features/system/systemSlice';
+import * as InvokeAI from 'app/invokeai';
 import { useHotkeys } from 'react-hotkeys-hook';
 import _ from 'lodash';
 

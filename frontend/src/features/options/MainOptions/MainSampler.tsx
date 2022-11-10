@@ -1,9 +1,8 @@
 import React, { ChangeEvent } from 'react';
-import { SAMPLERS } from '../../../app/constants';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAISelect from '../../../common/components/IAISelect';
-import { setSampler } from '../optionsSlice';
-import { fontSize } from './MainOptions';
+import { SAMPLERS } from 'app/constants';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAISelect from 'common/components/IAISelect';
+import { setSampler } from 'features/options/optionsSlice';
 
 export default function MainSampler() {
   const sampler = useAppSelector((state: RootState) => state.options.sampler);
@@ -18,7 +17,6 @@ export default function MainSampler() {
       value={sampler}
       onChange={handleChangeSampler}
       validValues={SAMPLERS}
-      fontSize={fontSize}
       styleClass="main-option-block"
     />
   );

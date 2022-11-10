@@ -1,16 +1,20 @@
 import React from 'react';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAICheckbox from 'common/components/IAICheckbox';
 import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../../../app/store';
-import IAICheckbox from '../../../../../common/components/IAICheckbox';
-import { setShouldLockBoundingBox } from '../../../../tabs/Inpainting/inpaintingSlice';
+  currentCanvasSelector,
+  GenericCanvasState,
+  setShouldLockBoundingBox,
+} from 'features/canvas/canvasSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+const boundingBoxLockSelector = createSelector(
+  currentCanvasSelector,
+  (currentCanvas: GenericCanvasState) => currentCanvas.shouldLockBoundingBox
+);
 
 export default function BoundingBoxLock() {
-  const shouldLockBoundingBox = useAppSelector(
-    (state: RootState) => state.inpainting.shouldLockBoundingBox
-  );
+  const shouldLockBoundingBox = useAppSelector(boundingBoxLockSelector);
   const dispatch = useAppDispatch();
 
   const handleChangeShouldLockBoundingBox = () => {

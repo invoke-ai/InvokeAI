@@ -1,12 +1,18 @@
-import { useCallback, ReactNode, useState, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+import {
+  useCallback,
+  ReactNode,
+  useState,
+  useEffect,
+  KeyboardEvent,
+} from 'react';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useToast } from '@chakra-ui/react';
-import { uploadImage } from '../../app/socketio/actions';
-import { ImageUploadDestination, UploadImagePayload } from '../../app/invokeai';
-import { ImageUploaderTriggerContext } from '../../app/contexts/ImageUploaderTriggerContext';
-import { activeTabNameSelector } from '../../features/options/optionsSelectors';
-import { tabDict } from '../../features/tabs/InvokeTabs';
+import { uploadImage } from 'app/socketio/actions';
+import { ImageUploadDestination, UploadImagePayload } from 'app/invokeai';
+import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { tabDict } from 'features/tabs/InvokeTabs';
 import ImageUploadOverlay from './ImageUploadOverlay';
 
 type ImageUploaderProps = {
@@ -41,7 +47,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     (file: File) => {
       setIsHandlingUpload(true);
       const payload: UploadImagePayload = { file };
-      if (['img2img', 'inpainting'].includes(activeTabName)) {
+      if (['img2img', 'inpainting', 'outpainting'].includes(activeTabName)) {
         payload.destination = activeTabName as ImageUploadDestination;
       }
       dispatch(uploadImage(payload));
@@ -137,7 +143,13 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   return (
     <ImageUploaderTriggerContext.Provider value={open}>
-      <div {...getRootProps({ style: {} })}>
+      <div
+        {...getRootProps({ style: {} })}
+        onKeyDown={(e: KeyboardEvent) => {
+          // Bail out if user hits spacebar - do not open the uploader
+          if (e.key === ' ') return;
+        }}
+      >
         <input {...getInputProps()} />
         {children}
         {isDragActive && isHandlingUpload && (

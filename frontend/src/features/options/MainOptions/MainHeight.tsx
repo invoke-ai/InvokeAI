@@ -1,10 +1,9 @@
 import React, { ChangeEvent } from 'react';
-import { HEIGHTS } from '../../../app/constants';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import IAISelect from '../../../common/components/IAISelect';
-import { activeTabNameSelector } from '../optionsSelectors';
-import { setHeight } from '../optionsSlice';
-import { fontSize } from './MainOptions';
+import { HEIGHTS } from 'app/constants';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAISelect from 'common/components/IAISelect';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { setHeight } from 'features/options/optionsSlice';
 
 export default function MainHeight() {
   const height = useAppSelector((state: RootState) => state.options.height);
@@ -22,7 +21,6 @@ export default function MainHeight() {
       flexGrow={1}
       onChange={handleChangeHeight}
       validValues={HEIGHTS}
-      fontSize={fontSize}
       styleClass="main-option-block"
     />
   );

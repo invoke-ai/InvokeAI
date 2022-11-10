@@ -6,7 +6,7 @@ import {
   Tooltip,
   useToast,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { setCurrentImage } from './gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
@@ -16,12 +16,16 @@ import {
   setAllImageToImageParameters,
   setAllTextToImageParameters,
   setInitialImage,
+  setIsLightBoxOpen,
   setPrompt,
   setSeed,
-} from '../options/optionsSlice';
-import * as InvokeAI from '../../app/invokeai';
+} from 'features/options/optionsSlice';
+import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { setImageToInpaint } from '../tabs/Inpainting/inpaintingSlice';
+import {
+  setImageToInpaint,
+  setImageToOutpaint,
+} from 'features/canvas/canvasSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
 interface HoverableImageProps {
@@ -44,6 +48,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     galleryImageObjectFit,
     galleryImageMinimumWidth,
     mayDeleteImage,
+    isLightBoxOpen,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, uuid, metadata } = image;
@@ -77,6 +82,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToImageToImage = () => {
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setInitialImage(image));
     if (activeTabName !== 'img2img') {
       dispatch(setActiveTab('img2img'));
@@ -90,12 +96,27 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToInpainting = () => {
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setImageToInpaint(image));
     if (activeTabName !== 'inpainting') {
       dispatch(setActiveTab('inpainting'));
     }
     toast({
       title: 'Sent to Inpainting',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
+  const handleSendToOutpainting = () => {
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+    dispatch(setImageToOutpaint(image));
+    if (activeTabName !== 'outpainting') {
+      dispatch(setActiveTab('outpainting'));
+    }
+    toast({
+      title: 'Sent to Outpainting',
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -227,6 +248,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         </ContextMenu.Item>
         <ContextMenu.Item onClickCapture={handleSendToInpainting}>
           Send to Inpainting
+        </ContextMenu.Item>
+        <ContextMenu.Item onClickCapture={handleSendToOutpainting}>
+          Send to Outpainting
         </ContextMenu.Item>
         <DeleteImageModal image={image}>
           <ContextMenu.Item data-warning>Delete Image</ContextMenu.Item>

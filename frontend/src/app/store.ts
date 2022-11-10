@@ -5,16 +5,14 @@ import type { TypedUseSelectorHook } from 'react-redux';
 import { persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
 
-import optionsReducer, { OptionsState } from '../features/options/optionsSlice';
-import galleryReducer, { GalleryState } from '../features/gallery/gallerySlice';
-import inpaintingReducer, {
-  InpaintingState,
-} from '../features/tabs/Inpainting/inpaintingSlice';
+import { getPersistConfig } from 'redux-deep-persist';
 
-import systemReducer, { SystemState } from '../features/system/systemSlice';
+import optionsReducer from 'features/options/optionsSlice';
+import galleryReducer from 'features/gallery/gallerySlice';
+import systemReducer from 'features/system/systemSlice';
+import canvasReducer from 'features/canvas/canvasSlice';
+
 import { socketioMiddleware } from './socketio/middleware';
-import autoMergeLevel2 from 'redux-persist/es/stateReconciler/autoMergeLevel2';
-import { PersistPartial } from 'redux-persist/es/persistReducer';
 
 /**
  * redux-persist provides an easy and reliable way to persist state across reloads.
@@ -28,87 +26,82 @@ import { PersistPartial } from 'redux-persist/es/persistReducer';
  * These can be blacklisted in redux-persist.
  *
  * The necesssary nested persistors with blacklists are configured below.
- *
- * TODO: Do we blacklist initialImagePath? If the image is deleted from disk we get an
- * ugly 404. But if we blacklist it, then this is a valuable parameter that is lost
- * on reload. Need to figure out a good way to handle this.
  */
 
-const rootPersistConfig = {
-  key: 'root',
-  storage,
-  stateReconciler: autoMergeLevel2,
-  blacklist: ['gallery', 'system', 'inpainting'],
-};
+const genericCanvasBlacklist = [
+  'pastObjects',
+  'futureObjects',
+  'stageScale',
+  'stageDimensions',
+  'stageCoordinates',
+  'cursorPosition',
+];
 
-const systemPersistConfig = {
-  key: 'system',
-  storage,
-  stateReconciler: autoMergeLevel2,
-  blacklist: [
-    'isCancelable',
-    'isConnected',
-    'isProcessing',
-    'currentStep',
-    'socketId',
-    'isESRGANAvailable',
-    'isGFPGANAvailable',
-    'currentStep',
-    'totalSteps',
-    'currentIteration',
-    'totalIterations',
-    'currentStatus',
-  ],
-};
+const inpaintingCanvasBlacklist = genericCanvasBlacklist.map(
+  (blacklistItem) => `canvas.inpainting.${blacklistItem}`
+);
 
-const galleryPersistConfig = {
-  key: 'gallery',
-  storage,
-  stateReconciler: autoMergeLevel2,
-  whitelist: [
-    'galleryWidth',
-    'shouldPinGallery',
-    'shouldShowGallery',
-    'galleryScrollPosition',
-    'galleryImageMinimumWidth',
-    'galleryImageObjectFit',
-  ],
-};
+const outpaintingCanvasBlacklist = genericCanvasBlacklist.map(
+  (blacklistItem) => `canvas.outpainting.${blacklistItem}`
+);
 
-const inpaintingPersistConfig = {
-  key: 'inpainting',
-  storage,
-  stateReconciler: autoMergeLevel2,
-  blacklist: ['pastLines', 'futuresLines', 'cursorPosition'],
-};
+const systemBlacklist = [
+  'currentIteration',
+  'currentStatus',
+  'currentStep',
+  'isCancelable',
+  'isConnected',
+  'isESRGANAvailable',
+  'isGFPGANAvailable',
+  'isProcessing',
+  'socketId',
+  'totalIterations',
+  'totalSteps',
+].map((blacklistItem) => `system.${blacklistItem}`);
 
-const reducers = combineReducers({
+const galleryBlacklist = [
+  'categories',
+  'currentCategory',
+  'currentImage',
+  'currentImageUuid',
+  'shouldAutoSwitchToNewImages',
+  'shouldHoldGalleryOpen',
+  'intermediateImage',
+].map((blacklistItem) => `gallery.${blacklistItem}`);
+
+const rootReducer = combineReducers({
   options: optionsReducer,
-  gallery: persistReducer<GalleryState>(galleryPersistConfig, galleryReducer),
-  system: persistReducer<SystemState>(systemPersistConfig, systemReducer),
-  inpainting: persistReducer<InpaintingState>(
-    inpaintingPersistConfig,
-    inpaintingReducer
-  ),
+  gallery: galleryReducer,
+  system: systemReducer,
+  canvas: canvasReducer,
 });
 
-const persistedReducer = persistReducer<{
-  options: OptionsState;
-  gallery: GalleryState & PersistPartial;
-  system: SystemState & PersistPartial;
-  inpainting: InpaintingState & PersistPartial;
-}>(rootPersistConfig, reducers);
+const rootPersistConfig = getPersistConfig({
+  key: 'root',
+  storage,
+  rootReducer,
+  blacklist: [
+    ...inpaintingCanvasBlacklist,
+    ...outpaintingCanvasBlacklist,
+    ...systemBlacklist,
+    ...galleryBlacklist,
+  ],
+  throttle: 500,
+});
+
+const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 // Continue with store setup
 export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      // redux-persist sometimes needs to temporarily put a function in redux state, need to disable this check
+      immutableCheck: false,
       serializableCheck: false,
     }).concat(socketioMiddleware()),
 });
 
+export type AppGetState = typeof store.getState;
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 

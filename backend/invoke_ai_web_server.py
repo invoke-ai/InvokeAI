@@ -7,10 +7,13 @@ import traceback
 import math
 import io
 import base64
+import os
 
-from flask import Flask, redirect, send_from_directory
+from werkzeug.utils import secure_filename
+from flask import Flask, redirect, send_from_directory, flash, request, url_for, jsonify
 from flask_socketio import SocketIO
 from PIL import Image
+from PIL.Image import Image as ImageType
 from uuid import uuid4
 from threading import Event
 
@@ -19,6 +22,9 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
+from backend.modules.get_outpainting_generation_mode import (
+    get_outpainting_generation_mode,
+)
 
 # Loading Arguments
 opt = Args()
@@ -90,6 +96,43 @@ class InvokeAIWebServer:
                 return redirect("http://127.0.0.1:5173")
             else:
                 return send_from_directory(self.app.static_folder, "index.html")
+
+        @self.app.route("/upload", methods=["POST"])
+        def upload_base64_file():
+            try:
+                data = request.get_json()
+                dataURL = data["dataURL"]
+                name = data["name"]
+
+                print(f'>> Image upload requested "{name}"')
+
+                if dataURL is not None:
+                    bytes = dataURL_to_bytes(dataURL)
+
+                    file_path = self.save_file_unique_uuid_name(
+                        bytes=bytes, name=name, path=self.result_path
+                    )
+
+                    mtime = os.path.getmtime(file_path)
+                    (width, height) = Image.open(file_path).size
+
+                    response = {
+                        "url": self.get_url_from_image_path(file_path),
+                        "mtime": mtime,
+                        "width": width,
+                        "height": height,
+                        "category": "result",
+                        "destination": "outpainting_merge",
+                    }
+                    return response
+                else:
+                    return "No dataURL provided"
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
 
         self.load_socketio_listeners(self.socketio)
 
@@ -308,19 +351,24 @@ class InvokeAIWebServer:
             generation_parameters, esrgan_parameters, facetool_parameters
         ):
             try:
-                # truncate long init_mask base64 if needed
+                # truncate long init_mask/init_img base64 if needed
+                printable_parameters = {
+                    **generation_parameters,
+                }
+
+                if "init_img" in generation_parameters:
+                    printable_parameters["init_img"] = (
+                        printable_parameters["init_img"][:64] + "..."
+                    )
+
                 if "init_mask" in generation_parameters:
-                    printable_parameters = {
-                        **generation_parameters,
-                        "init_mask": generation_parameters["init_mask"][:20] + "...",
-                    }
-                    print(
-                        f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
+                    printable_parameters["init_mask"] = (
+                        printable_parameters["init_mask"][:64] + "..."
                     )
-                else:
-                    print(
-                        f">> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
-                    )
+
+                print(
+                    f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
+                )
                 self.generate_images(
                     generation_parameters,
                     esrgan_parameters,
@@ -456,7 +504,7 @@ class InvokeAIWebServer:
                 from send2trash import send2trash
 
                 path = self.get_image_path_from_url(url)
-                print(path)
+
                 send2trash(path)
                 socketio.emit(
                     "imageDeleted",
@@ -479,7 +527,7 @@ class InvokeAIWebServer:
                 )
                 mtime = os.path.getmtime(file_path)
                 (width, height) = Image.open(file_path).size
-                print(file_path)
+
                 socketio.emit(
                     "imageUploaded",
                     {
@@ -499,17 +547,18 @@ class InvokeAIWebServer:
                 print("\n")
 
         # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadMaskImage")
-        def handle_upload_mask_image(bytes, name):
+        @socketio.on("uploadOutpaintingMergeImage")
+        def handle_upload_outpainting_merge_image(dataURL, name):
             try:
-                print(f'>> Mask image upload requested "{name}"')
+                print(f'>> Outpainting merge image upload requested "{name}"')
 
-                file_path = self.save_file_unique_uuid_name(
-                    bytes=bytes, name=name, path=self.mask_image_path
-                )
+                image = dataURL_to_image(dataURL)
+                file_name = self.make_unique_init_image_filename(name)
+                file_path = os.path.join(self.result_path, file_name)
+                image.save(file_path)
 
                 socketio.emit(
-                    "maskImageUploaded",
+                    "outpaintingMergeImageUploaded",
                     {
                         "url": self.get_url_from_image_path(file_path),
                     },
@@ -546,59 +595,146 @@ class InvokeAIWebServer:
                 else []
             )
 
+            actual_generation_mode = generation_parameters["generation_mode"]
+            original_bounding_box = None
             """
             TODO:
             If a result image is used as an init image, and then deleted, we will want to be
             able to use it as an init image in the future. Need to handle this case.
             """
 
-            # We need to give absolute paths to the generator, stash the URLs for later
-            init_img_url = None
-            mask_img_url = None
+            """
+            Prepare for generation based on generation_mode
+            """
+            if generation_parameters["generation_mode"] == "outpainting":
+                """
+                generation_parameters["init_img"] is a base64 image
+                generation_parameters["init_mask"] is a base64 image
 
-            if "init_img" in generation_parameters:
+                So we need to convert each into a PIL Image.
+                """
+
+                truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
+                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
+
+                outpaint_image = dataURL_to_image(
+                    generation_parameters["init_img"]
+                ).convert("RGBA")
+
+                # Convert mask dataURL to an image and convert to greyscale
+                outpaint_mask = dataURL_to_image(
+                    generation_parameters["init_mask"]
+                ).convert("L")
+
+                actual_generation_mode = get_outpainting_generation_mode(
+                    outpaint_image, outpaint_mask
+                )
+
+                """
+                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
+                to the generator should be:
+                    {
+                        "x": 0, 
+                        "y": 0,
+                        "width": original_bounding_box["width"],
+                        "height": original_bounding_box["height"]
+                    }
+                
+                Save the original bounding box, we need to give it back to the UI when finished,
+                because the UI needs to know where to put the inpainted image on the canvas.
+                """
+                original_bounding_box = generation_parameters["bounding_box"].copy()
+
+                generation_parameters["bounding_box"]["x"] = 0
+                generation_parameters["bounding_box"]["y"] = 0
+
+                """
+                Apply the mask to the init image, creating a "mask" image with 
+                transparency where inpainting should occur. This is the kind of
+                mask that prompt2image() needs.
+                """
+                alpha_mask = outpaint_image.copy()
+                alpha_mask.putalpha(outpaint_mask)
+
+                generation_parameters["init_img"] = outpaint_image
+                generation_parameters["init_mask"] = alpha_mask
+
+                # Remove the unneeded parameters for whichever mode we are doing
+                if actual_generation_mode == "inpainting":
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+                elif actual_generation_mode == "img2img":
+                    generation_parameters["height"] = original_bounding_box["height"]
+                    generation_parameters["width"] = original_bounding_box["width"]
+                    generation_parameters.pop("init_mask", None)
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+                elif actual_generation_mode == "txt2img":
+                    generation_parameters["height"] = original_bounding_box["height"]
+                    generation_parameters["width"] = original_bounding_box["width"]
+                    generation_parameters.pop("strength", None)
+                    generation_parameters.pop("fit", None)
+                    generation_parameters.pop("init_img", None)
+                    generation_parameters.pop("init_mask", None)
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+
+            elif generation_parameters["generation_mode"] == "inpainting":
+                """
+                generation_parameters["init_img"] is a url
+                generation_parameters["init_mask"] is a base64 image
+
+                So we need to convert each into a PIL Image.
+                """
                 init_img_url = generation_parameters["init_img"]
+                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
+
+                init_img_url = generation_parameters["init_img"]
+
                 init_img_path = self.get_image_path_from_url(init_img_url)
-                generation_parameters["init_img"] = init_img_path
 
-            # if 'init_mask' in generation_parameters:
-            #     mask_img_url = generation_parameters['init_mask']
-            #     generation_parameters[
-            #         'init_mask'
-            #     ] = self.get_image_path_from_url(
-            #         generation_parameters['init_mask']
-            #     )
-
-            if "init_mask" in generation_parameters:
-                # grab an Image of the init image
                 original_image = Image.open(init_img_path)
+
+                rgba_image = original_image.convert("RGBA")
 
                 # copy a region from it which we will inpaint
                 cropped_init_image = copy_image_from_bounding_box(
-                    original_image, **generation_parameters["bounding_box"]
+                    rgba_image, **generation_parameters["bounding_box"]
                 )
+
                 generation_parameters["init_img"] = cropped_init_image
 
-                if generation_parameters["is_mask_empty"]:
-                    generation_parameters["init_mask"] = None
-                else:
-                    # grab an Image of the mask
-                    mask_image = Image.open(
-                        io.BytesIO(
-                            base64.decodebytes(
-                                bytes(generation_parameters["init_mask"], "utf-8")
-                            )
-                        )
-                    )
-                    generation_parameters["init_mask"] = mask_image
+                # Convert mask dataURL to an image and convert to greyscale
+                mask_image = dataURL_to_image(
+                    generation_parameters["init_mask"]
+                ).convert("L")
 
-            totalSteps = self.calculate_real_steps(
-                steps=generation_parameters["steps"],
-                strength=generation_parameters["strength"]
-                if "strength" in generation_parameters
-                else None,
-                has_init_image="init_img" in generation_parameters,
-            )
+                """
+                Apply the mask to the init image, creating a "mask" image with 
+                transparency where inpainting should occur. This is the kind of
+                mask that prompt2image() needs.
+                """
+                alpha_mask = cropped_init_image.copy()
+                alpha_mask.putalpha(mask_image)
+
+                generation_parameters["init_mask"] = alpha_mask
+
+            elif generation_parameters["generation_mode"] == "img2img":
+                init_img_url = generation_parameters["init_img"]
+                init_img_path = self.get_image_path_from_url(init_img_url)
+                generation_parameters["init_img"] = init_img_path
 
             progress = Progress(generation_parameters=generation_parameters)
 
@@ -613,13 +749,22 @@ class InvokeAIWebServer:
                 nonlocal generation_parameters
                 nonlocal progress
 
+                generation_messages = {
+                    "txt2img": "Text to Image",
+                    "img2img": "Image to Image",
+                    "inpainting": "Inpainting",
+                    "outpainting": "Outpainting",
+                }
+
                 progress.set_current_step(step + 1)
-                progress.set_current_status("Generating")
+                progress.set_current_status(
+                    f"Generating ({generation_messages[actual_generation_mode]})"
+                )
                 progress.set_current_status_has_steps(True)
 
                 if (
                     generation_parameters["progress_images"]
-                    and step % generation_parameters['save_intermediates'] == 0
+                    and step % generation_parameters["save_intermediates"] == 0
                     and step < generation_parameters["steps"] - 1
                 ):
                     image = self.generate.sample_to_image(sample)
@@ -648,6 +793,8 @@ class InvokeAIWebServer:
                             "metadata": metadata,
                             "width": width,
                             "height": height,
+                            "generationMode": generation_parameters["generation_mode"],
+                            "boundingBox": original_bounding_box,
                         },
                     )
 
@@ -670,6 +817,8 @@ class InvokeAIWebServer:
                             "metadata": {},
                             "width": width,
                             "height": height,
+                            "generationMode": generation_parameters["generation_mode"],
+                            "boundingBox": original_bounding_box,
                         },
                     )
 
@@ -688,8 +837,11 @@ class InvokeAIWebServer:
                 step_index = 1
                 nonlocal prior_variations
 
+                """
+                Tidy up after generation based on generation_mode
+                """
                 # paste the inpainting image back onto the original
-                if "init_mask" in generation_parameters:
+                if generation_parameters["generation_mode"] == "inpainting":
                     image = paste_image_into_bounding_box(
                         Image.open(init_img_path),
                         image,
@@ -786,10 +938,13 @@ class InvokeAIWebServer:
 
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
                 if "init_img" in all_parameters:
-                    all_parameters["init_img"] = init_img_url
+                    all_parameters["init_img"] = ""
 
                 if "init_mask" in all_parameters:
                     all_parameters["init_mask"] = ""  # TODO: store the mask in metadata
+
+                if generation_parameters["generation_mode"] == "outpainting":
+                    all_parameters["bounding_box"] = original_bounding_box
 
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)
 
@@ -826,6 +981,8 @@ class InvokeAIWebServer:
                         "metadata": metadata,
                         "width": width,
                         "height": height,
+                        "boundingBox": original_bounding_box,
+                        "generationMode": generation_parameters["generation_mode"],
                     },
                 )
                 eventlet.sleep(0)
@@ -933,25 +1090,25 @@ class InvokeAIWebServer:
 
             rfc_dict["variations"] = variations
 
-            if "init_img" in parameters:
-                rfc_dict["type"] = "img2img"
-                rfc_dict["strength"] = parameters["strength"]
-                rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
-                rfc_dict["orig_hash"] = calculate_init_img_hash(
-                    self.get_image_path_from_url(parameters["init_img"])
-                )
-                rfc_dict["init_image_path"] = parameters[
-                    "init_img"
-                ]  # TODO: Noncompliant
-                # if 'init_mask' in parameters:
-                #     rfc_dict['mask_hash'] = calculate_init_img_hash(
-                #         self.get_image_path_from_url(parameters['init_mask'])
-                #     )  # TODO: Noncompliant
-                #     rfc_dict['mask_image_path'] = parameters[
-                #         'init_mask'
-                #     ]  # TODO: Noncompliant
-            else:
-                rfc_dict["type"] = "txt2img"
+            # if "init_img" in parameters:
+            #     rfc_dict["type"] = "img2img"
+            #     rfc_dict["strength"] = parameters["strength"]
+            #     rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
+            #     rfc_dict["orig_hash"] = calculate_init_img_hash(
+            #         self.get_image_path_from_url(parameters["init_img"])
+            #     )
+            #     rfc_dict["init_image_path"] = parameters[
+            #         "init_img"
+            #     ]  # TODO: Noncompliant
+            #     # if 'init_mask' in parameters:
+            #     #     rfc_dict['mask_hash'] = calculate_init_img_hash(
+            #     #         self.get_image_path_from_url(parameters['init_mask'])
+            #     #     )  # TODO: Noncompliant
+            #     #     rfc_dict['mask_image_path'] = parameters[
+            #     #         'init_mask'
+            #     #     ]  # TODO: Noncompliant
+            # else:
+            #     rfc_dict["type"] = "txt2img"
 
             metadata["image"] = rfc_dict
 
@@ -1244,11 +1401,13 @@ class CanceledException(Exception):
 
 
 """
-Crops an image to a bounding box.
+Returns a copy an image, cropped to a bounding box.
 """
 
 
-def copy_image_from_bounding_box(image, x, y, width, height):
+def copy_image_from_bounding_box(
+    image: ImageType, x: int, y: int, width: int, height: int
+) -> ImageType:
     with image as im:
         bounds = (x, y, x + width, y + height)
         im_cropped = im.crop(bounds)
@@ -1256,11 +1415,53 @@ def copy_image_from_bounding_box(image, x, y, width, height):
 
 
 """
+Converts a base64 image dataURL into an image.
+The dataURL is split on the first commma.
+"""
+
+
+def dataURL_to_image(dataURL: str) -> ImageType:
+    image = Image.open(
+        io.BytesIO(
+            base64.decodebytes(
+                bytes(
+                    dataURL.split(",", 1)[1],
+                    "utf-8",
+                )
+            )
+        )
+    )
+    return image
+
+
+"""
+Converts a base64 image dataURL into bytes.
+The dataURL is split on the first commma.
+"""
+
+
+def dataURL_to_bytes(dataURL: str) -> bytes:
+    return base64.decodebytes(
+        bytes(
+            dataURL.split(",", 1)[1],
+            "utf-8",
+        )
+    )
+
+
+"""
 Pastes an image onto another with a bounding box.
 """
 
 
-def paste_image_into_bounding_box(recipient_image, donor_image, x, y, width, height):
+def paste_image_into_bounding_box(
+    recipient_image: ImageType,
+    donor_image: ImageType,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+) -> ImageType:
     with recipient_image as im:
         bounds = (x, y, x + width, y + height)
         im.paste(donor_image, bounds)

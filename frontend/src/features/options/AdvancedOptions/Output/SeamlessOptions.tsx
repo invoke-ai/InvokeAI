@@ -4,9 +4,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAISwitch from '../../../../common/components/IAISwitch';
-import { setSeamless } from '../../optionsSlice';
+} from 'app/store';
+import IAISwitch from 'common/components/IAISwitch';
+import { setSeamless } from 'features/options/optionsSlice';
 
 /**
  * Seamless tiling toggle

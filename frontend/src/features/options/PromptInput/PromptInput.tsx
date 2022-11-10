@@ -1,14 +1,14 @@
 import { FormControl, Textarea } from '@chakra-ui/react';
 import { ChangeEvent, KeyboardEvent, useRef } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import { generateImage } from '../../../app/socketio/actions';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { generateImage } from 'app/socketio/actions';
 
-import { OptionsState, setPrompt } from '../optionsSlice';
+import { OptionsState, setPrompt } from 'features/options/optionsSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { activeTabNameSelector } from '../optionsSelectors';
-import { readinessSelector } from '../../../app/selectors/readinessSelector';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { readinessSelector } from 'app/selectors/readinessSelector';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.options, activeTabNameSelector],

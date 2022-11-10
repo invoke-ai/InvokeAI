@@ -3,16 +3,26 @@ import { createSelector } from '@reduxjs/toolkit';
 import { ReactNode } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { VscSplitHorizontal } from 'react-icons/vsc';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import ImageGallery from '../gallery/ImageGallery';
-import { activeTabNameSelector } from '../options/optionsSelectors';
-import { OptionsState, setShowDualDisplay } from '../options/optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import ImageGallery from 'features/gallery/ImageGallery';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import {
+  OptionsState,
+  setShowDualDisplay,
+} from 'features/options/optionsSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
 
 const workareaSelector = createSelector(
   [(state: RootState) => state.options, activeTabNameSelector],
   (options: OptionsState, activeTabName) => {
-    const { showDualDisplay, shouldPinOptionsPanel } = options;
-    return { showDualDisplay, shouldPinOptionsPanel, activeTabName };
+    const { showDualDisplay, shouldPinOptionsPanel, isLightBoxOpen } = options;
+    return {
+      showDualDisplay,
+      shouldPinOptionsPanel,
+      activeTabName,
+      isLightBoxOpen,
+      shouldShowDualDisplayButton: ['inpainting'].includes(activeTabName),
+    };
   }
 );
 
@@ -25,10 +35,16 @@ type InvokeWorkareaProps = {
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const dispatch = useAppDispatch();
   const { optionsPanel, children, styleClass } = props;
-  const { showDualDisplay, activeTabName } = useAppSelector(workareaSelector);
+  const {
+    showDualDisplay,
+    activeTabName,
+    isLightBoxOpen,
+    shouldShowDualDisplayButton,
+  } = useAppSelector(workareaSelector);
 
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   // Hotkeys
@@ -39,7 +55,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
       handleDualDisplay();
     },
     {
-      enabled: activeTabName === 'inpainting',
+      enabled: shouldShowDualDisplayButton,
     },
     [showDualDisplay]
   );
@@ -54,7 +70,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
         {optionsPanel}
         <div className="workarea-children-wrapper">
           {children}
-          {activeTabName === 'inpainting' && (
+          {shouldShowDualDisplayButton && (
             <Tooltip label="Toggle Split View">
               <div
                 className="workarea-split-button"
@@ -66,7 +82,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
             </Tooltip>
           )}
         </div>
-        <ImageGallery />
+        {!isLightBoxOpen && <ImageGallery />}
       </div>
     </div>
   );

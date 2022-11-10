@@ -1,11 +1,7 @@
 import React from 'react';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../../app/store';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
-import { setImg2imgStrength } from '../../optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAISlider from 'common/components/IAISlider';
+import { setImg2imgStrength } from 'features/options/optionsSlice';
 
 interface ImageToImageStrengthProps {
   label?: string;
@@ -22,17 +18,36 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
 
   const handleChangeStrength = (v: number) => dispatch(setImg2imgStrength(v));
 
+  const handleImg2ImgStrengthReset = () => {
+    dispatch(setImg2imgStrength(0.5));
+  };
+
   return (
-    <IAINumberInput
+    <IAISlider
       label={label}
       step={0.01}
       min={0.01}
       max={0.99}
       onChange={handleChangeStrength}
       value={img2imgStrength}
-      width="100%"
       isInteger={false}
       styleClass={styleClass}
+      withInput
+      withReset
+      withSliderMarks
+      inputWidth={'5.5rem'}
+      handleReset={handleImg2ImgStrengthReset}
     />
+    // <IAINumberInput
+    //   label={label}
+    //   step={0.01}
+    //   min={0.01}
+    //   max={0.99}
+    //   onChange={handleChangeStrength}
+    //   value={img2imgStrength}
+    //   width="100%"
+    //   isInteger={false}
+    //   styleClass={styleClass}
+    // />
   );
 }

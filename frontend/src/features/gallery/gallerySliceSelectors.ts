@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from '../../app/store';
-import { activeTabNameSelector } from '../options/optionsSelectors';
-import { OptionsState } from '../options/optionsSlice';
-import { SystemState } from '../system/systemSlice';
+import { RootState } from 'app/store';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { OptionsState } from 'features/options/optionsSlice';
+import { SystemState } from 'features/system/systemSlice';
 import { GalleryState } from './gallerySlice';
 import _ from 'lodash';
 
@@ -27,6 +27,8 @@ export const imageGallerySelector = createSelector(
       galleryWidth,
     } = gallery;
 
+    const { isLightBoxOpen } = options;
+
     return {
       currentImageUuid,
       shouldPinGallery,
@@ -43,6 +45,7 @@ export const imageGallerySelector = createSelector(
         categories[currentCategory].areMoreImagesAvailable,
       currentCategory,
       galleryWidth,
+      isLightBoxOpen,
     };
   },
   {
@@ -70,6 +73,7 @@ export const hoverableImageSelector = createSelector(
       galleryImageObjectFit: gallery.galleryImageObjectFit,
       galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
       activeTabName,
+      isLightBoxOpen: options.isLightBoxOpen,
     };
   },
   {

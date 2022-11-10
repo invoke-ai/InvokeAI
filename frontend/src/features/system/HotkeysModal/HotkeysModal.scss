@@ -1,11 +1,10 @@
 @use '../../../styles/Mixins/' as *;
 
 .hotkeys-modal {
-  width: 36rem !important;
-  max-width: 36rem !important;
+  width: 36rem;
+  max-width: 36rem;
   display: grid;
   padding: 1rem;
-  background-color: var(--settings-modal-bg) !important;
   row-gap: 1rem;
   font-family: Inter;
 
@@ -42,7 +41,7 @@
   }
 
   button {
-    border-radius: 0.3rem !important;
+    border-radius: 0.3rem;
 
     &[aria-expanded='true'] {
       background-color: var(--tab-hover-color);
@@ -81,7 +80,7 @@
   .hotkey-key {
     font-size: 0.8rem;
     font-weight: bold;
-    border: 2px solid var(--settings-modal-bg);
+    background-color: var(--background-color-light);
     padding: 0.2rem 0.5rem;
     border-radius: 0.3rem;
   }

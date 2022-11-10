@@ -3,9 +3,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAISwitch from '../../../../common/components/IAISwitch';
-import { setShouldFitToWidthHeight } from '../../optionsSlice';
+} from 'app/store';
+import IAISwitch from 'common/components/IAISwitch';
+import { setShouldFitToWidthHeight } from 'features/options/optionsSlice';
 
 export default function ImageFit() {
   const dispatch = useAppDispatch();

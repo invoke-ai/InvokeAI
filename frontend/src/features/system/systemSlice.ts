@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { ExpandedIndex } from '@chakra-ui/react';
-import * as InvokeAI from '../../app/invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -44,6 +44,7 @@ export interface SystemState
   wasErrorSeen: boolean;
   isCancelable: boolean;
   saveIntermediatesInterval: number;
+  enableImageDebugging: boolean;
 }
 
 const initialSystemState: SystemState = {
@@ -74,6 +75,7 @@ const initialSystemState: SystemState = {
   wasErrorSeen: true,
   isCancelable: true,
   saveIntermediatesInterval: 5,
+  enableImageDebugging: false,
 };
 
 export const systemSlice = createSlice({
@@ -191,6 +193,9 @@ export const systemSlice = createSlice({
     setSaveIntermediatesInterval: (state, action: PayloadAction<number>) => {
       state.saveIntermediatesInterval = action.payload;
     },
+    setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
+      state.enableImageDebugging = action.payload;
+    },
   },
 });
 
@@ -214,6 +219,7 @@ export const {
   setIsCancelable,
   modelChangeRequested,
   setSaveIntermediatesInterval,
+  setEnableImageDebugging,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

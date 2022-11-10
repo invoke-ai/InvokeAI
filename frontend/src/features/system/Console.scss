@@ -37,39 +37,39 @@
 }
 
 .console-toggle-icon-button {
-  background: var(--console-icon-button-bg-color) !important;
-  position: fixed !important;
+  background: var(--console-icon-button-bg-color);
+  position: fixed;
   left: 0.5rem;
   bottom: 0.5rem;
   z-index: 10000;
 
   &:hover {
-    background: var(--console-icon-button-bg-color-hover) !important;
+    background: var(--console-icon-button-bg-color-hover);
   }
 
   &[data-error-seen='true'] {
-    background: var(--status-bad-color) !important;
+    background: var(--status-bad-color);
     &:hover {
-      background: var(--status-bad-color) !important;
+      background: var(--status-bad-color);
     }
   }
 }
 
 .console-autoscroll-icon-button {
-  background: var(--console-icon-button-bg-color) !important;
-  position: fixed !important;
+  background: var(--console-icon-button-bg-color);
+  position: fixed;
   left: 0.5rem;
   bottom: 3rem;
   z-index: 10000;
 
   &:hover {
-    background: var(--console-icon-button-bg-color-hover) !important;
+    background: var(--console-icon-button-bg-color-hover);
   }
 
   &[data-autoscroll-enabled='true'] {
-    background: var(--accent-color) !important;
+    background: var(--accent-color);
     &:hover {
-      background: var(--accent-color-hover) !important;
+      background: var(--accent-color-hover);
     }
   }
 }

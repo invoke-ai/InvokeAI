@@ -1,6 +1,6 @@
 // TODO: use Enums?
 
-import { InProgressImageType } from '../features/system/systemSlice';
+import { InProgressImageType } from 'features/system/systemSlice';
 
 // Valid samplers
 export const SAMPLERS: Array<string> = [

@@ -22,6 +22,12 @@
       grid-template-columns: 1fr 1fr;
       background-color: var(--background-color-secondary);
       border-radius: 0.5rem;
+      .workarea-split-view-left {
+        padding-right: 0.5rem;
+      }
+      .workarea-split-view-right {
+        padding-left: 0.5rem;
+      }
     }
 
     .workarea-single-view {
@@ -42,12 +48,6 @@
       border-radius: 0.5rem;
       padding: 1rem;
     }
-    .workarea-split-view-left {
-      padding-right: 0.5rem;
-    }
-    .workarea-split-view-right {
-      padding-left: 0.5rem;
-    }
   }
 }
 .workarea-split-button {
@@ -56,7 +56,7 @@
   padding: 0.5rem;
   top: 0;
   right: 0;
-  z-index: 20;
+  // z-index: 20;
 
   &[data-selected='true'] {
     top: 0;
