@@ -3,9 +3,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
-import { setThreshold } from '../../optionsSlice';
+} from 'app/store';
+import IAINumberInput from 'common/components/IAINumberInput';
+import { setThreshold } from 'features/options/optionsSlice';
 
 export default function Threshold() {
   const dispatch = useAppDispatch();

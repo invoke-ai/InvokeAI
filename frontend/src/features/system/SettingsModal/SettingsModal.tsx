@@ -15,21 +15,22 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import _, { isEqual } from 'lodash';
 import { ChangeEvent, cloneElement, ReactElement } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import { persistor } from '../../../main';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { persistor } from 'main';
 import {
   InProgressImageType,
+  setEnableImageDebugging,
   setSaveIntermediatesInterval,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
   SystemState,
-} from '../systemSlice';
+} from 'features/system/systemSlice';
 import ModelList from './ModelList';
-import { IN_PROGRESS_IMAGE_TYPES } from '../../../app/constants';
-import IAISwitch from '../../../common/components/IAISwitch';
-import IAISelect from '../../../common/components/IAISelect';
-import IAINumberInput from '../../../common/components/IAINumberInput';
+import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
+import IAISwitch from 'common/components/IAISwitch';
+import IAISelect from 'common/components/IAISelect';
+import IAINumberInput from 'common/components/IAINumberInput';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -39,12 +40,16 @@ const systemSelector = createSelector(
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       model_list,
+      saveIntermediatesInterval,
+      enableImageDebugging,
     } = system;
     return {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
       models: _.map(model_list, (_model, key) => key),
+      saveIntermediatesInterval,
+      enableImageDebugging,
     };
   },
   {
@@ -66,10 +71,6 @@ type SettingsModalProps = {
 const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
 
-  const saveIntermediatesInterval = useAppSelector(
-    (state: RootState) => state.system.saveIntermediatesInterval
-  );
-
   const steps = useAppSelector((state: RootState) => state.options.steps);
 
   const {
@@ -88,6 +89,8 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldDisplayInProgressType,
     shouldConfirmOnDelete,
     shouldDisplayGuides,
+    saveIntermediatesInterval,
+    enableImageDebugging,
   } = useAppSelector(systemSelector);
 
   /**
@@ -115,9 +118,9 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
 
       <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
         <ModalOverlay />
-        <ModalContent className="settings-modal">
+        <ModalContent className="modal settings-modal">
           <ModalHeader className="settings-modal-header">Settings</ModalHeader>
-          <ModalCloseButton />
+          <ModalCloseButton className="modal-close-btn" />
           <ModalBody className="settings-modal-content">
             <div className="settings-modal-items">
               <div className="settings-modal-item">
@@ -170,6 +173,18 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               />
             </div>
 
+            <div className="settings-modal-items">
+              <h2 style={{ fontWeight: 'bold' }}>Developer</h2>
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={'Enable Image Debugging'}
+                isChecked={enableImageDebugging}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(setEnableImageDebugging(e.target.checked))
+                }
+              />
+            </div>
+
             <div className="settings-modal-reset">
               <Heading size={'md'}>Reset Web UI</Heading>
               <Button colorScheme="red" onClick={handleClickResetWebUI}>
@@ -189,7 +204,9 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           </ModalBody>
 
           <ModalFooter>
-            <Button onClick={onSettingsModalClose}>Close</Button>
+            <Button onClick={onSettingsModalClose} className="modal-close-btn">
+              Close
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

@@ -5,17 +5,17 @@ import { MouseEvent, ReactNode, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { CSSTransition } from 'react-transition-group';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import useClickOutsideWatcher from '../../common/hooks/useClickOutsideWatcher';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import useClickOutsideWatcher from 'common/hooks/useClickOutsideWatcher';
 import {
   OptionsState,
   setOptionsPanelScrollPosition,
   setShouldHoldOptionsPanelOpen,
   setShouldPinOptionsPanel,
   setShouldShowOptionsPanel,
-} from '../options/optionsSlice';
-import { setNeedsCache } from './Inpainting/inpaintingSlice';
-import InvokeAILogo from '../../assets/images/logo.png';
+} from 'features/options/optionsSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import InvokeAILogo from 'assets/images/logo.png';
 
 type Props = { children: ReactNode };
 
@@ -63,8 +63,10 @@ const InvokeOptionsPanel = (props: Props) => {
     'o',
     () => {
       dispatch(setShouldShowOptionsPanel(!shouldShowOptionsPanel));
+      shouldPinOptionsPanel &&
+        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
     },
-    [shouldShowOptionsPanel]
+    [shouldShowOptionsPanel, shouldPinOptionsPanel]
   );
 
   useHotkeys(
@@ -72,6 +74,7 @@ const InvokeOptionsPanel = (props: Props) => {
     () => {
       if (shouldPinOptionsPanel) return;
       dispatch(setShouldShowOptionsPanel(false));
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinOptionsPanel]
   );
@@ -80,6 +83,7 @@ const InvokeOptionsPanel = (props: Props) => {
     'shift+o',
     () => {
       handleClickPinOptionsPanel();
+      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinOptionsPanel]
   );
@@ -95,7 +99,7 @@ const InvokeOptionsPanel = (props: Props) => {
     );
     dispatch(setShouldShowOptionsPanel(false));
     dispatch(setShouldHoldOptionsPanelOpen(false));
-    // dispatch(setNeedsCache(true));
+    // dispatch(setDoesCanvasNeedScaling(true));
   }, [dispatch, shouldPinOptionsPanel]);
 
   useClickOutsideWatcher(
@@ -117,7 +121,7 @@ const InvokeOptionsPanel = (props: Props) => {
 
   const handleClickPinOptionsPanel = () => {
     dispatch(setShouldPinOptionsPanel(!shouldPinOptionsPanel));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   return (

@@ -1,12 +1,12 @@
 import { MdCancel } from 'react-icons/md';
-import { cancelProcessing } from '../../../app/socketio/actions';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
+import { cancelProcessing } from 'app/socketio/actions';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton, {
   IAIIconButtonProps,
-} from '../../../common/components/IAIIconButton';
+} from 'common/components/IAIIconButton';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { createSelector } from '@reduxjs/toolkit';
-import { SystemState } from '../../system/systemSlice';
+import { SystemState } from 'features/system/systemSlice';
 import _ from 'lodash';
 
 const cancelButtonSelector = createSelector(

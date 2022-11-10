@@ -1,17 +1,15 @@
 import { ListItem, UnorderedList } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaPlay } from 'react-icons/fa';
-import { readinessSelector } from '../../../app/selectors/readinessSelector';
-import { generateImage } from '../../../app/socketio/actions';
-import { useAppDispatch, useAppSelector } from '../../../app/store';
-import IAIButton, {
-  IAIButtonProps,
-} from '../../../common/components/IAIButton';
+import { readinessSelector } from 'app/selectors/readinessSelector';
+import { generateImage } from 'app/socketio/actions';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
-} from '../../../common/components/IAIIconButton';
-import IAIPopover from '../../../common/components/IAIPopover';
-import { activeTabNameSelector } from '../optionsSelectors';
+} from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -29,7 +27,7 @@ export default function InvokeButton(props: InvokeButton) {
   };
 
   useHotkeys(
-    'ctrl+enter, cmd+enter',
+    ['ctrl+enter', 'meta+enter'],
     () => {
       if (isReady) {
         dispatch(generateImage(activeTabName));
@@ -47,7 +45,7 @@ export default function InvokeButton(props: InvokeButton) {
           icon={<FaPlay />}
           isDisabled={!isReady}
           onClick={handleClickGenerate}
-          className="invoke-btn invoke"
+          className="invoke-btn"
           tooltip="Invoke"
           tooltipProps={{ placement: 'bottom' }}
           {...rest}
@@ -80,20 +78,4 @@ export default function InvokeButton(props: InvokeButton) {
       )}
     </IAIPopover>
   );
-
-  // return isReady ? (
-  //   buttonComponent
-  // ) : (
-  //   <IAIPopover trigger="hover" triggerComponent={buttonComponent}>
-  //     {reasonsWhyNotReady ? (
-  //       <UnorderedList>
-  //         {reasonsWhyNotReady.map((reason, i) => (
-  //           <ListItem key={i}>{reason}</ListItem>
-  //         ))}
-  //       </UnorderedList>
-  //     ) : (
-  //       'test'
-  //     )}
-  //   </IAIPopover>
-  // );
 }

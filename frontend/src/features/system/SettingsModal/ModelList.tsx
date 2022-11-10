@@ -10,10 +10,10 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { ModelStatus } from '../../../app/invokeai';
-import { requestModelChange } from '../../../app/socketio/actions';
-import { RootState, useAppDispatch, useAppSelector } from '../../../app/store';
-import { SystemState } from '../systemSlice';
+import { ModelStatus } from 'app/invokeai';
+import { requestModelChange } from 'app/socketio/actions';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { SystemState } from 'features/system/systemSlice';
 
 type ModelListItemProps = {
   name: string;

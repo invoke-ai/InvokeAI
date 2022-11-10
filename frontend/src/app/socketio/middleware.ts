@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import makeSocketIOListeners from './listeners';
 import makeSocketIOEmitters from './emitters';
 
-import * as InvokeAI from '../invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 /**
  * Creates a socketio middleware to handle communication with server.
@@ -104,12 +104,9 @@ export const socketioMiddleware = () => {
         onImageDeleted(data);
       });
 
-      socketio.on(
-        'imageUploaded',
-        (data: InvokeAI.ImageUploadResponse) => {
-          onImageUploaded(data);
-        }
-      );
+      socketio.on('imageUploaded', (data: InvokeAI.ImageUploadResponse) => {
+        onImageUploaded(data);
+      });
 
       socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
         onMaskImageUploaded(data);

@@ -35,7 +35,7 @@
   }
 
   .image-gallery-popup {
-    background-color: var(--tab-color);
+    background-color: var(--background-color-secondary);
     padding: 1rem;
     display: flex;
     flex-direction: column;
@@ -55,16 +55,16 @@
       column-gap: 0.5rem;
       justify-content: space-between;
 
-      div {
+      .image-gallery-header-right-icons {
         display: flex;
-        column-gap: 0.5rem;
+        flex-direction: row;
         column-gap: 0.5rem;
       }
 
       .image-gallery-icon-btn {
-        background-color: var(--btn-load-more) !important;
+        background-color: var(--btn-load-more);
         &:hover {
-          background-color: var(--btn-load-more-hover) !important;
+          background-color: var(--btn-load-more-hover);
         }
       }
 
@@ -96,7 +96,8 @@
       .image-gallery-container-placeholder {
         display: flex;
         flex-direction: column;
-        background-color: var(--background-color-secondary);
+        row-gap: 0.5rem;
+        background-color: var(--background-color);
         border-radius: 0.5rem;
         place-items: center;
         padding: 2rem;
@@ -108,26 +109,26 @@
         }
 
         svg {
-          width: 5rem;
-          height: 5rem;
+          width: 4rem;
+          height: 4rem;
           color: var(--svg-color);
         }
       }
 
       .image-gallery-load-more-btn {
-        background-color: var(--btn-load-more) !important;
-        font-size: 0.85rem !important;
+        background-color: var(--btn-load-more);
+        font-size: 0.85rem;
         padding: 0.5rem;
         margin-top: 1rem;
 
         &:disabled {
           &:hover {
-            background-color: var(--btn-load-more) !important;
+            background-color: var(--btn-load-more);
           }
         }
 
         &:hover {
-          background-color: var(--btn-load-more-hover) !important;
+          background-color: var(--btn-load-more-hover);
         }
       }
     }
@@ -135,11 +136,15 @@
 }
 
 .image-gallery-category-btn-group {
-  width: 100% !important;
-  column-gap: 0 !important;
-  justify-content: stretch !important;
+  width: max-content;
+  column-gap: 0;
+  justify-content: stretch;
 
   button {
+    background-color: var(--btn-base-color);
+    &:hover {
+      background-color: var(--btn-base-color-hover);
+    }
     flex-grow: 1;
     &[data-selected='true'] {
       background-color: var(--accent-color);

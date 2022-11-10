@@ -1,10 +1,6 @@
-import { Link, useColorMode } from '@chakra-ui/react';
-
-import { useHotkeys } from 'react-hotkeys-hook';
+import { Link } from '@chakra-ui/react';
 
 import {
-  FaSun,
-  FaMoon,
   FaGithub,
   FaDiscord,
   FaBug,
@@ -12,28 +8,19 @@ import {
   FaWrench,
 } from 'react-icons/fa';
 
-import InvokeAILogo from '../../assets/images/logo.png';
-import IAIIconButton from '../../common/components/IAIIconButton';
+import InvokeAILogo from 'assets/images/logo.png';
+import IAIIconButton from 'common/components/IAIIconButton';
 
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 
 import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
+import ThemeChanger from './ThemeChanger';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
  */
 const SiteHeader = () => {
-  const { colorMode, toggleColorMode } = useColorMode();
-
-  useHotkeys(
-    'shift+d',
-    () => {
-      toggleColorMode();
-    },
-    [colorMode, toggleColorMode]
-  );
-
   return (
     <div className="site-header">
       <div className="site-header-left-side">
@@ -58,16 +45,7 @@ const SiteHeader = () => {
           />
         </HotkeysModal>
 
-        <IAIIconButton
-          aria-label="Toggle Dark Mode"
-          tooltip="Dark Mode"
-          onClick={toggleColorMode}
-          variant="link"
-          data-variant="link"
-          fontSize={20}
-          size={'sm'}
-          icon={colorMode === 'light' ? <FaMoon /> : <FaSun />}
-        />
+        <ThemeChanger />
 
         <IAIIconButton
           aria-label="Report Bug"

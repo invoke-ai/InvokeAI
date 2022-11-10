@@ -4,9 +4,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAISwitch from '../../../../common/components/IAISwitch';
-import { setShouldRunESRGAN } from '../../optionsSlice';
+} from 'app/store';
+import IAISwitch from 'common/components/IAISwitch';
+import { setShouldRunESRGAN } from 'features/options/optionsSlice';
 
 export default function UpscaleHeader() {
   const isESRGANAvailable = useAppSelector(

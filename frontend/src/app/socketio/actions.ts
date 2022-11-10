@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
-import { GalleryCategory } from '../../features/gallery/gallerySlice';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import * as InvokeAI from '../invokeai';
+import { GalleryCategory } from 'features/gallery/gallerySlice';
+import { InvokeTabName } from 'features/tabs/InvokeTabs';
+import * as InvokeAI from 'app/invokeai';
 
 
 /**

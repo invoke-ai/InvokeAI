@@ -1,24 +1,25 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { useAppDispatch, useAppSelector } from '../../app/store';
-import { RootState } from '../../app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
 import {
   OptionsState,
   setActiveTab,
   setAllParameters,
   setInitialImage,
+  setIsLightBoxOpen,
   setPrompt,
   setSeed,
   setShouldShowImageDetails,
-} from '../options/optionsSlice';
+} from 'features/options/optionsSlice';
 import DeleteImageModal from './DeleteImageModal';
-import { SystemState } from '../system/systemSlice';
-import IAIButton from '../../common/components/IAIButton';
-import { runESRGAN, runFacetool } from '../../app/socketio/actions';
-import IAIIconButton from '../../common/components/IAIIconButton';
-import UpscaleOptions from '../options/AdvancedOptions/Upscale/UpscaleOptions';
-import FaceRestoreOptions from '../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
+import { SystemState } from 'features/system/systemSlice';
+import IAIButton from 'common/components/IAIButton';
+import { runESRGAN, runFacetool } from 'app/socketio/actions';
+import IAIIconButton from 'common/components/IAIIconButton';
+import UpscaleOptions from 'features/options/AdvancedOptions/Upscale/UpscaleOptions';
+import FaceRestoreOptions from 'features/options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { ButtonGroup, Link, useClipboard, useToast } from '@chakra-ui/react';
 import {
@@ -36,11 +37,12 @@ import {
 } from 'react-icons/fa';
 import {
   setImageToInpaint,
-  setNeedsCache,
-} from '../tabs/Inpainting/inpaintingSlice';
+  setDoesCanvasNeedScaling,
+  setImageToOutpaint,
+} from 'features/canvas/canvasSlice';
 import { GalleryState } from './gallerySlice';
-import { activeTabNameSelector } from '../options/optionsSelectors';
-import IAIPopover from '../../common/components/IAIPopover';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import IAIPopover from 'common/components/IAIPopover';
 
 const systemSelector = createSelector(
   [
@@ -58,8 +60,12 @@ const systemSelector = createSelector(
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
       system;
 
-    const { upscalingLevel, facetoolStrength, shouldShowImageDetails } =
-      options;
+    const {
+      upscalingLevel,
+      facetoolStrength,
+      shouldShowImageDetails,
+      isLightBoxOpen,
+    } = options;
 
     const { intermediateImage, currentImage } = gallery;
 
@@ -74,6 +80,7 @@ const systemSelector = createSelector(
       currentImage,
       shouldShowImageDetails,
       activeTabName,
+      isLightBoxOpen,
     };
   },
   {
@@ -99,28 +106,31 @@ const CurrentImageButtons = () => {
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
     currentImage,
+    isLightBoxOpen,
   } = useAppSelector(systemSelector);
-
-  const { onCopy } = useClipboard(
-    currentImage ? window.location.toString() + currentImage.url : ''
-  );
 
   const toast = useToast();
 
   const handleClickUseAsInitialImage = () => {
     if (!currentImage) return;
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setInitialImage(currentImage));
     dispatch(setActiveTab('img2img'));
   };
 
   const handleCopyImageLink = () => {
-    onCopy();
-    toast({
-      title: 'Image Link Copied',
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
+    navigator.clipboard
+      .writeText(
+        currentImage ? window.location.toString() + currentImage.url : ''
+      )
+      .then(() => {
+        toast({
+          title: 'Image Link Copied',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        });
+      });
   };
 
   useHotkeys(
@@ -308,11 +318,27 @@ const CurrentImageButtons = () => {
 
   const handleSendToInpainting = () => {
     if (!currentImage) return;
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
     dispatch(setImageToInpaint(currentImage));
-
     dispatch(setActiveTab('inpainting'));
-    dispatch(setNeedsCache(true));
+    dispatch(setDoesCanvasNeedScaling(true));
+
+    toast({
+      title: 'Sent to Inpainting',
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
+  const handleSendToOutpainting = () => {
+    if (!currentImage) return;
+    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+
+    dispatch(setImageToOutpaint(currentImage));
+    dispatch(setActiveTab('outpainting'));
+    dispatch(setDoesCanvasNeedScaling(true));
 
     toast({
       title: 'Sent to Inpainting',
@@ -362,6 +388,13 @@ const CurrentImageButtons = () => {
               leftIcon={<FaShare />}
             >
               Send to Inpainting
+            </IAIButton>
+            <IAIButton
+              size={'sm'}
+              onClick={handleSendToOutpainting}
+              leftIcon={<FaShare />}
+            >
+              Send to Outpainting
             </IAIButton>
             <IAIButton
               size={'sm'}

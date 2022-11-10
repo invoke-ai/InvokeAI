@@ -1,12 +1,12 @@
 import React from 'react';
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../../../app/constants';
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
-import { setSeed } from '../../optionsSlice';
+} from 'app/store';
+import IAINumberInput from 'common/components/IAINumberInput';
+import { setSeed } from 'features/options/optionsSlice';
 
 export default function Seed() {
   const seed = useAppSelector((state: RootState) => state.options.seed);

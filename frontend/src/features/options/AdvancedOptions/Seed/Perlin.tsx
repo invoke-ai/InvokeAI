@@ -3,9 +3,9 @@ import {
   RootState,
   useAppDispatch,
   useAppSelector,
-} from '../../../../app/store';
-import IAINumberInput from '../../../../common/components/IAINumberInput';
-import { setPerlin } from '../../optionsSlice';
+} from 'app/store';
+import IAINumberInput from 'common/components/IAINumberInput';
+import { setPerlin } from 'features/options/optionsSlice';
 
 export default function Perlin() {
   const dispatch = useAppDispatch();

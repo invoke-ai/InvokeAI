@@ -1,5 +1,5 @@
 import TextToImagePanel from './TextToImagePanel';
-import InvokeWorkarea from '../InvokeWorkarea';
+import InvokeWorkarea from 'features/tabs/InvokeWorkarea';
 import TextToImageDisplay from './TextToImageDisplay';
 
 export default function TextToImageWorkarea() {

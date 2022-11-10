@@ -4,23 +4,24 @@ import { Socket } from 'socket.io-client';
 import {
   frontendToBackendParameters,
   FrontendToBackendParametersConfig,
-} from '../../common/util/parameterTranslation';
+} from 'common/util/parameterTranslation';
 import {
   GalleryCategory,
   GalleryState,
   removeImage,
-} from '../../features/gallery/gallerySlice';
-import { OptionsState } from '../../features/options/optionsSlice';
+} from 'features/gallery/gallerySlice';
+import { OptionsState } from 'features/options/optionsSlice';
 import {
   addLogEntry,
   errorOccurred,
   modelChangeRequested,
   setIsProcessing,
-} from '../../features/system/systemSlice';
-import { inpaintingImageElementRef } from '../../features/tabs/Inpainting/InpaintingCanvas';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import * as InvokeAI from '../invokeai';
-import { RootState } from '../store';
+} from 'features/system/systemSlice';
+import { inpaintingImageElementRef } from 'features/canvas/IAICanvas';
+import { InvokeTabName } from 'features/tabs/InvokeTabs';
+import * as InvokeAI from 'app/invokeai';
+import { RootState } from 'app/store';
+import { baseCanvasImageSelector } from 'features/canvas/canvasSlice';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -42,7 +43,7 @@ const makeSocketIOEmitters = (
       const {
         options: optionsState,
         system: systemState,
-        inpainting: inpaintingState,
+        canvas: canvasState,
         gallery: galleryState,
       } = state;
 
@@ -50,15 +51,15 @@ const makeSocketIOEmitters = (
         {
           generationMode,
           optionsState,
-          inpaintingState,
+          canvasState,
           systemState,
         };
 
-      if (generationMode === 'inpainting') {
-        if (
-          !inpaintingImageElementRef.current ||
-          !inpaintingState.imageToInpaint?.url
-        ) {
+      if (['inpainting', 'outpainting'].includes(generationMode)) {
+        const baseCanvasImage = baseCanvasImageSelector(getState());
+        const imageUrl = baseCanvasImage?.url;
+
+        if (!inpaintingImageElementRef.current || !imageUrl) {
           dispatch(
             addLogEntry({
               timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -70,11 +71,10 @@ const makeSocketIOEmitters = (
           return;
         }
 
-        frontendToBackendParametersConfig.imageToProcessUrl =
-          inpaintingState.imageToInpaint.url;
+        frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
 
-        frontendToBackendParametersConfig.maskImageElement =
-          inpaintingImageElementRef.current;
+        // frontendToBackendParametersConfig.maskImageElement =
+        //   inpaintingImageElementRef.current;
       } else if (!['txt2img', 'img2img'].includes(generationMode)) {
         if (!galleryState.currentImage?.url) return;
 
@@ -96,7 +96,12 @@ const makeSocketIOEmitters = (
       // TODO: handle maintaining masks for reproducibility in future
       if (generationParameters.init_mask) {
         generationParameters.init_mask = generationParameters.init_mask
-          .substr(0, 20)
+          .substr(0, 64)
+          .concat('...');
+      }
+      if (generationParameters.init_img) {
+        generationParameters.init_img = generationParameters.init_img
+          .substr(0, 64)
           .concat('...');
       }
 

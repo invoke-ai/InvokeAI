@@ -1,23 +1,23 @@
-import { Feature } from '../../../app/features';
-import { RootState, useAppSelector } from '../../../app/store';
-import FaceRestoreHeader from '../../options/AdvancedOptions/FaceRestore/FaceRestoreHeader';
-import FaceRestoreOptions from '../../options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
-import ImageFit from '../../options/AdvancedOptions/ImageToImage/ImageFit';
-import ImageToImageStrength from '../../options/AdvancedOptions/ImageToImage/ImageToImageStrength';
-import OutputHeader from '../../options/AdvancedOptions/Output/OutputHeader';
-import OutputOptions from '../../options/AdvancedOptions/Output/OutputOptions';
-import SeedHeader from '../../options/AdvancedOptions/Seed/SeedHeader';
-import SeedOptions from '../../options/AdvancedOptions/Seed/SeedOptions';
-import UpscaleHeader from '../../options/AdvancedOptions/Upscale/UpscaleHeader';
-import UpscaleOptions from '../../options/AdvancedOptions/Upscale/UpscaleOptions';
-import VariationsHeader from '../../options/AdvancedOptions/Variations/VariationsHeader';
-import VariationsOptions from '../../options/AdvancedOptions/Variations/VariationsOptions';
-import MainAdvancedOptionsCheckbox from '../../options/MainOptions/MainAdvancedOptionsCheckbox';
-import MainOptions from '../../options/MainOptions/MainOptions';
-import OptionsAccordion from '../../options/OptionsAccordion';
-import ProcessButtons from '../../options/ProcessButtons/ProcessButtons';
-import PromptInput from '../../options/PromptInput/PromptInput';
-import InvokeOptionsPanel from '../InvokeOptionsPanel';
+import { Feature } from 'app/features';
+import { RootState, useAppSelector } from 'app/store';
+import FaceRestoreHeader from 'features/options/AdvancedOptions/FaceRestore/FaceRestoreHeader';
+import FaceRestoreOptions from 'features/options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
+import ImageFit from 'features/options/AdvancedOptions/ImageToImage/ImageFit';
+import ImageToImageStrength from 'features/options/AdvancedOptions/ImageToImage/ImageToImageStrength';
+import OutputHeader from 'features/options/AdvancedOptions/Output/OutputHeader';
+import OutputOptions from 'features/options/AdvancedOptions/Output/OutputOptions';
+import SeedHeader from 'features/options/AdvancedOptions/Seed/SeedHeader';
+import SeedOptions from 'features/options/AdvancedOptions/Seed/SeedOptions';
+import UpscaleHeader from 'features/options/AdvancedOptions/Upscale/UpscaleHeader';
+import UpscaleOptions from 'features/options/AdvancedOptions/Upscale/UpscaleOptions';
+import VariationsHeader from 'features/options/AdvancedOptions/Variations/VariationsHeader';
+import VariationsOptions from 'features/options/AdvancedOptions/Variations/VariationsOptions';
+import MainAdvancedOptionsCheckbox from 'features/options/MainOptions/MainAdvancedOptionsCheckbox';
+import MainOptions from 'features/options/MainOptions/MainOptions';
+import OptionsAccordion from 'features/options/OptionsAccordion';
+import ProcessButtons from 'features/options/ProcessButtons/ProcessButtons';
+import PromptInput from 'features/options/PromptInput/PromptInput';
+import InvokeOptionsPanel from 'features/tabs/InvokeOptionsPanel';
 
 export default function ImageToImagePanel() {
   const showAdvancedOptions = useAppSelector(

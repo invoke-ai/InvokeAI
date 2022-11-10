@@ -1,21 +1,21 @@
 import { useEffect } from 'react';
-import ProgressBar from '../features/system/ProgressBar';
-import SiteHeader from '../features/system/SiteHeader';
-import Console from '../features/system/Console';
+import ProgressBar from 'features/system/ProgressBar';
+import SiteHeader from 'features/system/SiteHeader';
+import Console from 'features/system/Console';
 import { useAppDispatch } from './store';
 import { requestSystemConfig } from './socketio/actions';
 import { keepGUIAlive } from './utils';
-import InvokeTabs from '../features/tabs/InvokeTabs';
-import ImageUploader from '../common/components/ImageUploader';
-import { RootState, useAppSelector } from '../app/store';
+import InvokeTabs from 'features/tabs/InvokeTabs';
+import ImageUploader from 'common/components/ImageUploader';
+import { RootState, useAppSelector } from 'app/store';
 
-import FloatingGalleryButton from '../features/tabs/FloatingGalleryButton';
-import FloatingOptionsPanelButtons from '../features/tabs/FloatingOptionsPanelButtons';
+import FloatingGalleryButton from 'features/tabs/FloatingGalleryButton';
+import FloatingOptionsPanelButtons from 'features/tabs/FloatingOptionsPanelButtons';
 import { createSelector } from '@reduxjs/toolkit';
-import { GalleryState } from '../features/gallery/gallerySlice';
-import { OptionsState } from '../features/options/optionsSlice';
-import { activeTabNameSelector } from '../features/options/optionsSelectors';
-import { SystemState } from '../features/system/systemSlice';
+import { GalleryState } from 'features/gallery/gallerySlice';
+import { OptionsState } from 'features/options/optionsSlice';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { SystemState } from 'features/system/systemSlice';
 import _ from 'lodash';
 import { Model } from './invokeai';
 
@@ -51,16 +51,20 @@ const appSelector = createSelector(
       ''
     );
 
-    const shouldShowGalleryButton = !(
-      shouldShowGallery ||
-      (shouldHoldGalleryOpen && !shouldPinGallery)
-    );
+    const shouldShowGalleryButton =
+      !(shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)) &&
+      ['txt2img', 'img2img', 'inpainting', 'outpainting'].includes(
+        activeTabName
+      );
 
     const shouldShowOptionsPanelButton =
       !(
         shouldShowOptionsPanel ||
         (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
-      ) && ['txt2img', 'img2img', 'inpainting'].includes(activeTabName);
+      ) &&
+      ['txt2img', 'img2img', 'inpainting', 'outpainting'].includes(
+        activeTabName
+      );
 
     return {
       modelStatusText,
@@ -80,10 +84,6 @@ const App = () => {
 
   const { shouldShowGalleryButton, shouldShowOptionsPanelButton } =
     useAppSelector(appSelector);
-
-  useEffect(() => {
-    dispatch(requestSystemConfig());
-  }, [dispatch]);
 
   return (
     <div className="App">

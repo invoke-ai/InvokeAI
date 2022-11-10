@@ -13,11 +13,18 @@
     max-width: 25rem;
   }
 
+  .current-image-send-to-popover {
+    .invokeai__button {
+      place-content: start;
+    }
+  }
+
   .chakra-popover__popper {
     z-index: 11;
   }
 
   .delete-image-btn {
+    background-color: var(--btn-base-color);
     svg {
       fill: var(--btn-delete-image);
     }

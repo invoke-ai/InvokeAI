@@ -1,10 +1,10 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import * as InvokeAI from '../../app/invokeai';
-import promptToString from '../../common/util/promptToString';
-import { seedWeightsToString } from '../../common/util/seedWeightPairs';
-import { FACETOOL_TYPES } from '../../app/constants';
-import { InvokeTabName, tabMap } from '../tabs/InvokeTabs';
+import * as InvokeAI from 'app/invokeai';
+import promptToString from 'common/util/promptToString';
+import { seedWeightsToString } from 'common/util/seedWeightPairs';
+import { FACETOOL_TYPES } from 'app/constants';
+import { InvokeTabName, tabMap } from 'features/tabs/InvokeTabs';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -47,6 +47,8 @@ export interface OptionsState {
   optionsPanelScrollPosition: number;
   shouldHoldOptionsPanelOpen: boolean;
   shouldLoopback: boolean;
+  currentTheme: string;
+  isLightBoxOpen: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -85,6 +87,8 @@ const initialOptionsState: OptionsState = {
   optionsPanelScrollPosition: 0,
   shouldHoldOptionsPanelOpen: false,
   shouldLoopback: false,
+  currentTheme: 'dark',
+  isLightBoxOpen: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -349,6 +353,12 @@ export const optionsSlice = createSlice({
     setShouldLoopback: (state, action: PayloadAction<boolean>) => {
       state.shouldLoopback = action.payload;
     },
+    setCurrentTheme: (state, action: PayloadAction<string>) => {
+      state.currentTheme = action.payload;
+    },
+    setIsLightBoxOpen: (state, action: PayloadAction<boolean>) => {
+      state.isLightBoxOpen = action.payload;
+    },
   },
 });
 
@@ -396,6 +406,8 @@ export const {
   setOptionsPanelScrollPosition,
   setShouldHoldOptionsPanelOpen,
   setShouldLoopback,
+  setCurrentTheme,
+  setIsLightBoxOpen,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

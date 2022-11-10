@@ -2,21 +2,32 @@ import { Tab, TabPanel, TabPanels, Tabs, Tooltip } from '@chakra-ui/react';
 import _ from 'lodash';
 import React, { ReactElement } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import NodesWIP from '../../common/components/WorkInProgress/NodesWIP';
-import OutpaintingWIP from '../../common/components/WorkInProgress/OutpaintingWIP';
-import { PostProcessingWIP } from '../../common/components/WorkInProgress/PostProcessingWIP';
-import ImageToImageIcon from '../../common/icons/ImageToImageIcon';
-import InpaintIcon from '../../common/icons/InpaintIcon';
-import NodesIcon from '../../common/icons/NodesIcon';
-import OutpaintIcon from '../../common/icons/OutpaintIcon';
-import PostprocessingIcon from '../../common/icons/PostprocessingIcon';
-import TextToImageIcon from '../../common/icons/TextToImageIcon';
-import { setActiveTab } from '../options/optionsSlice';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
+import OutpaintingWIP from 'common/components/WorkInProgress/OutpaintingWIP';
+import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
+import ImageToImageIcon from 'common/icons/ImageToImageIcon';
+import InpaintIcon from 'common/icons/InpaintIcon';
+import NodesIcon from 'common/icons/NodesIcon';
+import OutpaintIcon from 'common/icons/OutpaintIcon';
+import PostprocessingIcon from 'common/icons/PostprocessingIcon';
+import TextToImageIcon from 'common/icons/TextToImageIcon';
+import {
+  setActiveTab,
+  setIsLightBoxOpen,
+  setShouldShowOptionsPanel,
+} from 'features/options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
-import InpaintingWorkarea from './Inpainting';
-import { setNeedsCache } from './Inpainting/inpaintingSlice';
+import InpaintingWorkarea from './Inpainting/InpaintingWorkarea';
+// import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
 import TextToImageWorkarea from './TextToImage';
+import Lightbox from 'features/lightbox/Lightbox';
+import {
+  setCurrentCanvas,
+  setDoesCanvasNeedScaling,
+} from 'features/canvas/canvasSlice';
+import OutpaintingWorkarea from './Outpainting/OutpaintingWorkarea';
+import { setShouldShowGallery } from 'features/gallery/gallerySlice';
 
 export const tabDict = {
   txt2img: {
@@ -36,7 +47,7 @@ export const tabDict = {
   },
   outpainting: {
     title: <OutpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    workarea: <OutpaintingWIP />,
+    workarea: <OutpaintingWorkarea />,
     tooltip: 'Outpainting',
   },
   nodes: {
@@ -62,6 +73,15 @@ export default function InvokeTabs() {
   const activeTab = useAppSelector(
     (state: RootState) => state.options.activeTab
   );
+  const isLightBoxOpen = useAppSelector(
+    (state: RootState) => state.options.isLightBoxOpen
+  );
+  const shouldShowGallery = useAppSelector(
+    (state: RootState) => state.gallery.shouldShowGallery
+  );
+  const shouldShowOptionsPanel = useAppSelector(
+    (state: RootState) => state.options.shouldShowOptionsPanel
+  );
   const dispatch = useAppDispatch();
 
   useHotkeys('1', () => {
@@ -74,7 +94,6 @@ export default function InvokeTabs() {
 
   useHotkeys('3', () => {
     dispatch(setActiveTab(2));
-    dispatch(setNeedsCache(true));
   });
 
   useHotkeys('4', () => {
@@ -88,6 +107,30 @@ export default function InvokeTabs() {
   useHotkeys('6', () => {
     dispatch(setActiveTab(5));
   });
+
+  // Lightbox Hotkey
+  useHotkeys(
+    'v',
+    () => {
+      dispatch(setIsLightBoxOpen(!isLightBoxOpen));
+    },
+    [isLightBoxOpen]
+  );
+
+  useHotkeys(
+    'f',
+    () => {
+      if (shouldShowGallery || shouldShowOptionsPanel) {
+        dispatch(setShouldShowOptionsPanel(false));
+        dispatch(setShouldShowGallery(false));
+      } else {
+        dispatch(setShouldShowOptionsPanel(true));
+        dispatch(setShouldShowGallery(true));
+      }
+      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+    },
+    [shouldShowGallery, shouldShowOptionsPanel]
+  );
 
   const renderTabs = () => {
     const tabsToRender: ReactElement[] = [];
@@ -127,11 +170,13 @@ export default function InvokeTabs() {
       index={activeTab}
       onChange={(index: number) => {
         dispatch(setActiveTab(index));
-        dispatch(setNeedsCache(true));
+        dispatch(setDoesCanvasNeedScaling(true));
       }}
     >
       <div className="app-tabs-list">{renderTabs()}</div>
-      <TabPanels className="app-tabs-panels">{renderTabPanels()}</TabPanels>
+      <TabPanels className="app-tabs-panels">
+        {isLightBoxOpen ? <Lightbox /> : renderTabPanels()}
+      </TabPanels>
     </Tabs>
   );
 }

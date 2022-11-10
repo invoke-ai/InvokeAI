@@ -8,7 +8,7 @@ import torchvision.transforms as T
 import numpy as  np
 import cv2 as cv
 import PIL
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageFilter, ImageOps, ImageChops
 from skimage.exposure.histogram_matching import match_histograms
 from einops import rearrange, repeat
 from ldm.invoke.devices             import choose_autocast
@@ -16,6 +16,7 @@ from ldm.invoke.generator.img2img   import Img2Img
 from ldm.models.diffusion.ddim     import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.invoke.generator.base import downsampling
+from ldm.util import debug_image
 
 class Inpaint(Img2Img):
     def __init__(self, model, precision):
@@ -46,6 +47,13 @@ class Inpaint(Img2Img):
         # Only fill if there's an alpha layer
         if im.mode != 'RGBA':
             return im
+
+        # # HACK PATCH MATCH
+        # from src.PyPatchMatch import patch_match
+        # im_patched_np = patch_match.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
+        # im_patched = Image.fromarray(im_patched_np, mode = 'RGB')
+        # return im_patched
+        # # /HACK
 
         a = np.asarray(im, dtype=np.uint8)
 
@@ -150,9 +158,7 @@ class Inpaint(Img2Img):
                        seam_steps: int = 10,
                        tile_size: int = 32,
                        step_callback=None,
-                       inpaint_replace=False,
-                       inpaint_width=None,
-                       inpaint_height=None,
+                       inpaint_replace=False, enable_image_debugging=False,
                        **kwargs):
         """
         Returns a function returning an image derived from the prompt and
@@ -160,8 +166,7 @@ class Inpaint(Img2Img):
         the time you call it.  kwargs are 'init_latent' and 'strength'
         """
 
-        self.inpaint_width = inpaint_width
-        self.inpaint_height = inpaint_height
+        self.enable_image_debugging = enable_image_debugging
 
         if isinstance(init_image, PIL.Image.Image):
             self.pil_image = init_image
@@ -174,21 +179,17 @@ class Inpaint(Img2Img):
                 tile_size = tile_size
             )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
-
-            # Resize if requested for inpainting
-            if inpaint_width and inpaint_height:
-                init_filled = init_filled.resize((inpaint_width, inpaint_height))
-
+            debug_image(init_filled, "init_filled", debug_status=self.enable_image_debugging)
+            
             # Create init tensor
             init_image = self._image_to_tensor(init_filled.convert('RGB'))
 
         if isinstance(mask_image, PIL.Image.Image):
             self.pil_mask = mask_image
+            debug_image(mask_image, "mask_image BEFORE multiply with pil_image", debug_status=self.enable_image_debugging)
 
-            # Resize if requested for inpainting
-            if inpaint_width and inpaint_height:
-                mask_image = mask_image.resize((inpaint_width, inpaint_height))
-
+            mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert('RGB'))
+            debug_image(mask_image, "mask_image AFTER multiply with pil_image", debug_status=self.enable_image_debugging)
             mask_image = mask_image.resize(
                 (
                     mask_image.width // downsampling,
@@ -277,59 +278,14 @@ class Inpaint(Img2Img):
         return make_image
 
 
-    def color_correct(self, image: Image.Image, base_image: Image.Image, mask: Image.Image, mask_blur_radius: int) -> Image.Image:
-        # Get the original alpha channel of the mask if there is one.
-        # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
-        pil_init_mask = mask.getchannel('A') if mask.mode == 'RGBA' else mask.convert('L')
-        pil_init_image = base_image.convert('RGBA') # Add an alpha channel if one doesn't exist
-
-        # Build an image with only visible pixels from source to use as reference for color-matching.
-        init_rgb_pixels = np.asarray(base_image.convert('RGB'), dtype=np.uint8)
-        init_a_pixels = np.asarray(pil_init_image.getchannel('A'), dtype=np.uint8)
-        init_mask_pixels = np.asarray(pil_init_mask, dtype=np.uint8)
-
-        # Get numpy version of result
-        np_image = np.asarray(image, dtype=np.uint8)
-
-        # Mask and calculate mean and standard deviation
-        mask_pixels = init_a_pixels * init_mask_pixels > 0
-        np_init_rgb_pixels_masked = init_rgb_pixels[mask_pixels, :]
-        np_image_masked = np_image[mask_pixels, :]
-
-        init_means = np_init_rgb_pixels_masked.mean(axis=0)
-        init_std = np_init_rgb_pixels_masked.std(axis=0)
-        gen_means = np_image_masked.mean(axis=0)
-        gen_std = np_image_masked.std(axis=0)
-
-        # Color correct
-        np_matched_result = np_image.copy()
-        np_matched_result[:,:,:] = (((np_matched_result[:,:,:].astype(np.float32) - gen_means[None,None,:]) / gen_std[None,None,:]) * init_std[None,None,:] + init_means[None,None,:]).clip(0, 255).astype(np.uint8)
-        matched_result = Image.fromarray(np_matched_result, mode='RGB')
-
-        # Blur the mask out (into init image) by specified amount
-        if mask_blur_radius > 0:
-            nm = np.asarray(pil_init_mask, dtype=np.uint8)
-            nmd = cv.erode(nm, kernel=np.ones((3,3), dtype=np.uint8), iterations=int(mask_blur_radius / 2))
-            pmd = Image.fromarray(nmd, mode='L')
-            blurred_init_mask = pmd.filter(ImageFilter.BoxBlur(mask_blur_radius))
-        else:
-            blurred_init_mask = pil_init_mask
-
-        # Paste original on color-corrected generation (using blurred mask)
-        matched_result.paste(base_image, (0,0), mask = blurred_init_mask)
-        return matched_result
-
-
     def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
-
-        # Resize if necessary
-        if self.inpaint_width and self.inpaint_height:
-            gen_result = gen_result.resize(self.pil_image.size)
+        debug_image(gen_result, "gen_result", debug_status=self.enable_image_debugging)
 
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
         
-        corrected_result = self.color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
+        corrected_result = super().repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
+        debug_image(corrected_result, "corrected_result", debug_status=self.enable_image_debugging)
 
         return corrected_result

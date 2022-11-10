@@ -1,20 +1,21 @@
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
-import { OptionsState } from '../../features/options/optionsSlice';
-import { SystemState } from '../../features/system/systemSlice';
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
+import { OptionsState } from 'features/options/optionsSlice';
+import { SystemState } from 'features/system/systemSlice';
 
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice';
-import generateMask from '../../features/tabs/Inpainting/util/generateMask';
+import { InvokeTabName } from 'features/tabs/InvokeTabs';
+import { CanvasState, isCanvasMaskLine } from 'features/canvas/canvasSlice';
+import generateMask from 'features/canvas/util/generateMask';
+import { canvasImageLayerRef } from 'features/canvas/IAICanvas';
+import openBase64ImageInTab from './openBase64ImageInTab';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
   optionsState: OptionsState;
-  inpaintingState: InpaintingState;
+  canvasState: CanvasState;
   systemState: SystemState;
   imageToProcessUrl?: string;
-  maskImageElement?: HTMLImageElement;
 };
 
 /**
@@ -27,10 +28,9 @@ export const frontendToBackendParameters = (
   const {
     generationMode,
     optionsState,
-    inpaintingState,
+    canvasState,
     systemState,
     imageToProcessUrl,
-    maskImageElement,
   } = config;
 
   const {
@@ -62,8 +62,11 @@ export const frontendToBackendParameters = (
     shouldRandomizeSeed,
   } = optionsState;
 
-  const { shouldDisplayInProgressType, saveIntermediatesInterval } =
-    systemState;
+  const {
+    shouldDisplayInProgressType,
+    saveIntermediatesInterval,
+    enableImageDebugging,
+  } = systemState;
 
   const generationParameters: { [k: string]: any } = {
     prompt,
@@ -80,6 +83,8 @@ export const frontendToBackendParameters = (
     progress_images: shouldDisplayInProgressType === 'full-res',
     progress_latents: shouldDisplayInProgressType === 'latents',
     save_intermediates: saveIntermediatesInterval,
+    generation_mode: generationMode,
+    init_mask: '',
   };
 
   generationParameters.seed = shouldRandomizeSeed
@@ -101,35 +106,36 @@ export const frontendToBackendParameters = (
   }
 
   // inpainting exclusive parameters
-  if (generationMode === 'inpainting' && maskImageElement) {
+  if (
+    ['inpainting', 'outpainting'].includes(generationMode) &&
+    canvasImageLayerRef.current
+  ) {
     const {
-      lines,
-      boundingBoxCoordinate,
+      objects,
+      boundingBoxCoordinates,
       boundingBoxDimensions,
       inpaintReplace,
       shouldUseInpaintReplace,
-    } = inpaintingState;
+      stageScale,
+      isMaskEnabled,
+    } = canvasState[canvasState.currentCanvas];
 
     const boundingBox = {
-      ...boundingBoxCoordinate,
+      ...boundingBoxCoordinates,
       ...boundingBoxDimensions,
     };
 
-    generationParameters.init_img = imageToProcessUrl;
-    generationParameters.strength = img2imgStrength;
-    generationParameters.fit = false;
-
-    const { maskDataURL, isMaskEmpty } = generateMask(
-      maskImageElement,
-      lines,
+    const maskDataURL = generateMask(
+      isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
       boundingBox
     );
 
-    generationParameters.is_mask_empty = isMaskEmpty;
+    generationParameters.init_mask = maskDataURL;
 
-    generationParameters.init_mask = maskDataURL.split(
-      'data:image/png;base64,'
-    )[1];
+    generationParameters.fit = false;
+
+    generationParameters.init_img = imageToProcessUrl;
+    generationParameters.strength = img2imgStrength;
 
     if (shouldUseInpaintReplace) {
       generationParameters.inpaint_replace = inpaintReplace;
@@ -137,8 +143,44 @@ export const frontendToBackendParameters = (
 
     generationParameters.bounding_box = boundingBox;
 
-    // TODO: The server metadata generation needs to be changed to fix this.
-    generationParameters.progress_images = false;
+    if (generationMode === 'outpainting') {
+      const tempScale = canvasImageLayerRef.current.scale();
+
+      canvasImageLayerRef.current.scale({
+        x: 1 / stageScale,
+        y: 1 / stageScale,
+      });
+
+      const absPos = canvasImageLayerRef.current.getAbsolutePosition();
+
+      const imageDataURL = canvasImageLayerRef.current.toDataURL({
+        x: boundingBox.x + absPos.x,
+        y: boundingBox.y + absPos.y,
+        width: boundingBox.width,
+        height: boundingBox.height,
+      });
+
+      if (enableImageDebugging) {
+        openBase64ImageInTab([
+          { base64: maskDataURL, caption: 'mask sent as init_mask' },
+          { base64: imageDataURL, caption: 'image sent as init_img' },
+        ]);
+      }
+
+      canvasImageLayerRef.current.scale(tempScale);
+
+      generationParameters.init_img = imageDataURL;
+
+      // TODO: The server metadata generation needs to be changed to fix this.
+      generationParameters.progress_images = false;
+
+      generationParameters.seam_size = 96;
+      generationParameters.seam_blur = 16;
+      generationParameters.seam_strength = 0.7;
+      generationParameters.seam_steps = 10;
+      generationParameters.tile_size = 32;
+      generationParameters.force_outpaint = false;
+    }
   }
 
   if (shouldGenerateVariations) {
@@ -169,6 +211,10 @@ export const frontendToBackendParameters = (
     if (facetoolType === 'codeformer') {
       facetoolParameters.codeformer_fidelity = codeformerFidelity;
     }
+  }
+
+  if (enableImageDebugging) {
+    generationParameters.enable_image_debugging = enableImageDebugging;
   }
 
   return {

@@ -2,7 +2,7 @@ import { FormControl, FormLabel, Select, SelectProps } from '@chakra-ui/react';
 import { MouseEvent } from 'react';
 
 type IAISelectProps = SelectProps & {
-  label: string;
+  label?: string;
   styleClass?: string;
   validValues:
     | Array<number | string>
@@ -32,15 +32,18 @@ const IAISelect = (props: IAISelectProps) => {
         e.nativeEvent.cancelBubble = true;
       }}
     >
-      <FormLabel
-        className="invokeai__select-label"
-        fontSize={fontSize}
-        marginBottom={1}
-        flexGrow={2}
-        whiteSpace="nowrap"
-      >
-        {label}
-      </FormLabel>
+      {label && (
+        <FormLabel
+          className="invokeai__select-label"
+          fontSize={fontSize}
+          marginBottom={1}
+          flexGrow={2}
+          whiteSpace="nowrap"
+        >
+          {label}
+        </FormLabel>
+      )}
+
       <Select
         className="invokeai__select-picker"
         fontSize={fontSize}

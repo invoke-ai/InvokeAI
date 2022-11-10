@@ -2,7 +2,7 @@ import { AnyAction, MiddlewareAPI, Dispatch } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 import dateFormat from 'dateformat';
 
-import * as InvokeAI from '../invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 import {
   addLogEntry,
@@ -15,7 +15,7 @@ import {
   errorOccurred,
   setModelList,
   setIsCancelable,
-} from '../../features/system/systemSlice';
+} from 'features/system/systemSlice';
 
 import {
   addGalleryImages,
@@ -25,19 +25,21 @@ import {
   removeImage,
   setCurrentImage,
   setIntermediateImage,
-} from '../../features/gallery/gallerySlice';
+} from 'features/gallery/gallerySlice';
 
 import {
   clearInitialImage,
   setInitialImage,
   setMaskPath,
-} from '../../features/options/optionsSlice';
-import { requestImages, requestNewImages } from './actions';
+} from 'features/options/optionsSlice';
+import { requestImages, requestNewImages, requestSystemConfig } from './actions';
 import {
+  addImageToOutpaintingSesion,
   clearImageToInpaint,
   setImageToInpaint,
-} from '../../features/tabs/Inpainting/inpaintingSlice';
-import { tabMap } from '../../features/tabs/InvokeTabs';
+  setImageToOutpaint,
+} from 'features/canvas/canvasSlice';
+import { tabMap } from 'features/tabs/InvokeTabs';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -56,6 +58,7 @@ const makeSocketIOListeners = (
       try {
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus('Connected'));
+        dispatch(requestSystemConfig());
         const gallery: GalleryState = getState().gallery;
 
         if (gallery.categories.user.latest_mtime) {
@@ -110,6 +113,16 @@ const makeSocketIOListeners = (
             image: newImage,
           })
         );
+
+        if (data.generationMode === 'outpainting' && data.boundingBox) {
+          const { boundingBox } = data;
+          dispatch(
+            addImageToOutpaintingSesion({
+              image: newImage,
+              boundingBox,
+            })
+          );
+        }
 
         if (shouldLoopback) {
           const activeTabName = tabMap[activeTab];
@@ -299,15 +312,15 @@ const makeSocketIOListeners = (
 
       // remove references to image in options
       const { initialImage, maskPath } = getState().options;
-      const { imageToInpaint } = getState().inpainting;
+      const { inpainting, outpainting } = getState().canvas;
 
       if (initialImage?.url === url || initialImage === url) {
         dispatch(clearInitialImage());
       }
 
-      if (imageToInpaint?.url === url) {
-        dispatch(clearImageToInpaint());
-      }
+      // if (imageToInpaint?.url === url) {
+      //   dispatch(clearImageToInpaint());
+      // }
 
       if (maskPath === url) {
         dispatch(setMaskPath(''));

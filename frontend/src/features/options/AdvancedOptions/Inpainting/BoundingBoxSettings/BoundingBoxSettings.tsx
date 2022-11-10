@@ -12,8 +12,8 @@ const BoundingBoxSettings = () => {
         <BoundingBoxVisibility />
       </div>
       <div className="inpainting-bounding-box-settings-items">
-        <BoundingBoxDimensionSlider dimension="width" />
-        <BoundingBoxDimensionSlider dimension="height" />
+        <BoundingBoxDimensionSlider dimension="width" label="Box W" />
+        <BoundingBoxDimensionSlider dimension="height" label="Box H" />
         <Flex alignItems={'center'} justifyContent={'space-between'}>
           <BoundingBoxDarkenOutside />
           <BoundingBoxLock />

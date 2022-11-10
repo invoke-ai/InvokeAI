@@ -1,15 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { IoMdOptions } from 'react-icons/io';
-import { RootState, useAppDispatch, useAppSelector } from '../../app/store';
-import IAIIconButton from '../../common/components/IAIIconButton';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import IAIIconButton from 'common/components/IAIIconButton';
 import {
   OptionsState,
   setShouldShowOptionsPanel,
-} from '../options/optionsSlice';
-import CancelButton from '../options/ProcessButtons/CancelButton';
-import InvokeButton from '../options/ProcessButtons/InvokeButton';
+} from 'features/options/optionsSlice';
+import CancelButton from 'features/options/ProcessButtons/CancelButton';
+import InvokeButton from 'features/options/ProcessButtons/InvokeButton';
 import _ from 'lodash';
-import LoopbackButton from '../options/ProcessButtons/Loopback';
+import LoopbackButton from 'features/options/ProcessButtons/Loopback';
+import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
 
 const canInvokeSelector = createSelector(
   (state: RootState) => state.options,
@@ -17,6 +18,7 @@ const canInvokeSelector = createSelector(
   (options: OptionsState) => {
     const { shouldPinOptionsPanel, shouldShowOptionsPanel } = options;
     return {
+      shouldPinOptionsPanel,
       shouldShowProcessButtons:
         !shouldPinOptionsPanel || !shouldShowOptionsPanel,
     };
@@ -26,10 +28,14 @@ const canInvokeSelector = createSelector(
 
 const FloatingOptionsPanelButtons = () => {
   const dispatch = useAppDispatch();
-  const { shouldShowProcessButtons } = useAppSelector(canInvokeSelector);
+  const { shouldShowProcessButtons, shouldPinOptionsPanel } =
+    useAppSelector(canInvokeSelector);
 
   const handleShowOptionsPanel = () => {
     dispatch(setShouldShowOptionsPanel(true));
+    if (shouldPinOptionsPanel) {
+      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+    }
   };
 
   return (

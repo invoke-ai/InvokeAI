@@ -24,3 +24,14 @@
   align-items: center;
   column-gap: 0.5rem;
 }
+
+.theme-changer-dropdown {
+  .invokeai__select-picker {
+    background-color: var(--background-color-light) !important;
+    font-size: 0.9rem;
+    &:focus {
+      border: none !important;
+      box-shadow: none !important;
+    }
+  }
+}

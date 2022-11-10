@@ -1,7 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import _, { clamp } from 'lodash';
-import * as InvokeAI from '../../app/invokeai';
+import * as InvokeAI from 'app/invokeai';
+import { IRect } from 'konva/lib/types';
+import { InvokeTabName } from 'features/tabs/InvokeTabs';
 
 export type GalleryCategory = 'user' | 'result';
 
@@ -23,7 +25,7 @@ export type Gallery = {
 export interface GalleryState {
   currentImage?: InvokeAI.Image;
   currentImageUuid: string;
-  intermediateImage?: InvokeAI.Image;
+  intermediateImage?: InvokeAI.Image & { boundingBox?: IRect; generationMode?: InvokeTabName };
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   galleryScrollPosition: number;
@@ -148,7 +150,12 @@ export const gallerySlice = createSlice({
       state.intermediateImage = undefined;
       tempCategory.latest_mtime = mtime;
     },
-    setIntermediateImage: (state, action: PayloadAction<InvokeAI.Image>) => {
+    setIntermediateImage: (
+      state,
+      action: PayloadAction<
+        InvokeAI.Image & { boundingBox?: IRect; generationMode?: InvokeTabName }
+      >
+    ) => {
       state.intermediateImage = action.payload;
     },
     clearIntermediateImage: (state) => {

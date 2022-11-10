@@ -1,7 +1,6 @@
 @use '../../../styles/Mixins/' as *;
 
 .settings-modal {
-  background-color: var(--settings-modal-bg) !important;
   max-height: 36rem;
   font-family: Inter;
 

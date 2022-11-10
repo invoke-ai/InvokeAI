@@ -9,11 +9,12 @@
 }
 
 .image-to-image-strength-main-option {
-  display: grid;
-  grid-template-columns: none !important;
+  display: flex;
+  row-gap: 0.5rem !important;
 
-  .number-input-entry {
-    padding: 0 1rem;
+  .invokeai__slider-component-label {
+    color: var(--text-color-secondary);
+    font-size: 0.9rem !important;
   }
 }
 
