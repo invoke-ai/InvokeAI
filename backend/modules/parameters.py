@@ -11,7 +11,6 @@ SAMPLER_CHOICES = [
     "k_lms",
     "plms",
     # diffusers:
-    "ipndm",
     "pndm",
 ]
 
