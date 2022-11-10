@@ -978,9 +978,7 @@ class InvokeAIWebServer:
                         "metadata": metadata,
                         "width": width,
                         "height": height,
-                        "boundingBox": generation_parameters["bounding_box"]
-                        if "bounding_box" in generation_parameters
-                        else None,
+                        "boundingBox": original_bounding_box,
                         "generationMode": generation_parameters["generation_mode"],
                     },
                 )
