@@ -552,14 +552,8 @@ class Args(object):
         postprocessing_group.add_argument(
             '--gfpgan_model_path',
             type=str,
-            default='./GFPGANv1.4.pth',
-            help='Indicates the path to the GFPGAN model, relative to --gfpgan_dir.',
-        )
-        postprocessing_group.add_argument(
-            '--gfpgan_dir',
-            type=str,
-            default='./models/gfpgan',
-            help='Indicates the directory containing the GFPGAN code.',
+            default='./models/gfpgan/GFPGANv1.4.pth',
+            help='Indicates the path to the GFPGAN model',
         )
         web_server_group.add_argument(
             '--web',

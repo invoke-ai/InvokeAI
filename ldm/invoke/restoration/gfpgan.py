@@ -10,17 +10,14 @@ from PIL import Image
 class GFPGAN():
     def __init__(
             self,
-            gfpgan_dir='models/gfpgan',
-            gfpgan_model_path='GFPGANv1.4.pth'
-    ) -> None:
+            gfpgan_model_path='./models/gfpgan/GFPGANv1.4.pth') -> None:
 
-        self.model_path = os.path.join(gfpgan_dir, gfpgan_model_path)
+        self.model_path = os.path.join(gfpgan_model_path)
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
 
         if not self.gfpgan_model_exists:
             print('## NOT FOUND: GFPGAN model not found at ' + self.model_path)
             return None
-        sys.path.append(os.path.abspath(gfpgan_dir))
 
     def model_exists(self):
         return os.path.isfile(self.model_path)
@@ -51,7 +48,7 @@ class GFPGAN():
                 f'>> WARNING: GFPGAN not initialized.'
             )
             print(
-                f'>> Download https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth to {self.model_path}, \nor change GFPGAN directory with --gfpgan_dir.'
+                f'>> Download https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth to {self.model_path}'
             )
 
         image = image.convert('RGB')
