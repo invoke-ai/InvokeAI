@@ -19,7 +19,7 @@ set INSTALL_ENV_DIR=%cd%\installer_files\env
 @rem https://mamba.readthedocs.io/en/latest/installation.html
 set MICROMAMBA_DOWNLOAD_URL=https://micro.mamba.pm/api/micromamba/win-64/latest
 set RELEASE_URL=https://github.com/invoke-ai/InvokeAI
-set RELEASE_SOURCEBALL=/archive/refs/tags/2.1.3-rc4.tar.gz
+set RELEASE_SOURCEBALL=/archive/refs/tags/2.1.3-rc5.tar.gz
 set PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
 set PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-x86_64-pc-windows-msvc-shared-install_only.tar.gz
 
@@ -140,7 +140,7 @@ set err_msg=----- main pip install failed -----
 if %errorlevel% neq 0 goto err_exit
 
 set err_msg=----- clipseg install failed -----
-.venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location -e git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
+.venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location -e git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
 if %errorlevel% neq 0 goto err_exit
 
 set err_msg=----- InvokeAI setup failed -----
