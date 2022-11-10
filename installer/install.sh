@@ -184,7 +184,7 @@ _err_msg="\n----- main pip install failed -----\n"
 _err_exit $? _err_msg
 
 _err_msg="\n----- clipseg install failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -e git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
+.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
 _err_exit $? _err_msg
 
 _err_msg="\n----- InvokeAI setup failed -----\n"
