@@ -61,6 +61,7 @@ const galleryBlacklist = [
   'currentImageUuid',
   'shouldAutoSwitchToNewImages',
   'shouldHoldGalleryOpen',
+  'intermediateImage',
 ].map((blacklistItem) => `gallery.${blacklistItem}`);
 
 const rootReducer = combineReducers({
@@ -89,7 +90,7 @@ export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      // redux-persist sometimes needs to temporarily put a function in redux state, need to disable this check
+      immutableCheck: false,
       serializableCheck: false,
     }).concat(socketioMiddleware()),
 });

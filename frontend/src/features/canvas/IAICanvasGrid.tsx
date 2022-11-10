@@ -1,14 +1,18 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
 
+import { useColorMode } from '@chakra-ui/react';
 import _ from 'lodash';
 import { Group, Line as KonvaLine } from 'react-konva';
 import useUnscaleCanvasValue from './hooks/useUnscaleCanvasValue';
 import { stageRef } from './IAICanvas';
 
 const IAICanvasGrid = () => {
+  const { colorMode } = useColorMode();
   const unscale = useUnscaleCanvasValue();
 
   if (!stageRef.current) return null;
+  const gridLineColor =
+    colorMode === 'light' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)';
 
   const stage = stageRef.current;
   const width = stage.width();
@@ -63,7 +67,7 @@ const IAICanvasGrid = () => {
           x={fullRect.x1 + i * 64}
           y={fullRect.y1}
           points={[0, 0, 0, ySize]}
-          stroke={'rgba(0, 0, 0, 0.4)'}
+          stroke={gridLineColor}
           strokeWidth={1}
         />
       ))}
@@ -73,7 +77,7 @@ const IAICanvasGrid = () => {
           x={fullRect.x1}
           y={fullRect.y1 + i * 64}
           points={[0, 0, xSize, 0]}
-          stroke={'rgba(0, 0, 0, 0.4)'}
+          stroke={gridLineColor}
           strokeWidth={1}
         />
       ))}

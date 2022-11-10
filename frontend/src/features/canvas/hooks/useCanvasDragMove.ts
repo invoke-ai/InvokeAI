@@ -6,33 +6,44 @@ import _ from 'lodash';
 import { useCallback } from 'react';
 import {
   currentCanvasSelector,
-  GenericCanvasState,
+  setIsMovingStage,
   setStageCoordinates,
 } from '../canvasSlice';
 
 const selector = createSelector(
   [currentCanvasSelector, activeTabNameSelector],
-  (canvas: GenericCanvasState, activeTabName) => {
-    const { isMoveStageKeyHeld } = canvas;
+  (canvas, activeTabName) => {
+    const { tool } = canvas;
     return {
-      isMoveStageKeyHeld,
+      tool,
+
       activeTabName,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
 );
 
-const useCanvasDragMove = () => {
+const useCanvasDrag = () => {
   const dispatch = useAppDispatch();
-  const { isMoveStageKeyHeld, activeTabName } = useAppSelector(selector);
+  const { tool, activeTabName } = useAppSelector(selector);
 
-  return useCallback(
-    (e: KonvaEventObject<MouseEvent>) => {
-      if (!isMoveStageKeyHeld || activeTabName !== 'outpainting') return;
-      dispatch(setStageCoordinates(e.target.getPosition()));
-    },
-    [activeTabName, dispatch, isMoveStageKeyHeld]
-  );
+  return {
+    handleDragStart: useCallback(() => {
+      if (tool !== 'move' || activeTabName !== 'outpainting') return;
+      dispatch(setIsMovingStage(true));
+    }, [activeTabName, dispatch, tool]),
+    handleDragMove: useCallback(
+      (e: KonvaEventObject<MouseEvent>) => {
+        if (tool !== 'move' || activeTabName !== 'outpainting') return;
+        dispatch(setStageCoordinates(e.target.getPosition()));
+      },
+      [activeTabName, dispatch, tool]
+    ),
+    handleDragEnd: useCallback(() => {
+      if (tool !== 'move' || activeTabName !== 'outpainting') return;
+      dispatch(setIsMovingStage(false));
+    }, [activeTabName, dispatch, tool]),
+  };
 };
 
-export default useCanvasDragMove;
+export default useCanvasDrag;

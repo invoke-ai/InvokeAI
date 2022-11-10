@@ -87,4 +87,12 @@
   left: 0;
   background-color: var(--background-color);
   opacity: 0.5;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  padding: 0.25rem;
+  width: 12rem;
+  border-radius: 0.25rem;
+  margin: 0.25rem;
+  pointer-events: none;
 }

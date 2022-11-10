@@ -6,7 +6,6 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
-  GenericCanvasState,
   setTool,
 } from 'features/canvas/canvasSlice';
 
@@ -15,7 +14,7 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const eraserSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+  (currentCanvas, activeTabName, areHotkeysEnabled) => {
     const { tool, shouldShowMask } = currentCanvas;
 
     return {
@@ -37,7 +36,7 @@ export default function IAICanvasEraserControl() {
     useAppSelector(eraserSelector);
   const dispatch = useAppDispatch();
 
-  const handleSelectEraserTool = () => dispatch(setTool('maskEraser'));
+  const handleSelectEraserTool = () => dispatch(setTool('eraser'));
 
   // Hotkeys
   // Set tool to maskEraser
@@ -61,7 +60,7 @@ export default function IAICanvasEraserControl() {
       tooltip={activeTabName === 'inpainting' ? 'Eraser (E)' : 'Erase Mask (E)'}
       icon={<FaEraser />}
       onClick={handleSelectEraserTool}
-      data-selected={tool === 'maskEraser'}
+      data-selected={tool === 'eraser'}
       isDisabled={!shouldShowMask}
     />
   );

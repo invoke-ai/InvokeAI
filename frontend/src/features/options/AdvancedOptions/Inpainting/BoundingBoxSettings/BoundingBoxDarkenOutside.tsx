@@ -4,29 +4,30 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import {
   currentCanvasSelector,
   GenericCanvasState,
-  setShouldShowBoundingBoxFill,
+  setShouldDarkenOutsideBoundingBox,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
-const boundingBoxDarkenOutsideSelector = createSelector(
+const selector = createSelector(
   currentCanvasSelector,
-  (currentCanvas: GenericCanvasState) => currentCanvas.shouldShowBoundingBoxFill
+  (currentCanvas: GenericCanvasState) =>
+    currentCanvas.shouldDarkenOutsideBoundingBox
 );
 
 export default function BoundingBoxDarkenOutside() {
   const dispatch = useAppDispatch();
-  const shouldShowBoundingBoxFill = useAppSelector(
-    boundingBoxDarkenOutsideSelector
-  );
+  const shouldDarkenOutsideBoundingBox = useAppSelector(selector);
 
   const handleChangeShouldShowBoundingBoxFill = () => {
-    dispatch(setShouldShowBoundingBoxFill(!shouldShowBoundingBoxFill));
+    dispatch(
+      setShouldDarkenOutsideBoundingBox(!shouldDarkenOutsideBoundingBox)
+    );
   };
 
   return (
     <IAICheckbox
       label="Darken Outside Box"
-      isChecked={shouldShowBoundingBoxFill}
+      isChecked={shouldDarkenOutsideBoundingBox}
       onChange={handleChangeShouldShowBoundingBoxFill}
       styleClass="inpainting-bounding-box-darken"
     />

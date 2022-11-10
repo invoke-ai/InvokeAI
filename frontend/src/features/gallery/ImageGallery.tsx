@@ -76,7 +76,7 @@ export default function ImageGallery() {
       return;
     }
 
-    if (activeTabName === 'inpainting' || activeTabName === 'outpainting') {
+    if (activeTabName === 'inpainting') {
       dispatch(setGalleryWidth(190));
       setGalleryMinWidth(190);
       setGalleryMaxWidth(190);

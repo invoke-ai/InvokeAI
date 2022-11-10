@@ -5,7 +5,6 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
-  GenericCanvasState,
   setTool,
 } from 'features/canvas/canvasSlice';
 
@@ -15,7 +14,7 @@ import { BsEraser } from 'react-icons/bs';
 
 const imageEraserSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
+  (currentCanvas, activeTabName, areHotkeysEnabled) => {
     const { tool, shouldShowMask } = currentCanvas;
 
     return {
@@ -37,7 +36,7 @@ export default function IAICanvasImageEraserControl() {
     useAppSelector(imageEraserSelector);
   const dispatch = useAppDispatch();
 
-  const handleSelectEraserTool = () => dispatch(setTool('imageEraser'));
+  const handleSelectEraserTool = () => dispatch(setTool('eraser'));
 
   // Hotkeys
   useHotkeys(
@@ -59,7 +58,7 @@ export default function IAICanvasImageEraserControl() {
       icon={<BsEraser />}
       fontSize={18}
       onClick={handleSelectEraserTool}
-      data-selected={tool === 'imageEraser'}
+      data-selected={tool === 'eraser'}
       isDisabled={!shouldShowMask}
     />
   );

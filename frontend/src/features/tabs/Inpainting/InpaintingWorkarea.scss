@@ -70,6 +70,8 @@
 
     .inpainting-canvas-stage {
       border-radius: 0.5rem;
+      border: 1px solid var(--border-color-light);
+
       canvas {
         border-radius: 0.5rem;
       }
@@ -79,12 +81,4 @@
 
 .inpainting-options-btn {
   min-height: 2rem;
-}
-
-.canvas-status-text {
-  position: absolute;
-  top: 0;
-  left: 0;
-  background-color: var(--background-color);
-  opacity: 0.5;
 }

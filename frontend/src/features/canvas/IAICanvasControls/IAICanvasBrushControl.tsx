@@ -11,8 +11,7 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
-  GenericCanvasState,
-  setToolSize,
+  setBrushSize,
   setShouldShowBrushPreview,
   setTool,
 } from 'features/canvas/canvasSlice';
@@ -22,13 +21,13 @@ import IAICanvasMaskColorPicker from './IAICanvasMaskControls/IAICanvasMaskColor
 
 const inpaintingBrushSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (currentCanvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { tool, toolSize: brushSize, shouldShowMask } = currentCanvas;
+  (currentCanvas, activeTabName, areHotkeysEnabled) => {
+    const { tool, brushSize } = currentCanvas;
 
     return {
       tool,
       brushSize,
-      shouldShowMask,
+
       activeTabName,
       areHotkeysEnabled,
     };
@@ -42,10 +41,11 @@ const inpaintingBrushSelector = createSelector(
 
 export default function IAICanvasBrushControl() {
   const dispatch = useAppDispatch();
-  const { tool, brushSize, shouldShowMask, activeTabName, areHotkeysEnabled } =
-    useAppSelector(inpaintingBrushSelector);
+  const { tool, brushSize, activeTabName, areHotkeysEnabled } = useAppSelector(
+    inpaintingBrushSelector
+  );
 
-  const handleSelectBrushTool = () => dispatch(setTool('maskBrush'));
+  const handleSelectBrushTool = () => dispatch(setTool('brush'));
 
   const handleShowBrushPreview = () => {
     dispatch(setShouldShowBrushPreview(true));
@@ -57,12 +57,9 @@ export default function IAICanvasBrushControl() {
 
   const handleChangeBrushSize = (v: number) => {
     dispatch(setShouldShowBrushPreview(true));
-    dispatch(setToolSize(v));
+    dispatch(setBrushSize(v));
   };
 
-  // Hotkeys
-
-  // Decrease brush size
   useHotkeys(
     '[',
     (e: KeyboardEvent) => {
@@ -76,7 +73,7 @@ export default function IAICanvasBrushControl() {
     {
       enabled: areHotkeysEnabled,
     },
-    [activeTabName, shouldShowMask, brushSize]
+    [activeTabName, brushSize]
   );
 
   // Increase brush size
@@ -89,7 +86,7 @@ export default function IAICanvasBrushControl() {
     {
       enabled: areHotkeysEnabled,
     },
-    [activeTabName, shouldShowMask, brushSize]
+    [activeTabName, brushSize]
   );
 
   // Set tool to brush
@@ -102,7 +99,7 @@ export default function IAICanvasBrushControl() {
     {
       enabled: areHotkeysEnabled,
     },
-    [activeTabName, shouldShowMask]
+    [activeTabName]
   );
 
   return (
@@ -116,8 +113,7 @@ export default function IAICanvasBrushControl() {
           tooltip="Brush (B)"
           icon={<FaPaintBrush />}
           onClick={handleSelectBrushTool}
-          data-selected={tool === 'maskBrush'}
-          isDisabled={!shouldShowMask}
+          data-selected={tool === 'brush'}
         />
       }
     >
@@ -135,7 +131,6 @@ export default function IAICanvasBrushControl() {
           width={'80px'}
           min={1}
           max={999}
-          isDisabled={!shouldShowMask}
         />
         <IAICanvasMaskColorPicker />
       </div>

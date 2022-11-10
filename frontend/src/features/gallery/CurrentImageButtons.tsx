@@ -39,7 +39,6 @@ import {
   setImageToInpaint,
   setDoesCanvasNeedScaling,
   setImageToOutpaint,
-  clearOutpaintingSession,
 } from 'features/canvas/canvasSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';

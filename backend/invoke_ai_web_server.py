@@ -501,7 +501,7 @@ class InvokeAIWebServer:
                 from send2trash import send2trash
 
                 path = self.get_image_path_from_url(url)
-                print(path)
+
                 send2trash(path)
                 socketio.emit(
                     "imageDeleted",
@@ -524,7 +524,7 @@ class InvokeAIWebServer:
                 )
                 mtime = os.path.getmtime(file_path)
                 (width, height) = Image.open(file_path).size
-                print(file_path)
+                
                 socketio.emit(
                     "imageUploaded",
                     {

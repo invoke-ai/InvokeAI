@@ -12,12 +12,13 @@ import {
   clearImageToInpaint,
   currentCanvasSelector,
   GenericCanvasState,
+  outpaintingCanvasSelector,
 } from 'features/canvas/canvasSlice';
 
 // component
 import IAICanvasMaskLines from './IAICanvasMaskLines';
-import IAICanvasMaskBrushPreview from './IAICanvasMaskBrushPreview';
-import IAICanvasMaskBrushPreviewOutline from './IAICanvasMaskBrushPreviewOutline';
+import IAICanvasMaskBrushPreview from './IAICanvasBrushPreview';
+import IAICanvasMaskBrushPreviewOutline from './IAICanvasBrushPreviewOutline';
 import { Vector2d } from 'konva/lib/types';
 import IAICanvasBoundingBoxPreview from './IAICanvasBoundingBoxPreview';
 import { useToast } from '@chakra-ui/react';
@@ -38,41 +39,53 @@ import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingObjects';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasImage from './IAICanvasImage';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
+import IAICanvasStatusText from './IAICanvasStatusText';
 
 const canvasSelector = createSelector(
-  [currentCanvasSelector, baseCanvasImageSelector, activeTabNameSelector],
-  (currentCanvas: GenericCanvasState, baseCanvasImage, activeTabName) => {
+  [
+    currentCanvasSelector,
+    outpaintingCanvasSelector,
+    baseCanvasImageSelector,
+    activeTabNameSelector,
+  ],
+  (currentCanvas, outpaintingCanvas, baseCanvasImage, activeTabName) => {
     const {
       shouldInvertMask,
       shouldShowMask,
       shouldShowCheckboardTransparency,
       stageScale,
       shouldShowBoundingBox,
-      shouldShowBoundingBoxFill,
+      shouldDarkenOutsideBoundingBox,
       shouldLockBoundingBox,
-      boundingBoxDimensions,
       isTransformingBoundingBox,
       isMouseOverBoundingBox,
       isMovingBoundingBox,
       stageDimensions,
       stageCoordinates,
       isMoveStageKeyHeld,
+      shouldShowIntermediates,
+      tool,
+      isMovingStage,
     } = currentCanvas;
+
+    const { shouldShowGrid } = outpaintingCanvas;
 
     let stageCursor: string | undefined = '';
 
-    if (isTransformingBoundingBox) {
-      stageCursor = undefined;
-    } else if (
-      isMovingBoundingBox ||
-      isMouseOverBoundingBox ||
-      isMoveStageKeyHeld
-    ) {
-      stageCursor = 'move';
-    } else if (shouldShowMask) {
-      stageCursor = 'none';
+    if (tool === 'move') {
+      if (isTransformingBoundingBox) {
+        stageCursor = undefined;
+      } else if (isMouseOverBoundingBox) {
+        stageCursor = 'move';
+      } else {
+        if (isMovingStage) {
+          stageCursor = 'grabbing';
+        } else {
+          stageCursor = 'grab';
+        }
+      }
     } else {
-      stageCursor = 'default';
+      stageCursor = 'none';
     }
 
     return {
@@ -81,9 +94,9 @@ const canvasSelector = createSelector(
       shouldShowCheckboardTransparency,
       stageScale,
       shouldShowBoundingBox,
-      shouldShowBoundingBoxFill,
+      shouldDarkenOutsideBoundingBox,
       shouldLockBoundingBox,
-      boundingBoxDimensions,
+      shouldShowGrid,
       isTransformingBoundingBox,
       isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       stageCursor,
@@ -92,7 +105,9 @@ const canvasSelector = createSelector(
       stageCoordinates,
       isMoveStageKeyHeld,
       activeTabName,
+      shouldShowIntermediates,
       baseCanvasImage,
+      tool,
     };
   },
   {
@@ -116,15 +131,16 @@ const IAICanvas = () => {
     shouldShowCheckboardTransparency,
     stageScale,
     shouldShowBoundingBox,
-    shouldShowBoundingBoxFill,
+    shouldDarkenOutsideBoundingBox,
     isModifyingBoundingBox,
     stageCursor,
     stageDimensions,
     stageCoordinates,
-    isMoveStageKeyHeld,
-    boundingBoxDimensions,
+    shouldShowGrid,
     activeTabName,
     baseCanvasImage,
+    shouldShowIntermediates,
+    tool,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
@@ -155,7 +171,8 @@ const IAICanvas = () => {
   );
   const handleMouseEnter = useCanvasMouseEnter(stageRef);
   const handleMouseOut = useCanvasMouseOut();
-  const handleDragMove = useCanvasDragMove();
+  const { handleDragStart, handleDragMove, handleDragEnd } =
+    useCanvasDragMove();
 
   // Load the image and set the options panel width & height
   useEffect(() => {
@@ -183,7 +200,6 @@ const IAICanvas = () => {
   return (
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
-        <div className="canvas-status-text">{`${boundingBoxDimensions.width}x${boundingBoxDimensions.height}`}</div>
         <Stage
           ref={stageRef}
           style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
@@ -199,11 +215,22 @@ const IAICanvas = () => {
           onMouseMove={handleMouseMove}
           onMouseOut={handleMouseOut}
           onMouseUp={handleMouseUp}
+          onDragStart={handleDragStart}
           onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
           onWheel={handleWheel}
-          draggable={isMoveStageKeyHeld && activeTabName === 'outpainting'}
+          listening={
+            tool === 'move' &&
+            !isModifyingBoundingBox &&
+            activeTabName === 'outpainting'
+          }
+          draggable={
+            tool === 'move' &&
+            !isModifyingBoundingBox &&
+            activeTabName === 'outpainting'
+          }
         >
-          <Layer>
+          <Layer visible={shouldShowGrid}>
             <IAICanvasGrid />
           </Layer>
 
@@ -220,16 +247,7 @@ const IAICanvas = () => {
           <Layer id={'mask-layer'} visible={shouldShowMask} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
 
-            <IAICanvasMaskBrushPreview
-              visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
-              listening={false}
-            />
             <IAICanvasMaskCompositer listening={false} />
-
-            <IAICanvasMaskBrushPreviewOutline
-              visible={!isModifyingBoundingBox && !isMoveStageKeyHeld}
-              listening={false}
-            />
 
             {canvasBgImage && (
               <>
@@ -251,14 +269,19 @@ const IAICanvas = () => {
               </>
             )}
           </Layer>
-          <Layer id={'bounding-box-layer'} visible={shouldShowMask}>
-            <IAICanvasBoundingBoxPreviewOverlay
-              visible={shouldShowBoundingBoxFill && shouldShowBoundingBox}
+          <Layer
+            id={'preview-layer'}
+            visible={shouldShowMask}
+            imageSmoothingEnabled={false}
+          >
+            <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
+            <IAICanvasMaskBrushPreview
+              visible={tool !== 'move'}
               listening={false}
             />
-            <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
           </Layer>
         </Stage>
+        <IAICanvasStatusText />
       </div>
     </div>
   );

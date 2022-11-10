@@ -1,14 +1,11 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaUndo } from 'react-icons/fa';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   areHotkeysEnabledSelector,
   currentCanvasSelector,
-  GenericCanvasState,
-  InpaintingCanvasState,
-  OutpaintingCanvasState,
   undo,
 } from 'features/canvas/canvasSlice';
 
@@ -17,17 +14,13 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const canvasUndoSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector, areHotkeysEnabledSelector],
-  (canvas: GenericCanvasState, activeTabName, areHotkeysEnabled) => {
-    const { pastObjects, shouldShowMask, tool } = canvas as
-      | InpaintingCanvasState
-      | OutpaintingCanvasState;
+  (canvas, activeTabName, areHotkeysEnabled) => {
+    const { pastObjects } = canvas;
 
     return {
       canUndo: pastObjects.length > 0,
-      shouldShowMask,
       activeTabName,
       areHotkeysEnabled,
-      tool,
     };
   },
   {
@@ -37,18 +30,16 @@ const canvasUndoSelector = createSelector(
   }
 );
 
-export default function IAICanvasUndoControl() {
+export default function IAICanvasUndoButton() {
   const dispatch = useAppDispatch();
 
-  const { canUndo, shouldShowMask, activeTabName, areHotkeysEnabled, tool } =
+  const { canUndo, activeTabName, areHotkeysEnabled } =
     useAppSelector(canvasUndoSelector);
 
   const handleUndo = () => {
     dispatch(undo());
   };
 
-  // Hotkeys
-  // Undo
   useHotkeys(
     'cmd+z, control+z',
     (e: KeyboardEvent) => {
@@ -58,7 +49,7 @@ export default function IAICanvasUndoControl() {
     {
       enabled: areHotkeysEnabled && canUndo,
     },
-    [activeTabName, shouldShowMask, canUndo, tool]
+    [activeTabName, canUndo]
   );
 
   return (
@@ -67,7 +58,7 @@ export default function IAICanvasUndoControl() {
       tooltip="Undo"
       icon={<FaUndo />}
       onClick={handleUndo}
-      isDisabled={!canUndo || !shouldShowMask}
+      isDisabled={!canUndo}
     />
   );
 }

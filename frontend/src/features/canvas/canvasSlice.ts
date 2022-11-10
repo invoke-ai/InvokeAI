@@ -16,8 +16,10 @@ import { MutableRefObject } from 'react';
 import Konva from 'konva';
 
 export interface GenericCanvasState {
-  tool: InpaintingTool;
-  toolSize: number;
+  tool: CanvasTool;
+  brushSize: number;
+  brushColor: RgbaColor;
+  eraserSize: number;
   maskColor: RgbaColor;
   cursorPosition: Vector2d | null;
   stageDimensions: Dimensions;
@@ -26,7 +28,7 @@ export interface GenericCanvasState {
   boundingBoxCoordinates: Vector2d;
   boundingBoxPreviewFill: RgbaColor;
   shouldShowBoundingBox: boolean;
-  shouldShowBoundingBoxFill: boolean;
+  shouldDarkenOutsideBoundingBox: boolean;
   shouldShowMask: boolean;
   shouldInvertMask: boolean;
   shouldShowCheckboardTransparency: boolean;
@@ -37,57 +39,75 @@ export interface GenericCanvasState {
   isTransformingBoundingBox: boolean;
   isMouseOverBoundingBox: boolean;
   isMovingBoundingBox: boolean;
+  isMovingStage: boolean;
   shouldUseInpaintReplace: boolean;
   inpaintReplace: number;
   shouldLockBoundingBox: boolean;
   isMoveBoundingBoxKeyHeld: boolean;
   isMoveStageKeyHeld: boolean;
+  intermediateImage?: InvokeAI.Image;
+  shouldShowIntermediates: boolean;
 }
 
-export type InpaintingTool = 'maskBrush' | 'maskEraser' | 'imageEraser';
+export type CanvasLayer = 'base' | 'mask';
+
+export type CanvasDrawingTool = 'brush' | 'eraser';
+
+export type CanvasTool = CanvasDrawingTool | 'move';
 
 export type Dimensions = {
   width: number;
   height: number;
 };
 
-export type CanvasMaskLine = {
-  type: 'maskLine';
-  tool: InpaintingTool;
+export type CanvasAnyLine = {
+  kind: 'line';
+  tool: CanvasDrawingTool;
   strokeWidth: number;
   points: number[];
 };
 
 export type CanvasImage = {
-  type: 'image';
+  kind: 'image';
+  layer: 'base';
   x: number;
   y: number;
   image: InvokeAI.Image;
 };
 
-export type CanvasEraserLine = {
-  type: 'eraserLine';
-  strokeWidth: number;
-  points: number[];
+export type CanvasMaskLine = CanvasAnyLine & {
+  layer: 'mask';
 };
+
+export type CanvasLine = CanvasAnyLine & {
+  layer: 'base';
+  color?: RgbaColor;
+};
+
+type CanvasObject = CanvasImage | CanvasLine | CanvasMaskLine;
 
 // type guards
 export const isCanvasMaskLine = (obj: CanvasObject): obj is CanvasMaskLine =>
-  obj.type === 'maskLine';
+  obj.kind === 'line' && obj.layer === 'mask';
 
-export const isCanvasEraserLine = (
+export const isCanvasBaseLine = (obj: CanvasObject): obj is CanvasLine =>
+  obj.kind === 'line' && obj.layer === 'base';
+
+export const isCanvasBaseImage = (obj: CanvasObject): obj is CanvasImage =>
+  obj.kind === 'image' && obj.layer === 'base';
+
+export const isCanvasAnyLine = (
   obj: CanvasObject
-): obj is CanvasEraserLine => obj.type === 'eraserLine';
-
-export const isCanvasImage = (obj: CanvasObject): obj is CanvasImage =>
-  obj.type === 'image';
-
-type CanvasObject = CanvasImage | CanvasEraserLine | CanvasMaskLine;
+): obj is CanvasMaskLine | CanvasLine => obj.kind === 'line';
 
 export type OutpaintingCanvasState = GenericCanvasState & {
+  layer: CanvasLayer;
   objects: CanvasObject[];
   pastObjects: CanvasObject[][];
   futureObjects: CanvasObject[][];
+  shouldShowGrid: boolean;
+  shouldSnapToGrid: boolean;
+  shouldAutoSave: boolean;
   stagingArea: {
     images: CanvasImage[];
     selectedImageIndex: number;
@@ -95,11 +115,14 @@ export type OutpaintingCanvasState = GenericCanvasState & {
 };
 
 export type InpaintingCanvasState = GenericCanvasState & {
+  layer: 'mask';
   objects: CanvasObject[];
   pastObjects: CanvasObject[][];
   futureObjects: CanvasObject[][];
   imageToInpaint?: InvokeAI.Image;
 };
+
+export type BaseCanvasState = InpaintingCanvasState | OutpaintingCanvasState;
 
 export type ValidCanvasName = 'inpainting' | 'outpainting';
 
@@ -111,16 +134,18 @@ export interface CanvasState {
 }
 
 const initialGenericCanvasState: GenericCanvasState = {
-  tool: 'maskBrush',
-  toolSize: 50,
+  tool: 'brush',
+  brushColor: { r: 90, g: 90, b: 255, a: 1 },
+  brushSize: 50,
   maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
+  eraserSize: 50,
   stageDimensions: { width: 0, height: 0 },
   stageCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
   shouldShowBoundingBox: true,
-  shouldShowBoundingBoxFill: false,
+  shouldDarkenOutsideBoundingBox: false,
   cursorPosition: null,
   shouldShowMask: true,
   shouldInvertMask: false,
@@ -137,18 +162,22 @@ const initialGenericCanvasState: GenericCanvasState = {
   shouldLockBoundingBox: false,
   isMoveBoundingBoxKeyHeld: false,
   isMoveStageKeyHeld: false,
+  shouldShowIntermediates: true,
+  isMovingStage: false,
 };
 
 const initialCanvasState: CanvasState = {
   currentCanvas: 'inpainting',
   doesCanvasNeedScaling: false,
   inpainting: {
+    layer: 'mask',
     objects: [],
     pastObjects: [],
     futureObjects: [],
     ...initialGenericCanvasState,
   },
   outpainting: {
+    layer: 'base',
     objects: [],
     pastObjects: [],
     futureObjects: [],
@@ -156,6 +185,9 @@ const initialCanvasState: CanvasState = {
       images: [],
       selectedImageIndex: 0,
     },
+    shouldShowGrid: true,
+    shouldSnapToGrid: true,
+    shouldAutoSave: false,
     ...initialGenericCanvasState,
   },
 };
@@ -164,17 +196,30 @@ export const canvasSlice = createSlice({
   name: 'canvas',
   initialState: initialCanvasState,
   reducers: {
-    setTool: (state, action: PayloadAction<InpaintingTool>) => {
+    setTool: (state, action: PayloadAction<CanvasTool>) => {
       state[state.currentCanvas].tool = action.payload;
     },
-    toggleTool: (state) => {
-      state[state.currentCanvas].tool =
-        state[state.currentCanvas].tool === 'maskBrush'
-          ? 'maskEraser'
-          : 'maskBrush';
+    setLayer: (state, action: PayloadAction<CanvasLayer>) => {
+      state[state.currentCanvas].layer = action.payload;
     },
-    setToolSize: (state, action: PayloadAction<number>) => {
-      state[state.currentCanvas].toolSize = action.payload;
+    toggleTool: (state) => {
+      const currentTool = state[state.currentCanvas].tool;
+      if (currentTool !== 'move') {
+        state[state.currentCanvas].tool =
+          currentTool === 'brush' ? 'eraser' : 'brush';
+      }
+    },
+    setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
+      state[state.currentCanvas].maskColor = action.payload;
+    },
+    setBrushColor: (state, action: PayloadAction<RgbaColor>) => {
+      state[state.currentCanvas].brushColor = action.payload;
+    },
+    setBrushSize: (state, action: PayloadAction<number>) => {
+      state[state.currentCanvas].brushSize = action.payload;
+    },
+    setEraserSize: (state, action: PayloadAction<number>) => {
+      state[state.currentCanvas].eraserSize = action.payload;
     },
     clearMask: (state) => {
       state[state.currentCanvas].pastObjects.push(
@@ -182,7 +227,7 @@ export const canvasSlice = createSlice({
       );
       state[state.currentCanvas].objects = state[
         state.currentCanvas
-      ].objects.filter((obj) => obj.type !== 'maskLine');
+      ].objects.filter((obj) => !isCanvasMaskLine(obj));
       state[state.currentCanvas].futureObjects = [];
       state[state.currentCanvas].shouldInvertMask = false;
     },
@@ -215,9 +260,6 @@ export const canvasSlice = createSlice({
     },
     setShouldShowBrush: (state, action: PayloadAction<boolean>) => {
       state[state.currentCanvas].shouldShowBrush = action.payload;
-    },
-    setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
-      state[state.currentCanvas].maskColor = action.payload;
     },
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state[state.currentCanvas].cursorPosition = action.payload;
@@ -262,7 +304,8 @@ export const canvasSlice = createSlice({
       // state.outpainting.imageToInpaint = action.payload;
       state.outpainting.objects = [
         {
-          type: 'image',
+          kind: 'image',
+          layer: 'base',
           x: 0,
           y: 0,
           image: action.payload,
@@ -418,8 +461,12 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].stageScale = action.payload;
       state.doesCanvasNeedScaling = false;
     },
-    setShouldShowBoundingBoxFill: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldShowBoundingBoxFill = action.payload;
+    setShouldDarkenOutsideBoundingBox: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state[state.currentCanvas].shouldDarkenOutsideBoundingBox =
+        action.payload;
     },
     setIsDrawing: (state, action: PayloadAction<boolean>) => {
       state[state.currentCanvas].isDrawing = action.payload;
@@ -478,35 +525,39 @@ export const canvasSlice = createSlice({
       state.outpainting.futureObjects = [];
 
       state.outpainting.objects.push({
-        type: 'image',
+        kind: 'image',
+        layer: 'base',
         x,
         y,
         image,
       });
     },
-    clearOutpaintingSession: (state) => {
-      state.outpainting.objects = [];
-    },
-    addLine: (
-      state,
-      action: PayloadAction<CanvasEraserLine | CanvasMaskLine>
-    ) => {
+    addLine: (state, action: PayloadAction<number[]>) => {
+      const { tool, layer, brushColor, brushSize, eraserSize } =
+        state[state.currentCanvas];
+
+      if (tool === 'move') return;
+
       state[state.currentCanvas].pastObjects.push(
         state[state.currentCanvas].objects
       );
-      state[state.currentCanvas].objects.push(action.payload);
+
+      state[state.currentCanvas].objects.push({
+        kind: 'line',
+        layer,
+        tool,
+        strokeWidth: tool === 'brush' ? brushSize / 2 : eraserSize / 2,
+        points: action.payload,
+        ...(layer === 'base' && tool === 'brush' && { color: brushColor }),
+      });
+
       state[state.currentCanvas].futureObjects = [];
     },
     addPointToCurrentLine: (state, action: PayloadAction<number[]>) => {
-      const lastLine = state[state.currentCanvas].objects.findLast(
-        (obj) => obj.type === 'eraserLine' || obj.type === 'maskLine'
-      );
+      const lastLine =
+        state[state.currentCanvas].objects.findLast(isCanvasAnyLine);
 
-      if (
-        !lastLine ||
-        (lastLine.type !== 'eraserLine' && lastLine.type !== 'maskLine')
-      )
-        return;
+      if (!lastLine) return;
 
       lastLine.points.push(...action.payload);
     },
@@ -525,6 +576,29 @@ export const canvasSlice = createSlice({
       state.outpainting.pastObjects.push(state.outpainting.objects);
       state.outpainting.objects = newObjects;
     },
+    setShouldShowGrid: (state, action: PayloadAction<boolean>) => {
+      state.outpainting.shouldShowGrid = action.payload;
+    },
+    setIsMovingStage: (state, action: PayloadAction<boolean>) => {
+      state[state.currentCanvas].isMovingStage = action.payload;
+    },
+    setShouldSnapToGrid: (state, action: PayloadAction<boolean>) => {
+      state.outpainting.shouldSnapToGrid = action.payload;
+    },
+    setShouldAutoSave: (state, action: PayloadAction<boolean>) => {
+      state.outpainting.shouldAutoSave = action.payload;
+    },
+    setShouldShowIntermediates: (state, action: PayloadAction<boolean>) => {
+      state[state.currentCanvas].shouldShowIntermediates = action.payload;
+    },
+    resetCanvas: (state) => {
+      state[state.currentCanvas].pastObjects.push(
+        state[state.currentCanvas].objects
+      );
+
+      state[state.currentCanvas].objects = [];
+      state[state.currentCanvas].futureObjects = [];
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(uploadOutpaintingMergedImage.fulfilled, (state, action) => {
@@ -534,7 +608,8 @@ export const canvasSlice = createSlice({
 
       state.outpainting.objects = [
         {
-          type: 'image',
+          kind: 'image',
+          layer: 'base',
           ...action.payload,
         },
       ];
@@ -544,7 +619,10 @@ export const canvasSlice = createSlice({
 
 export const {
   setTool,
-  setToolSize,
+  setLayer,
+  setBrushColor,
+  setBrushSize,
+  setEraserSize,
   addLine,
   addPointToCurrentLine,
   setShouldInvertMask,
@@ -567,7 +645,7 @@ export const {
   setStageScale,
   toggleTool,
   setShouldShowBoundingBox,
-  setShouldShowBoundingBoxFill,
+  setShouldDarkenOutsideBoundingBox,
   setIsDrawing,
   setShouldShowBrush,
   setClearBrushHistory,
@@ -583,7 +661,12 @@ export const {
   setStageCoordinates,
   setCurrentCanvas,
   addImageToOutpaintingSesion,
-  clearOutpaintingSession,
+  resetCanvas,
+  setShouldShowGrid,
+  setShouldSnapToGrid,
+  setShouldAutoSave,
+  setShouldShowIntermediates,
+  setIsMovingStage,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
@@ -648,19 +731,21 @@ export const uploadOutpaintingMergedImage = createAsyncThunk(
   }
 );
 
-export const currentCanvasSelector = (state: RootState) =>
+export const currentCanvasSelector = (state: RootState): BaseCanvasState =>
   state.canvas[state.canvas.currentCanvas];
 
-export const outpaintingCanvasSelector = (state: RootState) =>
-  state.canvas.outpainting;
+export const outpaintingCanvasSelector = (
+  state: RootState
+): OutpaintingCanvasState => state.canvas.outpainting;
 
-export const inpaintingCanvasSelector = (state: RootState) =>
-  state.canvas.inpainting;
+export const inpaintingCanvasSelector = (
+  state: RootState
+): InpaintingCanvasState => state.canvas.inpainting;
 
 export const areHotkeysEnabledSelector = createSelector(
   currentCanvasSelector,
   activeTabNameSelector,
-  (currentCanvas: GenericCanvasState, activeTabName) => {
+  (currentCanvas: GenericCanvasState, activeTabName): boolean => {
     return (
       currentCanvas.shouldShowMask &&
       ['inpainting', 'outpainting'].includes(activeTabName)
@@ -675,9 +760,9 @@ export const baseCanvasImageSelector = createSelector(
       return canvas.inpainting.imageToInpaint;
     } else if (activeTabName === 'outpainting') {
       const firstImageObject = canvas.outpainting.objects.find(
-        (obj) => obj.type === 'image'
+        (obj) => obj.kind === 'image'
       );
-      if (firstImageObject && firstImageObject.type === 'image') {
+      if (firstImageObject && firstImageObject.kind === 'image') {
         return firstImageObject.image;
       }
     }

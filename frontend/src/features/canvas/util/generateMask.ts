@@ -46,7 +46,7 @@ const generateMask = (lines: CanvasMaskLine[], boundingBox: IRect): string => {
         lineJoin: 'round',
         shadowForStrokeEnabled: false,
         globalCompositeOperation:
-          line.tool === 'maskBrush' ? 'source-over' : 'destination-out',
+          line.tool === 'brush' ? 'source-over' : 'destination-out',
       })
     )
   );

@@ -25,7 +25,14 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
   } = props;
 
   return (
-    <Tooltip label={tooltip} hasArrow {...tooltipProps}>
+    <Tooltip
+      label={tooltip}
+      hasArrow
+      {...tooltipProps}
+      {...(tooltipProps?.placement
+        ? { placement: tooltipProps.placement }
+        : { placement: 'top' })}
+    >
       <IconButton
         ref={forwardedRef}
         className={

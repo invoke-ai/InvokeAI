@@ -10,22 +10,15 @@ import {
   currentCanvasSelector,
   GenericCanvasState,
   setIsDrawing,
+  setIsMovingStage,
 } from '../canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
   [activeTabNameSelector, currentCanvasSelector],
   (activeTabName, canvas: GenericCanvasState) => {
-    const {
-      isMoveStageKeyHeld,
-      isTransformingBoundingBox,
-      isMovingBoundingBox,
-      tool,
-      isDrawing,
-    } = canvas;
+    const { tool, isDrawing } = canvas;
     return {
-      isMoveStageKeyHeld,
-      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       tool,
       isDrawing,
       activeTabName,
@@ -39,15 +32,18 @@ const useCanvasMouseUp = (
   didMouseMoveRef: MutableRefObject<boolean>
 ) => {
   const dispatch = useAppDispatch();
-  const { isMoveStageKeyHeld, isModifyingBoundingBox, tool, isDrawing } =
-    useAppSelector(selector);
+  const { tool, isDrawing } = useAppSelector(selector);
 
   return useCallback(() => {
+    if (tool === 'move') {
+      dispatch(setIsMovingStage(false));
+      return;
+    }
+
     if (!didMouseMoveRef.current && isDrawing && stageRef.current) {
       const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-      if (!scaledCursorPosition || isModifyingBoundingBox || isMoveStageKeyHeld)
-        return;
+      if (!scaledCursorPosition) return;
 
       /**
        * Extend the current line.
@@ -58,33 +54,11 @@ const useCanvasMouseUp = (
       dispatch(
         addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
       );
-      // if (tool === 'imageEraser') {
-      //   dispatch(
-      //     addPointToCurrentEraserLine([
-      //       scaledCursorPosition.x,
-      //       scaledCursorPosition.y,
-      //     ])
-      //   );
-      // } else {
-      //   dispatch(
-      //     addPointToCurrentLine([
-      //       scaledCursorPosition.x,
-      //       scaledCursorPosition.y,
-      //     ])
-      //   );
-      // }
     } else {
       didMouseMoveRef.current = false;
     }
     dispatch(setIsDrawing(false));
-  }, [
-    didMouseMoveRef,
-    dispatch,
-    isDrawing,
-    isModifyingBoundingBox,
-    isMoveStageKeyHeld,
-    stageRef,
-  ]);
+  }, [didMouseMoveRef, dispatch, isDrawing, stageRef, tool]);
 };
 
 export default useCanvasMouseUp;

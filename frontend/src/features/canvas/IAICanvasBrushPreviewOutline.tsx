@@ -11,7 +11,7 @@ const canvasBrushPreviewOutlineSelector = createSelector(
     const {
       cursorPosition,
       stageDimensions: { width, height },
-      toolSize: brushSize,
+      brushSize,
       tool,
       shouldShowBrush,
       isMovingBoundingBox,

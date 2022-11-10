@@ -13,6 +13,7 @@ import {
   baseCanvasImageSelector,
   currentCanvasSelector,
   GenericCanvasState,
+  outpaintingCanvasSelector,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setIsMouseOverBoundingBox,
@@ -24,9 +25,10 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const boundingBoxPreviewSelector = createSelector(
   currentCanvasSelector,
+  outpaintingCanvasSelector,
   baseCanvasImageSelector,
   activeTabNameSelector,
-  (currentCanvas: GenericCanvasState, baseCanvasImage, activeTabName) => {
+  (currentCanvas, outpaintingCanvas, baseCanvasImage, activeTabName) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -37,14 +39,17 @@ const boundingBoxPreviewSelector = createSelector(
       isTransformingBoundingBox,
       isMovingBoundingBox,
       isMouseOverBoundingBox,
-      isMoveBoundingBoxKeyHeld,
+      shouldDarkenOutsideBoundingBox,
+      tool,
+      stageCoordinates,
     } = currentCanvas;
+    const { shouldSnapToGrid } = outpaintingCanvas;
     return {
       boundingBoxCoordinates,
       boundingBoxDimensions,
       isDrawing,
       isMouseOverBoundingBox,
-      isMoveBoundingBoxKeyHeld,
+      shouldDarkenOutsideBoundingBox,
       isMovingBoundingBox,
       isTransformingBoundingBox,
       shouldLockBoundingBox,
@@ -52,6 +57,9 @@ const boundingBoxPreviewSelector = createSelector(
       stageScale,
       baseCanvasImage,
       activeTabName,
+      shouldSnapToGrid,
+      tool,
+      stageCoordinates,
     };
   },
   {
@@ -74,14 +82,17 @@ const IAICanvasBoundingBoxPreview = (
     boundingBoxDimensions,
     isDrawing,
     isMouseOverBoundingBox,
-    isMoveBoundingBoxKeyHeld,
+    shouldDarkenOutsideBoundingBox,
     isMovingBoundingBox,
     isTransformingBoundingBox,
     shouldLockBoundingBox,
+    stageCoordinates,
     stageDimensions,
     stageScale,
     baseCanvasImage,
     activeTabName,
+    shouldSnapToGrid,
+    tool,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -97,7 +108,7 @@ const IAICanvasBoundingBoxPreview = (
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
-      if (activeTabName === 'inpainting') {
+      if (activeTabName === 'inpainting' || !shouldSnapToGrid) {
         dispatch(
           setBoundingBoxCoordinates({
             x: e.target.x(),
@@ -123,7 +134,7 @@ const IAICanvasBoundingBoxPreview = (
         })
       );
     },
-    [activeTabName, dispatch]
+    [activeTabName, dispatch, shouldSnapToGrid]
   );
 
   const dragBoundFunc = useCallback(
@@ -274,97 +285,101 @@ const IAICanvasBoundingBoxPreview = (
     [baseCanvasImage, stageDimensions]
   );
 
-  const handleStartedTransforming = (e: KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true;
-    e.evt.stopImmediatePropagation();
+  const handleStartedTransforming = () => {
     dispatch(setIsTransformingBoundingBox(true));
   };
 
-  const handleEndedTransforming = (e: KonvaEventObject<MouseEvent>) => {
+  const handleEndedTransforming = () => {
     dispatch(setIsTransformingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
   };
 
-  const handleStartedMoving = (e: KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true;
-    e.evt.stopImmediatePropagation();
+  const handleStartedMoving = () => {
     dispatch(setIsMovingBoundingBox(true));
   };
 
-  const handleEndedModifying = (e: KonvaEventObject<MouseEvent>) => {
+  const handleEndedModifying = () => {
     dispatch(setIsTransformingBoundingBox(false));
     dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
   };
 
-  const spacebarHeldHitFunc = (context: Context, shape: Konva.Shape) => {
-    context.rect(0, 0, baseCanvasImage?.width, baseCanvasImage?.height);
-    context.fillShape(shape);
+  const handleMouseOver = () => {
+    dispatch(setIsMouseOverBoundingBox(true));
+  };
+
+  const handleMouseOut = () => {
+    !isTransformingBoundingBox &&
+      !isMovingBoundingBox &&
+      dispatch(setIsMouseOverBoundingBox(false));
   };
 
   return (
     <Group {...rest}>
       <Rect
+        offsetX={stageCoordinates.x / stageScale}
+        offsetY={stageCoordinates.y / stageScale}
+        height={stageDimensions.height / stageScale}
+        width={stageDimensions.width / stageScale}
+        fill={'rgba(0,0,0,0.4)'}
+        listening={false}
+        visible={shouldDarkenOutsideBoundingBox}
+      />
+      <Rect
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
         width={boundingBoxDimensions.width}
         height={boundingBoxDimensions.height}
-        ref={shapeRef}
-        stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.3)' : 'white'}
-        strokeWidth={Math.floor((isMouseOverBoundingBox ? 8 : 1) / stageScale)}
-        fillEnabled={isMoveBoundingBoxKeyHeld}
-        hitFunc={isMoveBoundingBoxKeyHeld ? spacebarHeldHitFunc : undefined}
-        hitStrokeWidth={Math.floor(13 / stageScale)}
-        listening={!isDrawing && !shouldLockBoundingBox}
-        onMouseOver={() => {
-          dispatch(setIsMouseOverBoundingBox(true));
-        }}
-        onMouseOut={() => {
-          !isTransformingBoundingBox &&
-            !isMovingBoundingBox &&
-            dispatch(setIsMouseOverBoundingBox(false));
-        }}
-        onMouseDown={handleStartedMoving}
-        onMouseUp={handleEndedModifying}
-        draggable={true}
-        onDragMove={handleOnDragMove}
+        fill={'rgb(255,255,255)'}
+        listening={false}
+        visible={shouldDarkenOutsideBoundingBox}
+        globalCompositeOperation={'destination-out'}
+      />
+      <Rect
         dragBoundFunc={
           activeTabName === 'inpainting' ? dragBoundFunc : undefined
         }
-        onTransform={handleOnTransform}
+        draggable={true}
+        fillEnabled={tool === 'move'}
+        height={boundingBoxDimensions.height}
+        listening={!isDrawing && tool === 'move'}
         onDragEnd={handleEndedModifying}
+        onDragMove={handleOnDragMove}
+        onMouseDown={handleStartedMoving}
+        onMouseOut={handleMouseOut}
+        onMouseOver={handleMouseOver}
+        onMouseUp={handleEndedModifying}
+        onTransform={handleOnTransform}
         onTransformEnd={handleEndedTransforming}
+        ref={shapeRef}
+        stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.7)' : 'white'}
+        strokeWidth={Math.floor((isMouseOverBoundingBox ? 8 : 1) / stageScale)}
+        width={boundingBoxDimensions.width}
+        x={boundingBoxCoordinates.x}
+        y={boundingBoxCoordinates.y}
       />
       <Transformer
-        ref={transformerRef}
         anchorCornerRadius={3}
+        anchorDragBoundFunc={anchorDragBoundFunc}
         anchorFill={'rgba(212,216,234,1)'}
         anchorSize={15}
         anchorStroke={'rgb(42,42,42)'}
         borderDash={[4, 4]}
-        borderStroke={'black'}
-        rotateEnabled={false}
         borderEnabled={true}
+        borderStroke={'black'}
+        boundBoxFunc={boundBoxFunc}
+        draggable={false}
+        enabledAnchors={tool === 'move' ? undefined : []}
         flipEnabled={false}
         ignoreStroke={true}
         keepRatio={false}
-        draggable={false}
-        listening={!isDrawing && !shouldLockBoundingBox}
+        listening={!isDrawing && tool === 'move'}
+        onDragEnd={handleEndedModifying}
         onMouseDown={handleStartedTransforming}
         onMouseUp={handleEndedTransforming}
-        enabledAnchors={shouldLockBoundingBox ? [] : undefined}
-        boundBoxFunc={boundBoxFunc}
-        anchorDragBoundFunc={anchorDragBoundFunc}
-        onDragEnd={handleEndedModifying}
         onTransformEnd={handleEndedTransforming}
-        onMouseOver={() => {
-          dispatch(setIsMouseOverBoundingBox(true));
-        }}
-        onMouseOut={() => {
-          !isTransformingBoundingBox &&
-            !isMovingBoundingBox &&
-            dispatch(setIsMouseOverBoundingBox(false));
-        }}
+        ref={transformerRef}
+        rotateEnabled={false}
       />
     </Group>
   );

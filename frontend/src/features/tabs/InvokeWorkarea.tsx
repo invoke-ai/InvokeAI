@@ -21,9 +21,7 @@ const workareaSelector = createSelector(
       shouldPinOptionsPanel,
       activeTabName,
       isLightBoxOpen,
-      shouldShowDualDisplayButton: ['inpainting', 'outpainting'].includes(
-        activeTabName
-      ),
+      shouldShowDualDisplayButton: ['inpainting'].includes(activeTabName),
     };
   }
 );
@@ -46,7 +44,7 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
 
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
-    dispatch(setDoesCanvasNeedScaling(true))
+    dispatch(setDoesCanvasNeedScaling(true));
   };
 
   // Hotkeys

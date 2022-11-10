@@ -1,7 +1,7 @@
 import IAICanvasBrushControl from './IAICanvasControls/IAICanvasBrushControl';
 import IAICanvasEraserControl from './IAICanvasControls/IAICanvasEraserControl';
-import IAICanvasUndoControl from './IAICanvasControls/IAICanvasUndoControl';
-import IAICanvasRedoControl from './IAICanvasControls/IAICanvasRedoControl';
+import IAICanvasUndoControl from './IAICanvasControls/IAICanvasUndoButton';
+import IAICanvasRedoControl from './IAICanvasControls/IAICanvasRedoButton';
 import { Button, ButtonGroup } from '@chakra-ui/react';
 import IAICanvasMaskClear from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskClear';
 import IAICanvasMaskVisibilityControl from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskVisibilityControl';

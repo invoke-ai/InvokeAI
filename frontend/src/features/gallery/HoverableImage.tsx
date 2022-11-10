@@ -23,7 +23,6 @@ import {
 import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import {
-  clearOutpaintingSession,
   setImageToInpaint,
   setImageToOutpaint,
 } from 'features/canvas/canvasSlice';

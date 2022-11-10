@@ -6,7 +6,6 @@ import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
-  // addPointToCurrentEraserLine,
   addPointToCurrentLine,
   currentCanvasSelector,
   GenericCanvasState,
@@ -17,16 +16,8 @@ import getScaledCursorPosition from '../util/getScaledCursorPosition';
 const selector = createSelector(
   [activeTabNameSelector, currentCanvasSelector],
   (activeTabName, canvas: GenericCanvasState) => {
-    const {
-      isMoveStageKeyHeld,
-      isTransformingBoundingBox,
-      isMovingBoundingBox,
-      tool,
-      isDrawing,
-    } = canvas;
+    const { tool, isDrawing } = canvas;
     return {
-      isMoveStageKeyHeld,
-      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       tool,
       isDrawing,
       activeTabName,
@@ -41,8 +32,7 @@ const useCanvasMouseMove = (
   lastCursorPositionRef: MutableRefObject<Vector2d>
 ) => {
   const dispatch = useAppDispatch();
-  const { isMoveStageKeyHeld, isModifyingBoundingBox, tool, isDrawing } =
-    useAppSelector(selector);
+  const { isDrawing, tool } = useAppSelector(selector);
 
   return useCallback(() => {
     if (!stageRef.current) return;
@@ -55,33 +45,19 @@ const useCanvasMouseMove = (
 
     lastCursorPositionRef.current = scaledCursorPosition;
 
-    if (!isDrawing || isModifyingBoundingBox || isMoveStageKeyHeld) return;
+    if (!isDrawing || tool === 'move') return;
 
     didMouseMoveRef.current = true;
     dispatch(
       addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
     );
-    // // Extend the current line
-    // if (tool === 'imageEraser') {
-    //   dispatch(
-    //     addPointToCurrentEraserLine([
-    //       scaledCursorPosition.x,
-    //       scaledCursorPosition.y,
-    //     ])
-    //   );
-    // } else {
-    //   dispatch(
-    //     addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-    //   );
-    // }
   }, [
     didMouseMoveRef,
     dispatch,
     isDrawing,
-    isModifyingBoundingBox,
-    isMoveStageKeyHeld,
     lastCursorPositionRef,
     stageRef,
+    tool,
   ]);
 };
 

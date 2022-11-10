@@ -53,7 +53,7 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
           shadowForStrokeEnabled={false}
           listening={false}
           globalCompositeOperation={
-            line.tool === 'maskBrush' ? 'source-over' : 'destination-out'
+            line.tool === 'brush' ? 'source-over' : 'destination-out'
           }
         />
       ))}

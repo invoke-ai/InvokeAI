@@ -5,29 +5,15 @@ import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
-import {
-  addLine,
-  currentCanvasSelector,
-  GenericCanvasState,
-  setIsDrawing,
-} from '../canvasSlice';
+import { addLine, currentCanvasSelector, setIsDrawing } from '../canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
   [activeTabNameSelector, currentCanvasSelector],
-  (activeTabName, canvas: GenericCanvasState) => {
-    const {
-      isMoveStageKeyHeld,
-      isTransformingBoundingBox,
-      isMovingBoundingBox,
-      tool,
-      toolSize,
-    } = canvas;
+  (activeTabName, currentCanvas) => {
+    const { tool } = currentCanvas;
     return {
-      isMoveStageKeyHeld,
-      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       tool,
-      toolSize,
       activeTabName,
     };
   },
@@ -38,55 +24,24 @@ const useCanvasMouseEnter = (
   stageRef: MutableRefObject<Konva.Stage | null>
 ) => {
   const dispatch = useAppDispatch();
-  const { isMoveStageKeyHeld, isModifyingBoundingBox, tool, toolSize } =
-    useAppSelector(selector);
+  const { tool } = useAppSelector(selector);
 
   return useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
-      if (e.evt.buttons === 1) {
-        if (!stageRef.current) return;
+      if (e.evt.buttons !== 1) return;
 
-        const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
+      if (!stageRef.current) return;
 
-        if (
-          !scaledCursorPosition ||
-          isModifyingBoundingBox ||
-          isMoveStageKeyHeld
-        )
-          return;
+      const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-        dispatch(setIsDrawing(true));
+      if (!scaledCursorPosition || tool === 'move') return;
 
-        if (tool === 'imageEraser') {
-          // Add a new line starting from the current cursor position.
-          dispatch(
-            addLine({
-              type: 'eraserLine',
-              strokeWidth: toolSize / 2,
-              points: [scaledCursorPosition.x, scaledCursorPosition.y],
-            })
-          );
-        } else {
-          // Add a new line starting from the current cursor position.
-          dispatch(
-            addLine({
-              type: 'maskLine',
-              tool,
-              strokeWidth: toolSize / 2,
-              points: [scaledCursorPosition.x, scaledCursorPosition.y],
-            })
-          );
-        }
-      }
+      dispatch(setIsDrawing(true));
+
+      // Add a new line starting from the current cursor position.
+      dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));
     },
-    [
-      stageRef,
-      isModifyingBoundingBox,
-      isMoveStageKeyHeld,
-      dispatch,
-      tool,
-      toolSize,
-    ]
+    [stageRef, tool, dispatch]
   );
 };
 

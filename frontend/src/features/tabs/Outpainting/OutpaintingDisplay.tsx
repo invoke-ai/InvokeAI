@@ -16,6 +16,7 @@ import {
   setDoesCanvasNeedScaling,
 } from 'features/canvas/canvasSlice';
 import IAICanvas from 'features/canvas/IAICanvas';
+import IAICanvasOutpaintingControls from 'features/canvas/IAICanvasOutpaintingControls';
 
 const outpaintingDisplaySelector = createSelector(
   [(state: RootState) => state.canvas, (state: RootState) => state.options],
@@ -54,7 +55,7 @@ const OutpaintingDisplay = () => {
 
   const outpaintingComponent = doesOutpaintingHaveObjects ? (
     <div className="inpainting-main-area">
-      <IAICanvasControls />
+      <IAICanvasOutpaintingControls />
       <div className="inpainting-canvas-area">
         {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
       </div>
@@ -64,17 +65,8 @@ const OutpaintingDisplay = () => {
   );
 
   return (
-    <div
-      className={
-        showDualDisplay ? 'workarea-split-view' : 'workarea-single-view'
-      }
-    >
+    <div className={'workarea-single-view'}>
       <div className="workarea-split-view-left">{outpaintingComponent}</div>
-      {showDualDisplay && (
-        <div className="workarea-split-view-right">
-          <CurrentImageDisplay />
-        </div>
-      )}
     </div>
   );
 };
