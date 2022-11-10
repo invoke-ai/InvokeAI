@@ -40,8 +40,8 @@ const canvasBrushPreviewSelector = createSelector(
           isTransformingBoundingBox ||
           !cursorPosition
         ) && shouldShowBrush,
-      strokeWidth: 1 / stageScale, // scale stroke thickness
-      dotRadius: 1 / stageScale, // scale stroke thickness
+      strokeWidth: 1.5 / stageScale,
+      dotRadius: 1.5 / stageScale,
     };
   },
   {
@@ -86,9 +86,25 @@ const IAICanvasBrushPreview = (props: GroupConfig) => {
         x={cursorPosition ? cursorPosition.x : width / 2}
         y={cursorPosition ? cursorPosition.y : height / 2}
         radius={radius}
+        stroke={'rgba(255,255,255,0.4)'}
+        strokeWidth={strokeWidth * 2}
+        strokeEnabled={true}
+        listening={false}
+      />
+      <Circle
+        x={cursorPosition ? cursorPosition.x : width / 2}
+        y={cursorPosition ? cursorPosition.y : height / 2}
+        radius={radius}
         stroke={'rgba(0,0,0,1)'}
         strokeWidth={strokeWidth}
         strokeEnabled={true}
+        listening={false}
+      />
+      <Circle
+        x={cursorPosition ? cursorPosition.x : width / 2}
+        y={cursorPosition ? cursorPosition.y : height / 2}
+        radius={dotRadius * 2}
+        fill={'rgba(255,255,255,0.4)'}
         listening={false}
       />
       <Circle
