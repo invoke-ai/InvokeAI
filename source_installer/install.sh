@@ -116,6 +116,8 @@ then
    echo "Please visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
    echo "installation methods"
 else
+    ln -sf source_installer/install.sh .
+    ln -sf source_installer/update.sh .
     conda activate invokeai
     # preload the models
     echo "Calling the preload_models.py script"

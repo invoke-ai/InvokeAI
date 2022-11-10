@@ -93,6 +93,9 @@ if "%ERRORLEVEL%" NEQ "0" (
    exit /b
 )
 
+cp source_installer/install.bat install.bat
+cp source_installer/update.bat update.bat
+
 call conda activate invokeai
 @rem preload the models
 call python scripts\preload_models.py
