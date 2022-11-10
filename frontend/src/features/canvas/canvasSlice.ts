@@ -747,17 +747,6 @@ export const inpaintingCanvasSelector = (
   state: RootState
 ): InpaintingCanvasState => state.canvas.inpainting;
 
-// export const areHotkeysEnabledSelector = createSelector(
-//   currentCanvasSelector,
-//   activeTabNameSelector,
-//   (currentCanvas: GenericCanvasState, activeTabName): boolean => {
-//     return (
-//       currentCanvas.isMaskEnabled &&
-//       ['inpainting', 'outpainting'].includes(activeTabName)
-//     );
-//   }
-// );
-
 export const baseCanvasImageSelector = createSelector(
   [(state: RootState) => state.canvas, activeTabNameSelector],
   (canvas: CanvasState, activeTabName) => {

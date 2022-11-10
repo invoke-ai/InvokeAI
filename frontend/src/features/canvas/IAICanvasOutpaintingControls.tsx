@@ -1,27 +1,12 @@
-import { Button, ButtonGroup, Flex } from '@chakra-ui/react';
+import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  clearMask,
   currentCanvasSelector,
-  outpaintingCanvasSelector,
-  redo,
   resetCanvas,
-  setBrushColor,
-  setBrushSize,
-  setEraserSize,
-  setLayer,
-  setMaskColor,
-  setShouldAutoSave,
-  setShouldDarkenOutsideBoundingBox,
-  setShouldShowGrid,
-  setShouldShowIntermediates,
-  setShouldSnapToGrid,
   setTool,
-  undo,
   uploadOutpaintingMergedImage,
 } from './canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import _ from 'lodash';
 import { canvasImageLayerRef } from './IAICanvas';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -29,24 +14,11 @@ import {
   FaArrowsAlt,
   FaCopy,
   FaDownload,
-  FaEraser,
-  FaImage,
   FaLayerGroup,
-  FaMask,
-  FaPaintBrush,
-  FaRedo,
   FaSave,
   FaTrash,
-  FaUndo,
   FaUpload,
-  FaWrench,
 } from 'react-icons/fa';
-import IAIPopover from 'common/components/IAIPopover';
-import IAICheckbox from 'common/components/IAICheckbox';
-import IAIColorPicker from 'common/components/IAIColorPicker';
-import { RgbaColorPicker } from 'react-colorful';
-import IAISlider from 'common/components/IAISlider';
-import IAICanvasMaskColorPicker from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskColorPicker';
 import IAICanvasUndoButton from './IAICanvasControls/IAICanvasUndoButton';
 import IAICanvasRedoButton from './IAICanvasControls/IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
@@ -55,35 +27,12 @@ import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
 
 export const canvasControlsSelector = createSelector(
-  [currentCanvasSelector, outpaintingCanvasSelector, activeTabNameSelector],
-  (currentCanvas, outpaintingCanvas, activeTabName) => {
-    const {
-      layer,
-      maskColor,
-      brushColor,
-      brushSize,
-      eraserSize,
-      tool,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowIntermediates,
-    } = currentCanvas;
-
-    const { shouldShowGrid, shouldSnapToGrid, shouldAutoSave } =
-      outpaintingCanvas;
+  [currentCanvasSelector],
+  (currentCanvas) => {
+    const { tool } = currentCanvas;
 
     return {
-      layer,
       tool,
-      maskColor,
-      brushColor,
-      brushSize,
-      eraserSize,
-      activeTabName,
-      shouldShowGrid,
-      shouldSnapToGrid,
-      shouldAutoSave,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowIntermediates,
     };
   },
   {
@@ -95,20 +44,7 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const {
-    layer,
-    tool,
-    maskColor,
-    brushColor,
-    activeTabName,
-    brushSize,
-    eraserSize,
-    shouldShowIntermediates,
-    shouldShowGrid,
-    shouldSnapToGrid,
-    shouldAutoSave,
-    shouldDarkenOutsideBoundingBox,
-  } = useAppSelector(canvasControlsSelector);
+  const { tool } = useAppSelector(canvasControlsSelector);
 
   return (
     <div className="inpainting-settings">

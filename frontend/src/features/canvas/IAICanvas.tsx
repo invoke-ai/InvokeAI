@@ -11,14 +11,12 @@ import {
   baseCanvasImageSelector,
   clearImageToInpaint,
   currentCanvasSelector,
-  GenericCanvasState,
   outpaintingCanvasSelector,
 } from 'features/canvas/canvasSlice';
 
 // component
 import IAICanvasMaskLines from './IAICanvasMaskLines';
 import IAICanvasBrushPreview from './IAICanvasBrushPreview';
-import IAICanvasMaskBrushPreviewOutline from './IAICanvasBrushPreviewOutline';
 import { Vector2d } from 'konva/lib/types';
 import IAICanvasBoundingBoxPreview from './IAICanvasBoundingBoxPreview';
 import { useToast } from '@chakra-ui/react';
@@ -27,7 +25,6 @@ import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
-import IAICanvasBoundingBoxPreviewOverlay from './IAICanvasBoundingBoxPreviewOverlay';
 import useCanvasWheel from './hooks/useCanvasZoom';
 import useCanvasMouseDown from './hooks/useCanvasMouseDown';
 import useCanvasMouseUp from './hooks/useCanvasMouseUp';
@@ -37,7 +34,6 @@ import useCanvasMouseOut from './hooks/useCanvasMouseOut';
 import useCanvasDragMove from './hooks/useCanvasDragMove';
 import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingObjects';
 import IAICanvasGrid from './IAICanvasGrid';
-import IAICanvasImage from './IAICanvasImage';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasStatusText from './IAICanvasStatusText';
 
@@ -55,7 +51,6 @@ const canvasSelector = createSelector(
       shouldShowCheckboardTransparency,
       stageScale,
       shouldShowBoundingBox,
-      shouldDarkenOutsideBoundingBox,
       shouldLockBoundingBox,
       isTransformingBoundingBox,
       isMouseOverBoundingBox,
@@ -63,7 +58,6 @@ const canvasSelector = createSelector(
       stageDimensions,
       stageCoordinates,
       isMoveStageKeyHeld,
-      shouldShowIntermediates,
       tool,
       isMovingStage,
     } = currentCanvas;
@@ -94,7 +88,6 @@ const canvasSelector = createSelector(
       shouldShowCheckboardTransparency,
       stageScale,
       shouldShowBoundingBox,
-      shouldDarkenOutsideBoundingBox,
       shouldLockBoundingBox,
       shouldShowGrid,
       isTransformingBoundingBox,
@@ -105,7 +98,6 @@ const canvasSelector = createSelector(
       stageCoordinates,
       isMoveStageKeyHeld,
       activeTabName,
-      shouldShowIntermediates,
       baseCanvasImage,
       tool,
     };
@@ -131,7 +123,6 @@ const IAICanvas = () => {
     shouldShowCheckboardTransparency,
     stageScale,
     shouldShowBoundingBox,
-    shouldDarkenOutsideBoundingBox,
     isModifyingBoundingBox,
     stageCursor,
     stageDimensions,
@@ -139,7 +130,6 @@ const IAICanvas = () => {
     shouldShowGrid,
     activeTabName,
     baseCanvasImage,
-    shouldShowIntermediates,
     tool,
   } = useAppSelector(canvasSelector);
 
