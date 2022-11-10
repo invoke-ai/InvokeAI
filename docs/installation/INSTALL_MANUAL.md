@@ -80,20 +80,17 @@ download installers from the following URLs
 
     !!! todo "Macintosh and Linux"
     
-    ```bash
-    ln -sf environments-and-requirements/environment-xxx-yyy.yml environment.yml
-    ```
+       ```bash
+       ln -sf environments-and-requirements/environment-xxx-yyy.yml environment.yml
+       ```
 
-    Replace `xxx` and `yyy` with the appropriate OS and GPU codes.
+       Replace `xxx` and `yyy` with the appropriate OS and GPU codes.
 
-    !!! todo "Windows"
+    !!! todo "Windows requires admin privileges to make links, so we use the copy (cp) command"
     
-    ```bash
-    mklink environment.yml environments-and-requirements\environment-win-cuda.yml
-    ```
-
-    Note that the order of arguments is reversed between the Linux/Mac and Windows
-    commands!
+       ```bash
+       cp environments-and-requirements\environment-win-cuda.yml environment.yml 
+       ```
 
     When this is done, confirm that a file `environment.yml` has been created in
     the InvokeAI root directory and that it points to the correct file in the
@@ -239,17 +236,17 @@ operating system.
 
     !!! todo "Macintosh and Linux"
     
-    ```bash
-    ln -sf environments-and-requirements/requirements-xxx-yyy.txt requirements.txt
-    ```
+       ```bash
+       ln -sf environments-and-requirements/requirements-xxx-yyy.txt requirements.txt
+       ```
 
     Replace `xxx` and `yyy` with the appropriate OS and GPU codes.
 
-    !!! todo "Windows"
+    !!! todo "Windows requires admin privileges to make links, so we use the copy (cp) command instead"
     
-    ```bash
-    mklink requirements.txt environments-and-requirements\requirements-lin-win-colab-cuda.txt
-    ```
+       ```bash
+       cp environments-and-requirements\requirements-lin-win-colab-cuda.txt requirements.txt
+       ```
 
     Note that the order of arguments is reversed between the Linux/Mac and Windows
     commands!

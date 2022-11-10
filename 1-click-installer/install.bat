@@ -81,7 +81,7 @@ call conda activate
 
 @rem create the environment
 call conda env remove -n invokeai
-mklink environment.yml environments-and-requirements\environment-win-cuda.yml
+cp environments-and-requirements\environment-win-cuda.yml environment.yml 
 call conda env create
 if "%ERRORLEVEL%" NEQ "0" (
    echo ""
