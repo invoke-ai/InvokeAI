@@ -18,8 +18,8 @@ set PATH=c:\windows\system32
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 @rem https://mamba.readthedocs.io/en/latest/installation.html
 set MICROMAMBA_DOWNLOAD_URL=https://micro.mamba.pm/api/micromamba/win-64/latest
-set RELEASE_URL=https://github.com/tildebyte/InvokeAI
-set RELEASE_SOURCEBALL=/archive/feat-install-pip-compile.tar.gz
+set RELEASE_URL=https://github.com/invoke-ai/InvokeAI
+set RELEASE_SOURCEBALL=/archive/refs/tags/2.1.3-rc4.tar.gz
 set PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
 set PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-x86_64-pc-windows-msvc-shared-install_only.tar.gz
 

@@ -23,6 +23,7 @@ if [ "$0" != "bash" ]; then
         * ) echo "Invalid selection"; exit;;
     esac
 else # in developer console
-    export PS1="(InvokeAI) \u@\h \w> "
     python --version
+    echo "Press ^D to exit"
+    export PS1="(InvokeAI) \u@\h \w> "
 fi

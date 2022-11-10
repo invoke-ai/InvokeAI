@@ -73,8 +73,8 @@ fi
 # config
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${MAMBA_OS_NAME}-${MAMBA_ARCH}/latest"
-RELEASE_URL=https://github.com/tildebyte/InvokeAI
-RELEASE_SOURCEBALL=/archive/feat-install-pip-compile.tar.gz
+RELEASE_URL=https://github.com/invoke-ai/InvokeAI
+RELEASE_SOURCEBALL=/archive/refs/tags/2.1.3-rc4.tar.gz
 PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
 if [ "$OS_NAME" == "darwin" ]; then
     PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-${PY_ARCH}-apple-darwin-install_only.tar.gz

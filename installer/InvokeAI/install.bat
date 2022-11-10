@@ -156,6 +156,10 @@ if %errorlevel% neq 0 goto err_exit
 
 echo ***** Finished downloading models *****
 
+echo ***** Installing invoke.bat ******
+cp installer\invoke.bat .\invoke.bat
+
+
 @rem more cleanup
 rd /s /q installer installer_files
 

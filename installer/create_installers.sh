@@ -24,4 +24,6 @@ cp WinLongPathsEnabled.reg InvokeAI
 
 zip -r InvokeAI-windows.zip InvokeAI
 
+rm -rf InvokeAI
+
 echo "The installer zips are ready for distribution."
