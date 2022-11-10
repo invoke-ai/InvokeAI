@@ -1,10 +1,10 @@
 ---
-title: The "One-Click" Installer
+title: The InvokeAI Source Installer
 ---
 
 ## Introduction
 
-The one-click installer is a shell script that attempts to automate
+The source installer is a shell script that attempts to automate
 every step needed to install and run InvokeAI on a stock computer
 running recent versions of Linux, MacOSX or Windows.
 
@@ -22,7 +22,7 @@ libraries and recommended model weights files.
 Though there are multiple steps, there really is only one click
 involved to kick off the process.
 
-1. The 1-click installer is distributed in ZIP files. Download the one
+1. The source installer is distributed in ZIP files. Download the one
 that is appropriate for your operating system:
 
   !!! todo "Change the URLs after release"

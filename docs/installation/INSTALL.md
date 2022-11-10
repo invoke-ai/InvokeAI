@@ -7,28 +7,27 @@ title: Installation Overview
 We offer several ways to install InvokeAI, each one suited to your
 experience and preferences.
 
-1. [1-click installer](INSTALL_1CLICK.md)
+1. [InvokeAI installer](INSTALL_INVOKE.md)
 
-    This is an automated shell script that will handle installation of
-    all dependencies for you, and is recommended for those who have
-    limited or no experience with the Python programming language, are
-    not currently interested in contributing to the project, and just want
-    the thing to install and run. In this version, you interact with the
-    web server and command-line clients through a shell script named
-    `invoke.sh` (Linux/Mac) or `invoke.bat` (Windows), and perform
-    updates using `update.sh` and `update.bat`.
+    This is a an installer script that installs InvokeAI and all its
+    the essential third party libraries. When a new version of
+    InvokeAI is released, you will run another script to upgrade to
+    the new version.
 
-2. [Pre-compiled PIP installer](INSTALL_PCP.md)
+    This installer is designed for people who want the system to "just
+    work", and have no interest in exploring how it works or
+    contributing enhancements to the code or documentation.
 
-    This is a series of installer files for which all the requirements
-    for InvokeAI have been precompiled, thereby preventing the conflicts
-    that sometimes occur when an external library is changed unexpectedly.
-    It will leave you with an environment in which you interact directly
-    with the scripts for running the web and command line clients, and
-    you will update to new versions using standard developer commands.
+2. [Source code installer](INSTALL_SOURCE.md)
 
-    This method is recommended for users with a bit of experience using
-    the `git` and `pip` tools.
+    This is a script that will install InvokeAI and all its essential
+    third party libraries. In contrast to the previous installer, it
+    includes access to a "developer console" which will allow you to
+    access experimental features on the development branch.
+
+    This method is recommended for individuals who are wish to stay
+    on the cutting edge of InvokeAI development and are not afraid
+    of occasional breakage.
 
 3. [Manual Installation](INSTALL_MANUAL.md)
 
