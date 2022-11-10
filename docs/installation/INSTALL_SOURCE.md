@@ -4,9 +4,12 @@ title: The InvokeAI Source Installer
 
 ## Introduction
 
-The source installer is a shell script that attempts to automate
-every step needed to install and run InvokeAI on a stock computer
-running recent versions of Linux, MacOSX or Windows.
+The source installer is a shell script that attempts to automate every
+step needed to install and run InvokeAI on a stock computer running
+recent versions of Linux, MacOSX or Windows. It will leave you with a
+version that runs a stable version of InvokeAI with the option to
+upgrade to experimental versions later. It is not as foolproof as the
+[InvokeAI installer](INSTALL_INVOKE.md)
 
 Before you begin, make sure that you meet the [hardware
 requirements](index.md#Hardware_Requirements) and has the appropriate
@@ -22,14 +25,15 @@ libraries and recommended model weights files.
 Though there are multiple steps, there really is only one click
 involved to kick off the process.
 
-1. The source installer is distributed in ZIP files. Download the one
-that is appropriate for your operating system:
+1. The source installer is distributed in ZIP files. Go to the [latest
+   release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
+   look for a series of files named:
 
-  !!! todo "Change the URLs after release"
-  
-    - [invokeAI-mac.zip](https://github.com/invoke-ai/InvokeAI/releases/download/2.1.3-rc1/invokeAI-mac.zip)
-    - [invokeAI-linux.zip](https://github.com/invoke-ai/InvokeAI/releases/download/2.1.3-rc1/invokeAI-linux.zip)
-    - [invokeAI-windows.zip](https://github.com/invoke-ai/InvokeAI/releases/download/2.1.3-rc1/invokeAI-windows.zip)
+   - invokeAI-src-installer-mac.zip
+   - invokeAI-src-installer-windows.zip
+   - invokeAI-src-installer-linux.zip
+
+Download the one that is appropriate for your operating system.
 
 2. Unpack the zip file into a directory that has at least 18G of free
    space. Do *not* unpack into a directory that has an earlier version of

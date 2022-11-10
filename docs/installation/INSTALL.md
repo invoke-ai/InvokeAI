@@ -9,14 +9,14 @@ experience and preferences.
 
 1. [InvokeAI installer](INSTALL_INVOKE.md)
 
-    This is a an installer script that installs InvokeAI and all its
-    the essential third party libraries. When a new version of
-    InvokeAI is released, you will run another script to upgrade to
-    the new version.
+    This is a installer script that installs InvokeAI and all the
+    third party libraries it depends on. When a new version of
+    InvokeAI is released, you will download and reinstall the new
+    version.
 
     This installer is designed for people who want the system to "just
-    work", and have no interest in exploring how it works or
-    contributing enhancements to the code or documentation.
+    work", don't have an interest in tinkering with it, and do not
+    care about upgrading to unreleased experimental features.
 
 2. [Source code installer](INSTALL_SOURCE.md)
 
