@@ -80,7 +80,7 @@ const DeleteImageModal = forwardRef(
     };
 
     useHotkeys(
-      'del',
+      'delete',
       () => {
         shouldConfirmOnDelete ? onOpen() : handleDelete();
       },
