@@ -15,6 +15,7 @@ from uuid import uuid4
 from threading import Event
 
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
@@ -602,7 +603,9 @@ class InvokeAIWebServer:
             self.socketio.emit("progressUpdate", progress.to_formatted_dict())
             eventlet.sleep(0)
 
-            def image_progress(sample, step):
+            def image_progress(progress_state: PipelineIntermediateState):
+                step = progress_state.step
+                sample = progress_state.latents
                 if self.canceled.is_set():
                     raise CanceledException
 

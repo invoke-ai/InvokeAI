@@ -188,7 +188,7 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
         result = None
         for result in self.generate_from_embeddings(
                 latents, text_embeddings, guidance_scale, run_id, **extra_step_kwargs):
-            if callback is not None:
+            if callback is not None and isinstance(result, PipelineIntermediateState):
                 callback(result)
         if result is None:
             raise AssertionError("why was that an empty generator?")
