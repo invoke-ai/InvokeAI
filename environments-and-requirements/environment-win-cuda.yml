@@ -13,6 +13,7 @@ dependencies:
   - cudatoolkit=11.6
   - pip:
     - albumentations==0.4.3
+    - basicsr==1.4.1
     - dependency_injector==4.40.0
     - diffusers==0.6.0
     - einops==0.3.0
