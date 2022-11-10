@@ -1033,7 +1033,9 @@ class Generate:
                 return True
         return False
 
-    def _check_for_erasure(self, image):
+    def _check_for_erasure(self, image:Image.Image)->bool:
+        if image.mode not in ('RGBA','RGB'):
+            return False
         width, height = image.size
         pixdata = image.load()
         colored = 0
