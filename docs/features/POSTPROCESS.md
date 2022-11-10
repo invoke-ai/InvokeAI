@@ -6,48 +6,38 @@ title: Postprocessing
 
 ## Intro
 
-This extension provides the ability to restore faces and upscale
-images.
+This extension provides the ability to restore faces and upscale images.
 
-Face restoration and upscaling can be applied at the time you generate
-the images, or at any later time against a previously-generated PNG
-file, using the [!fix](#fixing-previously-generated-images)
-command. [Outpainting and outcropping](OUTPAINTING.md) can only be
-applied after the fact.
+Face restoration and upscaling can be applied at the time you generate the
+images, or at any later time against a previously-generated PNG file, using the
+[!fix](#fixing-previously-generated-images) command.
+[Outpainting and outcropping](OUTPAINTING.md) can only be applied after the
+fact.
 
 ## Face Fixing
 
 The default face restoration module is GFPGAN. The default upscale is
-Real-ESRGAN. For an alternative face restoration module, see [CodeFormer
-Support](#codeformer-support) below.
+Real-ESRGAN. For an alternative face restoration module, see
+[CodeFormer Support](#codeformer-support) below.
 
-As of version 1.14, environment.yaml will install the Real-ESRGAN
-package into the standard install location for python packages, and
-will put GFPGAN into a subdirectory of "src" in the InvokeAI
-directory. Upscaling with Real-ESRGAN should "just work" without
-further intervention. Simply pass the `--upscale` (`-U`) option on the
-`invoke>` command line, or indicate the desired scale on the popup in
-the Web GUI.
+As of version 1.14, environment.yaml will install the Real-ESRGAN package into
+the standard install location for python packages, and will put GFPGAN into a
+subdirectory of "src" in the InvokeAI directory. Upscaling with Real-ESRGAN
+should "just work" without further intervention. Simply pass the `--upscale`
+(`-U`) option on the `invoke>` command line, or indicate the desired scale on
+the popup in the Web GUI.
 
-**GFPGAN** requires a series of downloadable model files to
-work. These are loaded when you run `scripts/preload_models.py`. If
-GFPAN is failing with an error, please run the following from the
-InvokeAI directory:
+**GFPGAN** requires a series of downloadable model files to work. These are
+loaded when you run `scripts/preload_models.py`. If GFPAN is failing with an
+error, please run the following from the InvokeAI directory:
 
 ```bash
 python scripts/preload_models.py
 ```
 
-If you do not run this script in advance, the GFPGAN module will attempt
-to download the models files the first time you try to perform facial
+If you do not run this script in advance, the GFPGAN module will attempt to
+download the models files the first time you try to perform facial
 reconstruction.
-
-Alternatively, if you have GFPGAN installed elsewhere, or if you are
-using an earlier version of this package which asked you to install
-GFPGAN in a sibling directory, you may use the `--gfpgan_dir` argument
-with `invoke.py` to set a custom path to your GFPGAN directory. _There
-are other GFPGAN related boot arguments if you wish to customize
-further._
 
 ## Usage
 
@@ -119,15 +109,15 @@ actions.
 This repo also allows you to perform face restoration using
 [CodeFormer](https://github.com/sczhou/CodeFormer).
 
-In order to setup CodeFormer to work, you need to download the models
-like with GFPGAN. You can do this either by running
-`preload_models.py` or by manually downloading the [model
-file](https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth)
+In order to setup CodeFormer to work, you need to download the models like with
+GFPGAN. You can do this either by running `preload_models.py` or by manually
+downloading the
+[model file](https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth)
 and saving it to `ldm/invoke/restoration/codeformer/weights` folder.
 
-You can use `-ft` prompt argument to swap between CodeFormer and the
-default GFPGAN. The above mentioned `-G` prompt argument will allow
-you to control the strength of the restoration effect.
+You can use `-ft` prompt argument to swap between CodeFormer and the default
+GFPGAN. The above mentioned `-G` prompt argument will allow you to control the
+strength of the restoration effect.
 
 ### Usage
 
@@ -157,9 +147,9 @@ situations when there is very little facial data to work with.
 ## Fixing Previously-Generated Images
 
 It is easy to apply face restoration and/or upscaling to any
-previously-generated file. Just use the syntax `!fix path/to/file.png
-<options>`. For example, to apply GFPGAN at strength 0.8 and upscale
-2X for a file named `./outputs/img-samples/000044.2945021133.png`,
+previously-generated file. Just use the syntax
+`!fix path/to/file.png <options>`. For example, to apply GFPGAN at strength 0.8
+and upscale 2X for a file named `./outputs/img-samples/000044.2945021133.png`,
 just run:
 
 ```bash

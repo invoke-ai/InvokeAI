@@ -2,9 +2,9 @@ class Restoration():
     def __init__(self) -> None:
         pass
 
-    def load_face_restore_models(self, gfpgan_dir='./src/gfpgan', gfpgan_model_path='experiments/pretrained_models/GFPGANv1.4.pth'):
+    def load_face_restore_models(self, gfpgan_model_path='./models/gfpgan/GFPGANv1.4.pth'):
         # Load GFPGAN
-        gfpgan = self.load_gfpgan(gfpgan_dir, gfpgan_model_path)
+        gfpgan = self.load_gfpgan(gfpgan_model_path)
         if gfpgan.gfpgan_model_exists:
             print('>> GFPGAN Initialized')
         else:
@@ -22,9 +22,9 @@ class Restoration():
         return gfpgan, codeformer
 
     # Face Restore Models
-    def load_gfpgan(self, gfpgan_dir, gfpgan_model_path):
+    def load_gfpgan(self, gfpgan_model_path):
         from ldm.invoke.restoration.gfpgan import GFPGAN
-        return GFPGAN(gfpgan_dir, gfpgan_model_path)
+        return GFPGAN(gfpgan_model_path)
 
     def load_codeformer(self):
         from ldm.invoke.restoration.codeformer import CodeFormerRestoration
