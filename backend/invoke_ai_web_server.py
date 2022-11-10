@@ -592,6 +592,8 @@ class InvokeAIWebServer:
                 else []
             )
 
+            actual_generation_mode = generation_parameters["generation_mode"]
+            original_bounding_box = None
             """
             TODO:
             If a result image is used as an init image, and then deleted, we will want to be
@@ -621,7 +623,7 @@ class InvokeAIWebServer:
                     generation_parameters["init_mask"]
                 ).convert("L")
 
-                outpaint_generation_mode = get_outpainting_generation_mode(
+                actual_generation_mode = get_outpainting_generation_mode(
                     outpaint_image, outpaint_mask
                 )
 
@@ -655,14 +657,14 @@ class InvokeAIWebServer:
                 generation_parameters["init_mask"] = alpha_mask
 
                 # Remove the unneeded parameters for whichever mode we are doing
-                if outpaint_generation_mode == "inpainting":
+                if actual_generation_mode == "inpainting":
                     generation_parameters.pop("seam_size", None)
                     generation_parameters.pop("seam_blur", None)
                     generation_parameters.pop("seam_strength", None)
                     generation_parameters.pop("seam_steps", None)
                     generation_parameters.pop("tile_size", None)
                     generation_parameters.pop("force_outpaint", None)
-                elif outpaint_generation_mode == "img2img":
+                elif actual_generation_mode == "img2img":
                     generation_parameters["height"] = original_bounding_box["height"]
                     generation_parameters["width"] = original_bounding_box["width"]
                     generation_parameters.pop("init_mask", None)
@@ -672,7 +674,7 @@ class InvokeAIWebServer:
                     generation_parameters.pop("seam_steps", None)
                     generation_parameters.pop("tile_size", None)
                     generation_parameters.pop("force_outpaint", None)
-                elif outpaint_generation_mode == "txt2img":
+                elif actual_generation_mode == "txt2img":
                     generation_parameters["height"] = original_bounding_box["height"]
                     generation_parameters["width"] = original_bounding_box["width"]
                     generation_parameters.pop("strength", None)
@@ -744,8 +746,17 @@ class InvokeAIWebServer:
                 nonlocal generation_parameters
                 nonlocal progress
 
+                generation_messages = {
+                    "txt2img": "Text to Image",
+                    "img2img": "Image to Image",
+                    "inpainting": "Inpainting",
+                    "outpainting": "Outpainting",
+                }
+
                 progress.set_current_step(step + 1)
-                progress.set_current_status("Generating")
+                progress.set_current_status(
+                    f"Generating ({generation_messages[actual_generation_mode]})"
+                )
                 progress.set_current_status_has_steps(True)
 
                 if (
@@ -780,9 +791,7 @@ class InvokeAIWebServer:
                             "width": width,
                             "height": height,
                             "generationMode": generation_parameters["generation_mode"],
-                            "boundingBox": original_bounding_box
-                            if original_bounding_box
-                            else None,
+                            "boundingBox": original_bounding_box,
                         },
                     )
 
@@ -806,9 +815,7 @@ class InvokeAIWebServer:
                             "width": width,
                             "height": height,
                             "generationMode": generation_parameters["generation_mode"],
-                            "boundingBox": original_bounding_box
-                            if original_bounding_box
-                            else None,
+                            "boundingBox": original_bounding_box,
                         },
                     )
 
