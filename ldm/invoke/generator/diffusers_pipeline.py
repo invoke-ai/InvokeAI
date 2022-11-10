@@ -231,6 +231,8 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
                                  run_id: str = None, **extra_step_kwargs):
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents *= self.scheduler.init_noise_sigma
         yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
                                         latents=latents)
         # NOTE: Depends on scheduler being already initialized!
