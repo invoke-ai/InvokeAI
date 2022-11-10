@@ -1,4 +1,4 @@
-import { Button, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   clearMask,
@@ -14,6 +14,7 @@ import { FaMask } from 'react-icons/fa';
 import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
+import IAIButton from 'common/components/IAIButton';
 
 export const selector = createSelector(
   [currentCanvasSelector],
@@ -50,7 +51,7 @@ const IAICanvasMaskButtonPopover = () => {
       }
     >
       <Flex direction={'column'} gap={'0.5rem'}>
-        <Button onClick={() => dispatch(clearMask())}>Clear Mask</Button>
+        <IAIButton onClick={() => dispatch(clearMask())}>Clear Mask</IAIButton>
         <IAICheckbox
           label="Enable Mask"
           isChecked={isMaskEnabled}
