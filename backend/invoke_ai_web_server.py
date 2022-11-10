@@ -524,7 +524,7 @@ class InvokeAIWebServer:
                 )
                 mtime = os.path.getmtime(file_path)
                 (width, height) = Image.open(file_path).size
-                
+
                 socketio.emit(
                     "imageUploaded",
                     {
@@ -779,6 +779,10 @@ class InvokeAIWebServer:
                             "metadata": metadata,
                             "width": width,
                             "height": height,
+                            "generationMode": generation_parameters["generation_mode"],
+                            "boundingBox": original_bounding_box
+                            if original_bounding_box
+                            else None,
                         },
                     )
 
@@ -801,6 +805,10 @@ class InvokeAIWebServer:
                             "metadata": {},
                             "width": width,
                             "height": height,
+                            "generationMode": generation_parameters["generation_mode"],
+                            "boundingBox": original_bounding_box
+                            if original_bounding_box
+                            else None,
                         },
                     )
 
