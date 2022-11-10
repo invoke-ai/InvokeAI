@@ -225,5 +225,9 @@ invokeai.init
 environment.yml
 requirements.txt
 
+# source installer files
+source_installer/*zip
+source_installer/invokeAI
+
 # this may be present if the user created a venv
 invokeai
