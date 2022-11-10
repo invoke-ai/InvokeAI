@@ -304,8 +304,8 @@ class ModelCache(object):
         )
         pipeline.to(self.device)
 
-        width = pipeline.vae.sample_size
-        height = pipeline.vae.sample_size
+        width = pipeline.vae.block_out_channels[-1]
+        height = pipeline.vae.block_out_channels[-1]
 
         return pipeline, width, height, model_hash
 

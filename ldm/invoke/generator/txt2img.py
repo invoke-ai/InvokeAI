@@ -5,7 +5,6 @@ import PIL.Image
 import torch
 
 from .base import Generator
-from .diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 
 class Txt2Img(Generator):
