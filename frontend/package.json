@@ -30,7 +30,7 @@
     "react-colorful": "^5.6.1",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.2",
-    "react-hotkeys-hook": "4",
+    "react-hotkeys-hook": "4.0.2",
     "react-icons": "^4.4.0",
     "react-image-pan-zoom-rotate": "^1.6.0",
     "react-konva": "^18.2.3",
