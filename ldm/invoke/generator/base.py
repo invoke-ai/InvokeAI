@@ -9,8 +9,8 @@ import traceback
 
 import numpy as np
 import torch
-from PIL import Image, ImageFilter, ImageChops
-import cv2 as cv
+from PIL import Image, ImageFilter
+from diffusers import DiffusionPipeline
 from einops import rearrange
 from pytorch_lightning import seed_everything
 from tqdm import trange
@@ -26,9 +26,9 @@ class Generator:
     downsampling_factor: int
     latent_channels: int
     precision: str
-    model: DiffusionWrapper
+    model: DiffusionWrapper | DiffusionPipeline
 
-    def __init__(self, model: DiffusionWrapper, precision: str):
+    def __init__(self, model: DiffusionWrapper | DiffusionPipeline, precision: str):
         self.model = model
         self.precision = precision
         self.seed = None

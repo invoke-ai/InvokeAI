@@ -24,17 +24,8 @@ class Txt2Img(Generator):
         self.perlin = perlin
         uc, c, extra_conditioning_info   = conditioning
 
-        # FIXME: this should probably be either passed in to __init__ instead of model & precision,
-        #     or be constructed in __init__ from those inputs.
-        pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
-            "runwayml/stable-diffusion-v1-5",
-            revision="fp16", torch_dtype=torch.float16,
-            safety_checker=None,  # TODO
-            # scheduler=sampler + ddim_eta,  # TODO
-            # TODO: local_files_only=True
-        )
-        pipeline.unet.to("cuda")
-        pipeline.vae.to("cuda")
+        pipeline = self.model
+        # TODO: customize a new pipeline for the given sampler (Scheduler)
 
         def make_image(x_T) -> PIL.Image.Image:
             # FIXME: restore free_gpu_mem functionality
