@@ -90,7 +90,12 @@ def main():
             safety_checker=opt.safety_checker,
             max_loaded_models=opt.max_loaded_models,
             )
-    except (FileNotFoundError, IOError, KeyError) as e:
+    except FileNotFoundError:
+        print('** You appear to be missing configs/models.yaml')
+        print('** You can either exit this script and run scripts/preload_models.py, or fix the problem now.')
+        emergency_model_create(opt)
+        sys.exit(-1)
+    except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
         sys.exit(-1)
 
@@ -481,6 +486,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
     else:  # not a recognized command, so give the --help text
         command = '-h'
     return command, operation
+
 
 def add_weights_to_config(model_path:str, gen, opt, completer):
     print(f'>> Model import in process. Please enter the values needed to configure this model:')
@@ -878,6 +884,36 @@ def write_commands(opt, file_path:str, outfilepath:str):
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
 
+def emergency_model_create(opt:Args):
+    completer   = get_completer(opt)
+    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
+    completer.set_default_dir('.')
+    valid_path = False
+    while not valid_path:
+        weights_file = input('Enter the path to a downloaded models file, or ^C to exit: ')
+        valid_path = os.path.exists(weights_file)
+    dir,basename = os.path.split(weights_file)
+
+    valid_name = False
+    while not valid_name:
+        name = input('Enter a short name for this model (no spaces): ')
+        name = 'unnamed model' if len(name)==0 else name
+        valid_name = ' ' not in name
+
+    description = input('Enter a description for this model: ')
+    description = 'no description' if len(description)==0 else description
+
+    with open(opt.conf, 'w', encoding='utf-8') as f:
+        f.write(f'{name}:\n')
+        f.write(f'  description: {description}\n')
+        f.write(f'  weights: {weights_file}\n')
+        f.write(f'  config: ./configs/stable-diffusion/v1-inference.yaml\n')
+        f.write(f'  width: 512\n')
+        f.write(f'  height: 512\n')
+        f.write(f'  default: true\n')
+    print(f'Config file {opt.conf} is created. This script will now exit.')
+    print(f'After restarting you may examine the entry with !models and edit it with !edit.')
+    
 ######################################
 
 if __name__ == '__main__':
