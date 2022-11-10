@@ -4,6 +4,7 @@ They are moved between GPU and CPU as necessary. If CPU memory falls
 below a preset minimum, the least recently used model will be
 cleared and loaded from disk when next needed.
 '''
+from pathlib import Path
 
 import torch
 import os
@@ -18,6 +19,8 @@ import os
 from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
+
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.util import instantiate_from_config
 
 DEFAULT_MAX_MODELS=2
@@ -268,7 +271,43 @@ class ModelCache(object):
         return model, width, height, model_hash
 
     def _load_diffusers_model(self, mconfig):
-        raise NotImplementedError()  # return pipeline, width, height, model_hash
+        pipeline_args = {}
+
+        if 'repo_name' in mconfig:
+            name_or_path = mconfig['repo_name']
+            model_hash = "FIXME"
+            # model_hash = huggingface_hub.get_hf_file_metadata(url).commit_hash
+        elif 'path' in mconfig:
+            name_or_path = Path(mconfig['path'])
+            # FIXME: What should the model_hash be? A hash of the unet weights? Of all files of all
+            #     the submodels hashed together? The commit ID from the repo?
+            model_hash = "FIXME TOO"
+        else:
+            raise ValueError("Model config must specify either repo_name or path.")
+
+        print(f'>> Loading diffusers model from {name_or_path}')
+
+        if self.precision == 'float16':
+            print('   | Using faster float16 precision')
+            pipeline_args.update(revision="fp16", torch_dtype=torch.float16)
+        else:
+            # TODO: more accurately, "using the model's default precision."
+            #     How do we find out what that is?
+            print('   | Using more accurate float32 precision')
+
+        pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
+            name_or_path,
+            safety_checker=None,  # TODO
+            # TODO: alternate VAE
+            # TODO: local_files_only=True
+            **pipeline_args
+        )
+        pipeline.to(self.device)
+
+        width = pipeline.vae.sample_size
+        height = pipeline.vae.sample_size
+
+        return pipeline, width, height, model_hash
 
     def offload_model(self, model_name:str):
         '''

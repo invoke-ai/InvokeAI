@@ -18,6 +18,8 @@ import gc
 import hashlib
 import cv2
 import skimage
+from diffusers import DiffusionPipeline, DDIMScheduler, LMSDiscreteScheduler, EulerDiscreteScheduler, \
+    EulerAncestralDiscreteScheduler
 
 from omegaconf import OmegaConf
 from ldm.invoke.generator.base import downsampling
@@ -386,7 +388,10 @@ class Generate:
         width = width or self.width
         height = height or self.height
 
-        configure_model_padding(model, seamless, seamless_axes)
+        if isinstance(model, DiffusionPipeline):
+            configure_model_padding(model.unet, seamless, seamless_axes)
+        else:
+            configure_model_padding(model, seamless, seamless_axes)
 
         assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert threshold >= 0.0, '--threshold must be >=0.0'
@@ -930,9 +935,15 @@ class Generate:
     def sample_to_lowres_estimated_image(self, samples):
         return self._make_base().sample_to_lowres_estimated_image(samples)
 
+    def _set_sampler(self):
+        if isinstance(self.model, DiffusionPipeline):
+            return self._set_scheduler()
+        else:
+            return self._set_sampler_legacy()
+
     # very repetitive code - can this be simplified? The KSampler names are
     # consistent, at least
-    def _set_sampler(self):
+    def _set_sampler_legacy(self):
         msg = f'>> Setting Sampler to {self.sampler_name}'
         if self.sampler_name == 'plms':
             self.sampler = PLMSSampler(self.model, device=self.device)
@@ -955,6 +966,44 @@ class Generate:
             self.sampler = PLMSSampler(self.model, device=self.device)
 
         print(msg)
+
+    def _set_scheduler(self):
+        msg = f'>> Setting Sampler to {self.sampler_name}'
+        default = self.model.scheduler
+        # TODO: Test me! Not all schedulers take the same args.
+        scheduler_args = dict(
+            num_train_timesteps=default.num_train_timesteps,
+            beta_start=default.beta_start,
+            beta_end=default.beta_end,
+            beta_schedule=default.beta_schedule,
+        )
+        trained_betas = getattr(self.model.scheduler, 'trained_betas')
+        if trained_betas is not None:
+            scheduler_args.update(trained_betas=trained_betas)
+        if self.sampler_name == 'plms':
+            raise NotImplementedError("What's the diffusers implementation of PLMS?")
+        elif self.sampler_name == 'ddim':
+            self.sampler = DDIMScheduler(**scheduler_args)
+        elif self.sampler_name == 'k_dpm_2_a':
+            raise NotImplementedError("no diffusers implementation of dpm_2 samplers")
+        elif self.sampler_name == 'k_dpm_2':
+            raise NotImplementedError("no diffusers implementation of dpm_2 samplers")
+        elif self.sampler_name == 'k_euler_a':
+            self.sampler = EulerAncestralDiscreteScheduler(**scheduler_args)
+        elif self.sampler_name == 'k_euler':
+            self.sampler = EulerDiscreteScheduler(**scheduler_args)
+        elif self.sampler_name == 'k_heun':
+            raise NotImplementedError("no diffusers implementation of Heun's sampler")
+        elif self.sampler_name == 'k_lms':
+            self.sampler = LMSDiscreteScheduler(**scheduler_args)
+        else:
+            msg = f'>> Unsupported Sampler: {self.sampler_name}, Defaulting to {default}'
+
+        print(msg)
+
+        if not hasattr(self.sampler, 'uses_inpainting_model'):
+            # FIXME: terrible kludge!
+            self.sampler.uses_inpainting_model = lambda: False
 
     def _load_img(self, img)->Image:
         if isinstance(img, Image.Image):
