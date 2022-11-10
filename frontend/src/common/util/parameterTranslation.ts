@@ -117,6 +117,7 @@ export const frontendToBackendParameters = (
       inpaintReplace,
       shouldUseInpaintReplace,
       stageScale,
+      isMaskEnabled,
     } = canvasState[canvasState.currentCanvas];
 
     const boundingBox = {
@@ -125,16 +126,16 @@ export const frontendToBackendParameters = (
     };
 
     const maskDataURL = generateMask(
-      objects.filter(isCanvasMaskLine),
+      isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
       boundingBox
     );
+
+    generationParameters.init_mask = maskDataURL;
 
     generationParameters.fit = false;
 
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
-
-    generationParameters.init_mask = maskDataURL;
 
     if (shouldUseInpaintReplace) {
       generationParameters.inpaint_replace = inpaintReplace;
