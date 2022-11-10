@@ -24,7 +24,7 @@ class Txt2Img(Generator):
         uc, c, extra_conditioning_info   = conditioning
 
         pipeline = self.model
-        # TODO: customize a new pipeline for the given sampler (Scheduler)
+        pipeline.scheduler = sampler
 
         def make_image(x_T) -> PIL.Image.Image:
             # FIXME: restore free_gpu_mem functionality
