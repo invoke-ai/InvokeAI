@@ -48,6 +48,13 @@ class Inpaint(Img2Img):
         if im.mode != 'RGBA':
             return im
 
+        # # HACK PATCH MATCH
+        # from src.PyPatchMatch import patch_match
+        # im_patched_np = patch_match.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
+        # im_patched = Image.fromarray(im_patched_np, mode = 'RGB')
+        # return im_patched
+        # # /HACK
+
         a = np.asarray(im, dtype=np.uint8)
 
         tile_size = (tile_size, tile_size)
@@ -270,51 +277,6 @@ class Inpaint(Img2Img):
         return make_image
 
 
-    def color_correct(self, image: Image.Image, base_image: Image.Image, mask: Image.Image, mask_blur_radius: int) -> Image.Image:
-        # Get the original alpha channel of the mask if there is one.
-        # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
-        pil_init_mask = mask.getchannel('A') if mask.mode == 'RGBA' else mask.convert('L')
-        pil_init_image = base_image.convert('RGBA') # Add an alpha channel if one doesn't exist
-
-        # Build an image with only visible pixels from source to use as reference for color-matching.
-        init_rgb_pixels = np.asarray(base_image.convert('RGB'), dtype=np.uint8)
-        init_a_pixels = np.asarray(pil_init_image.getchannel('A'), dtype=np.uint8)
-        init_mask_pixels = np.asarray(pil_init_mask, dtype=np.uint8)
-
-        # Get numpy version of result
-        np_image = np.asarray(image, dtype=np.uint8)
-
-        # Mask and calculate mean and standard deviation
-        mask_pixels = init_a_pixels * init_mask_pixels > 0
-        np_init_rgb_pixels_masked = init_rgb_pixels[mask_pixels, :]
-        np_image_masked = np_image[mask_pixels, :]
-
-        init_means = np_init_rgb_pixels_masked.mean(axis=0)
-        init_std = np_init_rgb_pixels_masked.std(axis=0)
-        gen_means = np_image_masked.mean(axis=0)
-        gen_std = np_image_masked.std(axis=0)
-
-        # Color correct
-        np_matched_result = np_image.copy()
-        np_matched_result[:,:,:] = (((np_matched_result[:,:,:].astype(np.float32) - gen_means[None,None,:]) / gen_std[None,None,:]) * init_std[None,None,:] + init_means[None,None,:]).clip(0, 255).astype(np.uint8)
-        matched_result = Image.fromarray(np_matched_result, mode='RGB')
-
-        # Blur the mask out (into init image) by specified amount
-        if mask_blur_radius > 0:
-            nm = np.asarray(pil_init_mask, dtype=np.uint8)
-            nmd = cv.erode(nm, kernel=np.ones((3,3), dtype=np.uint8), iterations=int(mask_blur_radius / 2))
-            pmd = Image.fromarray(nmd, mode='L')
-            blurred_init_mask = pmd.filter(ImageFilter.BoxBlur(mask_blur_radius))
-        else:
-            blurred_init_mask = pil_init_mask
-
-        multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, self.pil_image.split()[-1])
-        
-        # Paste original on color-corrected generation (using blurred mask)
-        matched_result.paste(base_image, (0,0), mask = multiplied_blurred_init_mask)
-        return matched_result
-
-
     def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
         debug_image(gen_result, "gen_result", debug_status=self.enable_image_debugging)
@@ -322,7 +284,7 @@ class Inpaint(Img2Img):
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
         
-        corrected_result = self.color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
+        corrected_result = super().repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
         debug_image(corrected_result, "corrected_result", debug_status=self.enable_image_debugging)
 
         return corrected_result

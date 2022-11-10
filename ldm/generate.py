@@ -445,7 +445,7 @@ class Generate:
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            generator = self.select_generator(init_image, mask_image, embiggen, hires_fix)
+            generator = self.select_generator(init_image, mask_image, embiggen, hires_fix, force_outpaint)
 
             generator.set_variation(
                 self.seed, variation_amount, with_variations

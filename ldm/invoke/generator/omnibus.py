@@ -3,7 +3,7 @@
 import torch
 import numpy as  np
 from einops import repeat
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageChops
 from ldm.invoke.devices import choose_autocast
 from ldm.invoke.generator.base import downsampling
 from ldm.invoke.generator.img2img import Img2Img
@@ -29,6 +29,7 @@ class Omnibus(Img2Img,Txt2Img):
             step_callback=None,
             threshold=0.0,
             perlin=0.0,
+            mask_blur_radius: int = 8,
             **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
@@ -42,12 +43,18 @@ class Omnibus(Img2Img,Txt2Img):
         )
 
         if isinstance(init_image, Image.Image):
+            self.pil_image = init_image
             if init_image.mode != 'RGB':
                 init_image = init_image.convert('RGB')
             init_image = self._image_to_tensor(init_image)
 
         if isinstance(mask_image, Image.Image):
-            mask_image = self._image_to_tensor(ImageOps.invert(mask_image).convert('L'),normalize=False)
+            self.pil_mask = mask_image
+
+            mask_image = ImageChops.multiply(mask_image.convert('L'), self.pil_image.split()[-1])
+            mask_image = self._image_to_tensor(ImageOps.invert(mask_image), normalize=False)
+
+        self.mask_blur_radius = mask_blur_radius
 
         t_enc = steps
 
@@ -151,3 +158,14 @@ class Omnibus(Img2Img,Txt2Img):
             height = self.init_latent.shape[2]
             width = self.init_latent.shape[3]
         return Txt2Img.get_noise(self,width,height)
+
+
+    def sample_to_image(self, samples)->Image.Image:
+        gen_result = super().sample_to_image(samples).convert('RGB')
+        
+        if self.pil_image is None or self.pil_mask is None:
+            return gen_result
+
+        corrected_result = super(Img2Img, self).repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
+        
+        return corrected_result
