@@ -29,14 +29,14 @@ import { socketioMiddleware } from './socketio/middleware';
  */
 
 const inpaintingCanvasBlacklist = [
-  'pastLines',
-  'futureLines',
+  'pastObjects',
+  'futureObjects',
   'cursorPosition',
 ].map((blacklistItem) => `canvas.inpainting.${blacklistItem}`);
 
 const outpaintingCanvasBlacklist = [
-  'pastLines',
-  'futureLines',
+  'pastObjects',
+  'futureObjects',
   'cursorPosition',
 ].map((blacklistItem) => `canvas.outpainting.${blacklistItem}`);
 
