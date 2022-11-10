@@ -804,7 +804,7 @@ def load_face_restoration(opt):
             from ldm.invoke.restoration import Restoration
             restoration = Restoration()
             if opt.restore:
-                gfpgan, codeformer = restoration.load_face_restore_models(opt.gfpgan_dir, opt.gfpgan_model_path)
+                gfpgan, codeformer = restoration.load_face_restore_models(opt.gfpgan_model_path)
             else:
                 print('>> Face restoration disabled')
             if opt.esrgan:

@@ -446,15 +446,15 @@ def download_gfpgan():
     for model in (
             [
                 'https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth',
-                'src/gfpgan/experiments/pretrained_models/GFPGANv1.4.pth'
+                './models/gfpgan/GFPGANv1.4.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth',
-                './gfpgan/weights/detection_Resnet50_Final.pth'
+                './models/gfpgan/weights/detection_Resnet50_Final.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth',
-                './gfpgan/weights/parsing_parsenet.pth'
+                './models/gfpgan/weights/parsing_parsenet.pth'
             ],
     ):
         model_url,model_dest  = model
