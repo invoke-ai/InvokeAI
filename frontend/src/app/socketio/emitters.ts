@@ -17,7 +17,6 @@ import {
   modelChangeRequested,
   setIsProcessing,
 } from 'features/system/systemSlice';
-import { inpaintingImageElementRef } from 'features/canvas/IAICanvas';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
 import * as InvokeAI from 'app/invokeai';
 import { RootState } from 'app/store';
@@ -57,9 +56,9 @@ const makeSocketIOEmitters = (
 
       if (['inpainting', 'outpainting'].includes(generationMode)) {
         const baseCanvasImage = baseCanvasImageSelector(getState());
-        const imageUrl = baseCanvasImage?.url;
+        const imageUrl = baseCanvasImage?.image.url;
 
-        if (!inpaintingImageElementRef.current || !imageUrl) {
+        if (!imageUrl) {
           dispatch(
             addLogEntry({
               timestamp: dateFormat(new Date(), 'isoDateTime'),
@@ -72,9 +71,6 @@ const makeSocketIOEmitters = (
         }
 
         frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
-
-        // frontendToBackendParametersConfig.maskImageElement =
-        //   inpaintingImageElementRef.current;
       } else if (!['txt2img', 'img2img'].includes(generationMode)) {
         if (!galleryState.currentImage?.url) return;
 

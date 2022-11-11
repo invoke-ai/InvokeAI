@@ -1,5 +1,4 @@
 import { useAppDispatch } from 'app/store';
-import _ from 'lodash';
 import { useCallback } from 'react';
 import { setCursorPosition, setIsDrawing } from '../canvasSlice';
 

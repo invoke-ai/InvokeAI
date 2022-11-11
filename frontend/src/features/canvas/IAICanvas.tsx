@@ -1,15 +1,13 @@
 // lib
-import { MutableRefObject, useEffect, useRef, useState } from 'react';
+import { MutableRefObject, useRef } from 'react';
 import Konva from 'konva';
 import { Layer, Stage } from 'react-konva';
-import { Image as KonvaImage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
 // app
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/store';
 import {
   baseCanvasImageSelector,
-  clearImageToInpaint,
   currentCanvasSelector,
   outpaintingCanvasSelector,
 } from 'features/canvas/canvasSlice';
@@ -18,8 +16,7 @@ import {
 import IAICanvasMaskLines from './IAICanvasMaskLines';
 import IAICanvasBrushPreview from './IAICanvasBrushPreview';
 import { Vector2d } from 'konva/lib/types';
-import IAICanvasBoundingBoxPreview from './IAICanvasBoundingBoxPreview';
-import { useToast } from '@chakra-ui/react';
+import IAICanvasBoundingBox from './IAICanvasBoundingBox';
 import useCanvasHotkeys from './hooks/useCanvasHotkeys';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
@@ -32,7 +29,7 @@ import useCanvasMouseMove from './hooks/useCanvasMouseMove';
 import useCanvasMouseEnter from './hooks/useCanvasMouseEnter';
 import useCanvasMouseOut from './hooks/useCanvasMouseOut';
 import useCanvasDragMove from './hooks/useCanvasDragMove';
-import IAICanvasOutpaintingObjects from './IAICanvasOutpaintingObjects';
+import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasStatusText from './IAICanvasStatusText';
@@ -46,18 +43,14 @@ const canvasSelector = createSelector(
   ],
   (currentCanvas, outpaintingCanvas, baseCanvasImage, activeTabName) => {
     const {
-      shouldInvertMask,
       isMaskEnabled,
-      shouldShowCheckboardTransparency,
       stageScale,
       shouldShowBoundingBox,
-      shouldLockBoundingBox,
       isTransformingBoundingBox,
       isMouseOverBoundingBox,
       isMovingBoundingBox,
       stageDimensions,
       stageCoordinates,
-      isMoveStageKeyHeld,
       tool,
       isMovingStage,
     } = currentCanvas;
@@ -71,7 +64,7 @@ const canvasSelector = createSelector(
         stageCursor = undefined;
       } else if (isMouseOverBoundingBox) {
         stageCursor = 'move';
-      } else {
+      } else if (activeTabName === 'outpainting') {
         if (isMovingStage) {
           stageCursor = 'grabbing';
         } else {
@@ -83,22 +76,15 @@ const canvasSelector = createSelector(
     }
 
     return {
-      shouldInvertMask,
-      isMaskEnabled,
-      shouldShowCheckboardTransparency,
-      stageScale,
-      shouldShowBoundingBox,
-      shouldLockBoundingBox,
-      shouldShowGrid,
-      isTransformingBoundingBox,
-      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
-      stageCursor,
-      isMouseOverBoundingBox,
-      stageDimensions,
-      stageCoordinates,
-      isMoveStageKeyHeld,
       activeTabName,
-      baseCanvasImage,
+      isMaskEnabled,
+      isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
+      shouldShowBoundingBox,
+      shouldShowGrid,
+      stageCoordinates,
+      stageCursor,
+      stageDimensions,
+      stageScale,
       tool,
     };
   },
@@ -112,44 +98,31 @@ const canvasSelector = createSelector(
 // Use a closure allow other components to use these things... not ideal...
 export let stageRef: MutableRefObject<StageType | null>;
 export let canvasImageLayerRef: MutableRefObject<Konva.Layer | null>;
-export let inpaintingImageElementRef: MutableRefObject<HTMLImageElement | null>;
 
 const IAICanvas = () => {
-  const dispatch = useAppDispatch();
-
   const {
-    shouldInvertMask,
+    activeTabName,
     isMaskEnabled,
-    shouldShowCheckboardTransparency,
-    stageScale,
-    shouldShowBoundingBox,
     isModifyingBoundingBox,
+    shouldShowBoundingBox,
+    shouldShowGrid,
+    stageCoordinates,
     stageCursor,
     stageDimensions,
-    stageCoordinates,
-    shouldShowGrid,
-    activeTabName,
-    baseCanvasImage,
+    stageScale,
     tool,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
 
-  const toast = useToast();
   // set the closure'd refs
   stageRef = useRef<StageType>(null);
   canvasImageLayerRef = useRef<Konva.Layer>(null);
-  inpaintingImageElementRef = useRef<HTMLImageElement>(null);
 
   const lastCursorPositionRef = useRef<Vector2d>({ x: 0, y: 0 });
 
   // Use refs for values that do not affect rendering, other values in redux
   const didMouseMoveRef = useRef<boolean>(false);
-
-  // Load the image into this
-  const [canvasBgImage, setCanvasBgImage] = useState<HTMLImageElement | null>(
-    null
-  );
 
   const handleWheel = useCanvasWheel(stageRef);
   const handleMouseDown = useCanvasMouseDown(stageRef);
@@ -163,29 +136,6 @@ const IAICanvas = () => {
   const handleMouseOut = useCanvasMouseOut();
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
-
-  // Load the image and set the options panel width & height
-  useEffect(() => {
-    if (baseCanvasImage) {
-      const image = new Image();
-      image.onload = () => {
-        inpaintingImageElementRef.current = image;
-        setCanvasBgImage(image);
-      };
-      image.onerror = () => {
-        toast({
-          title: 'Unable to Load Image',
-          description: `Image ${baseCanvasImage.url} failed to load`,
-          status: 'error',
-          isClosable: true,
-        });
-        dispatch(clearImageToInpaint());
-      };
-      image.src = baseCanvasImage.url;
-    } else {
-      setCanvasBgImage(null);
-    }
-  }, [baseCanvasImage, dispatch, stageScale, toast]);
 
   return (
     <div className="inpainting-canvas-container">
@@ -209,36 +159,31 @@ const IAICanvas = () => {
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
-          listening={
-            tool === 'move' &&
-            !isModifyingBoundingBox &&
-            activeTabName === 'outpainting'
-          }
+          listening={tool === 'move' && !isModifyingBoundingBox}
           draggable={
             tool === 'move' &&
             !isModifyingBoundingBox &&
             activeTabName === 'outpainting'
           }
         >
-          <Layer visible={shouldShowGrid}>
+          <Layer id={'grid'} visible={shouldShowGrid}>
             <IAICanvasGrid />
           </Layer>
 
           <Layer
-            id={'image-layer'}
+            id={'image'}
             ref={canvasImageLayerRef}
             listening={false}
             imageSmoothingEnabled={false}
           >
-            <IAICanvasOutpaintingObjects />
+            <IAICanvasObjectRenderer />
             <IAICanvasIntermediateImage />
           </Layer>
-          <Layer id={'mask-layer'} visible={isMaskEnabled} listening={false}>
+          <Layer id={'mask'} visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
-
             <IAICanvasMaskCompositer listening={false} />
 
-            {canvasBgImage && (
+            {/* {canvasBgImage && (
               <>
                 <KonvaImage
                   image={canvasBgImage}
@@ -256,10 +201,10 @@ const IAICanvas = () => {
                   }
                 />
               </>
-            )}
+            )} */}
           </Layer>
-          <Layer id={'preview-layer'}>
-            <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
+          <Layer id={'tool'}>
+            <IAICanvasBoundingBox visible={shouldShowBoundingBox} />
             <IAICanvasBrushPreview
               visible={tool !== 'move'}
               listening={false}

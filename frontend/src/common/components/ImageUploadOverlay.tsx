@@ -1,5 +1,4 @@
 import { Heading } from '@chakra-ui/react';
-import { KeyboardEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 type ImageUploadOverlayProps = {

@@ -1,7 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import { RectConfig } from 'konva/lib/shapes/Rect';
-import _ from 'lodash';
 import { Rect } from 'react-konva';
 import {
   currentCanvasSelector,
@@ -24,7 +23,6 @@ export const canvasMaskCompositerSelector = createSelector(
       stageDimensions,
       stageScale,
       maskColorString: rgbaColorToString(maskColor),
-      maskOpacity: maskColor.a,
     };
   }
 );
@@ -116,13 +114,8 @@ const getColoredSVG = (color: string) => {
 const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   const { ...rest } = props;
 
-  const {
-    maskColorString,
-    maskOpacity,
-    stageCoordinates,
-    stageDimensions,
-    stageScale,
-  } = useAppSelector(canvasMaskCompositerSelector);
+  const { maskColorString, stageCoordinates, stageDimensions, stageScale } =
+    useAppSelector(canvasMaskCompositerSelector);
 
   const [fillPatternImage, setFillPatternImage] =
     useState<HTMLImageElement | null>(null);

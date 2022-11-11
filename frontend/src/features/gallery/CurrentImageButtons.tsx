@@ -21,7 +21,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import UpscaleOptions from 'features/options/AdvancedOptions/Upscale/UpscaleOptions';
 import FaceRestoreOptions from 'features/options/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { ButtonGroup, Link, useClipboard, useToast } from '@chakra-ui/react';
+import { ButtonGroup, Link, useToast } from '@chakra-ui/react';
 import {
   FaAsterisk,
   FaCode,

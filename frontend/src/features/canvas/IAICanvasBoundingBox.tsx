@@ -1,6 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import Konva from 'konva';
-import { Context } from 'konva/lib/Context';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Box } from 'konva/lib/shapes/Transformer';
 import { Vector2d } from 'konva/lib/types';
@@ -33,7 +32,6 @@ const boundingBoxPreviewSelector = createSelector(
       boundingBoxDimensions,
       stageDimensions,
       stageScale,
-      shouldLockBoundingBox,
       isDrawing,
       isTransformingBoundingBox,
       isMovingBoundingBox,
@@ -52,7 +50,6 @@ const boundingBoxPreviewSelector = createSelector(
       shouldDarkenOutsideBoundingBox,
       isMovingBoundingBox,
       isTransformingBoundingBox,
-      shouldLockBoundingBox,
       stageDimensions,
       stageScale,
       baseCanvasImage,
@@ -72,9 +69,7 @@ const boundingBoxPreviewSelector = createSelector(
 
 type IAICanvasBoundingBoxPreviewProps = GroupConfig;
 
-const IAICanvasBoundingBoxPreview = (
-  props: IAICanvasBoundingBoxPreviewProps
-) => {
+const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   const { ...rest } = props;
 
   const dispatch = useAppDispatch();
@@ -86,7 +81,6 @@ const IAICanvasBoundingBoxPreview = (
     shouldDarkenOutsideBoundingBox,
     isMovingBoundingBox,
     isTransformingBoundingBox,
-    shouldLockBoundingBox,
     stageCoordinates,
     stageDimensions,
     stageScale,
@@ -104,7 +98,7 @@ const IAICanvasBoundingBoxPreview = (
     if (!transformerRef.current || !shapeRef.current) return;
     transformerRef.current.nodes([shapeRef.current]);
     transformerRef.current.getLayer()?.batchDraw();
-  }, [shouldLockBoundingBox]);
+  }, []);
 
   const scaledStep = 64 * stageScale;
 
@@ -264,7 +258,6 @@ const IAICanvasBoundingBoxPreview = (
     [scaledStep]
   );
 
-  // OK
   const boundBoxFunc = useCallback(
     (oldBoundBox: Box, newBoundBox: Box) => {
       /**
@@ -341,10 +334,10 @@ const IAICanvasBoundingBoxPreview = (
         dragBoundFunc={
           activeTabName === 'inpainting' ? dragBoundFunc : undefined
         }
+        listening={!isDrawing && tool === 'move'}
         draggable={true}
         fillEnabled={tool === 'move'}
         height={boundingBoxDimensions.height}
-        listening={!isDrawing && tool === 'move'}
         onDragEnd={handleEndedModifying}
         onDragMove={handleOnDragMove}
         onMouseDown={handleStartedMoving}
@@ -387,4 +380,4 @@ const IAICanvasBoundingBoxPreview = (
   );
 };
 
-export default IAICanvasBoundingBoxPreview;
+export default IAICanvasBoundingBox;

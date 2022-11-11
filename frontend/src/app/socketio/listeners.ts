@@ -32,12 +32,14 @@ import {
   setInitialImage,
   setMaskPath,
 } from 'features/options/optionsSlice';
-import { requestImages, requestNewImages, requestSystemConfig } from './actions';
+import {
+  requestImages,
+  requestNewImages,
+  requestSystemConfig,
+} from './actions';
 import {
   addImageToOutpaintingSesion,
-  clearImageToInpaint,
   setImageToInpaint,
-  setImageToOutpaint,
 } from 'features/canvas/canvasSlice';
 import { tabMap } from 'features/tabs/InvokeTabs';
 
@@ -312,15 +314,10 @@ const makeSocketIOListeners = (
 
       // remove references to image in options
       const { initialImage, maskPath } = getState().options;
-      const { inpainting, outpainting } = getState().canvas;
 
       if (initialImage?.url === url || initialImage === url) {
         dispatch(clearInitialImage());
       }
-
-      // if (imageToInpaint?.url === url) {
-      //   dispatch(clearImageToInpaint());
-      // }
 
       if (maskPath === url) {
         dispatch(setMaskPath(''));

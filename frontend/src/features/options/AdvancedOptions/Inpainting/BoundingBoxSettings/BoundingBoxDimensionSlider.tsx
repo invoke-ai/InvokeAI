@@ -1,12 +1,10 @@
 import React from 'react';
 import IAISlider from 'common/components/IAISlider';
 
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   currentCanvasSelector,
-  GenericCanvasState,
-  // InpaintingState,
   setBoundingBoxDimensions,
 } from 'features/canvas/canvasSlice';
 
@@ -15,7 +13,7 @@ import _ from 'lodash';
 
 const boundingBoxDimensionsSelector = createSelector(
   currentCanvasSelector,
-  (currentCanvas: GenericCanvasState) => {
+  (currentCanvas) => {
     const { stageDimensions, boundingBoxDimensions, shouldLockBoundingBox } =
       currentCanvas;
     return {

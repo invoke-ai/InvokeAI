@@ -15,7 +15,6 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAISlider from 'common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
-import IAINumberInput from 'common/components/IAINumberInput';
 
 export const selector = createSelector(
   [currentCanvasSelector, outpaintingCanvasSelector, activeTabNameSelector],

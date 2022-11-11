@@ -5,14 +5,10 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
   baseCanvasImageSelector,
   CanvasState,
-  currentCanvasSelector,
-  GenericCanvasState,
   setStageDimensions,
   setStageScale,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/invokeai';
-import { first } from 'lodash';
 
 const canvasResizerSelector = createSelector(
   (state: RootState) => state.canvas,
@@ -39,13 +35,12 @@ const IAICanvasResizer = () => {
   useLayoutEffect(() => {
     window.setTimeout(() => {
       if (!ref.current || !baseCanvasImage) return;
-
-      const width = ref.current.clientWidth;
-      const height = ref.current.clientHeight;
+      const { width: imageWidth, height: imageHeight } = baseCanvasImage.image;
+      const { clientWidth, clientHeight } = ref.current;
 
       const scale = Math.min(
         1,
-        Math.min(width / baseCanvasImage.width, height / baseCanvasImage.height)
+        Math.min(clientWidth / imageWidth, clientHeight / imageHeight)
       );
 
       dispatch(setStageScale(scale));
@@ -53,15 +48,15 @@ const IAICanvasResizer = () => {
       if (activeTabName === 'inpainting') {
         dispatch(
           setStageDimensions({
-            width: Math.floor(baseCanvasImage.width * scale),
-            height: Math.floor(baseCanvasImage.height * scale),
+            width: Math.floor(imageWidth * scale),
+            height: Math.floor(imageHeight * scale),
           })
         );
       } else if (activeTabName === 'outpainting') {
         dispatch(
           setStageDimensions({
-            width: Math.floor(width),
-            height: Math.floor(height),
+            width: Math.floor(clientWidth),
+            height: Math.floor(clientHeight),
           })
         );
       }
