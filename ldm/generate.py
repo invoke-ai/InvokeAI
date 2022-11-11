@@ -566,13 +566,12 @@ class Generate:
 
         args   = metadata_from_png(image_path)
         seed   = args.seed
-        prompt = args.prompt or ''
-        if seed == 0:
-            seed = random.randrange(0, np.iinfo(np.uint32).max)
-            opt.seed = seed
-            print(f'>> generated new seed {seed} and prompt "{prompt}" for {image_path}')
-        else:
-            print(f'>> retrieved seed {seed} and prompt "{prompt}" from {image_path}')
+        prompt = args.prompt
+        print(f'>> retrieved seed {seed} and prompt "{prompt}" from {image_path}')
+
+        if not seed:
+            print('* Could not recover seed for image. Replacing with 42. This will not affect image quality')
+            seed = 42
 
         # try to reuse the same filename prefix as the original file.
         # we take everything up to the first period

@@ -29,7 +29,6 @@ infile = None
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
-    print('* Initializing, be patient...')
     
     opt  = Args()
     args = opt.parse_args()
@@ -47,6 +46,7 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
+    print('* Initializing, be patient...')
     from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
@@ -662,10 +662,7 @@ def do_postprocess (gen, opt, callback):
 def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
     original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir,original_file)
     new_file       = new_file     if os.path.exists(new_file)      else os.path.join(opt.outdir,new_file)
-    try:
-        meta = retrieve_metadata(original_file)['sd-metadata']
-    except AttributeError:
-        meta = retrieve_metadata(new_file)['sd-metadata']
+    meta = retrieve_metadata(original_file)['sd-metadata']
     if 'image' not in meta:
         meta = metadata_dumps(opt,seeds=[opt.seed])['image']
         meta['image'] = {}

@@ -28,12 +28,11 @@ class Outcrop(object):
         self.generate._set_sampler()
 
         def wrapped_callback(img,seed,**kwargs):
-            preferred_seed = orig_opt.seed if orig_opt.seed> 0 else seed
-            image_callback(img,preferred_seed,use_prefix=prefix,**kwargs)
+            image_callback(img,orig_opt.seed,use_prefix=prefix,**kwargs)
 
         result= self.generate.prompt2image(
             orig_opt.prompt,
-            seed        = orig_opt.seed if orig_opt.seed>0 else opt.seed,
+            seed        = orig_opt.seed,    # uncomment to make it deterministic
             sampler     = self.generate.sampler,
             steps       = opt.steps,
             cfg_scale   = opt.cfg_scale,
