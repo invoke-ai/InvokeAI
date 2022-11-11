@@ -12,7 +12,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { OptionsState, setIsLightBoxOpen } from 'features/options/optionsSlice';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
-import FlexibleLoadingSpinner from 'common/components/FlexibleLoadingSpinner';
 
 export const imagesSelector = createSelector(
   [(state: RootState) => state.gallery, (state: RootState) => state.options],
