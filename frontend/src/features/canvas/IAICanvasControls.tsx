@@ -13,16 +13,11 @@ import { createSelector } from '@reduxjs/toolkit';
 import {
   outpaintingCanvasSelector,
   OutpaintingCanvasState,
-  uploadOutpaintingMergedImage,
 } from './canvasSlice';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import _ from 'lodash';
-import IAICanvasImageEraserControl from './IAICanvasControls/IAICanvasImageEraserControl';
-import { canvasImageLayerRef } from './IAICanvas';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaSave } from 'react-icons/fa';
 
 export const canvasControlsSelector = createSelector(
   [
@@ -52,15 +47,11 @@ export const canvasControlsSelector = createSelector(
 );
 
 const IAICanvasControls = () => {
-  const dispatch = useAppDispatch();
-  const { activeTabName } = useAppSelector(canvasControlsSelector);
-
   return (
     <div className="inpainting-settings">
       <ButtonGroup isAttached={true}>
         <IAICanvasBrushControl />
         <IAICanvasEraserControl />
-        {activeTabName === 'outpainting' && <IAICanvasImageEraserControl />}
       </ButtonGroup>
       <ButtonGroup isAttached={true}>
         <IAICanvasMaskVisibilityControl />
@@ -69,15 +60,6 @@ const IAICanvasControls = () => {
         <IAICanvasShowHideBoundingBoxControl />
         <IAICanvasMaskClear />
       </ButtonGroup>
-      <IAIIconButton
-        aria-label="Save"
-        tooltip="Save"
-        icon={<FaSave />}
-        onClick={() => {
-          dispatch(uploadOutpaintingMergedImage(canvasImageLayerRef));
-        }}
-        fontSize={20}
-      />
       <ButtonGroup isAttached={true}>
         <IAICanvasUndoControl />
         <IAICanvasRedoControl />
