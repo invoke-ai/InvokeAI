@@ -1,8 +1,6 @@
 ---
-title: Installation Overview
+title: Overview
 ---
-
-## Installation
 
 We offer several ways to install InvokeAI, each one suited to your
 experience and preferences.
