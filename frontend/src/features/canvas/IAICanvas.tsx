@@ -1,7 +1,7 @@
 // lib
 import { MutableRefObject, useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
-import { Group, Layer, Stage } from 'react-konva';
+import { Layer, Stage } from 'react-konva';
 import { Image as KonvaImage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
@@ -233,31 +233,30 @@ const IAICanvas = () => {
             <IAICanvasOutpaintingObjects />
             <IAICanvasIntermediateImage />
           </Layer>
-          <Layer id={'mask-layer'} listening={false}>
-            <IAICanvasMaskLines visible={isMaskEnabled} listening={false} />
+          <Layer id={'mask-layer'} visible={isMaskEnabled} listening={false}>
+            <IAICanvasMaskLines visible={true} listening={false} />
 
-            <IAICanvasMaskCompositer
-              listening={false}
-              globalCompositeOperation="source-in"
-            />
+            <IAICanvasMaskCompositer listening={false} />
 
-            <Group globalCompositeOperation="destination-over">
-              {canvasBgImage && (
-                <>
-                  <KonvaImage
-                    image={canvasBgImage}
-                    listening={false}
-                    visible={!shouldInvertMask}
-                  />
-                  <KonvaImage
-                    image={canvasBgImage}
-                    listening={false}
-                    globalCompositeOperation="source-in"
-                    visible={shouldInvertMask}
-                  />
-                </>
-              )}
-            </Group>
+            {canvasBgImage && (
+              <>
+                <KonvaImage
+                  image={canvasBgImage}
+                  listening={false}
+                  globalCompositeOperation="source-in"
+                  visible={shouldInvertMask}
+                />
+
+                <KonvaImage
+                  image={canvasBgImage}
+                  listening={false}
+                  globalCompositeOperation="source-out"
+                  visible={
+                    !shouldInvertMask && shouldShowCheckboardTransparency
+                  }
+                />
+              </>
+            )}
           </Layer>
           <Layer id={'preview-layer'}>
             <IAICanvasBoundingBoxPreview visible={shouldShowBoundingBox} />
