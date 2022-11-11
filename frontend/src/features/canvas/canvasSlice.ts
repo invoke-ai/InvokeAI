@@ -29,7 +29,7 @@ export interface GenericCanvasState {
   shouldShowBoundingBox: boolean;
   shouldDarkenOutsideBoundingBox: boolean;
   isMaskEnabled: boolean;
-  shouldInvertMask: boolean;
+  shouldPreserveMaskedArea: boolean;
   shouldShowCheckboardTransparency: boolean;
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;
@@ -147,7 +147,7 @@ const initialGenericCanvasState: GenericCanvasState = {
   shouldDarkenOutsideBoundingBox: false,
   cursorPosition: null,
   isMaskEnabled: true,
-  shouldInvertMask: false,
+  shouldPreserveMaskedArea: false,
   shouldShowCheckboardTransparency: false,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
@@ -235,18 +235,18 @@ export const canvasSlice = createSlice({
         state.currentCanvas
       ].objects.filter((obj) => !isCanvasMaskLine(obj));
       state[state.currentCanvas].futureObjects = [];
-      state[state.currentCanvas].shouldInvertMask = false;
+      state[state.currentCanvas].shouldPreserveMaskedArea = false;
     },
     toggleShouldInvertMask: (state) => {
-      state[state.currentCanvas].shouldInvertMask =
-        !state[state.currentCanvas].shouldInvertMask;
+      state[state.currentCanvas].shouldPreserveMaskedArea =
+        !state[state.currentCanvas].shouldPreserveMaskedArea;
     },
     toggleShouldShowMask: (state) => {
       state[state.currentCanvas].isMaskEnabled =
         !state[state.currentCanvas].isMaskEnabled;
     },
-    setShouldInvertMask: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldInvertMask = action.payload;
+    setShouldPreserveMaskedArea: (state, action: PayloadAction<boolean>) => {
+      state[state.currentCanvas].shouldPreserveMaskedArea = action.payload;
     },
     setIsMaskEnabled: (state, action: PayloadAction<boolean>) => {
       state[state.currentCanvas].isMaskEnabled = action.payload;
@@ -552,14 +552,6 @@ export const canvasSlice = createSlice({
 
       if (tool === 'move') return;
 
-      let newTool: CanvasDrawingTool;
-
-      if (layer === 'mask' && currentCanvas.shouldInvertMask) {
-        newTool = tool === 'eraser' ? 'brush' : 'eraser';
-      } else {
-        newTool = tool;
-      }
-
       const newStrokeWidth = tool === 'brush' ? brushSize / 2 : eraserSize / 2;
 
       // set & then spread this to only conditionally add the "color" key
@@ -571,7 +563,7 @@ export const canvasSlice = createSlice({
       currentCanvas.objects.push({
         kind: 'line',
         layer,
-        tool: newTool,
+        tool,
         strokeWidth: newStrokeWidth,
         points: action.payload,
         ...newColor,
@@ -655,7 +647,7 @@ export const {
   setEraserSize,
   addLine,
   addPointToCurrentLine,
-  setShouldInvertMask,
+  setShouldPreserveMaskedArea,
   setIsMaskEnabled,
   setShouldShowCheckboardTransparency,
   setShouldShowBrushPreview,

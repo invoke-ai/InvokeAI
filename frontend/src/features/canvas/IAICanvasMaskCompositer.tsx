@@ -15,20 +15,14 @@ import Konva from 'konva';
 export const canvasMaskCompositerSelector = createSelector(
   currentCanvasSelector,
   (currentCanvas) => {
-    const {
-      maskColor,
-      stageCoordinates,
-      stageDimensions,
-      stageScale,
-      shouldInvertMask,
-    } = currentCanvas as InpaintingCanvasState | OutpaintingCanvasState;
+    const { maskColor, stageCoordinates, stageDimensions, stageScale } =
+      currentCanvas as InpaintingCanvasState | OutpaintingCanvasState;
 
     return {
       stageCoordinates,
       stageDimensions,
       stageScale,
       maskColorString: rgbaColorToString(maskColor),
-      shouldInvertMask,
     };
   }
 );
@@ -120,13 +114,8 @@ const getColoredSVG = (color: string) => {
 const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   const { ...rest } = props;
 
-  const {
-    maskColorString,
-    stageCoordinates,
-    stageDimensions,
-    stageScale,
-    shouldInvertMask,
-  } = useAppSelector(canvasMaskCompositerSelector);
+  const { maskColorString, stageCoordinates, stageDimensions, stageScale } =
+    useAppSelector(canvasMaskCompositerSelector);
 
   const [fillPatternImage, setFillPatternImage] =
     useState<HTMLImageElement | null>(null);
@@ -173,7 +162,7 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
       fillPatternRepeat={'repeat'}
       fillPatternScale={{ x: 1 / stageScale, y: 1 / stageScale }}
       listening={true}
-      globalCompositeOperation={shouldInvertMask ? 'source-out' : 'source-in'}
+      globalCompositeOperation={'source-in'}
       {...rest}
     />
   );
