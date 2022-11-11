@@ -561,22 +561,18 @@ class Generate:
             ):
         # retrieve the seed from the image;
         seed   = None
+        image_metadata = None
         prompt = None
 
         args   = metadata_from_png(image_path)
-        if opt.seed is not None:
-            seed = opt.seed
-        elif args.seed >= 0:
-            seed = args.seed
+        seed   = args.seed
+        prompt = args.prompt or ''
+        if seed == 0:
+            seed = random.randrange(0, np.iinfo(np.uint32).max)
+            opt.seed = seed
+            print(f'>> generated new seed {seed} and prompt "{prompt}" for {image_path}')
         else:
-            seed   = random.randrange(0, np.iinfo(np.uint32).max)
-
-        if opt.prompt is not None:
-            prompt = opt.prompt
-        else:
-            prompt = args.prompt
-
-        print(f'>> using seed {seed} and prompt "{prompt}" for {image_path}')
+            print(f'>> retrieved seed {seed} and prompt "{prompt}" from {image_path}')
 
         # try to reuse the same filename prefix as the original file.
         # we take everything up to the first period
@@ -623,10 +619,6 @@ class Generate:
                     extend_instructions[direction]=int(pixels)
                 except ValueError:
                     print(f'** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
-
-            opt.seed = seed
-            opt.prompt = prompt
-            
             if len(extend_instructions)>0:
                 restorer = Outcrop(image,self,)
                 return restorer.process (
