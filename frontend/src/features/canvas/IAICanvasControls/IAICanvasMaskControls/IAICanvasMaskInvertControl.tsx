@@ -5,7 +5,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import {
   currentCanvasSelector,
   GenericCanvasState,
-  setShouldInvertMask,
+  setShouldPreserveMaskedArea,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
@@ -15,10 +15,10 @@ import { useHotkeys } from 'react-hotkeys-hook';
 const canvasMaskInvertSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector],
   (currentCanvas: GenericCanvasState, activeTabName) => {
-    const { isMaskEnabled, shouldInvertMask } = currentCanvas;
+    const { isMaskEnabled, shouldPreserveMaskedArea } = currentCanvas;
 
     return {
-      shouldInvertMask,
+      shouldPreserveMaskedArea,
       isMaskEnabled,
       activeTabName,
     };
@@ -31,13 +31,13 @@ const canvasMaskInvertSelector = createSelector(
 );
 
 export default function IAICanvasMaskInvertControl() {
-  const { shouldInvertMask, isMaskEnabled, activeTabName } = useAppSelector(
+  const { shouldPreserveMaskedArea, isMaskEnabled, activeTabName } = useAppSelector(
     canvasMaskInvertSelector
   );
   const dispatch = useAppDispatch();
 
   const handleToggleShouldInvertMask = () =>
-    dispatch(setShouldInvertMask(!shouldInvertMask));
+    dispatch(setShouldPreserveMaskedArea(!shouldPreserveMaskedArea));
 
   // Invert mask
   useHotkeys(
@@ -49,16 +49,16 @@ export default function IAICanvasMaskInvertControl() {
     {
       enabled: true,
     },
-    [activeTabName, shouldInvertMask, isMaskEnabled]
+    [activeTabName, shouldPreserveMaskedArea, isMaskEnabled]
   );
 
   return (
     <IAIIconButton
       tooltip="Invert Mask Display (Shift+M)"
       aria-label="Invert Mask Display (Shift+M)"
-      data-selected={shouldInvertMask}
+      data-selected={shouldPreserveMaskedArea}
       icon={
-        shouldInvertMask ? (
+        shouldPreserveMaskedArea ? (
           <MdInvertColors size={22} />
         ) : (
           <MdInvertColorsOff size={22} />

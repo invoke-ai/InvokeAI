@@ -6,7 +6,7 @@ import {
   setIsMaskEnabled,
   setLayer,
   setMaskColor,
-  setShouldInvertMask,
+  setShouldPreserveMaskedArea,
 } from './canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
@@ -20,13 +20,13 @@ import IAIButton from 'common/components/IAIButton';
 export const selector = createSelector(
   [currentCanvasSelector],
   (currentCanvas) => {
-    const { maskColor, layer, isMaskEnabled, shouldInvertMask } = currentCanvas;
+    const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } = currentCanvas;
 
     return {
       layer,
       maskColor,
       isMaskEnabled,
-      shouldInvertMask,
+      shouldPreserveMaskedArea,
     };
   },
   {
@@ -37,7 +37,7 @@ export const selector = createSelector(
 );
 const IAICanvasMaskButtonPopover = () => {
   const dispatch = useAppDispatch();
-  const { layer, maskColor, isMaskEnabled, shouldInvertMask } =
+  const { layer, maskColor, isMaskEnabled, shouldPreserveMaskedArea } =
     useAppSelector(selector);
 
   return (
@@ -61,9 +61,9 @@ const IAICanvasMaskButtonPopover = () => {
           onChange={(e) => dispatch(setIsMaskEnabled(e.target.checked))}
         />
         <IAICheckbox
-          label="Invert Mask"
-          isChecked={shouldInvertMask}
-          onChange={(e) => dispatch(setShouldInvertMask(e.target.checked))}
+          label="Preserve Masked Area"
+          isChecked={shouldPreserveMaskedArea}
+          onChange={(e) => dispatch(setShouldPreserveMaskedArea(e.target.checked))}
         />
         <IAIColorPicker
           color={maskColor}

@@ -118,7 +118,7 @@ export const frontendToBackendParameters = (
       shouldUseInpaintReplace,
       stageScale,
       isMaskEnabled,
-      shouldInvertMask,
+      shouldPreserveMaskedArea,
     } = canvasState[canvasState.currentCanvas];
 
     const boundingBox = {
@@ -138,7 +138,7 @@ export const frontendToBackendParameters = (
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
 
-    if (shouldInvertMask) {
+    if (shouldPreserveMaskedArea) {
       generationParameters.invert_mask = true;
     }
 

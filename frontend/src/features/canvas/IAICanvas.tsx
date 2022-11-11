@@ -187,7 +187,7 @@ const IAICanvas = () => {
                   image={canvasBgImage}
                   listening={false}
                   globalCompositeOperation="source-in"
-                  visible={shouldInvertMask}
+                  visible={shouldPreserveMaskedArea}
                 />
 
                 <KonvaImage
@@ -195,7 +195,7 @@ const IAICanvas = () => {
                   listening={false}
                   globalCompositeOperation="source-out"
                   visible={
-                    !shouldInvertMask && shouldShowCheckboardTransparency
+                    !shouldPreserveMaskedArea && shouldShowCheckboardTransparency
                   }
                 />
               </>
