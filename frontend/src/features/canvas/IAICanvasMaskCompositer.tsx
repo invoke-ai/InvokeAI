@@ -39,7 +39,7 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
       height={stageDimensions.height / stageScale}
       width={stageDimensions.width / stageScale}
       fill={maskColorString}
-      globalCompositeOperation={'source-over'}
+      globalCompositeOperation={'source-in'}
       listening={false}
       {...rest}
     />
