@@ -847,8 +847,8 @@ class Generate:
                 self.embedding_path, self.precision == 'float32' or self.precision == 'autocast'
             )
 
-        self._set_sampler()
         self.model_name = model_name
+        self._set_sampler()  # requires self.model_name to be set first
         return self.model
 
     def correct_colors(self,
