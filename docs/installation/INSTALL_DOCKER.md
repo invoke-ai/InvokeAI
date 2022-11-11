@@ -4,12 +4,17 @@ title: Docker
 
 # :fontawesome-brands-docker: Docker
 
-## Before you begin
+!!! warning "For end users"
 
-- For end users: Install InvokeAI locally using the instructions for your OS.
-- For developers: For container-related development tasks or for enabling easy
-  deployment to other environments (on-premises or cloud), follow these
-  instructions. For general use, install locally to leverage your machine's GPU.
+    We highly recommend to Install InvokeAI locally using [these instructions](index.md)"
+
+!!! tip "For developers"
+
+    For container-related development tasks or for enabling easy
+    deployment to other environments (on-premises or cloud), follow these
+    instructions.
+    
+    For general use, install locally to leverage your machine's GPU.
 
 ## Why containers?
 
@@ -94,11 +99,11 @@ After the build process is done, you can run the container via the provided
 ./docker-build/run.sh
 ```
 
-When used without arguments, the container will start the website and provide
+When used without arguments, the container will start the webserver and provide
 you the link to open it. But if you want to use some other parameters you can
 also do so.
 
-!!! example
+!!! example ""
 
     ```bash
     docker-build/run.sh --from_file tests/validate_pr_prompt.txt
@@ -112,7 +117,7 @@ also do so.
 
 !!! warning "Deprecated"
 
-    From here on you will find the rest of the previous Docker-Docs, which will still
+    From here on you will find the the previous Docker-Docs, which will still
     provide some usefull informations.
 
 ## Usage (time to have fun)

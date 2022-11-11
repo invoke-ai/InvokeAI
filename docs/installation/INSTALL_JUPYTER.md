@@ -14,8 +14,7 @@ download the notebook from the link above and load it up in VSCode
 (with the appropriate extensions installed)/Jupyter/JupyterLab and
 start running the cells one-by-one.
 
-Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehand.
-
+!!! Note "you will need NVIDIA drivers, Python 3.10, and Git installed beforehand"
 
 ## Walkthrough
 
