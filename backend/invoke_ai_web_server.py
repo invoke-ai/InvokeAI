@@ -12,7 +12,7 @@ import os
 from werkzeug.utils import secure_filename
 from flask import Flask, redirect, send_from_directory, flash, request, url_for, jsonify
 from flask_socketio import SocketIO
-from PIL import Image
+from PIL import Image, ImageOps
 from PIL.Image import Image as ImageType
 from uuid import uuid4
 from threading import Event
@@ -698,11 +698,11 @@ class InvokeAIWebServer:
 
                 So we need to convert each into a PIL Image.
                 """
+                truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
                 truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
 
                 init_img_url = generation_parameters["init_img"]
-
-                init_img_url = generation_parameters["init_img"]
+                init_mask_url = generation_parameters["init_mask"]
 
                 init_img_path = self.get_image_path_from_url(init_img_url)
 
@@ -722,6 +722,9 @@ class InvokeAIWebServer:
                 mask_image = dataURL_to_image(
                     generation_parameters["init_mask"]
                 ).convert("L")
+
+                if generation_parameters.invert_mask:
+                    mask_image = ImageOps.invert(mask_image)
 
                 """
                 Apply the mask to the init image, creating a "mask" image with 

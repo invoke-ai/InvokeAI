@@ -546,25 +546,38 @@ export const canvasSlice = createSlice({
       });
     },
     addLine: (state, action: PayloadAction<number[]>) => {
-      const { tool, layer, brushColor, brushSize, eraserSize } =
-        state[state.currentCanvas];
+      const currentCanvas = state[state.currentCanvas];
+
+      const { tool, layer, brushColor, brushSize, eraserSize } = currentCanvas;
 
       if (tool === 'move') return;
 
-      state[state.currentCanvas].pastObjects.push(
-        state[state.currentCanvas].objects
-      );
+      let newTool: CanvasDrawingTool;
 
-      state[state.currentCanvas].objects.push({
+      if (layer === 'mask' && currentCanvas.shouldInvertMask) {
+        newTool = tool === 'eraser' ? 'brush' : 'eraser';
+      } else {
+        newTool = tool;
+      }
+
+      const newStrokeWidth = tool === 'brush' ? brushSize / 2 : eraserSize / 2;
+
+      // set & then spread this to only conditionally add the "color" key
+      const newColor =
+        layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
+
+      currentCanvas.pastObjects.push(currentCanvas.objects);
+
+      currentCanvas.objects.push({
         kind: 'line',
         layer,
-        tool,
-        strokeWidth: tool === 'brush' ? brushSize / 2 : eraserSize / 2,
+        tool: newTool,
+        strokeWidth: newStrokeWidth,
         points: action.payload,
-        ...(layer === 'base' && tool === 'brush' && { color: brushColor }),
+        ...newColor,
       });
 
-      state[state.currentCanvas].futureObjects = [];
+      currentCanvas.futureObjects = [];
     },
     addPointToCurrentLine: (state, action: PayloadAction<number[]>) => {
       const lastLine =
@@ -579,14 +592,18 @@ export const canvasSlice = createSlice({
 
       const newObjects = state[state.currentCanvas].pastObjects.pop();
       if (!newObjects) return;
-      state[state.currentCanvas].futureObjects.unshift(state[state.currentCanvas].objects);
+      state[state.currentCanvas].futureObjects.unshift(
+        state[state.currentCanvas].objects
+      );
       state[state.currentCanvas].objects = newObjects;
     },
     redo: (state) => {
       if (state[state.currentCanvas].futureObjects.length === 0) return;
       const newObjects = state[state.currentCanvas].futureObjects.shift();
       if (!newObjects) return;
-      state[state.currentCanvas].pastObjects.push(state[state.currentCanvas].objects);
+      state[state.currentCanvas].pastObjects.push(
+        state[state.currentCanvas].objects
+      );
       state[state.currentCanvas].objects = newObjects;
     },
     setShouldShowGrid: (state, action: PayloadAction<boolean>) => {
