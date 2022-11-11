@@ -240,17 +240,17 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     def __init__(
         self,
         version='openai/clip-vit-large-patch14',
-        device=choose_torch_device(),
         max_length=77,
+        tokenizer=None,
+        transformer=None,
     ):
         super().__init__()
-        self.tokenizer = CLIPTokenizer.from_pretrained(
+        self.tokenizer = tokenizer or CLIPTokenizer.from_pretrained(
             version, local_files_only=True
         )
-        self.transformer = CLIPTextModel.from_pretrained(
+        self.transformer = transformer or CLIPTextModel.from_pretrained(
             version, local_files_only=True
         )
-        self.device = device
         self.max_length = max_length
         self.freeze()
 
@@ -455,6 +455,10 @@ class FrozenCLIPEmbedder(AbstractEncoder):
 
     def encode(self, text, **kwargs):
         return self(text, **kwargs)
+
+    @property
+    def device(self):
+        return self.transformer.device
 
 class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
