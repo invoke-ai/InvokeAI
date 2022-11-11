@@ -584,7 +584,7 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
 
     try:
         print('>> Verifying that new model loads...')
-        yaml_str = gen.model_cache.add_model(model_name, new_config, clobber)
+        gen.model_cache.add_model(model_name, new_config, clobber)
         assert gen.set_model(model_name) is not None, 'model failed to load'
     except AssertionError as e:
         print(f'** aborting **')
