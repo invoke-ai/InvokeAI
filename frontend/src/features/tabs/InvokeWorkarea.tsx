@@ -19,7 +19,6 @@ const workareaSelector = createSelector(
     return {
       showDualDisplay,
       shouldPinOptionsPanel,
-      activeTabName,
       isLightBoxOpen,
       shouldShowDualDisplayButton: ['inpainting'].includes(activeTabName),
     };
@@ -37,7 +36,6 @@ const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const { optionsPanel, children, styleClass } = props;
   const {
     showDualDisplay,
-    activeTabName,
     isLightBoxOpen,
     shouldShowDualDisplayButton,
   } = useAppSelector(workareaSelector);

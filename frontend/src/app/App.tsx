@@ -1,9 +1,6 @@
-import { useEffect } from 'react';
 import ProgressBar from 'features/system/ProgressBar';
 import SiteHeader from 'features/system/SiteHeader';
 import Console from 'features/system/Console';
-import { useAppDispatch } from './store';
-import { requestSystemConfig } from './socketio/actions';
 import { keepGUIAlive } from './utils';
 import InvokeTabs from 'features/tabs/InvokeTabs';
 import ImageUploader from 'common/components/ImageUploader';
@@ -80,8 +77,6 @@ const appSelector = createSelector(
 );
 
 const App = () => {
-  const dispatch = useAppDispatch();
-
   const { shouldShowGalleryButton, shouldShowOptionsPanelButton } =
     useAppSelector(appSelector);
 

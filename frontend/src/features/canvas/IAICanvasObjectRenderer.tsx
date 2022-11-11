@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState, useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { Group, Line } from 'react-konva';
 import {
-  CanvasState,
+  currentCanvasSelector,
   isCanvasBaseImage,
   isCanvasBaseLine,
 } from './canvasSlice';
@@ -11,14 +11,9 @@ import IAICanvasImage from './IAICanvasImage';
 import { rgbaColorToString } from './util/colorToString';
 
 const selector = createSelector(
-  [(state: RootState) => state.canvas],
-  (canvas: CanvasState) => {
-    return {
-      objects:
-        canvas.currentCanvas === 'outpainting'
-          ? canvas.outpainting.objects
-          : undefined,
-    };
+  [currentCanvasSelector],
+  (currentCanvas) => {
+    return currentCanvas.objects;
   },
   {
     memoizeOptions: {
@@ -27,8 +22,8 @@ const selector = createSelector(
   }
 );
 
-const IAICanvasOutpaintingObjects = () => {
-  const { objects } = useAppSelector(selector);
+const IAICanvasObjectRenderer = () => {
+  const objects = useAppSelector(selector);
 
   if (!objects) return null;
 
@@ -62,4 +57,4 @@ const IAICanvasOutpaintingObjects = () => {
   );
 };
 
-export default IAICanvasOutpaintingObjects;
+export default IAICanvasObjectRenderer;

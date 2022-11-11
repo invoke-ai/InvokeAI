@@ -4,7 +4,6 @@ import React, { ReactElement } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
-import OutpaintingWIP from 'common/components/WorkInProgress/OutpaintingWIP';
 import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
 import ImageToImageIcon from 'common/icons/ImageToImageIcon';
 import InpaintIcon from 'common/icons/InpaintIcon';
@@ -19,13 +18,9 @@ import {
 } from 'features/options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
 import InpaintingWorkarea from './Inpainting/InpaintingWorkarea';
-// import { setDoesCanvasNeedScaling } from './Inpainting/inpaintingSlice';
 import TextToImageWorkarea from './TextToImage';
 import Lightbox from 'features/lightbox/Lightbox';
-import {
-  setCurrentCanvas,
-  setDoesCanvasNeedScaling,
-} from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
 import OutpaintingWorkarea from './Outpainting/OutpaintingWorkarea';
 import { setShouldShowGallery } from 'features/gallery/gallerySlice';
 

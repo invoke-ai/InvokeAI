@@ -11,7 +11,6 @@ import * as InvokeAI from 'app/invokeai';
 import _ from 'lodash';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { RootState } from 'app/store';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { MutableRefObject } from 'react';
 import Konva from 'konva';
 
@@ -137,7 +136,7 @@ const initialGenericCanvasState: GenericCanvasState = {
   tool: 'brush',
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
-  maskColor: { r: 255, g: 90, b: 90, a: 0.5 },
+  maskColor: { r: 255, g: 90, b: 90, a: 1 },
   eraserSize: 50,
   stageDimensions: { width: 0, height: 0 },
   stageCoordinates: { x: 0, y: 0 },
@@ -351,7 +350,16 @@ export const canvasSlice = createSlice({
       state.inpainting.boundingBoxDimensions = newDimensions;
       state.inpainting.boundingBoxCoordinates = newCoordinates;
 
-      state.inpainting.imageToInpaint = action.payload;
+      // state.inpainting.imageToInpaint = action.payload;
+      state.inpainting.objects = [
+        {
+          kind: 'image',
+          layer: 'base',
+          x: 0,
+          y: 0,
+          image: action.payload,
+        },
+      ];
       state.doesCanvasNeedScaling = true;
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
@@ -567,19 +575,19 @@ export const canvasSlice = createSlice({
       lastLine.points.push(...action.payload);
     },
     undo: (state) => {
-      if (state.outpainting.objects.length === 0) return;
+      if (state[state.currentCanvas].objects.length === 0) return;
 
-      const newObjects = state.outpainting.pastObjects.pop();
+      const newObjects = state[state.currentCanvas].pastObjects.pop();
       if (!newObjects) return;
-      state.outpainting.futureObjects.unshift(state.outpainting.objects);
-      state.outpainting.objects = newObjects;
+      state[state.currentCanvas].futureObjects.unshift(state[state.currentCanvas].objects);
+      state[state.currentCanvas].objects = newObjects;
     },
     redo: (state) => {
-      if (state.outpainting.futureObjects.length === 0) return;
-      const newObjects = state.outpainting.futureObjects.shift();
+      if (state[state.currentCanvas].futureObjects.length === 0) return;
+      const newObjects = state[state.currentCanvas].futureObjects.shift();
       if (!newObjects) return;
-      state.outpainting.pastObjects.push(state.outpainting.objects);
-      state.outpainting.objects = newObjects;
+      state[state.currentCanvas].pastObjects.push(state[state.currentCanvas].objects);
+      state[state.currentCanvas].objects = newObjects;
     },
     setShouldShowGrid: (state, action: PayloadAction<boolean>) => {
       state.outpainting.shouldShowGrid = action.payload;
@@ -748,17 +756,8 @@ export const inpaintingCanvasSelector = (
 ): InpaintingCanvasState => state.canvas.inpainting;
 
 export const baseCanvasImageSelector = createSelector(
-  [(state: RootState) => state.canvas, activeTabNameSelector],
-  (canvas: CanvasState, activeTabName) => {
-    if (activeTabName === 'inpainting') {
-      return canvas.inpainting.imageToInpaint;
-    } else if (activeTabName === 'outpainting') {
-      const firstImageObject = canvas.outpainting.objects.find(
-        (obj) => obj.kind === 'image'
-      );
-      if (firstImageObject && firstImageObject.kind === 'image') {
-        return firstImageObject.image;
-      }
-    }
+  [currentCanvasSelector],
+  (currentCanvas) => {
+    return currentCanvas.objects.find(isCanvasBaseImage);
   }
 );

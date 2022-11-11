@@ -2,26 +2,20 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { OptionsState } from 'features/options/optionsSlice';
 import {
   CanvasTool,
   setShouldShowBoundingBox,
   setTool,
   toggleShouldLockBoundingBox,
 } from 'features/canvas/canvasSlice';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
-import { currentCanvasSelector, GenericCanvasState } from '../canvasSlice';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import { currentCanvasSelector } from '../canvasSlice';
 import { useRef } from 'react';
 
 const inpaintingCanvasHotkeysSelector = createSelector(
-  [
-    (state: RootState) => state.options,
-    currentCanvasSelector,
-    activeTabNameSelector,
-  ],
-  (options: OptionsState, currentCanvas: GenericCanvasState, activeTabName) => {
+  [currentCanvasSelector, activeTabNameSelector],
+  (currentCanvas, activeTabName) => {
     const {
-      isMaskEnabled,
       cursorPosition,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
@@ -30,7 +24,6 @@ const inpaintingCanvasHotkeysSelector = createSelector(
 
     return {
       activeTabName,
-      isMaskEnabled,
       isCursorOnCanvas: Boolean(cursorPosition),
       shouldLockBoundingBox,
       shouldShowBoundingBox,
@@ -46,8 +39,9 @@ const inpaintingCanvasHotkeysSelector = createSelector(
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const { isMaskEnabled, activeTabName, shouldShowBoundingBox, tool } =
-    useAppSelector(inpaintingCanvasHotkeysSelector);
+  const { activeTabName, shouldShowBoundingBox, tool } = useAppSelector(
+    inpaintingCanvasHotkeysSelector
+  );
 
   const previousToolRef = useRef<CanvasTool | null>(null);
   //  Toggle lock bounding box

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAICheckbox from 'common/components/IAICheckbox';
 import {
   currentCanvasSelector,

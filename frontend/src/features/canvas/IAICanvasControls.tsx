@@ -2,7 +2,7 @@ import IAICanvasBrushControl from './IAICanvasControls/IAICanvasBrushControl';
 import IAICanvasEraserControl from './IAICanvasControls/IAICanvasEraserControl';
 import IAICanvasUndoControl from './IAICanvasControls/IAICanvasUndoButton';
 import IAICanvasRedoControl from './IAICanvasControls/IAICanvasRedoButton';
-import { Button, ButtonGroup } from '@chakra-ui/react';
+import { ButtonGroup } from '@chakra-ui/react';
 import IAICanvasMaskClear from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskClear';
 import IAICanvasMaskVisibilityControl from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskVisibilityControl';
 import IAICanvasMaskInvertControl from './IAICanvasControls/IAICanvasMaskControls/IAICanvasMaskInvertControl';
@@ -11,8 +11,6 @@ import IAICanvasShowHideBoundingBoxControl from './IAICanvasControls/IAICanvasSh
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  currentCanvasSelector,
-  GenericCanvasState,
   outpaintingCanvasSelector,
   OutpaintingCanvasState,
   uploadOutpaintingMergedImage,
@@ -23,7 +21,6 @@ import { OptionsState } from 'features/options/optionsSlice';
 import _ from 'lodash';
 import IAICanvasImageEraserControl from './IAICanvasControls/IAICanvasImageEraserControl';
 import { canvasImageLayerRef } from './IAICanvas';
-import { uploadImage } from 'app/socketio/actions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaSave } from 'react-icons/fa';
 
@@ -56,12 +53,7 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasControls = () => {
   const dispatch = useAppDispatch();
-  const {
-    activeTabName,
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    stageScale,
-  } = useAppSelector(canvasControlsSelector);
+  const { activeTabName } = useAppSelector(canvasControlsSelector);
 
   return (
     <div className="inpainting-settings">

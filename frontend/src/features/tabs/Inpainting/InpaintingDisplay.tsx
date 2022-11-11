@@ -1,5 +1,4 @@
 import { createSelector } from '@reduxjs/toolkit';
-// import IAICanvas from 'features/canvas/IAICanvas';
 import IAICanvasControls from 'features/canvas/IAICanvasControls';
 import IAICanvasResizer from 'features/canvas/IAICanvasResizer';
 import _ from 'lodash';
@@ -9,23 +8,25 @@ import ImageUploadButton from 'common/components/ImageUploaderButton';
 import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
 import { OptionsState } from 'features/options/optionsSlice';
 import {
+  baseCanvasImageSelector,
   CanvasState,
   setDoesCanvasNeedScaling,
 } from 'features/canvas/canvasSlice';
 import IAICanvas from 'features/canvas/IAICanvas';
 
 const inpaintingDisplaySelector = createSelector(
-  [(state: RootState) => state.canvas, (state: RootState) => state.options],
-  (canvas: CanvasState, options: OptionsState) => {
-    const {
-      doesCanvasNeedScaling,
-      inpainting: { imageToInpaint },
-    } = canvas;
+  [
+    baseCanvasImageSelector,
+    (state: RootState) => state.canvas,
+    (state: RootState) => state.options,
+  ],
+  (baseCanvasImage, canvas: CanvasState, options: OptionsState) => {
+    const { doesCanvasNeedScaling } = canvas;
     const { showDualDisplay } = options;
     return {
       doesCanvasNeedScaling,
       showDualDisplay,
-      imageToInpaint,
+      baseCanvasImage,
     };
   },
   {
@@ -37,7 +38,7 @@ const inpaintingDisplaySelector = createSelector(
 
 const InpaintingDisplay = () => {
   const dispatch = useAppDispatch();
-  const { showDualDisplay, doesCanvasNeedScaling, imageToInpaint } =
+  const { showDualDisplay, doesCanvasNeedScaling, baseCanvasImage } =
     useAppSelector(inpaintingDisplaySelector);
 
   useLayoutEffect(() => {
@@ -49,7 +50,7 @@ const InpaintingDisplay = () => {
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
 
-  const inpaintingComponent = imageToInpaint ? (
+  const inpaintingComponent = baseCanvasImage ? (
     <div className="inpainting-main-area">
       <IAICanvasControls />
       <div className="inpainting-canvas-area">
