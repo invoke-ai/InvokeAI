@@ -76,7 +76,6 @@ const canvasSelector = createSelector(
     }
 
     return {
-      activeTabName,
       isMaskEnabled,
       isModifyingBoundingBox: isTransformingBoundingBox || isMovingBoundingBox,
       shouldShowBoundingBox,
@@ -86,6 +85,7 @@ const canvasSelector = createSelector(
       stageDimensions,
       stageScale,
       tool,
+      outpaintingOnly: activeTabName === 'outpainting',
     };
   },
   {
@@ -101,7 +101,6 @@ export let canvasImageLayerRef: MutableRefObject<Konva.Layer | null>;
 
 const IAICanvas = () => {
   const {
-    activeTabName,
     isMaskEnabled,
     isModifyingBoundingBox,
     shouldShowBoundingBox,
@@ -111,6 +110,7 @@ const IAICanvas = () => {
     stageDimensions,
     stageScale,
     tool,
+    outpaintingOnly,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
@@ -161,9 +161,7 @@ const IAICanvas = () => {
           onWheel={handleWheel}
           listening={tool === 'move' && !isModifyingBoundingBox}
           draggable={
-            tool === 'move' &&
-            !isModifyingBoundingBox &&
-            activeTabName === 'outpainting'
+            tool === 'move' && !isModifyingBoundingBox && outpaintingOnly
           }
         >
           <Layer id={'grid'} visible={shouldShowGrid}>
@@ -211,7 +209,7 @@ const IAICanvas = () => {
             />
           </Layer>
         </Stage>
-        <IAICanvasStatusText />
+        {outpaintingOnly && <IAICanvasStatusText />}
       </div>
     </div>
   );
