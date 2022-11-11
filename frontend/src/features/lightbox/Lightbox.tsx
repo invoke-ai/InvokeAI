@@ -22,7 +22,7 @@ export default function Lightbox() {
   );
 
   const {
-    imageToDisplay,
+    viewerImageToDisplay,
     shouldShowImageDetails,
     isOnFirstImage,
     isOnLastImage,
@@ -102,9 +102,9 @@ export default function Lightbox() {
               </div>
             </div>
           )}
-          {imageToDisplay && (
+          {viewerImageToDisplay && (
             <ReactPanZoom
-              image={imageToDisplay.url}
+              image={viewerImageToDisplay.url}
               styleClass="lightbox-image"
             />
           )}
