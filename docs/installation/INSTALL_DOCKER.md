@@ -13,7 +13,7 @@ title: Docker
     For container-related development tasks or for enabling easy
     deployment to other environments (on-premises or cloud), follow these
     instructions.
-    
+
     For general use, install locally to leverage your machine's GPU.
 
 ## Why containers?
@@ -42,16 +42,19 @@ another environment with NVIDIA GPUs on-premises or in the cloud.
 
 #### Install [Docker](https://github.com/santisbon/guides#docker)
 
-On the Docker Desktop app, go to Preferences, Resources, Advanced. Increase the
-CPUs and Memory to avoid this
+On the [Docker Desktop app](https://docs.docker.com/get-docker/), go to
+Preferences, Resources, Advanced. Increase the CPUs and Memory to avoid this
 [Issue](https://github.com/invoke-ai/InvokeAI/issues/342). You may need to
 increase Swap and Disk image size too.
 
 #### Get a Huggingface-Token
 
-Go to [Hugging Face](https://huggingface.co/settings/tokens), create a token and
-temporary place it somewhere like a open texteditor window (but dont save it!,
-only keep it open, we need it in the next step)
+Besides the Docker Agent you will need an Account on
+[huggingface.co](https://huggingface.co/join).
+
+After you succesfully registered your account, go to
+[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens), create
+a token and copy it, since you will need in for the next step.
 
 ### Setup
 
@@ -106,12 +109,12 @@ also do so.
 !!! example ""
 
     ```bash
-    docker-build/run.sh --from_file tests/validate_pr_prompt.txt
+    ./docker-build/run.sh --from_file tests/validate_pr_prompt.txt
     ```
 
     The output folder is located on the volume which is also used to store the model.
 
-    Find out more about available CLI-Parameter at [features/CLI.md](../features/CLI.md)
+    Find out more about available CLI-Parameters at [features/CLI.md](../features/CLI.md/#arguments)
 
 ---
 
