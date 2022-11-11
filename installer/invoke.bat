@@ -16,7 +16,9 @@ IF /I "%restore%" == "1" (
     .venv\Scripts\python scripts\invoke.py --web
 ) ELSE IF /I "%restore%" == "3" (
     echo Developer Console
-    .venv\Scripts\python
+    call where python
+    call python --version
+
     cmd /k
 ) ELSE (
     echo Invalid selection

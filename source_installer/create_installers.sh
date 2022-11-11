@@ -16,6 +16,7 @@ rm -rf invokeAI
 mkdir -p invokeAI
 cp install.bat invokeAI
 cp readme.txt invokeAI
+cp WinLongPathsEnabled.reg invokeAI
 
 zip -r invokeAI-src-installer-windows.zip invokeAI
 

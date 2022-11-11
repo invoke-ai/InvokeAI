@@ -17,7 +17,7 @@ set PATH=c:\windows\system32
 @rem Config
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 @rem https://mamba.readthedocs.io/en/latest/installation.html
-set MICROMAMBA_DOWNLOAD_URL=https://micro.mamba.pm/api/micromamba/win-64/latest
+set MICROMAMBA_DOWNLOAD_URL=https://github.com/cmdr2/stable-diffusion-ui/releases/download/v1.1/micromamba.exe
 set RELEASE_URL=https://github.com/invoke-ai/InvokeAI
 set RELEASE_SOURCEBALL=/archive/refs/heads/release-candidate-2-1-3.tar.gz
 set PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
@@ -36,15 +36,7 @@ if "%PACKAGES_TO_INSTALL%" NEQ "" (
     @rem download micromamba
     echo ***** Downloading micromamba from %MICROMAMBA_DOWNLOAD_URL% to micromamba.exe *****
 
-    call curl -L "%MICROMAMBA_DOWNLOAD_URL%" > micromamba.tbz2
-
-    set err_msg=----- micromamba source unpack failed -----
-    tar -jxf micromamba.tbz2
-    if %errorlevel% neq 0 goto err_exit
-
-    move Library\bin\micromamba.exe micromamba.exe
-    rd /s /q Library info
-    del /q micromamba.tbz2
+    call curl -L "%MICROMAMBA_DOWNLOAD_URL%" > micromamba.exe
 
     @rem test the mamba binary
     echo ***** Micromamba version:  *****
