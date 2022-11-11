@@ -28,7 +28,6 @@ infile = None
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
-    print('* Initializing, be patient...')
     
     opt  = Args()
     args = opt.parse_args()
@@ -46,6 +45,7 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
+    print('* Initializing, be patient...')
     from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
@@ -281,7 +281,7 @@ def main_loop(gen, opt):
                     filename = f'{prefix}.{use_prefix}.{seed}.png'
                     tm = opt.text_mask[0]
                     th = opt.text_mask[1] if len(opt.text_mask)>1 else 0.5
-                    formatted_dream_prompt = f'!mask {opt.input_file_path} -tm {tm} {th}'
+                    formatted_dream_prompt = f'!mask {opt.prompt} -tm {tm} {th}'
                     path = file_writer.save_image_and_prompt_to_png(
                         image           = image,
                         dream_prompt    = formatted_dream_prompt,
@@ -321,7 +321,7 @@ def main_loop(gen, opt):
                         tool = re.match('postprocess:(\w+)',opt.last_operation).groups()[0]
                         add_postprocessing_to_metadata(
                             opt,
-                            opt.input_file_path,
+                            opt.prompt,
                             filename,
                             tool,
                             formatted_dream_prompt,
@@ -619,16 +619,10 @@ def do_textmask(gen, opt, callback):
     )
 
 def do_postprocess (gen, opt, callback):
-    file_path = opt.prompt      # treat the prompt as the file pathname
-    if opt.new_prompt is not None:
-        opt.prompt = opt.new_prompt
-    else:
-        opt.prompt = None
-        
+    file_path = opt.prompt     # treat the prompt as the file pathname
     if os.path.dirname(file_path) == '': #basename given
         file_path = os.path.join(opt.outdir,file_path)
 
-    opt.input_file_path = file_path
     tool=None
     if opt.facetool_strength > 0:
         tool = opt.facetool
@@ -667,10 +661,7 @@ def do_postprocess (gen, opt, callback):
 def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
     original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir,original_file)
     new_file       = new_file     if os.path.exists(new_file)      else os.path.join(opt.outdir,new_file)
-    try:
-        meta = retrieve_metadata(original_file)['sd-metadata']
-    except AttributeError:
-        meta = retrieve_metadata(new_file)['sd-metadata']
+    meta = retrieve_metadata(original_file)['sd-metadata']
     if 'image' not in meta:
         meta = metadata_dumps(opt,seeds=[opt.seed])['image']
         meta['image'] = {}
@@ -718,7 +709,7 @@ def prepare_image_metadata(
     elif len(prior_variations) > 0:
         formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed)
     elif operation == 'postprocess':
-        formatted_dream_prompt = '!fix '+opt.dream_prompt_str(seed=seed,prompt=opt.input_file_path)
+        formatted_dream_prompt = '!fix '+opt.dream_prompt_str(seed=seed)
     else:
         formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
     return filename,formatted_dream_prompt
