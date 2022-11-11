@@ -206,5 +206,6 @@ cp installer/invoke.sh .
 # more cleanup
 rm -rf installer/ installer_files/
 
+echo "All done! Run the command './invoke.sh' to start InvokeAI."
 read -p "Press any key to exit..."
 exit

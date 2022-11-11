@@ -157,8 +157,8 @@ if %errorlevel% neq 0 goto err_exit
 echo ***** Finished downloading models *****
 
 echo ***** Installing invoke.bat ******
-cp installer\invoke.bat .\invoke.bat
-
+copy installer\invoke.bat .\invoke.bat
+echo All done! Execute the file invoke.bat in this directory to start InvokeAI
 
 @rem more cleanup
 rd /s /q installer installer_files

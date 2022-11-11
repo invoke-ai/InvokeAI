@@ -80,7 +80,7 @@ call conda activate
 
 @rem create the environment
 call conda env remove -n invokeai
-cp environments-and-requirements\environment-win-cuda.yml environment.yml 
+copy environments-and-requirements\environment-win-cuda.yml environment.yml 
 call conda env create
 if "%ERRORLEVEL%" NEQ "0" (
    echo ""
@@ -92,8 +92,8 @@ if "%ERRORLEVEL%" NEQ "0" (
    exit /b
 )
 
-cp source_installer/install.bat install.bat
-cp source_installer/update.bat update.bat
+copy source_installer/install.bat install.bat
+copy source_installer/update.bat update.bat
 
 call conda activate invokeai
 @rem preload the models
