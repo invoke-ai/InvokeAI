@@ -38,4 +38,4 @@ git+https://github.com/openai/CLIP.git@main#egg=clip
 git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
 git+https://github.com/invoke-ai/Real-ESRGAN.git#egg=realesrgan
 git+https://github.com/invoke-ai/GFPGAN.git#egg=gfpgan
--e git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg
+git+https://github.com/invoke-ai/clipseg.git@models-rename#egg=clipseg

@@ -636,7 +636,7 @@ def split_weighted_subprompts(text, skip_normalize=False)->list:
     weight_sum = sum(map(lambda x: x[1], parsed_prompts))
     if weight_sum == 0:
         print(
-            "Warning: Subprompt weights add up to zero. Discarding and using even weights instead.")
+            "* Warning: Subprompt weights add up to zero. Discarding and using even weights instead.")
         equal_weight = 1 / max(len(parsed_prompts), 1)
         return [(x[0], equal_weight) for x in parsed_prompts]
     return [(x[0], x[1] / weight_sum) for x in parsed_prompts]
