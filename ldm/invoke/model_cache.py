@@ -109,10 +109,13 @@ class ModelCache(object):
         Set the default model. The change will not take
         effect until you call model_cache.commit()
         '''
+        print(f'DEBUG: before set_default_model()\n{OmegaConf.to_yaml(self.config)}')
         assert model_name in self.models,f"unknown model '{model_name}'"
-        for model in self.models:
-            self.models[model].pop('default',None)
-        self.models[model_name]['default'] = True
+        config = self.config
+        for model in config:
+            config[model].pop('default',None)
+        config[model_name]['default'] = True
+        print(f'DEBUG: after set_default_model():\n{OmegaConf.to_yaml(self.config)}')
 
     def list_models(self) -> dict:
         '''
