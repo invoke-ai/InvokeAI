@@ -92,10 +92,7 @@ command-line completion.
 
         === "Macintosh and Linux"
 
-            !!! todo
-
-                Replace `xxx` and `yyy` with the appropriate OS and GPU codes as seen in the
-                table above
+            !!! todo "Replace `xxx` and `yyy` with the appropriate OS and GPU codes as seen in the table above"
 
             ```bash
             ln -sf environments-and-requirements/environment-xxx-yyy.yml environment.yml
@@ -111,8 +108,7 @@ command-line completion.
 
         === "Windows"
 
-            Since it requires admin privileges to create links, we will use the copy (cp)
-            command to create your `environment.yml`
+            !!! todo " Since it requires admin privileges to create links, we will use the copy (cp) command to create your `environment.yml`"
 
             ```cmd
             cp environments-and-requirements\environment-win-cuda.yml environment.yml
@@ -200,7 +196,7 @@ command-line completion.
 
 10. Render away!
 
-    Browse the [features](../features) section to learn about all the things you
+    Browse the [features](../features/CLI.md) section to learn about all the things you
     can do with InvokeAI.
 
     Note that some GPUs are slow to warm up. In particular, when using an AMD
