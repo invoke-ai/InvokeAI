@@ -150,7 +150,7 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
 
   useEffect(() => {
     const timer = setInterval(
-      () => setOffset((i) => (i + 2) % Number(fillPatternImage?.width)),
+      () => setOffset((i) => (i + 2) % (fillPatternImage?.width || 0)),
       100
     );
     return () => clearInterval(timer);
