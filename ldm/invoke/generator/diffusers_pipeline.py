@@ -1,5 +1,4 @@
 import secrets
-import warnings
 from dataclasses import dataclass
 from typing import List, Optional, Union, Callable
 
@@ -10,6 +9,8 @@ from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+
+from ldm.modules.encoders.modules import WeightedFrozenCLIPEmbedder
 
 
 @dataclass
@@ -75,6 +76,11 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
+        )
+        # InvokeAI's interface for text embeddings and whatnot
+        self.clip_embedder = WeightedFrozenCLIPEmbedder(
+            tokenizer=self.tokenizer,
+            transformer=self.text_encoder
         )
 
     def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
@@ -312,27 +318,12 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
             text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
         return text_embeddings
 
-    def get_learned_conditioning(self, c: List[List[str]], return_tokens=True,
-                                 fragment_weights=None, **kwargs):
+    @torch.inference_mode()
+    def get_learned_conditioning(self, c: List[List[str]], *, return_tokens=True, fragment_weights=None):
         """
         Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
         """
-        assert return_tokens == True
-        if fragment_weights:
-            weights = fragment_weights[0]
-            if any(weight != 1.0 for weight in weights):
-                warnings.warn(f"fragment weights not implemented yet {fragment_weights}", stacklevel=2)
-
-        if kwargs:
-            warnings.warn(f"unsupported args {kwargs}", stacklevel=2)
-
-        text_fragments = c[0]
-        text_input = self._tokenize(text_fragments)
-
-        with torch.inference_mode():
-            token_ids = text_input.input_ids.to(self.text_encoder.device)
-            text_embeddings = self.text_encoder(token_ids)[0]
-        return text_embeddings, text_input.input_ids
+        return self.clip_embedder.encode(c, return_tokens=return_tokens, fragment_weights=fragment_weights)
 
     @torch.inference_mode()
     def _tokenize(self, prompt: Union[str, List[str]]):
