@@ -8,7 +8,6 @@ import {
   InpaintingCanvasState,
   OutpaintingCanvasState,
 } from './canvasSlice';
-import maskPatternImage from 'assets/images/mask_pattern2.png';
 
 import { rgbaColorToString } from './util/colorToString';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -32,6 +31,86 @@ export const canvasMaskCompositerSelector = createSelector(
 
 type IAICanvasMaskCompositerProps = RectConfig;
 
+const getColoredSVG = (color: string) => {
+  return `data:image/svg+xml;utf8,<svg width="100%" height="100%" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">
+  <g transform="matrix(0.5,0,0,0.5,0,0)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,2.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,7.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,10)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,12.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,15)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,17.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,20)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,22.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,25)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,27.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,30)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-2.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-7.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-10)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-12.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-15)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-17.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-20)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-22.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-25)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-27.5)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+  <g transform="matrix(0.5,0,0,0.5,0,-30)">
+      <path d="M-3.5,63.5L64,-4" style="fill:none;stroke:black;stroke-width:1px;"/>
+  </g>
+</svg>`.replaceAll('black', color);
+};
+
 const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   const { ...rest } = props;
 
@@ -52,8 +131,6 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   const incrementOffset = useCallback(() => {
     setOffset(offset + 1);
     setTimeout(incrementOffset, 500);
-    console.log('toggle');
-    console.log('incrementing');
   }, [offset]);
 
   useEffect(() => {
@@ -63,14 +140,21 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
     image.onload = () => {
       setFillPatternImage(image);
     };
-
-    image.src = maskPatternImage;
-  }, [fillPatternImage]);
+    image.src = getColoredSVG(maskColorString);
+  }, [fillPatternImage, maskColorString]);
 
   useEffect(() => {
-    const timer = setInterval(() => setOffset((i) => (i + 1) % 6), 100);
+    if (!fillPatternImage) return;
+    fillPatternImage.src = getColoredSVG(maskColorString);
+  }, [fillPatternImage, maskColorString]);
+
+  useEffect(() => {
+    const timer = setInterval(
+      () => setOffset((i) => (i + 2) % Number(fillPatternImage?.width)),
+      100
+    );
     return () => clearInterval(timer);
-  }, []);
+  }, [fillPatternImage?.width]);
 
   if (!fillPatternImage) return null;
 
@@ -84,7 +168,7 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
       fillPatternImage={fillPatternImage}
       fillPatternOffsetY={offset}
       fillPatternRepeat={'repeat'}
-      fillPatternScale={{ x: 1 / stageScale, y: 1 / stageScale }}
+      fillPatternScale={{ x: 0.5 / stageScale, y: 0.5 / stageScale }}
       listening={true}
       opacity={maskOpacity}
       globalCompositeOperation={'source-in'}
