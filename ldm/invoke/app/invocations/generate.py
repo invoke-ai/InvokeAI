@@ -43,6 +43,14 @@ class TextToImageInvocation(BaseInvocation):
         def step_callback(sample, step = 0):
             self.dispatch_progress(services, session_id, sample, step)
 
+        # Handle invalid model parameter
+        # TODO: figure out if this can be done via a validator that uses the model_cache
+        if self.model is None or self.Model == '':
+            self.model = services.generate.model_cache.default_model
+
+        # Set the model (if already cached, this does nothing)
+        services.generate.set_model(self.model)
+
         results = services.generate.prompt2image(
             prompt = self.prompt,
             step_callback = step_callback,
@@ -59,40 +67,84 @@ class TextToImageInvocation(BaseInvocation):
             image = ImageField(image_type = image_type, image_name = image_name)
         )
 
+
 class ImageToImageInvocation(TextToImageInvocation):
     """Generates an image using img2img."""
     type: Literal['img2img'] = 'img2img'
 
     # Inputs
     image: Union[ImageField,None] = Field(description="The input image")
-    mask: Union[ImageField,None]  = Field(description="The mask")
     strength: float               = Field(default=0.75, gt=0, le=1, description="The strength of the original image")
     fit: bool                     = Field(default=True, description="Whether or not the result should be fit to the aspect ratio of the input image")
-    inpaint_replace: float        = Field(default=0.0, ge=0.0, le=1.0, description="The amount by which to replace masked areas with latent noise")
-    color_match: bool             = Field(default=False, description="Whether or not to color-match the original image after inpainting")
 
     def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
         image = None if self.image is None else services.images.get(self.image.image_type, self.image.image_name)
-        mask  = None if self.mask is None else services.images.get(self.mask.image_type, self.mask.image_name)
+        mask  = None
+
+        def step_callback(sample, step = 0):
+            self.dispatch_progress(services, session_id, sample, step)
+
+        # Handle invalid model parameter
+        # TODO: figure out if this can be done via a validator that uses the model_cache
+        if self.model is None or self.Model == '':
+            self.model = services.generate.model_cache.default_model
+
+        # Set the model (if already cached, this does nothing)
+        services.generate.set_model(self.model)
 
         results = services.generate.prompt2image(
             prompt    = self.prompt,
             init_img  = image,
             init_mask = mask,
+            step_callback = step_callback,
             **self.dict(exclude = {'prompt','image','mask'}) # Shorthand for passing all of the parameters above manually
         )
 
         result_image = results[0][0]
 
-        # Match colors to source image if requested
-        # NOTE: this ignores the mask
-        if self.color_match:
-            np_init_image = np.asarray(image)
-            np_result_image = np.asarray(result_image)
-            matched = match_histograms(np_result_image, np_init_image, channel_axis=-1)
-            result_image = Image.fromarray(matched)
+        # Results are image and seed, unwrap for now and ignore the seed
+        # TODO: pre-seed?
+        # TODO: can this return multiple results? Should it?
+        image_type = ImageType.RESULT
+        image_name = f'{session_id}_{self.id}_{str(int(datetime.now(timezone.utc).timestamp()))}.png'
+        services.images.save(image_type, image_name, result_image)
+        return ImageOutput(
+            image = ImageField(image_type = image_type, image_name = image_name)
+        )
 
-        # TODO: send events on progress
+
+class InpaintInvocation(ImageToImageInvocation):
+    """Generates an image using inpaint."""
+    type: Literal['inpaint'] = 'inpaint'
+
+    # Inputs
+    mask: Union[ImageField,None]  = Field(description="The mask")
+    inpaint_replace: float        = Field(default=0.0, ge=0.0, le=1.0, description="The amount by which to replace masked areas with latent noise")
+
+    def invoke(self, services: InvocationServices, session_id: str) -> ImageOutput:
+        image = None if self.image is None else services.images.get(self.image.image_type, self.image.image_name)
+        mask  = None if self.mask is None else services.images.get(self.mask.image_type, self.mask.image_name)
+
+        def step_callback(sample, step = 0):
+            self.dispatch_progress(services, session_id, sample, step)
+
+        # Handle invalid model parameter
+        # TODO: figure out if this can be done via a validator that uses the model_cache
+        if self.model is None or self.Model == '':
+            self.model = services.generate.model_cache.default_model
+
+        # Set the model (if already cached, this does nothing)
+        services.generate.set_model(self.model)
+
+        results = services.generate.prompt2image(
+            prompt    = self.prompt,
+            init_img  = image,
+            init_mask = mask,
+            step_callback = step_callback,
+            **self.dict(exclude = {'prompt','image','mask'}) # Shorthand for passing all of the parameters above manually
+        )
+
+        result_image = results[0][0]
 
         # Results are image and seed, unwrap for now and ignore the seed
         # TODO: pre-seed?
