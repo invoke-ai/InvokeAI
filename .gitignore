@@ -194,12 +194,17 @@ checkpoints
 
 # Let the frontend manage its own gitignore
 !frontend/*
+frontend/apt-get
+frontend/dist
+frontend/sudo
+frontend/update
 
 # Scratch folder
 .scratch/
 .vscode/
 gfpgan/
 models/ldm/stable-diffusion-v1/*.sha256
+
 
 # GFPGAN model files
 gfpgan/
@@ -209,3 +214,24 @@ configs/models.yaml
 
 # weights (will be created by installer)
 models/ldm/stable-diffusion-v1/*.ckpt
+models/clipseg
+models/gfpgan
+
+# ignore initfile
+invokeai.init
+
+# ignore environment.yml and requirements.txt
+# these are links to the real files in environments-and-requirements
+environment.yml
+requirements.txt
+
+# source installer files
+source_installer/*zip
+source_installer/invokeAI
+install.bat
+install.sh
+update.bat
+update.sh
+
+# this may be present if the user created a venv
+invokeai

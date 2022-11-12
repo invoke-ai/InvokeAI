@@ -1,0 +1,64 @@
+name: invokeai
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip>=22.2
+  - pytorch=1.12
+  - pytorch-lightning=1.7
+  - torchvision=0.13
+  - torchmetrics=0.10
+  - torch-fidelity=0.3
+
+  # I suggest to keep the other deps sorted for convenience.
+  # To determine what the latest versions should be, run:
+  #
+  # ```shell
+  # sed -E 's/invokeai/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
+  # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
+  # ```
+
+  - albumentations=1.2
+  - coloredlogs=15.0
+  - diffusers=0.6
+  - einops=0.3
+  - eventlet
+  - grpcio=1.46
+  - flask=2.1
+  - flask-socketio=5.3
+  - flask-cors=3.0
+  - humanfriendly=10.0
+  - imageio=2.21
+  - imageio-ffmpeg=0.4
+  - imgaug=0.4
+  - kornia=0.6
+  - mpmath=1.2
+  - nomkl=3
+  - numpy=1.23
+  - omegaconf=2.1
+  - openh264=2.3
+  - onnx=1.12
+  - onnxruntime=1.12
+  - pudb=2019.2
+  - protobuf=3.20
+  - py-opencv=4.6
+  - scipy=1.9
+  - streamlit=1.12
+  - sympy=1.10
+  - send2trash=1.8
+  - tensorboard=2.10
+  - transformers=4.23
+  - pip:
+      - getpass_asterisk
+      - taming-transformers-rom1504
+      - test-tube==0.7.5
+      - git+https://github.com/openai/CLIP.git@main#egg=clip
+      - git+https://github.com/invoke-ai/k-diffusion.git@mps#egg=k_diffusion
+      - git+https://github.com/invoke-ai/Real-ESRGAN.git#egg=realesrgan
+      - git+https://github.com/invoke-ai/GFPGAN.git#egg=gfpgan
+      - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
+      - -e .
+variables:
+  PYTORCH_ENABLE_MPS_FALLBACK: 1

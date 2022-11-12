@@ -23,7 +23,7 @@ jobs:
           - macOS-12
         include:
           - os: ubuntu-latest
-            environment-file: environment.yml
+            environment-file: environment-lin-cuda.yml
             default-shell: bash -l {0}
           - os: macOS-12
             environment-file: environment-mac.yml
@@ -49,6 +49,9 @@ jobs:
       - name: create models.yaml from example
         run: cp configs/models.yaml.example configs/models.yaml
 
+      - name: create environment.yml
+        run: cp environments-and-requirements/${{ matrix.environment-file }} environment.yml
+
       - name: Use cached conda packages
         id: use-cached-conda-packages
         uses: actions/cache@v3
@@ -61,7 +64,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: ${{ env.CONDA_ENV_NAME }}
-          environment-file: ${{ matrix.environment-file }}
+          environment-file: environment.yml
           miniconda-version: latest
 
       - name: set test prompt to main branch validation
@@ -76,8 +79,18 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
+      - name: Use Cached Stable Diffusion Model
+        id: cache-sd-model
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-${{ matrix.stable-diffusion-model-switch }}
+        with:
+          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          key: ${{ env.cache-name }}
+
       - name: Download ${{ matrix.stable-diffusion-model-switch }}
         id: download-stable-diffusion-model
+        if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
         run: |
           [[ -d models/ldm/stable-diffusion-v1 ]] \
             || mkdir -p models/ldm/stable-diffusion-v1

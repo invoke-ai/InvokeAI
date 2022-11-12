@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+
 # General
 site_name: Stable Diffusion Toolkit Docs
 site_url: https://invoke-ai.github.io/InvokeAI
@@ -30,6 +32,14 @@ theme:
       toggle:
         icon: material/lightbulb-outline
         name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - toc.integrate
 
 # Extensions
 markdown_extensions:

@@ -1,0 +1,24 @@
+--prefer-binary
+--extra-index-url https://download.pytorch.org/whl/cu116
+--trusted-host https://download.pytorch.org
+albumentations
+diffusers
+eventlet
+flask_cors
+flask_socketio
+flaskwebgui
+getpass_asterisk
+imageio-ffmpeg
+pyreadline3
+realesrgan
+send2trash
+streamlit
+taming-transformers-rom1504
+test-tube
+torch-fidelity
+torchvision==0.13.1 ; platform_system == 'Darwin'
+torchvision==0.13.1+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
+transformers
+https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip
+https://github.com/TencentARC/GFPGAN/archive/2eac2033893ca7f427f4035d80fe95b92649ac56.zip
+https://github.com/invoke-ai/k-diffusion/archive/7f16b2c33411f26b3eae78d10648d625cb0c1095.zip

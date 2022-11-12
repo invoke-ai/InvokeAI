@@ -19,14 +19,14 @@ applied after the fact.
 
 The default face restoration module is GFPGAN. The default upscale is
 Real-ESRGAN. For an alternative face restoration module, see [CodeFormer
-Support] below.
+Support](#codeformer-support) below.
 
 As of version 1.14, environment.yaml will install the Real-ESRGAN
 package into the standard install location for python packages, and
 will put GFPGAN into a subdirectory of "src" in the InvokeAI
 directory. Upscaling with Real-ESRGAN should "just work" without
-further intervention. Simply pass the --upscale (-U) option on the
-invoke> command line, or indicate the desired scale on the popup in
+further intervention. Simply pass the `--upscale` (`-U`) option on the
+`invoke>` command line, or indicate the desired scale on the popup in
 the Web GUI.
 
 **GFPGAN** requires a series of downloadable model files to

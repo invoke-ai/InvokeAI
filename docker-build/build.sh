@@ -8,8 +8,9 @@ source ./docker-build/env.sh || echo "please run from repository root" || exit 1
 
 invokeai_conda_version=${INVOKEAI_CONDA_VERSION:-py39_4.12.0-${platform/\//-}}
 invokeai_conda_prefix=${INVOKEAI_CONDA_PREFIX:-\/opt\/conda}
-invokeai_conda_env_file=${INVOKEAI_CONDA_ENV_FILE:-environment.yml}
-invokeai_git=${INVOKEAI_GIT:-https://github.com/invoke-ai/InvokeAI.git}
+invokeai_conda_env_file=${INVOKEAI_CONDA_ENV_FILE:-environment-lin-cuda.yml}
+invokeai_git=${INVOKEAI_GIT:-invoke-ai/InvokeAI}
+invokeai_branch=${INVOKEAI_BRANCH:-main}
 huggingface_token=${HUGGINGFACE_TOKEN?}
 
 # print the settings
@@ -38,11 +39,12 @@ _copyCheckpoints() {
   echo "creating subfolders for models and outputs"
   _runAlpine mkdir models
   _runAlpine mkdir outputs
-  echo -n "downloading sd-v1-4.ckpt"
-  _runAlpine wget --header="Authorization: Bearer ${huggingface_token}" -O models/sd-v1-4.ckpt https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
+  echo "downloading v1-5-pruned-emaonly.ckpt"
+  _runAlpine wget \
+    --header="Authorization: Bearer ${huggingface_token}" \
+    -O models/v1-5-pruned-emaonly.ckpt \
+    https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
   echo "done"
-  echo "downloading GFPGANv1.4.pth"
-  _runAlpine wget -O models/GFPGANv1.4.pth https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth
 }
 
 _checkVolumeContent() {
@@ -51,7 +53,7 @@ _checkVolumeContent() {
 
 _getModelMd5s() {
   _runAlpine  \
-    alpine sh -c "md5sum /data/models/*"
+    alpine sh -c "md5sum /data/models/*.ckpt"
 }
 
 if [[ -n "$(docker volume ls -f name="${volumename}" -q)" ]]; then
@@ -77,5 +79,6 @@ docker build \
   --build-arg conda_prefix="${invokeai_conda_prefix}" \
   --build-arg conda_env_file="${invokeai_conda_env_file}" \
   --build-arg invokeai_git="${invokeai_git}" \
+  --build-arg invokeai_branch="${invokeai_branch}" \
   --file ./docker-build/Dockerfile \
   .

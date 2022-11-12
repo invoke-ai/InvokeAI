@@ -1,0 +1,45 @@
+name: invokeai
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - albumentations=0.4.3
+  - cudatoolkit
+  - einops=0.3.0
+  - eventlet
+  - flask-socketio=5.3.0
+  - flask=2.1.*
+  - flask_cors=3.0.10
+  - imageio-ffmpeg=0.4.2
+  - imageio=2.9.0
+  - kornia=0.6
+  - numpy=1.19
+  - opencv=4.6.0
+  - pillow=8.*
+  - pip>=22.2.2
+  - pudb=2019.2
+  - python=3.9.*
+  - pytorch
+  - pytorch-lightning=1.7.7
+  - send2trash=1.8.0
+  - streamlit
+  - tokenizers>=0.11.1,!=0.11.3,<0.13
+  - torch-fidelity=0.3.0
+  - torchmetrics=0.7.0
+  - torchvision
+  - transformers=4.21.3
+  - pip:
+      - dependency_injector==4.40.0
+      - getpass_asterisk
+      - gfpgan
+      - omegaconf==2.1.1
+      - pyreadline3
+      - realesrgan
+      - taming-transformers-rom1504
+      - test-tube>=0.7.5
+      - git+https://github.com/openai/CLIP.git@main#egg=clip
+      - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
+      - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
+      - -e .
+variables:
+  PYTORCH_ENABLE_MPS_FALLBACK: 1

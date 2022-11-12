@@ -1,3 +1,0 @@
-[tool.blue]
-line-length = 90
-target-version = ['py310']

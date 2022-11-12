@@ -29,6 +29,7 @@ infile = None
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
+    print('* Initializing, be patient...')
     
     opt  = Args()
     args = opt.parse_args()
@@ -46,7 +47,6 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
-    print('* Initializing, be patient...')
     from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
@@ -90,7 +90,12 @@ def main():
             safety_checker=opt.safety_checker,
             max_loaded_models=opt.max_loaded_models,
             )
-    except (FileNotFoundError, IOError, KeyError) as e:
+    except FileNotFoundError:
+        print('** You appear to be missing configs/models.yaml')
+        print('** You can either exit this script and run scripts/preload_models.py, or fix the problem now.')
+        emergency_model_create(opt)
+        sys.exit(-1)
+    except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
         sys.exit(-1)
 
@@ -208,7 +213,10 @@ def main_loop(gen, opt):
                 setattr(opt,attr,path)
 
         # retrieve previous value of seed if requested
-        if opt.seed is not None and opt.seed < 0:   
+        # Exception: for postprocess operations negative seed values
+        # mean "discard the original seed and generate a new one"
+        # (this is a non-obvious hack and needs to be reworked)
+        if opt.seed is not None and opt.seed < 0 and operation != 'postprocess':
             try:
                 opt.seed = last_results[opt.seed][1]
                 print(f'>> Reusing previous seed {opt.seed}')
@@ -277,7 +285,7 @@ def main_loop(gen, opt):
                     filename = f'{prefix}.{use_prefix}.{seed}.png'
                     tm = opt.text_mask[0]
                     th = opt.text_mask[1] if len(opt.text_mask)>1 else 0.5
-                    formatted_dream_prompt = f'!mask {opt.prompt} -tm {tm} {th}'
+                    formatted_dream_prompt = f'!mask {opt.input_file_path} -tm {tm} {th}'
                     path = file_writer.save_image_and_prompt_to_png(
                         image           = image,
                         dream_prompt    = formatted_dream_prompt,
@@ -317,7 +325,7 @@ def main_loop(gen, opt):
                         tool = re.match('postprocess:(\w+)',opt.last_operation).groups()[0]
                         add_postprocessing_to_metadata(
                             opt,
-                            opt.prompt,
+                            opt.input_file_path,
                             filename,
                             tool,
                             formatted_dream_prompt,
@@ -482,6 +490,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         command = '-h'
     return command, operation
 
+
 def add_weights_to_config(model_path:str, gen, opt, completer):
     print(f'>> Model import in process. Please enter the values needed to configure this model:')
     print()
@@ -578,7 +587,7 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
 
     try:
         print('>> Verifying that new model loads...')
-        yaml_str = gen.model_cache.add_model(model_name, new_config, clobber)
+        gen.model_cache.add_model(model_name, new_config, clobber)
         assert gen.set_model(model_name) is not None, 'model failed to load'
     except AssertionError as e:
         print(f'** aborting **')
@@ -614,10 +623,16 @@ def do_textmask(gen, opt, callback):
     )
 
 def do_postprocess (gen, opt, callback):
-    file_path = opt.prompt     # treat the prompt as the file pathname
+    file_path = opt.prompt      # treat the prompt as the file pathname
+    if opt.new_prompt is not None:
+        opt.prompt = opt.new_prompt
+    else:
+        opt.prompt = None
+        
     if os.path.dirname(file_path) == '': #basename given
         file_path = os.path.join(opt.outdir,file_path)
 
+    opt.input_file_path = file_path
     tool=None
     if opt.facetool_strength > 0:
         tool = opt.facetool
@@ -656,7 +671,10 @@ def do_postprocess (gen, opt, callback):
 def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
     original_file = original_file if os.path.exists(original_file) else os.path.join(opt.outdir,original_file)
     new_file       = new_file     if os.path.exists(new_file)      else os.path.join(opt.outdir,new_file)
-    meta = retrieve_metadata(original_file)['sd-metadata']
+    try:
+        meta = retrieve_metadata(original_file)['sd-metadata']
+    except AttributeError:
+        meta = retrieve_metadata(new_file)['sd-metadata']
     if 'image' not in meta:
         meta = metadata_dumps(opt,seeds=[opt.seed])['image']
         meta['image'] = {}
@@ -704,7 +722,7 @@ def prepare_image_metadata(
     elif len(prior_variations) > 0:
         formatted_dream_prompt = opt.dream_prompt_str(seed=first_seed)
     elif operation == 'postprocess':
-        formatted_dream_prompt = '!fix '+opt.dream_prompt_str(seed=seed)
+        formatted_dream_prompt = '!fix '+opt.dream_prompt_str(seed=seed,prompt=opt.input_file_path)
     else:
         formatted_dream_prompt = opt.dream_prompt_str(seed=seed)
     return filename,formatted_dream_prompt
@@ -878,6 +896,36 @@ def write_commands(opt, file_path:str, outfilepath:str):
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
 
+def emergency_model_create(opt:Args):
+    completer   = get_completer(opt)
+    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
+    completer.set_default_dir('.')
+    valid_path = False
+    while not valid_path:
+        weights_file = input('Enter the path to a downloaded models file, or ^C to exit: ')
+        valid_path = os.path.exists(weights_file)
+    dir,basename = os.path.split(weights_file)
+
+    valid_name = False
+    while not valid_name:
+        name = input('Enter a short name for this model (no spaces): ')
+        name = 'unnamed model' if len(name)==0 else name
+        valid_name = ' ' not in name
+
+    description = input('Enter a description for this model: ')
+    description = 'no description' if len(description)==0 else description
+
+    with open(opt.conf, 'w', encoding='utf-8') as f:
+        f.write(f'{name}:\n')
+        f.write(f'  description: {description}\n')
+        f.write(f'  weights: {weights_file}\n')
+        f.write(f'  config: ./configs/stable-diffusion/v1-inference.yaml\n')
+        f.write(f'  width: 512\n')
+        f.write(f'  height: 512\n')
+        f.write(f'  default: true\n')
+    print(f'Config file {opt.conf} is created. This script will now exit.')
+    print(f'After restarting you may examine the entry with !models and edit it with !edit.')
+    
 ######################################
 
 if __name__ == '__main__':

@@ -17,6 +17,7 @@ from omegaconf import OmegaConf
 from huggingface_hub import HfFolder, hf_hub_url
 from pathlib import Path
 from getpass_asterisk import getpass_asterisk
+from transformers import CLIPTokenizer, CLIPTextModel
 import traceback
 import requests
 import clip
@@ -29,10 +30,6 @@ warnings.filterwarnings('ignore')
 #warnings.simplefilter('ignore')
 #warnings.filterwarnings('ignore',category=DeprecationWarning)
 #warnings.filterwarnings('ignore',category=UserWarning)
-
-# deferred loading so that help message can be printed quickly
-def load_libs():
-    pass
 
 #--------------------------globals--
 Model_dir = './models/ldm/stable-diffusion-v1/'
@@ -107,12 +104,14 @@ def postscript():
     print(
         '''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
 Web version: 
-
     python scripts/invoke.py --web  (connect to http://localhost:9090)
-
 Command-line version:
-
    python scripts/invoke.py
+
+Remember to activate that 'invokeai' environment before running invoke.py.
+
+Or, if you used one of the automated installers, execute "invoke.sh" (Linux/Mac) 
+or "invoke.bat" (Windows) to start the script.
 
 Have fun!
 '''
@@ -347,7 +346,7 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
 
     try:
         if os.path.exists(Config_file):
-            print(f'* {Config_file} exists. Renaming to {Config_file}.orig')
+            print(f'** {Config_file} exists. Renaming to {Config_file}.orig')
             os.rename(Config_file,f'{Config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(Config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
@@ -418,10 +417,7 @@ def download_kornia():
 
 #---------------------------------------------
 def download_clip():
-    print('Loading CLIP model...',end='')
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=DeprecationWarning)
-        from transformers import CLIPTokenizer, CLIPTextModel
+    print('Loading CLIP model (ignore deprecation errors)...',end='')
     sys.stdout.flush()
     version = 'openai/clip-vit-large-patch14'
     tokenizer = CLIPTokenizer.from_pretrained(version)
@@ -430,7 +426,7 @@ def download_clip():
 
 #---------------------------------------------
 def download_gfpgan():
-    print('Installing models from RealESRGAN and facexlib...',end='')
+    print('Installing models from RealESRGAN and facexlib  (ignore deprecation errors)...',end='')
     try:
         from realesrgan import RealESRGANer
         from realesrgan.archs.srvgg_arch import SRVGGNetCompact
@@ -448,19 +444,19 @@ def download_gfpgan():
         print('Error loading ESRGAN:')
         print(traceback.format_exc())
 
-    print('Loading models from GFPGAN')
+    print('Loading models from GFPGAN...',end='')
     for model in (
             [
                 'https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth',
-                'src/gfpgan/experiments/pretrained_models/GFPGANv1.4.pth'
+                'models/gfpgan/GFPGANv1.4.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth',
-                './gfpgan/weights/detection_Resnet50_Final.pth'
+                'models/gfpgan/weights/detection_Resnet50_Final.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth',
-                './gfpgan/weights/parsing_parsenet.pth'
+                'models/gfpgan/weights/parsing_parsenet.pth'
             ],
     ):
         model_url,model_dest  = model
@@ -495,22 +491,23 @@ def download_clipseg():
     import zipfile
     try:
         model_url  = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
-        model_dest = 'src/clipseg/clipseg_weights.zip'
-        weights_dir = 'src/clipseg/weights'
-        if not os.path.exists(weights_dir):
+        model_dest = 'models/clipseg/clipseg_weights'
+        weights_zip = 'models/clipseg/weights.zip'
+        
+        if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-        if not os.path.exists('src/clipseg/weights/rd64-uni-refined.pth'):
-            request.urlretrieve(model_url,model_dest)
-            with zipfile.ZipFile(model_dest,'r') as zip:
-                zip.extractall('src/clipseg')
-                os.rename('src/clipseg/clipseg_weights','src/clipseg/weights')
-            os.remove(model_dest)
-            from clipseg_models.clipseg import CLIPDensePredT
+        if not os.path.exists(f'{model_dest}/rd64-uni-refined.pth'):
+            request.urlretrieve(model_url,weights_zip)
+            with zipfile.ZipFile(weights_zip,'r') as zip:
+                zip.extractall('models/clipseg')
+            os.remove(weights_zip)
+
+            from clipseg.clipseg import CLIPDensePredT
             model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
             model.eval()
             model.load_state_dict(
                 torch.load(
-                    'src/clipseg/weights/rd64-uni-refined.pth',
+                    'models/clipseg/clipseg_weights/rd64-uni-refined.pth',
                     map_location=torch.device('cpu')
                     ),
                 strict=False,
@@ -550,7 +547,6 @@ if __name__ == '__main__':
                         default='./configs/models.yaml',
                         help='path to configuration file to create')
     opt = parser.parse_args()
-    load_libs()
     
     try:
         if opt.interactive:
@@ -562,16 +558,11 @@ if __name__ == '__main__':
                 if models is None:
                     if yes_or_no('Quit?',default_yes=False):
                         sys.exit(0)
-
-                done = False
-                while not done:
-                    print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
-                    access_token = authenticate()
-                    print('\n** DOWNLOADING WEIGHTS **')
-                    successfully_downloaded = download_weight_datasets(models, access_token)
-                    done = successfully_downloaded is not None
+                print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+                access_token = authenticate()
+                print('\n** DOWNLOADING WEIGHTS **')
+                successfully_downloaded = download_weight_datasets(models, access_token)
                 update_config_file(successfully_downloaded,opt)
-
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
         download_kornia()

@@ -6,14 +6,22 @@ on:
     branches:
       - 'main'
       - 'development'
-  pull_request:
-    branches:
-      - 'main'
-      - 'development'
 
 jobs:
   docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - aarch64
+        include:
+          - arch: x86_64
+            conda-env-file: environment-lin-cuda.yml
+          - arch: aarch64
+            conda-env-file: environment-lin-aarch64.yml
     runs-on: ubuntu-latest
+    name: ${{ matrix.arch }}
     steps:
       - name: prepare docker-tag
         env:
@@ -25,18 +33,16 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: buildx-${{ hashFiles('docker-build/Dockerfile') }}
       - name: Build container
         uses: docker/build-push-action@v3
         with:
           context: .
           file: docker-build/Dockerfile
-          platforms: linux/amd64
+          platforms: Linux/${{ matrix.arch }}
           push: false
-          tags: ${{ env.dockertag }}:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+          tags: ${{ env.dockertag }}:${{ matrix.arch }}
+          build-args: |
+            conda_env_file=${{ matrix.conda-env-file }}
+            conda_version=py39_4.12.0-Linux-${{ matrix.arch }}
+            invokeai_git=${{ github.repository }}
+            invokeai_branch=${{ github.ref_name }}

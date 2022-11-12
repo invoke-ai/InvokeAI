@@ -87,6 +87,7 @@ import json
 import hashlib
 import os
 import re
+import sys
 import shlex
 import copy
 import base64
@@ -114,7 +115,8 @@ PRECISION_CHOICES = [
 
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
-APP_VERSION = 'v2.02'
+APP_VERSION = 'v2.1.2'
+INITFILE = os.path.expanduser('~/.invokeai')
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -141,11 +143,15 @@ class ArgFormatter(argparse.RawTextHelpFormatter):
 class PagingArgumentParser(argparse.ArgumentParser):
     '''
     A custom ArgumentParser that uses pydoc to page its output.
+    It also supports reading defaults from an init file.
     '''
     def print_help(self, file=None):
         text = self.format_help()
         pydoc.pager(text)
-    
+
+    def convert_arg_line_to_args(self, arg_line):
+        return shlex.split(arg_line,comments=True)
+
 class Args(object):
     def __init__(self,arg_parser=None,cmd_parser=None):
         '''
@@ -162,9 +168,16 @@ class Args(object):
     def parse_args(self):
         '''Parse the shell switches and store.'''
         try:
-            self._arg_switches = self._arg_parser.parse_args()
+            sysargs = sys.argv[1:]
+            if os.path.exists(INITFILE):
+                print(f'>> Initialization file {INITFILE} found. Loading...')
+                sysargs.insert(0,f'@{INITFILE}')
+            else:
+                print(f'>> Initialization file {INITFILE} not found. Applying default settings...')
+            self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
-        except:
+        except Exception as e:
+            print(f'An exception has occurred: {e}')
             return None
 
     def parse_cmd(self,cmd_string):
@@ -355,7 +368,7 @@ class Args(object):
         This defines all the arguments used on the command line when you launch
         the CLI or web backend.
         '''
-        parser = argparse.ArgumentParser(
+        parser = PagingArgumentParser(
             description=
             """
             Generate images using Stable Diffusion.
@@ -365,6 +378,7 @@ class Args(object):
             Other command-line arguments are defaults that can usually be overridden
             prompt the command prompt.
             """,
+            fromfile_prefix_chars='@',
         )
         model_group      = parser.add_argument_group('Model selection')
         file_group       = parser.add_argument_group('Input/output')
@@ -394,17 +408,6 @@ class Args(object):
             choices=range(0,9),
             dest='png_compression',
             help='level of PNG compression, from 0 (none) to 9 (maximum). Default is 6.'
-        )
-        model_group.add_argument(
-            '--sampler',
-            '-A',
-            '-m',
-            dest='sampler_name',
-            type=str,
-            choices=SAMPLER_CHOICES,
-            metavar='SAMPLER_NAME',
-            help=f'Switch to a different sampler. Supported samplers: {", ".join(SAMPLER_CHOICES)}',
-            default='k_lms',
         )
         model_group.add_argument(
             '-F',
@@ -466,9 +469,60 @@ class Args(object):
             help='Overwrite the filename format. You can use any argument as wildcard enclosed in curly braces. Default is {prefix}.{seed}.png',
         )
         render_group.add_argument(
+            '-s',
+            '--steps',
+            type=int,
+            default=50,
+            help='Number of steps'
+        )
+        render_group.add_argument(
+            '-W',
+            '--width',
+            type=int,
+            help='Image width, multiple of 64',
+        )
+        render_group.add_argument(
+            '-H',
+            '--height',
+            type=int,
+            help='Image height, multiple of 64',
+        )
+        render_group.add_argument(
+            '-C',
+            '--cfg_scale',
+            default=7.5,
+            type=float,
+            help='Classifier free guidance (CFG) scale - higher numbers cause generator to "try" harder.',
+        )
+        render_group.add_argument(
+            '--sampler',
+            '-A',
+            '-m',
+            dest='sampler_name',
+            type=str,
+            choices=SAMPLER_CHOICES,
+            metavar='SAMPLER_NAME',
+            help=f'Set the default sampler. Supported samplers: {", ".join(SAMPLER_CHOICES)}',
+            default='k_lms',
+        )
+        render_group.add_argument(
+            '-f',
+            '--strength',
+            type=float,
+            help='img2img strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely',
+        )
+        render_group.add_argument(
+            '-T',
+            '-fit',
+            '--fit',
+            action=argparse.BooleanOptionalAction,
+            help='If specified, will resize the input image to fit within the dimensions of width x height (512x512 default)',
+        )
+
+        render_group.add_argument(
             '--grid',
             '-g',
-            action='store_true',
+            action=argparse.BooleanOptionalAction,
             help='generate a grid'
         )
         render_group.add_argument(
@@ -498,13 +552,13 @@ class Args(object):
         postprocessing_group.add_argument(
             '--gfpgan_model_path',
             type=str,
-            default='experiments/pretrained_models/GFPGANv1.4.pth',
+            default='./GFPGANv1.4.pth',
             help='Indicates the path to the GFPGAN model, relative to --gfpgan_dir.',
         )
         postprocessing_group.add_argument(
             '--gfpgan_dir',
             type=str,
-            default='./src/gfpgan',
+            default='./models/gfpgan',
             help='Indicates the directory containing the GFPGAN code.',
         )
         web_server_group.add_argument(
@@ -597,7 +651,6 @@ class Args(object):
             '-s',
             '--steps',
             type=int,
-            default=50,
             help='Number of steps'
         )
         render_group.add_argument(
@@ -629,7 +682,6 @@ class Args(object):
         render_group.add_argument(
             '-C',
             '--cfg_scale',
-            default=7.5,
             type=float,
             help='Classifier free guidance (CFG) scale - higher numbers cause generator to "try" harder.',
         )
@@ -654,7 +706,7 @@ class Args(object):
         render_group.add_argument(
             '--grid',
             '-g',
-            action='store_true',
+            action=argparse.BooleanOptionalAction,
             help='generate a grid'
         )
         render_group.add_argument(
@@ -748,8 +800,7 @@ class Args(object):
             '-f',
             '--strength',
             type=float,
-            help='Strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely',
-            default=0.75,
+            help='img2img strength for noising/unnoising. 0.0 preserves image exactly, 1.0 replaces it completely',
         )
         inpainting_group.add_argument(
             '-M',
@@ -812,6 +863,11 @@ class Args(object):
             type=int,
             default=32,
             help='When outpainting, the tile size to use for filling outpaint areas',
+        )
+        postprocessing_group.add_argument(
+            '--new_prompt',
+            type=str,
+            help='Change the text prompt applied during postprocessing (default, use original generation prompt)',
         )
         postprocessing_group.add_argument(
             '-ft',
