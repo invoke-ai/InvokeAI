@@ -11,6 +11,7 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { currentCanvasSelector } from '../canvasSlice';
 import { useRef } from 'react';
+import { stageRef } from '../IAICanvas';
 
 const inpaintingCanvasHotkeysSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector],
@@ -52,7 +53,7 @@ const useInpaintingCanvasHotkeys = () => {
       dispatch(toggleShouldLockBoundingBox());
     },
     {
-      enabled: true,
+      scopes: ['inpainting', 'outpainting'],
     },
     [activeTabName]
   );
@@ -64,7 +65,7 @@ const useInpaintingCanvasHotkeys = () => {
       dispatch(setShouldShowBoundingBox(!shouldShowBoundingBox));
     },
     {
-      enabled: true,
+      scopes: ['inpainting', 'outpainting'],
     },
     [activeTabName, shouldShowBoundingBox]
   );
@@ -74,19 +75,12 @@ const useInpaintingCanvasHotkeys = () => {
     (e: KeyboardEvent) => {
       if (e.repeat) return;
 
+      stageRef.current?.container().focus();
+
       if (tool !== 'move') {
         previousToolRef.current = tool;
         dispatch(setTool('move'));
       }
-    },
-    { keyup: false, keydown: true },
-    [tool, previousToolRef]
-  );
-
-  useHotkeys(
-    ['space'],
-    (e: KeyboardEvent) => {
-      if (e.repeat) return;
 
       if (
         tool === 'move' &&
@@ -97,7 +91,11 @@ const useInpaintingCanvasHotkeys = () => {
         previousToolRef.current = 'move';
       }
     },
-    { keyup: true, keydown: false },
+    {
+      keyup: true,
+      keydown: true,
+      scopes: ['inpainting', 'outpainting'],
+    },
     [tool, previousToolRef]
   );
 };

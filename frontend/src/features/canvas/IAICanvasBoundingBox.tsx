@@ -58,6 +58,7 @@ const boundingBoxPreviewSelector = createSelector(
       tool,
       stageCoordinates,
       boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
+      hitStrokeWidth: 20 / stageScale,
     };
   },
   {
@@ -89,6 +90,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     shouldSnapToGrid,
     tool,
     boundingBoxStrokeWidth,
+    hitStrokeWidth,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -336,7 +338,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         }
         listening={!isDrawing && tool === 'move'}
         draggable={true}
-        fillEnabled={tool === 'move'}
+        fillEnabled={false}
         height={boundingBoxDimensions.height}
         onDragEnd={handleEndedModifying}
         onDragMove={handleOnDragMove}
@@ -352,6 +354,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
+        hitStrokeWidth={hitStrokeWidth}
       />
       <Transformer
         anchorCornerRadius={3}

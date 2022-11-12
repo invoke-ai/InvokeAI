@@ -32,6 +32,7 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   return useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       if (!stageRef.current) return;
+      stageRef.current.container().focus();
 
       if (tool === 'move') {
         dispatch(setIsMovingStage(true));

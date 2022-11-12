@@ -141,8 +141,12 @@ const IAICanvas = () => {
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
         <Stage
+          tabIndex={-1}
           ref={stageRef}
-          style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
+          style={{
+            outline: 'none',
+            ...(stageCursor ? { cursor: stageCursor } : {}),
+          }}
           className="inpainting-canvas-stage checkerboard"
           x={stageCoordinates.x}
           y={stageCoordinates.y}
@@ -180,26 +184,6 @@ const IAICanvas = () => {
           <Layer id={'mask'} visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
-
-            {/* {canvasBgImage && (
-              <>
-                <KonvaImage
-                  image={canvasBgImage}
-                  listening={false}
-                  globalCompositeOperation="source-in"
-                  visible={shouldPreserveMaskedArea}
-                />
-
-                <KonvaImage
-                  image={canvasBgImage}
-                  listening={false}
-                  globalCompositeOperation="source-out"
-                  visible={
-                    !shouldPreserveMaskedArea && shouldShowCheckboardTransparency
-                  }
-                />
-              </>
-            )} */}
           </Layer>
           <Layer id={'tool'}>
             <IAICanvasBoundingBox visible={shouldShowBoundingBox} />
