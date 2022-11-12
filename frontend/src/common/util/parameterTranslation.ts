@@ -138,9 +138,7 @@ export const frontendToBackendParameters = (
     generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
 
-    if (shouldPreserveMaskedArea) {
-      generationParameters.invert_mask = true;
-    }
+    generationParameters.invert_mask = shouldPreserveMaskedArea;
 
     if (shouldUseInpaintReplace) {
       generationParameters.inpaint_replace = inpaintReplace;
