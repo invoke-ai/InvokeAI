@@ -48,24 +48,22 @@ const useInpaintingCanvasHotkeys = () => {
   //  Toggle lock bounding box
   useHotkeys(
     'shift+w',
-    (e: KeyboardEvent) => {
-      e.preventDefault();
+    () => {
       dispatch(toggleShouldLockBoundingBox());
     },
     {
-      scopes: ['inpainting', 'outpainting'],
+      preventDefault: true,
     },
     [activeTabName]
   );
 
   useHotkeys(
     'shift+h',
-    (e: KeyboardEvent) => {
-      e.preventDefault();
+    () => {
       dispatch(setShouldShowBoundingBox(!shouldShowBoundingBox));
     },
     {
-      scopes: ['inpainting', 'outpainting'],
+      preventDefault: true,
     },
     [activeTabName, shouldShowBoundingBox]
   );
@@ -94,7 +92,7 @@ const useInpaintingCanvasHotkeys = () => {
     {
       keyup: true,
       keydown: true,
-      scopes: ['inpainting', 'outpainting'],
+      preventDefault: true,
     },
     [tool, previousToolRef]
   );
