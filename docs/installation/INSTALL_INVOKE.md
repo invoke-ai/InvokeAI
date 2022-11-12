@@ -12,6 +12,15 @@ potentially unstable new features, you should consider using the
 [source installer](INSTALL_SOURCE.md) or one of the
 [manual install](INSTALL_MANUAL.md) methods.
 
+**Important Caveats**
+  - This script does not support AMD GPUs. For Linux AMD support,
+    please use the manual or source code installer methods.
+
+  - This script has difficulty on some Macintosh machines
+    that have previously been used for Python development due to
+    conflicting development tools versions. Mac developers may wish
+    to try the source code installer or one of the manual methods instead.
+
 !!! todo
 
     Before you begin, make sure that you meet

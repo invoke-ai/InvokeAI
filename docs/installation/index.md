@@ -16,10 +16,13 @@ experience and preferences.
     work", don't have an interest in tinkering with it, and do not
     care about upgrading to unreleased experimental features.
 
-    *Note that this script has difficulty on some Macintosh machines
+    **Important Caveats**
+    - This script does not support AMD GPUs. For Linux AMD support,
+    please use the manual or source code installer methods.
+    - This script has difficulty on some Macintosh machines
     that have previously been used for Python development due to
     conflicting development tools versions. Mac developers may wish
-    to try method (2) or one of the manual methods instead.
+    to try the source code installer or one of the manual methods instead.
 
 2. [Source code installer](INSTALL_SOURCE.md)
 
