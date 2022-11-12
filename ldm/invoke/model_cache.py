@@ -4,6 +4,7 @@ They are moved between GPU and CPU as necessary. If CPU memory falls
 below a preset minimum, the least recently used model will be
 cleared and loaded from disk when next needed.
 '''
+import warnings
 from pathlib import Path
 
 import torch
@@ -387,10 +388,13 @@ class ModelCache(object):
         
     def _model_to_cpu(self,model):
         if self.device != 'cpu':
-            model.cond_stage_model.device = 'cpu'
-            model.first_stage_model.to('cpu')
-            model.cond_stage_model.to('cpu') 
-            model.model.to('cpu')
+            try:
+                model.cond_stage_model.device = 'cpu'
+                model.first_stage_model.to('cpu')
+                model.cond_stage_model.to('cpu')
+                model.model.to('cpu')
+            except AttributeError as e:
+                warnings.warn(f"TODO: clean up legacy model-management: {e}")
             return model.to('cpu')
         else:
             return model

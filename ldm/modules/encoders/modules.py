@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -236,13 +237,15 @@ class SpatialRescaler(nn.Module):
 
 class FrozenCLIPEmbedder(AbstractEncoder):
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
+    tokenizer: CLIPTokenizer
+    transformer: CLIPTextModel
 
     def __init__(
         self,
-        version='openai/clip-vit-large-patch14',
-        max_length=77,
-        tokenizer=None,
-        transformer=None,
+        version:str='openai/clip-vit-large-patch14',
+        max_length:int=77,
+        tokenizer:Optional[CLIPTokenizer]=None,
+        transformer:Optional[CLIPTextModel]=None,
     ):
         super().__init__()
         self.tokenizer = tokenizer or CLIPTokenizer.from_pretrained(
@@ -459,6 +462,10 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     @property
     def device(self):
         return self.transformer.device
+
+    @device.setter
+    def device(self, device):
+        self.transformer.to(device=device)
 
 class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
