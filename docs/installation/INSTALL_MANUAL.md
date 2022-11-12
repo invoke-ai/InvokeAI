@@ -79,7 +79,7 @@ command-line completion.
     | :----------------------: | :----------------------------: |
     | environment-lin-amd.yml  |  Linux with an AMD (ROCm) GPU  |
     | environment-lin-cuda.yml | Linux with an NVIDIA CUDA GPU  |
-    |   environment-mac.yml    |           Macintosh            |
+    | environment-mac.yml    |   Macintosh            |
     | environment-win-cuda.yml | Windows with an NVIDA CUDA GPU |
 
     </figure>
@@ -108,10 +108,10 @@ command-line completion.
 
         === "Windows"
 
-            !!! todo " Since it requires admin privileges to create links, we will use the copy (cp) command to create your `environment.yml`"
+            !!! todo " Since it requires admin privileges to create links, we will use the copy command to create your `environment.yml`"
 
             ```cmd
-            cp environments-and-requirements\environment-win-cuda.yml environment.yml
+            copy environments-and-requirements\environment-win-cuda.yml environment.yml
             ```
 
             Afterwards verify that the file `environment.yml` has been created, either via the
@@ -121,6 +121,8 @@ command-line completion.
             dir
             ```
 
+    !!! warning "Do not try to run conda on directly on the subdirectory environments file. This won't work. Instead, copy or link it to the top-level directory as shown."    
+    
 6.  Create the conda environment:
 
     ```bash
@@ -287,17 +289,19 @@ steps:
 
         === "Windows"
 
-            !!! info "since admin privileges are required to make links, so we use the copy (`cp`) command instead"
+            !!! info "on Windows, admin privileges are required to make links, so we use the copy command instead"
 
             ```cmd
-            cp environments-and-requirements\requirements-lin-win-colab-cuda.txt requirements.txt
+            copy environments-and-requirements\requirements-lin-win-colab-cuda.txt requirements.txt
             ```
 
         !!! warning
 
-            Please do not link or copy `environments-and-requirements/requirements.txt`.
+            Please do not link or copy `environments-and-requirements/requirements-base.txt`.
             This is a base requirements file that does not have the platform-specific
-            libraries.
+            libraries. Also, be sure to link or copy the platform-specific file to
+	    a top-level file named `requirements.txt` as shown here. Running pip on
+	    a requirements file in a subdirectory will not work as expected.
 
     When this is done, confirm that a file named `requirements.txt` has been
     created in the InvokeAI root directory and that it points to the correct

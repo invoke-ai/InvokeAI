@@ -16,6 +16,11 @@ experience and preferences.
     work", don't have an interest in tinkering with it, and do not
     care about upgrading to unreleased experimental features.
 
+    *Note that this script has difficulty on some Macintosh machines
+    that have previously been used for Python development due to
+    conflicting development tools versions. Mac developers may wish
+    to try method (2) or one of the manual methods instead.
+
 2. [Source code installer](INSTALL_SOURCE.md)
 
     This is a script that will install InvokeAI and all its essential

@@ -569,7 +569,7 @@ class Generate:
         elif args.seed >= 0:
             seed = args.seed
         else:
-            seed   = random.randrange(0, np.iinfo(np.uint32).max)
+            seed = random.randrange(0, np.iinfo(np.uint32).max)
 
         if opt.prompt is not None:
             prompt = opt.prompt
