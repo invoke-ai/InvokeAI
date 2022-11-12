@@ -41,15 +41,22 @@ class ModelCache(object):
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
 
+    def valid_model(self, model_name:str)->bool:
+        '''
+        Given a model name, returns True if it is a valid
+        identifier.
+        '''
+        return model_name in self.config
+    
     def get_model(self, model_name:str):
         '''
         Given a model named identified in models.yaml, return
         the model object. If in RAM will load into GPU VRAM.
         If on disk, will load from there.
         '''
-        if model_name not in self.config:
+        if not self.valid_model(model_name):
             print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
-            return None
+            return self.current_model
 
         if self.current_model != model_name:
             if model_name not in self.models: # make room for a new one
@@ -102,10 +109,13 @@ class ModelCache(object):
         Set the default model. The change will not take
         effect until you call model_cache.commit()
         '''
+        print(f'DEBUG: before set_default_model()\n{OmegaConf.to_yaml(self.config)}')
         assert model_name in self.models,f"unknown model '{model_name}'"
-        for model in self.models:
-            self.models[model].pop('default',None)
-        self.models[model_name]['default'] = True
+        config = self.config
+        for model in config:
+            config[model].pop('default',None)
+        config[model_name]['default'] = True
+        print(f'DEBUG: after set_default_model():\n{OmegaConf.to_yaml(self.config)}')
 
     def list_models(self) -> dict:
         '''

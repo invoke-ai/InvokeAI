@@ -284,6 +284,7 @@ class Completer(object):
             switch,partial_path  = match.groups()
         partial_path = partial_path.lstrip()
 
+
         matches = list()
         path = os.path.expanduser(partial_path)
 
@@ -321,6 +322,7 @@ class Completer(object):
                 matches.append(
                     switch+os.path.join(os.path.dirname(full_path), node)
                 )
+
         return matches
 
 class DummyCompleter(Completer):
