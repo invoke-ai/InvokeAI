@@ -15,8 +15,6 @@ installed)/Jupyter/JupyterLab and start running the cells one-by-one.
 
 Note that you will need NVIDIA drivers, Python 3.10, and Git installed
 beforehand - simplified
-[step-by-step instructions](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
-are available in the wiki (you'll only need steps 1, 2, & 3 ).
 
 ## **Manual Install**
 
@@ -122,12 +120,6 @@ in the wiki
 command window (step 3),enter the InvokeAI directory (step 5, `cd
 \path\to\InvokeAI`), run `conda activate invokeai` (step 6b), and then
 launch the invoke script (step 9).
-
-!!! tip "Tildebyte has written an alternative"
-
-    ["Easy peasy Windows install"](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
-    which uses the Windows Powershell and pew. If you are having trouble with
-    Anaconda on Windows, give this a try (or try it first!)
 
 ---
 
