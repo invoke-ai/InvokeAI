@@ -92,7 +92,7 @@ if "%ERRORLEVEL%" NEQ "0" (
    exit /b
 )
 
-copy source_installer\install.bat install.bat
+copy source_installer\invoke.bat invoke.bat
 copy source_installer\update.bat update.bat
 
 call conda activate invokeai
