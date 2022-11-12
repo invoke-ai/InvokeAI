@@ -5,6 +5,7 @@ import PIL.Image
 import torch
 
 from .base import Generator
+from .diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 
 class Txt2Img(Generator):
@@ -23,7 +24,8 @@ class Txt2Img(Generator):
         self.perlin = perlin
         uc, c, extra_conditioning_info   = conditioning
 
-        pipeline = self.model
+        # noinspection PyTypeChecker
+        pipeline: StableDiffusionGeneratorPipeline = self.model
         pipeline.scheduler = sampler
 
         def make_image(x_T) -> PIL.Image.Image:
@@ -31,16 +33,14 @@ class Txt2Img(Generator):
             # if self.free_gpu_mem and self.model.model.device != self.model.device:
             #     self.model.model.to(self.model.device)
 
-            # FIXME: how the embeddings are combined should be internal to the pipeline
-            combined_text_embeddings = torch.cat([uc, c])
-
             pipeline_output = pipeline.image_from_embeddings(
                 latents=x_T,
                 num_inference_steps=steps,
-                text_embeddings=combined_text_embeddings,
+                text_embeddings=c,
+                unconditioned_embeddings=uc,
                 guidance_scale=cfg_scale,
                 callback=step_callback,
-                # TODO: extra_conditioning_info = extra_conditioning_info,
+                extra_conditioning_info=extra_conditioning_info,
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
             )
