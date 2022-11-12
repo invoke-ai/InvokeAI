@@ -723,9 +723,6 @@ class InvokeAIWebServer:
                     generation_parameters["init_mask"]
                 ).convert("L")
 
-                if generation_parameters.invert_mask:
-                    mask_image = ImageOps.invert(mask_image)
-
                 """
                 Apply the mask to the init image, creating a "mask" image with 
                 transparency where inpainting should occur. This is the kind of
