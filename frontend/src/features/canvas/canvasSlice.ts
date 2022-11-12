@@ -46,6 +46,7 @@ export interface GenericCanvasState {
   isMoveStageKeyHeld: boolean;
   intermediateImage?: InvokeAI.Image;
   shouldShowIntermediates: boolean;
+  maxHistory: number;
 }
 
 export type CanvasLayer = 'base' | 'mask';
@@ -163,6 +164,7 @@ const initialGenericCanvasState: GenericCanvasState = {
   isMoveStageKeyHeld: false,
   shouldShowIntermediates: true,
   isMovingStage: false,
+  maxHistory: 256,
 };
 
 const initialCanvasState: CanvasState = {
@@ -530,14 +532,21 @@ export const canvasSlice = createSlice({
       }>
     ) => {
       const { boundingBox, image } = action.payload;
+
       if (!boundingBox || !image) return;
 
       const { x, y } = boundingBox;
+      const currentCanvas = state.outpainting;
 
-      state.outpainting.pastObjects.push([...state.outpainting.objects]);
-      state.outpainting.futureObjects = [];
+      currentCanvas.pastObjects.push([...currentCanvas.objects]);
 
-      state.outpainting.objects.push({
+      if (currentCanvas.pastObjects.length > currentCanvas.maxHistory) {
+        currentCanvas.pastObjects.shift();
+      }
+
+      currentCanvas.futureObjects = [];
+
+      currentCanvas.objects.push({
         kind: 'image',
         layer: 'base',
         x,
@@ -560,6 +569,10 @@ export const canvasSlice = createSlice({
 
       currentCanvas.pastObjects.push(currentCanvas.objects);
 
+      if (currentCanvas.pastObjects.length > currentCanvas.maxHistory) {
+        currentCanvas.pastObjects.shift();
+      }
+
       currentCanvas.objects.push({
         kind: 'line',
         layer,
@@ -580,23 +593,37 @@ export const canvasSlice = createSlice({
       lastLine.points.push(...action.payload);
     },
     undo: (state) => {
-      if (state[state.currentCanvas].objects.length === 0) return;
+      const currentCanvas = state[state.currentCanvas];
+      if (currentCanvas.objects.length === 0) return;
 
-      const newObjects = state[state.currentCanvas].pastObjects.pop();
+      const newObjects = currentCanvas.pastObjects.pop();
+
       if (!newObjects) return;
-      state[state.currentCanvas].futureObjects.unshift(
-        state[state.currentCanvas].objects
-      );
-      state[state.currentCanvas].objects = newObjects;
+
+      currentCanvas.futureObjects.unshift(currentCanvas.objects);
+
+      if (currentCanvas.futureObjects.length > currentCanvas.maxHistory) {
+        currentCanvas.futureObjects.pop();
+      }
+
+      currentCanvas.objects = newObjects;
     },
     redo: (state) => {
-      if (state[state.currentCanvas].futureObjects.length === 0) return;
-      const newObjects = state[state.currentCanvas].futureObjects.shift();
+      const currentCanvas = state[state.currentCanvas];
+
+      if (currentCanvas.futureObjects.length === 0) return;
+
+      const newObjects = currentCanvas.futureObjects.shift();
+
       if (!newObjects) return;
-      state[state.currentCanvas].pastObjects.push(
-        state[state.currentCanvas].objects
-      );
-      state[state.currentCanvas].objects = newObjects;
+
+      currentCanvas.pastObjects.push(currentCanvas.objects);
+
+      if (currentCanvas.pastObjects.length > currentCanvas.maxHistory) {
+        currentCanvas.pastObjects.shift();
+      }
+
+      currentCanvas.objects = newObjects;
     },
     setShouldShowGrid: (state, action: PayloadAction<boolean>) => {
       state.outpainting.shouldShowGrid = action.payload;
