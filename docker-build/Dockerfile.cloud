@@ -1,0 +1,51 @@
+# Copyright (c) 2022 Eugene Brodsky (https://github.com/ebr)
+
+FROM nvidia/cuda:11.7.1-runtime-ubuntu22.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+# # no __pycache__ - unclear if there is a benefit
+# ENV PYTHONDONTWRITEBYTECODE=1
+# unbuffered output, ensures stdout and stderr are printed in the correct order
+ENV PYTHONUNBUFFERED=1
+
+RUN apt update && apt install -y \
+    git \
+    curl \
+    ncdu \
+    iotop \
+    bzip2 \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    && apt-get clean
+
+# Micromamba is a minimal conda implementation
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+
+WORKDIR /invokeai
+
+### Cache the dependencies first
+# Avoid re-downloading the dependencies when unrelated files change in context
+#
+# We could use relative paths in the environment file, but it's not currently set up that way.
+# So we copy it to the working directory to maintain compatibility with other installation methods
+COPY environments-and-requirements/environment-lin-cuda.yml environment.yml
+
+# Patch the env file to remove installation of local package
+RUN sed -i '/-e \./d' environment.yml
+RUN micromamba create -y -f environment.yml &&\
+    micromamba clean --all -f -y &&\
+    rm -rf ${MAMBA_ROOT_PREFIX}/pkgs
+
+### Copy the rest of the context and install local package
+COPY . .
+RUN micromamba -n invokeai run pip install -e .
+
+### Default model config
+RUN cp configs/models.yaml.example configs/models.yaml
+
+ENTRYPOINT ["bash"]
+
+EXPOSE 9090
+
+CMD [ "-c", "micromamba -r ${MAMBA_ROOT_PREFIX} -n invokeai run python scripts/invoke.py --web --host 0.0.0.0"]

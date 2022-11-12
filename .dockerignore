@@ -1,3 +1,25 @@
 *
-!environment*.yml
+
+!backend
+!frontend
+!scripts
+!server
+!static
+!LICENSE*
+!main.py
+!setup.py
 !docker-build
+!ldm
+
+# Guard against pulling in any models that might exist in the directory tree
+**/*.pt*
+
+# unignore configs, but only ignore the custom models.yaml, in case it exists
+!configs
+configs/models.yaml
+
+# unignore environment dirs/files, but ignore the environment.yml file or symlink in case it exists
+!environment*
+environment.yml
+
+**/__pycache__
