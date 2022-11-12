@@ -213,6 +213,13 @@ class StableDiffusionGeneratorPipeline(DiffusionPipeline):
             **extra_step_kwargs):
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
+
+        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
+            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info,
+                                                                 step_count=len(self.scheduler.timesteps))
+        else:
+            self.invokeai_diffuser.remove_cross_attention_control()
+
         # scale the initial noise by the standard deviation required by the scheduler
         latents *= self.scheduler.init_noise_sigma
         yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
