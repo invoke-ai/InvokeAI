@@ -155,6 +155,19 @@ will do our best to help.
 
 ---
 
+### Conda create env error
+
+If conda fails to create the virtual environment and you get errors related to lmdb, run brew config and check Clang. If Clang is missing, you will need to install llvm
+        ```bash
+        brew install llvm
+        ```
+
+If brew isn't able to install llvm, you need to install xcode command line tools
+
+        ```bash
+        xcode-select --install
+        ```
+
 ## Common problems
 
 After you followed all the instructions and try to run invoke.py, you might get
