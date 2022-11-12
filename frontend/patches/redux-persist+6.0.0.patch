@@ -1,8 +1,14 @@
 diff --git a/node_modules/redux-persist/es/createPersistoid.js b/node_modules/redux-persist/es/createPersistoid.js
-index 8b43b9a..316d975 100644
+index 8b43b9a..ffe8d3f 100644
 --- a/node_modules/redux-persist/es/createPersistoid.js
 +++ b/node_modules/redux-persist/es/createPersistoid.js
-@@ -6,6 +6,7 @@ export default function createPersistoid(config) {
+@@ -1,11 +1,13 @@
+ import { KEY_PREFIX, REHYDRATE } from './constants';
+ // @TODO remove once flow < 0.63 support is no longer required.
+ export default function createPersistoid(config) {
++  console.log(config)
+   // defaults
+   var blacklist = config.blacklist || null;
    var whitelist = config.whitelist || null;
    var transforms = config.transforms || [];
    var throttle = config.throttle || 0;
@@ -10,32 +16,62 @@ index 8b43b9a..316d975 100644
    var storageKey = "".concat(config.keyPrefix !== undefined ? config.keyPrefix : KEY_PREFIX).concat(config.key);
    var storage = config.storage;
    var serialize;
-@@ -28,7 +29,15 @@ export default function createPersistoid(config) {
+@@ -28,30 +30,37 @@ export default function createPersistoid(config) {
    var timeIterator = null;
    var writePromise = null;
  
 -  var update = function update(state) {
-+  function debounce(func, timeout){
-+    let timer;
-+    return (...args) => {
-+      clearTimeout(timer);
-+      timer = setTimeout(() => { func.apply(this, args); }, timeout);
-+    };
-+  }
-+
-+  var update = debounce(function update(state) {
-     // add any changed keys to the queue
-     Object.keys(state).forEach(function (key) {
-       if (!passWhitelistBlacklist(key)) return; // is keyspace ignored? noop
-@@ -52,7 +61,7 @@ export default function createPersistoid(config) {
-     }
+-    // add any changed keys to the queue
+-    Object.keys(state).forEach(function (key) {
+-      if (!passWhitelistBlacklist(key)) return; // is keyspace ignored? noop
++  // Timer for debounced `update()`
++  let timer = 0;
  
-     lastState = state;
--  };
-+  }, debounce);
+-      if (lastState[key] === state[key]) return; // value unchanged? noop
++  function update(state) {
++    // Debounce the update
++    clearTimeout(timer);
++    timer = setTimeout(() => {
++      // add any changed keys to the queue
++      Object.keys(state).forEach(function (key) {
++        if (!passWhitelistBlacklist(key)) return; // is keyspace ignored? noop
+ 
+-      if (keysToProcess.indexOf(key) !== -1) return; // is key already queued? noop
++        if (lastState[key] === state[key]) return; // value unchanged? noop
+ 
+-      keysToProcess.push(key); // add key to queue
+-    }); //if any key is missing in the new state which was present in the lastState,
+-    //add it for processing too
++        if (keysToProcess.indexOf(key) !== -1) return; // is key already queued? noop
+ 
+-    Object.keys(lastState).forEach(function (key) {
+-      if (state[key] === undefined && passWhitelistBlacklist(key) && keysToProcess.indexOf(key) === -1 && lastState[key] !== undefined) {
+-        keysToProcess.push(key);
+-      }
+-    }); // start the time iterator if not running (read: throttle)
++        keysToProcess.push(key); // add key to queue
++      }); //if any key is missing in the new state which was present in the lastState,
++      //add it for processing too
+ 
+-    if (timeIterator === null) {
+-      timeIterator = setInterval(processNextKey, throttle);
+-    }
++      Object.keys(lastState).forEach(function (key) {
++        if (state[key] === undefined && passWhitelistBlacklist(key) && keysToProcess.indexOf(key) === -1 && lastState[key] !== undefined) {
++          keysToProcess.push(key);
++        }
++      }); // start the time iterator if not running (read: throttle)
++
++      if (timeIterator === null) {
++        timeIterator = setInterval(processNextKey, throttle);
++      }
+ 
+-    lastState = state;
++      lastState = state;
++    }, debounce)
+   };
  
    function processNextKey() {
-     if (keysToProcess.length === 0) {
 diff --git a/node_modules/redux-persist/es/types.js.flow b/node_modules/redux-persist/es/types.js.flow
 index c50d3cd..39d8be2 100644
 --- a/node_modules/redux-persist/es/types.js.flow
