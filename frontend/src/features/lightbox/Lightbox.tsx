@@ -8,6 +8,7 @@ import {
   selectPrevImage,
 } from 'features/gallery/gallerySlice';
 import ImageGallery from 'features/gallery/ImageGallery';
+import ImageMetadataViewer from 'features/gallery/ImageMetaDataViewer/ImageMetadataViewer';
 import { setIsLightBoxOpen } from 'features/options/optionsSlice';
 import React, { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -103,10 +104,15 @@ export default function Lightbox() {
             </div>
           )}
           {viewerImageToDisplay && (
-            <ReactPanZoom
-              image={viewerImageToDisplay.url}
-              styleClass="lightbox-image"
-            />
+            <>
+              <ReactPanZoom
+                image={viewerImageToDisplay.url}
+                styleClass="lightbox-image"
+              />
+              {shouldShowImageDetails && (
+                <ImageMetadataViewer image={viewerImageToDisplay} />
+              )}
+            </>
           )}
         </div>
         <ImageGallery />
