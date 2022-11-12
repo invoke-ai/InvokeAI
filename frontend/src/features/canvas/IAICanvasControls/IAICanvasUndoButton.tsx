@@ -36,12 +36,12 @@ export default function IAICanvasUndoButton() {
 
   useHotkeys(
     ['meta+z', 'control+z'],
-    (e: KeyboardEvent) => {
-      e.preventDefault();
+    () => {
       handleUndo();
     },
     {
-      enabled: canUndo,
+      enabled: () => canUndo,
+      preventDefault: true,
     },
     [activeTabName, canUndo]
   );
