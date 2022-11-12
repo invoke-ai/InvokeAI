@@ -29,11 +29,11 @@ import { socketioMiddleware } from './socketio/middleware';
  */
 
 const genericCanvasBlacklist = [
-  'pastObjects',
-  'futureObjects',
-  'stageScale',
-  'stageDimensions',
-  'stageCoordinates',
+  // 'pastObjects',
+  // 'futureObjects',
+  // 'stageScale',
+  // 'stageDimensions',
+  // 'stageCoordinates',
   'cursorPosition',
 ];
 
@@ -86,8 +86,10 @@ const rootPersistConfig = getPersistConfig({
     ...systemBlacklist,
     ...galleryBlacklist,
   ],
-  throttle: 500,
+  debounce: 500,
 });
+
+// console.log(rootPersistConfig)
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
