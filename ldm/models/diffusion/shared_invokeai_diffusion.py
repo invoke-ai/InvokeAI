@@ -34,6 +34,7 @@ class InvokeAIDiffuserComponent:
         :param model: the unet model to pass through to cross attention control
         :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
         """
+        self.conditioning = None
         self.model = model
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
