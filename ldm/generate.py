@@ -805,6 +805,10 @@ class Generate:
 
         # the model cache does the loading and offloading
         cache = self.model_cache
+        if not cache.valid_model(model_name):
+            print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
+            return self.model
+        
         cache.print_vram_usage()
 
         # have to get rid of all references to model in order
@@ -1032,7 +1036,9 @@ class Generate:
                 return True
         return False
 
-    def _check_for_erasure(self, image):
+    def _check_for_erasure(self, image:Image.Image)->bool:
+        if image.mode not in ('RGBA','RGB'):
+            return False
         width, height = image.size
         pixdata = image.load()
         colored = 0

@@ -1,6 +1,6 @@
 from inspect import isfunction
 import math
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
 import torch.nn.functional as F
@@ -151,6 +151,17 @@ class SpatialSelfAttention(nn.Module):
 
         return x+h_
 
+def get_mem_free_total(device):
+    #only on cuda
+    if not torch.cuda.is_available():
+        return None
+    stats = torch.cuda.memory_stats(device)
+    mem_active = stats['active_bytes.all.current']
+    mem_reserved = stats['reserved_bytes.all.current']
+    mem_free_cuda, _ = torch.cuda.mem_get_info(device)
+    mem_free_torch = mem_reserved - mem_active
+    mem_free_total = mem_free_cuda + mem_free_torch
+    return mem_free_total
 
 
 class CrossAttention(nn.Module):
@@ -173,31 +184,43 @@ class CrossAttention(nn.Module):
 
         self.mem_total_gb = psutil.virtual_memory().total // (1 << 30)
 
+        self.cached_mem_free_total = None
         self.attention_slice_wrangler = None
+        self.slicing_strategy_getter = None
 
-    def set_attention_slice_wrangler(self, wrangler:Callable[[nn.Module, torch.Tensor, torch.Tensor, int, int, int], torch.Tensor]):
+    def set_attention_slice_wrangler(self, wrangler: Optional[Callable[[nn.Module, torch.Tensor, int, int, int], torch.Tensor]]):
         '''
         Set custom attention calculator to be called when attention is calculated
-        :param wrangler: Callback, with args (self, attention_scores, suggested_attention_slice, dim, offset, slice_size),
+        :param wrangler: Callback, with args (module, suggested_attention_slice, dim, offset, slice_size),
         which returns either the suggested_attention_slice or an adjusted equivalent.
-            self is the current CrossAttention module for which the callback is being invoked.
-            attention_scores are the scores for attention
-            suggested_attention_slice is a softmax(dim=-1) over attention_scores
-            dim is -1 if the call is non-sliced, or 0 or 1 for dimension-0 or dimension-1 slicing.
-                If dim is >= 0, offset and slice_size specify the slice start and length.
+            `module` is the current CrossAttention module for which the callback is being invoked.
+            `suggested_attention_slice` is the default-calculated attention slice
+            `dim` is -1 if the attenion map has not been sliced, or 0 or 1 for dimension-0 or dimension-1 slicing.
+                If `dim` is >= 0, `offset` and `slice_size` specify the slice start and length.
 
         Pass None to use the default attention calculation.
         :return:
         '''
         self.attention_slice_wrangler = wrangler
 
+    def set_slicing_strategy_getter(self, getter: Optional[Callable[[nn.Module], tuple[int,int]]]):
+        self.slicing_strategy_getter = getter
+
+    def cache_free_memory_count(self, device):
+        self.cached_mem_free_total = get_mem_free_total(device)
+        print("free cuda memory: ", self.cached_mem_free_total)
+
+    def clear_cached_free_memory_count(self):
+        self.cached_mem_free_total = None
+
     def einsum_lowest_level(self, q, k, v, dim, offset, slice_size):
         # calculate attention scores
         attention_scores = einsum('b i d, b j d -> b i j', q, k)
-        # calculate attenion slice by taking the best scores for each latent pixel
+        # calculate attention slice by taking the best scores for each latent pixel
         default_attention_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
-        if self.attention_slice_wrangler is not None:
-            attention_slice = self.attention_slice_wrangler(self, attention_scores, default_attention_slice, dim, offset, slice_size)
+        attention_slice_wrangler = self.attention_slice_wrangler
+        if attention_slice_wrangler is not None:
+            attention_slice = attention_slice_wrangler(self, default_attention_slice, dim, offset, slice_size)
         else:
             attention_slice = default_attention_slice
 
@@ -240,17 +263,26 @@ class CrossAttention(nn.Module):
         return self.einsum_op_slice_dim1(q, k, v, max(q.shape[1] // div, 1))
 
     def einsum_op_cuda(self, q, k, v):
-        stats = torch.cuda.memory_stats(q.device)
-        mem_active = stats['active_bytes.all.current']
-        mem_reserved = stats['reserved_bytes.all.current']
-        mem_free_cuda, _ = torch.cuda.mem_get_info(q.device)
-        mem_free_torch = mem_reserved - mem_active
-        mem_free_total = mem_free_cuda + mem_free_torch
+        # check if we already have a slicing strategy (this should only happen during cross-attention controlled generation)
+        slicing_strategy_getter = self.slicing_strategy_getter
+        if slicing_strategy_getter is not None:
+            (dim, slice_size) = slicing_strategy_getter(self)
+            if dim is not None:
+                # print("using saved slicing strategy with dim", dim, "slice size", slice_size)
+                if dim == 0:
+                    return self.einsum_op_slice_dim0(q, k, v, slice_size)
+                elif dim == 1:
+                    return self.einsum_op_slice_dim1(q, k, v, slice_size)
+
+        # fallback for when there is no saved strategy, or saved strategy does not slice
+        mem_free_total = self.cached_mem_free_total or get_mem_free_total(q.device)
         # Divide factor of safety as there's copying and fragmentation
         return self.einsum_op_tensor_mem(q, k, v, mem_free_total / 3.3 / (1 << 20))
 
+
     def get_attention_mem_efficient(self, q, k, v):
         if q.device.type == 'cuda':
+            #print("in get_attention_mem_efficient with q shape", q.shape, ", k shape", k.shape, ", free memory is", get_mem_free_total(q.device))
             return self.einsum_op_cuda(q, k, v)
 
         if q.device.type == 'mps':

@@ -247,8 +247,6 @@ class Args(object):
             switches.append('--seamless')
         if a['hires_fix']:
             switches.append('--hires_fix')
-            if a['strength'] and a['strength']>0:
-                switches.append(f'-f {a["strength"]}')
 
         # img2img generations have parameters relevant only to them and have special handling
         if a['init_img'] and len(a['init_img'])>0:
