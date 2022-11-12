@@ -72,7 +72,7 @@ if not exist ".git" (
     call git config --local init.defaultBranch main
     call git remote add origin %REPO_URL%
     call git fetch
-    call git checkout origin/release-candidate-2-1-3 -ft
+    call git checkout origin/main -ft
 )
 
 @rem activate the base env

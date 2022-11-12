@@ -86,7 +86,7 @@ if [ ! -e ".git" ]; then
     git config --local init.defaultBranch main
     git remote add origin "$REPO_URL"
     git fetch
-    git checkout origin/release-candidate-2-1-3 -ft
+    git checkout origin/main -ft
 fi
 
 # create the environment
