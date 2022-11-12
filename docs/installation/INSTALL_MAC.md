@@ -158,6 +158,7 @@ will do our best to help.
 ### Conda create env error
 
 If conda fails to create the virtual environment and you get errors related to lmdb, run brew config and check Clang. If Clang is missing, you will need to install llvm
+
         ```bash
         brew install llvm
         ```
