@@ -46,8 +46,7 @@
 @use '../features/tabs/TextToImage/TextToImage.scss';
 @use '../features/tabs/ImageToImage/ImageToImage.scss';
 @use '../features/tabs/FloatingButton.scss';
-@use '../features/tabs/Inpainting/InpaintingWorkarea.scss';
-@use '../features/tabs/Outpainting/OutpaintingWorkarea.scss';
+@use '../features/tabs/CanvasWorkarea.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';

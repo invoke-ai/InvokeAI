@@ -33,6 +33,8 @@ import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasStatusText from './IAICanvasStatusText';
+import { Box, Button } from '@chakra-ui/react';
+import { rgbaColorToRgbString, rgbaColorToString } from './util/colorToString';
 
 const canvasSelector = createSelector(
   [
@@ -52,7 +54,11 @@ const canvasSelector = createSelector(
       stageDimensions,
       stageCoordinates,
       tool,
+      layer,
+      boundingBoxCoordinates,
+      boundingBoxDimensions,
       isMovingStage,
+      maskColor,
     } = currentCanvas;
 
     const { shouldShowGrid } = outpaintingCanvas;
@@ -85,6 +91,10 @@ const canvasSelector = createSelector(
       stageDimensions,
       stageScale,
       tool,
+      layer,
+      boundingBoxCoordinates,
+      boundingBoxDimensions,
+      maskColorString: rgbaColorToString({ ...maskColor, a: 0.5 }),
       outpaintingOnly: activeTabName === 'outpainting',
     };
   },
@@ -110,7 +120,11 @@ const IAICanvas = () => {
     stageDimensions,
     stageScale,
     tool,
+    layer,
     outpaintingOnly,
+    boundingBoxCoordinates,
+    boundingBoxDimensions,
+    maskColorString,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
@@ -137,6 +151,9 @@ const IAICanvas = () => {
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
 
+  const panelTop = boundingBoxCoordinates.y + boundingBoxDimensions.height;
+  const panelLeft = boundingBoxCoordinates.x + boundingBoxDimensions.width;
+
   return (
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
@@ -146,8 +163,14 @@ const IAICanvas = () => {
           style={{
             outline: 'none',
             ...(stageCursor ? { cursor: stageCursor } : {}),
+            border: `1px solid var(--border-color-light)`,
+            borderRadius: '0.5rem',
+            boxShadow: `inset 0 0 20px ${layer === 'mask' ? '1px' : '1px'} ${
+              layer === 'mask'
+                ? 'var(--accent-color)'
+                : 'var(--border-color-light)'
+            }`,
           }}
-          className="inpainting-canvas-stage checkerboard"
           x={stageCoordinates.x}
           y={stageCoordinates.y}
           width={stageDimensions.width}

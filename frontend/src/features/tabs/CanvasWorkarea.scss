@@ -1,4 +1,4 @@
-@use '../../../styles/Mixins/' as *;
+@use '../../styles/Mixins/' as *;
 
 .inpainting-main-area {
   display: flex;
@@ -30,7 +30,7 @@
     }
 
     .inpainting-color-picker {
-      margin-left: 1rem !important;
+      margin-left: 1rem;
     }
 
     .inpainting-brush-options {
@@ -69,7 +69,9 @@
     }
 
     .inpainting-canvas-stage {
-      border-radius: 0.5rem;
+      // border-radius: 0.5rem;
+      // border: 1px solid var(--border-color-light);
+
       canvas {
         border-radius: 0.5rem;
       }
