@@ -169,7 +169,7 @@ class Inpaint(Img2Img):
             # Fill missing areas of original image
             init_filled = self.tile_fill_missing(
                 self.pil_image.copy(),
-                seed = self.seed,
+                seed = self.seed if self.seed >= 0 else self.new_seed(),
                 tile_size = tile_size
             )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])

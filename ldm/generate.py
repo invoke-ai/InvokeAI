@@ -563,19 +563,12 @@ class Generate:
         seed   = None
         prompt = None
 
-        args   = metadata_from_png(image_path)
-        if opt.seed is not None:
-            seed = opt.seed
-        elif args.seed >= 0:
-            seed = args.seed
-        else:
+        args = metadata_from_png(image_path)
+        seed = opt.seed or args.seed
+        if seed is None or seed < 0:
             seed = random.randrange(0, np.iinfo(np.uint32).max)
-
-        if opt.prompt is not None:
-            prompt = opt.prompt
-        else:
-            prompt = args.prompt
-
+        
+        prompt = opt.prompt or args.prompt or ''
         print(f'>> using seed {seed} and prompt "{prompt}" for {image_path}')
 
         # try to reuse the same filename prefix as the original file.
@@ -627,7 +620,7 @@ class Generate:
             opt.seed = seed
             opt.prompt = prompt
             
-            if len(extend_instructions)>0:
+            if len(extend_instructions) > 0:
                 restorer = Outcrop(image,self,)
                 return restorer.process (
                     extend_instructions,

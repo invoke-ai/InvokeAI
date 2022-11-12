@@ -213,7 +213,10 @@ def main_loop(gen, opt):
                 setattr(opt,attr,path)
 
         # retrieve previous value of seed if requested
-        if opt.seed is not None and opt.seed < 0:   
+        # Exception: for postprocess operations negative seed values
+￼        # mean "discard the original seed and generate a new one"
+￼        # (this is a non-obvious hack and needs to be reworked)
+￼        if opt.seed is not None and opt.seed < 0 and operation != 'postprocess':
             try:
                 opt.seed = last_results[opt.seed][1]
                 print(f'>> Reusing previous seed {opt.seed}')

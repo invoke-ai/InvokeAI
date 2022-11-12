@@ -105,7 +105,7 @@ invoke> !fix images/vacation.png --outcrop top 128 --new_prompt "family vacation
 ```
 
 You may also provide a different seed for outcropping to use by passing
-`-S<seed>`. A seed of "0" will generate a new random seed.
+`-S<seed>`. A negative seed will generate a new random seed.
 
 A number of caveats:
 
