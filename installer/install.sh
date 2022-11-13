@@ -34,12 +34,15 @@ if [ "$OS_NAME" == "linux" ] && [ "$OS_ARCH" == "arm64" ]; then OS_ARCH="aarch64
 # config
 export MAMBA_ROOT_PREFIX="$(pwd)/installer_files/mamba"
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
-MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${OS_NAME}-${OS_ARCH}/latest"
-REPO_URL="https://github.com/invoke-ai/InvokeAI.git"
-umamba_exists="F"
-
-# figure out whether git and conda needs to be installed
-if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
+MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${MAMBA_OS_NAME}-${MAMBA_ARCH}/latest"
+RELEASE_URL=https://github.com/invoke-ai/InvokeAI
+RELEASE_SOURCEBALL=/archive/refs/heads/main.tar.gz
+PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
+if [ "$OS_NAME" == "darwin" ]; then
+    PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-${PY_ARCH}-apple-darwin-install_only.tar.gz
+elif [ "$OS_NAME" == "linux" ]; then
+    PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-${PY_ARCH}-unknown-linux-gnu-install_only.tar.gz
+fi
 
 PACKAGES_TO_INSTALL=""
 

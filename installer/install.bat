@@ -16,12 +16,10 @@ echo.
 set MAMBA_ROOT_PREFIX=%cd%\installer_files\mamba
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 set MICROMAMBA_DOWNLOAD_URL=https://github.com/cmdr2/stable-diffusion-ui/releases/download/v1.1/micromamba.exe
-set REPO_URL=https://github.com/invoke-ai/InvokeAI.git
-set umamba_exists=F
-@rem Change the download URL to an InvokeAI repo's release URL
-
-@rem figure out whether git and conda needs to be installed
-if exist "%INSTALL_ENV_DIR%" set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scripts;%INSTALL_ENV_DIR%\Library\usr\bin;%PATH%
+set RELEASE_URL=https://github.com/invoke-ai/InvokeAI
+set RELEASE_SOURCEBALL=/archive/refs/heads/main.tar.gz
+set PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
+set PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-x86_64-pc-windows-msvc-shared-install_only.tar.gz
 
 set PACKAGES_TO_INSTALL=
 
