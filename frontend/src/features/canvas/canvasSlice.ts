@@ -479,7 +479,11 @@ export const canvasSlice = createSlice({
       };
     },
     setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
-      state[state.currentCanvas].boundingBoxCoordinates = action.payload;
+      const { x, y } = action.payload;
+      state[state.currentCanvas].boundingBoxCoordinates = {
+        x: Math.floor(x),
+        y: Math.floor(y),
+      };
     },
     setStageCoordinates: (state, action: PayloadAction<Vector2d>) => {
       state[state.currentCanvas].stageCoordinates = action.payload;
@@ -553,18 +557,7 @@ export const canvasSlice = createSlice({
 
       if (!boundingBox || !image) return;
 
-      const { x, y } = boundingBox;
-      const { width, height } = image;
-
       const currentCanvas = state.outpainting;
-
-      // const {
-      //   x: stagingX,
-      //   y: stagingY,
-      //   width: stagingWidth,
-      //   height: stagingHeight,
-      //   images: stagedImages,
-      // } = currentCanvas.layerState.stagingArea;
 
       currentCanvas.pastLayerStates.push(_.cloneDeep(currentCanvas.layerState));
 
@@ -575,8 +568,8 @@ export const canvasSlice = createSlice({
       currentCanvas.layerState.stagingArea.images.push({
         kind: 'image',
         layer: 'base',
-        x,
-        y,
+        x: boundingBox.x,
+        y: boundingBox.y,
         image,
       });
 
@@ -584,115 +577,6 @@ export const canvasSlice = createSlice({
         currentCanvas.layerState.stagingArea.images.length - 1;
 
       currentCanvas.futureLayerStates = [];
-
-      // // If the new image is in the staging area region, push it to staging area
-      // if (
-      //   x === stagingX &&
-      //   y === stagingY &&
-      //   width === stagingWidth &&
-      //   height === stagingHeight
-      // ) {
-      //   console.log('pushing new image to staging area images');
-      //   currentCanvas.pastLayerStates.push(
-      //     _.cloneDeep(currentCanvas.layerState)
-      //   );
-
-      //   if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
-      //     currentCanvas.pastLayerStates.shift();
-      //   }
-
-      //   currentCanvas.layerState.stagingArea.images.push({
-      //     kind: 'image',
-      //     layer: 'base',
-      //     x,
-      //     y,
-      //     image,
-      //   });
-
-      //   currentCanvas.layerState.stagingArea.selectedImageIndex =
-      //     currentCanvas.layerState.stagingArea.images.length - 1;
-
-      //   currentCanvas.futureLayerStates = [];
-      // }
-      // // Else, if the staging area is empty, set it to this image
-      // else if (stagedImages.length === 0) {
-      //   console.log('setting staging area image to be this one image');
-      //   // add new image to staging area
-      //   currentCanvas.pastLayerStates.push(
-      //     _.cloneDeep(currentCanvas.layerState)
-      //   );
-
-      //   if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
-      //     currentCanvas.pastLayerStates.shift();
-      //   }
-
-      //   currentCanvas.layerState.stagingArea = {
-      //     images: [
-      //       {
-      //         kind: 'image',
-      //         layer: 'base',
-      //         x,
-      //         y,
-      //         image,
-      //       },
-      //     ],
-      //     x,
-      //     y,
-      //     width: image.width,
-      //     height: image.height,
-      //     selectedImageIndex: 0,
-      //   };
-
-      //   currentCanvas.futureLayerStates = [];
-      // } else {
-      //   // commit the current staging area image & set the new image as the only staging area image
-      //   currentCanvas.pastLayerStates.push(
-      //     _.cloneDeep(currentCanvas.layerState)
-      //   );
-
-      //   if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
-      //     currentCanvas.pastLayerStates.shift();
-      //   }
-
-      //   if (stagedImages.length === 1) {
-      //     // commit the current staging area image
-      //     console.log('committing current image');
-
-      //     const {
-      //       x: currentStagedX,
-      //       y: currentStagedY,
-      //       image: currentStagedImage,
-      //     } = stagedImages[0];
-
-      //     currentCanvas.layerState.objects.push({
-      //       kind: 'image',
-      //       layer: 'base',
-      //       x: currentStagedX,
-      //       y: currentStagedY,
-      //       image: currentStagedImage,
-      //     });
-      //   }
-
-      //   console.log('setting staging area to this singel new image');
-      //   currentCanvas.layerState.stagingArea = {
-      //     images: [
-      //       {
-      //         kind: 'image',
-      //         layer: 'base',
-      //         x,
-      //         y,
-      //         image,
-      //       },
-      //     ],
-      //     x,
-      //     y,
-      //     width: image.width,
-      //     height: image.height,
-      //     selectedImageIndex: 0,
-      //   };
-
-      //   currentCanvas.futureLayerStates = [];
-      // }
     },
     discardStagedImages: (state) => {
       const currentCanvas = state[state.currentCanvas];
