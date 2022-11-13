@@ -35,8 +35,8 @@ from PIL import Image, ImageOps
 from torchvision import transforms
 
 CLIP_VERSION = 'ViT-B/16'
-CLIPSEG_WEIGHTS = 'src/clipseg/weights/rd64-uni.pth'
-CLIPSEG_WEIGHTS_REFINED = 'src/clipseg/weights/rd64-uni-refined.pth'
+CLIPSEG_WEIGHTS = 'models/clipseg/clipseg_weights/rd64-uni.pth'
+CLIPSEG_WEIGHTS_REFINED = 'models/clipseg/clipseg_weights/rd64-uni-refined.pth'
 CLIPSEG_SIZE = 352
 
 class SegmentedGrayscale(object):

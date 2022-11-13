@@ -19,13 +19,13 @@ tree on a hill with a river, nature photograph, national geographic -I./test-pic
 This will take the original image shown here:
 
 <figure markdown>
-![](https://user-images.githubusercontent.com/50542132/193946000-c42a96d8-5a74-4f8a-b4c3-5213e6cadcce.png)
+![original-image](https://user-images.githubusercontent.com/50542132/193946000-c42a96d8-5a74-4f8a-b4c3-5213e6cadcce.png){ width=320 }
 </figure>
 
 and generate a new image based on it as shown here:
 
 <figure markdown>
-![](https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png)
+![generated-image](https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png){ width=320 }
 </figure>
 
 The `--init_img` (`-I`) option gives the path to the seed picture. `--strength`
@@ -45,15 +45,16 @@ Note that the prompt makes a big difference. For example, this slight variation
 on the prompt produces a very different image:
 
 <figure markdown>
-![](https://user-images.githubusercontent.com/111189/194135220-16b62181-b60c-4248-8989-4834a8fd7fbd.png)
+![](https://user-images.githubusercontent.com/111189/194135220-16b62181-b60c-4248-8989-4834a8fd7fbd.png){ width=320 }
 <caption markdown>photograph of a tree on a hill with a river</caption>
 </figure>
 
 !!! tip
 
-    When designing prompts, think about how the images scraped from the internet were captioned. Very few photographs will
-    be labeled "photograph" or "photorealistic." They will, however, be captioned with the publication, photographer, camera
-    model, or film settings.
+    When designing prompts, think about how the images scraped from the internet were
+    captioned. Very few photographs will be labeled "photograph" or "photorealistic."
+    They will, however, be captioned with the publication, photographer, camera model,
+    or film settings.
 
 If the initial image contains transparent regions, then Stable Diffusion will
 only draw within the transparent regions, a process called
@@ -61,17 +62,17 @@ only draw within the transparent regions, a process called
 However, for this to work correctly, the color information underneath the
 transparent needs to be preserved, not erased.
 
-!!! warning
+!!! warning "**IMPORTANT ISSUE** "
 
-**IMPORTANT ISSUE** `img2img` does not work properly on initial images smaller
-than 512x512. Please scale your image to at least 512x512 before using it.
-Larger images are not a problem, but may run out of VRAM on your GPU card. To
-fix this, use the --fit option, which downscales the initial image to fit within
-the box specified by width x height:
+    `img2img` does not work properly on initial images smaller
+    than 512x512. Please scale your image to at least 512x512 before using it.
+    Larger images are not a problem, but may run out of VRAM on your GPU card. To
+    fix this, use the --fit option, which downscales the initial image to fit within
+    the box specified by width x height:
 
-```
-tree on a hill with a river, national geographic -I./test-pictures/big-sketch.png -H512 -W512 --fit
-```
+    ```
+    tree on a hill with a river, national geographic -I./test-pictures/big-sketch.png -H512 -W512 --fit
+    ```
 
 ## How does it actually work, though?
 
@@ -87,7 +88,7 @@ from a prompt. If the step count is 10, then the "latent space" (Stable
 Diffusion's internal representation of the image) for the prompt "fire" with
 seed `1592514025` develops something like this:
 
-```commandline
+```bash
 invoke> "fire" -s10 -W384 -H384 -S1592514025
 ```
 
@@ -133,9 +134,9 @@ Notice how much more fuzzy the starting image is for strength `0.7` compared to
 
 |                             | strength = 0.7                                                | strength = 0.4                                                |
 | --------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
-| initial image that SD sees  | ![](../assets/img2img/000032.step-0.png)                      | ![](../assets/img2img/000030.step-0.png)                      |
+| initial image that SD sees  | ![step-0](../assets/img2img/000032.step-0.png)                | ![step-0](../assets/img2img/000030.step-0.png)                |
 | steps argument to `invoke>` | `-S10`                                                        | `-S10`                                                        |
-| steps actually taken        | 7                                                             | 4                                                             |
+| steps actually taken        | `7`                                                           | `4`                                                           |
 | latent space at each step   | ![gravity32](../assets/img2img/000032.steps.gravity.png)      | ![gravity30](../assets/img2img/000030.steps.gravity.png)      |
 | output                      | ![000032.1592514025](../assets/img2img/000032.1592514025.png) | ![000030.1592514025](../assets/img2img/000030.1592514025.png) |
 
@@ -150,7 +151,7 @@ If you want to try this out yourself, all of these are using a seed of
 `1592514025` with a width/height of `384`, step count `10`, the default sampler
 (`k_lms`), and the single-word prompt `"fire"`:
 
-```commandline
+```bash
 invoke> "fire" -s10 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png --strength 0.7
 ```
 
@@ -170,7 +171,7 @@ give each generation 20 steps.
 Here's strength `0.4` (note step count `50`, which is `20 ÷ 0.4` to make sure SD
 does `20` steps from my image):
 
-```commandline
+```bash
 invoke> "fire" -s50 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.4
 ```
 

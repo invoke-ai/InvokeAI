@@ -567,9 +567,8 @@ class Generate:
         seed = opt.seed or args.seed
         if seed is None or seed < 0:
             seed = random.randrange(0, np.iinfo(np.uint32).max)
-
+        
         prompt = opt.prompt or args.prompt or ''
-
         print(f'>> using seed {seed} and prompt "{prompt}" for {image_path}')
 
         # try to reuse the same filename prefix as the original file.

@@ -47,7 +47,6 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
         parsed_prompt = pp.parse_conjunction(prompt_string_cleaned).prompts[0]
 
     parsed_negative_prompt: FlattenedPrompt = pp.parse_conjunction(unconditioned_words).prompts[0]
-    print(f">> Parsed prompt to {parsed_prompt}")
 
     conditioning = None
     cac_args:CrossAttentionControl.Arguments = None
