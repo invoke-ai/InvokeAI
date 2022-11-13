@@ -151,11 +151,11 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   if (
     !(
       fillPatternImage &&
-      stageCoordinates.x &&
-      stageCoordinates.y &&
-      stageScale &&
-      stageDimensions.width &&
-      stageDimensions.height
+      stageCoordinates.x !== undefined &&
+      stageCoordinates.y !== undefined &&
+      stageScale !== undefined &&
+      stageDimensions.width !== undefined &&
+      stageDimensions.height !== undefined
     )
   )
     return null;
