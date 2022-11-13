@@ -19,7 +19,7 @@ set INSTALL_ENV_DIR=%cd%\installer_files\env
 @rem https://mamba.readthedocs.io/en/latest/installation.html
 set MICROMAMBA_DOWNLOAD_URL=https://github.com/cmdr2/stable-diffusion-ui/releases/download/v1.1/micromamba.exe
 set RELEASE_URL=https://github.com/invoke-ai/InvokeAI
-set RELEASE_SOURCEBALL=/archive/refs/heads/v2.1.3.tar.gz
+set RELEASE_SOURCEBALL=/archive/refs/heads/main.tar.gz
 set PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
 set PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-x86_64-pc-windows-msvc-shared-install_only.tar.gz
 
