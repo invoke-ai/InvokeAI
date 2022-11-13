@@ -4,7 +4,8 @@ from typing import Callable, Optional, Union
 
 import torch
 
-from ldm.models.diffusion.cross_attention_control import CrossAttentionControl
+from ldm.models.diffusion.cross_attention_control import Arguments, \
+    remove_cross_attention_control, setup_cross_attention_control, Context
 from ldm.modules.attention import get_mem_free_total
 
 
@@ -20,7 +21,7 @@ class InvokeAIDiffuserComponent:
 
 
     class ExtraConditioningInfo:
-        def __init__(self, cross_attention_control_args: Optional[CrossAttentionControl.Arguments]):
+        def __init__(self, cross_attention_control_args: Optional[Arguments]):
             self.cross_attention_control_args = cross_attention_control_args
 
         @property
@@ -40,16 +41,16 @@ class InvokeAIDiffuserComponent:
 
     def setup_cross_attention_control(self, conditioning: ExtraConditioningInfo, step_count: int):
         self.conditioning = conditioning
-        self.cross_attention_control_context = CrossAttentionControl.Context(
+        self.cross_attention_control_context = Context(
             arguments=self.conditioning.cross_attention_control_args,
             step_count=step_count
         )
-        CrossAttentionControl.setup_cross_attention_control(self.model, self.cross_attention_control_context)
+        setup_cross_attention_control(self.model, self.cross_attention_control_context)
 
     def remove_cross_attention_control(self):
         self.conditioning = None
         self.cross_attention_control_context = None
-        CrossAttentionControl.remove_cross_attention_control(self.model)
+        remove_cross_attention_control(self.model)
 
 
 
@@ -71,7 +72,7 @@ class InvokeAIDiffuserComponent:
 
 
         cross_attention_control_types_to_do = []
-        context: CrossAttentionControl.Context = self.cross_attention_control_context
+        context: Context = self.cross_attention_control_context
         if self.cross_attention_control_context is not None:
             percent_through = self.estimate_percent_through(step_index, sigma)
             cross_attention_control_types_to_do = context.get_active_cross_attention_control_types_for_step(percent_through)
@@ -133,7 +134,7 @@ class InvokeAIDiffuserComponent:
         # representing batched uncond + cond, but then when it comes to applying the saved attention, the
         # wrangler gets an attention tensor which only has shape[0]=8, representing just self.edited_conditionings.)
         # todo: give CrossAttentionControl's `wrangler` function more info so it can work with a batched call as well.
-        context:CrossAttentionControl.Context = self.cross_attention_control_context
+        context:Context = self.cross_attention_control_context
 
         try:
             unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning)
