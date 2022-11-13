@@ -2,6 +2,7 @@ import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   currentCanvasSelector,
+  isStagingSelector,
   resetCanvas,
   setTool,
   uploadOutpaintingMergedImage,
@@ -27,12 +28,13 @@ import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
 
 export const canvasControlsSelector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
+  [currentCanvasSelector, isStagingSelector],
+  (currentCanvas, isStaging) => {
     const { tool } = currentCanvas;
 
     return {
       tool,
+      isStaging,
     };
   },
   {
@@ -44,7 +46,7 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { tool } = useAppSelector(canvasControlsSelector);
+  const { tool, isStaging } = useAppSelector(canvasControlsSelector);
 
   return (
     <div className="inpainting-settings">
@@ -56,7 +58,7 @@ const IAICanvasOutpaintingControls = () => {
           aria-label="Move (M)"
           tooltip="Move (M)"
           icon={<FaArrowsAlt />}
-          data-selected={tool === 'move'}
+          data-selected={tool === 'move' || isStaging}
           onClick={() => dispatch(setTool('move'))}
         />
       </ButtonGroup>

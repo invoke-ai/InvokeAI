@@ -69,10 +69,13 @@
     }
 
     .inpainting-canvas-stage {
-      // border-radius: 0.5rem;
-      // border: 1px solid var(--border-color-light);
+      outline: none;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-color-light);
+      overflow: hidden;
 
       canvas {
+        outline: none;
         border-radius: 0.5rem;
       }
     }

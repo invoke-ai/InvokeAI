@@ -3420,7 +3420,15 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
-react-konva@^18.2.3:
+react-konva-utils@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/react-konva-utils/-/react-konva-utils-0.3.0.tgz#d9099ad1a767286b24fb1b08377af2dfa5c9f176"
+  integrity sha512-yH5FVpDGQ8gHeClyHY533M4oSLjEfYuvn+Z29zXm9osjhuulhtJrh5k+wtyY6QSC0MG0ioqE0cjiudGl1WGB9A==
+  dependencies:
+    react-konva "^18.0.0-0"
+    use-image "^1.0.12"
+
+react-konva@^18.0.0-0, react-konva@^18.2.3:
   version "18.2.3"
   resolved "https://registry.yarnpkg.com/react-konva/-/react-konva-18.2.3.tgz#75c658fca493bdf515b38f2a8d544fa7a9c754c4"
   integrity sha512-OPxjBTgaEGU9pt/VJSVM7QNXYHEZ5CkulX+4fTTvbaH+Wh+vMLbXmH3yjWw4kT/5Qi6t0UQKHPPmirCv8/9sdg==
@@ -3942,7 +3950,7 @@ use-callback-ref@^1.3.0:
   dependencies:
     tslib "^2.0.0"
 
-use-image@^1.1.0:
+use-image@^1.0.12, use-image@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/use-image/-/use-image-1.1.0.tgz#dc244c34506d3cf3a8177c1f0bbfb158b9beefe5"
   integrity sha512-+cBHRR/44ZyMUS873O0vbVylgMM0AbdTunEplAWXvIQ2p69h2sIo2Qq74zeUsq6AMo+27e5lERQvXzd1crGiMg==

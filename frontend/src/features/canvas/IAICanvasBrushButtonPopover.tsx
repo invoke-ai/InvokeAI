@@ -1,13 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
 import {
   currentCanvasSelector,
-  outpaintingCanvasSelector,
+  isStagingSelector,
   setBrushColor,
   setBrushSize,
   setTool,
 } from './canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaPaintBrush } from 'react-icons/fa';
@@ -17,35 +16,15 @@ import IAISlider from 'common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
 
 export const selector = createSelector(
-  [currentCanvasSelector, outpaintingCanvasSelector, activeTabNameSelector],
-  (currentCanvas, outpaintingCanvas, activeTabName) => {
-    const {
-      layer,
-      maskColor,
-      brushColor,
-      brushSize,
-      eraserSize,
-      tool,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowIntermediates,
-    } = currentCanvas;
-
-    const { shouldShowGrid, shouldSnapToGrid, shouldAutoSave } =
-      outpaintingCanvas;
+  [currentCanvasSelector, isStagingSelector],
+  (currentCanvas, isStaging) => {
+    const { brushColor, brushSize, tool } = currentCanvas;
 
     return {
-      layer,
       tool,
-      maskColor,
       brushColor,
       brushSize,
-      eraserSize,
-      activeTabName,
-      shouldShowGrid,
-      shouldSnapToGrid,
-      shouldAutoSave,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowIntermediates,
+      isStaging,
     };
   },
   {
@@ -57,7 +36,7 @@ export const selector = createSelector(
 
 const IAICanvasBrushButtonPopover = () => {
   const dispatch = useAppDispatch();
-  const { tool, brushColor, brushSize } = useAppSelector(selector);
+  const { tool, brushColor, brushSize, isStaging } = useAppSelector(selector);
 
   return (
     <IAIPopover
@@ -67,8 +46,9 @@ const IAICanvasBrushButtonPopover = () => {
           aria-label="Brush (B)"
           tooltip="Brush (B)"
           icon={<FaPaintBrush />}
-          data-selected={tool === 'brush'}
+          data-selected={tool === 'brush' && !isStaging}
           onClick={() => dispatch(setTool('brush'))}
+          isDisabled={isStaging}
         />
       }
     >

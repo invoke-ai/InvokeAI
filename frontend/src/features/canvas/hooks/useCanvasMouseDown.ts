@@ -8,18 +8,20 @@ import { MutableRefObject, useCallback } from 'react';
 import {
   addLine,
   currentCanvasSelector,
+  isStagingSelector,
   setIsDrawing,
   setIsMovingStage,
 } from '../canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector],
-  (activeTabName, currentCanvas) => {
+  [activeTabNameSelector, currentCanvasSelector, isStagingSelector],
+  (activeTabName, currentCanvas, isStaging) => {
     const { tool } = currentCanvas;
     return {
       tool,
       activeTabName,
+      isStaging,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -27,14 +29,15 @@ const selector = createSelector(
 
 const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
-  const { tool } = useAppSelector(selector);
+  const { tool, isStaging } = useAppSelector(selector);
 
   return useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       if (!stageRef.current) return;
+
       stageRef.current.container().focus();
 
-      if (tool === 'move') {
+      if (tool === 'move' || isStaging) {
         dispatch(setIsMovingStage(true));
         return;
       }
@@ -50,7 +53,7 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       // Add a new line starting from the current cursor position.
       dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));
     },
-    [stageRef, dispatch, tool]
+    [stageRef, tool, isStaging, dispatch]
   );
 };
 

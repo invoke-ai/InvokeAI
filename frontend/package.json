@@ -35,6 +35,7 @@
     "react-icons": "^4.4.0",
     "react-image-pan-zoom-rotate": "^1.6.0",
     "react-konva": "^18.2.3",
+    "react-konva-utils": "^0.3.0",
     "react-redux": "^8.0.2",
     "react-transition-group": "^4.4.5",
     "redux-deep-persist": "^1.0.6",

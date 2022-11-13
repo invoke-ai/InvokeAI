@@ -47,6 +47,9 @@ export interface GenericCanvasState {
   intermediateImage?: InvokeAI.Image;
   shouldShowIntermediates: boolean;
   maxHistory: number;
+  layerState: CanvasLayerState;
+  pastLayerStates: CanvasLayerState[];
+  futureLayerStates: CanvasLayerState[];
 }
 
 export type CanvasLayer = 'base' | 'mask';
@@ -84,7 +87,19 @@ export type CanvasLine = CanvasAnyLine & {
   color?: RgbaColor;
 };
 
-type CanvasObject = CanvasImage | CanvasLine | CanvasMaskLine;
+export type CanvasObject = CanvasImage | CanvasLine | CanvasMaskLine;
+
+export type CanvasLayerState = {
+  objects: CanvasObject[];
+  stagingArea: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    images: CanvasImage[];
+    selectedImageIndex: number;
+  };
+};
 
 // type guards
 export const isCanvasMaskLine = (obj: CanvasObject): obj is CanvasMaskLine =>
@@ -102,24 +117,13 @@ export const isCanvasAnyLine = (
 
 export type OutpaintingCanvasState = GenericCanvasState & {
   layer: CanvasLayer;
-  objects: CanvasObject[];
-  pastObjects: CanvasObject[][];
-  futureObjects: CanvasObject[][];
   shouldShowGrid: boolean;
   shouldSnapToGrid: boolean;
   shouldAutoSave: boolean;
-  stagingArea: {
-    images: CanvasImage[];
-    selectedImageIndex: number;
-  };
 };
 
 export type InpaintingCanvasState = GenericCanvasState & {
   layer: 'mask';
-  objects: CanvasObject[];
-  pastObjects: CanvasObject[][];
-  futureObjects: CanvasObject[][];
-  imageToInpaint?: InvokeAI.Image;
 };
 
 export type BaseCanvasState = InpaintingCanvasState | OutpaintingCanvasState;
@@ -132,6 +136,18 @@ export interface CanvasState {
   inpainting: InpaintingCanvasState;
   outpainting: OutpaintingCanvasState;
 }
+
+const initialLayerState: CanvasLayerState = {
+  objects: [],
+  stagingArea: {
+    x: -1,
+    y: -1,
+    width: -1,
+    height: -1,
+    images: [],
+    selectedImageIndex: -1,
+  },
+};
 
 const initialGenericCanvasState: GenericCanvasState = {
   tool: 'brush',
@@ -164,7 +180,10 @@ const initialGenericCanvasState: GenericCanvasState = {
   isMoveStageKeyHeld: false,
   shouldShowIntermediates: true,
   isMovingStage: false,
-  maxHistory: 256,
+  maxHistory: 128,
+  layerState: initialLayerState,
+  futureLayerStates: [],
+  pastLayerStates: [],
 };
 
 const initialCanvasState: CanvasState = {
@@ -172,20 +191,10 @@ const initialCanvasState: CanvasState = {
   doesCanvasNeedScaling: false,
   inpainting: {
     layer: 'mask',
-    objects: [],
-    pastObjects: [],
-    futureObjects: [],
     ...initialGenericCanvasState,
   },
   outpainting: {
     layer: 'base',
-    objects: [],
-    pastObjects: [],
-    futureObjects: [],
-    stagingArea: {
-      images: [],
-      selectedImageIndex: 0,
-    },
     shouldShowGrid: true,
     shouldSnapToGrid: true,
     shouldAutoSave: false,
@@ -230,14 +239,13 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].eraserSize = action.payload;
     },
     clearMask: (state) => {
-      state[state.currentCanvas].pastObjects.push(
-        state[state.currentCanvas].objects
-      );
-      state[state.currentCanvas].objects = state[
+      const currentCanvas = state[state.currentCanvas];
+      currentCanvas.pastLayerStates.push(currentCanvas.layerState);
+      currentCanvas.layerState.objects = state[
         state.currentCanvas
-      ].objects.filter((obj) => !isCanvasMaskLine(obj));
-      state[state.currentCanvas].futureObjects = [];
-      state[state.currentCanvas].shouldPreserveMaskedArea = false;
+      ].layerState.objects.filter((obj) => !isCanvasMaskLine(obj));
+      currentCanvas.futureLayerStates = [];
+      currentCanvas.shouldPreserveMaskedArea = false;
     },
     toggleShouldInvertMask: (state) => {
       state[state.currentCanvas].shouldPreserveMaskedArea =
@@ -271,9 +279,9 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].cursorPosition = action.payload;
     },
     clearImageToInpaint: (state) => {
-      state.inpainting.imageToInpaint = undefined;
+      // TODO
+      // state.inpainting.imageToInpaint = undefined;
     },
-
     setImageToOutpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
       const { width: canvasWidth, height: canvasHeight } =
         state.outpainting.stageDimensions;
@@ -307,16 +315,20 @@ export const canvasSlice = createSlice({
       state.outpainting.boundingBoxDimensions = newDimensions;
       state.outpainting.boundingBoxCoordinates = newCoordinates;
 
-      // state.outpainting.imageToInpaint = action.payload;
-      state.outpainting.objects = [
-        {
-          kind: 'image',
-          layer: 'base',
-          x: 0,
-          y: 0,
-          image: action.payload,
-        },
-      ];
+      state.outpainting.pastLayerStates.push(state.outpainting.layerState);
+      state.outpainting.layerState = {
+        ...initialLayerState,
+        objects: [
+          {
+            kind: 'image',
+            layer: 'base',
+            x: 0,
+            y: 0,
+            image: action.payload,
+          },
+        ],
+      };
+      state.outpainting.futureLayerStates = [];
       state.doesCanvasNeedScaling = true;
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
@@ -352,16 +364,22 @@ export const canvasSlice = createSlice({
       state.inpainting.boundingBoxDimensions = newDimensions;
       state.inpainting.boundingBoxCoordinates = newCoordinates;
 
-      // state.inpainting.imageToInpaint = action.payload;
-      state.inpainting.objects = [
-        {
-          kind: 'image',
-          layer: 'base',
-          x: 0,
-          y: 0,
-          image: action.payload,
-        },
-      ];
+      state.inpainting.pastLayerStates.push(state.inpainting.layerState);
+
+      state.inpainting.layerState = {
+        ...initialLayerState,
+        objects: [
+          {
+            kind: 'image',
+            layer: 'base',
+            x: 0,
+            y: 0,
+            image: action.payload,
+          },
+        ],
+      };
+
+      state.outpainting.futureLayerStates = [];
       state.doesCanvasNeedScaling = true;
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
@@ -487,8 +505,8 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].isDrawing = action.payload;
     },
     setClearBrushHistory: (state) => {
-      state[state.currentCanvas].pastObjects = [];
-      state[state.currentCanvas].futureObjects = [];
+      state[state.currentCanvas].pastLayerStates = [];
+      state[state.currentCanvas].futureLayerStates = [];
     },
     setShouldUseInpaintReplace: (state, action: PayloadAction<boolean>) => {
       state[state.currentCanvas].shouldUseInpaintReplace = action.payload;
@@ -524,7 +542,7 @@ export const canvasSlice = createSlice({
     setCurrentCanvas: (state, action: PayloadAction<ValidCanvasName>) => {
       state.currentCanvas = action.payload;
     },
-    addImageToOutpaintingSesion: (
+    addImageToOutpainting: (
       state,
       action: PayloadAction<{
         boundingBox: IRect;
@@ -536,23 +554,151 @@ export const canvasSlice = createSlice({
       if (!boundingBox || !image) return;
 
       const { x, y } = boundingBox;
+      const { width, height } = image;
+
       const currentCanvas = state.outpainting;
 
-      currentCanvas.pastObjects.push([...currentCanvas.objects]);
+      // const {
+      //   x: stagingX,
+      //   y: stagingY,
+      //   width: stagingWidth,
+      //   height: stagingHeight,
+      //   images: stagedImages,
+      // } = currentCanvas.layerState.stagingArea;
 
-      if (currentCanvas.pastObjects.length > currentCanvas.maxHistory) {
-        currentCanvas.pastObjects.shift();
+      currentCanvas.pastLayerStates.push(_.cloneDeep(currentCanvas.layerState));
+
+      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
+        currentCanvas.pastLayerStates.shift();
       }
 
-      currentCanvas.futureObjects = [];
-
-      currentCanvas.objects.push({
+      currentCanvas.layerState.stagingArea.images.push({
         kind: 'image',
         layer: 'base',
         x,
         y,
         image,
       });
+
+      currentCanvas.layerState.stagingArea.selectedImageIndex =
+        currentCanvas.layerState.stagingArea.images.length - 1;
+
+      currentCanvas.futureLayerStates = [];
+
+      // // If the new image is in the staging area region, push it to staging area
+      // if (
+      //   x === stagingX &&
+      //   y === stagingY &&
+      //   width === stagingWidth &&
+      //   height === stagingHeight
+      // ) {
+      //   console.log('pushing new image to staging area images');
+      //   currentCanvas.pastLayerStates.push(
+      //     _.cloneDeep(currentCanvas.layerState)
+      //   );
+
+      //   if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
+      //     currentCanvas.pastLayerStates.shift();
+      //   }
+
+      //   currentCanvas.layerState.stagingArea.images.push({
+      //     kind: 'image',
+      //     layer: 'base',
+      //     x,
+      //     y,
+      //     image,
+      //   });
+
+      //   currentCanvas.layerState.stagingArea.selectedImageIndex =
+      //     currentCanvas.layerState.stagingArea.images.length - 1;
+
+      //   currentCanvas.futureLayerStates = [];
+      // }
+      // // Else, if the staging area is empty, set it to this image
+      // else if (stagedImages.length === 0) {
+      //   console.log('setting staging area image to be this one image');
+      //   // add new image to staging area
+      //   currentCanvas.pastLayerStates.push(
+      //     _.cloneDeep(currentCanvas.layerState)
+      //   );
+
+      //   if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
+      //     currentCanvas.pastLayerStates.shift();
+      //   }
+
+      //   currentCanvas.layerState.stagingArea = {
+      //     images: [
+      //       {
+      //         kind: 'image',
+      //         layer: 'base',
+      //         x,
+      //         y,
+      //         image,
+      //       },
+      //     ],
+      //     x,
+      //     y,
+      //     width: image.width,
+      //     height: image.height,
+      //     selectedImageIndex: 0,
+      //   };
+
+      //   currentCanvas.futureLayerStates = [];
+      // } else {
+      //   // commit the current staging area image & set the new image as the only staging area image
+      //   currentCanvas.pastLayerStates.push(
+      //     _.cloneDeep(currentCanvas.layerState)
+      //   );
+
+      //   if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
+      //     currentCanvas.pastLayerStates.shift();
+      //   }
+
+      //   if (stagedImages.length === 1) {
+      //     // commit the current staging area image
+      //     console.log('committing current image');
+
+      //     const {
+      //       x: currentStagedX,
+      //       y: currentStagedY,
+      //       image: currentStagedImage,
+      //     } = stagedImages[0];
+
+      //     currentCanvas.layerState.objects.push({
+      //       kind: 'image',
+      //       layer: 'base',
+      //       x: currentStagedX,
+      //       y: currentStagedY,
+      //       image: currentStagedImage,
+      //     });
+      //   }
+
+      //   console.log('setting staging area to this singel new image');
+      //   currentCanvas.layerState.stagingArea = {
+      //     images: [
+      //       {
+      //         kind: 'image',
+      //         layer: 'base',
+      //         x,
+      //         y,
+      //         image,
+      //       },
+      //     ],
+      //     x,
+      //     y,
+      //     width: image.width,
+      //     height: image.height,
+      //     selectedImageIndex: 0,
+      //   };
+
+      //   currentCanvas.futureLayerStates = [];
+      // }
+    },
+    discardStagedImages: (state) => {
+      const currentCanvas = state[state.currentCanvas];
+      currentCanvas.layerState.stagingArea = {
+        ...initialLayerState.stagingArea,
+      };
     },
     addLine: (state, action: PayloadAction<number[]>) => {
       const currentCanvas = state[state.currentCanvas];
@@ -567,13 +713,13 @@ export const canvasSlice = createSlice({
       const newColor =
         layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
 
-      currentCanvas.pastObjects.push(currentCanvas.objects);
+      currentCanvas.pastLayerStates.push(currentCanvas.layerState);
 
-      if (currentCanvas.pastObjects.length > currentCanvas.maxHistory) {
-        currentCanvas.pastObjects.shift();
+      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
+        currentCanvas.pastLayerStates.shift();
       }
 
-      currentCanvas.objects.push({
+      currentCanvas.layerState.objects.push({
         kind: 'line',
         layer,
         tool,
@@ -582,11 +728,11 @@ export const canvasSlice = createSlice({
         ...newColor,
       });
 
-      currentCanvas.futureObjects = [];
+      currentCanvas.futureLayerStates = [];
     },
     addPointToCurrentLine: (state, action: PayloadAction<number[]>) => {
       const lastLine =
-        state[state.currentCanvas].objects.findLast(isCanvasAnyLine);
+        state[state.currentCanvas].layerState.objects.findLast(isCanvasAnyLine);
 
       if (!lastLine) return;
 
@@ -594,36 +740,33 @@ export const canvasSlice = createSlice({
     },
     undo: (state) => {
       const currentCanvas = state[state.currentCanvas];
-      if (currentCanvas.objects.length === 0) return;
 
-      const newObjects = currentCanvas.pastObjects.pop();
+      const targetState = currentCanvas.pastLayerStates.pop();
 
-      if (!newObjects) return;
+      if (!targetState) return;
 
-      currentCanvas.futureObjects.unshift(currentCanvas.objects);
+      currentCanvas.futureLayerStates.unshift(currentCanvas.layerState);
 
-      if (currentCanvas.futureObjects.length > currentCanvas.maxHistory) {
-        currentCanvas.futureObjects.pop();
+      if (currentCanvas.futureLayerStates.length > currentCanvas.maxHistory) {
+        currentCanvas.futureLayerStates.pop();
       }
 
-      currentCanvas.objects = newObjects;
+      currentCanvas.layerState = targetState;
     },
     redo: (state) => {
       const currentCanvas = state[state.currentCanvas];
 
-      if (currentCanvas.futureObjects.length === 0) return;
+      const targetState = currentCanvas.futureLayerStates.shift();
 
-      const newObjects = currentCanvas.futureObjects.shift();
+      if (!targetState) return;
 
-      if (!newObjects) return;
+      currentCanvas.pastLayerStates.push(currentCanvas.layerState);
 
-      currentCanvas.pastObjects.push(currentCanvas.objects);
-
-      if (currentCanvas.pastObjects.length > currentCanvas.maxHistory) {
-        currentCanvas.pastObjects.shift();
+      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
+        currentCanvas.pastLayerStates.shift();
       }
 
-      currentCanvas.objects = newObjects;
+      currentCanvas.layerState = targetState;
     },
     setShouldShowGrid: (state, action: PayloadAction<boolean>) => {
       state.outpainting.shouldShowGrid = action.payload;
@@ -641,21 +784,69 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].shouldShowIntermediates = action.payload;
     },
     resetCanvas: (state) => {
-      state[state.currentCanvas].pastObjects.push(
-        state[state.currentCanvas].objects
+      state[state.currentCanvas].pastLayerStates.push(
+        state[state.currentCanvas].layerState
       );
 
-      state[state.currentCanvas].objects = [];
-      state[state.currentCanvas].futureObjects = [];
+      state[state.currentCanvas].layerState = initialLayerState;
+      state[state.currentCanvas].futureLayerStates = [];
+    },
+    nextStagingAreaImage: (state) => {
+      const currentIndex =
+        state.outpainting.layerState.stagingArea.selectedImageIndex;
+      const length = state.outpainting.layerState.stagingArea.images.length;
+
+      state.outpainting.layerState.stagingArea.selectedImageIndex = Math.min(
+        currentIndex + 1,
+        length - 1
+      );
+    },
+    prevStagingAreaImage: (state) => {
+      const currentIndex =
+        state.outpainting.layerState.stagingArea.selectedImageIndex;
+
+      state.outpainting.layerState.stagingArea.selectedImageIndex = Math.max(
+        currentIndex - 1,
+        0
+      );
+    },
+    commitStagingAreaImage: (state) => {
+      const currentCanvas = state[state.currentCanvas];
+      const { images, selectedImageIndex } =
+        currentCanvas.layerState.stagingArea;
+
+      currentCanvas.pastLayerStates.push(_.cloneDeep(currentCanvas.layerState));
+
+      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
+        currentCanvas.pastLayerStates.shift();
+      }
+
+      const { x, y, image } = images[selectedImageIndex];
+
+      currentCanvas.layerState.objects.push({
+        kind: 'image',
+        layer: 'base',
+        x,
+        y,
+        image,
+      });
+
+      currentCanvas.layerState.stagingArea = {
+        ...initialLayerState.stagingArea,
+      };
+
+      currentCanvas.futureLayerStates = [];
     },
   },
   extraReducers: (builder) => {
     builder.addCase(uploadOutpaintingMergedImage.fulfilled, (state, action) => {
       if (!action.payload) return;
-      state.outpainting.pastObjects.push([...state.outpainting.objects]);
-      state.outpainting.futureObjects = [];
+      state.outpainting.pastLayerStates.push({
+        ...state.outpainting.layerState,
+      });
+      state.outpainting.futureLayerStates = [];
 
-      state.outpainting.objects = [
+      state.outpainting.layerState.objects = [
         {
           kind: 'image',
           layer: 'base',
@@ -709,13 +900,17 @@ export const {
   setIsMoveStageKeyHeld,
   setStageCoordinates,
   setCurrentCanvas,
-  addImageToOutpaintingSesion,
+  addImageToOutpainting,
   resetCanvas,
   setShouldShowGrid,
   setShouldSnapToGrid,
   setShouldAutoSave,
   setShouldShowIntermediates,
   setIsMovingStage,
+  nextStagingAreaImage,
+  prevStagingAreaImage,
+  commitStagingAreaImage,
+  discardStagedImages,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
@@ -783,6 +978,10 @@ export const uploadOutpaintingMergedImage = createAsyncThunk(
 export const currentCanvasSelector = (state: RootState): BaseCanvasState =>
   state.canvas[state.canvas.currentCanvas];
 
+export const isStagingSelector = (state: RootState): boolean =>
+  state.canvas[state.canvas.currentCanvas].layerState.stagingArea.images
+    .length > 0;
+
 export const outpaintingCanvasSelector = (
   state: RootState
 ): OutpaintingCanvasState => state.canvas.outpainting;
@@ -794,6 +993,6 @@ export const inpaintingCanvasSelector = (
 export const baseCanvasImageSelector = createSelector(
   [currentCanvasSelector],
   (currentCanvas) => {
-    return currentCanvas.objects.find(isCanvasBaseImage);
+    return currentCanvas.layerState.objects.find(isCanvasBaseImage);
   }
 );

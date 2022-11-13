@@ -13,12 +13,12 @@ import _ from 'lodash';
 const clearBrushHistorySelector = createSelector(
   currentCanvasSelector,
   (currentCanvas) => {
-    const { pastObjects, futureObjects } = currentCanvas as
+    const { pastLayerStates, futureLayerStates } = currentCanvas as
       | InpaintingCanvasState
       | OutpaintingCanvasState;
     return {
       mayClearBrushHistory:
-        futureObjects.length > 0 || pastObjects.length > 0 ? false : true,
+      futureLayerStates.length > 0 || pastLayerStates.length > 0 ? false : true,
     };
   },
   {

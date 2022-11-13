@@ -11,10 +11,10 @@ import _ from 'lodash';
 const canvasRedoSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector],
   (currentCanvas, activeTabName) => {
-    const { futureObjects } = currentCanvas;
+    const { futureLayerStates } = currentCanvas;
 
     return {
-      canRedo: futureObjects.length > 0,
+      canRedo: futureLayerStates.length > 0,
       activeTabName,
     };
   },
@@ -34,7 +34,7 @@ export default function IAICanvasRedoButton() {
   };
 
   useHotkeys(
-    ['meta+shift+z', 'control+shift+z', 'control+y', 'meta+y'],
+    ['meta+shift+z', 'ctrl+shift+z', 'control+y', 'meta+y'],
     () => {
       handleRedo();
     },

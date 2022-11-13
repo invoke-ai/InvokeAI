@@ -5,16 +5,22 @@ import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
-import { addLine, currentCanvasSelector, setIsDrawing } from '../canvasSlice';
+import {
+  addLine,
+  currentCanvasSelector,
+  isStagingSelector,
+  setIsDrawing,
+} from '../canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector],
-  (activeTabName, currentCanvas) => {
+  [activeTabNameSelector, currentCanvasSelector, isStagingSelector],
+  (activeTabName, currentCanvas, isStaging) => {
     const { tool } = currentCanvas;
     return {
       tool,
       activeTabName,
+      isStaging,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -24,7 +30,7 @@ const useCanvasMouseEnter = (
   stageRef: MutableRefObject<Konva.Stage | null>
 ) => {
   const dispatch = useAppDispatch();
-  const { tool } = useAppSelector(selector);
+  const { tool, isStaging } = useAppSelector(selector);
 
   return useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
@@ -34,14 +40,14 @@ const useCanvasMouseEnter = (
 
       const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-      if (!scaledCursorPosition || tool === 'move') return;
+      if (!scaledCursorPosition || tool === 'move' || isStaging) return;
 
       dispatch(setIsDrawing(true));
 
       // Add a new line starting from the current cursor position.
       dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));
     },
-    [stageRef, tool, dispatch]
+    [stageRef, tool, isStaging, dispatch]
   );
 };
 

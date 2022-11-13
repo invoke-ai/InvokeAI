@@ -9,6 +9,7 @@ import { useAppSelector } from 'app/store';
 import {
   baseCanvasImageSelector,
   currentCanvasSelector,
+  isStagingSelector,
   outpaintingCanvasSelector,
 } from 'features/canvas/canvasSlice';
 
@@ -33,17 +34,16 @@ import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasStatusText from './IAICanvasStatusText';
-import { Box, Button } from '@chakra-ui/react';
-import { rgbaColorToRgbString, rgbaColorToString } from './util/colorToString';
+import IAICanvasStagingArea from './IAICanvasStagingArea';
 
 const canvasSelector = createSelector(
   [
     currentCanvasSelector,
     outpaintingCanvasSelector,
-    baseCanvasImageSelector,
+    isStagingSelector,
     activeTabNameSelector,
   ],
-  (currentCanvas, outpaintingCanvas, baseCanvasImage, activeTabName) => {
+  (currentCanvas, outpaintingCanvas, isStaging, activeTabName) => {
     const {
       isMaskEnabled,
       stageScale,
@@ -54,29 +54,23 @@ const canvasSelector = createSelector(
       stageDimensions,
       stageCoordinates,
       tool,
-      layer,
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
       isMovingStage,
-      maskColor,
     } = currentCanvas;
 
     const { shouldShowGrid } = outpaintingCanvas;
 
     let stageCursor: string | undefined = '';
 
-    if (tool === 'move') {
-      if (isTransformingBoundingBox) {
-        stageCursor = undefined;
-      } else if (isMouseOverBoundingBox) {
-        stageCursor = 'move';
-      } else if (activeTabName === 'outpainting') {
-        if (isMovingStage) {
-          stageCursor = 'grabbing';
-        } else {
-          stageCursor = 'grab';
-        }
+    if (tool === 'move' || isStaging) {
+      if (isMovingStage) {
+        stageCursor = 'grabbing';
+      } else {
+        stageCursor = 'grab';
       }
+    } else if (isTransformingBoundingBox) {
+      stageCursor = undefined;
+    } else if (isMouseOverBoundingBox) {
+      stageCursor = 'move';
     } else {
       stageCursor = 'none';
     }
@@ -91,11 +85,8 @@ const canvasSelector = createSelector(
       stageDimensions,
       stageScale,
       tool,
-      layer,
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      maskColorString: rgbaColorToString({ ...maskColor, a: 0.5 }),
-      outpaintingOnly: activeTabName === 'outpainting',
+      isOnOutpaintingTab: activeTabName === 'outpainting',
+      isStaging,
     };
   },
   {
@@ -120,11 +111,8 @@ const IAICanvas = () => {
     stageDimensions,
     stageScale,
     tool,
-    layer,
-    outpaintingOnly,
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    maskColorString,
+    isOnOutpaintingTab,
+    isStaging,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
@@ -151,25 +139,15 @@ const IAICanvas = () => {
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
 
-  const panelTop = boundingBoxCoordinates.y + boundingBoxDimensions.height;
-  const panelLeft = boundingBoxCoordinates.x + boundingBoxDimensions.width;
-
   return (
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
         <Stage
           tabIndex={-1}
           ref={stageRef}
+          className={'inpainting-canvas-stage'}
           style={{
-            outline: 'none',
             ...(stageCursor ? { cursor: stageCursor } : {}),
-            border: `1px solid var(--border-color-light)`,
-            borderRadius: '0.5rem',
-            boxShadow: `inset 0 0 20px ${layer === 'mask' ? '1px' : '1px'} ${
-              layer === 'mask'
-                ? 'var(--accent-color)'
-                : 'var(--border-color-light)'
-            }`,
           }}
           x={stageCoordinates.x}
           y={stageCoordinates.y}
@@ -186,9 +164,11 @@ const IAICanvas = () => {
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
-          listening={tool === 'move' && !isModifyingBoundingBox}
+          listening={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
           draggable={
-            tool === 'move' && !isModifyingBoundingBox && outpaintingOnly
+            (tool === 'move' || isStaging) &&
+            !isModifyingBoundingBox &&
+            isOnOutpaintingTab
           }
         >
           <Layer id={'grid'} visible={shouldShowGrid}>
@@ -209,14 +189,21 @@ const IAICanvas = () => {
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
           <Layer id={'tool'}>
-            <IAICanvasBoundingBox visible={shouldShowBoundingBox} />
-            <IAICanvasBrushPreview
-              visible={tool !== 'move'}
-              listening={false}
-            />
+            {!isStaging && (
+              <>
+                <IAICanvasBoundingBox visible={shouldShowBoundingBox} />
+                <IAICanvasBrushPreview
+                  visible={tool !== 'move'}
+                  listening={false}
+                />
+              </>
+            )}
+          </Layer>
+          <Layer imageSmoothingEnabled={false}>
+            {isStaging && <IAICanvasStagingArea />}
           </Layer>
         </Stage>
-        {outpaintingOnly && <IAICanvasStatusText />}
+        {isOnOutpaintingTab && <IAICanvasStatusText />}
       </div>
     </div>
   );
