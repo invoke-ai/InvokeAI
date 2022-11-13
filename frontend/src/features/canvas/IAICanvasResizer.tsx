@@ -34,8 +34,10 @@ const IAICanvasResizer = () => {
 
   useLayoutEffect(() => {
     window.setTimeout(() => {
-      if (!ref.current || !baseCanvasImage) return;
-      const { width: imageWidth, height: imageHeight } = baseCanvasImage.image;
+      if (!ref.current) return;
+      const { width: imageWidth, height: imageHeight } = baseCanvasImage?.image
+        ? baseCanvasImage.image
+        : { width: 512, height: 512 };
       const { clientWidth, clientHeight } = ref.current;
 
       const scale = Math.min(

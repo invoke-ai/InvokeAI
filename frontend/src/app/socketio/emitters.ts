@@ -54,7 +54,7 @@ const makeSocketIOEmitters = (
           systemState,
         };
 
-      if (['inpainting', 'outpainting'].includes(generationMode)) {
+      if (generationMode === 'inpainting') {
         const baseCanvasImage = baseCanvasImageSelector(getState());
         const imageUrl = baseCanvasImage?.image.url;
 
