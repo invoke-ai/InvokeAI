@@ -55,6 +55,7 @@ const canvasSelector = createSelector(
       stageCoordinates,
       tool,
       isMovingStage,
+      shouldShowIntermediates,
     } = currentCanvas;
 
     const { shouldShowGrid } = outpaintingCanvas;
@@ -87,6 +88,7 @@ const canvasSelector = createSelector(
       tool,
       isOnOutpaintingTab: activeTabName === 'outpainting',
       isStaging,
+      shouldShowIntermediates,
     };
   },
   {
@@ -113,6 +115,7 @@ const IAICanvas = () => {
     tool,
     isOnOutpaintingTab,
     isStaging,
+    shouldShowIntermediates,
   } = useAppSelector(canvasSelector);
 
   useCanvasHotkeys();
@@ -176,31 +179,29 @@ const IAICanvas = () => {
           </Layer>
 
           <Layer
-            id={'image'}
+            id={'base'}
             ref={canvasImageLayerRef}
             listening={false}
             imageSmoothingEnabled={false}
           >
             <IAICanvasObjectRenderer />
-            <IAICanvasIntermediateImage />
           </Layer>
           <Layer id={'mask'} visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
-          <Layer id={'tool'}>
+          <Layer id="preview" imageSmoothingEnabled={false}>
             {!isStaging && (
-              <>
-                <IAICanvasBoundingBox visible={shouldShowBoundingBox} />
-                <IAICanvasBrushPreview
-                  visible={tool !== 'move'}
-                  listening={false}
-                />
-              </>
+              <IAICanvasBrushPreview
+                visible={tool !== 'move'}
+                listening={false}
+              />
             )}
-          </Layer>
-          <Layer imageSmoothingEnabled={false}>
             {isStaging && <IAICanvasStagingArea />}
+            {shouldShowIntermediates && <IAICanvasIntermediateImage />}
+            {!isStaging && (
+              <IAICanvasBoundingBox visible={shouldShowBoundingBox} />
+            )}
           </Layer>
         </Stage>
         {isOnOutpaintingTab && <IAICanvasStatusText />}
