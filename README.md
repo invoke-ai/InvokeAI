@@ -65,14 +65,11 @@ requests. Be sure to use the provided templates. They will help aid diagnose iss
 
 ### Installation
 
-This fork is supported across multiple platforms. You can find individual installation instructions
-below.
-
-- #### [Linux](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_LINUX/)
-
-- #### [Windows](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_WINDOWS/)
-
-- #### [Macintosh](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_MAC/)
+This fork is supported across Linux, Windows and Macintosh. Linux
+users can use either an Nvidia-based card (with CUDA support) or an
+AMD card (using the ROCm driver). For full installation and upgrade
+instructions, please see:
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
 ### Hardware Requirements
 
