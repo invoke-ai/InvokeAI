@@ -413,18 +413,18 @@ export const canvasSlice = createSlice({
       };
     },
     setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
-      state[state.currentCanvas].boundingBoxDimensions = action.payload;
+      const currentCanvas = state[state.currentCanvas];
+      currentCanvas.boundingBoxDimensions = action.payload;
+
       const { width: boundingBoxWidth, height: boundingBoxHeight } =
         action.payload;
       const { x: boundingBoxX, y: boundingBoxY } =
-        state[state.currentCanvas].boundingBoxCoordinates;
+        currentCanvas.boundingBoxCoordinates;
       const { width: canvasWidth, height: canvasHeight } =
-        state[state.currentCanvas].stageDimensions;
+        currentCanvas.stageDimensions;
 
-      const scaledCanvasWidth =
-        canvasWidth / state[state.currentCanvas].stageScale;
-      const scaledCanvasHeight =
-        canvasHeight / state[state.currentCanvas].stageScale;
+      const scaledCanvasWidth = canvasWidth / currentCanvas.stageScale;
+      const scaledCanvasHeight = canvasHeight / currentCanvas.stageScale;
 
       const roundedCanvasWidth = roundDownToMultiple(scaledCanvasWidth, 64);
       const roundedCanvasHeight = roundDownToMultiple(scaledCanvasHeight, 64);
@@ -458,22 +458,22 @@ export const canvasSlice = createSlice({
 
       const clampedX = _.clamp(
         overflowCorrectedX,
-        state[state.currentCanvas].stageCoordinates.x,
+        currentCanvas.stageCoordinates.x,
         roundedCanvasWidth - newBoundingBoxWidth
       );
 
       const clampedY = _.clamp(
         overflowCorrectedY,
-        state[state.currentCanvas].stageCoordinates.y,
+        currentCanvas.stageCoordinates.y,
         roundedCanvasHeight - newBoundingBoxHeight
       );
 
-      state[state.currentCanvas].boundingBoxDimensions = {
+      currentCanvas.boundingBoxDimensions = {
         width: newBoundingBoxWidth,
         height: newBoundingBoxHeight,
       };
 
-      state[state.currentCanvas].boundingBoxCoordinates = {
+      currentCanvas.boundingBoxCoordinates = {
         x: clampedX,
         y: clampedY,
       };

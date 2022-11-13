@@ -61,7 +61,15 @@ const OutpaintingDisplay = () => {
 
   return (
     <div className={'workarea-single-view'}>
-      <div className="workarea-split-view-left">{outpaintingComponent}</div>
+      <div className="workarea-split-view-left">
+        <div className="inpainting-main-area">
+          <IAICanvasOutpaintingControls />
+          <div className="inpainting-canvas-area">
+            {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
+          </div>
+        </div>
+      </div>
+      {/* <div className="workarea-split-view-left">{outpaintingComponent}</div> */}
     </div>
   );
 };

@@ -137,7 +137,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
   const dragBoundFunc = useCallback(
     (position: Vector2d) => {
-      if (!baseCanvasImage) return boundingBoxCoordinates;
+      if (!baseCanvasImage && activeTabName !== 'outpainting')
+        return boundingBoxCoordinates;
 
       const { x, y } = position;
 
@@ -153,6 +154,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     },
     [
       baseCanvasImage,
+      activeTabName,
       boundingBoxCoordinates,
       stageDimensions.width,
       stageDimensions.height,
@@ -236,7 +238,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
       // We may not change anything, stash the old position
       let newCoordinate = { ...oldPos };
-
+      console.log(oldPos, newPos);
       // Set the new coords based on what snapped
       if (didSnapX && !didSnapY) {
         newCoordinate = {
@@ -267,7 +269,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
        * Unlike anchorDragBoundFunc, it does get a width and height, so
        * the logic to constrain the size of the bounding box is very simple.
        */
-      if (!baseCanvasImage) return oldBoundBox;
+      if (!baseCanvasImage && activeTabName !== 'outpainting')
+        return oldBoundBox;
       if (
         newBoundBox.width + newBoundBox.x > stageDimensions.width ||
         newBoundBox.height + newBoundBox.y > stageDimensions.height ||
@@ -279,7 +282,12 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
       return newBoundBox;
     },
-    [baseCanvasImage, stageDimensions]
+    [
+      activeTabName,
+      baseCanvasImage,
+      stageDimensions.height,
+      stageDimensions.width,
+    ]
   );
 
   const handleStartedTransforming = () => {
@@ -333,9 +341,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         globalCompositeOperation={'destination-out'}
       />
       <Rect
-        dragBoundFunc={
-          activeTabName === 'inpainting' ? dragBoundFunc : undefined
-        }
+        {...(activeTabName === 'inpainting' ? { dragBoundFunc } : {})}
         listening={!isDrawing && tool === 'move'}
         draggable={true}
         fillEnabled={false}
