@@ -80,12 +80,11 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB or RAM.
 
 ## :octicons-package-dependencies-24: Installation
 
-This fork is supported across multiple platforms. You can find individual
-installation instructions below.
-
-- :fontawesome-brands-linux: [Linux](installation/INSTALL_LINUX.md)
-- :fontawesome-brands-windows: [Windows](installation/INSTALL_WINDOWS.md)
-- :fontawesome-brands-apple: [Macintosh](installation/INSTALL_MAC.md)
+This fork is supported across Linux, Windows and Macintosh. Linux
+users can use either an Nvidia-based card (with CUDA support) or an
+AMD card (using the ROCm driver). For full installation and upgrade
+instructions, please see:
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
 ## :fontawesome-solid-computer: Hardware Requirements
 
@@ -94,6 +93,7 @@ installation instructions below.
 You wil need one of the following:
 
 - :simple-nvidia: An NVIDIA-based graphics card with 4 GB or more VRAM memory.
+- :simple-amd: An AMD-based graphics card with 4 GB or more VRAM memory (Linux only)
 - :fontawesome-brands-apple: An Apple computer with an M1 chip.
 
 ### :fontawesome-solid-memory: Memory
@@ -121,6 +121,14 @@ You wil need one of the following:
     ```
 
 ## :octicons-log-16: Latest Changes
+
+### v2.1.3 <small>(13 November 2022)</small>
+
+- A choice of installer scripts that automate installation and configuration. See [Installation](https://github.com/invoke-ai/InvokeAI/blob/2.1.3-rc6/docs/installation/INSTALL.md).
+- A streamlined manual installation process that works for both Conda and PIP-only installs. See [Manual Installation](https://github.com/invoke-ai/InvokeAI/blob/2.1.3-rc6/docs/installation/INSTALL_MANUAL.md).
+- The ability to save frequently-used startup options (model to load, steps, sampler, etc) in a `.invokeai` file. See [Client](https://github.com/invoke-ai/InvokeAI/blob/2.1.3-rc6/docs/features/CLI.md)
+- Support for AMD GPU cards (non-CUDA) on Linux machines.
+- Multiple bugs and edge cases squashed.
 
 ### v2.1.0 <small>(2 November 2022)</small>
 

@@ -13,22 +13,9 @@ one of the steps, so instead of cloning this repo, simply download the notebook
 from the link above and load it up in VSCode (with the appropriate extensions
 installed)/Jupyter/JupyterLab and start running the cells one-by-one.
 
-Note that you will need NVIDIA drivers, Python 3.10, and Git installed
-beforehand - simplified
-[step-by-step instructions](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
-are available in the wiki (you'll only need steps 1, 2, & 3 ).
+Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehand.
 
-## **Manual Install**
-
-### **pip**
-
-See
-[Easy-peasy Windows install](https://github.com/invoke-ai/InvokeAI/wiki/Easy-peasy-Windows-install)
-in the wiki
-
----
-
-### **Conda**
+## **Manual Install with Conda**
 
 1. Install Anaconda3 (miniconda3 version) from [here](https://docs.anaconda.com/anaconda/install/windows/)
 
@@ -52,22 +39,28 @@ in the wiki
     cd InvokeAI
     ```
 
-6. Run the following two commands:
+6. Run the following commands:
 
-    ```batch title="step 6a"
-    conda env create
-    ```
+    !!! todo "For systems with a CUDA (Nvidia) card:"
 
-    ```batch title="step 6b"
-    conda activate invokeai
-    ```
+       ```bash
+       rmdir src      # (this is a precaution in case there is already a src directory)
+       conda env create -f environment-cuda.yml
+       conda activate invokeai
+       (invokeai)>
+       ```
+
+    !!! todo "For systems with an AMD card (using ROCm driver):"
+
+       ```bash
+       rmdir src      # (this is a precaution in case there is already a src directory)
+       conda env create -f environment-AMD.yml
+       conda activate invokeai
+       (invokeai)>
+       ```
 
     This will install all python requirements and activate the "invokeai" environment
     which sets PATH and other environment variables properly.
-
-    Note that the long form of the first command is `conda env create -f environment.yml`. If the
-    environment file isn't specified, conda will default to `environment.yml`. You will need
-    to provide the `-f` option if you wish to load a different environment file at any point.
 
 7. Load the big stable diffusion weights files and a couple of smaller machine-learning models:
 

@@ -72,6 +72,7 @@ class GFPGAN():
                 image = image.resize(res.size)
             res = Image.blend(image, res, strength)
 
+
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         self.gfpgan = None

@@ -612,6 +612,7 @@ def do_textmask(gen, opt, callback):
         image_path = os.path.join(opt.outdir,image_path)
     assert os.path.exists(image_path), '** "{opt.prompt}" not found. Please enter the name of an existing image file to mask **'
     assert opt.text_mask is not None and len(opt.text_mask) >= 1, '** Please provide a text mask with -tm **'
+    opt.input_file_path = image_path
     tm = opt.text_mask[0]
     threshold = float(opt.text_mask[1]) if len(opt.text_mask) > 1  else 0.5
     gen.apply_textmask(
@@ -632,6 +633,7 @@ def do_postprocess (gen, opt, callback):
         file_path = os.path.join(opt.outdir,file_path)
 
     opt.input_file_path = file_path
+
     tool=None
     if opt.facetool_strength > 0:
         tool = opt.facetool
