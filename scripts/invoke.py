@@ -11,9 +11,8 @@ import time
 import traceback
 import yaml
 
-from ldm.invoke.prompt_parser import PromptParser
-
 sys.path.append('.')    # corrects a weird problem on Macs
+from ldm.invoke.prompt_parser import PromptParser
 from ldm.invoke.readline import get_completer
 from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
