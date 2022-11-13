@@ -94,6 +94,18 @@ export const store = configureStore({
       immutableCheck: false,
       serializableCheck: false,
     }).concat(socketioMiddleware()),
+  devTools: {
+    actionsDenylist: [
+      // 'canvas/setCursorPosition',
+      // 'canvas/setStageCoordinates',
+      // 'canvas/setStageScale',
+      // 'canvas/setIsDrawing',
+      // 'canvas/setBoundingBoxCoordinates',
+      // 'canvas/setBoundingBoxDimensions',
+      // 'canvas/setIsDrawing',
+      // 'canvas/addPointToCurrentLine',
+    ],
+  },
 });
 
 export type AppGetState = typeof store.getState;

@@ -38,7 +38,7 @@ import {
   requestSystemConfig,
 } from './actions';
 import {
-  addImageToOutpaintingSesion,
+  addImageToOutpainting,
   setImageToInpaint,
 } from 'features/canvas/canvasSlice';
 import { tabMap } from 'features/tabs/InvokeTabs';
@@ -119,7 +119,7 @@ const makeSocketIOListeners = (
         if (data.generationMode === 'outpainting' && data.boundingBox) {
           const { boundingBox } = data;
           dispatch(
-            addImageToOutpaintingSesion({
+            addImageToOutpainting({
               image: newImage,
               boundingBox,
             })

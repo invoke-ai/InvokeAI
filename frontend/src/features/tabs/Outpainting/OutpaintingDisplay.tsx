@@ -17,7 +17,9 @@ const outpaintingDisplaySelector = createSelector(
   (canvas: CanvasState) => {
     const {
       doesCanvasNeedScaling,
-      outpainting: { objects },
+      outpainting: {
+        layerState: { objects },
+      },
     } = canvas;
     return {
       doesCanvasNeedScaling,

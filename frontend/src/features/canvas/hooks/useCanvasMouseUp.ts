@@ -9,19 +9,21 @@ import {
   addPointToCurrentLine,
   currentCanvasSelector,
   GenericCanvasState,
+  isStagingSelector,
   setIsDrawing,
   setIsMovingStage,
 } from '../canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector],
-  (activeTabName, canvas: GenericCanvasState) => {
-    const { tool, isDrawing } = canvas;
+  [activeTabNameSelector, currentCanvasSelector, isStagingSelector],
+  (activeTabName, currentCanvas, isStaging) => {
+    const { tool, isDrawing } = currentCanvas;
     return {
       tool,
       isDrawing,
       activeTabName,
+      isStaging,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -32,10 +34,10 @@ const useCanvasMouseUp = (
   didMouseMoveRef: MutableRefObject<boolean>
 ) => {
   const dispatch = useAppDispatch();
-  const { tool, isDrawing } = useAppSelector(selector);
+  const { tool, isDrawing, isStaging } = useAppSelector(selector);
 
   return useCallback(() => {
-    if (tool === 'move') {
+    if (tool === 'move' || isStaging) {
       dispatch(setIsMovingStage(false));
       return;
     }
@@ -58,7 +60,7 @@ const useCanvasMouseUp = (
       didMouseMoveRef.current = false;
     }
     dispatch(setIsDrawing(false));
-  }, [didMouseMoveRef, dispatch, isDrawing, stageRef, tool]);
+  }, [didMouseMoveRef, dispatch, isDrawing, isStaging, stageRef, tool]);
 };
 
 export default useCanvasMouseUp;

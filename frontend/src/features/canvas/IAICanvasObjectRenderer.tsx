@@ -1,4 +1,4 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createSelector, current } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { Group, Line } from 'react-konva';
@@ -13,7 +13,10 @@ import { rgbaColorToString } from './util/colorToString';
 const selector = createSelector(
   [currentCanvasSelector],
   (currentCanvas) => {
-    return currentCanvas.objects;
+    const { objects } = currentCanvas.layerState;
+    return {
+      objects,
+    };
   },
   {
     memoizeOptions: {
@@ -23,7 +26,7 @@ const selector = createSelector(
 );
 
 const IAICanvasObjectRenderer = () => {
-  const objects = useAppSelector(selector);
+  const { objects } = useAppSelector(selector);
 
   if (!objects) return null;
 

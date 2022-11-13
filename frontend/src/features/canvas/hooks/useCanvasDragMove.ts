@@ -6,17 +6,18 @@ import _ from 'lodash';
 import { useCallback } from 'react';
 import {
   currentCanvasSelector,
+  isStagingSelector,
   setIsMovingStage,
   setStageCoordinates,
 } from '../canvasSlice';
 
 const selector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (canvas, activeTabName) => {
+  [currentCanvasSelector, isStagingSelector, activeTabNameSelector],
+  (canvas, isStaging, activeTabName) => {
     const { tool } = canvas;
     return {
       tool,
-
+      isStaging,
       activeTabName,
     };
   },
@@ -25,24 +26,26 @@ const selector = createSelector(
 
 const useCanvasDrag = () => {
   const dispatch = useAppDispatch();
-  const { tool, activeTabName } = useAppSelector(selector);
+  const { tool, activeTabName, isStaging } = useAppSelector(selector);
 
   return {
     handleDragStart: useCallback(() => {
-      if (tool !== 'move' || activeTabName !== 'outpainting') return;
+      if (!(tool === 'move' || isStaging)) return;
       dispatch(setIsMovingStage(true));
-    }, [activeTabName, dispatch, tool]),
+    }, [dispatch, isStaging, tool]),
+
     handleDragMove: useCallback(
       (e: KonvaEventObject<MouseEvent>) => {
-        if (tool !== 'move' || activeTabName !== 'outpainting') return;
+        if (!(tool === 'move' || isStaging)) return;
         dispatch(setStageCoordinates(e.target.getPosition()));
       },
-      [activeTabName, dispatch, tool]
+      [dispatch, isStaging, tool]
     ),
+
     handleDragEnd: useCallback(() => {
-      if (tool !== 'move' || activeTabName !== 'outpainting') return;
+      if (!(tool === 'move' || isStaging)) return;
       dispatch(setIsMovingStage(false));
-    }, [activeTabName, dispatch, tool]),
+    }, [dispatch, isStaging, tool]),
   };
 };
 

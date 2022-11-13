@@ -1,5 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { currentCanvasSelector, setEraserSize, setTool } from './canvasSlice';
+import {
+  currentCanvasSelector,
+  isStagingSelector,
+  setEraserSize,
+  setTool,
+} from './canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -10,13 +15,14 @@ import { Flex } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 export const selector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
+  [currentCanvasSelector, isStagingSelector],
+  (currentCanvas, isStaging) => {
     const { eraserSize, tool } = currentCanvas;
 
     return {
       tool,
       eraserSize,
+      isStaging,
     };
   },
   {
@@ -27,7 +33,7 @@ export const selector = createSelector(
 );
 const IAICanvasEraserButtonPopover = () => {
   const dispatch = useAppDispatch();
-  const { tool, eraserSize } = useAppSelector(selector);
+  const { tool, eraserSize, isStaging } = useAppSelector(selector);
 
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
 
@@ -51,7 +57,8 @@ const IAICanvasEraserButtonPopover = () => {
           aria-label="Eraser (E)"
           tooltip="Eraser (E)"
           icon={<FaEraser />}
-          data-selected={tool === 'eraser'}
+          data-selected={tool === 'eraser' && !isStaging}
+          isDisabled={isStaging}
           onClick={() => dispatch(setTool('eraser'))}
         />
       }

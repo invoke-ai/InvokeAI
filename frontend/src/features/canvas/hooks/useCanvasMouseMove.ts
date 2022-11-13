@@ -9,18 +9,20 @@ import {
   addPointToCurrentLine,
   currentCanvasSelector,
   GenericCanvasState,
+  isStagingSelector,
   setCursorPosition,
 } from '../canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector],
-  (activeTabName, canvas: GenericCanvasState) => {
-    const { tool, isDrawing } = canvas;
+  [activeTabNameSelector, currentCanvasSelector, isStagingSelector],
+  (activeTabName, currentCanvas, isStaging) => {
+    const { tool, isDrawing } = currentCanvas;
     return {
       tool,
       isDrawing,
       activeTabName,
+      isStaging,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -32,7 +34,7 @@ const useCanvasMouseMove = (
   lastCursorPositionRef: MutableRefObject<Vector2d>
 ) => {
   const dispatch = useAppDispatch();
-  const { isDrawing, tool } = useAppSelector(selector);
+  const { isDrawing, tool, isStaging } = useAppSelector(selector);
 
   return useCallback(() => {
     if (!stageRef.current) return;
@@ -45,7 +47,7 @@ const useCanvasMouseMove = (
 
     lastCursorPositionRef.current = scaledCursorPosition;
 
-    if (!isDrawing || tool === 'move') return;
+    if (!isDrawing || tool === 'move' || isStaging) return;
 
     didMouseMoveRef.current = true;
     dispatch(
@@ -55,6 +57,7 @@ const useCanvasMouseMove = (
     didMouseMoveRef,
     dispatch,
     isDrawing,
+    isStaging,
     lastCursorPositionRef,
     stageRef,
     tool,

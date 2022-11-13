@@ -11,10 +11,10 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 const canvasUndoSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector],
   (canvas, activeTabName) => {
-    const { pastObjects } = canvas;
+    const { pastLayerStates } = canvas;
 
     return {
-      canUndo: pastObjects.length > 0,
+      canUndo: pastLayerStates.length > 0,
       activeTabName,
     };
   },
@@ -35,7 +35,7 @@ export default function IAICanvasUndoButton() {
   };
 
   useHotkeys(
-    ['meta+z', 'control+z'],
+    ['meta+z', 'ctrl+z'],
     () => {
       handleUndo();
     },

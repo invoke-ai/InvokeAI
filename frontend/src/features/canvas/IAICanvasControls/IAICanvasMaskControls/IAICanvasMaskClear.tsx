@@ -18,9 +18,10 @@ import { useToast } from '@chakra-ui/react';
 const canvasMaskClearSelector = createSelector(
   [currentCanvasSelector, activeTabNameSelector],
   (currentCanvas, activeTabName) => {
-    const { isMaskEnabled, objects } = currentCanvas as
-      | InpaintingCanvasState
-      | OutpaintingCanvasState;
+    const {
+      isMaskEnabled,
+      layerState: { objects },
+    } = currentCanvas as InpaintingCanvasState | OutpaintingCanvasState;
 
     return {
       isMaskEnabled,

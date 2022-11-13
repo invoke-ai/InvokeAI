@@ -13,7 +13,7 @@ export const persistor = persistStore(store);
 import Loading from './Loading';
 import App from './app/App';
 
-const emotionCache = createCache({
+export const emotionCache = createCache({
   key: 'invokeai-style-cache',
   prepend: true,
 });

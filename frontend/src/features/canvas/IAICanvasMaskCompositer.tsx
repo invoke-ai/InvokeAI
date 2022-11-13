@@ -148,7 +148,17 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
     return () => clearInterval(timer);
   }, []);
 
-  if (!fillPatternImage) return null;
+  if (
+    !(
+      fillPatternImage &&
+      stageCoordinates.x &&
+      stageCoordinates.y &&
+      stageScale &&
+      stageDimensions.width &&
+      stageDimensions.height
+    )
+  )
+    return null;
 
   return (
     <Rect

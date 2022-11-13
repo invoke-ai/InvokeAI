@@ -13,13 +13,8 @@ import _ from 'lodash';
 
 export const canvasLinesSelector = createSelector(
   currentCanvasSelector,
-  (currentCanvas: GenericCanvasState) => {
-    const { objects } = currentCanvas as
-      | InpaintingCanvasState
-      | OutpaintingCanvasState;
-    return {
-      objects,
-    };
+  (currentCanvas) => {
+    return currentCanvas.layerState.objects;
   },
   {
     memoizeOptions: {
@@ -37,7 +32,7 @@ type InpaintingCanvasLinesProps = GroupConfig;
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
   const { ...rest } = props;
-  const { objects } = useAppSelector(canvasLinesSelector);
+  const objects = useAppSelector(canvasLinesSelector);
 
   return (
     <Group listening={false} {...rest}>

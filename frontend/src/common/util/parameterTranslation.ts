@@ -111,7 +111,7 @@ export const frontendToBackendParameters = (
     canvasImageLayerRef.current
   ) {
     const {
-      objects,
+      layerState: { objects },
       boundingBoxCoordinates,
       boundingBoxDimensions,
       inpaintReplace,
