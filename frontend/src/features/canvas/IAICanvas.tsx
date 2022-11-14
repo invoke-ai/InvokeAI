@@ -197,11 +197,11 @@ const IAICanvas = () => {
                 listening={false}
               />
             )}
-            {isStaging && <IAICanvasStagingArea />}
+            <IAICanvasStagingArea visible={isStaging} />
             {shouldShowIntermediates && <IAICanvasIntermediateImage />}
-            {!isStaging && (
-              <IAICanvasBoundingBox visible={shouldShowBoundingBox} />
-            )}
+            <IAICanvasBoundingBox
+              visible={shouldShowBoundingBox && !isStaging}
+            />
           </Layer>
         </Stage>
         {isOnOutpaintingTab && <IAICanvasStatusText />}

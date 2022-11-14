@@ -46,6 +46,13 @@ class InvokeAIWebServer:
         self.esrgan = esrgan
 
         self.canceled = Event()
+        self.ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+
+    def allowed_file(self, filename: str) -> bool:
+        return (
+            "." in filename
+            and filename.rsplit(".", 1)[1].lower() in self.ALLOWED_EXTENSIONS
+        )
 
     def run(self):
         self.setup_app()
@@ -98,41 +105,70 @@ class InvokeAIWebServer:
                 return send_from_directory(self.app.static_folder, "index.html")
 
         @self.app.route("/upload", methods=["POST"])
-        def upload_base64_file():
+        def upload():
             try:
-                data = request.get_json()
-                dataURL = data["dataURL"]
-                name = data["name"]
+                # check if the post request has the file part
+                if "file" not in request.files:
+                    return "No file part", 400
+                file = request.files["file"]
 
-                print(f'>> Image upload requested "{name}"')
+                # If the user does not select a file, the browser submits an
+                # empty file without a filename.
+                if file.filename == "":
+                    return "No selected file", 400
 
-                if dataURL is not None:
-                    bytes = dataURL_to_bytes(dataURL)
+                kind = request.form["kind"]
 
-                    file_path = self.save_file_unique_uuid_name(
-                        bytes=bytes, name=name, path=self.result_path
+                if kind == "init":
+                    path = self.init_image_path
+                elif kind == "temp":
+                    path = self.temp_image_path
+                elif kind == "result":
+                    path = self.result_path
+                elif kind == "mask":
+                    path = self.mask_image_path
+                else:
+                    return f"Invalid upload kind: {kind}", 400
+
+                if not self.allowed_file(file.filename):
+                    return (
+                        f'Invalid file type, must be one of: {", ".join(self.ALLOWED_EXTENSIONS)}',
+                        400,
                     )
 
-                    mtime = os.path.getmtime(file_path)
-                    (width, height) = Image.open(file_path).size
+                secured_filename = secure_filename(file.filename)
 
-                    response = {
+                uuid = uuid4().hex
+                truncated_uuid = uuid[:8]
+
+                split = os.path.splitext(secured_filename)
+                name = f"{split[0]}.{truncated_uuid}{split[1]}"
+
+                file_path = os.path.join(path, name)
+
+                file.save(file_path)
+
+                mtime = os.path.getmtime(file_path)
+                (width, height) = Image.open(file_path).size
+
+                response = {
+                    "image": {
                         "url": self.get_url_from_image_path(file_path),
                         "mtime": mtime,
                         "width": width,
                         "height": height,
-                        "category": "result",
-                        "destination": "outpainting_merge",
-                    }
-                    return response
-                else:
-                    return "No dataURL provided"
+                    },
+                }
+
+                return response, 200
+
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
                 print("\n")
 
                 traceback.print_exc()
                 print("\n")
+                return "Error uploading file", 500
 
         self.load_socketio_listeners(self.socketio)
 
@@ -177,6 +213,7 @@ class InvokeAIWebServer:
         self.init_image_url = "outputs/init-images/"
         self.mask_image_url = "outputs/mask-images/"
         self.intermediate_url = "outputs/intermediates/"
+        self.temp_image_url = "outputs/temp-images/"
         # location for "finished" images
         self.result_path = args.outdir
         # temporary path for intermediates
@@ -184,6 +221,8 @@ class InvokeAIWebServer:
         # path for user-uploaded init images and masks
         self.init_image_path = os.path.join(self.result_path, "init-images/")
         self.mask_image_path = os.path.join(self.result_path, "mask-images/")
+        # path for temp images e.g. gallery generations which are not committed
+        self.temp_image_path = os.path.join(self.result_path, "temp-images/")
         # txt log
         self.log_path = os.path.join(self.result_path, "invoke_log.txt")
         # make all output paths
@@ -194,6 +233,7 @@ class InvokeAIWebServer:
                 self.intermediate_path,
                 self.init_image_path,
                 self.mask_image_path,
+                self.temp_image_path,
             ]
         ]
 
@@ -517,59 +557,6 @@ class InvokeAIWebServer:
                 traceback.print_exc()
                 print("\n")
 
-        # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadImage")
-        def handle_upload_image(bytes, name, destination):
-            try:
-                print(f'>> Image upload requested "{name}"')
-                file_path = self.save_file_unique_uuid_name(
-                    bytes=bytes, name=name, path=self.init_image_path
-                )
-                mtime = os.path.getmtime(file_path)
-                (width, height) = Image.open(file_path).size
-
-                socketio.emit(
-                    "imageUploaded",
-                    {
-                        "url": self.get_url_from_image_path(file_path),
-                        "mtime": mtime,
-                        "width": width,
-                        "height": height,
-                        "category": "user",
-                        "destination": destination,
-                    },
-                )
-            except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
-
-        # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadOutpaintingMergeImage")
-        def handle_upload_outpainting_merge_image(dataURL, name):
-            try:
-                print(f'>> Outpainting merge image upload requested "{name}"')
-
-                image = dataURL_to_image(dataURL)
-                file_name = self.make_unique_init_image_filename(name)
-                file_path = os.path.join(self.result_path, file_name)
-                image.save(file_path)
-
-                socketio.emit(
-                    "outpaintingMergeImageUploaded",
-                    {
-                        "url": self.get_url_from_image_path(file_path),
-                    },
-                )
-            except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
-
     # App Functions
     def get_system_config(self):
         model_list = self.generate.model_cache.list_models()
@@ -621,7 +608,7 @@ class InvokeAIWebServer:
                 truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
 
                 init_img_url = generation_parameters["init_img"]
-                
+
                 original_bounding_box = generation_parameters["bounding_box"].copy()
 
                 if generation_parameters["generation_mode"] == "outpainting":
@@ -1247,6 +1234,10 @@ class InvokeAIWebServer:
                 return os.path.abspath(
                     os.path.join(self.intermediate_path, os.path.basename(url))
                 )
+            elif "temp-images" in url:
+                return os.path.abspath(
+                    os.path.join(self.temp_image_path, os.path.basename(url))
+                )
             else:
                 return os.path.abspath(
                     os.path.join(self.result_path, os.path.basename(url))
@@ -1267,6 +1258,8 @@ class InvokeAIWebServer:
                 return os.path.join(self.mask_image_url, os.path.basename(path))
             elif "intermediates" in path:
                 return os.path.join(self.intermediate_url, os.path.basename(path))
+            elif "temp-images" in path:
+                return os.path.join(self.temp_image_url, os.path.basename(path))
             else:
                 return os.path.join(self.result_url, os.path.basename(path))
         except Exception as e:

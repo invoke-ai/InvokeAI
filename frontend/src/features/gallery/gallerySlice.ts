@@ -4,6 +4,10 @@ import _, { clamp } from 'lodash';
 import * as InvokeAI from 'app/invokeai';
 import { IRect } from 'konva/lib/types';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
+import { mergeAndUploadCanvas } from 'features/canvas/util/mergeAndUploadCanvas';
+import { uploadImage } from './util/uploadImage';
+import { setInitialImage } from 'features/options/optionsSlice';
+import { setImageToInpaint } from 'features/canvas/canvasSlice';
 
 export type GalleryCategory = 'user' | 'result';
 
@@ -25,7 +29,10 @@ export type Gallery = {
 export interface GalleryState {
   currentImage?: InvokeAI.Image;
   currentImageUuid: string;
-  intermediateImage?: InvokeAI.Image & { boundingBox?: IRect; generationMode?: InvokeTabName };
+  intermediateImage?: InvokeAI.Image & {
+    boundingBox?: IRect;
+    generationMode?: InvokeTabName;
+  };
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   galleryScrollPosition: number;
@@ -260,6 +267,46 @@ export const gallerySlice = createSlice({
     setGalleryWidth: (state, action: PayloadAction<number>) => {
       state.galleryWidth = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(mergeAndUploadCanvas.fulfilled, (state, action) => {
+      if (!action.payload) return;
+      const { image, kind, boundingBox } = action.payload;
+
+      if (kind === 'merged_canvas') {
+        const { uuid, url, mtime } = image;
+
+        state.categories.result.images.unshift(image);
+
+        if (state.shouldAutoSwitchToNewImages) {
+          state.currentImageUuid = uuid;
+          state.currentImage = image;
+          state.currentCategory = 'result';
+        }
+
+        state.intermediateImage = undefined;
+        state.categories.result.latest_mtime = mtime;
+      }
+    });
+    builder.addCase(uploadImage.fulfilled, (state, action) => {
+      if (!action.payload) return;
+      const { image, kind } = action.payload;
+
+      if (kind === 'init') {
+        const { uuid, mtime } = image;
+
+        state.categories.result.images.unshift(image);
+
+        if (state.shouldAutoSwitchToNewImages) {
+          state.currentImageUuid = uuid;
+          state.currentImage = image;
+          state.currentCategory = 'user';
+        }
+
+        state.intermediateImage = undefined;
+        state.categories.result.latest_mtime = mtime;
+      }
+    });
   },
 });
 

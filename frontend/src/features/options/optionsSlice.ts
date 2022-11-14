@@ -5,6 +5,7 @@ import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { FACETOOL_TYPES } from 'app/constants';
 import { InvokeTabName, tabMap } from 'features/tabs/InvokeTabs';
+import { uploadImage } from 'features/gallery/util/uploadImage';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -360,6 +361,16 @@ export const optionsSlice = createSlice({
     setIsLightBoxOpen: (state, action: PayloadAction<boolean>) => {
       state.isLightBoxOpen = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(uploadImage.fulfilled, (state, action) => {
+      if (!action.payload) return;
+      const { image, kind, activeTabName } = action.payload;
+
+      if (kind === 'init' && activeTabName === 'img2img') {
+        state.initialImage = image;
+      }
+    });
   },
 });
 

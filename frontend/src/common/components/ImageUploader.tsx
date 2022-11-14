@@ -8,12 +8,13 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useToast } from '@chakra-ui/react';
-import { uploadImage } from 'app/socketio/actions';
-import { ImageUploadDestination, UploadImagePayload } from 'app/invokeai';
+// import { uploadImage } from 'app/socketio/actions';
+import { UploadImagePayload } from 'app/invokeai';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { tabDict } from 'features/tabs/InvokeTabs';
 import ImageUploadOverlay from './ImageUploadOverlay';
+import { uploadImage } from 'features/gallery/util/uploadImage';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -44,15 +45,12 @@ const ImageUploader = (props: ImageUploaderProps) => {
   );
 
   const fileAcceptedCallback = useCallback(
-    (file: File) => {
-      setIsHandlingUpload(true);
-      const payload: UploadImagePayload = { file };
-      if (['img2img', 'inpainting', 'outpainting'].includes(activeTabName)) {
-        payload.destination = activeTabName as ImageUploadDestination;
-      }
-      dispatch(uploadImage(payload));
+    async (file: File) => {
+      // setIsHandlingUpload(true);
+
+      dispatch(uploadImage({ imageFile: file }));
     },
-    [dispatch, activeTabName]
+    [dispatch]
   );
 
   const onDrop = useCallback(
@@ -124,12 +122,12 @@ const ImageUploader = (props: ImageUploaderProps) => {
         return;
       }
 
-      const payload: UploadImagePayload = { file };
-      if (['img2img', 'inpainting'].includes(activeTabName)) {
-        payload.destination = activeTabName as ImageUploadDestination;
-      }
+      // const payload: UploadImagePayload = { file };
+      // if (['img2img', 'inpainting'].includes(activeTabName)) {
+      //   payload.destination = activeTabName as ImageUploadDestination;
+      // }
 
-      dispatch(uploadImage(payload));
+      // dispatch(uploadImage(payload));
     };
     document.addEventListener('paste', pasteImageListener);
     return () => {
