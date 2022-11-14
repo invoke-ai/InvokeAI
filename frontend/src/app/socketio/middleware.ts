@@ -43,7 +43,7 @@ export const socketioMiddleware = () => {
       onGalleryImages,
       onProcessingCanceled,
       onImageDeleted,
-      onImageUploaded,
+      // onImageUploaded,
       onMaskImageUploaded,
       onSystemConfig,
       onModelChanged,
@@ -104,9 +104,9 @@ export const socketioMiddleware = () => {
         onImageDeleted(data);
       });
 
-      socketio.on('imageUploaded', (data: InvokeAI.ImageUploadResponse) => {
-        onImageUploaded(data);
-      });
+      // socketio.on('imageUploaded', (data: InvokeAI.ImageUploadResponse) => {
+      //   onImageUploaded(data);
+      // });
 
       socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
         onMaskImageUploaded(data);

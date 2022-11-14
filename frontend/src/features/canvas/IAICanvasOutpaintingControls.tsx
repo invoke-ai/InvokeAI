@@ -5,7 +5,6 @@ import {
   isStagingSelector,
   resetCanvas,
   setTool,
-  uploadOutpaintingMergedImage,
 } from './canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
@@ -26,6 +25,7 @@ import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
+import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
 
 export const canvasControlsSelector = createSelector(
   [currentCanvasSelector, isStagingSelector],
@@ -68,13 +68,23 @@ const IAICanvasOutpaintingControls = () => {
           tooltip="Merge Visible"
           icon={<FaLayerGroup />}
           onClick={() => {
-            dispatch(uploadOutpaintingMergedImage(canvasImageLayerRef));
+            dispatch(
+              mergeAndUploadCanvas({
+                canvasImageLayerRef,
+                saveToGallery: false,
+              })
+            );
           }}
         />
         <IAIIconButton
-          aria-label="Save Selection to Gallery"
-          tooltip="Save Selection to Gallery"
+          aria-label="Save to Gallery"
+          tooltip="Save to Gallery"
           icon={<FaSave />}
+          onClick={() => {
+            dispatch(
+              mergeAndUploadCanvas({ canvasImageLayerRef, saveToGallery: true })
+            );
+          }}
         />
         <IAIIconButton
           aria-label="Copy Selection"

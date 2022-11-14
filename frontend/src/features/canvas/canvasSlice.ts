@@ -13,6 +13,14 @@ import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { RootState } from 'app/store';
 import { MutableRefObject } from 'react';
 import Konva from 'konva';
+import { tabMap } from 'features/tabs/InvokeTabs';
+import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
+import { uploadImage } from 'features/gallery/util/uploadImage';
+import {
+  setImageToInpaint_reducer,
+  setImageToOutpaint_reducer,
+} from './canvasReducers';
 
 export interface GenericCanvasState {
   tool: CanvasTool;
@@ -75,6 +83,8 @@ export type CanvasImage = {
   layer: 'base';
   x: number;
   y: number;
+  width: number;
+  height: number;
   image: InvokeAI.Image;
 };
 
@@ -137,7 +147,7 @@ export interface CanvasState {
   outpainting: OutpaintingCanvasState;
 }
 
-const initialLayerState: CanvasLayerState = {
+export const initialLayerState: CanvasLayerState = {
   objects: [],
   stagingArea: {
     x: -1,
@@ -283,104 +293,10 @@ export const canvasSlice = createSlice({
       // state.inpainting.imageToInpaint = undefined;
     },
     setImageToOutpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
-      const { width: canvasWidth, height: canvasHeight } =
-        state.outpainting.stageDimensions;
-      const { width, height } = state.outpainting.boundingBoxDimensions;
-      const { x, y } = state.outpainting.boundingBoxCoordinates;
-
-      const maxWidth = Math.min(action.payload.width, canvasWidth);
-      const maxHeight = Math.min(action.payload.height, canvasHeight);
-
-      const newCoordinates: Vector2d = { x, y };
-      const newDimensions: Dimensions = { width, height };
-
-      if (width + x > maxWidth) {
-        // Bounding box at least needs to be translated
-        if (width > maxWidth) {
-          // Bounding box also needs to be resized
-          newDimensions.width = roundDownToMultiple(maxWidth, 64);
-        }
-        newCoordinates.x = maxWidth - newDimensions.width;
-      }
-
-      if (height + y > maxHeight) {
-        // Bounding box at least needs to be translated
-        if (height > maxHeight) {
-          // Bounding box also needs to be resized
-          newDimensions.height = roundDownToMultiple(maxHeight, 64);
-        }
-        newCoordinates.y = maxHeight - newDimensions.height;
-      }
-
-      state.outpainting.boundingBoxDimensions = newDimensions;
-      state.outpainting.boundingBoxCoordinates = newCoordinates;
-
-      state.outpainting.pastLayerStates.push(state.outpainting.layerState);
-      state.outpainting.layerState = {
-        ...initialLayerState,
-        objects: [
-          {
-            kind: 'image',
-            layer: 'base',
-            x: 0,
-            y: 0,
-            image: action.payload,
-          },
-        ],
-      };
-      state.outpainting.futureLayerStates = [];
-      state.doesCanvasNeedScaling = true;
+      setImageToOutpaint_reducer(state, action.payload);
     },
     setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
-      const { width: canvasWidth, height: canvasHeight } =
-        state.inpainting.stageDimensions;
-      const { width, height } = state.inpainting.boundingBoxDimensions;
-      const { x, y } = state.inpainting.boundingBoxCoordinates;
-
-      const maxWidth = Math.min(action.payload.width, canvasWidth);
-      const maxHeight = Math.min(action.payload.height, canvasHeight);
-
-      const newCoordinates: Vector2d = { x, y };
-      const newDimensions: Dimensions = { width, height };
-
-      if (width + x > maxWidth) {
-        // Bounding box at least needs to be translated
-        if (width > maxWidth) {
-          // Bounding box also needs to be resized
-          newDimensions.width = roundDownToMultiple(maxWidth, 64);
-        }
-        newCoordinates.x = maxWidth - newDimensions.width;
-      }
-
-      if (height + y > maxHeight) {
-        // Bounding box at least needs to be translated
-        if (height > maxHeight) {
-          // Bounding box also needs to be resized
-          newDimensions.height = roundDownToMultiple(maxHeight, 64);
-        }
-        newCoordinates.y = maxHeight - newDimensions.height;
-      }
-
-      state.inpainting.boundingBoxDimensions = newDimensions;
-      state.inpainting.boundingBoxCoordinates = newCoordinates;
-
-      state.inpainting.pastLayerStates.push(state.inpainting.layerState);
-
-      state.inpainting.layerState = {
-        ...initialLayerState,
-        objects: [
-          {
-            kind: 'image',
-            layer: 'base',
-            x: 0,
-            y: 0,
-            image: action.payload,
-          },
-        ],
-      };
-
-      state.outpainting.futureLayerStates = [];
-      state.doesCanvasNeedScaling = true;
+      setImageToInpaint_reducer(state, action.payload);
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
       state[state.currentCanvas].stageDimensions = action.payload;
@@ -568,8 +484,7 @@ export const canvasSlice = createSlice({
       currentCanvas.layerState.stagingArea.images.push({
         kind: 'image',
         layer: 'base',
-        x: boundingBox.x,
-        y: boundingBox.y,
+        ...boundingBox,
         image,
       });
 
@@ -705,14 +620,8 @@ export const canvasSlice = createSlice({
         currentCanvas.pastLayerStates.shift();
       }
 
-      const { x, y, image } = images[selectedImageIndex];
-
       currentCanvas.layerState.objects.push({
-        kind: 'image',
-        layer: 'base',
-        x,
-        y,
-        image,
+        ...images[selectedImageIndex],
       });
 
       currentCanvas.layerState.stagingArea = {
@@ -723,20 +632,39 @@ export const canvasSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(uploadOutpaintingMergedImage.fulfilled, (state, action) => {
+    builder.addCase(mergeAndUploadCanvas.fulfilled, (state, action) => {
       if (!action.payload) return;
-      state.outpainting.pastLayerStates.push({
-        ...state.outpainting.layerState,
-      });
-      state.outpainting.futureLayerStates = [];
+      const { image, kind, boundingBox } = action.payload;
 
-      state.outpainting.layerState.objects = [
-        {
-          kind: 'image',
-          layer: 'base',
-          ...action.payload,
-        },
-      ];
+      if (kind === 'temp_merged_canvas') {
+        state.outpainting.pastLayerStates.push({
+          ...state.outpainting.layerState,
+        });
+
+        state.outpainting.futureLayerStates = [];
+
+        state.outpainting.layerState.objects = [
+          {
+            kind: 'image',
+            layer: 'base',
+            ...boundingBox,
+            image,
+          },
+        ];
+      }
+    });
+
+    builder.addCase(uploadImage.fulfilled, (state, action) => {
+      if (!action.payload) return;
+      const { image, kind, activeTabName } = action.payload;
+
+      if (kind !== 'init') return;
+
+      if (activeTabName === 'inpainting') {
+        setImageToInpaint_reducer(state, image);
+      } else if (activeTabName === 'outpainting') {
+        setImageToOutpaint_reducer(state, image);
+      }
     });
   },
 });
@@ -798,66 +726,6 @@ export const {
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
-
-export const uploadOutpaintingMergedImage = createAsyncThunk(
-  'canvas/uploadOutpaintingMergedImage',
-  async (
-    canvasImageLayerRef: MutableRefObject<Konva.Layer | null>,
-    thunkAPI
-  ) => {
-    const { getState } = thunkAPI;
-
-    const state = getState() as RootState;
-    const stageScale = state.canvas.outpainting.stageScale;
-
-    if (!canvasImageLayerRef.current) return;
-    const tempScale = canvasImageLayerRef.current.scale();
-
-    const { x: relativeX, y: relativeY } =
-      canvasImageLayerRef.current.getClientRect({
-        relativeTo: canvasImageLayerRef.current.getParent(),
-      });
-
-    canvasImageLayerRef.current.scale({
-      x: 1 / stageScale,
-      y: 1 / stageScale,
-    });
-
-    const clientRect = canvasImageLayerRef.current.getClientRect();
-
-    const imageDataURL = canvasImageLayerRef.current.toDataURL(clientRect);
-
-    canvasImageLayerRef.current.scale(tempScale);
-
-    if (!imageDataURL) return;
-
-    const response = await fetch(window.location.origin + '/upload', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        dataURL: imageDataURL,
-        name: 'outpaintingmerge.png',
-      }),
-    });
-
-    const data = (await response.json()) as InvokeAI.ImageUploadResponse;
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { destination, ...rest } = data;
-    const image = {
-      uuid: uuidv4(),
-      ...rest,
-    };
-
-    return {
-      image,
-      x: relativeX,
-      y: relativeY,
-    };
-  }
-);
 
 export const currentCanvasSelector = (state: RootState): BaseCanvasState =>
   state.canvas[state.canvas.currentCanvas];

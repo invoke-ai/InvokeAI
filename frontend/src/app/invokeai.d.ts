@@ -118,7 +118,7 @@ export declare type Image = {
   width: number;
   height: number;
   category: GalleryCategory;
-  isBase64: boolean;
+  isBase64?: boolean;
 };
 
 // GalleryImages is an array of Image.
@@ -178,8 +178,8 @@ export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
   generationMode: InvokeTabName;
 };
 
-export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
-  destination: 'img2img' | 'inpainting' | 'outpainting' | 'outpainting_merge';
+export declare type ImageUploadResponse = {
+  image: Omit<Image, 'uuid' | 'metadata' | 'category'>;
 };
 
 export declare type ErrorResponse = {
@@ -202,11 +202,6 @@ export declare type ImageDeletedResponse = {
 export declare type ImageUrlResponse = {
   url: string;
 };
-
-export declare type ImageUploadDestination =
-  | 'img2img'
-  | 'inpainting'
-  | 'outpainting_merge';
 
 export declare type UploadImagePayload = {
   file: File;
