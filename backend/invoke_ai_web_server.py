@@ -22,8 +22,8 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
-from backend.modules.get_outpainting_generation_mode import (
-    get_outpainting_generation_mode,
+from backend.modules.get_canvas_generation_mode import (
+    get_canvas_generation_mode,
 )
 
 # Loading Arguments
@@ -606,7 +606,10 @@ class InvokeAIWebServer:
             """
             Prepare for generation based on generation_mode
             """
-            if generation_parameters["generation_mode"] == "outpainting":
+            if generation_parameters["generation_mode"] in [
+                "outpainting",
+                "inpainting",
+            ]:
                 """
                 generation_parameters["init_img"] is a base64 image
                 generation_parameters["init_mask"] is a base64 image
@@ -617,46 +620,60 @@ class InvokeAIWebServer:
                 truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
                 truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
 
-                outpaint_image = dataURL_to_image(
-                    generation_parameters["init_img"]
-                ).convert("RGBA")
+                init_img_url = generation_parameters["init_img"]
+                
+                original_bounding_box = generation_parameters["bounding_box"].copy()
+
+                if generation_parameters["generation_mode"] == "outpainting":
+                    initial_image = dataURL_to_image(
+                        generation_parameters["init_img"]
+                    ).convert("RGBA")
+
+                    """
+                    The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
+                    to the generator should be:
+                        {
+                            "x": 0, 
+                            "y": 0,
+                            "width": original_bounding_box["width"],
+                            "height": original_bounding_box["height"]
+                        }
+                    """
+
+                    generation_parameters["bounding_box"]["x"] = 0
+                    generation_parameters["bounding_box"]["y"] = 0
+                elif generation_parameters["generation_mode"] == "inpainting":
+                    init_img_path = self.get_image_path_from_url(init_img_url)
+                    initial_image = Image.open(init_img_path)
+
+                    """
+                    For inpainting, only the mask is pre-cropped by the UI, so we need to crop out a copy
+                    of the region of the image to be inpainted to match the size of the mask image.
+                    """
+                    initial_image = copy_image_from_bounding_box(
+                        initial_image, **generation_parameters["bounding_box"]
+                    )
 
                 # Convert mask dataURL to an image and convert to greyscale
-                outpaint_mask = dataURL_to_image(
+                mask_image = dataURL_to_image(
                     generation_parameters["init_mask"]
                 ).convert("L")
 
-                actual_generation_mode = get_outpainting_generation_mode(
-                    outpaint_image, outpaint_mask
+                actual_generation_mode = get_canvas_generation_mode(
+                    initial_image, mask_image
                 )
 
-                """
-                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
-                to the generator should be:
-                    {
-                        "x": 0, 
-                        "y": 0,
-                        "width": original_bounding_box["width"],
-                        "height": original_bounding_box["height"]
-                    }
-                
-                Save the original bounding box, we need to give it back to the UI when finished,
-                because the UI needs to know where to put the inpainted image on the canvas.
-                """
-                original_bounding_box = generation_parameters["bounding_box"].copy()
-
-                generation_parameters["bounding_box"]["x"] = 0
-                generation_parameters["bounding_box"]["y"] = 0
+                print(initial_image, mask_image)
 
                 """
                 Apply the mask to the init image, creating a "mask" image with 
                 transparency where inpainting should occur. This is the kind of
                 mask that prompt2image() needs.
                 """
-                alpha_mask = outpaint_image.copy()
-                alpha_mask.putalpha(outpaint_mask)
+                alpha_mask = initial_image.copy()
+                alpha_mask.putalpha(mask_image)
 
-                generation_parameters["init_img"] = outpaint_image
+                generation_parameters["init_img"] = initial_image
                 generation_parameters["init_mask"] = alpha_mask
 
                 # Remove the unneeded parameters for whichever mode we are doing
@@ -690,48 +707,6 @@ class InvokeAIWebServer:
                     generation_parameters.pop("seam_steps", None)
                     generation_parameters.pop("tile_size", None)
                     generation_parameters.pop("force_outpaint", None)
-
-            elif generation_parameters["generation_mode"] == "inpainting":
-                """
-                generation_parameters["init_img"] is a url
-                generation_parameters["init_mask"] is a base64 image
-
-                So we need to convert each into a PIL Image.
-                """
-                truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
-                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
-
-                init_img_url = generation_parameters["init_img"]
-                init_mask_url = generation_parameters["init_mask"]
-
-                init_img_path = self.get_image_path_from_url(init_img_url)
-
-                original_image = Image.open(init_img_path)
-
-                rgba_image = original_image.convert("RGBA")
-                # copy a region from it which we will inpaint
-                cropped_init_image = copy_image_from_bounding_box(
-                    rgba_image, **generation_parameters["bounding_box"]
-                )
-
-                original_bounding_box = generation_parameters["bounding_box"].copy()
-
-                generation_parameters["init_img"] = cropped_init_image
-
-                # Convert mask dataURL to an image and convert to greyscale
-                mask_image = dataURL_to_image(
-                    generation_parameters["init_mask"]
-                ).convert("L")
-
-                """
-                Apply the mask to the init image, creating a "mask" image with 
-                transparency where inpainting should occur. This is the kind of
-                mask that prompt2image() needs.
-                """
-                alpha_mask = cropped_init_image.copy()
-                alpha_mask.putalpha(mask_image)
-
-                generation_parameters["init_mask"] = alpha_mask
 
             elif generation_parameters["generation_mode"] == "img2img":
                 init_img_url = generation_parameters["init_img"]

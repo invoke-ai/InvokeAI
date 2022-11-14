@@ -21,7 +21,7 @@ def check_for_any_transparency(img: Union[ImageType, str]) -> bool:
     return False
 
 
-def get_outpainting_generation_mode(
+def get_canvas_generation_mode(
     init_img: Union[ImageType, str], init_mask: Union[ImageType, str]
 ) -> Literal["txt2img", "outpainting", "inpainting", "img2img",]:
     if type(init_img) is str:
@@ -80,36 +80,36 @@ def main():
 
     print(
         "OPAQUE IMAGE, NO MASK, expect img2img, got ",
-        get_outpainting_generation_mode(init_img_opaque, init_mask_no_mask),
+        get_canvas_generation_mode(init_img_opaque, init_mask_no_mask),
     )
 
     print(
         "IMAGE WITH TRANSPARENCY, NO MASK, expect outpainting, got ",
-        get_outpainting_generation_mode(
+        get_canvas_generation_mode(
             init_img_partial_transparency, init_mask_no_mask
         ),
     )
 
     print(
         "FULLY TRANSPARENT IMAGE NO MASK, expect txt2img, got ",
-        get_outpainting_generation_mode(init_img_full_transparency, init_mask_no_mask),
+        get_canvas_generation_mode(init_img_full_transparency, init_mask_no_mask),
     )
 
     print(
         "OPAQUE IMAGE, WITH MASK, expect inpainting, got ",
-        get_outpainting_generation_mode(init_img_opaque, init_mask_has_mask),
+        get_canvas_generation_mode(init_img_opaque, init_mask_has_mask),
     )
 
     print(
         "IMAGE WITH TRANSPARENCY, WITH MASK, expect outpainting, got ",
-        get_outpainting_generation_mode(
+        get_canvas_generation_mode(
             init_img_partial_transparency, init_mask_has_mask
         ),
     )
 
     print(
         "FULLY TRANSPARENT IMAGE WITH MASK, expect txt2img, got ",
-        get_outpainting_generation_mode(init_img_full_transparency, init_mask_has_mask),
+        get_canvas_generation_mode(init_img_full_transparency, init_mask_has_mask),
     )
 
 
