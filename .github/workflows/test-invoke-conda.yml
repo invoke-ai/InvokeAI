@@ -93,8 +93,11 @@ jobs:
         run: |
           mkdir -p ~/.huggingface
           echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
-          wc ~/.huggingface/token
-          echo -n Logged in to huggingface as: ; huggingface-cli whoami
+          if [ -s ~/.huggingface/token ] ; then
+            echo -n Logged in to huggingface as: ; huggingface-cli whoami
+          else
+            echo -e '\a ⛔ I have no huggingface token!' ; exit 1
+          fi
           python scripts/preload_models.py \
             --no-interactive
 
