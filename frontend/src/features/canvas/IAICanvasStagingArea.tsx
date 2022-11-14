@@ -7,7 +7,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { emotionCache } from 'main';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   FaArrowLeft,
   FaArrowRight,
@@ -61,6 +61,17 @@ const IAICanvasStagingArea = (props: Props) => {
   const [shouldShowStagedImage, setShouldShowStagedImage] =
     useState<boolean>(true);
 
+  const [shouldShowStagingAreaOutline, setShouldShowStagingAreaOutline] =
+    useState<boolean>(true);
+
+  const handleMouseOver = useCallback(() => {
+    setShouldShowStagingAreaOutline(false);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setShouldShowStagingAreaOutline(true);
+  }, []);
+
   if (!currentStagingAreaImage) return null;
 
   const {
@@ -71,29 +82,30 @@ const IAICanvasStagingArea = (props: Props) => {
 
   return (
     <Group {...rest}>
-      <Group>
-        {shouldShowStagedImage && <IAICanvasImage url={url} x={x} y={y} />}
-
-        <Rect
-          x={x}
-          y={y}
-          width={width}
-          height={height}
-          strokeWidth={1}
-          stroke={'black'}
-          strokeScaleEnabled={false}
-        />
-        <Rect
-          x={x}
-          y={y}
-          width={width}
-          height={height}
-          dash={[4, 4]}
-          strokeWidth={1}
-          stroke={'white'}
-          strokeScaleEnabled={false}
-        />
-      </Group>
+      {shouldShowStagedImage && <IAICanvasImage url={url} x={x} y={y} />}
+      {shouldShowStagingAreaOutline && (
+        <Group>
+          <Rect
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            strokeWidth={1}
+            stroke={'black'}
+            strokeScaleEnabled={false}
+          />
+          <Rect
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            dash={[4, 4]}
+            strokeWidth={1}
+            stroke={'white'}
+            strokeScaleEnabled={false}
+          />
+        </Group>
+      )}
       <Html>
         <CacheProvider value={emotionCache}>
           <ChakraProvider>
@@ -113,6 +125,8 @@ const IAICanvasStagingArea = (props: Props) => {
                   aria-label="Previous"
                   icon={<FaArrowLeft />}
                   onClick={() => dispatch(prevStagingAreaImage())}
+                  onMouseOver={handleMouseOver}
+                  onMouseOut={handleMouseOut}
                   data-selected={true}
                   isDisabled={isOnFirstImage}
                 />
@@ -122,6 +136,8 @@ const IAICanvasStagingArea = (props: Props) => {
                   aria-label="Next"
                   icon={<FaArrowRight />}
                   onClick={() => dispatch(nextStagingAreaImage())}
+                  onMouseOver={handleMouseOver}
+                  onMouseOut={handleMouseOut}
                   data-selected={true}
                   isDisabled={isOnLastImage}
                 />
