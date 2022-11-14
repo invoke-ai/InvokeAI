@@ -12,8 +12,6 @@
 
 echo ***** Installing InvokeAI.. *****
 
-set PATH=c:\windows\system32
-
 @rem Config
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 @rem https://mamba.readthedocs.io/en/latest/installation.html
@@ -103,11 +101,8 @@ echo ***** Unpacked python-build-standalone *****
 @rem create venv
 set err_msg=----- problem creating venv -----
 .\python\python -E -s -m venv .venv
-@rem In reality, the following is ALL that 'activate.bat' does,
-@rem aside from setting the prompt, which we don't care about
-set PYTHONPATH=
-set PATH=.venv\Scripts;%PATH%
 if %errorlevel% neq 0 goto err_exit
+call .venv\Scripts\activate.bat
 
 echo ***** Created Python virtual environment *****
 
@@ -131,10 +126,6 @@ set err_msg=----- main pip install failed -----
 .venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location -r requirements.txt
 if %errorlevel% neq 0 goto err_exit
 
-set err_msg=----- clipseg install failed -----
-.venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-if %errorlevel% neq 0 goto err_exit
-
 set err_msg=----- InvokeAI setup failed -----
 .venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location -e .
 if %errorlevel% neq 0 goto err_exit
@@ -154,6 +145,8 @@ echo All done! Execute the file invoke.bat in this directory to start InvokeAI
 
 @rem more cleanup
 rd /s /q installer installer_files
+
+deactivate
 
 pause
 exit

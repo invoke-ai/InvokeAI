@@ -1,7 +1,6 @@
 @echo off
 
-set PATH=c:\windows\system32
-set PATH=.venv\Scripts;%PATH%
+call .venv\Scripts\activate.bat
 
 echo Do you want to generate images using the
 echo 1. command-line
@@ -16,12 +15,16 @@ IF /I "%restore%" == "1" (
     .venv\Scripts\python scripts\invoke.py --web
 ) ELSE IF /I "%restore%" == "3" (
     echo Developer Console
-    call where python
-    call python --version
-
-    cmd /k
+    echo 'python' command is:
+    where python
+    echo 'python' version is:
+    python --version
+    echo Type 'exit' to quit this shell
+    call cmd
 ) ELSE (
     echo Invalid selection
     pause
     exit /b
 )
+
+deactivate
