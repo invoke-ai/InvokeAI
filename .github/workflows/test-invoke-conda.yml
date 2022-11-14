@@ -1,16 +1,16 @@
 name: Test invoke.py
-on:
-  push:
-    branches:
-      - 'main'
-      - 'development'
-  pull_request:
-    branches:
-      - 'main'
-      - 'development'
+on: [push, pull_request]
 
 jobs:
   matrix:
+    # Run on:
+    # - pull requests
+    # - pushes to forks (will run in the forked project with that fork's secrets)
+    # - pushes to branches that are *not* pull requests
+    if: |
+      github.event_name == 'pull_request'
+      || github.repository != 'invoke-ai/InvokeAI'
+      || github.ref_protected
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +38,7 @@ jobs:
     env:
       CONDA_ENV_NAME: invokeai
       PYTHONUNBUFFERED: 1
+      HAVE_SECRETS: ${{ secrets.HUGGINGFACE_TOKEN != '' }}
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
@@ -51,6 +52,19 @@ jobs:
 
       - name: create environment.yml
         run: cp environments-and-requirements/${{ matrix.environment-file }} environment.yml
+
+      - name: Use Cached Stable Diffusion Model
+        id: cache-sd-model
+        uses: actions/cache@v3
+        env:
+          cache-name: huggingface-${{ matrix.stable-diffusion-model-switch }}
+        with:
+          path: ~/.cache/huggingface
+          key: ${{ env.cache-name }}
+
+      - name: Check model availability
+        if: steps.cache-sd-model.outputs.cache-hit != true && !env.HAVE_SECRETS
+        run: echo -e '\a ⛔ GitHub model cache not found, and no HUGGINGFACE_TOKEN is available. Will not be able to load Stable Diffusion.' ; exit 1
 
       - name: Use cached conda packages
         id: use-cached-conda-packages
@@ -79,24 +93,12 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
-      - name: Use Cached Stable Diffusion Model
-        id: cache-sd-model
-        uses: actions/cache@v3
-        env:
-          cache-name: huggingface-${{ matrix.stable-diffusion-model-switch }}
-        with:
-          path: ~/.cache/huggingface
-          key: ${{ env.cache-name }}
-
       - name: run preload_models.py
         id: run-preload-models
         run: |
-          mkdir -p ~/.huggingface
-          echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
-          if [ -s ~/.huggingface/token ] ; then
-            echo -n Logged in to huggingface as: ; huggingface-cli whoami
-          else
-            echo -e '\a ⛔ I have no huggingface token!' ; exit 1
+          if [ "${HAVE_SECRETS}" == true ] ; then
+            mkdir -p ~/.huggingface
+            echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
           fi
           python scripts/preload_models.py \
             --no-interactive
