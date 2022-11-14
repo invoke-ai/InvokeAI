@@ -63,7 +63,7 @@ jobs:
           key: ${{ env.cache-name }}
 
       - name: Check model availability
-        if: steps.cache-sd-model.outputs.cache-hit != true && !env.HAVE_SECRETS
+        if: steps.cache-sd-model.outputs.cache-hit != true && env.HAVE_SECRETS != 'true'
         run: echo -e '\a ⛔ GitHub model cache not found, and no HUGGINGFACE_TOKEN is available. Will not be able to load Stable Diffusion.' ; exit 1
 
       - name: Use cached conda packages
