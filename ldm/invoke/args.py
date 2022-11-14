@@ -173,7 +173,8 @@ class Args(object):
                 print(f'>> Initialization file {INITFILE} found. Loading...')
                 sysargs.insert(0,f'@{INITFILE}')
             else:
-                print(f'>> Initialization file {INITFILE} not found. Applying default settings...')
+                print(f'>> Initialization file {INITFILE} not found. Creating a new one...')
+                self._create_init_file(INITFILE)
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
@@ -362,6 +363,17 @@ class Args(object):
             value2 = dict2.get(k,None)
             new_dict[k] = value2 if value2 is not None else value1
         return new_dict
+
+    def _create_init_file(self,initfile:str):
+        with open(initfile, mode='w', encoding='utf-8') as f:
+            f.write('''# InvokeAI initialization file
+# Put frequently-used startup commands here, one or more per line
+# Examples:
+# --web --host=0.0.0.0
+# --steps 20
+# -Ak_euler_a -C10.0
+'''
+            )
 
     def _create_arg_parser(self):
         '''
