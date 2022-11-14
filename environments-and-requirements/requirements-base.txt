@@ -26,7 +26,7 @@ scikit-image>=0.19
 send2trash
 streamlit
 taming-transformers-rom1504
-test-tube
+test-tube>=0.7.5
 torch-fidelity
 torchmetrics
 transformers==4.21.*
