@@ -37,6 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
+      PYTHONUNBUFFERED: 1
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
@@ -82,25 +83,16 @@ jobs:
         id: cache-sd-model
         uses: actions/cache@v3
         env:
-          cache-name: cache-${{ matrix.stable-diffusion-model-switch }}
+          cache-name: cache-huggingface-${{ matrix.stable-diffusion-model-switch }}
         with:
-          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          path: ~/.cache/huggingface
           key: ${{ env.cache-name }}
-
-      - name: Download ${{ matrix.stable-diffusion-model-switch }}
-        id: download-stable-diffusion-model
-        if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
-        run: |
-          [[ -d models/ldm/stable-diffusion-v1 ]] \
-            || mkdir -p models/ldm/stable-diffusion-v1
-          curl \
-            -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
-            -o ${{ matrix.stable-diffusion-model-dl-path }} \
-            -L ${{ matrix.stable-diffusion-model }}
 
       - name: run preload_models.py
         id: run-preload-models
         run: |
+          mkdir -p ~/.huggingface
+          echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
           python scripts/preload_models.py \
             --no-interactive
 
