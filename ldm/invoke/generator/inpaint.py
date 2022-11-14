@@ -262,6 +262,8 @@ class Inpaint(Img2Img):
 
             # Seam paint if this is our first pass (seam_size set to 0 during seam painting)
             if seam_size > 0:
+                old_image = self.pil_image or init_image
+                old_mask = self.pil_mask or mask_image
 
                 result = self.seam_paint(
                     result,
@@ -279,7 +281,10 @@ class Inpaint(Img2Img):
 
                 # Restore original settings
                 self.get_make_image(prompt,sampler,steps,cfg_scale,ddim_eta,
-                       conditioning,init_image,mask_image,strength,
+                       conditioning,
+                       old_image,
+                       old_mask,
+                       strength,
                        mask_blur_radius, seam_size, seam_blur, seam_strength,
                        seam_steps, tile_size, step_callback,
                        inpaint_replace, enable_image_debugging,
