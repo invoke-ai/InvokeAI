@@ -93,6 +93,8 @@ jobs:
         run: |
           mkdir -p ~/.huggingface
           echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
+          wc ~/.huggingface/token
+          echo -n Logged in to huggingface as: ; huggingface-cli whoami
           python scripts/preload_models.py \
             --no-interactive
 
