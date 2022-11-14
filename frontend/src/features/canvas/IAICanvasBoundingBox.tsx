@@ -109,8 +109,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       if (activeTabName === 'inpainting' || !shouldSnapToGrid) {
         dispatch(
           setBoundingBoxCoordinates({
-            x: e.target.x(),
-            y: e.target.y(),
+            x: Math.floor(e.target.x()),
+            y: Math.floor(e.target.y()),
           })
         );
         return;
@@ -238,7 +238,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
       // We may not change anything, stash the old position
       let newCoordinate = { ...oldPos };
-      console.log(oldPos, newPos);
+
       // Set the new coords based on what snapped
       if (didSnapX && !didSnapY) {
         newCoordinate = {
@@ -269,25 +269,21 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
        * Unlike anchorDragBoundFunc, it does get a width and height, so
        * the logic to constrain the size of the bounding box is very simple.
        */
-      if (!baseCanvasImage && activeTabName !== 'outpainting')
-        return oldBoundBox;
+
+      // On the Inpainting canvas, the bounding box needs to stay in the stage
       if (
-        newBoundBox.width + newBoundBox.x > stageDimensions.width ||
-        newBoundBox.height + newBoundBox.y > stageDimensions.height ||
-        newBoundBox.x < 0 ||
-        newBoundBox.y < 0
+        activeTabName === 'inpainting' &&
+        (newBoundBox.width + newBoundBox.x > stageDimensions.width ||
+          newBoundBox.height + newBoundBox.y > stageDimensions.height ||
+          newBoundBox.x < 0 ||
+          newBoundBox.y < 0)
       ) {
         return oldBoundBox;
       }
 
       return newBoundBox;
     },
-    [
-      activeTabName,
-      baseCanvasImage,
-      stageDimensions.height,
-      stageDimensions.width,
-    ]
+    [activeTabName, stageDimensions.height, stageDimensions.width]
   );
 
   const handleStartedTransforming = () => {
