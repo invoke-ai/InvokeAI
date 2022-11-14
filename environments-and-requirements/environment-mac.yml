@@ -22,7 +22,7 @@ dependencies:
 
   - albumentations=1.2
   - coloredlogs=15.0
-  - diffusers=0.6
+  - diffusers~=0.7
   - einops=0.3
   - eventlet
   - grpcio=1.46
