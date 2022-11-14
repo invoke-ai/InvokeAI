@@ -123,7 +123,8 @@ class Inpaint(Img2Img):
         seam_blur: int,
         prompt,sampler,steps,cfg_scale,ddim_eta,
         conditioning,strength,
-        noise
+        noise,
+        step_callback
     ) -> Image.Image:
         hard_mask = self.pil_image.split()[-1].copy()
         mask = self.mask_edge(hard_mask, seam_size, seam_blur)
@@ -139,7 +140,8 @@ class Inpaint(Img2Img):
             mask_image = mask.convert('RGB'), # Code currently requires an RGB mask
             strength = strength,
             mask_blur_radius = 0,
-            seam_size = 0
+            seam_size = 0,
+            step_callback = step_callback
         )
 
         result = make_image(noise)
@@ -169,7 +171,7 @@ class Inpaint(Img2Img):
         self.enable_image_debugging = enable_image_debugging
 
         if isinstance(init_image, PIL.Image.Image):
-            self.pil_image = init_image
+            self.pil_image = init_image.copy()
 
             # Fill missing areas of original image
             init_filled = self.tile_fill_missing(
@@ -185,7 +187,7 @@ class Inpaint(Img2Img):
             init_image = self._image_to_tensor(init_filled.convert('RGB'))
 
         if isinstance(mask_image, PIL.Image.Image):
-            self.pil_mask = mask_image
+            self.pil_mask = mask_image.copy()
             debug_image(mask_image, "mask_image BEFORE multiply with pil_image", debug_status=self.enable_image_debugging)
 
             mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert('RGB'))
@@ -260,6 +262,7 @@ class Inpaint(Img2Img):
 
             # Seam paint if this is our first pass (seam_size set to 0 during seam painting)
             if seam_size > 0:
+
                 result = self.seam_paint(
                     result,
                     seam_size,
@@ -271,7 +274,16 @@ class Inpaint(Img2Img):
                     ddim_eta,
                     conditioning,
                     seam_strength,
-                    x_T)
+                    x_T,
+                    step_callback)
+
+                # Restore original settings
+                self.get_make_image(prompt,sampler,steps,cfg_scale,ddim_eta,
+                       conditioning,init_image,mask_image,strength,
+                       mask_blur_radius, seam_size, seam_blur, seam_strength,
+                       seam_steps, tile_size, step_callback,
+                       inpaint_replace, enable_image_debugging,
+                       **kwargs)
 
             return result
 
