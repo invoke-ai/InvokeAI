@@ -286,6 +286,8 @@ class Args(object):
             switches.append(f'--embiggen {" ".join([str(u) for u in a["embiggen"]])}')
         if a['embiggen_tiles']:
             switches.append(f'--embiggen_tiles {" ".join([str(u) for u in a["embiggen_tiles"]])}')
+        if a['embiggen_strength']:
+            switches.append(f'--embiggen_strength {a["embiggen_strength"]}')
 
         # outpainting parameters
         if a['out_direction']:
@@ -914,6 +916,13 @@ class Args(object):
             type=int,
             help='For embiggen, provide list of tiles to process and replace onto the image e.g. `1 3 5`.',
             default=None,
+        )
+        postprocessing_group.add_argument(
+            '--embiggen_strength',
+            '-embiggen_strength',
+            type=float,
+            help='The strength of the embiggen img2img step, defaults to 0.4',
+            default=0.4,
         )
         special_effects_group.add_argument(
             '--seamless',
