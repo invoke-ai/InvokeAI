@@ -26,8 +26,8 @@ export const requestNewImages = createAction<GalleryCategory>(
 export const cancelProcessing = createAction<undefined>(
   'socketio/cancelProcessing'
 );
-export const uploadImage = createAction<InvokeAI.UploadImagePayload>('socketio/uploadImage');
-export const uploadMaskImage = createAction<File>('socketio/uploadMaskImage');
+// export const uploadImage = createAction<InvokeAI.UploadImagePayload>('socketio/uploadImage');
+// export const uploadMaskImage = createAction<File>('socketio/uploadMaskImage');
 
 export const requestSystemConfig = createAction<undefined>(
   'socketio/requestSystemConfig'

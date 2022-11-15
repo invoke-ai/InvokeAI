@@ -4,7 +4,7 @@ import Konva from 'konva';
 import { MutableRefObject } from 'react';
 import * as InvokeAI from 'app/invokeai';
 import { v4 as uuidv4 } from 'uuid';
-import layerToBlob from './layerToBlob';
+import layerToDataURL from './layerToDataURL';
 
 export const mergeAndUploadCanvas = createAsyncThunk(
   'canvas/mergeAndUploadCanvas',
@@ -25,16 +25,17 @@ export const mergeAndUploadCanvas = createAsyncThunk(
 
     if (!canvasImageLayerRef.current) return;
 
-    const { blob, relativeX, relativeY } = await layerToBlob(
+    const { dataURL, relativeX, relativeY } = layerToDataURL(
       canvasImageLayerRef.current,
       stageScale
     );
 
-    if (!blob) return;
+    if (!dataURL) return;
 
     const formData = new FormData();
 
-    formData.append('file', blob as Blob, 'merged_canvas.png');
+    formData.append('dataURL', dataURL);
+    formData.append('filename', 'merged_canvas.png');
     formData.append('kind', saveToGallery ? 'result' : 'temp');
 
     const response = await fetch(window.location.origin + '/upload', {

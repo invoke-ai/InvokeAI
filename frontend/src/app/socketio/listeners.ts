@@ -103,20 +103,28 @@ const makeSocketIOListeners = (
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
         const { shouldLoopback, activeTab } = getState().options;
+        const { boundingBox: _, generationMode, ...rest } = data;
+
         const newImage = {
           uuid: uuidv4(),
-          ...data,
-          category: 'result',
+          ...rest,
         };
 
-        dispatch(
-          addImage({
-            category: 'result',
-            image: newImage,
-          })
-        );
+        if (['txt2img', 'img2img'].includes(generationMode)) {
+          newImage.category = 'result';
+          dispatch(
+            addImage({
+              category: 'result',
+              image: newImage,
+            })
+          );
+        }
 
-        if (data.generationMode === 'outpainting' && data.boundingBox) {
+        if (
+          ['inpainting', 'outpainting'].includes(generationMode) &&
+          data.boundingBox
+        ) {
+          newImage.category = 'temp';
           const { boundingBox } = data;
           dispatch(
             addImageToOutpainting({
@@ -139,6 +147,8 @@ const makeSocketIOListeners = (
             }
           }
         }
+
+        dispatch(clearIntermediateImage());
 
         dispatch(
           addLogEntry({
@@ -368,16 +378,16 @@ const makeSocketIOListeners = (
     /**
      * Callback to run when we receive a 'maskImageUploaded' event.
      */
-    onMaskImageUploaded: (data: InvokeAI.ImageUrlResponse) => {
-      const { url } = data;
-      dispatch(setMaskPath(url));
-      dispatch(
-        addLogEntry({
-          timestamp: dateFormat(new Date(), 'isoDateTime'),
-          message: `Mask image uploaded: ${url}`,
-        })
-      );
-    },
+    // onMaskImageUploaded: (data: InvokeAI.ImageUrlResponse) => {
+    //   const { url } = data;
+    //   dispatch(setMaskPath(url));
+    //   dispatch(
+    //     addLogEntry({
+    //       timestamp: dateFormat(new Date(), 'isoDateTime'),
+    //       message: `Mask image uploaded: ${url}`,
+    //     })
+    //   );
+    // },
     onSystemConfig: (data: InvokeAI.SystemConfig) => {
       dispatch(setSystemConfig(data));
     },
