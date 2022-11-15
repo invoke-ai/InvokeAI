@@ -636,9 +636,7 @@ class Generate:
         elif tool == 'embiggen':
             # fetch the metadata from the image
             generator = self.select_generator(embiggen=True)
-            opt.strength  = 0.40
-            if opt.embiggen_strength is not None:
-                opt.strength = embiggen_strength
+            opt.strength = opt.embiggen_strength or 0.40
             print(f'>> Setting img2img strength to {opt.strength} for happy embiggening')
             generator.generate(
                 prompt,
