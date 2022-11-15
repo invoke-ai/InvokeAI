@@ -38,7 +38,7 @@ import {
   requestSystemConfig,
 } from './actions';
 import {
-  addImageToOutpainting,
+  addImageToStagingArea,
   setImageToInpaint,
 } from 'features/canvas/canvasSlice';
 import { tabMap } from 'features/tabs/InvokeTabs';
@@ -126,12 +126,17 @@ const makeSocketIOListeners = (
         ) {
           newImage.category = 'temp';
           const { boundingBox } = data;
-          dispatch(
-            addImageToOutpainting({
-              image: newImage,
-              boundingBox,
-            })
-          );
+
+          if (generationMode === 'inpainting') {
+            dispatch(setImageToInpaint(newImage));
+          } else {
+            dispatch(
+              addImageToStagingArea({
+                image: newImage,
+                boundingBox,
+              })
+            );
+          }
         }
 
         if (shouldLoopback) {

@@ -3,6 +3,9 @@ import { useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { Group, Line } from 'react-konva';
 import {
+  baseCanvasImageSelector,
+  canvasClipSelector,
+  canvasModeSelector,
   currentCanvasSelector,
   isCanvasBaseImage,
   isCanvasBaseLine,
@@ -11,11 +14,13 @@ import IAICanvasImage from './IAICanvasImage';
 import { rgbaColorToString } from './util/colorToString';
 
 const selector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
+  [currentCanvasSelector, canvasClipSelector],
+  (currentCanvas, canvasClip) => {
     const { objects } = currentCanvas.layerState;
+
     return {
       objects,
+      canvasClip,
     };
   },
   {
@@ -26,12 +31,12 @@ const selector = createSelector(
 );
 
 const IAICanvasObjectRenderer = () => {
-  const { objects } = useAppSelector(selector);
+  const { objects, canvasClip } = useAppSelector(selector);
 
   if (!objects) return null;
 
   return (
-    <Group name="outpainting-objects" listening={false}>
+    <Group name="outpainting-objects" listening={false} {...canvasClip}>
       {objects.map((obj, i) => {
         if (isCanvasBaseImage(obj)) {
           return (
