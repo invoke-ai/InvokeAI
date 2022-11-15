@@ -93,6 +93,7 @@ import copy
 import base64
 import functools
 import ldm.invoke.pngwriter
+from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
@@ -116,7 +117,6 @@ PRECISION_CHOICES = [
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
 APP_VERSION = 'v2.1.2'
-INITFILE = os.path.expanduser('~/.invokeai')
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -169,11 +169,12 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             sysargs = sys.argv[1:]
-            if os.path.exists(INITFILE):
-                print(f'>> Initialization file {INITFILE} found. Loading...')
-                sysargs.insert(0,f'@{INITFILE}')
+            initfile = os.path.expanduser(Globals.initfile)
+            if os.path.exists(initfile):
+                print(f'>> Initialization file {initfile} found. Loading...')
+                sysargs.insert(0,f'@{initfile}')
             else:
-                print(f'>> Initialization file {INITFILE} not found. Applying default settings...')
+                print(f'>> Initialization file {initfile} not found. Applying default settings...')
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
@@ -391,8 +392,8 @@ class Args(object):
         deprecated_group.add_argument('--weights') # deprecated
         model_group.add_argument(
             '--root_dir',
-            default='.',
-            help='Path to directory containing "models", "outputs" and "configs"'
+            default=None,
+            help='Path to directory containing "models", "outputs" and "configs". If not present will try to read from ~/.invokeai and then from environment variable INVOKEAI_ROOT. Defaults to the current directory as a last resort.',
         )
         model_group.add_argument(
             '--config',

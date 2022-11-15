@@ -8,8 +8,13 @@ the attributes:
   - root    - the root directory under which "models" and "outputs" can be found
 '''
 
+import os
 from argparse import Namespace
 
 Globals = Namespace()
+
+# This is usually overwritten by the command line and/or environment variables
 Globals.root = '.'
 
+# Where to look for the initialization file
+Globals.initfile = os.path.expanduser('~/.invokeai')

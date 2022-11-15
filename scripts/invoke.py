@@ -48,7 +48,7 @@ def main():
             args.max_loaded_models = 1
 
     # alert - setting a global here
-    Globals.root=os.path.expanduser(args.root_dir)
+    Globals.root=os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or '.')
 
     from ldm.generate import Generate
 
