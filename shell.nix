@@ -98,7 +98,7 @@ let
     };
   };
 
-  envFile = env.${stdenv.system}.envFile;
+  envFile = "environments-and-requirements/" + env.${stdenv.system}.envFile;
   installPath = env.${stdenv.system}.condaPath;
   ptrSize = env.${stdenv.system}.ptrSize;
   shellHook = ''
