@@ -390,6 +390,11 @@ class Args(object):
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
         model_group.add_argument(
+            '--root_dir',
+            default='.',
+            help='Path to directory containing "models", "outputs" and "configs"'
+        )
+        model_group.add_argument(
             '--config',
             '-c',
             '-config',

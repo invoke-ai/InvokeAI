@@ -32,7 +32,9 @@ warnings.filterwarnings('ignore')
 #warnings.filterwarnings('ignore',category=UserWarning)
 
 #--------------------------globals--
-Model_dir = './models/ldm/stable-diffusion-v1/'
+Root_dir = '.'
+Model_dir = 'models'
+Weights_dir = 'ldm/stable-diffusion-v1/'
 Default_config_file = './configs/models.yaml'
 SD_Configs = './configs/stable-diffusion'
 Datasets = {
@@ -253,14 +255,15 @@ This involves a few easy steps.
 # look for legacy model.ckpt in models directory and offer to
 # normalize its name
 def migrate_models_ckpt():
-    if not os.path.exists(os.path.join(Model_dir,'model.ckpt')):
+    model_path = os.path.join(Root_dir,Model_dir,Weights_dir)
+    if not os.path.exists(os.path.join(model_path,'model.ckpt')):
         return
     new_name = Datasets['stable-diffusion-1.4']['file']
     print('You seem to have the Stable Diffusion v4.1 "model.ckpt" already installed.')
     rename = yes_or_no(f'Ok to rename it to "{new_name}" for future reference?')
     if rename:
         print(f'model.ckpt => {new_name}')
-        os.rename(os.path.join(Model_dir,'model.ckpt'),os.path.join(Model_dir,new_name))
+        os.rename(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
             
 #---------------------------------------------
 def download_weight_datasets(models:dict, access_token:str):
@@ -271,6 +274,7 @@ def download_weight_datasets(models:dict, access_token:str):
         filename = Datasets[mod]['file']
         success = download_with_resume(
             repo_id=repo_id,
+            model_dir=os.path.join(Root_dir,Model_dir,Weights_dir),
             model_name=filename,
             access_token=access_token
         )
@@ -290,12 +294,12 @@ def download_weight_datasets(models:dict, access_token:str):
     return successful
     
 #---------------------------------------------
-def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
-    model_dest = os.path.join(Model_dir, model_name)
-    os.makedirs(os.path.dirname(model_dest), exist_ok=True)
+def download_with_resume(repo_id:str, model_dir:str, model_name:str, access_token:str=None)->bool:
+    model_dest = os.path.join(model_dir, model_name)
+    os.makedirs(model_dir, exist_ok=True)
     url = hf_hub_url(repo_id, model_name)
 
-    header = {"Authorization": f'Bearer {access_token}'}
+    header = {"Authorization": f'Bearer {access_token}'} if access_token else {}
     open_mode = 'wb'
     exist_size = 0
     
@@ -399,30 +403,27 @@ def new_config_file_contents(successfully_downloaded:dict, Config_file:str)->str
 #---------------------------------------------
 # this will preload the Bert tokenizer fles
 def download_bert():
-    print('Installing bert tokenizer (ignore deprecation errors)...', end='')
-    sys.stdout.flush()
+    print('Installing bert tokenizer (ignore deprecation errors)...', end='',file=sys.stderr)
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=DeprecationWarning)
         from transformers import BertTokenizerFast, AutoFeatureExtractor
-        tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
-        print('...success')
+        download_from_hf(BertTokenizerFast,'bert-base-uncased')
+        print('...success',file=sys.stderr)
 
 #---------------------------------------------
-# this will download requirements for Kornia
-def download_kornia():
-    print('Installing Kornia requirements (ignore deprecation errors)...', end='')
-    sys.stdout.flush()
-    import kornia
-    print('...success')
+def download_from_hf(model_class:object, model_name:str):
+    return model_class.from_pretrained(model_name,
+                                       cache_dir=os.path.join(Root_dir,Model_dir,model_name),
+                                       resume_download=True
+    )
 
 #---------------------------------------------
 def download_clip():
-    print('Loading CLIP model (ignore deprecation errors)...',end='')
-    sys.stdout.flush()
+    print('Loading CLIP model (ignore deprecation errors)...',end='',file=sys.stderr)
     version = 'openai/clip-vit-large-patch14'
-    tokenizer = CLIPTokenizer.from_pretrained(version)
-    transformer = CLIPTextModel.from_pretrained(version)
-    print('...success')
+    download_from_hf(CLIPTokenizer,version)
+    download_from_hf(CLIPTextModel,version)
+    print('...success',file=sys.stderr)
 
 #---------------------------------------------
 def download_gfpgan():
@@ -464,7 +465,7 @@ def download_gfpgan():
             if not os.path.exists(model_dest):
                 print(f'Downloading gfpgan model file {model_url}...',end='')
                 os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-                request.urlretrieve(model_url,model_dest)
+                request.urlretrieve(model_url,model_dest,ProgressBar(os.path.basename(model_dest)))
                 print('...success')
         except Exception:
             print('Error loading GFPGAN:')
@@ -472,18 +473,18 @@ def download_gfpgan():
 
 #---------------------------------------------
 def download_codeformer():
-    print('Installing CodeFormer model file...',end='')
+    print('Installing CodeFormer model file...',end='',file=sys.stderr)
     try:
-            model_url  = 'https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
-            model_dest = 'ldm/invoke/restoration/codeformer/weights/codeformer.pth'
-            if not os.path.exists(model_dest):
-                print('Downloading codeformer model file...')
-                os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-                request.urlretrieve(model_url,model_dest)
+        model_url  = 'https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
+        model_dest = os.path.join(Root_dir,'models/codeformer/codeformer.pth')
+        if not os.path.exists(model_dest):
+            print('Downloading codeformer model file...')
+            os.makedirs(os.path.dirname(model_dest), exist_ok=True)
+            request.urlretrieve(model_url,model_dest,ProgressBar(os.path.basename(model_dest)))
     except Exception:
         print('Error loading CodeFormer:')
         print(traceback.format_exc())
-    print('...success')
+    print('...success',file=sys.stderr)
     
 #---------------------------------------------
 def download_clipseg():
@@ -497,7 +498,7 @@ def download_clipseg():
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
         if not os.path.exists(f'{model_dest}/rd64-uni-refined.pth'):
-            request.urlretrieve(model_url,weights_zip)
+            request.urlretrieve(model_url,weights_zip,ProgressBar(os.path.basename(model_dest)))
             with zipfile.ZipFile(weights_zip,'r') as zip:
                 zip.extractall('models/clipseg')
             os.remove(weights_zip)
@@ -519,7 +520,7 @@ def download_clipseg():
 
 #-------------------------------------
 def download_safety_checker():
-    print('Installing safety model for NSFW content detection...',end='')
+    print('Installing safety model for NSFW content detection...',end='',file=sys.stderr)
     try:
         from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
         from transformers import AutoFeatureExtractor
@@ -528,9 +529,25 @@ def download_safety_checker():
         print(traceback.format_exc())
         return
     safety_model_id = "CompVis/stable-diffusion-safety-checker"
-    safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id)
-    safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id)
-    print('...success')
+    download_from_hf(AutoFeatureExtractor,safety_model_id)
+    download_from_hf(StableDiffusionSafetyChecker,safety_model_id)
+    print('...success',file=sys.stderr)
+
+#-------------------------------------
+class ProgressBar():
+    def __init__(self,model_name='file'):
+        self.pbar = None
+        self.name = model_name
+
+    def __call__(self, block_num, block_size, total_size):
+        if not self.pbar:
+            self.pbar=tqdm(desc=self.name,
+                           initial=0,
+                           unit='iB',
+                           unit_scale=True,
+                           total=total_size)
+        downloaded = block_num * block_size
+        self.pbar.update(downloaded)
 
 #-------------------------------------
 if __name__ == '__main__':
@@ -540,13 +557,26 @@ if __name__ == '__main__':
                         action=argparse.BooleanOptionalAction,
                         default=True,
                         help='run in interactive mode (default)')
+    parser.add_argument('--yes','-y',
+                        dest='yes_to_all',
+                        action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help='run in interactive mode (default)')
     parser.add_argument('--config_file',
                         '-c',
                         dest='config_file',
                         type=str,
                         default='./configs/models.yaml',
                         help='path to configuration file to create')
+    parser.add_argument('--root',
+                        dest='root',
+                        type=str,
+                        default='.',
+                        help='path to root of install directory')
     opt = parser.parse_args()
+
+    # setting a global here
+    Root_dir = os.path.expanduser(opt.root)
     
     try:
         if opt.interactive:
@@ -565,7 +595,6 @@ if __name__ == '__main__':
                 update_config_file(successfully_downloaded,opt)
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
-        download_kornia()
         download_clip()
         download_gfpgan()
         download_codeformer()

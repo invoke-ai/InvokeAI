@@ -19,6 +19,7 @@ from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config
+from ldm.invoke.globals import Globals
 
 DEFAULT_MAX_MODELS=2
 
@@ -200,6 +201,9 @@ class ModelCache(object):
         width = mconfig.width
         height = mconfig.height
 
+        if not os.path.isabs(weights):
+            weights = os.path.normpath(os.path.join(Globals.root,weights))
+
         print(f'>> Loading {model_name} from {weights}')
 
         # for usage statistics
@@ -210,6 +214,8 @@ class ModelCache(object):
         tic = time.time()
 
         # this does the work
+        if not os.path.isabs(config):
+            config = os.path.join(Globals.root,config)
         c     = OmegaConf.load(config)
         with open(weights,'rb') as f:
             weight_bytes = f.read()
@@ -228,6 +234,8 @@ class ModelCache(object):
 
         # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
         if vae:
+            if not os.path.isabs(vae):
+                vae = os.path.normpath(os.path.join(Globals.root,vae))
             if os.path.exists(vae):
                 print(f'   | Loading VAE weights from: {vae}')
                 vae_ckpt = torch.load(vae, map_location="cpu")

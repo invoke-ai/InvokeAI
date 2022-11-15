@@ -27,6 +27,7 @@ from pytorch_lightning import seed_everything, logging
 
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.util import instantiate_from_config
+from ldm.invoke.globals import Globals
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
@@ -220,8 +221,14 @@ class Generate:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
-                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id, local_files_only=True)
-                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id, local_files_only=True)
+                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id,
+                                                                                   local_files_only=True,
+                                                                                   cache_dir=os.path.join(Globals.root,'models',safety_model_id)
+                )
+                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id,
+                                                                                     local_files_only=True,
+                                                                                     cache_dir=os.path.join(Globals.root,'models',safety_model_id)
+                )
                 self.safety_checker.to(self.device)
             except Exception:
                 print('** An error was encountered while installing the safety checker:')

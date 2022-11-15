@@ -11,9 +11,9 @@ import time
 import traceback
 import yaml
 
-from ldm.invoke.prompt_parser import PromptParser
-
 sys.path.append('.')    # corrects a weird problem on Macs
+from ldm.invoke.globals import Globals
+from ldm.invoke.prompt_parser import PromptParser
 from ldm.invoke.readline import get_completer
 from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
@@ -47,6 +47,9 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
+    # alert - setting a global here
+    Globals.root=os.path.expanduser(args.root_dir)
+
     from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
@@ -57,9 +60,15 @@ def main():
     # Loading Face Restoration and ESRGAN Modules
     gfpgan,codeformer,esrgan = load_face_restoration(opt)
 
-    # make sure the output directory exists
+    # normalize the outdir relative to root and make sure it exists
+    if not os.path.abspath(opt.outdir):
+        opt.outdir=os.path.normpath(os.path.join(Globals.root,opt.outdir))
     if not os.path.exists(opt.outdir):
         os.makedirs(opt.outdir)
+
+    # normalize the config directory relative to root
+    if not os.path.abspath(opt.conf):
+        opt.conf=os.path.normpath(os.path.join(Globals.root,opt.conf))
 
     # load the infile as a list of lines
     if opt.infile:
@@ -77,7 +86,7 @@ def main():
     # creating a Generate object:
     try:
         gen = Generate(
-            conf = opt.conf,
+            conf = os.path.join(Globals.root,opt.conf),
             model = opt.model,
             sampler_name = opt.sampler_name,
             embedding_path = opt.embedding_path,
@@ -128,6 +137,8 @@ def main_loop(gen, opt):
     doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
+    if not os.path.isabs(opt.conf):
+        opt.conf = os.path.join(Globals.root,opt.conf)
     model_config = OmegaConf.load(opt.conf)
 
     # The readline completer reads history from the .dream_history file located in the
