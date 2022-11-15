@@ -44,7 +44,7 @@ export const socketioMiddleware = () => {
       onProcessingCanceled,
       onImageDeleted,
       // onImageUploaded,
-      onMaskImageUploaded,
+      // onMaskImageUploaded,
       onSystemConfig,
       onModelChanged,
       onModelChangeFailed,
@@ -58,8 +58,8 @@ export const socketioMiddleware = () => {
       emitRequestImages,
       emitRequestNewImages,
       emitCancelProcessing,
-      emitUploadImage,
-      emitUploadMaskImage,
+      // emitUploadImage,
+      // emitUploadMaskImage,
       emitRequestSystemConfig,
       emitRequestModelChange,
     } = makeSocketIOEmitters(store, socketio);
@@ -108,9 +108,9 @@ export const socketioMiddleware = () => {
       //   onImageUploaded(data);
       // });
 
-      socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
-        onMaskImageUploaded(data);
-      });
+      // socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
+      //   onMaskImageUploaded(data);
+      // });
 
       socketio.on('systemConfig', (data: InvokeAI.SystemConfig) => {
         onSystemConfig(data);
@@ -166,15 +166,15 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/uploadImage': {
-        emitUploadImage(action.payload);
-        break;
-      }
+      // case 'socketio/uploadImage': {
+      //   emitUploadImage(action.payload);
+      //   break;
+      // }
 
-      case 'socketio/uploadMaskImage': {
-        emitUploadMaskImage(action.payload);
-        break;
-      }
+      // case 'socketio/uploadMaskImage': {
+      //   emitUploadMaskImage(action.payload);
+      //   break;
+      // }
 
       case 'socketio/requestSystemConfig': {
         emitRequestSystemConfig();

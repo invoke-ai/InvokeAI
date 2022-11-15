@@ -180,13 +180,13 @@ const makeSocketIOEmitters = (
     emitCancelProcessing: () => {
       socketio.emit('cancel');
     },
-    emitUploadImage: (payload: InvokeAI.UploadImagePayload) => {
-      const { file, destination } = payload;
-      socketio.emit('uploadImage', file, file.name, destination);
-    },
-    emitUploadMaskImage: (file: File) => {
-      socketio.emit('uploadMaskImage', file, file.name);
-    },
+    // emitUploadImage: (payload: InvokeAI.UploadImagePayload) => {
+    //   const { file, destination } = payload;
+    //   socketio.emit('uploadImage', file, file.name, destination);
+    // },
+    // emitUploadMaskImage: (file: File) => {
+    //   socketio.emit('uploadMaskImage', file, file.name);
+    // },
     emitRequestSystemConfig: () => {
       socketio.emit('requestSystemConfig');
     },

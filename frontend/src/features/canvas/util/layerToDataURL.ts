@@ -1,6 +1,6 @@
 import Konva from 'konva';
 
-const layerToBlob = async (layer: Konva.Layer, stageScale: number) => {
+const layerToDataURL = (layer: Konva.Layer, stageScale: number) => {
   const tempScale = layer.scale();
 
   const { x: relativeX, y: relativeY } = layer.getClientRect({
@@ -15,12 +15,12 @@ const layerToBlob = async (layer: Konva.Layer, stageScale: number) => {
 
   const clientRect = layer.getClientRect();
 
-  const blob = await layer.toBlob(clientRect);
+  const dataURL = layer.toDataURL(clientRect);
 
   // Unscale the canvas
   layer.scale(tempScale);
 
-  return { blob, relativeX, relativeY };
+  return { dataURL, relativeX, relativeY };
 };
 
-export default layerToBlob;
+export default layerToDataURL;
