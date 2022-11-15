@@ -346,6 +346,19 @@ script runs without errors. Please report to
 [Issues](https://github.com/invoke-ai/InvokeAI/issues) what you were able to do
 to work around the problem so that others can benefit from your investigation.
 
+### Create Conda Environment fails on MacOS
+
+If conda create environment fails with lmdb error, this is most likely caused by Clang.
+Run brew config to see which Clang is installed on your Mac. If Clang isn't installed, that's causing the error.
+Start by installing additional XCode command line tools, followed by brew install llvm.
+
+```bash
+xcode-select --install
+brew install llvm
+```
+
+If brew config has Clang installed, update to the latest llvm and try creating the environment again.
+
 #### `preload_models.py` or `invoke.py` crashes at an early stage
 
 This is usually due to an incomplete or corrupted Conda install. Make sure you
