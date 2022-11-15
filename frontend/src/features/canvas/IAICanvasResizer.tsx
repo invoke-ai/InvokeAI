@@ -4,66 +4,107 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
   baseCanvasImageSelector,
-  CanvasState,
-  setStageDimensions,
-  setStageScale,
+  currentCanvasSelector,
+  initializeCanvas,
+  resizeCanvas,
+  setDoesCanvasNeedScaling,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
 const canvasResizerSelector = createSelector(
   (state: RootState) => state.canvas,
+  currentCanvasSelector,
   baseCanvasImageSelector,
   activeTabNameSelector,
-  (canvas: CanvasState, baseCanvasImage, activeTabName) => {
-    const { doesCanvasNeedScaling } = canvas;
-
+  (canvas, currentCanvas, baseCanvasImage, activeTabName) => {
+    const { doesCanvasNeedScaling, mode, isCanvasInitialized } = canvas;
     return {
       doesCanvasNeedScaling,
+      mode,
       activeTabName,
       baseCanvasImage,
+      isCanvasInitialized,
     };
   }
 );
 
 const IAICanvasResizer = () => {
   const dispatch = useAppDispatch();
-  const { doesCanvasNeedScaling, activeTabName, baseCanvasImage } =
-    useAppSelector(canvasResizerSelector);
+  const {
+    doesCanvasNeedScaling,
+    mode,
+    activeTabName,
+    baseCanvasImage,
+    isCanvasInitialized,
+  } = useAppSelector(canvasResizerSelector);
 
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     window.setTimeout(() => {
       if (!ref.current) return;
-      const { width: imageWidth, height: imageHeight } = baseCanvasImage?.image
-        ? baseCanvasImage.image
-        : { width: 512, height: 512 };
+
       const { clientWidth, clientHeight } = ref.current;
 
-      const scale = Math.min(
-        1,
-        Math.min(clientWidth / imageWidth, clientHeight / imageHeight)
-      );
+      if (!baseCanvasImage?.image) return;
 
-      dispatch(setStageScale(scale));
+      const { width: imageWidth, height: imageHeight } = baseCanvasImage.image;
 
-      if (activeTabName === 'inpainting') {
+      if (!isCanvasInitialized) {
         dispatch(
-          setStageDimensions({
-            width: Math.floor(imageWidth * scale),
-            height: Math.floor(imageHeight * scale),
+          initializeCanvas({
+            clientWidth,
+            clientHeight,
+            imageWidth,
+            imageHeight,
           })
         );
-      } else if (activeTabName === 'outpainting') {
+      } else {
         dispatch(
-          setStageDimensions({
-            width: Math.floor(clientWidth),
-            height: Math.floor(clientHeight),
+          resizeCanvas({
+            clientWidth,
+            clientHeight,
           })
         );
       }
+
+      dispatch(setDoesCanvasNeedScaling(false));
+      // }
+      // if ((activeTabName === 'inpainting') && baseCanvasImage?.image) {
+      //   const { width: imageWidth, height: imageHeight } =
+      //     baseCanvasImage.image;
+
+      //   const scale = Math.min(
+      //     1,
+      //     Math.min(clientWidth / imageWidth, clientHeight / imageHeight)
+      //   );
+
+      //   dispatch(setStageScale(scale));
+
+      //   dispatch(
+      //     setStageDimensions({
+      //       width: Math.floor(imageWidth * scale),
+      //       height: Math.floor(imageHeight * scale),
+      //     })
+      //   );
+      //   dispatch(setDoesCanvasNeedScaling(false));
+      // } else if (activeTabName === 'outpainting') {
+      //   dispatch(
+      //     setStageDimensions({
+      //       width: Math.floor(clientWidth),
+      //       height: Math.floor(clientHeight),
+      //     })
+      //   );
+      //   dispatch(setDoesCanvasNeedScaling(false));
+      // }
     }, 0);
-  }, [dispatch, baseCanvasImage, doesCanvasNeedScaling, activeTabName]);
+  }, [
+    dispatch,
+    baseCanvasImage,
+    doesCanvasNeedScaling,
+    activeTabName,
+    isCanvasInitialized,
+  ]);
 
   return (
     <div ref={ref} className="inpainting-canvas-area">

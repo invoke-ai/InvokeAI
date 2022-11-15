@@ -4,15 +4,18 @@ import {
   currentCanvasSelector,
   isStagingSelector,
   resetCanvas,
+  resetCanvasView,
+  setCanvasMode,
   setTool,
 } from './canvasSlice';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
-import { canvasImageLayerRef } from './IAICanvas';
+import { canvasImageLayerRef, stageRef } from './IAICanvas';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   FaArrowsAlt,
   FaCopy,
+  FaCrosshairs,
   FaDownload,
   FaLayerGroup,
   FaSave,
@@ -26,15 +29,21 @@ import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
 import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
+import IAICheckbox from 'common/components/IAICheckbox';
 
 export const canvasControlsSelector = createSelector(
-  [currentCanvasSelector, isStagingSelector],
-  (currentCanvas, isStaging) => {
+  [
+    (state: RootState) => state.canvas,
+    currentCanvasSelector,
+    isStagingSelector,
+  ],
+  (canvas, currentCanvas, isStaging) => {
     const { tool } = currentCanvas;
-
+    const { mode } = canvas;
     return {
       tool,
       isStaging,
+      mode,
     };
   },
   {
@@ -46,7 +55,7 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging } = useAppSelector(canvasControlsSelector);
+  const { tool, isStaging, mode } = useAppSelector(canvasControlsSelector);
 
   return (
     <div className="inpainting-settings">
@@ -111,12 +120,35 @@ const IAICanvasOutpaintingControls = () => {
           icon={<FaUpload />}
         />
         <IAIIconButton
+          aria-label="Reset Canvas View"
+          tooltip="Reset Canvas View"
+          icon={<FaCrosshairs />}
+          onClick={() => {
+            if (!stageRef.current || !canvasImageLayerRef.current) return;
+            const clientRect = canvasImageLayerRef.current.getClientRect({skipTransform: true});
+            dispatch(
+              resetCanvasView({
+                clientRect,
+              })
+            );
+          }}
+        />
+        <IAIIconButton
           aria-label="Reset Canvas"
           tooltip="Reset Canvas"
           icon={<FaTrash />}
           onClick={() => dispatch(resetCanvas())}
         />
       </ButtonGroup>
+      <IAICheckbox
+        label={'inpainting'}
+        isChecked={mode === 'inpainting'}
+        onChange={(e) =>
+          dispatch(
+            setCanvasMode(e.target.checked ? 'inpainting' : 'outpainting')
+          )
+        }
+      />
     </div>
   );
 };
