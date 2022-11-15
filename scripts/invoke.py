@@ -14,7 +14,7 @@ import yaml
 sys.path.append('.')    # corrects a weird problem on Macs
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import PromptParser
-from ldm.invoke.readline import get_completer
+from ldm.invoke.readline import get_completer, Completer
 from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
@@ -48,8 +48,10 @@ def main():
             args.max_loaded_models = 1
 
     # alert - setting a global here
-    Globals.root=os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or '.')
+    Globals.root = os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or '.')
+    print(f'>> Using InvokeAI directory {Globals.root}')
 
+    # loading here to avoid long delays on startup
     from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
@@ -60,14 +62,8 @@ def main():
     # Loading Face Restoration and ESRGAN Modules
     gfpgan,codeformer,esrgan = load_face_restoration(opt)
 
-    # normalize the outdir relative to root and make sure it exists
-    if not os.path.abspath(opt.outdir):
-        opt.outdir=os.path.normpath(os.path.join(Globals.root,opt.outdir))
-    if not os.path.exists(opt.outdir):
-        os.makedirs(opt.outdir)
-
     # normalize the config directory relative to root
-    if not os.path.abspath(opt.conf):
+    if not os.path.isabs(opt.conf):
         opt.conf=os.path.normpath(os.path.join(Globals.root,opt.conf))
 
     # load the infile as a list of lines
@@ -145,7 +141,7 @@ def main_loop(gen, opt):
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
     completer   = get_completer(opt, models=list(model_config.keys()))
-    completer.set_default_dir(opt.outdir)
+    set_default_output_dir(opt, completer)
     output_cntr = completer.get_current_history_length()+1
 
     # os.pathconf is not available on Windows
@@ -177,6 +173,9 @@ def main_loop(gen, opt):
         if len(command.strip()) == 1 and command.startswith('q'):
             done = True
             break
+
+        if not command.startswith('!history'):
+            completer.add_history(command)
 
         if command.startswith('!'):
             command, operation = do_command(command, gen, opt, completer)
@@ -215,6 +214,9 @@ def main_loop(gen, opt):
                     f'>> No previous initial image at position {opt.init_img} found')
                 opt.init_img = None
                 continue
+
+        # the outdir can change with each command, so we adjust it here
+        set_default_output_dir(opt,completer)
 
         # try to relativize pathnames
         for attr in ('init_img','init_mask','init_color','embedding_path'):
@@ -260,16 +262,6 @@ def main_loop(gen, opt):
             if not os.path.exists(opt.outdir):
                 os.makedirs(opt.outdir)
             current_outdir = opt.outdir
-
-        # Write out the history at this point.
-        # TODO: Fix the parsing of command-line parameters
-        # so that !operations don't need to be stripped and readded
-        if operation == 'postprocess':
-            completer.add_history(f'!fix {command}')
-        elif operation == 'mask':
-            completer.add_history(f'!mask {command}')
-        else:
-            completer.add_history(command)
 
         # Here is where the images are actually generated!
         last_results = []
@@ -500,6 +492,17 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
     else:  # not a recognized command, so give the --help text
         command = '-h'
     return command, operation
+
+def set_default_output_dir(opt:Args, completer:Completer):
+    '''
+    If opt.outdir is relative, we add the root directory to it
+    normalize the outdir relative to root and make sure it exists.
+    '''
+    if not os.path.isabs(opt.outdir):
+        opt.outdir=os.path.normpath(os.path.join(Globals.root,opt.outdir))
+    if not os.path.exists(opt.outdir):
+        os.makedirs(opt.outdir)
+    completer.set_default_dir(opt.outdir)
 
 
 def add_weights_to_config(model_path:str, gen, opt, completer):
