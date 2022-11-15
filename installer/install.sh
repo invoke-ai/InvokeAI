@@ -29,7 +29,7 @@ OS_NAME=$(uname -s)
 case "${OS_NAME}" in
     Linux*)     OS_NAME="linux";;
     Darwin*)    OS_NAME="darwin";;
-    *)          echo -e "\n----- Unknown OS: $OS_NAME! This script runs only on Linux or MacOS -----\n" && exit
+    *)          echo -e "\n----- Unknown OS: $OS_NAME! This script runs only on Linux or macOS -----\n" && exit
 esac
 
 OS_ARCH=$(uname -m)
@@ -154,6 +154,19 @@ echo -e "\n***** Unpacked python-build-standalone *****\n"
 
 # create venv
 _err_msg="\n----- problem creating venv -----\n"
+
+if [ "$OS_NAME" == "darwin" ]; then
+    # patch sysconfig so that extensions can build properly
+    # adapted from https://github.com/cashapp/hermit-packages/commit/fcba384663892f4d9cfb35e8639ff7a28166ee43
+    PYTHON_INSTALL_DIR="$(pwd)/python"
+    SYSCONFIG="$(echo python/lib/python*/_sysconfigdata_*.py)"
+    TMPFILE="$(mktemp)"
+    chmod +w "${SYSCONFIG}"
+    cp "${SYSCONFIG}" "${TMPFILE}"
+    sed "s,'/install,'${PYTHON_INSTALL_DIR},g" "${TMPFILE}" > "${SYSCONFIG}"
+    rm -f ${TMPFILE}
+fi
+
 ./python/bin/python3 -E -s -m venv .venv
 _err_exit $? _err_msg
 # In reality, the following is ALL that 'activate.bat' does,
