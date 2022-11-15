@@ -247,6 +247,9 @@ const InpaintingCanvas = () => {
             onMouseUp={handleMouseUp}
             onMouseOut={handleMouseOutCanvas}
             onMouseLeave={handleMouseOutCanvas}
+            onTouchStart={handleMouseDown}
+            onTouchMove={handleMouseMove}
+            onTouchEnd={handleMouseUp}
             style={{ ...(stageCursor ? { cursor: stageCursor } : {}) }}
             className="inpainting-canvas-stage checkerboard"
             ref={stageRef}
