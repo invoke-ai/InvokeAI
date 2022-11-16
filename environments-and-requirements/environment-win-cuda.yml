@@ -13,7 +13,7 @@ dependencies:
   - cudatoolkit=11.6
   - pip:
     - albumentations==0.4.3
-    - basicsr==1.4.1
+    - basicsr==1.4.2
     - dependency_injector==4.40.0
     - diffusers==0.6.0
     - einops==0.3.0
@@ -31,7 +31,7 @@ dependencies:
     - pudb==2019.2
     - pyreadline3
     - pytorch-lightning==1.7.7
-    - realesrgan
+    - realesrgan==0.3.0
     - send2trash==1.8.0
     - streamlit==1.12.0
     - taming-transformers-rom1504
