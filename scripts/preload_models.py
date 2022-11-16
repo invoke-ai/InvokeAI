@@ -8,24 +8,23 @@
 #
 print('Loading Python libraries...\n')
 import argparse
-import sys
 import os
+import sys
+import traceback
 import warnings
 from urllib import request
-from tqdm import tqdm
-from omegaconf import OmegaConf
-from huggingface_hub import HfFolder, hf_hub_url
-from pathlib import Path
-from getpass_asterisk import getpass_asterisk
-from transformers import CLIPTokenizer, CLIPTextModel
-import traceback
+
 import requests
-import clip
-import transformers
 import torch
+import transformers
+from getpass_asterisk import getpass_asterisk
+from huggingface_hub import HfFolder, hf_hub_url
+from omegaconf import OmegaConf
+from tqdm import tqdm
+from transformers import CLIPTokenizer, CLIPTextModel
+
 transformers.logging.set_verbosity_error()
 
-import warnings
 warnings.filterwarnings('ignore')
 #warnings.simplefilter('ignore')
 #warnings.filterwarnings('ignore',category=DeprecationWarning)
@@ -277,7 +276,7 @@ def download_weight_datasets(models:dict, access_token:str):
         if success:
             successful[mod] = True
     if len(successful) < len(models):
-        print(f'\n\n** There were errors downloading one or more files. **')
+        print('\n\n** There were errors downloading one or more files. **')
         print('Please double-check your license agreements, and your access token.')
         HfFolder.delete_token()
         print('Press any key to try again. Type ^C to quit.\n')
@@ -403,8 +402,8 @@ def download_bert():
     sys.stdout.flush()
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=DeprecationWarning)
-        from transformers import BertTokenizerFast, AutoFeatureExtractor
-        tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
+        from transformers import BertTokenizerFast
+        BertTokenizerFast.from_pretrained('bert-base-uncased')
         print('...success')
 
 #---------------------------------------------
@@ -413,6 +412,8 @@ def download_kornia():
     print('Installing Kornia requirements (ignore deprecation errors)...', end='')
     sys.stdout.flush()
     import kornia
+    # Is importing it all we need to do to get it to download weights for all models?
+    assert kornia.__version__  # reference kornia in some way to avoid `unused` warning.
     print('...success')
 
 #---------------------------------------------
@@ -420,8 +421,8 @@ def download_clip():
     print('Loading CLIP model (ignore deprecation errors)...',end='')
     sys.stdout.flush()
     version = 'openai/clip-vit-large-patch14'
-    tokenizer = CLIPTokenizer.from_pretrained(version)
-    transformer = CLIPTextModel.from_pretrained(version)
+    CLIPTokenizer.from_pretrained(version)
+    CLIPTextModel.from_pretrained(version)
     print('...success')
 
 #---------------------------------------------
@@ -528,8 +529,8 @@ def download_safety_checker():
         print(traceback.format_exc())
         return
     safety_model_id = "CompVis/stable-diffusion-safety-checker"
-    safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id)
-    safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id)
+    AutoFeatureExtractor.from_pretrained(safety_model_id)
+    StableDiffusionSafetyChecker.from_pretrained(safety_model_id)
     print('...success')
 
 #-------------------------------------
