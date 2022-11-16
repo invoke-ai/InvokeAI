@@ -12,13 +12,15 @@ import time
 import gc
 import hashlib
 import psutil
+import sys
 import transformers
 import traceback
 import os
-from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config
+from picklescan.scanner import scan_file_path
+
 
 DEFAULT_MAX_MODELS=2
 
@@ -201,7 +203,7 @@ class ModelCache(object):
         height = mconfig.height
 
         # scan model
-        self.scan_model(model_name, weights)
+        self._scan_model(model_name, weights)
 
         print(f'>> Loading {model_name} from {weights}')
 
@@ -279,10 +281,8 @@ class ModelCache(object):
         if self._has_cuda():
             torch.cuda.empty_cache()
     
-    def scan_model(self, model_name, checkpoint):
+    def _scan_model(self, model_name, checkpoint):
         # scan model
-        from picklescan.scanner import scan_file_path
-        import sys
         print(f'>> Scanning Model: {model_name}')
         scan_result = scan_file_path(checkpoint)
         if scan_result.infected_files != 0:
