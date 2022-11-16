@@ -12,16 +12,26 @@ import os
 import sys
 import traceback
 import warnings
+from pathlib import Path
+from typing import Dict
 from urllib import request
 
+import huggingface_hub
 import requests
 import torch
 import transformers
+from diffusers import StableDiffusionPipeline, AutoencoderKL
 from getpass_asterisk import getpass_asterisk
 from huggingface_hub import HfFolder, hf_hub_url
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import CLIPTokenizer, CLIPTextModel
+
+try:
+    from ldm.invoke.model_cache import ModelCache
+except ImportError:
+    sys.path.append('.')
+    from ldm.invoke.model_cache import ModelCache
 
 transformers.logging.set_verbosity_error()
 
@@ -287,7 +297,20 @@ def download_weight_datasets(models:dict, access_token:str):
     keys = ', '.join(successful.keys())
     print(f'Successfully installed {keys}') 
     return successful
-    
+
+#---------------------------------------------
+def is_huggingface_authenticated():
+    # huggingface_hub 0.10 API isn't great for this, it could be OSError, ValueError,
+    # maybe other things, not all end-user-friendly.
+    # noinspection PyBroadException
+    try:
+        response = huggingface_hub.whoami()
+        if response.get('id') is not None:
+            return True
+    except Exception:
+        pass
+    return False
+
 #---------------------------------------------
 def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
     model_dest = os.path.join(Model_dir, model_name)
@@ -336,7 +359,55 @@ def download_with_resume(repo_id:str, model_name:str, access_token:str)->bool:
         print(f'An error occurred while downloading {model_name}: {str(e)}')
         return False
     return True
-                             
+
+#---------------------------------------------
+def download_diffusers(models: Dict, full_precision: bool):
+    # This is a minimal implementation until https://github.com/invoke-ai/InvokeAI/pull/1490 lands,
+    # which moves a bunch of stuff.
+    # We can be more complete after we know it won't be all merge conflicts.
+    diffusers_repos = {
+        'CompVis/stable-diffusion-v1-4-original': 'CompVis/stable-diffusion-v1-4',
+        'runwayml/stable-diffusion-v1-5': 'runwayml/stable-diffusion-v1-5',
+        'runwayml/stable-diffusion-inpainting': 'runwayml/stable-diffusion-inpainting',
+        'hakurei/waifu-diffusion-v1-3': 'hakurei/waifu-diffusion'
+    }
+    vae_repos = {
+        'stabilityai/sd-vae-ft-mse-original': 'stabilityai/sd-vae-ft-mse',
+    }
+    precision_args = {}
+    if not full_precision:
+        precision_args.update(revision='fp16')
+
+    for model_name, model in models.items():
+        repo_id = model['repo_id']
+        if repo_id in vae_repos:
+            print(f" * Downloading diffusers VAE {model_name}...")
+            # TODO: can we autodetect when a repo has no fp16 revision?
+            AutoencoderKL.from_pretrained(repo_id)
+        elif repo_id not in diffusers_repos:
+            print(f" * Downloading diffusers {model_name}...")
+            StableDiffusionPipeline.from_pretrained(repo_id, **precision_args)
+        else:
+            warnings.warn(f" ⚠ FIXME: add diffusers repo for {repo_id}")
+            continue
+
+
+def download_diffusers_in_config(config_path: Path, full_precision: bool):
+    # This is a minimal implementation until https://github.com/invoke-ai/InvokeAI/pull/1490 lands,
+    # which moves a bunch of stuff.
+    # We can be more complete after we know it won't be all merge conflicts.
+    precision = 'full' if full_precision else 'float16'
+    cache = ModelCache(OmegaConf.load(config_path), precision=precision,
+                       device_type='cpu', max_loaded_models=1)
+    for model_name in cache.list_models():
+        # TODO: download model without loading it.
+        #   https://github.com/huggingface/diffusers/issues/1301
+        model_config = cache.config[model_name]
+        if model_config.get('format') == 'diffusers':
+            print(f" * Downloading diffusers {model_name}...")
+            cache.get_model(model_name)
+            cache.offload_model(model_name)
+
 #---------------------------------------------
 def update_config_file(successfully_downloaded:dict,opt:dict):
     Config_file = opt.config_file or Default_config_file
@@ -541,6 +612,12 @@ if __name__ == '__main__':
                         action=argparse.BooleanOptionalAction,
                         default=True,
                         help='run in interactive mode (default)')
+    parser.add_argument('--full-precision',
+                        dest='full_precision',
+                        action=argparse.BooleanOptionalAction,
+                        type=bool,
+                        default=False,
+                        help='use 32-bit weights instead of faster 16-bit weights')
     parser.add_argument('--config_file',
                         '-c',
                         dest='config_file',
@@ -563,7 +640,16 @@ if __name__ == '__main__':
                 access_token = authenticate()
                 print('\n** DOWNLOADING WEIGHTS **')
                 successfully_downloaded = download_weight_datasets(models, access_token)
+                download_diffusers(models, full_precision=opt.full_precision)
                 update_config_file(successfully_downloaded,opt)
+        elif is_huggingface_authenticated():
+            config_path = Path(opt.config_file or Default_config_file)
+            if config_path.exists():
+                download_diffusers_in_config(config_path, full_precision=opt.full_precision)
+            else:
+                print("*⚠ No config file found; downloading no weights.")
+        else:
+            print("*⚠ No Hugging Face access; downloading no weights.")
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
         download_kornia()
