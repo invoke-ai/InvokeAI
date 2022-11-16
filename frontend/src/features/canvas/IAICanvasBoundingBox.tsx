@@ -6,8 +6,11 @@ import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useCallback, useEffect, useRef } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
-import { useAppDispatch, useAppSelector } from 'app/store';
-import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import {
+  roundDownToMultiple,
+  roundToMultiple,
+} from 'common/util/roundDownToMultiple';
 import {
   baseCanvasImageSelector,
   currentCanvasSelector,
@@ -17,16 +20,24 @@ import {
   setIsMouseOverBoundingBox,
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
+  shouldLockToInitialImageSelector,
 } from 'features/canvas/canvasSlice';
 import { GroupConfig } from 'konva/lib/Group';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const boundingBoxPreviewSelector = createSelector(
+  shouldLockToInitialImageSelector,
   currentCanvasSelector,
   outpaintingCanvasSelector,
   baseCanvasImageSelector,
   activeTabNameSelector,
-  (currentCanvas, outpaintingCanvas, baseCanvasImage, activeTabName) => {
+  (
+    shouldLockToInitialImage,
+    currentCanvas,
+    outpaintingCanvas,
+    baseCanvasImage,
+    activeTabName
+  ) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -40,6 +51,7 @@ const boundingBoxPreviewSelector = createSelector(
       tool,
       stageCoordinates,
     } = currentCanvas;
+
     const { shouldSnapToGrid } = outpaintingCanvas;
 
     return {
@@ -59,6 +71,7 @@ const boundingBoxPreviewSelector = createSelector(
       stageCoordinates,
       boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
       hitStrokeWidth: 20 / stageScale,
+      shouldLockToInitialImage,
     };
   },
   {
@@ -91,6 +104,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     tool,
     boundingBoxStrokeWidth,
     hitStrokeWidth,
+    shouldLockToInitialImage,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -106,7 +120,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
-      if (activeTabName === 'inpainting' || !shouldSnapToGrid) {
+      if (!shouldSnapToGrid) {
         dispatch(
           setBoundingBoxCoordinates({
             x: Math.floor(e.target.x()),
@@ -132,20 +146,27 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         })
       );
     },
-    [activeTabName, dispatch, shouldSnapToGrid]
+    [dispatch, shouldSnapToGrid]
   );
 
   const dragBoundFunc = useCallback(
     (position: Vector2d) => {
-      if (!baseCanvasImage && activeTabName !== 'outpainting')
-        return boundingBoxCoordinates;
+      /**
+       * This limits the bounding box's drag coordinates.
+       */
+      if (!shouldLockToInitialImage) return boundingBoxCoordinates;
 
       const { x, y } = position;
 
       const maxX =
-        stageDimensions.width - boundingBoxDimensions.width * stageScale;
+        stageDimensions.width -
+        boundingBoxDimensions.width -
+        (stageDimensions.width % 64);
+
       const maxY =
-        stageDimensions.height - boundingBoxDimensions.height * stageScale;
+        stageDimensions.height -
+        boundingBoxDimensions.height -
+        (stageDimensions.height % 64);
 
       const clampedX = Math.floor(_.clamp(x, 0, maxX));
       const clampedY = Math.floor(_.clamp(y, 0, maxY));
@@ -153,14 +174,12 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       return { x: clampedX, y: clampedY };
     },
     [
-      baseCanvasImage,
-      activeTabName,
+      shouldLockToInitialImage,
       boundingBoxCoordinates,
       stageDimensions.width,
       stageDimensions.height,
       boundingBoxDimensions.width,
       boundingBoxDimensions.height,
-      stageScale,
     ]
   );
 
@@ -203,7 +222,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     rect.scaleY(1);
   }, [dispatch]);
 
-  // OK
   const anchorDragBoundFunc = useCallback(
     (
       oldPos: Vector2d, // old absolute position of anchor point
@@ -215,49 +233,14 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
        * Konva does not transform with width or height. It transforms the anchor point
        * and scale factor. This is then sent to the shape's onTransform listeners.
        *
-       * We need to snap the new width to steps of 64 without also snapping the
-       * coordinates of the bounding box to steps of 64. But because the whole
+       * We need to snap the new dimensions to steps of 64. But because the whole
        * stage is scaled, our actual desired step is actually 64 * the stage scale.
        */
 
-      // Difference of the old coords from the nearest multiple the scaled step
-      const offsetX = oldPos.x % scaledStep;
-      const offsetY = oldPos.y % scaledStep;
-
-      // Round new position to the nearest multiple of the scaled step
-      const closestX = roundToMultiple(newPos.x, scaledStep) + offsetX;
-      const closestY = roundToMultiple(newPos.y, scaledStep) + offsetY;
-
-      // the difference between the old coord and new
-      const diffX = Math.abs(newPos.x - closestX);
-      const diffY = Math.abs(newPos.y - closestY);
-
-      // if the difference is less than the scaled step, we want to snap
-      const didSnapX = diffX < scaledStep;
-      const didSnapY = diffY < scaledStep;
-
-      // We may not change anything, stash the old position
-      let newCoordinate = { ...oldPos };
-
-      // Set the new coords based on what snapped
-      if (didSnapX && !didSnapY) {
-        newCoordinate = {
-          x: closestX,
-          y: oldPos.y,
-        };
-      } else if (!didSnapX && didSnapY) {
-        newCoordinate = {
-          x: oldPos.x,
-          y: closestY,
-        };
-      } else if (didSnapX && didSnapY) {
-        newCoordinate = {
-          x: closestX,
-          y: closestY,
-        };
-      }
-
-      return newCoordinate;
+      return {
+        x: roundToMultiple(newPos.x, scaledStep),
+        y: roundToMultiple(newPos.y, scaledStep),
+      };
     },
     [scaledStep]
   );
@@ -272,7 +255,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
       // On the Inpainting canvas, the bounding box needs to stay in the stage
       if (
-        activeTabName === 'inpainting' &&
+        shouldLockToInitialImage &&
         (newBoundBox.width + newBoundBox.x > stageDimensions.width ||
           newBoundBox.height + newBoundBox.y > stageDimensions.height ||
           newBoundBox.x < 0 ||
@@ -283,7 +266,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
       return newBoundBox;
     },
-    [activeTabName, stageDimensions.height, stageDimensions.width]
+    [shouldLockToInitialImage, stageDimensions.height, stageDimensions.width]
   );
 
   const handleStartedTransforming = () => {
@@ -337,7 +320,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         globalCompositeOperation={'destination-out'}
       />
       <Rect
-        {...(activeTabName === 'inpainting' ? { dragBoundFunc } : {})}
+        {...(shouldLockToInitialImage ? { dragBoundFunc } : {})}
         listening={!isDrawing && tool === 'move'}
         draggable={true}
         fillEnabled={false}

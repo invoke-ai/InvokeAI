@@ -271,7 +271,7 @@ export const gallerySlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(mergeAndUploadCanvas.fulfilled, (state, action) => {
       if (!action.payload) return;
-      const { image, kind, boundingBox } = action.payload;
+      const { image, kind, originalBoundingBox } = action.payload;
 
       if (kind === 'merged_canvas') {
         const { uuid, url, mtime } = image;

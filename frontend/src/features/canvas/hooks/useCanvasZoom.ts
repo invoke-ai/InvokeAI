@@ -1,15 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
+  baseCanvasImageSelector,
   currentCanvasSelector,
   GenericCanvasState,
   setStageCoordinates,
   setStageScale,
+  shouldLockToInitialImageSelector,
 } from '../canvasSlice';
 import {
   CANVAS_SCALE_BY,
@@ -18,13 +20,34 @@ import {
 } from '../util/constants';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector],
-  (activeTabName, canvas: GenericCanvasState) => {
-    const { isMoveStageKeyHeld, stageScale } = canvas;
+  [
+    (state: RootState) => state.canvas,
+    activeTabNameSelector,
+    currentCanvasSelector,
+    baseCanvasImageSelector,
+    shouldLockToInitialImageSelector,
+  ],
+  (
+    canvas,
+    activeTabName,
+    currentCanvas,
+    baseCanvasImage,
+    shouldLockToInitialImage
+  ) => {
+    const {
+      isMoveStageKeyHeld,
+      stageScale,
+      stageDimensions,
+      minimumStageScale,
+    } = currentCanvas;
     return {
       isMoveStageKeyHeld,
       stageScale,
       activeTabName,
+      baseCanvasImage,
+      shouldLockToInitialImage,
+      stageDimensions,
+      minimumStageScale,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -32,18 +55,28 @@ const selector = createSelector(
 
 const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
-  const { isMoveStageKeyHeld, stageScale, activeTabName } =
-    useAppSelector(selector);
+  const {
+    isMoveStageKeyHeld,
+    stageScale,
+    activeTabName,
+    baseCanvasImage,
+    shouldLockToInitialImage,
+    stageDimensions,
+    minimumStageScale,
+  } = useAppSelector(selector);
 
   return useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
       // stop default scrolling
-      if (activeTabName !== 'outpainting') return;
+      if (
+        activeTabName !== 'outpainting' ||
+        !stageRef.current ||
+        isMoveStageKeyHeld ||
+        !baseCanvasImage
+      )
+        return;
 
       e.evt.preventDefault();
-
-      // const oldScale = stageRef.current.scaleX();
-      if (!stageRef.current || isMoveStageKeyHeld) return;
 
       const cursorPos = stageRef.current.getPointerPosition();
 
@@ -64,19 +97,44 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       const newScale = _.clamp(
         stageScale * CANVAS_SCALE_BY ** delta,
-        MIN_CANVAS_SCALE,
+        shouldLockToInitialImage ? minimumStageScale : MIN_CANVAS_SCALE,
         MAX_CANVAS_SCALE
       );
 
-      const newPos = {
+      const newCoordinates = {
         x: cursorPos.x - mousePointTo.x * newScale,
         y: cursorPos.y - mousePointTo.y * newScale,
       };
 
+      if (shouldLockToInitialImage) {
+        newCoordinates.x = _.clamp(
+          newCoordinates.x,
+          stageDimensions.width - Math.floor(baseCanvasImage.width * newScale),
+          0
+        );
+        newCoordinates.y = _.clamp(
+          newCoordinates.y,
+          stageDimensions.height -
+            Math.floor(baseCanvasImage.height * newScale),
+          0
+        );
+      }
+
       dispatch(setStageScale(newScale));
-      dispatch(setStageCoordinates(newPos));
+      dispatch(setStageCoordinates(newCoordinates));
     },
-    [activeTabName, dispatch, isMoveStageKeyHeld, stageRef, stageScale]
+    [
+      activeTabName,
+      stageRef,
+      isMoveStageKeyHeld,
+      baseCanvasImage,
+      stageScale,
+      shouldLockToInitialImage,
+      minimumStageScale,
+      dispatch,
+      stageDimensions.width,
+      stageDimensions.height,
+    ]
   );
 };
 

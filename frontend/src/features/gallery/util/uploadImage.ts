@@ -23,19 +23,36 @@ export const uploadImage = createAsyncThunk(
     const formData = new FormData();
 
     formData.append('file', imageFile, imageFile.name);
-    formData.append('kind', 'init');
+    formData.append(
+      'data',
+      JSON.stringify({
+        kind: 'init',
+      })
+    );
+    // formData.append('kind', 'init');
 
     const response = await fetch(window.location.origin + '/upload', {
       method: 'POST',
       body: formData,
     });
 
-    const { image } = (await response.json()) as InvokeAI.ImageUploadResponse;
+    const { url, mtime, width, height } =
+      (await response.json()) as InvokeAI.ImageUploadResponse;
+
+    // const newBoundingBox = {
+    //   x: bbox[0],
+    //   y: bbox[1],
+    //   width: bbox[2],
+    //   height: bbox[3],
+    // };
 
     const newImage: InvokeAI.Image = {
       uuid: uuidv4(),
+      url,
+      mtime,
       category: 'user',
-      ...image,
+      width: width,
+      height: height,
     };
 
     return {

@@ -2,10 +2,11 @@ import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   currentCanvasSelector,
+  resizeAndScaleCanvas,
   isStagingSelector,
   resetCanvas,
   resetCanvasView,
-  setCanvasMode,
+  setShouldLockToInitialImage,
   setTool,
 } from './canvasSlice';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
@@ -30,6 +31,7 @@ import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
 import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
 import IAICheckbox from 'common/components/IAICheckbox';
+import { ChangeEvent } from 'react';
 
 export const canvasControlsSelector = createSelector(
   [
@@ -38,12 +40,12 @@ export const canvasControlsSelector = createSelector(
     isStagingSelector,
   ],
   (canvas, currentCanvas, isStaging) => {
+    const { shouldLockToInitialImage } = canvas;
     const { tool } = currentCanvas;
-    const { mode } = canvas;
     return {
       tool,
       isStaging,
-      mode,
+      shouldLockToInitialImage,
     };
   },
   {
@@ -55,7 +57,16 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging, mode } = useAppSelector(canvasControlsSelector);
+  const { tool, isStaging, shouldLockToInitialImage } = useAppSelector(
+    canvasControlsSelector
+  );
+
+  const handleToggleShouldLockToInitialImage = (
+    e: ChangeEvent<HTMLInputElement>
+  ) => {
+    dispatch(setShouldLockToInitialImage(e.target.checked));
+    dispatch(resizeAndScaleCanvas());
+  };
 
   return (
     <div className="inpainting-settings">
@@ -125,10 +136,12 @@ const IAICanvasOutpaintingControls = () => {
           icon={<FaCrosshairs />}
           onClick={() => {
             if (!stageRef.current || !canvasImageLayerRef.current) return;
-            const clientRect = canvasImageLayerRef.current.getClientRect({skipTransform: true});
+            const clientRect = canvasImageLayerRef.current.getClientRect({
+              skipTransform: true,
+            });
             dispatch(
               resetCanvasView({
-                clientRect,
+                contentRect: clientRect,
               })
             );
           }}
@@ -141,13 +154,9 @@ const IAICanvasOutpaintingControls = () => {
         />
       </ButtonGroup>
       <IAICheckbox
-        label={'inpainting'}
-        isChecked={mode === 'inpainting'}
-        onChange={(e) =>
-          dispatch(
-            setCanvasMode(e.target.checked ? 'inpainting' : 'outpainting')
-          )
-        }
+        label={'Lock Canvas to Initial Image'}
+        isChecked={shouldLockToInitialImage}
+        onChange={handleToggleShouldLockToInitialImage}
       />
     </div>
   );

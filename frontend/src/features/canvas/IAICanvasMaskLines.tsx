@@ -2,17 +2,13 @@ import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line } from 'react-konva';
 import { useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
-import {
-  canvasClipSelector,
-  currentCanvasSelector,
-  isCanvasMaskLine,
-} from './canvasSlice';
+import { currentCanvasSelector, isCanvasMaskLine } from './canvasSlice';
 import _ from 'lodash';
 
 export const canvasLinesSelector = createSelector(
-  [currentCanvasSelector, canvasClipSelector],
-  (currentCanvas, canvasClip) => {
-    return { objects: currentCanvas.layerState.objects, canvasClip };
+  [currentCanvasSelector],
+  (currentCanvas) => {
+    return { objects: currentCanvas.layerState.objects };
   },
   {
     memoizeOptions: {
@@ -30,10 +26,10 @@ type InpaintingCanvasLinesProps = GroupConfig;
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
   const { ...rest } = props;
-  const { objects, canvasClip } = useAppSelector(canvasLinesSelector);
+  const { objects } = useAppSelector(canvasLinesSelector);
 
   return (
-    <Group listening={false} {...rest} {...canvasClip}>
+    <Group listening={false} {...rest}>
       {objects.filter(isCanvasMaskLine).map((line, i) => (
         <Line
           key={i}

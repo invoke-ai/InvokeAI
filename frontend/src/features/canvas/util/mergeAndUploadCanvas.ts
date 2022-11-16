@@ -25,7 +25,7 @@ export const mergeAndUploadCanvas = createAsyncThunk(
 
     if (!canvasImageLayerRef.current) return;
 
-    const { dataURL, relativeX, relativeY } = layerToDataURL(
+    const { dataURL, boundingBox: originalBoundingBox } = layerToDataURL(
       canvasImageLayerRef.current,
       stageScale
     );
@@ -34,32 +34,45 @@ export const mergeAndUploadCanvas = createAsyncThunk(
 
     const formData = new FormData();
 
-    formData.append('dataURL', dataURL);
-    formData.append('filename', 'merged_canvas.png');
-    formData.append('kind', saveToGallery ? 'result' : 'temp');
+    formData.append(
+      'data',
+      JSON.stringify({
+        dataURL,
+        filename: 'merged_canvas.png',
+        kind: saveToGallery ? 'result' : 'temp',
+        cropVisible: saveToGallery,
+      })
+    );
 
     const response = await fetch(window.location.origin + '/upload', {
       method: 'POST',
       body: formData,
     });
 
-    const { image } = (await response.json()) as InvokeAI.ImageUploadResponse;
+    const { url, mtime, width, height } =
+      (await response.json()) as InvokeAI.ImageUploadResponse;
+
+    // const newBoundingBox = {
+    //   x: bbox[0],
+    //   y: bbox[1],
+    //   width: bbox[2],
+    //   height: bbox[3],
+    // };
 
     const newImage: InvokeAI.Image = {
       uuid: uuidv4(),
+      url,
+      mtime,
       category: saveToGallery ? 'result' : 'user',
-      ...image,
+      width: width,
+      height: height,
     };
 
     return {
       image: newImage,
       kind: saveToGallery ? 'merged_canvas' : 'temp_merged_canvas',
-      boundingBox: {
-        x: relativeX,
-        y: relativeY,
-        width: image.width,
-        height: image.height,
-      },
+      originalBoundingBox,
+      // newBoundingBox,
     };
   }
 );
