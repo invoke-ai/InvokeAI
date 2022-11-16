@@ -200,6 +200,9 @@ class ModelCache(object):
         width = mconfig.width
         height = mconfig.height
 
+        # scan model
+        self.scan_model(model_name, weights)
+
         print(f'>> Loading {model_name} from {weights}')
 
         # for usage statistics
@@ -275,6 +278,32 @@ class ModelCache(object):
         gc.collect()
         if self._has_cuda():
             torch.cuda.empty_cache()
+    
+    def scan_model(self, model_name, checkpoint):
+        # scan model
+        from picklescan.scanner import scan_file_path
+        import sys
+        print(f'>> Scanning Model: {model_name}')
+        scan_result = scan_file_path(checkpoint)
+        if scan_result.infected_files != 0:
+            if scan_result.infected_files == 1:
+                print(f'\n### Issues Found In Model: {scan_result.issues_count}')
+                print('### WARNING: The model you are trying to load seems to be infected.')
+                print('### For your safety, InvokeAI will not load this model.')
+                print('### Please use checkpoints from trusted sources.')
+                print("### Exiting InvokeAI")
+                sys.exit()
+            else:
+                print('\n### WARNING: InvokeAI was unable to scan the model you are using.')
+                from ldm.util import ask_user
+                model_safe_check_fail = ask_user('Do you want to to continue loading the model?', ['y', 'n'])
+                if model_safe_check_fail.lower() == 'y':
+                    pass
+                else:
+                    print("### Exiting InvokeAI")
+                    sys.exit()
+        else:
+            print('>> Model Scanned. OK!!')
 
     def _make_cache_room(self):
         num_loaded_models = len(self.models)
