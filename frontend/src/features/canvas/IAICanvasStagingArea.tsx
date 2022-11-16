@@ -106,7 +106,7 @@ const IAICanvasStagingArea = (props: Props) => {
           />
         </Group>
       )}
-      <Html>
+      {/* <Html>
         <CacheProvider value={emotionCache}>
           <ChakraProvider>
             <div
@@ -172,7 +172,7 @@ const IAICanvasStagingArea = (props: Props) => {
             </div>
           </ChakraProvider>
         </CacheProvider>
-      </Html>
+      </Html> */}
     </Group>
   );
 };

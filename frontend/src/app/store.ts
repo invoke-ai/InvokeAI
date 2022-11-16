@@ -82,8 +82,6 @@ const rootPersistConfig = getPersistConfig({
   debounce: 300,
 });
 
-// console.log(rootPersistConfig)
-
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 // Continue with store setup
@@ -95,6 +93,7 @@ export const store = configureStore({
       serializableCheck: false,
     }).concat(socketioMiddleware()),
   devTools: {
+    // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [
       // 'canvas/setCursorPosition',
       // 'canvas/setStageCoordinates',

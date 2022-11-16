@@ -179,7 +179,12 @@ export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
 };
 
 export declare type ImageUploadResponse = {
-  image: Omit<Image, 'uuid' | 'metadata' | 'category'>;
+  // image: Omit<Image, 'uuid' | 'metadata' | 'category'>;
+  url: string;
+  mtime: number;
+  width: number;
+  height: number;
+  // bbox: [number, number, number, number];
 };
 
 export declare type ErrorResponse = {

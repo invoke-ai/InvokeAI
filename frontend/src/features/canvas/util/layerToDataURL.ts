@@ -3,7 +3,7 @@ import Konva from 'konva';
 const layerToDataURL = (layer: Konva.Layer, stageScale: number) => {
   const tempScale = layer.scale();
 
-  const { x: relativeX, y: relativeY } = layer.getClientRect({
+  const relativeClientRect = layer.getClientRect({
     relativeTo: layer.getParent(),
   });
 
@@ -13,14 +13,27 @@ const layerToDataURL = (layer: Konva.Layer, stageScale: number) => {
     y: 1 / stageScale,
   });
 
-  const clientRect = layer.getClientRect();
+  const { x, y, width, height } = layer.getClientRect();
 
-  const dataURL = layer.toDataURL(clientRect);
+  const dataURL = layer.toDataURL({
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.round(width),
+    height: Math.round(height),
+  });
 
   // Unscale the canvas
   layer.scale(tempScale);
 
-  return { dataURL, relativeX, relativeY };
+  return {
+    dataURL,
+    boundingBox: {
+      x: Math.round(relativeClientRect.x),
+      y: Math.round(relativeClientRect.y),
+      width: Math.round(width),
+      height: Math.round(height),
+    },
+  };
 };
 
 export default layerToDataURL;

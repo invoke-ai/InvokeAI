@@ -21,6 +21,7 @@ import { uploadImage } from 'features/gallery/util/uploadImage';
 import { setInitialCanvasImage } from './canvasReducers';
 import calculateScale from './util/calculateScale';
 import calculateCoordinates from './util/calculateCoordinates';
+import floorCoordinates from './util/floorCoordinates';
 
 export interface GenericCanvasState {
   boundingBoxCoordinates: Vector2d;
@@ -58,6 +59,7 @@ export interface GenericCanvasState {
   stageDimensions: Dimensions;
   stageScale: number;
   tool: CanvasTool;
+  minimumStageScale: number;
 }
 
 export type CanvasMode = 'inpainting' | 'outpainting';
@@ -147,8 +149,10 @@ export interface CanvasState {
   currentCanvas: ValidCanvasName;
   inpainting: InpaintingCanvasState;
   outpainting: OutpaintingCanvasState;
-  mode: CanvasMode;
+  // mode: CanvasMode;
+  shouldLockToInitialImage: boolean;
   isCanvasInitialized: boolean;
+  canvasContainerDimensions: Dimensions;
 }
 
 export const initialLayerState: CanvasLayerState = {
@@ -197,14 +201,17 @@ const initialGenericCanvasState: GenericCanvasState = {
   stageCoordinates: { x: 0, y: 0 },
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
+  minimumStageScale: 1,
   tool: 'brush',
 };
 
 const initialCanvasState: CanvasState = {
   currentCanvas: 'inpainting',
   doesCanvasNeedScaling: false,
-  mode: 'outpainting',
+  shouldLockToInitialImage: false,
+  // mode: 'outpainting',
   isCanvasInitialized: false,
+  canvasContainerDimensions: { width: 0, height: 0 },
   inpainting: {
     layer: 'mask',
     ...initialGenericCanvasState,
@@ -335,80 +342,15 @@ export const canvasSlice = createSlice({
       };
     },
     setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
-      const currentCanvas = state[state.currentCanvas];
-      currentCanvas.boundingBoxDimensions = action.payload;
-
-      const { width: boundingBoxWidth, height: boundingBoxHeight } =
-        action.payload;
-      const { x: boundingBoxX, y: boundingBoxY } =
-        currentCanvas.boundingBoxCoordinates;
-      const { width: canvasWidth, height: canvasHeight } =
-        currentCanvas.stageDimensions;
-
-      const scaledCanvasWidth = canvasWidth / currentCanvas.stageScale;
-      const scaledCanvasHeight = canvasHeight / currentCanvas.stageScale;
-
-      const roundedCanvasWidth = roundDownToMultiple(scaledCanvasWidth, 64);
-      const roundedCanvasHeight = roundDownToMultiple(scaledCanvasHeight, 64);
-
-      const roundedBoundingBoxWidth = roundDownToMultiple(boundingBoxWidth, 64);
-      const roundedBoundingBoxHeight = roundDownToMultiple(
-        boundingBoxHeight,
-        64
-      );
-
-      const overflowX = boundingBoxX + boundingBoxWidth - scaledCanvasWidth;
-      const overflowY = boundingBoxY + boundingBoxHeight - scaledCanvasHeight;
-
-      const newBoundingBoxWidth = _.clamp(
-        roundedBoundingBoxWidth,
-        64,
-        roundedCanvasWidth
-      );
-
-      const newBoundingBoxHeight = _.clamp(
-        roundedBoundingBoxHeight,
-        64,
-        roundedCanvasHeight
-      );
-
-      const overflowCorrectedX =
-        overflowX > 0 ? boundingBoxX - overflowX : boundingBoxX;
-
-      const overflowCorrectedY =
-        overflowY > 0 ? boundingBoxY - overflowY : boundingBoxY;
-
-      const clampedX = _.clamp(
-        overflowCorrectedX,
-        currentCanvas.stageCoordinates.x,
-        roundedCanvasWidth - newBoundingBoxWidth
-      );
-
-      const clampedY = _.clamp(
-        overflowCorrectedY,
-        currentCanvas.stageCoordinates.y,
-        roundedCanvasHeight - newBoundingBoxHeight
-      );
-
-      currentCanvas.boundingBoxDimensions = {
-        width: newBoundingBoxWidth,
-        height: newBoundingBoxHeight,
-      };
-
-      currentCanvas.boundingBoxCoordinates = {
-        x: clampedX,
-        y: clampedY,
-      };
+      state[state.currentCanvas].boundingBoxDimensions = action.payload;
     },
     setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
-      const { x, y } = action.payload;
-      state[state.currentCanvas].boundingBoxCoordinates = {
-        x: Math.floor(x),
-        y: Math.floor(y),
-      };
+      state[state.currentCanvas].boundingBoxCoordinates = floorCoordinates(
+        action.payload
+      );
     },
     setStageCoordinates: (state, action: PayloadAction<Vector2d>) => {
-      state[state.currentCanvas].stageCoordinates = action.payload;
+      state.outpainting.stageCoordinates = floorCoordinates(action.payload);
     },
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
       state[state.currentCanvas].boundingBoxPreviewFill = action.payload;
@@ -595,30 +537,52 @@ export const canvasSlice = createSlice({
       state[state.currentCanvas].layerState = initialLayerState;
       state[state.currentCanvas].futureLayerStates = [];
     },
-    initializeCanvas: (
+    setCanvasContainerDimensions: (
       state,
-      action: PayloadAction<{
-        clientWidth: number;
-        clientHeight: number;
-        imageWidth: number;
-        imageHeight: number;
-      }>
+      action: PayloadAction<Dimensions>
     ) => {
-      const { clientWidth, clientHeight, imageWidth, imageHeight } =
-        action.payload;
+      state.canvasContainerDimensions = action.payload;
+    },
+    resizeAndScaleCanvas: (state) => {
+      const { width: containerWidth, height: containerHeight } =
+        state.canvasContainerDimensions;
+
+      const initialCanvasImage =
+        state.outpainting.layerState.objects.find(isCanvasBaseImage);
+
+      if (!initialCanvasImage) return;
+
+      const { width: imageWidth, height: imageHeight } = initialCanvasImage;
+
+      // const { clientWidth, clientHeight, imageWidth, imageHeight } =
+      //   action.payload;
+
+      const { shouldLockToInitialImage } = state;
 
       const currentCanvas = state[state.currentCanvas];
 
+      const padding = shouldLockToInitialImage ? 1 : 0.95;
+
       const newScale = calculateScale(
-        clientWidth,
-        clientHeight,
+        containerWidth,
+        containerHeight,
         imageWidth,
-        imageHeight
+        imageHeight,
+        padding
       );
 
+      const newDimensions = {
+        width: shouldLockToInitialImage
+          ? Math.floor(imageWidth * newScale)
+          : Math.floor(containerWidth),
+        height: shouldLockToInitialImage
+          ? Math.floor(imageHeight * newScale)
+          : Math.floor(containerHeight),
+      };
+
       const newCoordinates = calculateCoordinates(
-        clientWidth,
-        clientHeight,
+        newDimensions.width,
+        newDimensions.height,
         0,
         0,
         imageWidth,
@@ -627,50 +591,53 @@ export const canvasSlice = createSlice({
       );
 
       currentCanvas.stageScale = newScale;
+      currentCanvas.minimumStageScale = newScale;
       currentCanvas.stageCoordinates = newCoordinates;
 
-      currentCanvas.stageDimensions = {
-        width: Math.floor(clientWidth),
-        height: Math.floor(clientHeight),
-      };
+      currentCanvas.stageDimensions = newDimensions;
       state.isCanvasInitialized = true;
     },
-    resizeCanvas: (
-      state,
-      action: PayloadAction<{
-        clientWidth: number;
-        clientHeight: number;
-      }>
-    ) => {
-      const { clientWidth, clientHeight } = action.payload;
+    resizeCanvas: (state) => {
+      const { width: containerWidth, height: containerHeight } =
+        state.canvasContainerDimensions;
 
       const currentCanvas = state[state.currentCanvas];
 
       currentCanvas.stageDimensions = {
-        width: Math.floor(clientWidth),
-        height: Math.floor(clientHeight),
+        width: Math.floor(containerWidth),
+        height: Math.floor(containerHeight),
       };
     },
     resetCanvasView: (
       state,
       action: PayloadAction<{
-        clientRect: IRect;
+        contentRect: IRect;
       }>
     ) => {
-      const { clientRect } = action.payload;
+      const { contentRect } = action.payload;
+
       const currentCanvas = state[state.currentCanvas];
+
       const baseCanvasImage =
         currentCanvas.layerState.objects.find(isCanvasBaseImage);
-
+      const { shouldLockToInitialImage } = state;
       if (!baseCanvasImage) return;
 
       const {
         stageDimensions: { width: stageWidth, height: stageHeight },
       } = currentCanvas;
 
-      const { x, y, width, height } = clientRect;
+      const { x, y, width, height } = contentRect;
 
-      const newScale = calculateScale(stageWidth, stageHeight, width, height);
+      const padding = shouldLockToInitialImage ? 1 : 0.95;
+      const newScale = calculateScale(
+        stageWidth,
+        stageHeight,
+        width,
+        height,
+        padding
+      );
+
       const newCoordinates = calculateCoordinates(
         stageWidth,
         stageHeight,
@@ -683,10 +650,7 @@ export const canvasSlice = createSlice({
 
       currentCanvas.stageScale = newScale;
 
-      currentCanvas.stageCoordinates = {
-        x: stageWidth / 2 - (x + width / 2) * newScale,
-        y: stageHeight / 2 - (y + height / 2) * newScale,
-      };
+      currentCanvas.stageCoordinates = newCoordinates;
     },
     nextStagingAreaImage: (state) => {
       const currentIndex =
@@ -728,14 +692,17 @@ export const canvasSlice = createSlice({
 
       currentCanvas.futureLayerStates = [];
     },
-    setCanvasMode: (state, action: PayloadAction<CanvasMode>) => {
-      state.mode = action.payload;
+    setShouldLockToInitialImage: (state, action: PayloadAction<boolean>) => {
+      state.shouldLockToInitialImage = action.payload;
     },
+    // setCanvasMode: (state, action: PayloadAction<CanvasMode>) => {
+    //   state.mode = action.payload;
+    // },
   },
   extraReducers: (builder) => {
     builder.addCase(mergeAndUploadCanvas.fulfilled, (state, action) => {
       if (!action.payload) return;
-      const { image, kind, boundingBox } = action.payload;
+      const { image, kind, originalBoundingBox } = action.payload;
 
       if (kind === 'temp_merged_canvas') {
         state.outpainting.pastLayerStates.push({
@@ -748,7 +715,7 @@ export const canvasSlice = createSlice({
           {
             kind: 'image',
             layer: 'base',
-            ...boundingBox,
+            ...originalBoundingBox,
             image,
           },
         ];
@@ -824,10 +791,11 @@ export const {
   prevStagingAreaImage,
   commitStagingAreaImage,
   discardStagedImages,
-  setCanvasMode,
-  initializeCanvas,
+  setShouldLockToInitialImage,
+  resizeAndScaleCanvas,
   resizeCanvas,
   resetCanvasView,
+  setCanvasContainerDimensions,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
@@ -847,8 +815,8 @@ export const inpaintingCanvasSelector = (
   state: RootState
 ): InpaintingCanvasState => state.canvas.inpainting;
 
-export const canvasModeSelector = (state: RootState): CanvasMode =>
-  state.canvas.mode;
+export const shouldLockToInitialImageSelector = (state: RootState): boolean =>
+  state.canvas.shouldLockToInitialImage;
 
 export const baseCanvasImageSelector = createSelector(
   [currentCanvasSelector],
@@ -857,16 +825,16 @@ export const baseCanvasImageSelector = createSelector(
   }
 );
 
-export const canvasClipSelector = createSelector(
-  [canvasModeSelector, baseCanvasImageSelector],
-  (canvasMode, baseCanvasImage) => {
-    return canvasMode === 'inpainting'
-      ? {
-          clipX: 0,
-          clipY: 0,
-          clipWidth: baseCanvasImage?.width,
-          clipHeight: baseCanvasImage?.height,
-        }
-      : {};
-  }
-);
+// export const canvasClipSelector = createSelector(
+//   [canvasModeSelector, baseCanvasImageSelector],
+//   (canvasMode, baseCanvasImage) => {
+//     return canvasMode === 'inpainting'
+//       ? {
+//           clipX: 0,
+//           clipY: 0,
+//           clipWidth: baseCanvasImage?.width,
+//           clipHeight: baseCanvasImage?.height,
+//         }
+//       : {};
+//   }
+// );

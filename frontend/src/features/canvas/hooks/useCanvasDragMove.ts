@@ -5,20 +5,21 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { useCallback } from 'react';
 import {
+  baseCanvasImageSelector,
   currentCanvasSelector,
   isStagingSelector,
   setIsMovingStage,
   setStageCoordinates,
+  shouldLockToInitialImageSelector,
 } from '../canvasSlice';
 
 const selector = createSelector(
-  [currentCanvasSelector, isStagingSelector, activeTabNameSelector],
-  (canvas, isStaging, activeTabName) => {
+  [currentCanvasSelector, isStagingSelector],
+  (canvas, isStaging) => {
     const { tool } = canvas;
     return {
       tool,
       isStaging,
-      activeTabName,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -26,7 +27,7 @@ const selector = createSelector(
 
 const useCanvasDrag = () => {
   const dispatch = useAppDispatch();
-  const { tool, activeTabName, isStaging } = useAppSelector(selector);
+  const { tool, isStaging } = useAppSelector(selector);
 
   return {
     handleDragStart: useCallback(() => {
@@ -37,7 +38,10 @@ const useCanvasDrag = () => {
     handleDragMove: useCallback(
       (e: KonvaEventObject<MouseEvent>) => {
         if (!(tool === 'move' || isStaging)) return;
-        dispatch(setStageCoordinates(e.target.getPosition()));
+
+        const newCoordinates = { x: e.target.x(), y: e.target.y() };
+
+        dispatch(setStageCoordinates(newCoordinates));
       },
       [dispatch, isStaging, tool]
     ),

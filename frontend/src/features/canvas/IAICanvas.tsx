@@ -1,16 +1,19 @@
 // lib
-import { MutableRefObject, useRef } from 'react';
+import { MutableRefObject, useCallback, useRef } from 'react';
 import Konva from 'konva';
 import { Layer, Stage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
 // app
-import { useAppSelector } from 'app/store';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import {
   baseCanvasImageSelector,
   currentCanvasSelector,
   isStagingSelector,
   outpaintingCanvasSelector,
+  setStageCoordinates,
+  setStageScale,
+  shouldLockToInitialImageSelector,
 } from 'features/canvas/canvasSlice';
 
 // component
@@ -35,15 +38,31 @@ import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasStatusText from './IAICanvasStatusText';
 import IAICanvasStagingArea from './IAICanvasStagingArea';
+import IAICanvasStagingAreaToolbar from './IAICanvasStagingAreaToolbar';
+import { KonvaEventObject } from 'konva/lib/Node';
+import {
+  CANVAS_SCALE_BY,
+  MAX_CANVAS_SCALE,
+  MIN_CANVAS_SCALE,
+} from './util/constants';
 
 const canvasSelector = createSelector(
   [
+    shouldLockToInitialImageSelector,
     currentCanvasSelector,
     outpaintingCanvasSelector,
     isStagingSelector,
     activeTabNameSelector,
+    baseCanvasImageSelector,
   ],
-  (currentCanvas, outpaintingCanvas, isStaging, activeTabName) => {
+  (
+    shouldLockToInitialImage,
+    currentCanvas,
+    outpaintingCanvas,
+    isStaging,
+    activeTabName,
+    baseCanvasImage
+  ) => {
     const {
       isMaskEnabled,
       stageScale,
@@ -56,6 +75,7 @@ const canvasSelector = createSelector(
       tool,
       isMovingStage,
       shouldShowIntermediates,
+      minimumStageScale,
     } = currentCanvas;
 
     const { shouldShowGrid } = outpaintingCanvas;
@@ -89,6 +109,10 @@ const canvasSelector = createSelector(
       isOnOutpaintingTab: activeTabName === 'outpainting',
       isStaging,
       shouldShowIntermediates,
+      shouldLockToInitialImage,
+      activeTabName,
+      minimumStageScale,
+      baseCanvasImage,
     };
   },
   {
@@ -116,8 +140,12 @@ const IAICanvas = () => {
     isOnOutpaintingTab,
     isStaging,
     shouldShowIntermediates,
+    shouldLockToInitialImage,
+    activeTabName,
+    minimumStageScale,
+    baseCanvasImage,
   } = useAppSelector(canvasSelector);
-
+  const dispatch = useAppDispatch();
   useCanvasHotkeys();
 
   // set the closure'd refs
@@ -142,6 +170,34 @@ const IAICanvas = () => {
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
 
+  const dragBoundFunc = useCallback(
+    (newCoordinates: Vector2d) => {
+      if (shouldLockToInitialImage && baseCanvasImage) {
+        newCoordinates.x = _.clamp(
+          newCoordinates.x,
+          stageDimensions.width -
+            Math.floor(baseCanvasImage.width * stageScale),
+          0
+        );
+        newCoordinates.y = _.clamp(
+          newCoordinates.y,
+          stageDimensions.height -
+            Math.floor(baseCanvasImage.height * stageScale),
+          0
+        );
+      }
+
+      return newCoordinates;
+    },
+    [
+      baseCanvasImage,
+      shouldLockToInitialImage,
+      stageDimensions.height,
+      stageDimensions.width,
+      stageScale,
+    ]
+  );
+
   return (
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
@@ -157,6 +213,7 @@ const IAICanvas = () => {
           width={stageDimensions.width}
           height={stageDimensions.height}
           scale={{ x: stageScale, y: stageScale }}
+          dragBoundFunc={dragBoundFunc}
           onMouseDown={handleMouseDown}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseOut}
@@ -205,6 +262,7 @@ const IAICanvas = () => {
           </Layer>
         </Stage>
         {isOnOutpaintingTab && <IAICanvasStatusText />}
+        <IAICanvasStagingAreaToolbar />
       </div>
     </div>
   );

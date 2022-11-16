@@ -8,6 +8,7 @@ import math
 import io
 import base64
 import os
+import json
 
 from werkzeug.utils import secure_filename
 from flask import Flask, redirect, send_from_directory, request, make_response
@@ -107,6 +108,7 @@ class InvokeAIWebServer:
         @self.app.route("/upload", methods=["POST"])
         def upload():
             try:
+                data = json.loads(request.form["data"])
                 filename = ""
                 # check if the post request has the file part
                 if "file" in request.files:
@@ -116,15 +118,15 @@ class InvokeAIWebServer:
                     if file.filename == "":
                         return make_response("No file selected", 400)
                     filename = file.filename
-                elif "dataURL" in request.form:
-                    file = dataURL_to_bytes(request.form["dataURL"])
-                    if "filename" not in request.form or request.form["filename"] == "":
+                elif "dataURL" in data:
+                    file = dataURL_to_bytes(data["dataURL"])
+                    if "filename" not in data or data["filename"] == "":
                         return make_response("No filename provided", 400)
-                    filename = request.form["filename"]
+                    filename = data["filename"]
                 else:
                     return make_response("No file or dataURL", 400)
 
-                kind = request.form["kind"]
+                kind = data["kind"]
 
                 if kind == "init":
                     path = self.init_image_path
@@ -153,22 +155,32 @@ class InvokeAIWebServer:
 
                 file_path = os.path.join(path, name)
 
-                if "dataURL" in request.form:
+                if "dataURL" in data:
                     with open(file_path, "wb") as f:
                         f.write(file)
                 else:
                     file.save(file_path)
 
                 mtime = os.path.getmtime(file_path)
-                (width, height) = Image.open(file_path).size
+
+                pil_image = Image.open(file_path)
+
+                # visible_image_bbox = pil_image.getbbox()
+                # pil_image = pil_image.crop(visible_image_bbox)
+                # pil_image.save(file_path)
+                # if "cropVisible" in data and data["cropVisible"] == True:
+                #     visible_image_bbox = pil_image.getbbox()
+                #     pil_image = pil_image.crop(visible_image_bbox)
+                #     pil_image.save(file_path)
+
+                (width, height) = pil_image.size
 
                 response = {
-                    "image": {
-                        "url": self.get_url_from_image_path(file_path),
-                        "mtime": mtime,
-                        "width": width,
-                        "height": height,
-                    },
+                    "url": self.get_url_from_image_path(file_path),
+                    "mtime": mtime,
+                    # "bbox": visible_image_bbox,
+                    "width": width,
+                    "height": height,
                 }
 
                 return make_response(response, 200)
