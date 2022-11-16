@@ -1,14 +1,8 @@
 diff --git a/node_modules/redux-persist/es/createPersistoid.js b/node_modules/redux-persist/es/createPersistoid.js
-index 8b43b9a..ffe8d3f 100644
+index 8b43b9a..184faab 100644
 --- a/node_modules/redux-persist/es/createPersistoid.js
 +++ b/node_modules/redux-persist/es/createPersistoid.js
-@@ -1,11 +1,13 @@
- import { KEY_PREFIX, REHYDRATE } from './constants';
- // @TODO remove once flow < 0.63 support is no longer required.
- export default function createPersistoid(config) {
-+  console.log(config)
-   // defaults
-   var blacklist = config.blacklist || null;
+@@ -6,6 +6,7 @@ export default function createPersistoid(config) {
    var whitelist = config.whitelist || null;
    var transforms = config.transforms || [];
    var throttle = config.throttle || 0;
@@ -16,7 +10,7 @@ index 8b43b9a..ffe8d3f 100644
    var storageKey = "".concat(config.keyPrefix !== undefined ? config.keyPrefix : KEY_PREFIX).concat(config.key);
    var storage = config.storage;
    var serialize;
-@@ -28,30 +30,37 @@ export default function createPersistoid(config) {
+@@ -28,30 +29,37 @@ export default function createPersistoid(config) {
    var timeIterator = null;
    var writePromise = null;
  
