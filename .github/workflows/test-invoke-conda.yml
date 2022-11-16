@@ -105,7 +105,9 @@ jobs:
             mkdir -p ~/.huggingface
             echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
           fi
-          python scripts/configure_invokeai.py --no-interactive --yes
+          python scripts/preload_models.py \
+            --no-interactive \
+            --full-precision  # can't use fp16 weights without a GPU
 
       - name: cat ~/.invokeai
         id: cat-invokeai
@@ -113,6 +115,10 @@ jobs:
 
       - name: Run the tests
         id: run-tests
+        env:
+          HF_HUB_OFFLINE: 1
+          HF_DATASETS_OFFLINE: 1
+          TRANSFORMERS_OFFLINE: 1
         run: |
           time python scripts/invoke.py \
             --no-patchmatch \
