@@ -2,17 +2,16 @@ import { FaVectorSquare } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
-  currentCanvasSelector,
-  GenericCanvasState,
+  canvasSelector,
   setShouldShowBoundingBox,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 
 const canvasShowHideBoundingBoxControlSelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas: GenericCanvasState) => {
-    const { shouldShowBoundingBox } = currentCanvas;
+  canvasSelector,
+  (canvas) => {
+    const { shouldShowBoundingBox } = canvas;
 
     return {
       shouldShowBoundingBox,

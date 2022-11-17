@@ -9,19 +9,19 @@ import {
   toggleShouldLockBoundingBox,
 } from 'features/canvas/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { currentCanvasSelector } from '../canvasSlice';
+import { canvasSelector } from '../canvasSlice';
 import { useRef } from 'react';
 import { stageRef } from '../IAICanvas';
 
 const inpaintingCanvasHotkeysSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas, activeTabName) => {
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
     const {
       cursorPosition,
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
-    } = currentCanvas;
+    } = canvas;
 
     return {
       activeTabName,

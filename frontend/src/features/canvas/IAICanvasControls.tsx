@@ -10,28 +10,17 @@ import IAICanvasLockBoundingBoxControl from './IAICanvasControls/IAICanvasLockBo
 import IAICanvasShowHideBoundingBoxControl from './IAICanvasControls/IAICanvasShowHideBoundingBoxControl';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
 import { createSelector } from '@reduxjs/toolkit';
-import {
-  outpaintingCanvasSelector,
-  OutpaintingCanvasState,
-} from './canvasSlice';
 import { RootState } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import _ from 'lodash';
+import { canvasSelector } from './canvasSlice';
 
 export const canvasControlsSelector = createSelector(
-  [
-    outpaintingCanvasSelector,
-    (state: RootState) => state.options,
-    activeTabNameSelector,
-  ],
-  (
-    outpaintingCanvas: OutpaintingCanvasState,
-    options: OptionsState,
-    activeTabName
-  ) => {
+  [(state: RootState) => state.options, canvasSelector, activeTabNameSelector],
+  (options: OptionsState, canvas, activeTabName) => {
     const { stageScale, boundingBoxCoordinates, boundingBoxDimensions } =
-      outpaintingCanvas;
+      canvas;
     return {
       activeTabName,
       stageScale,

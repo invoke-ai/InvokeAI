@@ -1,10 +1,10 @@
 import { Spinner } from '@chakra-ui/react';
 import { useLayoutEffect, useRef } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
-  baseCanvasImageSelector,
-  currentCanvasSelector,
+  initialCanvasImageSelector,
+  canvasSelector,
   resizeAndScaleCanvas,
   resizeCanvas,
   setCanvasContainerDimensions,
@@ -13,11 +13,10 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 
 const canvasResizerSelector = createSelector(
-  (state: RootState) => state.canvas,
-  currentCanvasSelector,
-  baseCanvasImageSelector,
+  canvasSelector,
+  initialCanvasImageSelector,
   activeTabNameSelector,
-  (canvas, currentCanvas, baseCanvasImage, activeTabName) => {
+  (canvas, initialCanvasImage, activeTabName) => {
     const {
       doesCanvasNeedScaling,
       shouldLockToInitialImage,
@@ -27,7 +26,7 @@ const canvasResizerSelector = createSelector(
       doesCanvasNeedScaling,
       shouldLockToInitialImage,
       activeTabName,
-      baseCanvasImage,
+      initialCanvasImage,
       isCanvasInitialized,
     };
   }
@@ -39,7 +38,7 @@ const IAICanvasResizer = () => {
     doesCanvasNeedScaling,
     shouldLockToInitialImage,
     activeTabName,
-    baseCanvasImage,
+    initialCanvasImage,
     isCanvasInitialized,
   } = useAppSelector(canvasResizerSelector);
 
@@ -51,9 +50,10 @@ const IAICanvasResizer = () => {
 
       const { clientWidth, clientHeight } = ref.current;
 
-      if (!baseCanvasImage?.image) return;
+      if (!initialCanvasImage?.image) return;
 
-      const { width: imageWidth, height: imageHeight } = baseCanvasImage.image;
+      const { width: imageWidth, height: imageHeight } =
+        initialCanvasImage.image;
 
       dispatch(
         setCanvasContainerDimensions({
@@ -70,9 +70,9 @@ const IAICanvasResizer = () => {
 
       dispatch(setDoesCanvasNeedScaling(false));
       // }
-      // if ((activeTabName === 'inpainting') && baseCanvasImage?.image) {
+      // if ((activeTabName === 'inpainting') && initialCanvasImage?.image) {
       //   const { width: imageWidth, height: imageHeight } =
-      //     baseCanvasImage.image;
+      //     initialCanvasImage.image;
 
       //   const scale = Math.min(
       //     1,
@@ -100,7 +100,7 @@ const IAICanvasResizer = () => {
     }, 0);
   }, [
     dispatch,
-    baseCanvasImage,
+    initialCanvasImage,
     doesCanvasNeedScaling,
     activeTabName,
     isCanvasInitialized,

@@ -3,23 +3,21 @@ import { createSelector } from '@reduxjs/toolkit';
 import IAICanvasResizer from 'features/canvas/IAICanvasResizer';
 import _ from 'lodash';
 import { useLayoutEffect } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import ImageUploadButton from 'common/components/ImageUploaderButton';
 import {
-  CanvasState,
+  canvasSelector,
   setDoesCanvasNeedScaling,
 } from 'features/canvas/canvasSlice';
 import IAICanvas from 'features/canvas/IAICanvas';
 import IAICanvasOutpaintingControls from 'features/canvas/IAICanvasOutpaintingControls';
 
 const outpaintingDisplaySelector = createSelector(
-  [(state: RootState) => state.canvas],
-  (canvas: CanvasState) => {
+  [canvasSelector],
+  (canvas) => {
     const {
       doesCanvasNeedScaling,
-      outpainting: {
-        layerState: { objects },
-      },
+      layerState: { objects },
     } = canvas;
     return {
       doesCanvasNeedScaling,

@@ -1,10 +1,4 @@
-import {
-  createAsyncThunk,
-  createSelector,
-  createSlice,
-  current,
-} from '@reduxjs/toolkit';
-import { v4 as uuidv4 } from 'uuid';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
@@ -12,55 +6,12 @@ import * as InvokeAI from 'app/invokeai';
 import _ from 'lodash';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { RootState } from 'app/store';
-import { MutableRefObject } from 'react';
-import Konva from 'konva';
-import { tabMap } from 'features/tabs/InvokeTabs';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
 import { uploadImage } from 'features/gallery/util/uploadImage';
 import { setInitialCanvasImage } from './canvasReducers';
 import calculateScale from './util/calculateScale';
 import calculateCoordinates from './util/calculateCoordinates';
 import floorCoordinates from './util/floorCoordinates';
-
-export interface GenericCanvasState {
-  boundingBoxCoordinates: Vector2d;
-  boundingBoxDimensions: Dimensions;
-  boundingBoxPreviewFill: RgbaColor;
-  brushColor: RgbaColor;
-  brushSize: number;
-  cursorPosition: Vector2d | null;
-  eraserSize: number;
-  futureLayerStates: CanvasLayerState[];
-  inpaintReplace: number;
-  intermediateImage?: InvokeAI.Image;
-  isDrawing: boolean;
-  isMaskEnabled: boolean;
-  isMouseOverBoundingBox: boolean;
-  isMoveBoundingBoxKeyHeld: boolean;
-  isMoveStageKeyHeld: boolean;
-  isMovingBoundingBox: boolean;
-  isMovingStage: boolean;
-  isTransformingBoundingBox: boolean;
-  layerState: CanvasLayerState;
-  maskColor: RgbaColor;
-  maxHistory: number;
-  pastLayerStates: CanvasLayerState[];
-  shouldDarkenOutsideBoundingBox: boolean;
-  shouldLockBoundingBox: boolean;
-  shouldPreserveMaskedArea: boolean;
-  shouldShowBoundingBox: boolean;
-  shouldShowBrush: boolean;
-  shouldShowBrushPreview: boolean;
-  shouldShowCheckboardTransparency: boolean;
-  shouldShowIntermediates: boolean;
-  shouldUseInpaintReplace: boolean;
-  stageCoordinates: Vector2d;
-  stageDimensions: Dimensions;
-  stageScale: number;
-  tool: CanvasTool;
-  minimumStageScale: number;
-}
 
 export type CanvasMode = 'inpainting' | 'outpainting';
 
@@ -129,30 +80,51 @@ export const isCanvasAnyLine = (
   obj: CanvasObject
 ): obj is CanvasMaskLine | CanvasLine => obj.kind === 'line';
 
-export type OutpaintingCanvasState = GenericCanvasState & {
-  layer: CanvasLayer;
-  shouldShowGrid: boolean;
-  shouldSnapToGrid: boolean;
-  shouldAutoSave: boolean;
-};
-
-export type InpaintingCanvasState = GenericCanvasState & {
-  layer: 'mask';
-};
-
-export type BaseCanvasState = InpaintingCanvasState | OutpaintingCanvasState;
-
-export type ValidCanvasName = 'inpainting' | 'outpainting';
-
 export interface CanvasState {
-  doesCanvasNeedScaling: boolean;
-  currentCanvas: ValidCanvasName;
-  inpainting: InpaintingCanvasState;
-  outpainting: OutpaintingCanvasState;
-  // mode: CanvasMode;
-  shouldLockToInitialImage: boolean;
-  isCanvasInitialized: boolean;
+  boundingBoxCoordinates: Vector2d;
+  boundingBoxDimensions: Dimensions;
+  boundingBoxPreviewFill: RgbaColor;
+  brushColor: RgbaColor;
+  brushSize: number;
   canvasContainerDimensions: Dimensions;
+  cursorPosition: Vector2d | null;
+  doesCanvasNeedScaling: boolean;
+  eraserSize: number;
+  futureLayerStates: CanvasLayerState[];
+  inpaintReplace: number;
+  intermediateImage?: InvokeAI.Image;
+  isCanvasInitialized: boolean;
+  isDrawing: boolean;
+  isMaskEnabled: boolean;
+  isMouseOverBoundingBox: boolean;
+  isMoveBoundingBoxKeyHeld: boolean;
+  isMoveStageKeyHeld: boolean;
+  isMovingBoundingBox: boolean;
+  isMovingStage: boolean;
+  isTransformingBoundingBox: boolean;
+  layer: CanvasLayer;
+  layerState: CanvasLayerState;
+  maskColor: RgbaColor;
+  maxHistory: number;
+  minimumStageScale: number;
+  pastLayerStates: CanvasLayerState[];
+  shouldAutoSave: boolean;
+  shouldDarkenOutsideBoundingBox: boolean;
+  shouldLockBoundingBox: boolean;
+  shouldLockToInitialImage: boolean;
+  shouldPreserveMaskedArea: boolean;
+  shouldShowBoundingBox: boolean;
+  shouldShowBrush: boolean;
+  shouldShowBrushPreview: boolean;
+  shouldShowCheckboardTransparency: boolean;
+  shouldShowGrid: boolean;
+  shouldShowIntermediates: boolean;
+  shouldSnapToGrid: boolean;
+  shouldUseInpaintReplace: boolean;
+  stageCoordinates: Vector2d;
+  stageDimensions: Dimensions;
+  stageScale: number;
+  tool: CanvasTool;
 }
 
 export const initialLayerState: CanvasLayerState = {
@@ -167,16 +139,19 @@ export const initialLayerState: CanvasLayerState = {
   },
 };
 
-const initialGenericCanvasState: GenericCanvasState = {
+const initialCanvasState: CanvasState = {
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
+  canvasContainerDimensions: { width: 0, height: 0 },
   cursorPosition: null,
+  doesCanvasNeedScaling: false,
   eraserSize: 50,
   futureLayerStates: [],
   inpaintReplace: 0.1,
+  isCanvasInitialized: false,
   isDrawing: false,
   isMaskEnabled: true,
   isMouseOverBoundingBox: false,
@@ -185,44 +160,29 @@ const initialGenericCanvasState: GenericCanvasState = {
   isMovingBoundingBox: false,
   isMovingStage: false,
   isTransformingBoundingBox: false,
+  layer: 'base',
   layerState: initialLayerState,
   maskColor: { r: 255, g: 90, b: 90, a: 1 },
   maxHistory: 128,
+  minimumStageScale: 1,
   pastLayerStates: [],
+  shouldAutoSave: false,
   shouldDarkenOutsideBoundingBox: false,
   shouldLockBoundingBox: false,
+  shouldLockToInitialImage: false,
   shouldPreserveMaskedArea: false,
   shouldShowBoundingBox: true,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
   shouldShowCheckboardTransparency: false,
+  shouldShowGrid: true,
   shouldShowIntermediates: true,
+  shouldSnapToGrid: true,
   shouldUseInpaintReplace: false,
   stageCoordinates: { x: 0, y: 0 },
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
-  minimumStageScale: 1,
   tool: 'brush',
-};
-
-const initialCanvasState: CanvasState = {
-  currentCanvas: 'inpainting',
-  doesCanvasNeedScaling: false,
-  shouldLockToInitialImage: false,
-  // mode: 'outpainting',
-  isCanvasInitialized: false,
-  canvasContainerDimensions: { width: 0, height: 0 },
-  inpainting: {
-    layer: 'mask',
-    ...initialGenericCanvasState,
-  },
-  outpainting: {
-    layer: 'base',
-    shouldShowGrid: true,
-    shouldSnapToGrid: true,
-    shouldAutoSave: false,
-    ...initialGenericCanvasState,
-  },
 };
 
 export const canvasSlice = createSlice({
@@ -231,75 +191,70 @@ export const canvasSlice = createSlice({
   reducers: {
     setTool: (state, action: PayloadAction<CanvasTool>) => {
       const tool = action.payload;
-      state[state.currentCanvas].tool = action.payload;
+      state.tool = action.payload;
       if (tool !== 'move') {
-        state[state.currentCanvas].isTransformingBoundingBox = false;
-        state[state.currentCanvas].isMouseOverBoundingBox = false;
-        state[state.currentCanvas].isMovingBoundingBox = false;
-        state[state.currentCanvas].isMovingStage = false;
+        state.isTransformingBoundingBox = false;
+        state.isMouseOverBoundingBox = false;
+        state.isMovingBoundingBox = false;
+        state.isMovingStage = false;
       }
     },
     setLayer: (state, action: PayloadAction<CanvasLayer>) => {
-      state[state.currentCanvas].layer = action.payload;
+      state.layer = action.payload;
     },
     toggleTool: (state) => {
-      const currentTool = state[state.currentCanvas].tool;
+      const currentTool = state.tool;
       if (currentTool !== 'move') {
-        state[state.currentCanvas].tool =
-          currentTool === 'brush' ? 'eraser' : 'brush';
+        state.tool = currentTool === 'brush' ? 'eraser' : 'brush';
       }
     },
     setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
-      state[state.currentCanvas].maskColor = action.payload;
+      state.maskColor = action.payload;
     },
     setBrushColor: (state, action: PayloadAction<RgbaColor>) => {
-      state[state.currentCanvas].brushColor = action.payload;
+      state.brushColor = action.payload;
     },
     setBrushSize: (state, action: PayloadAction<number>) => {
-      state[state.currentCanvas].brushSize = action.payload;
+      state.brushSize = action.payload;
     },
     setEraserSize: (state, action: PayloadAction<number>) => {
-      state[state.currentCanvas].eraserSize = action.payload;
+      state.eraserSize = action.payload;
     },
     clearMask: (state) => {
-      const currentCanvas = state[state.currentCanvas];
-      currentCanvas.pastLayerStates.push(currentCanvas.layerState);
-      currentCanvas.layerState.objects = state[
-        state.currentCanvas
-      ].layerState.objects.filter((obj) => !isCanvasMaskLine(obj));
-      currentCanvas.futureLayerStates = [];
-      currentCanvas.shouldPreserveMaskedArea = false;
+      state.pastLayerStates.push(state.layerState);
+      state.layerState.objects = state.layerState.objects.filter(
+        (obj) => !isCanvasMaskLine(obj)
+      );
+      state.futureLayerStates = [];
+      state.shouldPreserveMaskedArea = false;
     },
     toggleShouldInvertMask: (state) => {
-      state[state.currentCanvas].shouldPreserveMaskedArea =
-        !state[state.currentCanvas].shouldPreserveMaskedArea;
+      state.shouldPreserveMaskedArea = !state.shouldPreserveMaskedArea;
     },
     toggleShouldShowMask: (state) => {
-      state[state.currentCanvas].isMaskEnabled =
-        !state[state.currentCanvas].isMaskEnabled;
+      state.isMaskEnabled = !state.isMaskEnabled;
     },
     setShouldPreserveMaskedArea: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldPreserveMaskedArea = action.payload;
+      state.shouldPreserveMaskedArea = action.payload;
     },
     setIsMaskEnabled: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isMaskEnabled = action.payload;
-      state[state.currentCanvas].layer = action.payload ? 'mask' : 'base';
+      state.isMaskEnabled = action.payload;
+      state.layer = action.payload ? 'mask' : 'base';
     },
     setShouldShowCheckboardTransparency: (
       state,
       action: PayloadAction<boolean>
     ) => {
-      state[state.currentCanvas].shouldShowCheckboardTransparency =
-        action.payload;
+      state.shouldShowCheckboardTransparency = action.payload;
     },
     setShouldShowBrushPreview: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldShowBrushPreview = action.payload;
+      state.shouldShowBrushPreview = action.payload;
     },
     setShouldShowBrush: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldShowBrush = action.payload;
+      state.shouldShowBrush = action.payload;
     },
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
-      state[state.currentCanvas].cursorPosition = action.payload;
+      state.cursorPosition = action.payload;
     },
     clearImageToInpaint: (state) => {
       // TODO
@@ -312,102 +267,87 @@ export const canvasSlice = createSlice({
       setInitialCanvasImage(state, action.payload);
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
-      state[state.currentCanvas].stageDimensions = action.payload;
+      state.stageDimensions = action.payload;
 
       const { width: canvasWidth, height: canvasHeight } = action.payload;
 
       const { width: boundingBoxWidth, height: boundingBoxHeight } =
-        state[state.currentCanvas].boundingBoxDimensions;
+        state.boundingBoxDimensions;
 
       const newBoundingBoxWidth = roundDownToMultiple(
-        _.clamp(
-          boundingBoxWidth,
-          64,
-          canvasWidth / state[state.currentCanvas].stageScale
-        ),
+        _.clamp(boundingBoxWidth, 64, canvasWidth / state.stageScale),
         64
       );
       const newBoundingBoxHeight = roundDownToMultiple(
-        _.clamp(
-          boundingBoxHeight,
-          64,
-          canvasHeight / state[state.currentCanvas].stageScale
-        ),
+        _.clamp(boundingBoxHeight, 64, canvasHeight / state.stageScale),
         64
       );
 
-      state[state.currentCanvas].boundingBoxDimensions = {
+      state.boundingBoxDimensions = {
         width: newBoundingBoxWidth,
         height: newBoundingBoxHeight,
       };
     },
     setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
-      state[state.currentCanvas].boundingBoxDimensions = action.payload;
+      state.boundingBoxDimensions = action.payload;
     },
     setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
-      state[state.currentCanvas].boundingBoxCoordinates = floorCoordinates(
-        action.payload
-      );
+      state.boundingBoxCoordinates = floorCoordinates(action.payload);
     },
     setStageCoordinates: (state, action: PayloadAction<Vector2d>) => {
-      state.outpainting.stageCoordinates = floorCoordinates(action.payload);
+      state.stageCoordinates = floorCoordinates(action.payload);
     },
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
-      state[state.currentCanvas].boundingBoxPreviewFill = action.payload;
+      state.boundingBoxPreviewFill = action.payload;
     },
     setDoesCanvasNeedScaling: (state, action: PayloadAction<boolean>) => {
       state.doesCanvasNeedScaling = action.payload;
     },
     setStageScale: (state, action: PayloadAction<number>) => {
-      state[state.currentCanvas].stageScale = action.payload;
+      state.stageScale = action.payload;
     },
     setShouldDarkenOutsideBoundingBox: (
       state,
       action: PayloadAction<boolean>
     ) => {
-      state[state.currentCanvas].shouldDarkenOutsideBoundingBox =
-        action.payload;
+      state.shouldDarkenOutsideBoundingBox = action.payload;
     },
     setIsDrawing: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isDrawing = action.payload;
+      state.isDrawing = action.payload;
     },
     setClearBrushHistory: (state) => {
-      state[state.currentCanvas].pastLayerStates = [];
-      state[state.currentCanvas].futureLayerStates = [];
+      state.pastLayerStates = [];
+      state.futureLayerStates = [];
     },
     setShouldUseInpaintReplace: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldUseInpaintReplace = action.payload;
+      state.shouldUseInpaintReplace = action.payload;
     },
     setInpaintReplace: (state, action: PayloadAction<number>) => {
-      state[state.currentCanvas].inpaintReplace = action.payload;
+      state.inpaintReplace = action.payload;
     },
     setShouldLockBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldLockBoundingBox = action.payload;
+      state.shouldLockBoundingBox = action.payload;
     },
     toggleShouldLockBoundingBox: (state) => {
-      state[state.currentCanvas].shouldLockBoundingBox =
-        !state[state.currentCanvas].shouldLockBoundingBox;
+      state.shouldLockBoundingBox = !state.shouldLockBoundingBox;
     },
     setShouldShowBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldShowBoundingBox = action.payload;
+      state.shouldShowBoundingBox = action.payload;
     },
     setIsTransformingBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isTransformingBoundingBox = action.payload;
+      state.isTransformingBoundingBox = action.payload;
     },
     setIsMovingBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isMovingBoundingBox = action.payload;
+      state.isMovingBoundingBox = action.payload;
     },
     setIsMouseOverBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isMouseOverBoundingBox = action.payload;
+      state.isMouseOverBoundingBox = action.payload;
     },
     setIsMoveBoundingBoxKeyHeld: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isMoveBoundingBoxKeyHeld = action.payload;
+      state.isMoveBoundingBoxKeyHeld = action.payload;
     },
     setIsMoveStageKeyHeld: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isMoveStageKeyHeld = action.payload;
-    },
-    setCurrentCanvas: (state, action: PayloadAction<ValidCanvasName>) => {
-      state.currentCanvas = action.payload;
+      state.isMoveStageKeyHeld = action.payload;
     },
     addImageToStagingArea: (
       state,
@@ -420,36 +360,31 @@ export const canvasSlice = createSlice({
 
       if (!boundingBox || !image) return;
 
-      const currentCanvas = state.outpainting;
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
-      currentCanvas.pastLayerStates.push(_.cloneDeep(currentCanvas.layerState));
-
-      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
-        currentCanvas.pastLayerStates.shift();
+      if (state.pastLayerStates.length > state.maxHistory) {
+        state.pastLayerStates.shift();
       }
 
-      currentCanvas.layerState.stagingArea.images.push({
+      state.layerState.stagingArea.images.push({
         kind: 'image',
         layer: 'base',
         ...boundingBox,
         image,
       });
 
-      currentCanvas.layerState.stagingArea.selectedImageIndex =
-        currentCanvas.layerState.stagingArea.images.length - 1;
+      state.layerState.stagingArea.selectedImageIndex =
+        state.layerState.stagingArea.images.length - 1;
 
-      currentCanvas.futureLayerStates = [];
+      state.futureLayerStates = [];
     },
     discardStagedImages: (state) => {
-      const currentCanvas = state[state.currentCanvas];
-      currentCanvas.layerState.stagingArea = {
+      state.layerState.stagingArea = {
         ...initialLayerState.stagingArea,
       };
     },
     addLine: (state, action: PayloadAction<number[]>) => {
-      const currentCanvas = state[state.currentCanvas];
-
-      const { tool, layer, brushColor, brushSize, eraserSize } = currentCanvas;
+      const { tool, layer, brushColor, brushSize, eraserSize } = state;
 
       if (tool === 'move') return;
 
@@ -459,13 +394,13 @@ export const canvasSlice = createSlice({
       const newColor =
         layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
 
-      currentCanvas.pastLayerStates.push(currentCanvas.layerState);
+      state.pastLayerStates.push(state.layerState);
 
-      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
-        currentCanvas.pastLayerStates.shift();
+      if (state.pastLayerStates.length > state.maxHistory) {
+        state.pastLayerStates.shift();
       }
 
-      currentCanvas.layerState.objects.push({
+      state.layerState.objects.push({
         kind: 'line',
         layer,
         tool,
@@ -474,68 +409,61 @@ export const canvasSlice = createSlice({
         ...newColor,
       });
 
-      currentCanvas.futureLayerStates = [];
+      state.futureLayerStates = [];
     },
     addPointToCurrentLine: (state, action: PayloadAction<number[]>) => {
-      const lastLine =
-        state[state.currentCanvas].layerState.objects.findLast(isCanvasAnyLine);
+      const lastLine = state.layerState.objects.findLast(isCanvasAnyLine);
 
       if (!lastLine) return;
 
       lastLine.points.push(...action.payload);
     },
     undo: (state) => {
-      const currentCanvas = state[state.currentCanvas];
-
-      const targetState = currentCanvas.pastLayerStates.pop();
+      const targetState = state.pastLayerStates.pop();
 
       if (!targetState) return;
 
-      currentCanvas.futureLayerStates.unshift(currentCanvas.layerState);
+      state.futureLayerStates.unshift(state.layerState);
 
-      if (currentCanvas.futureLayerStates.length > currentCanvas.maxHistory) {
-        currentCanvas.futureLayerStates.pop();
+      if (state.futureLayerStates.length > state.maxHistory) {
+        state.futureLayerStates.pop();
       }
 
-      currentCanvas.layerState = targetState;
+      state.layerState = targetState;
     },
     redo: (state) => {
-      const currentCanvas = state[state.currentCanvas];
-
-      const targetState = currentCanvas.futureLayerStates.shift();
+      const targetState = state.futureLayerStates.shift();
 
       if (!targetState) return;
 
-      currentCanvas.pastLayerStates.push(currentCanvas.layerState);
+      state.pastLayerStates.push(state.layerState);
 
-      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
-        currentCanvas.pastLayerStates.shift();
+      if (state.pastLayerStates.length > state.maxHistory) {
+        state.pastLayerStates.shift();
       }
 
-      currentCanvas.layerState = targetState;
+      state.layerState = targetState;
     },
     setShouldShowGrid: (state, action: PayloadAction<boolean>) => {
-      state.outpainting.shouldShowGrid = action.payload;
+      state.shouldShowGrid = action.payload;
     },
     setIsMovingStage: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].isMovingStage = action.payload;
+      state.isMovingStage = action.payload;
     },
     setShouldSnapToGrid: (state, action: PayloadAction<boolean>) => {
-      state.outpainting.shouldSnapToGrid = action.payload;
+      state.shouldSnapToGrid = action.payload;
     },
     setShouldAutoSave: (state, action: PayloadAction<boolean>) => {
-      state.outpainting.shouldAutoSave = action.payload;
+      state.shouldAutoSave = action.payload;
     },
     setShouldShowIntermediates: (state, action: PayloadAction<boolean>) => {
-      state[state.currentCanvas].shouldShowIntermediates = action.payload;
+      state.shouldShowIntermediates = action.payload;
     },
     resetCanvas: (state) => {
-      state[state.currentCanvas].pastLayerStates.push(
-        state[state.currentCanvas].layerState
-      );
+      state.pastLayerStates.push(state.layerState);
 
-      state[state.currentCanvas].layerState = initialLayerState;
-      state[state.currentCanvas].futureLayerStates = [];
+      state.layerState = initialLayerState;
+      state.futureLayerStates = [];
     },
     setCanvasContainerDimensions: (
       state,
@@ -548,7 +476,7 @@ export const canvasSlice = createSlice({
         state.canvasContainerDimensions;
 
       const initialCanvasImage =
-        state.outpainting.layerState.objects.find(isCanvasBaseImage);
+        state.layerState.objects.find(isCanvasBaseImage);
 
       if (!initialCanvasImage) return;
 
@@ -558,8 +486,6 @@ export const canvasSlice = createSlice({
       //   action.payload;
 
       const { shouldLockToInitialImage } = state;
-
-      const currentCanvas = state[state.currentCanvas];
 
       const padding = shouldLockToInitialImage ? 1 : 0.95;
 
@@ -590,20 +516,18 @@ export const canvasSlice = createSlice({
         newScale
       );
 
-      currentCanvas.stageScale = newScale;
-      currentCanvas.minimumStageScale = newScale;
-      currentCanvas.stageCoordinates = newCoordinates;
+      state.stageScale = newScale;
+      state.minimumStageScale = newScale;
+      state.stageCoordinates = newCoordinates;
 
-      currentCanvas.stageDimensions = newDimensions;
+      state.stageDimensions = newDimensions;
       state.isCanvasInitialized = true;
     },
     resizeCanvas: (state) => {
       const { width: containerWidth, height: containerHeight } =
         state.canvasContainerDimensions;
 
-      const currentCanvas = state[state.currentCanvas];
-
-      currentCanvas.stageDimensions = {
+      state.stageDimensions = {
         width: Math.floor(containerWidth),
         height: Math.floor(containerHeight),
       };
@@ -616,16 +540,13 @@ export const canvasSlice = createSlice({
     ) => {
       const { contentRect } = action.payload;
 
-      const currentCanvas = state[state.currentCanvas];
-
-      const baseCanvasImage =
-        currentCanvas.layerState.objects.find(isCanvasBaseImage);
+      const baseCanvasImage = state.layerState.objects.find(isCanvasBaseImage);
       const { shouldLockToInitialImage } = state;
       if (!baseCanvasImage) return;
 
       const {
         stageDimensions: { width: stageWidth, height: stageHeight },
-      } = currentCanvas;
+      } = state;
 
       const { x, y, width, height } = contentRect;
 
@@ -648,56 +569,49 @@ export const canvasSlice = createSlice({
         newScale
       );
 
-      currentCanvas.stageScale = newScale;
+      state.stageScale = newScale;
 
-      currentCanvas.stageCoordinates = newCoordinates;
+      state.stageCoordinates = newCoordinates;
     },
     nextStagingAreaImage: (state) => {
-      const currentIndex =
-        state.outpainting.layerState.stagingArea.selectedImageIndex;
-      const length = state.outpainting.layerState.stagingArea.images.length;
+      const currentIndex = state.layerState.stagingArea.selectedImageIndex;
+      const length = state.layerState.stagingArea.images.length;
 
-      state.outpainting.layerState.stagingArea.selectedImageIndex = Math.min(
+      state.layerState.stagingArea.selectedImageIndex = Math.min(
         currentIndex + 1,
         length - 1
       );
     },
     prevStagingAreaImage: (state) => {
-      const currentIndex =
-        state.outpainting.layerState.stagingArea.selectedImageIndex;
+      const currentIndex = state.layerState.stagingArea.selectedImageIndex;
 
-      state.outpainting.layerState.stagingArea.selectedImageIndex = Math.max(
+      state.layerState.stagingArea.selectedImageIndex = Math.max(
         currentIndex - 1,
         0
       );
     },
     commitStagingAreaImage: (state) => {
-      const currentCanvas = state[state.currentCanvas];
-      const { images, selectedImageIndex } =
-        currentCanvas.layerState.stagingArea;
+      const { images, selectedImageIndex } = state.layerState.stagingArea;
 
-      currentCanvas.pastLayerStates.push(_.cloneDeep(currentCanvas.layerState));
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
-      if (currentCanvas.pastLayerStates.length > currentCanvas.maxHistory) {
-        currentCanvas.pastLayerStates.shift();
+      if (state.pastLayerStates.length > state.maxHistory) {
+        state.pastLayerStates.shift();
       }
 
-      currentCanvas.layerState.objects.push({
+      state.layerState.objects.push({
         ...images[selectedImageIndex],
       });
 
-      currentCanvas.layerState.stagingArea = {
+      state.layerState.stagingArea = {
         ...initialLayerState.stagingArea,
       };
 
-      currentCanvas.futureLayerStates = [];
+      state.futureLayerStates = [];
     },
     setShouldLockToInitialImage: (state, action: PayloadAction<boolean>) => {
       state.shouldLockToInitialImage = action.payload;
     },
-    // setCanvasMode: (state, action: PayloadAction<CanvasMode>) => {
-    //   state.mode = action.payload;
-    // },
   },
   extraReducers: (builder) => {
     builder.addCase(mergeAndUploadCanvas.fulfilled, (state, action) => {
@@ -705,13 +619,13 @@ export const canvasSlice = createSlice({
       const { image, kind, originalBoundingBox } = action.payload;
 
       if (kind === 'temp_merged_canvas') {
-        state.outpainting.pastLayerStates.push({
-          ...state.outpainting.layerState,
+        state.pastLayerStates.push({
+          ...state.layerState,
         });
 
-        state.outpainting.futureLayerStates = [];
+        state.futureLayerStates = [];
 
-        state.outpainting.layerState.objects = [
+        state.layerState.objects = [
           {
             kind: 'image',
             layer: 'base',
@@ -779,7 +693,6 @@ export const {
   setIsMoveBoundingBoxKeyHeld,
   setIsMoveStageKeyHeld,
   setStageCoordinates,
-  setCurrentCanvas,
   addImageToStagingArea,
   resetCanvas,
   setShouldShowGrid,
@@ -800,41 +713,15 @@ export const {
 
 export default canvasSlice.reducer;
 
-export const currentCanvasSelector = (state: RootState): BaseCanvasState =>
-  state.canvas[state.canvas.currentCanvas];
+export const canvasSelector = (state: RootState): CanvasState => state.canvas;
 
 export const isStagingSelector = (state: RootState): boolean =>
-  state.canvas[state.canvas.currentCanvas].layerState.stagingArea.images
-    .length > 0;
-
-export const outpaintingCanvasSelector = (
-  state: RootState
-): OutpaintingCanvasState => state.canvas.outpainting;
-
-export const inpaintingCanvasSelector = (
-  state: RootState
-): InpaintingCanvasState => state.canvas.inpainting;
+  state.canvas.layerState.stagingArea.images.length > 0;
 
 export const shouldLockToInitialImageSelector = (state: RootState): boolean =>
   state.canvas.shouldLockToInitialImage;
 
-export const baseCanvasImageSelector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
-    return currentCanvas.layerState.objects.find(isCanvasBaseImage);
-  }
-);
-
-// export const canvasClipSelector = createSelector(
-//   [canvasModeSelector, baseCanvasImageSelector],
-//   (canvasMode, baseCanvasImage) => {
-//     return canvasMode === 'inpainting'
-//       ? {
-//           clipX: 0,
-//           clipY: 0,
-//           clipWidth: baseCanvasImage?.width,
-//           clipHeight: baseCanvasImage?.height,
-//         }
-//       : {};
-//   }
-// );
+export const initialCanvasImageSelector = (
+  state: RootState
+): CanvasImage | undefined =>
+  state.canvas.layerState.objects.find(isCanvasBaseImage);

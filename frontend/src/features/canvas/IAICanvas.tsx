@@ -5,14 +5,11 @@ import { Layer, Stage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 
 // app
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import {
-  baseCanvasImageSelector,
-  currentCanvasSelector,
+  initialCanvasImageSelector,
+  canvasSelector,
   isStagingSelector,
-  outpaintingCanvasSelector,
-  setStageCoordinates,
-  setStageScale,
   shouldLockToInitialImageSelector,
 } from 'features/canvas/canvasSlice';
 
@@ -39,29 +36,21 @@ import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasStatusText from './IAICanvasStatusText';
 import IAICanvasStagingArea from './IAICanvasStagingArea';
 import IAICanvasStagingAreaToolbar from './IAICanvasStagingAreaToolbar';
-import { KonvaEventObject } from 'konva/lib/Node';
-import {
-  CANVAS_SCALE_BY,
-  MAX_CANVAS_SCALE,
-  MIN_CANVAS_SCALE,
-} from './util/constants';
 
-const canvasSelector = createSelector(
+const selector = createSelector(
   [
     shouldLockToInitialImageSelector,
-    currentCanvasSelector,
-    outpaintingCanvasSelector,
+    canvasSelector,
     isStagingSelector,
     activeTabNameSelector,
-    baseCanvasImageSelector,
+    initialCanvasImageSelector,
   ],
   (
     shouldLockToInitialImage,
-    currentCanvas,
-    outpaintingCanvas,
+    canvas,
     isStaging,
     activeTabName,
-    baseCanvasImage
+    initialCanvasImage
   ) => {
     const {
       isMaskEnabled,
@@ -75,10 +64,8 @@ const canvasSelector = createSelector(
       tool,
       isMovingStage,
       shouldShowIntermediates,
-      minimumStageScale,
-    } = currentCanvas;
-
-    const { shouldShowGrid } = outpaintingCanvas;
+      shouldShowGrid,
+    } = canvas;
 
     let stageCursor: string | undefined = '';
 
@@ -110,9 +97,7 @@ const canvasSelector = createSelector(
       isStaging,
       shouldShowIntermediates,
       shouldLockToInitialImage,
-      activeTabName,
-      minimumStageScale,
-      baseCanvasImage,
+      initialCanvasImage,
     };
   },
   {
@@ -141,11 +126,8 @@ const IAICanvas = () => {
     isStaging,
     shouldShowIntermediates,
     shouldLockToInitialImage,
-    activeTabName,
-    minimumStageScale,
-    baseCanvasImage,
-  } = useAppSelector(canvasSelector);
-  const dispatch = useAppDispatch();
+    initialCanvasImage,
+  } = useAppSelector(selector);
   useCanvasHotkeys();
 
   // set the closure'd refs
@@ -172,17 +154,17 @@ const IAICanvas = () => {
 
   const dragBoundFunc = useCallback(
     (newCoordinates: Vector2d) => {
-      if (shouldLockToInitialImage && baseCanvasImage) {
+      if (shouldLockToInitialImage && initialCanvasImage) {
         newCoordinates.x = _.clamp(
           newCoordinates.x,
           stageDimensions.width -
-            Math.floor(baseCanvasImage.width * stageScale),
+            Math.floor(initialCanvasImage.width * stageScale),
           0
         );
         newCoordinates.y = _.clamp(
           newCoordinates.y,
           stageDimensions.height -
-            Math.floor(baseCanvasImage.height * stageScale),
+            Math.floor(initialCanvasImage.height * stageScale),
           0
         );
       }
@@ -190,7 +172,7 @@ const IAICanvas = () => {
       return newCoordinates;
     },
     [
-      baseCanvasImage,
+      initialCanvasImage,
       shouldLockToInitialImage,
       stageDimensions.height,
       stageDimensions.width,

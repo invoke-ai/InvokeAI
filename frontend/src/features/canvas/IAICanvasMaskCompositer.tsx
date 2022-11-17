@@ -2,21 +2,16 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import { RectConfig } from 'konva/lib/shapes/Rect';
 import { Rect } from 'react-konva';
-import {
-  currentCanvasSelector,
-  InpaintingCanvasState,
-  OutpaintingCanvasState,
-} from './canvasSlice';
+import { canvasSelector } from './canvasSlice';
 
 import { rgbaColorToString } from './util/colorToString';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
 
 export const canvasMaskCompositerSelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas) => {
-    const { maskColor, stageCoordinates, stageDimensions, stageScale } =
-      currentCanvas as InpaintingCanvasState | OutpaintingCanvasState;
+  canvasSelector,
+  (canvas) => {
+    const { maskColor, stageCoordinates, stageDimensions, stageScale } = canvas;
 
     return {
       stageCoordinates,

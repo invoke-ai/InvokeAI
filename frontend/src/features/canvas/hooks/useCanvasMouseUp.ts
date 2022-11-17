@@ -7,8 +7,7 @@ import { MutableRefObject, useCallback } from 'react';
 import {
   // addPointToCurrentEraserLine,
   addPointToCurrentLine,
-  currentCanvasSelector,
-  GenericCanvasState,
+  canvasSelector,
   isStagingSelector,
   setIsDrawing,
   setIsMovingStage,
@@ -16,9 +15,9 @@ import {
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector, isStagingSelector],
-  (activeTabName, currentCanvas, isStaging) => {
-    const { tool, isDrawing } = currentCanvas;
+  [activeTabNameSelector, canvasSelector, isStagingSelector],
+  (activeTabName, canvas, isStaging) => {
+    const { tool, isDrawing } = canvas;
     return {
       tool,
       isDrawing,

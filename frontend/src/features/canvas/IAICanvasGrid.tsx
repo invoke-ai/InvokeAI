@@ -4,22 +4,14 @@ import { useColorMode } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import _ from 'lodash';
-import {
-  ReactNode,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useState,
-} from 'react';
+import { ReactNode, useCallback, useLayoutEffect, useState } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
-import { currentCanvasSelector } from './canvasSlice';
-import useUnscaleCanvasValue from './hooks/useUnscaleCanvasValue';
-import { stageRef } from './IAICanvas';
+import { canvasSelector } from './canvasSlice';
 
 const selector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
-    const { stageScale, stageCoordinates, stageDimensions } = currentCanvas;
+  [canvasSelector],
+  (canvas) => {
+    const { stageScale, stageCoordinates, stageDimensions } = canvas;
     return { stageScale, stageCoordinates, stageDimensions };
   },
   {
@@ -31,7 +23,6 @@ const selector = createSelector(
 
 const IAICanvasGrid = () => {
   const { colorMode } = useColorMode();
-  // const unscale = useUnscaleCanvasValue();
   const { stageScale, stageCoordinates, stageDimensions } =
     useAppSelector(selector);
   const [gridLines, setGridLines] = useState<ReactNode[]>([]);

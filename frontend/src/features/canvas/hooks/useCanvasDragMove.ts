@@ -1,20 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { useCallback } from 'react';
 import {
-  baseCanvasImageSelector,
-  currentCanvasSelector,
+  canvasSelector,
   isStagingSelector,
   setIsMovingStage,
   setStageCoordinates,
-  shouldLockToInitialImageSelector,
 } from '../canvasSlice';
 
 const selector = createSelector(
-  [currentCanvasSelector, isStagingSelector],
+  [canvasSelector, isStagingSelector],
   (canvas, isStaging) => {
     const { tool } = canvas;
     return {

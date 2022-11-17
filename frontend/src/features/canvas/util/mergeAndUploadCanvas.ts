@@ -21,7 +21,7 @@ export const mergeAndUploadCanvas = createAsyncThunk(
 
     const state = getState() as RootState;
 
-    const stageScale = state.canvas[state.canvas.currentCanvas].stageScale;
+    const stageScale = state.canvas.stageScale;
 
     if (!canvasImageLayerRef.current) return;
 

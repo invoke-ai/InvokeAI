@@ -2,13 +2,13 @@ import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line } from 'react-konva';
 import { useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
-import { currentCanvasSelector, isCanvasMaskLine } from './canvasSlice';
+import { canvasSelector, isCanvasMaskLine } from './canvasSlice';
 import _ from 'lodash';
 
 export const canvasLinesSelector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
-    return { objects: currentCanvas.layerState.objects };
+  [canvasSelector],
+  (canvas) => {
+    return { objects: canvas.layerState.objects };
   },
   {
     memoizeOptions: {

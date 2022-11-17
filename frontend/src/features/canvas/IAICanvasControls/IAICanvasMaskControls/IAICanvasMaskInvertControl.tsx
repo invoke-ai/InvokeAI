@@ -3,8 +3,7 @@ import { MdInvertColors, MdInvertColorsOff } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
-  currentCanvasSelector,
-  GenericCanvasState,
+  canvasSelector,
   setShouldPreserveMaskedArea,
 } from 'features/canvas/canvasSlice';
 
@@ -13,9 +12,9 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const canvasMaskInvertSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas: GenericCanvasState, activeTabName) => {
-    const { isMaskEnabled, shouldPreserveMaskedArea } = currentCanvas;
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
+    const { isMaskEnabled, shouldPreserveMaskedArea } = canvas;
 
     return {
       shouldPreserveMaskedArea,
@@ -31,9 +30,8 @@ const canvasMaskInvertSelector = createSelector(
 );
 
 export default function IAICanvasMaskInvertControl() {
-  const { shouldPreserveMaskedArea, isMaskEnabled, activeTabName } = useAppSelector(
-    canvasMaskInvertSelector
-  );
+  const { shouldPreserveMaskedArea, isMaskEnabled, activeTabName } =
+    useAppSelector(canvasMaskInvertSelector);
   const dispatch = useAppDispatch();
 
   const handleToggleShouldInvertMask = () =>

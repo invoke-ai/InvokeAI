@@ -6,15 +6,11 @@ import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useCallback, useEffect, useRef } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
-  roundDownToMultiple,
-  roundToMultiple,
-} from 'common/util/roundDownToMultiple';
-import {
-  baseCanvasImageSelector,
-  currentCanvasSelector,
-  outpaintingCanvasSelector,
+  initialCanvasImageSelector,
+  canvasSelector,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setIsMouseOverBoundingBox,
@@ -27,17 +23,10 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const boundingBoxPreviewSelector = createSelector(
   shouldLockToInitialImageSelector,
-  currentCanvasSelector,
-  outpaintingCanvasSelector,
-  baseCanvasImageSelector,
+  canvasSelector,
+  initialCanvasImageSelector,
   activeTabNameSelector,
-  (
-    shouldLockToInitialImage,
-    currentCanvas,
-    outpaintingCanvas,
-    baseCanvasImage,
-    activeTabName
-  ) => {
+  (shouldLockToInitialImage, canvas, initialCanvasImage, activeTabName) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -50,9 +39,8 @@ const boundingBoxPreviewSelector = createSelector(
       shouldDarkenOutsideBoundingBox,
       tool,
       stageCoordinates,
-    } = currentCanvas;
-
-    const { shouldSnapToGrid } = outpaintingCanvas;
+      shouldSnapToGrid,
+    } = canvas;
 
     return {
       boundingBoxCoordinates,
@@ -64,7 +52,7 @@ const boundingBoxPreviewSelector = createSelector(
       isTransformingBoundingBox,
       stageDimensions,
       stageScale,
-      baseCanvasImage,
+      initialCanvasImage,
       activeTabName,
       shouldSnapToGrid,
       tool,
@@ -98,7 +86,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     stageCoordinates,
     stageDimensions,
     stageScale,
-    baseCanvasImage,
+    initialCanvasImage,
     activeTabName,
     shouldSnapToGrid,
     tool,

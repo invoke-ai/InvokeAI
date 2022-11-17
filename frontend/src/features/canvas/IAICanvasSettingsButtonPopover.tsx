@@ -1,8 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  currentCanvasSelector,
-  outpaintingCanvasSelector,
+  canvasSelector,
   setShouldAutoSave,
   setShouldDarkenOutsideBoundingBox,
   setShouldShowGrid,
@@ -17,13 +16,15 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 
 export const canvasControlsSelector = createSelector(
-  [currentCanvasSelector, outpaintingCanvasSelector],
-  (currentCanvas, outpaintingCanvas) => {
-    const { shouldDarkenOutsideBoundingBox, shouldShowIntermediates } =
-      currentCanvas;
-
-    const { shouldShowGrid, shouldSnapToGrid, shouldAutoSave } =
-      outpaintingCanvas;
+  [canvasSelector],
+  (canvas) => {
+    const {
+      shouldDarkenOutsideBoundingBox,
+      shouldShowIntermediates,
+      shouldShowGrid,
+      shouldSnapToGrid,
+      shouldAutoSave,
+    } = canvas;
 
     return {
       shouldShowGrid,

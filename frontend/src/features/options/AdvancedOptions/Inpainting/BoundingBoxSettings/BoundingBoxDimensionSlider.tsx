@@ -4,7 +4,7 @@ import IAISlider from 'common/components/IAISlider';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  currentCanvasSelector,
+  canvasSelector,
   setBoundingBoxDimensions,
 } from 'features/canvas/canvasSlice';
 
@@ -12,10 +12,10 @@ import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import _ from 'lodash';
 
 const boundingBoxDimensionsSelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas) => {
+  canvasSelector,
+  (canvas) => {
     const { stageDimensions, boundingBoxDimensions, shouldLockBoundingBox } =
-      currentCanvas;
+      canvas;
     return {
       stageDimensions,
       boundingBoxDimensions,

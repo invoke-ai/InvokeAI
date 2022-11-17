@@ -7,7 +7,7 @@ import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
   addLine,
-  currentCanvasSelector,
+  canvasSelector,
   isStagingSelector,
   setIsDrawing,
   setIsMovingStage,
@@ -15,9 +15,9 @@ import {
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector, isStagingSelector],
-  (activeTabName, currentCanvas, isStaging) => {
-    const { tool } = currentCanvas;
+  [activeTabNameSelector, canvasSelector, isStagingSelector],
+  (activeTabName, canvas, isStaging) => {
+    const { tool } = canvas;
     return {
       tool,
       activeTabName,

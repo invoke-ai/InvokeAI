@@ -8,7 +8,7 @@ import ImageUploadButton from 'common/components/ImageUploaderButton';
 import CurrentImageDisplay from 'features/gallery/CurrentImageDisplay';
 import { OptionsState } from 'features/options/optionsSlice';
 import {
-  baseCanvasImageSelector,
+  initialCanvasImageSelector,
   CanvasState,
   setDoesCanvasNeedScaling,
 } from 'features/canvas/canvasSlice';
@@ -16,17 +16,17 @@ import IAICanvas from 'features/canvas/IAICanvas';
 
 const inpaintingDisplaySelector = createSelector(
   [
-    baseCanvasImageSelector,
+    initialCanvasImageSelector,
     (state: RootState) => state.canvas,
     (state: RootState) => state.options,
   ],
-  (baseCanvasImage, canvas: CanvasState, options: OptionsState) => {
+  (initialCanvasImage, canvas: CanvasState, options: OptionsState) => {
     const { doesCanvasNeedScaling } = canvas;
     const { showDualDisplay } = options;
     return {
       doesCanvasNeedScaling,
       showDualDisplay,
-      baseCanvasImage,
+      initialCanvasImage,
     };
   },
   {
@@ -38,7 +38,7 @@ const inpaintingDisplaySelector = createSelector(
 
 const InpaintingDisplay = () => {
   const dispatch = useAppDispatch();
-  const { showDualDisplay, doesCanvasNeedScaling, baseCanvasImage } =
+  const { showDualDisplay, doesCanvasNeedScaling, initialCanvasImage } =
     useAppSelector(inpaintingDisplaySelector);
 
   useLayoutEffect(() => {
@@ -50,7 +50,7 @@ const InpaintingDisplay = () => {
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
 
-  const inpaintingComponent = baseCanvasImage ? (
+  const inpaintingComponent = initialCanvasImage ? (
     <div className="inpainting-main-area">
       <IAICanvasControls />
       <div className="inpainting-canvas-area">

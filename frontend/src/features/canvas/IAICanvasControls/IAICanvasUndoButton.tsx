@@ -3,13 +3,13 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { FaUndo } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { currentCanvasSelector, undo } from 'features/canvas/canvasSlice';
+import { canvasSelector, undo } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const canvasUndoSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
+  [canvasSelector, activeTabNameSelector],
   (canvas, activeTabName) => {
     const { pastLayerStates } = canvas;
 

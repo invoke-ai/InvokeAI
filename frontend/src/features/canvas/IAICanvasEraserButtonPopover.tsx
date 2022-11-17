@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  currentCanvasSelector,
+  canvasSelector,
   isStagingSelector,
   setEraserSize,
   setTool,
@@ -15,9 +15,9 @@ import { Flex } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 export const selector = createSelector(
-  [currentCanvasSelector, isStagingSelector],
-  (currentCanvas, isStaging) => {
-    const { eraserSize, tool } = currentCanvas;
+  [canvasSelector, isStagingSelector],
+  (canvas, isStaging) => {
+    const { eraserSize, tool } = canvas;
 
     return {
       tool,

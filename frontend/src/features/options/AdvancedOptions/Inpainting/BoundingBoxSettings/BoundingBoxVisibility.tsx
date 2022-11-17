@@ -3,14 +3,14 @@ import { BiHide, BiShow } from 'react-icons/bi';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
-  currentCanvasSelector,
+  canvasSelector,
   setShouldShowBoundingBox,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
 const boundingBoxVisibilitySelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas) => currentCanvas.shouldShowBoundingBox
+  canvasSelector,
+  (canvas) => canvas.shouldShowBoundingBox
 );
 
 export default function BoundingBoxVisibility() {
