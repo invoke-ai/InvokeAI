@@ -6,7 +6,7 @@ import {
 } from 'common/util/roundDownToMultiple';
 import _ from 'lodash';
 
-export const setInitialCanvasImage = (
+export const setInitialCanvasImage_reducer = (
   state: CanvasState,
   image: InvokeAI.Image
 ) => {

@@ -54,24 +54,26 @@ const makeSocketIOEmitters = (
           systemState,
         };
 
-      if (generationMode === 'inpainting') {
-        const initialCanvasImage = initialCanvasImageSelector(getState());
-        const imageUrl = initialCanvasImage?.image.url;
+      // if (generationMode === 'inpainting') {
+      //   const initialCanvasImage = initialCanvasImageSelector(getState());
+      //   const imageUrl = initialCanvasImage?.image.url;
 
-        if (!imageUrl) {
-          dispatch(
-            addLogEntry({
-              timestamp: dateFormat(new Date(), 'isoDateTime'),
-              message: 'Inpainting image not loaded, cannot generate image.',
-              level: 'error',
-            })
-          );
-          dispatch(errorOccurred());
-          return;
-        }
+      //   if (!imageUrl) {
+      //     dispatch(
+      //       addLogEntry({
+      //         timestamp: dateFormat(new Date(), 'isoDateTime'),
+      //         message: 'Inpainting image not loaded, cannot generate image.',
+      //         level: 'error',
+      //       })
+      //     );
+      //     dispatch(errorOccurred());
+      //     return;
+      //   }
 
-        frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
-      } else if (!['txt2img', 'img2img'].includes(generationMode)) {
+      //   frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
+      // } else 
+      
+      if (!['txt2img', 'img2img'].includes(generationMode)) {
         if (!galleryState.currentImage?.url) return;
 
         frontendToBackendParametersConfig.imageToProcessUrl =

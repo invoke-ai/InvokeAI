@@ -18,7 +18,7 @@ import ProcessButtons from 'features/options/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/options/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/tabs/InvokeOptionsPanel';
 
-export default function OutpaintingPanel() {
+export default function UnifiedCanvasPanel() {
   const showAdvancedOptions = useAppSelector(
     (state: RootState) => state.options.showAdvancedOptions
   );

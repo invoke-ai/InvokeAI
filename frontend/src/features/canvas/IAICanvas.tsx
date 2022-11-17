@@ -93,7 +93,6 @@ const selector = createSelector(
       stageDimensions,
       stageScale,
       tool,
-      isOnOutpaintingTab: activeTabName === 'outpainting',
       isStaging,
       shouldShowIntermediates,
       shouldLockToInitialImage,
@@ -122,7 +121,6 @@ const IAICanvas = () => {
     stageDimensions,
     stageScale,
     tool,
-    isOnOutpaintingTab,
     isStaging,
     shouldShowIntermediates,
     shouldLockToInitialImage,
@@ -207,11 +205,7 @@ const IAICanvas = () => {
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
           listening={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
-          draggable={
-            (tool === 'move' || isStaging) &&
-            !isModifyingBoundingBox &&
-            isOnOutpaintingTab
-          }
+          draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
           <Layer id={'grid'} visible={shouldShowGrid}>
             <IAICanvasGrid />
@@ -243,7 +237,7 @@ const IAICanvas = () => {
             />
           </Layer>
         </Stage>
-        {isOnOutpaintingTab && <IAICanvasStatusText />}
+        <IAICanvasStatusText />
         <IAICanvasStagingAreaToolbar />
       </div>
     </div>

@@ -44,11 +44,6 @@ export const readinessSelector = createSelector(
       reasonsWhyNotReady.push('No initial image selected');
     }
 
-    if (activeTabName === 'inpainting' && !initialCanvasImage) {
-      isReady = false;
-      reasonsWhyNotReady.push('No inpainting image selected');
-    }
-
     // TODO: job queue
     // Cannot generate if already processing an image
     if (isProcessing) {

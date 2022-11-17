@@ -15,7 +15,7 @@ export default function MainHeight() {
 
   return (
     <IAISelect
-      isDisabled={activeTabName === 'inpainting'}
+      isDisabled={activeTabName === 'unifiedCanvas'}
       label="Height"
       value={height}
       flexGrow={1}

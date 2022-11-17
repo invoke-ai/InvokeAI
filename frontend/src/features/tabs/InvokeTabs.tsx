@@ -17,12 +17,12 @@ import {
   setShouldShowOptionsPanel,
 } from 'features/options/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
-import InpaintingWorkarea from './Inpainting/InpaintingWorkarea';
 import TextToImageWorkarea from './TextToImage';
 import Lightbox from 'features/lightbox/Lightbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
-import OutpaintingWorkarea from './Outpainting/OutpaintingWorkarea';
+import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
 import { setShouldShowGallery } from 'features/gallery/gallerySlice';
+import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
 
 export const tabDict = {
   txt2img: {
@@ -35,15 +35,10 @@ export const tabDict = {
     workarea: <ImageToImageWorkarea />,
     tooltip: 'Image To Image',
   },
-  inpainting: {
-    title: <InpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    workarea: <InpaintingWorkarea />,
-    tooltip: 'Inpainting',
-  },
-  outpainting: {
-    title: <OutpaintIcon fill={'black'} boxSize={'2.5rem'} />,
-    workarea: <OutpaintingWorkarea />,
-    tooltip: 'Outpainting',
+  unifiedCanvas: {
+    title: <UnifiedCanvasIcon fill={'black'} boxSize={'2.5rem'} />,
+    workarea: <UnifiedCanvasWorkarea />,
+    tooltip: 'Unified Canvas',
   },
   nodes: {
     title: <NodesIcon fill={'black'} boxSize={'2.5rem'} />,

@@ -52,9 +52,6 @@ const IAICanvasResizer = () => {
 
       if (!initialCanvasImage?.image) return;
 
-      const { width: imageWidth, height: imageHeight } =
-        initialCanvasImage.image;
-
       dispatch(
         setCanvasContainerDimensions({
           width: clientWidth,
@@ -69,34 +66,6 @@ const IAICanvasResizer = () => {
       }
 
       dispatch(setDoesCanvasNeedScaling(false));
-      // }
-      // if ((activeTabName === 'inpainting') && initialCanvasImage?.image) {
-      //   const { width: imageWidth, height: imageHeight } =
-      //     initialCanvasImage.image;
-
-      //   const scale = Math.min(
-      //     1,
-      //     Math.min(clientWidth / imageWidth, clientHeight / imageHeight)
-      //   );
-
-      //   dispatch(setStageScale(scale));
-
-      //   dispatch(
-      //     setStageDimensions({
-      //       width: Math.floor(imageWidth * scale),
-      //       height: Math.floor(imageHeight * scale),
-      //     })
-      //   );
-      //   dispatch(setDoesCanvasNeedScaling(false));
-      // } else if (activeTabName === 'outpainting') {
-      //   dispatch(
-      //     setStageDimensions({
-      //       width: Math.floor(clientWidth),
-      //       height: Math.floor(clientHeight),
-      //     })
-      //   );
-      //   dispatch(setDoesCanvasNeedScaling(false));
-      // }
     }, 0);
   }, [
     dispatch,
@@ -104,6 +73,7 @@ const IAICanvasResizer = () => {
     doesCanvasNeedScaling,
     activeTabName,
     isCanvasInitialized,
+    shouldLockToInitialImage,
   ]);
 
   return (

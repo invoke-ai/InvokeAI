@@ -106,10 +106,7 @@ export const frontendToBackendParameters = (
   }
 
   // inpainting exclusive parameters
-  if (
-    ['inpainting', 'outpainting'].includes(generationMode) &&
-    canvasImageLayerRef.current
-  ) {
+  if (generationMode === 'unifiedCanvas' && canvasImageLayerRef.current) {
     const {
       layerState: { objects },
       boundingBoxCoordinates,
@@ -146,44 +143,42 @@ export const frontendToBackendParameters = (
 
     generationParameters.bounding_box = boundingBox;
 
-    if (generationMode === 'outpainting') {
-      const tempScale = canvasImageLayerRef.current.scale();
+    const tempScale = canvasImageLayerRef.current.scale();
 
-      canvasImageLayerRef.current.scale({
-        x: 1 / stageScale,
-        y: 1 / stageScale,
-      });
+    canvasImageLayerRef.current.scale({
+      x: 1 / stageScale,
+      y: 1 / stageScale,
+    });
 
-      const absPos = canvasImageLayerRef.current.getAbsolutePosition();
+    const absPos = canvasImageLayerRef.current.getAbsolutePosition();
 
-      const imageDataURL = canvasImageLayerRef.current.toDataURL({
-        x: boundingBox.x + absPos.x,
-        y: boundingBox.y + absPos.y,
-        width: boundingBox.width,
-        height: boundingBox.height,
-      });
+    const imageDataURL = canvasImageLayerRef.current.toDataURL({
+      x: boundingBox.x + absPos.x,
+      y: boundingBox.y + absPos.y,
+      width: boundingBox.width,
+      height: boundingBox.height,
+    });
 
-      if (enableImageDebugging) {
-        openBase64ImageInTab([
-          { base64: maskDataURL, caption: 'mask sent as init_mask' },
-          { base64: imageDataURL, caption: 'image sent as init_img' },
-        ]);
-      }
-
-      canvasImageLayerRef.current.scale(tempScale);
-
-      generationParameters.init_img = imageDataURL;
-
-      // TODO: The server metadata generation needs to be changed to fix this.
-      generationParameters.progress_images = false;
-
-      generationParameters.seam_size = 96;
-      generationParameters.seam_blur = 16;
-      generationParameters.seam_strength = 0.7;
-      generationParameters.seam_steps = 10;
-      generationParameters.tile_size = 32;
-      generationParameters.force_outpaint = false;
+    if (enableImageDebugging) {
+      openBase64ImageInTab([
+        { base64: maskDataURL, caption: 'mask sent as init_mask' },
+        { base64: imageDataURL, caption: 'image sent as init_img' },
+      ]);
     }
+
+    canvasImageLayerRef.current.scale(tempScale);
+
+    generationParameters.init_img = imageDataURL;
+
+    // TODO: The server metadata generation needs to be changed to fix this.
+    generationParameters.progress_images = false;
+
+    generationParameters.seam_size = 96;
+    generationParameters.seam_blur = 16;
+    generationParameters.seam_strength = 0.7;
+    generationParameters.seam_steps = 10;
+    generationParameters.tile_size = 32;
+    generationParameters.force_outpaint = false;
   }
 
   if (shouldGenerateVariations) {

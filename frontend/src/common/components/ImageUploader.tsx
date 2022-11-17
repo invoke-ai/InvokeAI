@@ -135,7 +135,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [dispatch, toast, activeTabName]);
 
-  const overlaySecondaryText = ['img2img', 'inpainting'].includes(activeTabName)
+  const overlaySecondaryText = ['img2img', 'unifiedCanvas'].includes(activeTabName)
     ? ` to ${tabDict[activeTabName as keyof typeof tabDict].tooltip}`
     : ``;
 

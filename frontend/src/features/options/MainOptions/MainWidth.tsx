@@ -16,7 +16,7 @@ export default function MainWidth() {
 
   return (
     <IAISelect
-      isDisabled={activeTabName === 'inpainting'}
+      isDisabled={activeTabName === 'unifiedCanvas'}
       label="Width"
       value={width}
       flexGrow={1}

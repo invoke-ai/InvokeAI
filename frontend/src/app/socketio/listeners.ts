@@ -37,10 +37,7 @@ import {
   requestNewImages,
   requestSystemConfig,
 } from './actions';
-import {
-  addImageToStagingArea,
-  setImageToInpaint,
-} from 'features/canvas/canvasSlice';
+import { addImageToStagingArea } from 'features/canvas/canvasSlice';
 import { tabMap } from 'features/tabs/InvokeTabs';
 
 /**
@@ -120,23 +117,15 @@ const makeSocketIOListeners = (
           );
         }
 
-        if (
-          ['inpainting', 'outpainting'].includes(generationMode) &&
-          data.boundingBox
-        ) {
+        if (generationMode === 'unifiedCanvas' && data.boundingBox) {
           newImage.category = 'temp';
           const { boundingBox } = data;
-
-          if (generationMode === 'inpainting') {
-            dispatch(setImageToInpaint(newImage));
-          } else {
-            dispatch(
-              addImageToStagingArea({
-                image: newImage,
-                boundingBox,
-              })
-            );
-          }
+          dispatch(
+            addImageToStagingArea({
+              image: newImage,
+              boundingBox,
+            })
+          );
         }
 
         if (shouldLoopback) {
@@ -144,10 +133,6 @@ const makeSocketIOListeners = (
           switch (activeTabName) {
             case 'img2img': {
               dispatch(setInitialImage(newImage));
-              break;
-            }
-            case 'inpainting': {
-              dispatch(setImageToInpaint(newImage));
               break;
             }
           }
