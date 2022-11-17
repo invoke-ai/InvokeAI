@@ -91,7 +91,7 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
     # download micromamba
     echo -e "\n***** Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to micromamba *****\n"
 
-    curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvj bin/micromamba -O > micromamba
+    curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvjO bin/micromamba > micromamba
 
     chmod u+x "micromamba"
 
