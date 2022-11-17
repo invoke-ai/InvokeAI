@@ -33,6 +33,7 @@ dependencies:
       - dependency_injector==4.40.0
       - getpass_asterisk
       - omegaconf==2.1.1
+      - picklescan
       - pyreadline3
       - realesrgan
       - taming-transformers-rom1504
