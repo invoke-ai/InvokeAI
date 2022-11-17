@@ -17,7 +17,7 @@ echo ""
 OS_NAME=$(uname -s)
 case "${OS_NAME}" in
     Linux*)     OS_NAME="linux";;
-    Darwin*)    OS_NAME="mac";;
+    Darwin*)    OS_NAME="osx";;
     *)          echo "Unknown OS: $OS_NAME! This script runs only on Linux or Mac" && exit
 esac
 
@@ -29,14 +29,30 @@ case "${OS_ARCH}" in
 esac
 
 # https://mamba.readthedocs.io/en/latest/installation.html
-if [ "$OS_NAME" == "linux" ] && [ "$OS_ARCH" == "arm64" ]; then OS_ARCH="aarch64"; fi
+MAMBA_OS_NAME=$OS_NAME
+MAMBA_ARCH=$OS_ARCH
+
+if [ "$OS_ARCH" == "linux" ]; then
+    MAMBA_ARCH="aarch64"
+fi
+
+if [ "$OS_ARCH" == "x86_64" ]; then
+    MAMBA_ARCH="64"
+fi
+
+PY_ARCH=$OS_ARCH
+if [ "$OS_ARCH" == "arm64" ]; then
+    PY_ARCH="aarch64"
+fi
 
 # config
 export MAMBA_ROOT_PREFIX="$(pwd)/installer_files/mamba"
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
-MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${OS_NAME}-${OS_ARCH}/latest"
+MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${MAMBA_OS_NAME}-${MAMBA_ARCH}/latest"
 REPO_URL="https://github.com/invoke-ai/InvokeAI.git"
 umamba_exists="F"
+
+echo "Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to $MAMBA_ROOT_PREFIX/micromamba"
 
 # figure out whether git and conda needs to be installed
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
@@ -94,7 +110,7 @@ CONDA_BASEPATH=$(conda info --base)
 source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains about 'shell not initialized' (needed when running in a script)
 
 conda activate
-if [ "$OS_NAME" == "mac" ]; then
+if [ "$OS_NAME" == "osx" ]; then
     echo "Macintosh system detected. Installing MPS and CPU support."
     ln -sf environments-and-requirements/environment-mac.yml environment.yml
 else
