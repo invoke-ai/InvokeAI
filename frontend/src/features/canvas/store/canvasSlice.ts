@@ -23,6 +23,7 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
+import roundDimensionsTo64 from '../util/roundDimensionsTo64';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -180,7 +181,7 @@ export const canvasSlice = createSlice({
       };
     },
     setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
-      state.boundingBoxDimensions = action.payload;
+      state.boundingBoxDimensions = roundDimensionsTo64(action.payload);
     },
     setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
       state.boundingBoxCoordinates = floorCoordinates(action.payload);
