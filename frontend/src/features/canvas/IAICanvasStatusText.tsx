@@ -1,15 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import _ from 'lodash';
-import { currentCanvasSelector } from './canvasSlice';
+import { canvasSelector } from './canvasSlice';
 
 const roundToHundreth = (val: number): number => {
   return Math.round(val * 100) / 100;
 };
 
 const selector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
+  [canvasSelector],
+  (canvas) => {
     const {
       stageDimensions: { width: stageWidth, height: stageHeight },
       stageCoordinates: { x: stageX, y: stageY },
@@ -17,7 +17,7 @@ const selector = createSelector(
       boundingBoxCoordinates: { x: boxX, y: boxY },
       cursorPosition,
       stageScale,
-    } = currentCanvas;
+    } = canvas;
 
     const position = cursorPosition
       ? { cursorX: cursorPosition.x, cursorY: cursorPosition.y }

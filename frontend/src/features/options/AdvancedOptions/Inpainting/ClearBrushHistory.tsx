@@ -3,22 +3,20 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIButton from 'common/components/IAIButton';
 import {
-  currentCanvasSelector,
-  InpaintingCanvasState,
-  OutpaintingCanvasState,
+  canvasSelector,
   setClearBrushHistory,
 } from 'features/canvas/canvasSlice';
 import _ from 'lodash';
 
 const clearBrushHistorySelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas) => {
-    const { pastLayerStates, futureLayerStates } = currentCanvas as
-      | InpaintingCanvasState
-      | OutpaintingCanvasState;
+  canvasSelector,
+  (canvas) => {
+    const { pastLayerStates, futureLayerStates } = canvas;
     return {
       mayClearBrushHistory:
-      futureLayerStates.length > 0 || pastLayerStates.length > 0 ? false : true,
+        futureLayerStates.length > 0 || pastLayerStates.length > 0
+          ? false
+          : true,
     };
   },
   {

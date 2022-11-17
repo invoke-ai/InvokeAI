@@ -21,25 +21,22 @@ import {
   FaEyeSlash,
   FaTrash,
 } from 'react-icons/fa';
-import { Group, Rect } from 'react-konva';
-import { Html } from 'react-konva-utils';
 import {
   commitStagingAreaImage,
-  currentCanvasSelector,
+  canvasSelector,
   discardStagedImages,
   nextStagingAreaImage,
   prevStagingAreaImage,
 } from './canvasSlice';
-import IAICanvasImage from './IAICanvasImage';
 
 const selector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
+  [canvasSelector],
+  (canvas) => {
     const {
       layerState: {
         stagingArea: { images, selectedImageIndex },
       },
-    } = currentCanvas;
+    } = canvas;
 
     return {
       currentStagingAreaImage:

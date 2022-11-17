@@ -7,17 +7,16 @@ import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
   addPointToCurrentLine,
-  currentCanvasSelector,
-  GenericCanvasState,
+  canvasSelector,
   isStagingSelector,
   setCursorPosition,
 } from '../canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
-  [activeTabNameSelector, currentCanvasSelector, isStagingSelector],
-  (activeTabName, currentCanvas, isStaging) => {
-    const { tool, isDrawing } = currentCanvas;
+  [activeTabNameSelector, canvasSelector, isStagingSelector],
+  (activeTabName, canvas, isStaging) => {
+    const { tool, isDrawing } = canvas;
     return {
       tool,
       isDrawing,

@@ -119,7 +119,7 @@ export const frontendToBackendParameters = (
       stageScale,
       isMaskEnabled,
       shouldPreserveMaskedArea,
-    } = canvasState[canvasState.currentCanvas];
+    } = canvasState;
 
     const boundingBox = {
       ...boundingBoxCoordinates,

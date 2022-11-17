@@ -1,15 +1,15 @@
 import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  currentCanvasSelector,
   resizeAndScaleCanvas,
   isStagingSelector,
   resetCanvas,
   resetCanvasView,
   setShouldLockToInitialImage,
   setTool,
+  canvasSelector,
 } from './canvasSlice';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { canvasImageLayerRef, stageRef } from './IAICanvas';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -33,15 +33,10 @@ import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { ChangeEvent } from 'react';
 
-export const canvasControlsSelector = createSelector(
-  [
-    (state: RootState) => state.canvas,
-    currentCanvasSelector,
-    isStagingSelector,
-  ],
-  (canvas, currentCanvas, isStaging) => {
-    const { shouldLockToInitialImage } = canvas;
-    const { tool } = currentCanvas;
+export const selector = createSelector(
+  [canvasSelector, isStagingSelector],
+  (canvas, isStaging) => {
+    const { tool, shouldLockToInitialImage } = canvas;
     return {
       tool,
       isStaging,
@@ -57,9 +52,8 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging, shouldLockToInitialImage } = useAppSelector(
-    canvasControlsSelector
-  );
+  const { tool, isStaging, shouldLockToInitialImage } =
+    useAppSelector(selector);
 
   const handleToggleShouldLockToInitialImage = (
     e: ChangeEvent<HTMLInputElement>

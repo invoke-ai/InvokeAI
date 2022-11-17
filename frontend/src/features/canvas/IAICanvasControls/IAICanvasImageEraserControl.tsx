@@ -2,16 +2,16 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { currentCanvasSelector, setTool } from 'features/canvas/canvasSlice';
+import { canvasSelector, setTool } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { BsEraser } from 'react-icons/bs';
 
 const imageEraserSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas, activeTabName) => {
-    const { tool, isMaskEnabled } = currentCanvas;
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
+    const { tool, isMaskEnabled } = canvas;
 
     return {
       tool,

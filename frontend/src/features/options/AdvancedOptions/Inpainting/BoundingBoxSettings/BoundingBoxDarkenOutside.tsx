@@ -2,16 +2,14 @@ import React from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAICheckbox from 'common/components/IAICheckbox';
 import {
-  currentCanvasSelector,
-  GenericCanvasState,
+  canvasSelector,
   setShouldDarkenOutsideBoundingBox,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
 const selector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas: GenericCanvasState) =>
-    currentCanvas.shouldDarkenOutsideBoundingBox
+  canvasSelector,
+  (canvas) => canvas.shouldDarkenOutsideBoundingBox
 );
 
 export default function BoundingBoxDarkenOutside() {

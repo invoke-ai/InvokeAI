@@ -1,11 +1,7 @@
 import { RgbaColor } from 'react-colorful';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import {
-  currentCanvasSelector,
-  GenericCanvasState,
-  setMaskColor,
-} from 'features/canvas/canvasSlice';
+import { canvasSelector, setMaskColor } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
@@ -13,9 +9,9 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const selector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas: GenericCanvasState, activeTabName) => {
-    const { brushColor } = currentCanvas;
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
+    const { brushColor } = canvas;
 
     return {
       brushColor,

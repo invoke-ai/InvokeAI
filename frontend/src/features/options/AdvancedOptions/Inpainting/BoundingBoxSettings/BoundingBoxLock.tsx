@@ -2,14 +2,14 @@ import React from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAICheckbox from 'common/components/IAICheckbox';
 import {
-  currentCanvasSelector,
+  canvasSelector,
   setShouldLockBoundingBox,
 } from 'features/canvas/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
 
 const boundingBoxLockSelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas) => currentCanvas.shouldLockBoundingBox
+  canvasSelector,
+  (canvas) => canvas.shouldLockBoundingBox
 );
 
 export default function BoundingBoxLock() {

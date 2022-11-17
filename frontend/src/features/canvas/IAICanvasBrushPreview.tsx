@@ -3,12 +3,12 @@ import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { Circle, Group } from 'react-konva';
 import { useAppSelector } from 'app/store';
-import { currentCanvasSelector } from 'features/canvas/canvasSlice';
+import { canvasSelector } from 'features/canvas/canvasSlice';
 import { rgbaColorToString } from './util/colorToString';
 
 const canvasBrushPreviewSelector = createSelector(
-  currentCanvasSelector,
-  (currentCanvas) => {
+  canvasSelector,
+  (canvas) => {
     const {
       cursorPosition,
       stageDimensions: { width, height },
@@ -22,7 +22,7 @@ const canvasBrushPreviewSelector = createSelector(
       isMovingBoundingBox,
       isTransformingBoundingBox,
       stageScale,
-    } = currentCanvas;
+    } = canvas;
 
     return {
       cursorPosition,

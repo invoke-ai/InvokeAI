@@ -20,7 +20,7 @@ import {
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
 import * as InvokeAI from 'app/invokeai';
 import { RootState } from 'app/store';
-import { baseCanvasImageSelector } from 'features/canvas/canvasSlice';
+import { initialCanvasImageSelector } from 'features/canvas/canvasSlice';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -55,8 +55,8 @@ const makeSocketIOEmitters = (
         };
 
       if (generationMode === 'inpainting') {
-        const baseCanvasImage = baseCanvasImageSelector(getState());
-        const imageUrl = baseCanvasImage?.image.url;
+        const initialCanvasImage = initialCanvasImageSelector(getState());
+        const imageUrl = initialCanvasImage?.image.url;
 
         if (!imageUrl) {
           dispatch(

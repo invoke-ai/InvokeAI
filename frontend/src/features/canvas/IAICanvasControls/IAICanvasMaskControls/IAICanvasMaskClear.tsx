@@ -5,10 +5,8 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
   clearMask,
-  currentCanvasSelector,
-  InpaintingCanvasState,
+  canvasSelector,
   isCanvasMaskLine,
-  OutpaintingCanvasState,
 } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
@@ -16,12 +14,12 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useToast } from '@chakra-ui/react';
 
 const canvasMaskClearSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas, activeTabName) => {
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
     const {
       isMaskEnabled,
       layerState: { objects },
-    } = currentCanvas as InpaintingCanvasState | OutpaintingCanvasState;
+    } = canvas;
 
     return {
       isMaskEnabled,

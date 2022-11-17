@@ -4,20 +4,20 @@ import { RootState } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import { SystemState } from 'features/system/systemSlice';
-import { baseCanvasImageSelector } from 'features/canvas/canvasSlice';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
+import { initialCanvasImageSelector } from 'features/canvas/canvasSlice';
 
 export const readinessSelector = createSelector(
   [
     (state: RootState) => state.options,
     (state: RootState) => state.system,
-    baseCanvasImageSelector,
+    initialCanvasImageSelector,
     activeTabNameSelector,
   ],
   (
     options: OptionsState,
     system: SystemState,
-    baseCanvasImage,
+    initialCanvasImage,
     activeTabName
   ) => {
     const {
@@ -44,7 +44,7 @@ export const readinessSelector = createSelector(
       reasonsWhyNotReady.push('No initial image selected');
     }
 
-    if (activeTabName === 'inpainting' && !baseCanvasImage) {
+    if (activeTabName === 'inpainting' && !initialCanvasImage) {
       isReady = false;
       reasonsWhyNotReady.push('No inpainting image selected');
     }

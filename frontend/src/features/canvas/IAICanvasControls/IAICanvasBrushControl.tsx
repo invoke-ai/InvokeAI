@@ -9,7 +9,7 @@ import IAISlider from 'common/components/IAISlider';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 import {
-  currentCanvasSelector,
+  canvasSelector,
   setBrushSize,
   setShouldShowBrushPreview,
   setTool,
@@ -19,9 +19,9 @@ import _ from 'lodash';
 import IAICanvasMaskColorPicker from './IAICanvasMaskControls/IAICanvasMaskColorPicker';
 
 const inpaintingBrushSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas, activeTabName) => {
-    const { tool, brushSize } = currentCanvas;
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
+    const { tool, brushSize } = canvas;
 
     return {
       tool,

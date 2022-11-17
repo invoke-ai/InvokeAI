@@ -4,14 +4,14 @@ import { FaRedo } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { currentCanvasSelector, redo } from 'features/canvas/canvasSlice';
+import { canvasSelector, redo } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 
 const canvasRedoSelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas, activeTabName) => {
-    const { futureLayerStates } = currentCanvas;
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
+    const { futureLayerStates } = canvas;
 
     return {
       canRedo: futureLayerStates.length > 0,

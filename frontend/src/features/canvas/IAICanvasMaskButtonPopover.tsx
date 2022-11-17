@@ -2,7 +2,7 @@ import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   clearMask,
-  currentCanvasSelector,
+  canvasSelector,
   setIsMaskEnabled,
   setLayer,
   setMaskColor,
@@ -18,9 +18,10 @@ import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIButton from 'common/components/IAIButton';
 
 export const selector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
-    const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } = currentCanvas;
+  [canvasSelector],
+  (canvas) => {
+    const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } =
+      canvas;
 
     return {
       layer,
@@ -63,7 +64,9 @@ const IAICanvasMaskButtonPopover = () => {
         <IAICheckbox
           label="Preserve Masked Area"
           isChecked={shouldPreserveMaskedArea}
-          onChange={(e) => dispatch(setShouldPreserveMaskedArea(e.target.checked))}
+          onChange={(e) =>
+            dispatch(setShouldPreserveMaskedArea(e.target.checked))
+          }
         />
         <IAIColorPicker
           color={maskColor}

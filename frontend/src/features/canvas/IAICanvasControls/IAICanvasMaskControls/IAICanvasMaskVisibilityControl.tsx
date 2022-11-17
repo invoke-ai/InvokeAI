@@ -4,18 +4,14 @@ import { createSelector } from 'reselect';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import {
-  currentCanvasSelector,
-  GenericCanvasState,
-  setIsMaskEnabled,
-} from 'features/canvas/canvasSlice';
+import { canvasSelector, setIsMaskEnabled } from 'features/canvas/canvasSlice';
 
 import _ from 'lodash';
 
 const canvasMaskVisibilitySelector = createSelector(
-  [currentCanvasSelector, activeTabNameSelector],
-  (currentCanvas: GenericCanvasState, activeTabName) => {
-    const { isMaskEnabled } = currentCanvas;
+  [canvasSelector, activeTabNameSelector],
+  (canvas, activeTabName) => {
+    const { isMaskEnabled } = canvas;
 
     return { isMaskEnabled, activeTabName };
   },

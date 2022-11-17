@@ -1,12 +1,9 @@
-import { createSelector, current } from '@reduxjs/toolkit';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { Group, Line } from 'react-konva';
 import {
-  baseCanvasImageSelector,
-  // canvasClipSelector,
-  // canvasModeSelector,
-  currentCanvasSelector,
+  canvasSelector,
   isCanvasBaseImage,
   isCanvasBaseLine,
 } from './canvasSlice';
@@ -14,9 +11,9 @@ import IAICanvasImage from './IAICanvasImage';
 import { rgbaColorToString } from './util/colorToString';
 
 const selector = createSelector(
-  [currentCanvasSelector],
-  (currentCanvas) => {
-    const { objects } = currentCanvas.layerState;
+  [canvasSelector],
+  (canvas) => {
+    const { objects } = canvas.layerState;
 
     return {
       objects,

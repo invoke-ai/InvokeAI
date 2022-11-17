@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  currentCanvasSelector,
+  canvasSelector,
   isStagingSelector,
   setBrushColor,
   setBrushSize,
@@ -16,9 +16,9 @@ import IAISlider from 'common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
 
 export const selector = createSelector(
-  [currentCanvasSelector, isStagingSelector],
-  (currentCanvas, isStaging) => {
-    const { brushColor, brushSize, tool } = currentCanvas;
+  [canvasSelector, isStagingSelector],
+  (canvas, isStaging) => {
+    const { brushColor, brushSize, tool } = canvas;
 
     return {
       tool,
