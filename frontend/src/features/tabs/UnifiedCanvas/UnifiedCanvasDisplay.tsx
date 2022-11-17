@@ -12,7 +12,7 @@ import {
 import IAICanvas from 'features/canvas/IAICanvas';
 import IAICanvasOutpaintingControls from 'features/canvas/IAICanvasOutpaintingControls';
 
-const outpaintingDisplaySelector = createSelector(
+const selector = createSelector(
   [canvasSelector],
   (canvas) => {
     const {
@@ -31,11 +31,10 @@ const outpaintingDisplaySelector = createSelector(
   }
 );
 
-const OutpaintingDisplay = () => {
+const UnifiedCanvasDisplay = () => {
   const dispatch = useAppDispatch();
-  const { doesCanvasNeedScaling, doesOutpaintingHaveObjects } = useAppSelector(
-    outpaintingDisplaySelector
-  );
+  const { doesCanvasNeedScaling, doesOutpaintingHaveObjects } =
+    useAppSelector(selector);
 
   useLayoutEffect(() => {
     const resizeCallback = _.debounce(
@@ -45,17 +44,6 @@ const OutpaintingDisplay = () => {
     window.addEventListener('resize', resizeCallback);
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
-
-  const outpaintingComponent = doesOutpaintingHaveObjects ? (
-    <div className="inpainting-main-area">
-      <IAICanvasOutpaintingControls />
-      <div className="inpainting-canvas-area">
-        {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
-      </div>
-    </div>
-  ) : (
-    <ImageUploadButton />
-  );
 
   return (
     <div className={'workarea-single-view'}>
@@ -67,9 +55,8 @@ const OutpaintingDisplay = () => {
           </div>
         </div>
       </div>
-      {/* <div className="workarea-split-view-left">{outpaintingComponent}</div> */}
     </div>
   );
 };
 
-export default OutpaintingDisplay;
+export default UnifiedCanvasDisplay;

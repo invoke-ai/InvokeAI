@@ -23,8 +23,9 @@ import {
 import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import {
-  setImageToInpaint,
-  setImageToOutpaint,
+  setDoesCanvasNeedScaling,
+  setInitialCanvasImage,
+  setShouldLockToInitialImage,
 } from 'features/canvas/canvasSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
@@ -97,10 +98,15 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const handleSendToInpainting = () => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
-    dispatch(setImageToInpaint(image));
-    if (activeTabName !== 'inpainting') {
-      dispatch(setActiveTab('inpainting'));
+
+    dispatch(setInitialCanvasImage(image));
+    dispatch(setShouldLockToInitialImage(true));
+    dispatch(setDoesCanvasNeedScaling(true));
+
+    if (activeTabName !== 'unifiedCanvas') {
+      dispatch(setActiveTab('unifiedCanvas'));
     }
+
     toast({
       title: 'Sent to Inpainting',
       status: 'success',
@@ -111,10 +117,15 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const handleSendToOutpainting = () => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
-    dispatch(setImageToOutpaint(image));
-    if (activeTabName !== 'outpainting') {
-      dispatch(setActiveTab('outpainting'));
+
+    dispatch(setInitialCanvasImage(image));
+    dispatch(setShouldLockToInitialImage(true));
+    dispatch(setDoesCanvasNeedScaling(true));
+
+    if (activeTabName !== 'unifiedCanvas') {
+      dispatch(setActiveTab('unifiedCanvas'));
     }
+
     toast({
       title: 'Sent to Outpainting',
       status: 'success',

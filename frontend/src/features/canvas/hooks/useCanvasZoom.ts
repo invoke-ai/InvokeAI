@@ -60,12 +60,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   return useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
       // stop default scrolling
-      if (
-        activeTabName !== 'outpainting' ||
-        !stageRef.current ||
-        isMoveStageKeyHeld ||
-        !initialCanvasImage
-      )
+      if (!stageRef.current || isMoveStageKeyHeld || !initialCanvasImage)
         return;
 
       e.evt.preventDefault();

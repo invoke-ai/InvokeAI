@@ -28,14 +28,8 @@ import { socketioMiddleware } from './socketio/middleware';
  * The necesssary nested persistors with blacklists are configured below.
  */
 
-const genericCanvasBlacklist = ['cursorPosition'];
-
-const inpaintingCanvasBlacklist = genericCanvasBlacklist.map(
-  (blacklistItem) => `canvas.inpainting.${blacklistItem}`
-);
-
-const outpaintingCanvasBlacklist = genericCanvasBlacklist.map(
-  (blacklistItem) => `canvas.outpainting.${blacklistItem}`
+const canvasBlacklist = ['cursorPosition'].map(
+  (blacklistItem) => `canvas.${blacklistItem}`
 );
 
 const systemBlacklist = [
@@ -73,12 +67,7 @@ const rootPersistConfig = getPersistConfig({
   key: 'root',
   storage,
   rootReducer,
-  blacklist: [
-    ...inpaintingCanvasBlacklist,
-    ...outpaintingCanvasBlacklist,
-    ...systemBlacklist,
-    ...galleryBlacklist,
-  ],
+  blacklist: [...canvasBlacklist, ...systemBlacklist, ...galleryBlacklist],
   debounce: 300,
 });
 

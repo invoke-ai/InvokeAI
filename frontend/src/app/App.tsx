@@ -50,7 +50,7 @@ const appSelector = createSelector(
 
     const shouldShowGalleryButton =
       !(shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)) &&
-      ['txt2img', 'img2img', 'inpainting', 'outpainting'].includes(
+      ['txt2img', 'img2img', 'unifiedCanvas'].includes(
         activeTabName
       );
 
@@ -59,7 +59,7 @@ const appSelector = createSelector(
         shouldShowOptionsPanel ||
         (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
       ) &&
-      ['txt2img', 'img2img', 'inpainting', 'outpainting'].includes(
+      ['txt2img', 'img2img', 'unifiedCanvas'].includes(
         activeTabName
       );
 

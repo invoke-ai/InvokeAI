@@ -142,7 +142,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     },
   ];
 
-  const inpaintingHotkeys = [
+  const unifiedCanvasHotkeys = [
     {
       title: 'Select Brush',
       desc: 'Selects the inpainting brush',
@@ -223,9 +223,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       desc: 'Expand your inpainting work area',
       hotkey: 'Shift+J',
     },
-  ];
-
-  const outpaintingHotkeys = [
     {
       title: 'Erase Canvas',
       desc: 'Erase the images on the canvas',
@@ -301,17 +298,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
-                  {renderHotkeyModalItems(inpaintingHotkeys)}
-                </AccordionPanel>
-              </AccordionItem>
-
-              <AccordionItem>
-                <AccordionButton className="hotkeys-modal-button">
-                  <h2>Outpainting Hotkeys</h2>
-                  <AccordionIcon />
-                </AccordionButton>
-                <AccordionPanel>
-                  {renderHotkeyModalItems(outpaintingHotkeys)}
+                  {renderHotkeyModalItems(unifiedCanvasHotkeys)}
                 </AccordionPanel>
               </AccordionItem>
             </Accordion>

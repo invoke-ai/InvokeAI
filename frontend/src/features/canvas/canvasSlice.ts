@@ -8,12 +8,10 @@ import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { RootState } from 'app/store';
 import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
 import { uploadImage } from 'features/gallery/util/uploadImage';
-import { setInitialCanvasImage } from './canvasReducers';
+import { setInitialCanvasImage_reducer } from './canvasReducers';
 import calculateScale from './util/calculateScale';
 import calculateCoordinates from './util/calculateCoordinates';
 import floorCoordinates from './util/floorCoordinates';
-
-export type CanvasMode = 'inpainting' | 'outpainting';
 
 export type CanvasLayer = 'base' | 'mask';
 
@@ -256,15 +254,8 @@ export const canvasSlice = createSlice({
     setCursorPosition: (state, action: PayloadAction<Vector2d | null>) => {
       state.cursorPosition = action.payload;
     },
-    clearImageToInpaint: (state) => {
-      // TODO
-      // state.inpainting.imageToInpaint = undefined;
-    },
-    setImageToOutpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
-      setInitialCanvasImage(state, action.payload);
-    },
-    setImageToInpaint: (state, action: PayloadAction<InvokeAI.Image>) => {
-      setInitialCanvasImage(state, action.payload);
+    setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
+      setInitialCanvasImage_reducer(state, action.payload);
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
       state.stageDimensions = action.payload;
@@ -642,10 +633,8 @@ export const canvasSlice = createSlice({
 
       if (kind !== 'init') return;
 
-      if (activeTabName === 'inpainting') {
-        setInitialCanvasImage(state, image);
-      } else if (activeTabName === 'outpainting') {
-        setInitialCanvasImage(state, image);
+      if (activeTabName === 'unifiedCanvas') {
+        setInitialCanvasImage_reducer(state, image);
       }
     });
   },
@@ -665,13 +654,11 @@ export const {
   setShouldShowBrushPreview,
   setMaskColor,
   clearMask,
-  clearImageToInpaint,
   undo,
   redo,
   setCursorPosition,
   setStageDimensions,
-  setImageToInpaint,
-  setImageToOutpaint,
+  setInitialCanvasImage,
   setBoundingBoxDimensions,
   setBoundingBoxCoordinates,
   setBoundingBoxPreviewFill,

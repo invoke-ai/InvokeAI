@@ -1,21 +1,21 @@
-import OutpaintingPanel from './OutpaintingPanel';
-import OutpaintingDisplay from './OutpaintingDisplay';
+import UnifiedCanvasPanel from './UnifiedCanvasPanel';
+import UnifiedCanvasDisplay from './UnifiedCanvasDisplay';
 import InvokeWorkarea from 'features/tabs/InvokeWorkarea';
 import { useAppDispatch } from 'app/store';
 import { useEffect } from 'react';
 import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
 
-export default function OutpaintingWorkarea() {
+export default function UnifiedCanvasWorkarea() {
   const dispatch = useAppDispatch();
   useEffect(() => {
     dispatch(setDoesCanvasNeedScaling(true));
   }, [dispatch]);
   return (
     <InvokeWorkarea
-      optionsPanel={<OutpaintingPanel />}
+      optionsPanel={<UnifiedCanvasPanel />}
       styleClass="inpainting-workarea-overrides"
     >
-      <OutpaintingDisplay />
+      <UnifiedCanvasDisplay />
     </InvokeWorkarea>
   );
 }

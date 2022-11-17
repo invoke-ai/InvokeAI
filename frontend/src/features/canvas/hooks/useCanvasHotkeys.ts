@@ -13,7 +13,7 @@ import { canvasSelector } from '../canvasSlice';
 import { useRef } from 'react';
 import { stageRef } from '../IAICanvas';
 
-const inpaintingCanvasHotkeysSelector = createSelector(
+const selector = createSelector(
   [canvasSelector, activeTabNameSelector],
   (canvas, activeTabName) => {
     const {
@@ -40,9 +40,8 @@ const inpaintingCanvasHotkeysSelector = createSelector(
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const { activeTabName, shouldShowBoundingBox, tool } = useAppSelector(
-    inpaintingCanvasHotkeysSelector
-  );
+  const { activeTabName, shouldShowBoundingBox, tool } =
+    useAppSelector(selector);
 
   const previousToolRef = useRef<CanvasTool | null>(null);
   //  Toggle lock bounding box

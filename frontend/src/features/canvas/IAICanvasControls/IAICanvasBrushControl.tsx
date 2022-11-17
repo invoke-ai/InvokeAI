@@ -18,7 +18,7 @@ import {
 import _ from 'lodash';
 import IAICanvasMaskColorPicker from './IAICanvasMaskControls/IAICanvasMaskColorPicker';
 
-const inpaintingBrushSelector = createSelector(
+const selector = createSelector(
   [canvasSelector, activeTabNameSelector],
   (canvas, activeTabName) => {
     const { tool, brushSize } = canvas;
@@ -38,9 +38,7 @@ const inpaintingBrushSelector = createSelector(
 
 export default function IAICanvasBrushControl() {
   const dispatch = useAppDispatch();
-  const { tool, brushSize, activeTabName } = useAppSelector(
-    inpaintingBrushSelector
-  );
+  const { tool, brushSize, activeTabName } = useAppSelector(selector);
 
   const handleSelectBrushTool = () => dispatch(setTool('brush'));
 

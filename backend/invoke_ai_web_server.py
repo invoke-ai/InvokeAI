@@ -616,10 +616,7 @@ class InvokeAIWebServer:
             """
             Prepare for generation based on generation_mode
             """
-            if generation_parameters["generation_mode"] in [
-                "outpainting",
-                "inpainting",
-            ]:
+            if generation_parameters["generation_mode"] == "unifiedCanvas":
                 """
                 generation_parameters["init_img"] is a base64 image
                 generation_parameters["init_mask"] is a base64 image
@@ -634,35 +631,23 @@ class InvokeAIWebServer:
 
                 original_bounding_box = generation_parameters["bounding_box"].copy()
 
-                if generation_parameters["generation_mode"] == "outpainting":
-                    initial_image = dataURL_to_image(
-                        generation_parameters["init_img"]
-                    ).convert("RGBA")
+                initial_image = dataURL_to_image(
+                    generation_parameters["init_img"]
+                ).convert("RGBA")
 
-                    """
-                    The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
-                    to the generator should be:
-                        {
-                            "x": 0, 
-                            "y": 0,
-                            "width": original_bounding_box["width"],
-                            "height": original_bounding_box["height"]
-                        }
-                    """
+                """
+                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
+                to the generator should be:
+                    {
+                        "x": 0, 
+                        "y": 0,
+                        "width": original_bounding_box["width"],
+                        "height": original_bounding_box["height"]
+                    }
+                """
 
-                    generation_parameters["bounding_box"]["x"] = 0
-                    generation_parameters["bounding_box"]["y"] = 0
-                elif generation_parameters["generation_mode"] == "inpainting":
-                    init_img_path = self.get_image_path_from_url(init_img_url)
-                    initial_image = Image.open(init_img_path)
-
-                    """
-                    For inpainting, only the mask is pre-cropped by the UI, so we need to crop out a copy
-                    of the region of the image to be inpainted to match the size of the mask image.
-                    """
-                    initial_image = copy_image_from_bounding_box(
-                        initial_image, **generation_parameters["bounding_box"]
-                    )
+                generation_parameters["bounding_box"]["x"] = 0
+                generation_parameters["bounding_box"]["y"] = 0
 
                 # Convert mask dataURL to an image and convert to greyscale
                 mask_image = dataURL_to_image(
@@ -930,7 +915,7 @@ class InvokeAIWebServer:
                 if "init_mask" in all_parameters:
                     all_parameters["init_mask"] = ""  # TODO: store the mask in metadata
 
-                if generation_parameters["generation_mode"] == "outpainting":
+                if generation_parameters["generation_mode"] == "unifiedCanvas":
                     all_parameters["bounding_box"] = original_bounding_box
 
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)

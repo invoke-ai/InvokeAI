@@ -36,9 +36,9 @@ import {
   FaTrash,
 } from 'react-icons/fa';
 import {
-  setImageToInpaint,
   setDoesCanvasNeedScaling,
-  setImageToOutpaint,
+  setInitialCanvasImage,
+  setShouldLockToInitialImage,
 } from 'features/canvas/canvasSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
@@ -320,12 +320,12 @@ const CurrentImageButtons = () => {
     if (!currentImage) return;
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
-    dispatch(setImageToInpaint(currentImage));
-    dispatch(setActiveTab('inpainting'));
+    dispatch(setInitialCanvasImage(currentImage));
+    dispatch(setShouldLockToInitialImage(true));
     dispatch(setDoesCanvasNeedScaling(true));
 
     toast({
-      title: 'Sent to Inpainting',
+      title: 'Sent to Unified Canvas',
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -336,12 +336,12 @@ const CurrentImageButtons = () => {
     if (!currentImage) return;
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
-    dispatch(setImageToOutpaint(currentImage));
-    dispatch(setActiveTab('outpainting'));
+    dispatch(setInitialCanvasImage(currentImage));
+    dispatch(setShouldLockToInitialImage(false));
     dispatch(setDoesCanvasNeedScaling(true));
 
     toast({
-      title: 'Sent to Inpainting',
+      title: 'Sent to Unified Canvas',
       status: 'success',
       duration: 2500,
       isClosable: true,
