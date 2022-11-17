@@ -28,7 +28,6 @@ export const setInitialCanvasImage = (
   };
 
   state.boundingBoxDimensions = newBoundingBoxDimensions;
-
   state.boundingBoxCoordinates = newBoundingBoxCoordinates;
 
   state.pastLayerStates.push(state.layerState);
@@ -47,6 +46,13 @@ export const setInitialCanvasImage = (
     ],
   };
   state.futureLayerStates = [];
+
+  state.initialCanvasImageClipRect = {
+    clipX: 0,
+    clipY: 0,
+    clipWidth: image.width,
+    clipHeight: image.height,
+  };
 
   state.isCanvasInitialized = false;
   state.doesCanvasNeedScaling = true;

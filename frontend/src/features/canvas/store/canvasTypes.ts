@@ -1,5 +1,5 @@
 import * as InvokeAI from 'app/invokeai';
-import { Vector2d } from 'konva/lib/types';
+import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 
 export type CanvasLayer = 'base' | 'mask';
@@ -7,6 +7,13 @@ export type CanvasLayer = 'base' | 'mask';
 export type CanvasDrawingTool = 'brush' | 'eraser';
 
 export type CanvasTool = CanvasDrawingTool | 'move';
+
+export type ClipRect = {
+  clipX: number;
+  clipY: number;
+  clipWidth: number;
+  clipHeight: number;
+};
 
 export type Dimensions = {
   width: number;
@@ -18,6 +25,7 @@ export type CanvasAnyLine = {
   tool: CanvasDrawingTool;
   strokeWidth: number;
   points: number[];
+  clipRect: ClipRect | undefined;
 };
 
 export type CanvasImage = {
@@ -78,6 +86,7 @@ export interface CanvasState {
   doesCanvasNeedScaling: boolean;
   eraserSize: number;
   futureLayerStates: CanvasLayerState[];
+  initialCanvasImageClipRect?: ClipRect;
   inpaintReplace: number;
   intermediateImage?: InvokeAI.Image;
   isCanvasInitialized: boolean;

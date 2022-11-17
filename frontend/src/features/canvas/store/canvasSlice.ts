@@ -48,6 +48,7 @@ const initialCanvasState: CanvasState = {
   eraserSize: 50,
   futureLayerStates: [],
   inpaintReplace: 0.1,
+  initialCanvasImageClipRect: undefined,
   isCanvasInitialized: false,
   isDrawing: false,
   isMaskEnabled: true,
@@ -296,6 +297,10 @@ export const canvasSlice = createSlice({
         tool,
         strokeWidth: newStrokeWidth,
         points: action.payload,
+        clipRect:
+          state.shouldLockToInitialImage && state.initialCanvasImageClipRect
+            ? state.initialCanvasImageClipRect
+            : undefined,
         ...newColor,
       });
 
@@ -369,10 +374,14 @@ export const canvasSlice = createSlice({
         state.layerState.objects.find(isCanvasBaseImage);
 
       if (!initialCanvasImage) return;
+      const { shouldLockToInitialImage, initialCanvasImageClipRect } = state;
 
-      const { width: imageWidth, height: imageHeight } = initialCanvasImage;
+      let { width: imageWidth, height: imageHeight } = initialCanvasImage;
 
-      const { shouldLockToInitialImage } = state;
+      if (shouldLockToInitialImage && initialCanvasImageClipRect) {
+        imageWidth = initialCanvasImageClipRect.clipWidth;
+        imageHeight = initialCanvasImageClipRect.clipHeight;
+      }
 
       const padding = shouldLockToInitialImage ? 1 : 0.95;
 
@@ -403,11 +412,13 @@ export const canvasSlice = createSlice({
         newScale
       );
 
-      state.stageScale = newScale;
-      state.minimumStageScale = newScale;
-      state.stageCoordinates = newCoordinates;
+      if (!_.isEqual(state.stageDimensions, newDimensions)) {
+        state.minimumStageScale = newScale;
+        state.stageScale = newScale;
+        state.stageCoordinates = newCoordinates;
+        state.stageDimensions = newDimensions;
+      }
 
-      state.stageDimensions = newDimensions;
       state.isCanvasInitialized = true;
     },
     resizeCanvas: (state) => {
