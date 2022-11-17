@@ -3,14 +3,13 @@ import { useLayoutEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
-  initialCanvasImageSelector,
-  canvasSelector,
   resizeAndScaleCanvas,
   resizeCanvas,
   setCanvasContainerDimensions,
   setDoesCanvasNeedScaling,
-} from 'features/canvas/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
+import { canvasSelector, initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
 
 const canvasResizerSelector = createSelector(
   canvasSelector,

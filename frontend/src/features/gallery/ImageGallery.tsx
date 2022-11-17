@@ -31,7 +31,7 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import { BiReset } from 'react-icons/bi';
 import IAICheckbox from 'common/components/IAICheckbox';
-import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
 import useClickOutsideWatcher from 'common/hooks/useClickOutsideWatcher';
 

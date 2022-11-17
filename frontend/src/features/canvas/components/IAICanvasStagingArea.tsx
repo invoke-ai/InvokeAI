@@ -1,10 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/store';
 import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Group, Rect } from 'react-konva';
-import { canvasSelector } from './canvasSlice';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import IAICanvasImage from './IAICanvasImage';
 
 const selector = createSelector(

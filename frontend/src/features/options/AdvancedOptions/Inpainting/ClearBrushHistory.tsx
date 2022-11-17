@@ -2,13 +2,11 @@ import { useToast } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIButton from 'common/components/IAIButton';
-import {
-  canvasSelector,
-  setClearBrushHistory,
-} from 'features/canvas/canvasSlice';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { setClearBrushHistory } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
 
-const clearBrushHistorySelector = createSelector(
+const selector = createSelector(
   canvasSelector,
   (canvas) => {
     const { pastLayerStates, futureLayerStates } = canvas;
@@ -30,7 +28,7 @@ export default function ClearBrushHistory() {
   const dispatch = useAppDispatch();
   const toast = useToast();
 
-  const { mayClearBrushHistory } = useAppSelector(clearBrushHistorySelector);
+  const { mayClearBrushHistory } = useAppSelector(selector);
 
   const handleClearBrushHistory = () => {
     dispatch(setClearBrushHistory());

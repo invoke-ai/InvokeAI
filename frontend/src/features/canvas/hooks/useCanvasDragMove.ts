@@ -3,12 +3,11 @@ import { useAppDispatch, useAppSelector } from 'app/store';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { useCallback } from 'react';
+import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
-  canvasSelector,
-  isStagingSelector,
   setIsMovingStage,
   setStageCoordinates,
-} from '../canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],

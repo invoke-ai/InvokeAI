@@ -3,7 +3,7 @@ import UnifiedCanvasDisplay from './UnifiedCanvasDisplay';
 import InvokeWorkarea from 'features/tabs/InvokeWorkarea';
 import { useAppDispatch } from 'app/store';
 import { useEffect } from 'react';
-import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 
 export default function UnifiedCanvasWorkarea() {
   const dispatch = useAppDispatch();

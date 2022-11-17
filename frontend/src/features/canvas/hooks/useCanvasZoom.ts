@@ -6,12 +6,11 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
 import {
-  initialCanvasImageSelector,
   canvasSelector,
-  setStageCoordinates,
-  setStageScale,
+  initialCanvasImageSelector,
   shouldLockToInitialImageSelector,
-} from '../canvasSlice';
+} from 'features/canvas/store/canvasSelectors';
+import { setStageCoordinates, setStageScale } from 'features/canvas/store/canvasSlice';
 import {
   CANVAS_SCALE_BY,
   MAX_CANVAS_SCALE,

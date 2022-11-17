@@ -6,7 +6,7 @@ import { useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { ReactNode, useCallback, useLayoutEffect, useState } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
-import { canvasSelector } from './canvasSlice';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 const selector = createSelector(
   [canvasSelector],

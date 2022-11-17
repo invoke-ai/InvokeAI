@@ -2,7 +2,7 @@ import { MdPhotoLibrary } from 'react-icons/md';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setShouldShowGallery } from 'features/gallery/gallerySlice';
-import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 
 const FloatingGalleryButton = () => {
   const dispatch = useAppDispatch();

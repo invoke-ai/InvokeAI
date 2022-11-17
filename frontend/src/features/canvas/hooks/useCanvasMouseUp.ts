@@ -4,14 +4,13 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import Konva from 'konva';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
+import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   // addPointToCurrentEraserLine,
   addPointToCurrentLine,
-  canvasSelector,
-  isStagingSelector,
   setIsDrawing,
   setIsMovingStage,
-} from '../canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(

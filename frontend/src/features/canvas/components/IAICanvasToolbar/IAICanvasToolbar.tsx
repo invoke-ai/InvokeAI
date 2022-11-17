@@ -2,16 +2,14 @@ import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   resizeAndScaleCanvas,
-  isStagingSelector,
   resetCanvas,
   resetCanvasView,
   setShouldLockToInitialImage,
   setTool,
-  canvasSelector,
-} from './canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
-import { canvasImageLayerRef, stageRef } from './IAICanvas';
+import { canvasImageLayerRef, stageRef } from '../IAICanvas';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   FaArrowsAlt,
@@ -23,15 +21,16 @@ import {
   FaTrash,
   FaUpload,
 } from 'react-icons/fa';
-import IAICanvasUndoButton from './IAICanvasControls/IAICanvasUndoButton';
-import IAICanvasRedoButton from './IAICanvasControls/IAICanvasRedoButton';
+import IAICanvasUndoButton from './IAICanvasUndoButton';
+import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
-import { mergeAndUploadCanvas } from './util/mergeAndUploadCanvas';
+import { mergeAndUploadCanvas } from 'features/canvas/util/mergeAndUploadCanvas';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { ChangeEvent } from 'react';
+import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],

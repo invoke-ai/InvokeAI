@@ -14,7 +14,7 @@ import {
   setShouldPinOptionsPanel,
   setShouldShowOptionsPanel,
 } from 'features/options/optionsSlice';
-import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import InvokeAILogo from 'assets/images/logo.png';
 
 type Props = { children: ReactNode };

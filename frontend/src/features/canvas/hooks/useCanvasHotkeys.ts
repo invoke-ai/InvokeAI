@@ -3,15 +3,15 @@ import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import {
-  CanvasTool,
   setShouldShowBoundingBox,
   setTool,
   toggleShouldLockBoundingBox,
-} from 'features/canvas/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { canvasSelector } from '../canvasSlice';
 import { useRef } from 'react';
-import { stageRef } from '../IAICanvas';
+import { stageRef } from '../components/IAICanvas';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { CanvasTool } from '../store/canvasTypes';
 
 const selector = createSelector(
   [canvasSelector, activeTabNameSelector],

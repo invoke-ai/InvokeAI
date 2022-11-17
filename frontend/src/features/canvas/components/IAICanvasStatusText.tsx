@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import _ from 'lodash';
-import { canvasSelector } from './canvasSlice';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 const roundToHundreth = (val: number): number => {
   return Math.round(val * 100) / 100;

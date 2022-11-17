@@ -39,7 +39,7 @@ import {
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
   setShouldLockToInitialImage,
-} from 'features/canvas/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import IAIPopover from 'common/components/IAIPopover';

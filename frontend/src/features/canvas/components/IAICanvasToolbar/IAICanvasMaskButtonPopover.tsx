@@ -2,12 +2,11 @@ import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   clearMask,
-  canvasSelector,
   setIsMaskEnabled,
   setLayer,
   setMaskColor,
   setShouldPreserveMaskedArea,
-} from './canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -16,6 +15,7 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIButton from 'common/components/IAIButton';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 export const selector = createSelector(
   [canvasSelector],

@@ -6,12 +6,12 @@ import IAISwitch from '../../../../common/components/IAISwitch';
 import IAISlider from '../../../../common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
 import {
-  canvasSelector,
   setInpaintReplace,
   setShouldUseInpaintReplace,
-} from 'features/canvas/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
-const canvasInpaintReplaceSelector = createSelector(
+const selector = createSelector(
   canvasSelector,
   (canvas) => {
     const { inpaintReplace, shouldUseInpaintReplace } = canvas;
@@ -28,9 +28,7 @@ const canvasInpaintReplaceSelector = createSelector(
 );
 
 export default function InpaintReplace() {
-  const { inpaintReplace, shouldUseInpaintReplace } = useAppSelector(
-    canvasInpaintReplaceSelector
-  );
+  const { inpaintReplace, shouldUseInpaintReplace } = useAppSelector(selector);
 
   const dispatch = useAppDispatch();
 

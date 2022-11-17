@@ -2,7 +2,8 @@ import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line } from 'react-konva';
 import { useAppSelector } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
-import { canvasSelector, isCanvasMaskLine } from './canvasSlice';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { isCanvasMaskLine } from '../store/canvasTypes';
 import _ from 'lodash';
 
 export const canvasLinesSelector = createSelector(

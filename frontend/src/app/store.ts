@@ -10,7 +10,7 @@ import { getPersistConfig } from 'redux-deep-persist';
 import optionsReducer from 'features/options/optionsSlice';
 import galleryReducer from 'features/gallery/gallerySlice';
 import systemReducer from 'features/system/systemSlice';
-import canvasReducer from 'features/canvas/canvasSlice';
+import canvasReducer from 'features/canvas/store/canvasSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 

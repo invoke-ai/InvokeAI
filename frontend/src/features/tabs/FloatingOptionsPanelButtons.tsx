@@ -10,7 +10,7 @@ import CancelButton from 'features/options/ProcessButtons/CancelButton';
 import InvokeButton from 'features/options/ProcessButtons/InvokeButton';
 import _ from 'lodash';
 import LoopbackButton from 'features/options/ProcessButtons/Loopback';
-import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 
 const canInvokeSelector = createSelector(
   (state: RootState) => state.options,

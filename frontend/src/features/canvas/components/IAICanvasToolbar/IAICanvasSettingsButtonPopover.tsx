@@ -1,19 +1,19 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  canvasSelector,
   setShouldAutoSave,
   setShouldDarkenOutsideBoundingBox,
   setShouldShowGrid,
   setShouldShowIntermediates,
   setShouldSnapToGrid,
-} from './canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaWrench } from 'react-icons/fa';
 import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],

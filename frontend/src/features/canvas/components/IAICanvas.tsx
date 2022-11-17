@@ -1,35 +1,30 @@
-// lib
 import { MutableRefObject, useCallback, useRef } from 'react';
 import Konva from 'konva';
 import { Layer, Stage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
-
-// app
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/store';
 import {
   initialCanvasImageSelector,
   canvasSelector,
   isStagingSelector,
   shouldLockToInitialImageSelector,
-} from 'features/canvas/canvasSlice';
-
-// component
+} from 'features/canvas/store/canvasSelectors';
 import IAICanvasMaskLines from './IAICanvasMaskLines';
 import IAICanvasBrushPreview from './IAICanvasBrushPreview';
 import { Vector2d } from 'konva/lib/types';
-import IAICanvasBoundingBox from './IAICanvasBoundingBox';
-import useCanvasHotkeys from './hooks/useCanvasHotkeys';
+import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
+import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
-import useCanvasWheel from './hooks/useCanvasZoom';
-import useCanvasMouseDown from './hooks/useCanvasMouseDown';
-import useCanvasMouseUp from './hooks/useCanvasMouseUp';
-import useCanvasMouseMove from './hooks/useCanvasMouseMove';
-import useCanvasMouseEnter from './hooks/useCanvasMouseEnter';
-import useCanvasMouseOut from './hooks/useCanvasMouseOut';
-import useCanvasDragMove from './hooks/useCanvasDragMove';
+import useCanvasWheel from '../hooks/useCanvasZoom';
+import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
+import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
+import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
+import useCanvasMouseEnter from '../hooks/useCanvasMouseEnter';
+import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
+import useCanvasDragMove from '../hooks/useCanvasDragMove';
 import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
