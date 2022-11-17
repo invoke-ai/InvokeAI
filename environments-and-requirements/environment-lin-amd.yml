@@ -23,6 +23,7 @@ dependencies:
     - kornia==0.6.0
     - omegaconf==2.2.3
     - opencv-python==4.5.5.64
+    - picklescan
     - pillow==9.2.0
     - pudb==2019.2
     - pyreadline3
