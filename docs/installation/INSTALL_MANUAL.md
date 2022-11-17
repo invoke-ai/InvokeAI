@@ -256,7 +256,16 @@ steps:
     source invokeai/bin/activate
     ```
 
-4.  Pick the correct `requirements*.txt` file for your hardware and operating
+4. On **Macintosh Systems** run the following command:
+
+   ```
+   pip install pytorch<1.12 torchvision<0.14.0
+   ```
+
+   (This avoids a downstream error later when the `basicsr` package can't find torch,
+   and also avoids a performance regression when using torch 1.13 on Macintoshes)
+
+5.  Pick the correct `requirements*.txt` file for your hardware and operating
     system.
 
     We have created a series of environment files suited for different operating
@@ -303,13 +312,80 @@ steps:
     created in the InvokeAI root directory and that it points to the correct
     file in `environments-and-requirements`.
 
-5.  Run PIP
+6.  Run PIP
 
     Be sure that the `invokeai` environment is active before doing this:
 
     ```bash
     pip install --prefer-binary -r requirements.txt
     ```
+
+7.  Download the model weights files:
+
+    !!! tip
+
+        If you have already downloaded the weights file(s) for another Stable
+        Diffusion distribution, you may skip this step (by selecting "skip" when
+        prompted) and configure InvokeAI to use the previously-downloaded files. The
+        process for this is described in [here](INSTALLING_MODELS.md).
+
+    ```bash
+    python scripts/preload_models.py
+    ```
+
+    The script `preload_models.py` will interactively guide you through the
+    process of downloading and installing the weights files needed for InvokeAI.
+    Note that the main Stable Diffusion weights file is protected by a license
+    agreement that you have to agree to. The script will list the steps you need
+    to take to create an account on the site that hosts the weights files,
+    accept the agreement, and provide an access token that allows InvokeAI to
+    legally download and install the weights files.
+
+    If you get an error message about a module not being installed, check that
+    the `invokeai` environment is active and if not, repeat step 5.
+
+8.  Run the command-line- or the web- interface:
+
+    !!! example ""
+
+        !!! warning "Make sure that the conda environment is activated, which should create `(invokeai)` in front of your prompt!"
+
+        === "CLI"
+
+            ```bash
+            python scripts/invoke.py
+            ```
+
+        === "local Webserver"
+
+            ```bash
+            python scripts/invoke.py --web
+            ```
+
+        === "Public Webserver"
+
+            ```bash
+            python scripts/invoke.py --web --host 0.0.0.0
+            ```
+
+        If you choose the run the web interface, point your browser at
+        http://localhost:9090 in order to load the GUI.
+
+9. Render away!
+
+    Browse the [features](../features/CLI.md) section to learn about all the things you
+    can do with InvokeAI.
+
+    Note that some GPUs are slow to warm up. In particular, when using an AMD
+    card with the ROCm driver, you may have to wait for over a minute the first
+    time you try to generate an image. Fortunately, after the warm up period
+    rendering will be fast.
+
+10. Subsequently, to relaunch the script, be sure to run `source
+      invokeai/bin/activate` enter the `InvokeAI` directory, and then
+      launch the invoke script. If you forget to activate the
+      'invokeai' environment, the script will fail with multiple
+      `ModuleNotFound` errors.
 
 ---
 
