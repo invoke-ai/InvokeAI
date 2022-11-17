@@ -99,8 +99,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleSendToInpainting = () => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
-    dispatch(setInitialCanvasImage(image));
     dispatch(setShouldLockToInitialImage(true));
+    dispatch(setInitialCanvasImage(image));
     dispatch(setDoesCanvasNeedScaling(true));
 
     if (activeTabName !== 'unifiedCanvas') {
@@ -118,8 +118,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleSendToOutpainting = () => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
+    dispatch(setShouldLockToInitialImage(false));
     dispatch(setInitialCanvasImage(image));
-    dispatch(setShouldLockToInitialImage(true));
     dispatch(setDoesCanvasNeedScaling(true));
 
     if (activeTabName !== 'unifiedCanvas') {

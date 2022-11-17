@@ -107,6 +107,7 @@ const CurrentImageButtons = () => {
     shouldShowImageDetails,
     currentImage,
     isLightBoxOpen,
+    activeTabName,
   } = useAppSelector(systemSelector);
 
   const toast = useToast();
@@ -320,9 +321,13 @@ const CurrentImageButtons = () => {
     if (!currentImage) return;
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
-    dispatch(setInitialCanvasImage(currentImage));
     dispatch(setShouldLockToInitialImage(true));
+    dispatch(setInitialCanvasImage(currentImage));
     dispatch(setDoesCanvasNeedScaling(true));
+
+    if (activeTabName !== 'unifiedCanvas') {
+      dispatch(setActiveTab('unifiedCanvas'));
+    }
 
     toast({
       title: 'Sent to Unified Canvas',
@@ -336,9 +341,13 @@ const CurrentImageButtons = () => {
     if (!currentImage) return;
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
-    dispatch(setInitialCanvasImage(currentImage));
     dispatch(setShouldLockToInitialImage(false));
+    dispatch(setInitialCanvasImage(currentImage));
     dispatch(setDoesCanvasNeedScaling(true));
+
+    if (activeTabName !== 'unifiedCanvas') {
+      dispatch(setActiveTab('unifiedCanvas'));
+    }
 
     toast({
       title: 'Sent to Unified Canvas',
