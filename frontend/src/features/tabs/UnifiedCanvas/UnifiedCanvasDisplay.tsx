@@ -12,13 +12,9 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 const selector = createSelector(
   [canvasSelector],
   (canvas) => {
-    const {
-      doesCanvasNeedScaling,
-      layerState: { objects },
-    } = canvas;
+    const { doesCanvasNeedScaling } = canvas;
     return {
       doesCanvasNeedScaling,
-      doesOutpaintingHaveObjects: objects.length > 0,
     };
   },
   {
@@ -30,14 +26,12 @@ const selector = createSelector(
 
 const UnifiedCanvasDisplay = () => {
   const dispatch = useAppDispatch();
-  const { doesCanvasNeedScaling, doesOutpaintingHaveObjects } =
-    useAppSelector(selector);
+  const { doesCanvasNeedScaling } = useAppSelector(selector);
 
   useLayoutEffect(() => {
-    const resizeCallback = _.debounce(
-      () => dispatch(setDoesCanvasNeedScaling(true)),
-      250
-    );
+    const resizeCallback = _.debounce(() => {
+      dispatch(setDoesCanvasNeedScaling(true));
+    }, 250);
     window.addEventListener('resize', resizeCallback);
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
