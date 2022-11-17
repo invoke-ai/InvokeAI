@@ -52,8 +52,6 @@ MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${MAMBA_OS_NAME}-
 REPO_URL="https://github.com/invoke-ai/InvokeAI.git"
 umamba_exists="F"
 
-echo "Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to $MAMBA_ROOT_PREFIX/micromamba"
-
 # figure out whether git and conda needs to be installed
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
 
@@ -63,6 +61,13 @@ if ! which git &>/dev/null; then PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL git";
 
 if "$MAMBA_ROOT_PREFIX/micromamba" --version &>/dev/null; then umamba_exists="T"; fi
 
+echo "-----------------------------------------------------------------------------"
+echo "DEBUG:"
+echo "OS_NAME=$OS_NAME, OS_ARCH=$OS_ARCH, MAMBA_ARCH=$MAMBA_ARCH, PY_ARCH=$PY_ARCH"
+echo "Micromamba download URL = $MICROMAMBA_DOWNLOAD_URL"
+echo "Packages to install = $PACKAGES_TO_INSTALL"
+echo "-----------------------------------------------------------------------------"
+
 # (if necessary) install git and conda into a contained environment
 if [ "$PACKAGES_TO_INSTALL" != "" ]; then
     # download micromamba
@@ -70,6 +75,10 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
         echo "Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to $MAMBA_ROOT_PREFIX/micromamba"
 
         mkdir -p "$MAMBA_ROOT_PREFIX"
+	echo "------------DEBUG-----------------------------------------"
+	echo "curl -L \"$MICROMAMBA_DOWNLOAD_URL\" | tar -xvj bin/micromamba -O > \"$MAMBA_ROOT_PREFIX/micromamba\""
+	echo "-----------------------------------------------------------"
+	
         curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvj bin/micromamba -O > "$MAMBA_ROOT_PREFIX/micromamba"
 
         chmod u+x "$MAMBA_ROOT_PREFIX/micromamba"
@@ -99,7 +108,6 @@ if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
 # get the repo (and load into the current directory)
 if [ ! -e ".git" ]; then
     git init
-    git config --local init.defaultBranch main
     git remote add origin "$REPO_URL"
     git fetch
     git checkout origin/main -ft
