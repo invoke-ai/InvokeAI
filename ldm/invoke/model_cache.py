@@ -12,14 +12,15 @@ import time
 import gc
 import hashlib
 import psutil
+import sys
 import transformers
 import traceback
 import os
-from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config
 from ldm.invoke.globals import Globals
+from picklescan.scanner import scan_file_path
 
 DEFAULT_MAX_MODELS=2
 
@@ -203,6 +204,8 @@ class ModelCache(object):
 
         if not os.path.isabs(weights):
             weights = os.path.normpath(os.path.join(Globals.root,weights))
+        # scan model
+        self._scan_model(model_name, weights)
 
         print(f'>> Loading {model_name} from {weights}')
 
@@ -283,6 +286,30 @@ class ModelCache(object):
         gc.collect()
         if self._has_cuda():
             torch.cuda.empty_cache()
+    
+    def _scan_model(self, model_name, checkpoint):
+        # scan model
+        print(f'>> Scanning Model: {model_name}')
+        scan_result = scan_file_path(checkpoint)
+        if scan_result.infected_files != 0:
+            if scan_result.infected_files == 1:
+                print(f'\n### Issues Found In Model: {scan_result.issues_count}')
+                print('### WARNING: The model you are trying to load seems to be infected.')
+                print('### For your safety, InvokeAI will not load this model.')
+                print('### Please use checkpoints from trusted sources.')
+                print("### Exiting InvokeAI")
+                sys.exit()
+            else:
+                print('\n### WARNING: InvokeAI was unable to scan the model you are using.')
+                from ldm.util import ask_user
+                model_safe_check_fail = ask_user('Do you want to to continue loading the model?', ['y', 'n'])
+                if model_safe_check_fail.lower() == 'y':
+                    pass
+                else:
+                    print("### Exiting InvokeAI")
+                    sys.exit()
+        else:
+            print('>> Model Scanned. OK!!')
 
     def _make_cache_room(self):
         num_loaded_models = len(self.models)
