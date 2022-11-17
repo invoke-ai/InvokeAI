@@ -439,14 +439,21 @@ export const canvasSlice = createSlice({
       const { contentRect } = action.payload;
 
       const baseCanvasImage = state.layerState.objects.find(isCanvasBaseImage);
-      const { shouldLockToInitialImage } = state;
+      const { shouldLockToInitialImage, initialCanvasImageClipRect } = state;
       if (!baseCanvasImage) return;
 
       const {
         stageDimensions: { width: stageWidth, height: stageHeight },
       } = state;
 
-      const { x, y, width, height } = contentRect;
+      let { x, y, width, height } = contentRect;
+
+      if (shouldLockToInitialImage && initialCanvasImageClipRect) {
+        x = initialCanvasImageClipRect.clipX;
+        y = initialCanvasImageClipRect.clipY;
+        width = initialCanvasImageClipRect.clipWidth;
+        height = initialCanvasImageClipRect.clipHeight;
+      }
 
       const padding = shouldLockToInitialImage ? 1 : 0.95;
       const newScale = calculateScale(
