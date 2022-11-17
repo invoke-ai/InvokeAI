@@ -41,6 +41,8 @@ command-line completion.
     Macintosh users with MPS acceleration, or anybody with a CPU-only system,
     can skip this step.
 
+    !!! warning "Windows users, if Conda gives you the error 'CONDASSLError: OpenSSL appears to be unavailable', please see Troubleshooting for a solution."    
+
 2.  You will need to install Anaconda3 and Git if they are not already
     available. Use your operating system's preferred package manager, or
     download the installers manually. You can find them here:
@@ -295,13 +297,7 @@ steps:
             copy environments-and-requirements\requirements-lin-win-colab-cuda.txt requirements.txt
             ```
 
-        !!! warning
-
-            Please do not link or copy `environments-and-requirements/requirements-base.txt`.
-            This is a base requirements file that does not have the platform-specific
-            libraries. Also, be sure to link or copy the platform-specific file to
-	    a top-level file named `requirements.txt` as shown here. Running pip on
-	    a requirements file in a subdirectory will not work as expected.
+        !!! warning "Please do not link or copy `environments-and-requirements/requirements-base.txt`. This is a base requirements file that does not have the platform-specific libraries. Also, be sure to link or copy the platform-specific file to a top-level file named `requirements.txt` as shown here. Running pip on a requirements file in a subdirectory will not work as expected."
 
     When this is done, confirm that a file named `requirements.txt` has been
     created in the InvokeAI root directory and that it points to the correct
@@ -345,6 +341,13 @@ You can keep doing this until all requirements are satisfied and the `invoke.py`
 script runs without errors. Please report to
 [Issues](https://github.com/invoke-ai/InvokeAI/issues) what you were able to do
 to work around the problem so that others can benefit from your investigation.
+
+#### Conda fails with the error "CONDASSLError: OpenSSL appears to be unavailable"
+
+The verified solution from https://github.com/conda/conda/issues/11795 is:
+
+Copy `libcrypto-1_1-x64.dll` and `libssl-1_1-x64.dll` from `C:\Users\username\miniconda3\Library\bin`
+to `C:\Users\username\miniconda3\DLLs`
 
 ### Create Conda Environment fails on MacOS
 
