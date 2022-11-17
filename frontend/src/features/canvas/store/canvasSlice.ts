@@ -8,10 +8,8 @@ import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
-import {
-  canvasExtraReducers,
-  setInitialCanvasImage_reducer,
-} from './canvasExtraReducers';
+import { canvasExtraReducers } from './reducers/extraReducers';
+import { setInitialCanvasImage as setInitialCanvasImage_reducer } from './reducers/setInitialCanvasImage';
 import calculateScale from '../util/calculateScale';
 import calculateCoordinates from '../util/calculateCoordinates';
 import floorCoordinates from '../util/floorCoordinates';
