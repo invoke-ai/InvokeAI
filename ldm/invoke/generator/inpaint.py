@@ -17,6 +17,16 @@ from ldm.models.diffusion.ddim     import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.invoke.generator.base import downsampling
 from ldm.util import debug_image
+from patchmatch import patch_match
+
+
+infill_methods: list[str] = list()
+
+if patch_match.patchmatch_available:
+    infill_methods.append('patchmatch')
+
+infill_methods.append('tile')
+
 
 class Inpaint(Img2Img):
     def __init__(self, model, precision):
@@ -43,17 +53,23 @@ class Inpaint(Img2Img):
             writeable=False
         )
 
+    def infill_patchmatch(self, im: Image.Image) -> Image:        
+        if im.mode != 'RGBA':
+            return im
+
+        # Skip patchmatch if patchmatch isn't available
+        if not patch_match.patchmatch_available:
+            return im
+
+        # Patchmatch (note, we may want to expose patch_size? Increasing it significantly impacts performance though)
+        im_patched_np = patch_match.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
+        im_patched = Image.fromarray(im_patched_np, mode = 'RGB')
+        return im_patched
+
     def tile_fill_missing(self, im: Image.Image, tile_size: int = 16, seed: int = None) -> Image:
         # Only fill if there's an alpha layer
         if im.mode != 'RGBA':
             return im
-
-        # # HACK PATCH MATCH
-        # from src.PyPatchMatch import patch_match
-        # im_patched_np = patch_match.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
-        # im_patched = Image.fromarray(im_patched_np, mode = 'RGB')
-        # return im_patched
-        # # /HACK
 
         a = np.asarray(im, dtype=np.uint8)
 
@@ -161,6 +177,7 @@ class Inpaint(Img2Img):
                        tile_size: int = 32,
                        step_callback=None,
                        inpaint_replace=False, enable_image_debugging=False,
+                       infill_method = infill_methods[0], # The infill method to use
                        **kwargs):
         """
         Returns a function returning an image derived from the prompt and
@@ -173,13 +190,15 @@ class Inpaint(Img2Img):
         if isinstance(init_image, PIL.Image.Image):
             self.pil_image = init_image.copy()
 
-            # Fill missing areas of original image
-            init_filled = self.tile_fill_missing(
-                self.pil_image.copy(),
-                seed = self.seed if (self.seed is not None
-                                     and self.seed >= 0) else self.new_seed(),
-                tile_size = tile_size
-            )
+            # Do infill
+            if infill_method == 'patchmatch' and patch_match.patchmatch_available:
+                init_filled = self.infill_patchmatch(self.pil_image.copy())
+            else: # if infill_method == 'tile': # Only two methods right now, so always use 'tile' if not patchmatch
+                init_filled = self.tile_fill_missing(
+                    self.pil_image.copy(),
+                    seed = self.seed,
+                    tile_size = tile_size
+                )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
             debug_image(init_filled, "init_filled", debug_status=self.enable_image_debugging)
             

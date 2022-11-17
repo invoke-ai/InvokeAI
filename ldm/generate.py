@@ -263,6 +263,8 @@ class Generate:
         ), 'call to img2img() must include the init_img argument'
         return self.prompt2png(prompt, outdir, **kwargs)
 
+    from ldm.invoke.generator.inpaint import infill_methods
+
     def prompt2image(
             self,
             # these are common
@@ -323,8 +325,10 @@ class Generate:
             seam_strength: float = 0.7,
             seam_steps: int  = 10,
             tile_size: int   = 32,
+            infill_method = infill_methods[0], # The infill method to use
             force_outpaint: bool = False,
             enable_image_debugging = False,
+            
             **args,
     ):   # eat up additional cruft
         """
@@ -505,6 +509,7 @@ class Generate:
                 seam_strength = seam_strength,
                 seam_steps = seam_steps,
                 tile_size = tile_size,
+                infill_method = infill_method,
                 force_outpaint = force_outpaint,
                 inpaint_height = inpaint_height,
                 inpaint_width = inpaint_width,
