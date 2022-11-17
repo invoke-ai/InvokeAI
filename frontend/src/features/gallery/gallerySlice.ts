@@ -6,8 +6,6 @@ import { IRect } from 'konva/lib/types';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
 import { mergeAndUploadCanvas } from 'features/canvas/util/mergeAndUploadCanvas';
 import { uploadImage } from './util/uploadImage';
-import { setInitialImage } from 'features/options/optionsSlice';
-import { setImageToInpaint } from 'features/canvas/canvasSlice';
 
 export type GalleryCategory = 'user' | 'result';
 

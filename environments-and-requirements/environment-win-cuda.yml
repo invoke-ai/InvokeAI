@@ -44,4 +44,5 @@ dependencies:
     - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
     - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
     - git+https://github.com/invoke-ai/GFPGAN#egg=gfpgan
+    - git+https://github.com/invoke-ai/PyPatchMatch@0.1.1#egg=pypatchmatch
     - -e .
