@@ -11,13 +11,15 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
   initialCanvasImageSelector,
   canvasSelector,
+  shouldLockToInitialImageSelector,
+} from 'features/canvas/store/canvasSelectors';
+import {
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setIsMouseOverBoundingBox,
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
-  shouldLockToInitialImageSelector,
-} from 'features/canvas/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { GroupConfig } from 'konva/lib/Group';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
 

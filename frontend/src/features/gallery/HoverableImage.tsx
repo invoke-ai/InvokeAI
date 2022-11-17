@@ -26,7 +26,7 @@ import {
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
   setShouldLockToInitialImage,
-} from 'features/canvas/canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
 interface HoverableImageProps {

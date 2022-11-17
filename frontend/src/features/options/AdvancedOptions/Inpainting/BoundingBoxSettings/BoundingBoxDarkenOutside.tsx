@@ -1,11 +1,9 @@
 import React from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAICheckbox from 'common/components/IAICheckbox';
-import {
-  canvasSelector,
-  setShouldDarkenOutsideBoundingBox,
-} from 'features/canvas/canvasSlice';
+import { setShouldDarkenOutsideBoundingBox } from 'features/canvas/store/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 const selector = createSelector(
   canvasSelector,

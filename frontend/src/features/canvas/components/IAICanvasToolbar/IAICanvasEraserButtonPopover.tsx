@@ -1,10 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  canvasSelector,
-  isStagingSelector,
   setEraserSize,
   setTool,
-} from './canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -13,6 +11,7 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],

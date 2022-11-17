@@ -19,7 +19,7 @@ import {
 import ImageToImageWorkarea from './ImageToImage';
 import TextToImageWorkarea from './TextToImage';
 import Lightbox from 'features/lightbox/Lightbox';
-import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
 import { setShouldShowGallery } from 'features/gallery/gallerySlice';
 import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';

@@ -5,7 +5,7 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { OptionsState } from 'features/options/optionsSlice';
 import { SystemState } from 'features/system/systemSlice';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
-import { initialCanvasImageSelector } from 'features/canvas/canvasSlice';
+import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
 
 export const readinessSelector = createSelector(
   [

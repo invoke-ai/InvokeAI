@@ -37,7 +37,7 @@ import {
   requestNewImages,
   requestSystemConfig,
 } from './actions';
-import { addImageToStagingArea } from 'features/canvas/canvasSlice';
+import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import { tabMap } from 'features/tabs/InvokeTabs';
 
 /**

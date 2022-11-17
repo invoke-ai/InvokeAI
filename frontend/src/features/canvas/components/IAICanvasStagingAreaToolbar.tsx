@@ -21,13 +21,13 @@ import {
   FaEyeSlash,
   FaTrash,
 } from 'react-icons/fa';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   commitStagingAreaImage,
-  canvasSelector,
   discardStagedImages,
   nextStagingAreaImage,
   prevStagingAreaImage,
-} from './canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 
 const selector = createSelector(
   [canvasSelector],

@@ -5,9 +5,9 @@ import { SystemState } from 'features/system/systemSlice';
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
-import { CanvasState, isCanvasMaskLine } from 'features/canvas/canvasSlice';
+import { CanvasState, isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
 import generateMask from 'features/canvas/util/generateMask';
-import { canvasImageLayerRef } from 'features/canvas/IAICanvas';
+import { canvasImageLayerRef } from 'features/canvas/components/IAICanvas';
 import openBase64ImageInTab from './openBase64ImageInTab';
 
 export type FrontendToBackendParametersConfig = {

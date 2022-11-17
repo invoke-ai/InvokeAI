@@ -10,7 +10,7 @@ import {
   OptionsState,
   setShowDualDisplay,
 } from 'features/options/optionsSlice';
-import { setDoesCanvasNeedScaling } from 'features/canvas/canvasSlice';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 
 const workareaSelector = createSelector(
   [(state: RootState) => state.options, activeTabNameSelector],

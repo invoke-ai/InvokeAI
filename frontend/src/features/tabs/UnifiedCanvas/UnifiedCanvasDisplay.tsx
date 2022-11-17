@@ -1,16 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
 // import IAICanvas from 'features/canvas/IAICanvas';
-import IAICanvasResizer from 'features/canvas/IAICanvasResizer';
+import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
 import _ from 'lodash';
 import { useLayoutEffect } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import ImageUploadButton from 'common/components/ImageUploaderButton';
-import {
-  canvasSelector,
-  setDoesCanvasNeedScaling,
-} from 'features/canvas/canvasSlice';
-import IAICanvas from 'features/canvas/IAICanvas';
-import IAICanvasOutpaintingControls from 'features/canvas/IAICanvasOutpaintingControls';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import IAICanvas from 'features/canvas/components/IAICanvas';
+import IAICanvasOutpaintingControls from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 const selector = createSelector(
   [canvasSelector],

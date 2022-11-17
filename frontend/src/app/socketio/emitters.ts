@@ -13,14 +13,12 @@ import {
 import { OptionsState } from 'features/options/optionsSlice';
 import {
   addLogEntry,
-  errorOccurred,
   modelChangeRequested,
   setIsProcessing,
 } from 'features/system/systemSlice';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
 import * as InvokeAI from 'app/invokeai';
 import { RootState } from 'app/store';
-import { initialCanvasImageSelector } from 'features/canvas/canvasSlice';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -71,8 +69,8 @@ const makeSocketIOEmitters = (
       //   }
 
       //   frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
-      // } else 
-      
+      // } else
+
       if (!['txt2img', 'img2img'].includes(generationMode)) {
         if (!galleryState.currentImage?.url) return;
 

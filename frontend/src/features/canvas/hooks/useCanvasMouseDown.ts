@@ -5,13 +5,12 @@ import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
+import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   addLine,
-  canvasSelector,
-  isStagingSelector,
   setIsDrawing,
   setIsMovingStage,
-} from '../canvasSlice';
+} from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(

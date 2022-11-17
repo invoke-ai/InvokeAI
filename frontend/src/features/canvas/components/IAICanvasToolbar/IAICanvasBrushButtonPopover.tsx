@@ -1,11 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import {
-  canvasSelector,
-  isStagingSelector,
-  setBrushColor,
-  setBrushSize,
-  setTool,
-} from './canvasSlice';
+import { setBrushColor, setBrushSize, setTool } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -14,6 +8,7 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAISlider from 'common/components/IAISlider';
 import { Flex } from '@chakra-ui/react';
+import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],

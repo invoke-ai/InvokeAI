@@ -2,9 +2,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import { RectConfig } from 'konva/lib/shapes/Rect';
 import { Rect } from 'react-konva';
-import { canvasSelector } from './canvasSlice';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
-import { rgbaColorToString } from './util/colorToString';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
 
