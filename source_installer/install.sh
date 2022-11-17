@@ -95,7 +95,7 @@ source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains abou
 
 conda activate
 if [ "$OS_NAME" == "mac" ]; then
-    echo "Macintosh system detected. Installing MPS and CPU support."
+    echo "macOS detected. Installing MPS and CPU support."
     ln -sf environments-and-requirements/environment-mac.yml environment.yml
 else
     if (lsmod | grep amdgpu) &>/dev/null ; then
