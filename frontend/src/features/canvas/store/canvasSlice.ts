@@ -4,7 +4,10 @@ import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 import * as InvokeAI from 'app/invokeai';
 import _ from 'lodash';
-import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import {
+  roundDownToMultiple,
+  roundToMultiple,
+} from 'common/util/roundDownToMultiple';
 import {
   canvasExtraReducers,
   setInitialCanvasImage_reducer,
@@ -498,6 +501,44 @@ export const canvasSlice = createSlice({
     setShouldLockToInitialImage: (state, action: PayloadAction<boolean>) => {
       state.shouldLockToInitialImage = action.payload;
     },
+    fitBoundingBoxToStage: (state) => {
+      const { boundingBoxDimensions, boundingBoxCoordinates, stageDimensions } =
+        state;
+
+      if (
+        boundingBoxCoordinates.x < 0 ||
+        boundingBoxCoordinates.x + boundingBoxDimensions.width >
+          stageDimensions.width ||
+        boundingBoxCoordinates.y < 0 ||
+        boundingBoxCoordinates.y + boundingBoxDimensions.height >
+          stageDimensions.height
+      ) {
+        const newBoundingBoxDimensions = {
+          width: roundDownToMultiple(
+            _.clamp(stageDimensions.width, 64, 512),
+            64
+          ),
+          height: roundDownToMultiple(
+            _.clamp(stageDimensions.height, 64, 512),
+            64
+          ),
+        };
+
+        const newBoundingBoxCoordinates = {
+          x: roundToMultiple(
+            stageDimensions.width / 2 - newBoundingBoxDimensions.width / 2,
+            64
+          ),
+          y: roundToMultiple(
+            stageDimensions.height / 2 - newBoundingBoxDimensions.height / 2,
+            64
+          ),
+        };
+
+        state.boundingBoxDimensions = newBoundingBoxDimensions;
+        state.boundingBoxCoordinates = newBoundingBoxCoordinates;
+      }
+    },
   },
   extraReducers: canvasExtraReducers,
 });
@@ -558,6 +599,7 @@ export const {
   resizeCanvas,
   resetCanvasView,
   setCanvasContainerDimensions,
+  fitBoundingBoxToStage,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
