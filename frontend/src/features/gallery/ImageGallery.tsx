@@ -1,7 +1,13 @@
 import { Button } from '@chakra-ui/button';
 import { NumberSize, Resizable } from 're-resizable';
 
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
@@ -66,7 +72,7 @@ export default function ImageGallery() {
     galleryWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!shouldPinGallery) return;
 
     if (isLightBoxOpen) {
@@ -91,10 +97,9 @@ export default function ImageGallery() {
       );
       setGalleryMaxWidth(590);
     }
-    setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
   }, [dispatch, activeTabName, shouldPinGallery, galleryWidth, isLightBoxOpen]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!shouldPinGallery) {
       setGalleryMaxWidth(window.innerWidth);
     }
@@ -119,7 +124,6 @@ export default function ImageGallery() {
   };
 
   const handleCloseGallery = () => {
-    // if (shouldPinGallery) return;
     dispatch(setShouldShowGallery(false));
     dispatch(
       setGalleryScrollPosition(
@@ -127,7 +131,6 @@ export default function ImageGallery() {
       )
     );
     dispatch(setShouldHoldGalleryOpen(false));
-    // dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleClickLoadMore = () => {
@@ -151,8 +154,6 @@ export default function ImageGallery() {
     'g',
     () => {
       handleToggleGallery();
-      shouldPinGallery &&
-        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
     },
     [shouldShowGallery, shouldPinGallery]
   );
@@ -169,7 +170,6 @@ export default function ImageGallery() {
     'shift+g',
     () => {
       handleSetShouldPinGallery();
-      dispatch(setDoesCanvasNeedScaling(true));
     },
     [shouldPinGallery]
   );
