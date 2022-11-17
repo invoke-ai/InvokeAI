@@ -6,6 +6,7 @@ import {
   resetCanvasView,
   setShouldLockToInitialImage,
   setTool,
+  fitBoundingBoxToStage,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
@@ -30,7 +31,10 @@ import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
 import { mergeAndUploadCanvas } from 'features/canvas/util/mergeAndUploadCanvas';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { ChangeEvent } from 'react';
-import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -59,6 +63,7 @@ const IAICanvasOutpaintingControls = () => {
   ) => {
     dispatch(setShouldLockToInitialImage(e.target.checked));
     dispatch(resizeAndScaleCanvas());
+    dispatch(fitBoundingBoxToStage());
   };
 
   return (
