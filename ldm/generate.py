@@ -288,8 +288,9 @@ class Generate:
             strength         = None,
             init_color       = None,
             # these are specific to embiggen (which also relies on img2img args)
-            embiggen       =    None,
-            embiggen_tiles =    None,
+            embiggen          = None,
+            embiggen_tiles    = None,
+            embiggen_strength = None,
             # these are specific to GFPGAN/ESRGAN
             gfpgan_strength=    0,
             facetool         = None,
@@ -344,6 +345,7 @@ class Generate:
            perlin                          // optional 0-1 value to add a percentage of perlin noise to the initial noise
            embiggen                        // scale factor relative to the size of the --init_img (-I), followed by ESRGAN upscaling strength (0-1.0), followed by minimum amount of overlap between tiles as a decimal ratio (0 - 1.0) or number of pixels
            embiggen_tiles                  // list of tiles by number in order to process and replace onto the image e.g. `0 2 4`
+           embiggen_strength               // strength for embiggen. 0.0 preserves image exactly, 1.0 replaces it completely
 
         To use the step callback, define a function that receives two arguments:
         - Image GPU data
@@ -485,6 +487,7 @@ class Generate:
                 perlin=perlin,
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
+                embiggen_strength=embiggen_strength,
                 inpaint_replace=inpaint_replace,
                 mask_blur_radius=mask_blur_radius,
                 safety_checker=checker,
@@ -633,7 +636,7 @@ class Generate:
         elif tool == 'embiggen':
             # fetch the metadata from the image
             generator = self.select_generator(embiggen=True)
-            opt.strength  = 0.40
+            opt.strength = opt.embiggen_strength or 0.40
             print(f'>> Setting img2img strength to {opt.strength} for happy embiggening')
             generator.generate(
                 prompt,
@@ -649,6 +652,7 @@ class Generate:
                 height      = opt.height,
                 embiggen    = opt.embiggen,
                 embiggen_tiles = opt.embiggen_tiles,
+                embiggen_strength = opt.embiggen_strength,
                 image_callback = callback,
             )
         elif tool == 'outpaint':
