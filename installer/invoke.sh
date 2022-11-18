@@ -5,6 +5,10 @@ IFS=$'\n\t'
 
 source .venv/bin/activate
 
+if [ "$(uname -s)" == "Darwin" ]; then
+    export PYTORCH_ENABLE_MPS_FALLBACK=1
+fi
+
 if [ "$0" != "bash" ]; then
     echo "Do you want to generate images using the"
     echo "1. command-line"
