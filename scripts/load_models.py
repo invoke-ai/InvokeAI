@@ -31,7 +31,7 @@ warnings.filterwarnings('ignore')
 import torch
 transformers.logging.set_verbosity_error()
 
-#--------------------------globals--
+#--------------------------globals-----------------------
 Model_dir = 'models'
 Weights_dir = 'ldm/stable-diffusion-v1/'
 Default_config_file = './configs/models.yaml'
@@ -603,9 +603,9 @@ def initialize_rootdir(root:str):
     print(f'Creating a directory named {root} to contain InvokeAI models, configuration files and outputs.')
     print(f'If you move this directory, please change its location using the --root option in "{Globals.initfile},')
     print(f'or set the environment variable INVOKEAI_ROOT to the new location.\n')
-    for name in ('models','configs','outputs','scripts'):
+    for name in ('models','configs','outputs','scripts','frontend/dist'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in ('configs','scripts'):
+    for src in ('configs','scripts','frontend/dist'):
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
@@ -676,7 +676,8 @@ def main():
         introduction()
 
         # We check for this specific file, without which we are toast...
-        if not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
+        if not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
+           or not os.path.exists(os.path.join(Globals.root,'frontend/dist')):
             initialize_rootdir(Globals.root)
 
         if opt.interactive:

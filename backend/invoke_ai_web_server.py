@@ -25,6 +25,8 @@ from backend.modules.parameters import parameters_to_command
 opt = Args()
 args = opt.parse_args()
 
+if not os.path.isabs(args.outdir):
+    args.outdir=os.path.join(args.root_dir,args.outdir)
 
 class InvokeAIWebServer:
     def __init__(self, generate, gfpgan, codeformer, esrgan) -> None:
@@ -63,7 +65,7 @@ class InvokeAIWebServer:
             socketio_args["cors_allowed_origins"] = opt.cors
 
         self.app = Flask(
-            __name__, static_url_path="", static_folder="../frontend/dist/"
+            __name__, static_url_path="", static_folder=os.path.join(args.root_dir,"frontend/dist")
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)

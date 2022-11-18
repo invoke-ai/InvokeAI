@@ -1,22 +1,16 @@
 from setuptools import setup, find_packages
-from setuptools.command.develop import develop
-from setuptools.command.install import install
+import os
 
-class PostDevelopCommand(develop):
-    """Post-installation for development mode."""
-    def run(self):
-        develop.run(self)
-        print('Will now try loading a module (develop)')
-        import ldm.generate
-        print('ldm.generate loaded ok')
+def frontend_files(directory):
+     paths = []
+     for (path, directories, filenames) in os.walk(directory):
+         for filename in filenames:
+             paths.append(os.path.join(path, filename))
+     return paths
 
-class PostInstallCommand(install):
-    """Post-installation for installation mode."""
-    def run(self):
-        install.run(self)
-        print('Will now try loading a module (install)')
-        import ldm.generate
-        print('ldm.generate loaded ok')
+frontend_files = frontend_files('frontend/dist')
+print(f'DEBUG: {frontend_files}')
+
 
 setup(
     name='invoke-ai',
@@ -28,9 +22,7 @@ setup(
         'numpy',
         'tqdm',
     ],
-    cmdclass={
-        'develop': PostDevelopCommand,
-        'install': PostInstallCommand,
-    },
+    scripts = ['scripts/invoke.py','scripts/load_models.py','scripts/sd-metadata.py'],
+    data_files=[('frontend',frontend_files)],
 )
 

@@ -17,7 +17,8 @@ from ldm.invoke.args import Args
 try:
     import readline
     readline_available = True
-except (ImportError,ModuleNotFoundError):
+except (ImportError,ModuleNotFoundError) as e:
+    print(f'** An error occurred when loading the readline module: {str(e)}')
     readline_available = False
 
 IMG_EXTENSIONS     = ('.png','.jpg','.jpeg','.PNG','.JPG','.JPEG','.gif','.GIF')
