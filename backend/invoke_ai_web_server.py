@@ -20,11 +20,12 @@ from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 from backend.modules.parameters import parameters_to_command
 
-
 # Loading Arguments
 opt = Args()
 args = opt.parse_args()
 
+# Set the root directory for static files and relative paths
+args.root_dir = os.path.expanduser(args.root_dir or '..')
 if not os.path.isabs(args.outdir):
     args.outdir=os.path.join(args.root_dir,args.outdir)
 
@@ -64,6 +65,7 @@ class InvokeAIWebServer:
         if opt.cors:
             socketio_args["cors_allowed_origins"] = opt.cors
 
+        print(f'DEBUG: static_folder should be at {os.path.join(args.root_dir,"frontend/dist")}')
         self.app = Flask(
             __name__, static_url_path="", static_folder=os.path.join(args.root_dir,"frontend/dist")
         )

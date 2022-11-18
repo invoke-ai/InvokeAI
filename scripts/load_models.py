@@ -590,11 +590,13 @@ def get_root(root:str=None)->str:
     with open(init_file, 'r') as infile:
         lines = infile.readlines()
         for l in lines:
+            if re.search('\s*#',l): # ignore comments
+                continue
             match = re.search('--root\s*=?\s*"?([^"]+)"?',l)
             if match:
                 root = match.groups()[0]
-
-    return root.strip() or '.'
+    root = root or '.'
+    return root.strip()
 
 #-------------------------------------
 def initialize_rootdir(root:str):
@@ -675,7 +677,9 @@ def main():
     try:
         introduction()
 
-        # We check for this specific file, without which we are toast...
+        # We check for two files to see if the runtime directory is correctly initialized.
+        # 1. a key stable diffusion config file
+        # 2. the web front end static files
         if not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
            or not os.path.exists(os.path.join(Globals.root,'frontend/dist')):
             initialize_rootdir(Globals.root)
