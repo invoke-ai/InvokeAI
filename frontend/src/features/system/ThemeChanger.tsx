@@ -22,7 +22,6 @@ export default function ThemeChanger() {
     <IAISelect
       validValues={THEMES}
       value={currentTheme}
-      defaultValue={currentTheme}
       onChange={themeChangeHandler}
       styleClass="theme-changer-dropdown"
     ></IAISelect>
