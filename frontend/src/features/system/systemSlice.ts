@@ -175,6 +175,16 @@ export const systemSlice = createSlice({
       state.currentStatusHasSteps = false;
       state.currentStatus = 'Processing canceled';
     },
+    generationRequested: (state) => {
+      state.isProcessing = true;
+      state.isCancelable = true;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.currentIteration = 0;
+      state.totalIterations = 0;
+      state.currentStatusHasSteps = false;
+      state.currentStatus = 'Preparing';
+    },
     setModelList: (
       state,
       action: PayloadAction<InvokeAI.ModelList | Record<string, never>>
@@ -220,6 +230,7 @@ export const {
   modelChangeRequested,
   setSaveIntermediatesInterval,
   setEnableImageDebugging,
+  generationRequested,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

@@ -13,7 +13,9 @@ import {
 import { OptionsState } from 'features/options/optionsSlice';
 import {
   addLogEntry,
+  generationRequested,
   modelChangeRequested,
+  setCurrentStatus,
   setIsProcessing,
 } from 'features/system/systemSlice';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
@@ -52,24 +54,7 @@ const makeSocketIOEmitters = (
           systemState,
         };
 
-      // if (generationMode === 'inpainting') {
-      //   const initialCanvasImage = initialCanvasImageSelector(getState());
-      //   const imageUrl = initialCanvasImage?.image.url;
-
-      //   if (!imageUrl) {
-      //     dispatch(
-      //       addLogEntry({
-      //         timestamp: dateFormat(new Date(), 'isoDateTime'),
-      //         message: 'Inpainting image not loaded, cannot generate image.',
-      //         level: 'error',
-      //       })
-      //     );
-      //     dispatch(errorOccurred());
-      //     return;
-      //   }
-
-      //   frontendToBackendParametersConfig.imageToProcessUrl = imageUrl;
-      // } else
+      dispatch(generationRequested());
 
       if (!['txt2img', 'img2img'].includes(generationMode)) {
         if (!galleryState.currentImage?.url) return;
