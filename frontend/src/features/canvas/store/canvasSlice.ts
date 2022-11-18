@@ -394,8 +394,9 @@ export const canvasSlice = createSlice({
         );
 
         state.stageScale = newScale;
-
         state.stageCoordinates = newCoordinates;
+        state.boundingBoxCoordinates = { x: 0, y: 0 };
+        state.boundingBoxDimensions = { width: 512, height: 512 };
         return;
       }
 
@@ -461,6 +462,8 @@ export const canvasSlice = createSlice({
         state.stageScale = newScale;
 
         state.stageCoordinates = newCoordinates;
+        state.boundingBoxCoordinates = { x: 0, y: 0 };
+        state.boundingBoxDimensions = { width: 512, height: 512 };
       }
     },
     resetCanvasView: (
@@ -496,7 +499,6 @@ export const canvasSlice = createSlice({
         );
 
         state.stageScale = newScale;
-
         state.stageCoordinates = newCoordinates;
       } else {
         const newScale = calculateScale(
@@ -518,8 +520,9 @@ export const canvasSlice = createSlice({
         );
 
         state.stageScale = newScale;
-
         state.stageCoordinates = newCoordinates;
+        state.boundingBoxCoordinates = { x: 0, y: 0 };
+        state.boundingBoxDimensions = { width: 512, height: 512 };
       }
     },
     nextStagingAreaImage: (state) => {
