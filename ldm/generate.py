@@ -221,13 +221,14 @@ class Generate:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
+                safety_model_path = os.path.join(Globals.root,'models',safety_model_id)
                 self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id,
                                                                                    local_files_only=True,
-                                                                                   cache_dir=os.path.join(Globals.root,'models',safety_model_id)
+                                                                                   cache_dir=safety_model_path,
                 )
                 self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id,
                                                                                      local_files_only=True,
-                                                                                     cache_dir=os.path.join(Globals.root,'models',safety_model_id)
+                                                                                     cache_dir=safety_model_path,
                 )
                 self.safety_checker.to(self.device)
             except Exception:

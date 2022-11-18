@@ -243,14 +243,15 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         max_length=77,
     ):
         super().__init__()
+        cache = os.path.join(Globals.root,'models',version)
         self.tokenizer = CLIPTokenizer.from_pretrained(
             version,
-            cache_dir=os.path.join(Globals.root,'models',version),
+            cache_dir=cache,
             local_files_only=True
         )
         self.transformer = CLIPTextModel.from_pretrained(
             version,
-            cache_dir=os.path.join(Globals.root,'models',version),
+            cache_dir=cache,
             local_files_only=True
         )
         self.device = device

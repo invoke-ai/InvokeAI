@@ -15,7 +15,7 @@ class GFPGAN():
     ) -> None:
     
         if not os.path.isabs(gfpgan_model_path):
-            gfpgan_model_path=os.path.join(Globals.root,gfpgan_model_path)
+            gfpgan_model_path=os.path.abspath(os.path.join(Globals.root,gfpgan_model_path))
         self.model_path = gfpgan_model_path
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
         

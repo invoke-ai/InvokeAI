@@ -60,7 +60,7 @@ def main():
 
     # normalize the config directory relative to root
     if not os.path.isabs(opt.conf):
-        opt.conf=os.path.normpath(os.path.join(Globals.root,opt.conf))
+        opt.conf = os.path.normpath(os.path.join(Globals.root,opt.conf))
 
     # load the infile as a list of lines
     if opt.infile:
@@ -78,7 +78,7 @@ def main():
     # creating a Generate object:
     try:
         gen = Generate(
-            conf = os.path.join(Globals.root,opt.conf),
+            conf = opt.conf,
             model = opt.model,
             sampler_name = opt.sampler_name,
             embedding_path = opt.embedding_path,
@@ -129,8 +129,6 @@ def main_loop(gen, opt):
     doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
-    if not os.path.isabs(opt.conf):
-        opt.conf = os.path.join(Globals.root,opt.conf)
     model_config = OmegaConf.load(opt.conf)
 
     # The readline completer reads history from the .dream_history file located in the
