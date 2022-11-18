@@ -46,8 +46,6 @@ const IAICanvasResizer = () => {
 
       const { clientWidth, clientHeight } = ref.current;
 
-      if (!initialCanvasImage?.image) return;
-
       dispatch(
         setCanvasContainerDimensions({
           width: clientWidth,
