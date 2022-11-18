@@ -165,20 +165,16 @@ class InvokeAIWebServer:
 
                 pil_image = Image.open(file_path)
 
-                # visible_image_bbox = pil_image.getbbox()
-                # pil_image = pil_image.crop(visible_image_bbox)
-                # pil_image.save(file_path)
-                # if "cropVisible" in data and data["cropVisible"] == True:
-                #     visible_image_bbox = pil_image.getbbox()
-                #     pil_image = pil_image.crop(visible_image_bbox)
-                #     pil_image.save(file_path)
+                if "cropVisible" in data and data["cropVisible"] == True:
+                    visible_image_bbox = pil_image.getbbox()
+                    pil_image = pil_image.crop(visible_image_bbox)
+                    pil_image.save(file_path)
 
                 (width, height) = pil_image.size
 
                 response = {
                     "url": self.get_url_from_image_path(file_path),
                     "mtime": mtime,
-                    # "bbox": visible_image_bbox,
                     "width": width,
                     "height": height,
                 }
@@ -607,6 +603,12 @@ class InvokeAIWebServer:
 
             actual_generation_mode = generation_parameters["generation_mode"]
             original_bounding_box = None
+
+            progress = Progress(generation_parameters=generation_parameters)
+
+            self.socketio.emit("progressUpdate", progress.to_formatted_dict())
+            eventlet.sleep(0)
+
             """
             TODO:
             If a result image is used as an init image, and then deleted, we will want to be
@@ -658,8 +660,6 @@ class InvokeAIWebServer:
                     initial_image, mask_image
                 )
 
-                print(initial_image, mask_image)
-
                 """
                 Apply the mask to the init image, creating a "mask" image with 
                 transparency where inpainting should occur. This is the kind of
@@ -707,11 +707,6 @@ class InvokeAIWebServer:
                 init_img_url = generation_parameters["init_img"]
                 init_img_path = self.get_image_path_from_url(init_img_url)
                 generation_parameters["init_img"] = init_img_path
-
-            progress = Progress(generation_parameters=generation_parameters)
-
-            self.socketio.emit("progressUpdate", progress.to_formatted_dict())
-            eventlet.sleep(0)
 
             def image_progress(sample, step):
                 if self.canceled.is_set():
@@ -967,6 +962,8 @@ class InvokeAIWebServer:
                 eventlet.sleep(0)
 
                 progress.set_current_iteration(progress.current_iteration + 1)
+            
+            print(generation_parameters)
 
             self.generate.prompt2image(
                 **generation_parameters,

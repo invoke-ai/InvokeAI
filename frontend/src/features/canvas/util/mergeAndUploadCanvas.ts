@@ -5,17 +5,28 @@ import { MutableRefObject } from 'react';
 import * as InvokeAI from 'app/invokeai';
 import { v4 as uuidv4 } from 'uuid';
 import layerToDataURL from './layerToDataURL';
+import downloadFile from './downloadFile';
+import copyImage from './copyImage';
 
 export const mergeAndUploadCanvas = createAsyncThunk(
   'canvas/mergeAndUploadCanvas',
   async (
     args: {
       canvasImageLayerRef: MutableRefObject<Konva.Layer | null>;
-      saveToGallery: boolean;
+      cropVisible?: boolean;
+      saveToGallery?: boolean;
+      downloadAfterSaving?: boolean;
+      copyAfterSaving?: boolean;
     },
     thunkAPI
   ) => {
-    const { canvasImageLayerRef, saveToGallery } = args;
+    const {
+      canvasImageLayerRef,
+      saveToGallery,
+      downloadAfterSaving,
+      cropVisible,
+      copyAfterSaving,
+    } = args;
 
     const { getState } = thunkAPI;
 
@@ -40,7 +51,7 @@ export const mergeAndUploadCanvas = createAsyncThunk(
         dataURL,
         filename: 'merged_canvas.png',
         kind: saveToGallery ? 'result' : 'temp',
-        cropVisible: saveToGallery,
+        cropVisible,
       })
     );
 
@@ -52,12 +63,15 @@ export const mergeAndUploadCanvas = createAsyncThunk(
     const { url, mtime, width, height } =
       (await response.json()) as InvokeAI.ImageUploadResponse;
 
-    // const newBoundingBox = {
-    //   x: bbox[0],
-    //   y: bbox[1],
-    //   width: bbox[2],
-    //   height: bbox[3],
-    // };
+    if (downloadAfterSaving) {
+      downloadFile(url);
+      return;
+    }
+
+    if (copyAfterSaving) {
+      copyImage(url, width, height);
+      return;
+    }
 
     const newImage: InvokeAI.Image = {
       uuid: uuidv4(),
@@ -72,7 +86,6 @@ export const mergeAndUploadCanvas = createAsyncThunk(
       image: newImage,
       kind: saveToGallery ? 'merged_canvas' : 'temp_merged_canvas',
       originalBoundingBox,
-      // newBoundingBox,
     };
   }
 );

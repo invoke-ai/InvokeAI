@@ -78,7 +78,6 @@ const IAICanvasOutpaintingControls = () => {
             dispatch(
               mergeAndUploadCanvas({
                 canvasImageLayerRef,
-                saveToGallery: false,
               })
             );
           }}
@@ -89,7 +88,11 @@ const IAICanvasOutpaintingControls = () => {
           icon={<FaSave />}
           onClick={() => {
             dispatch(
-              mergeAndUploadCanvas({ canvasImageLayerRef, saveToGallery: true })
+              mergeAndUploadCanvas({
+                canvasImageLayerRef,
+                cropVisible: true,
+                saveToGallery: true,
+              })
             );
           }}
         />
@@ -97,11 +100,29 @@ const IAICanvasOutpaintingControls = () => {
           aria-label="Copy Selection"
           tooltip="Copy Selection"
           icon={<FaCopy />}
+          onClick={() => {
+            dispatch(
+              mergeAndUploadCanvas({
+                canvasImageLayerRef,
+                cropVisible: true,
+                copyAfterSaving: true,
+              })
+            );
+          }}
         />
         <IAIIconButton
           aria-label="Download Selection"
           tooltip="Download Selection"
           icon={<FaDownload />}
+          onClick={() => {
+            dispatch(
+              mergeAndUploadCanvas({
+                canvasImageLayerRef,
+                cropVisible: true,
+                downloadAfterSaving: true,
+              })
+            );
+          }}
         />
       </ButtonGroup>
       <ButtonGroup isAttached>
