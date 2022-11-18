@@ -1,18 +1,16 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
-import Konva from 'konva';
-import { MutableRefObject } from 'react';
 import * as InvokeAI from 'app/invokeai';
 import { v4 as uuidv4 } from 'uuid';
 import layerToDataURL from './layerToDataURL';
 import downloadFile from './downloadFile';
 import copyImage from './copyImage';
+import { getCanvasBaseLayer } from './konvaInstanceProvider';
 
 export const mergeAndUploadCanvas = createAsyncThunk(
   'canvas/mergeAndUploadCanvas',
   async (
     args: {
-      canvasImageLayerRef: MutableRefObject<Konva.Layer | null>;
       cropVisible?: boolean;
       saveToGallery?: boolean;
       downloadAfterSaving?: boolean;
@@ -20,13 +18,8 @@ export const mergeAndUploadCanvas = createAsyncThunk(
     },
     thunkAPI
   ) => {
-    const {
-      canvasImageLayerRef,
-      saveToGallery,
-      downloadAfterSaving,
-      cropVisible,
-      copyAfterSaving,
-    } = args;
+    const { saveToGallery, downloadAfterSaving, cropVisible, copyAfterSaving } =
+      args;
 
     const { getState } = thunkAPI;
 
@@ -34,10 +27,12 @@ export const mergeAndUploadCanvas = createAsyncThunk(
 
     const stageScale = state.canvas.stageScale;
 
-    if (!canvasImageLayerRef.current) return;
+    const canvasBaseLayer = getCanvasBaseLayer();
+
+    if (!canvasBaseLayer) return;
 
     const { dataURL, boundingBox: originalBoundingBox } = layerToDataURL(
-      canvasImageLayerRef.current,
+      canvasBaseLayer,
       stageScale
     );
 

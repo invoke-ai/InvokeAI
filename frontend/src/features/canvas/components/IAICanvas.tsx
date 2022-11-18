@@ -1,7 +1,6 @@
-import { MutableRefObject, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import Konva from 'konva';
 import { Layer, Stage } from 'react-konva';
-import { Stage as StageType } from 'konva/lib/Stage';
 import { useAppSelector } from 'app/store';
 import {
   canvasSelector,
@@ -28,6 +27,10 @@ import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasStatusText from './IAICanvasStatusText';
 import IAICanvasStagingArea from './IAICanvasStagingArea';
 import IAICanvasStagingAreaToolbar from './IAICanvasStagingAreaToolbar';
+import {
+  setCanvasBaseLayer,
+  setCanvasStage,
+} from '../util/konvaInstanceProvider';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -84,10 +87,6 @@ const selector = createSelector(
   }
 );
 
-// Use a closure allow other components to use these things... not ideal...
-export let stageRef: MutableRefObject<StageType | null>;
-export let canvasImageLayerRef: MutableRefObject<Konva.Layer | null>;
-
 const IAICanvas = () => {
   const {
     isMaskEnabled,
@@ -104,9 +103,18 @@ const IAICanvas = () => {
   } = useAppSelector(selector);
   useCanvasHotkeys();
 
-  // set the closure'd refs
-  stageRef = useRef<StageType>(null);
-  canvasImageLayerRef = useRef<Konva.Layer>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const canvasBaseLayerRef = useRef<Konva.Layer | null>(null);
+
+  const canvasStageRefCallback = useCallback((el: Konva.Stage) => {
+    setCanvasStage(el as Konva.Stage);
+    stageRef.current = el;
+  }, []);
+
+  const canvasBaseLayerRefCallback = useCallback((el: Konva.Layer) => {
+    setCanvasBaseLayer(el as Konva.Layer);
+    canvasBaseLayerRef.current = el;
+  }, []);
 
   const lastCursorPositionRef = useRef<Vector2d>({ x: 0, y: 0 });
 
@@ -131,7 +139,7 @@ const IAICanvas = () => {
       <div className="inpainting-canvas-wrapper">
         <Stage
           tabIndex={-1}
-          ref={stageRef}
+          ref={canvasStageRefCallback}
           className={'inpainting-canvas-stage'}
           style={{
             ...(stageCursor ? { cursor: stageCursor } : {}),
@@ -160,7 +168,7 @@ const IAICanvas = () => {
 
           <Layer
             id={'base'}
-            ref={canvasImageLayerRef}
+            ref={canvasBaseLayerRefCallback}
             listening={false}
             imageSmoothingEnabled={false}
           >

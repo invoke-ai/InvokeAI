@@ -135,11 +135,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       desc: 'Decreases gallery thumbnails size',
       hotkey: 'Shift+Down',
     },
-    {
-      title: 'Reset Gallery Image Size',
-      desc: 'Resets image gallery size',
-      hotkey: 'Shift+R',
-    },
   ];
 
   const unifiedCanvasHotkeys = [

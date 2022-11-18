@@ -246,20 +246,6 @@ export default function ImageGallery() {
     [galleryImageMinimumWidth]
   );
 
-  useHotkeys(
-    'shift+r',
-    () => {
-      dispatch(setGalleryImageMinimumWidth(64));
-      toast({
-        title: `Reset Gallery Image Size`,
-        status: 'success',
-        duration: 2500,
-        isClosable: true,
-      });
-    },
-    [galleryImageMinimumWidth]
-  );
-
   // set gallery scroll position
   useEffect(() => {
     if (!galleryContainerRef.current) return;
