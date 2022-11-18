@@ -23,10 +23,13 @@ import {
 import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import {
+  resetCanvasView,
+  resizeAndScaleCanvas,
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
+import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -99,7 +102,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
     dispatch(setInitialCanvasImage(image));
-    dispatch(setDoesCanvasNeedScaling(true));
+
+    dispatch(resizeAndScaleCanvas());
 
     if (activeTabName !== 'unifiedCanvas') {
       dispatch(setActiveTab('unifiedCanvas'));

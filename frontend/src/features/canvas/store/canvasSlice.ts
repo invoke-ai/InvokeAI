@@ -369,51 +369,6 @@ export const canvasSlice = createSlice({
       const initialCanvasImage =
         state.layerState.objects.find(isCanvasBaseImage);
 
-      if (!initialCanvasImage) return;
-
-      const { width: imageWidth, height: imageHeight } = initialCanvasImage;
-
-      const padding = 0.95;
-
-      const newScale = calculateScale(
-        containerWidth,
-        containerHeight,
-        imageWidth,
-        imageHeight,
-        padding
-      );
-
-      const newDimensions = {
-        width: Math.floor(containerWidth),
-        height: Math.floor(containerHeight),
-      };
-
-      const newCoordinates = calculateCoordinates(
-        newDimensions.width,
-        newDimensions.height,
-        0,
-        0,
-        imageWidth,
-        imageHeight,
-        newScale
-      );
-
-      if (!_.isEqual(state.stageDimensions, newDimensions)) {
-        state.minimumStageScale = newScale;
-        state.stageScale = newScale;
-        state.stageCoordinates = floorCoordinates(newCoordinates);
-        state.stageDimensions = newDimensions;
-      }
-
-      state.isCanvasInitialized = true;
-    },
-    resizeCanvas: (state) => {
-      const { width: containerWidth, height: containerHeight } =
-        state.canvasContainerDimensions;
-
-      const initialCanvasImage =
-        state.layerState.objects.find(isCanvasBaseImage);
-
       const newStageDimensions = {
         width: Math.floor(containerWidth),
         height: Math.floor(containerHeight),
@@ -441,9 +396,72 @@ export const canvasSlice = createSlice({
         state.stageScale = newScale;
 
         state.stageCoordinates = newCoordinates;
+        return;
       }
 
+      const { width: imageWidth, height: imageHeight } = initialCanvasImage;
+
+      const padding = 0.95;
+
+      const newScale = calculateScale(
+        containerWidth,
+        containerHeight,
+        imageWidth,
+        imageHeight,
+        padding
+      );
+
+      const newCoordinates = calculateCoordinates(
+        newStageDimensions.width,
+        newStageDimensions.height,
+        0,
+        0,
+        imageWidth,
+        imageHeight,
+        newScale
+      );
+
+      state.minimumStageScale = newScale;
+      state.stageScale = newScale;
+      state.stageCoordinates = floorCoordinates(newCoordinates);
       state.stageDimensions = newStageDimensions;
+
+      state.isCanvasInitialized = true;
+    },
+    resizeCanvas: (state) => {
+      const { width: containerWidth, height: containerHeight } =
+        state.canvasContainerDimensions;
+
+      const newStageDimensions = {
+        width: Math.floor(containerWidth),
+        height: Math.floor(containerHeight),
+      };
+
+      state.stageDimensions = newStageDimensions;
+
+      if (!state.layerState.objects.find(isCanvasBaseImage)) {
+        const newScale = calculateScale(
+          newStageDimensions.width,
+          newStageDimensions.height,
+          512,
+          512,
+          STAGE_PADDING_PERCENTAGE
+        );
+
+        const newCoordinates = calculateCoordinates(
+          newStageDimensions.width,
+          newStageDimensions.height,
+          0,
+          0,
+          512,
+          512,
+          newScale
+        );
+
+        state.stageScale = newScale;
+
+        state.stageCoordinates = newCoordinates;
+      }
     },
     resetCanvasView: (
       state,
@@ -452,38 +470,57 @@ export const canvasSlice = createSlice({
       }>
     ) => {
       const { contentRect } = action.payload;
-
-      const baseCanvasImage = state.layerState.objects.find(isCanvasBaseImage);
-
-      if (!baseCanvasImage) return;
-
       const {
         stageDimensions: { width: stageWidth, height: stageHeight },
       } = state;
 
       const { x, y, width, height } = contentRect;
 
-      const newScale = calculateScale(
-        stageWidth,
-        stageHeight,
-        width,
-        height,
-        STAGE_PADDING_PERCENTAGE
-      );
+      if (width !== 0 && height !== 0) {
+        const newScale = calculateScale(
+          stageWidth,
+          stageHeight,
+          width,
+          height,
+          STAGE_PADDING_PERCENTAGE
+        );
 
-      const newCoordinates = calculateCoordinates(
-        stageWidth,
-        stageHeight,
-        x,
-        y,
-        width,
-        height,
-        newScale
-      );
+        const newCoordinates = calculateCoordinates(
+          stageWidth,
+          stageHeight,
+          x,
+          y,
+          width,
+          height,
+          newScale
+        );
 
-      state.stageScale = newScale;
+        state.stageScale = newScale;
 
-      state.stageCoordinates = newCoordinates;
+        state.stageCoordinates = newCoordinates;
+      } else {
+        const newScale = calculateScale(
+          stageWidth,
+          stageHeight,
+          512,
+          512,
+          STAGE_PADDING_PERCENTAGE
+        );
+
+        const newCoordinates = calculateCoordinates(
+          stageWidth,
+          stageHeight,
+          0,
+          0,
+          512,
+          512,
+          newScale
+        );
+
+        state.stageScale = newScale;
+
+        state.stageCoordinates = newCoordinates;
+      }
     },
     nextStagingAreaImage: (state) => {
       const currentIndex = state.layerState.stagingArea.selectedImageIndex;
