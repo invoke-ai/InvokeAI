@@ -27,3 +27,6 @@ export const mayGenerateMultipleImagesSelector = createSelector(
     },
   }
 );
+
+export const optionsSelector = (state: RootState): OptionsState =>
+  state.options;
