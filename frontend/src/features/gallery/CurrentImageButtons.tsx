@@ -38,7 +38,6 @@ import {
 import {
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
-  setShouldLockToInitialImage,
 } from 'features/canvas/store/canvasSlice';
 import { GalleryState } from './gallerySlice';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
@@ -317,31 +316,10 @@ const CurrentImageButtons = () => {
   const handleClickShowImageDetails = () =>
     dispatch(setShouldShowImageDetails(!shouldShowImageDetails));
 
-  const handleSendToInpainting = () => {
+  const handleSendToCanvas = () => {
     if (!currentImage) return;
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
-    dispatch(setShouldLockToInitialImage(true));
-    dispatch(setInitialCanvasImage(currentImage));
-    dispatch(setDoesCanvasNeedScaling(true));
-
-    if (activeTabName !== 'unifiedCanvas') {
-      dispatch(setActiveTab('unifiedCanvas'));
-    }
-
-    toast({
-      title: 'Sent to Unified Canvas',
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
-  };
-
-  const handleSendToOutpainting = () => {
-    if (!currentImage) return;
-    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
-
-    dispatch(setShouldLockToInitialImage(false));
     dispatch(setInitialCanvasImage(currentImage));
     dispatch(setDoesCanvasNeedScaling(true));
 
@@ -393,17 +371,10 @@ const CurrentImageButtons = () => {
             </IAIButton>
             <IAIButton
               size={'sm'}
-              onClick={handleSendToInpainting}
+              onClick={handleSendToCanvas}
               leftIcon={<FaShare />}
             >
-              Send to Inpainting
-            </IAIButton>
-            <IAIButton
-              size={'sm'}
-              onClick={handleSendToOutpainting}
-              leftIcon={<FaShare />}
-            >
-              Send to Outpainting
+              Send to Unified Canvas
             </IAIButton>
             <IAIButton
               size={'sm'}

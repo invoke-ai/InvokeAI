@@ -25,7 +25,6 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import {
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
-  setShouldLockToInitialImage,
 } from 'features/canvas/store/canvasSlice';
 import { hoverableImageSelector } from './gallerySliceSelectors';
 
@@ -96,10 +95,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     });
   };
 
-  const handleSendToInpainting = () => {
+  const handleSendToCanvas = () => {
     if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
 
-    dispatch(setShouldLockToInitialImage(true));
     dispatch(setInitialCanvasImage(image));
     dispatch(setDoesCanvasNeedScaling(true));
 
@@ -108,26 +106,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     }
 
     toast({
-      title: 'Sent to Inpainting',
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
-  };
-
-  const handleSendToOutpainting = () => {
-    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
-
-    dispatch(setShouldLockToInitialImage(false));
-    dispatch(setInitialCanvasImage(image));
-    dispatch(setDoesCanvasNeedScaling(true));
-
-    if (activeTabName !== 'unifiedCanvas') {
-      dispatch(setActiveTab('unifiedCanvas'));
-    }
-
-    toast({
-      title: 'Sent to Outpainting',
+      title: 'Sent to Unified Canvas',
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -257,11 +236,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
           Send to Image To Image
         </ContextMenu.Item>
-        <ContextMenu.Item onClickCapture={handleSendToInpainting}>
-          Send to Inpainting
-        </ContextMenu.Item>
-        <ContextMenu.Item onClickCapture={handleSendToOutpainting}>
-          Send to Outpainting
+        <ContextMenu.Item onClickCapture={handleSendToCanvas}>
+          Send to Unified Canvas
         </ContextMenu.Item>
         <DeleteImageModal image={image}>
           <ContextMenu.Item data-warning>Delete Image</ContextMenu.Item>

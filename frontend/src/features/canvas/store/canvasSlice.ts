@@ -49,7 +49,6 @@ const initialCanvasState: CanvasState = {
   eraserSize: 50,
   futureLayerStates: [],
   inpaintReplace: 0.1,
-  initialCanvasImageClipRect: undefined,
   isCanvasInitialized: false,
   isDrawing: false,
   isMaskEnabled: true,
@@ -68,7 +67,6 @@ const initialCanvasState: CanvasState = {
   shouldAutoSave: false,
   shouldDarkenOutsideBoundingBox: false,
   shouldLockBoundingBox: false,
-  shouldLockToInitialImage: false,
   shouldPreserveMaskedArea: false,
   shouldShowBoundingBox: true,
   shouldShowBrush: true,
@@ -298,10 +296,6 @@ export const canvasSlice = createSlice({
         tool,
         strokeWidth: newStrokeWidth,
         points: action.payload,
-        clipRect:
-          state.shouldLockToInitialImage && state.initialCanvasImageClipRect
-            ? state.initialCanvasImageClipRect
-            : undefined,
         ...newColor,
       });
 
@@ -375,16 +369,10 @@ export const canvasSlice = createSlice({
         state.layerState.objects.find(isCanvasBaseImage);
 
       if (!initialCanvasImage) return;
-      const { shouldLockToInitialImage, initialCanvasImageClipRect } = state;
 
-      let { width: imageWidth, height: imageHeight } = initialCanvasImage;
+      const { width: imageWidth, height: imageHeight } = initialCanvasImage;
 
-      if (shouldLockToInitialImage && initialCanvasImageClipRect) {
-        imageWidth = initialCanvasImageClipRect.clipWidth;
-        imageHeight = initialCanvasImageClipRect.clipHeight;
-      }
-
-      const padding = shouldLockToInitialImage ? 1 : 0.95;
+      const padding = 0.95;
 
       const newScale = calculateScale(
         containerWidth,
@@ -395,12 +383,8 @@ export const canvasSlice = createSlice({
       );
 
       const newDimensions = {
-        width: shouldLockToInitialImage
-          ? Math.floor(imageWidth * newScale)
-          : Math.floor(containerWidth),
-        height: shouldLockToInitialImage
-          ? Math.floor(imageHeight * newScale)
-          : Math.floor(containerHeight),
+        width: Math.floor(containerWidth),
+        height: Math.floor(containerHeight),
       };
 
       const newCoordinates = calculateCoordinates(
@@ -416,7 +400,7 @@ export const canvasSlice = createSlice({
       if (!_.isEqual(state.stageDimensions, newDimensions)) {
         state.minimumStageScale = newScale;
         state.stageScale = newScale;
-        state.stageCoordinates = newCoordinates;
+        state.stageCoordinates = floorCoordinates(newCoordinates);
         state.stageDimensions = newDimensions;
       }
 
@@ -440,23 +424,16 @@ export const canvasSlice = createSlice({
       const { contentRect } = action.payload;
 
       const baseCanvasImage = state.layerState.objects.find(isCanvasBaseImage);
-      const { shouldLockToInitialImage, initialCanvasImageClipRect } = state;
+
       if (!baseCanvasImage) return;
 
       const {
         stageDimensions: { width: stageWidth, height: stageHeight },
       } = state;
 
-      let { x, y, width, height } = contentRect;
+      const { x, y, width, height } = contentRect;
 
-      if (shouldLockToInitialImage && initialCanvasImageClipRect) {
-        x = initialCanvasImageClipRect.clipX;
-        y = initialCanvasImageClipRect.clipY;
-        width = initialCanvasImageClipRect.clipWidth;
-        height = initialCanvasImageClipRect.clipHeight;
-      }
-
-      const padding = shouldLockToInitialImage ? 1 : 0.95;
+      const padding = 0.95;
       const newScale = calculateScale(
         stageWidth,
         stageHeight,
@@ -515,39 +492,36 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates = [];
     },
-    setShouldLockToInitialImage: (state, action: PayloadAction<boolean>) => {
-      state.shouldLockToInitialImage = action.payload;
-    },
     fitBoundingBoxToStage: (state) => {
-      const { boundingBoxDimensions, boundingBoxCoordinates, stageDimensions } =
-        state;
+      const {
+        boundingBoxDimensions,
+        boundingBoxCoordinates,
+        stageDimensions,
+        stageScale,
+      } = state;
+      const scaledStageWidth = stageDimensions.width / stageScale;
+      const scaledStageHeight = stageDimensions.height / stageScale;
 
       if (
         boundingBoxCoordinates.x < 0 ||
         boundingBoxCoordinates.x + boundingBoxDimensions.width >
-          stageDimensions.width ||
+          scaledStageWidth ||
         boundingBoxCoordinates.y < 0 ||
         boundingBoxCoordinates.y + boundingBoxDimensions.height >
-          stageDimensions.height
+          scaledStageHeight
       ) {
         const newBoundingBoxDimensions = {
-          width: roundDownToMultiple(
-            _.clamp(stageDimensions.width, 64, 512),
-            64
-          ),
-          height: roundDownToMultiple(
-            _.clamp(stageDimensions.height, 64, 512),
-            64
-          ),
+          width: roundDownToMultiple(_.clamp(scaledStageWidth, 64, 512), 64),
+          height: roundDownToMultiple(_.clamp(scaledStageHeight, 64, 512), 64),
         };
 
         const newBoundingBoxCoordinates = {
           x: roundToMultiple(
-            stageDimensions.width / 2 - newBoundingBoxDimensions.width / 2,
+            scaledStageWidth / 2 - newBoundingBoxDimensions.width / 2,
             64
           ),
           y: roundToMultiple(
-            stageDimensions.height / 2 - newBoundingBoxDimensions.height / 2,
+            scaledStageHeight / 2 - newBoundingBoxDimensions.height / 2,
             64
           ),
         };
@@ -611,7 +585,6 @@ export const {
   prevStagingAreaImage,
   commitStagingAreaImage,
   discardStagedImages,
-  setShouldLockToInitialImage,
   resizeAndScaleCanvas,
   resizeCanvas,
   resetCanvasView,

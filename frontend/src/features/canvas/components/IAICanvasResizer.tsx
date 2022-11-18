@@ -9,21 +9,19 @@ import {
   setDoesCanvasNeedScaling,
 } from 'features/canvas/store/canvasSlice';
 import { createSelector } from '@reduxjs/toolkit';
-import { canvasSelector, initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  canvasSelector,
+  initialCanvasImageSelector,
+} from 'features/canvas/store/canvasSelectors';
 
 const canvasResizerSelector = createSelector(
   canvasSelector,
   initialCanvasImageSelector,
   activeTabNameSelector,
   (canvas, initialCanvasImage, activeTabName) => {
-    const {
-      doesCanvasNeedScaling,
-      shouldLockToInitialImage,
-      isCanvasInitialized,
-    } = canvas;
+    const { doesCanvasNeedScaling, isCanvasInitialized } = canvas;
     return {
       doesCanvasNeedScaling,
-      shouldLockToInitialImage,
       activeTabName,
       initialCanvasImage,
       isCanvasInitialized,
@@ -35,7 +33,6 @@ const IAICanvasResizer = () => {
   const dispatch = useAppDispatch();
   const {
     doesCanvasNeedScaling,
-    shouldLockToInitialImage,
     activeTabName,
     initialCanvasImage,
     isCanvasInitialized,
@@ -58,11 +55,7 @@ const IAICanvasResizer = () => {
         })
       );
 
-      if (!isCanvasInitialized || shouldLockToInitialImage) {
-        dispatch(resizeAndScaleCanvas());
-      } else {
-        dispatch(resizeCanvas());
-      }
+      dispatch(resizeCanvas());
 
       dispatch(setDoesCanvasNeedScaling(false));
     }, 0);
@@ -72,7 +65,6 @@ const IAICanvasResizer = () => {
     doesCanvasNeedScaling,
     activeTabName,
     isCanvasInitialized,
-    shouldLockToInitialImage,
   ]);
 
   return (

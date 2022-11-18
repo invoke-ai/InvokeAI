@@ -1,18 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
-import { Box } from 'konva/lib/shapes/Transformer';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { useCallback, useEffect, useRef } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
-  initialCanvasImageSelector,
-  canvasSelector,
-  shouldLockToInitialImageSelector,
-} from 'features/canvas/store/canvasSelectors';
+  roundDownToMultiple,
+  roundToMultiple,
+} from 'common/util/roundDownToMultiple';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
@@ -21,14 +19,10 @@ import {
   setIsTransformingBoundingBox,
 } from 'features/canvas/store/canvasSlice';
 import { GroupConfig } from 'konva/lib/Group';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 
 const boundingBoxPreviewSelector = createSelector(
-  shouldLockToInitialImageSelector,
   canvasSelector,
-  initialCanvasImageSelector,
-  activeTabNameSelector,
-  (shouldLockToInitialImage, canvas, initialCanvasImage, activeTabName) => {
+  (canvas) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -54,14 +48,11 @@ const boundingBoxPreviewSelector = createSelector(
       isTransformingBoundingBox,
       stageDimensions,
       stageScale,
-      initialCanvasImage,
-      activeTabName,
       shouldSnapToGrid,
       tool,
       stageCoordinates,
       boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
       hitStrokeWidth: 20 / stageScale,
-      shouldLockToInitialImage,
     };
   },
   {
@@ -88,13 +79,10 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     stageCoordinates,
     stageDimensions,
     stageScale,
-    initialCanvasImage,
-    activeTabName,
     shouldSnapToGrid,
     tool,
     boundingBoxStrokeWidth,
     hitStrokeWidth,
-    shouldLockToInitialImage,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -139,40 +127,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     [dispatch, shouldSnapToGrid]
   );
 
-  const dragBoundFunc = useCallback(
-    (position: Vector2d) => {
-      /**
-       * This limits the bounding box's drag coordinates.
-       */
-      if (!shouldLockToInitialImage) return boundingBoxCoordinates;
-
-      const { x, y } = position;
-
-      const maxX =
-        stageDimensions.width -
-        boundingBoxDimensions.width -
-        (stageDimensions.width % 64);
-
-      const maxY =
-        stageDimensions.height -
-        boundingBoxDimensions.height -
-        (stageDimensions.height % 64);
-
-      const clampedX = Math.floor(_.clamp(x, 0, maxX));
-      const clampedY = Math.floor(_.clamp(y, 0, maxY));
-
-      return { x: clampedX, y: clampedY };
-    },
-    [
-      shouldLockToInitialImage,
-      boundingBoxCoordinates,
-      stageDimensions.width,
-      stageDimensions.height,
-      boundingBoxDimensions.width,
-      boundingBoxDimensions.height,
-    ]
-  );
-
   const handleOnTransform = useCallback(() => {
     /**
      * The Konva Transformer changes the object's anchor point and scale factor,
@@ -202,15 +156,15 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
     dispatch(
       setBoundingBoxCoordinates({
-        x,
-        y,
+        x: shouldSnapToGrid ? roundDownToMultiple(x, 64) : x,
+        y: shouldSnapToGrid ? roundDownToMultiple(y, 64) : y,
       })
     );
 
     // Reset the scale now that the coords/dimensions have been un-scaled
     rect.scaleX(1);
     rect.scaleY(1);
-  }, [dispatch]);
+  }, [dispatch, shouldSnapToGrid]);
 
   const anchorDragBoundFunc = useCallback(
     (
@@ -225,38 +179,24 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
        *
        * We need to snap the new dimensions to steps of 64. But because the whole
        * stage is scaled, our actual desired step is actually 64 * the stage scale.
+       *
+       * Additionally, we need to ensure we offset the position so that we snap to a
+       * multiple of 64 that is aligned with the grid, and not from the absolute zero
+       * coordinate.
        */
 
-      return {
-        x: roundToMultiple(newPos.x, scaledStep),
-        y: roundToMultiple(newPos.y, scaledStep),
+      // Calculate the offset of the grid.
+      const offsetX = oldPos.x % scaledStep;
+      const offsetY = oldPos.y % scaledStep;
+
+      const newCoordinates = {
+        x: roundDownToMultiple(newPos.x, scaledStep) + offsetX,
+        y: roundDownToMultiple(newPos.y, scaledStep) + offsetY,
       };
+
+      return newCoordinates;
     },
     [scaledStep]
-  );
-
-  const boundBoxFunc = useCallback(
-    (oldBoundBox: Box, newBoundBox: Box) => {
-      /**
-       * The transformer uses this callback to limit valid transformations.
-       * Unlike anchorDragBoundFunc, it does get a width and height, so
-       * the logic to constrain the size of the bounding box is very simple.
-       */
-
-      // On the Inpainting canvas, the bounding box needs to stay in the stage
-      if (
-        shouldLockToInitialImage &&
-        (newBoundBox.width + newBoundBox.x > stageDimensions.width ||
-          newBoundBox.height + newBoundBox.y > stageDimensions.height ||
-          newBoundBox.x < 0 ||
-          newBoundBox.y < 0)
-      ) {
-        return oldBoundBox;
-      }
-
-      return newBoundBox;
-    },
-    [shouldLockToInitialImage, stageDimensions.height, stageDimensions.width]
   );
 
   const handleStartedTransforming = () => {
@@ -310,11 +250,11 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         globalCompositeOperation={'destination-out'}
       />
       <Rect
-        {...(shouldLockToInitialImage ? { dragBoundFunc } : {})}
-        listening={!isDrawing && tool === 'move'}
         draggable={true}
         fillEnabled={false}
         height={boundingBoxDimensions.height}
+        hitStrokeWidth={hitStrokeWidth}
+        listening={!isDrawing && tool === 'move'}
         onDragEnd={handleEndedModifying}
         onDragMove={handleOnDragMove}
         onMouseDown={handleStartedMoving}
@@ -329,7 +269,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
-        hitStrokeWidth={hitStrokeWidth}
       />
       <Transformer
         anchorCornerRadius={3}
@@ -340,7 +279,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         borderDash={[4, 4]}
         borderEnabled={true}
         borderStroke={'black'}
-        boundBoxFunc={boundBoxFunc}
         draggable={false}
         enabledAnchors={tool === 'move' ? undefined : []}
         flipEnabled={false}
