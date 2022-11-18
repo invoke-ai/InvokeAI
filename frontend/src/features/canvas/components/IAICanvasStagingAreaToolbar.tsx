@@ -27,6 +27,7 @@ import {
   discardStagedImages,
   nextStagingAreaImage,
   prevStagingAreaImage,
+  setShouldShowStagingImage,
 } from 'features/canvas/store/canvasSlice';
 
 const selector = createSelector(
@@ -36,6 +37,7 @@ const selector = createSelector(
       layerState: {
         stagingArea: { images, selectedImageIndex },
       },
+      shouldShowStagingImage,
     } = canvas;
 
     return {
@@ -43,6 +45,7 @@ const selector = createSelector(
         images.length > 0 ? images[selectedImageIndex] : undefined,
       isOnFirstImage: selectedImageIndex === 0,
       isOnLastImage: selectedImageIndex === images.length - 1,
+      shouldShowStagingImage,
     };
   },
   {
@@ -54,11 +57,12 @@ const selector = createSelector(
 
 const IAICanvasStagingAreaToolbar = () => {
   const dispatch = useAppDispatch();
-  const { isOnFirstImage, isOnLastImage, currentStagingAreaImage } =
-    useAppSelector(selector);
-
-  const [shouldShowStagedImage, setShouldShowStagedImage] =
-    useState<boolean>(true);
+  const {
+    isOnFirstImage,
+    isOnLastImage,
+    currentStagingAreaImage,
+    shouldShowStagingImage,
+  } = useAppSelector(selector);
 
   const [shouldShowStagingAreaOutline, setShouldShowStagingAreaOutline] =
     useState<boolean>(true);
@@ -116,9 +120,11 @@ const IAICanvasStagingAreaToolbar = () => {
           tooltip="Show/Hide"
           tooltipProps={{ placement: 'bottom' }}
           aria-label="Show/Hide"
-          data-alert={!shouldShowStagedImage}
-          icon={shouldShowStagedImage ? <FaEye /> : <FaEyeSlash />}
-          onClick={() => setShouldShowStagedImage(!shouldShowStagedImage)}
+          data-alert={!shouldShowStagingImage}
+          icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
+          onClick={() =>
+            dispatch(setShouldShowStagingImage(!shouldShowStagingImage))
+          }
           data-selected={true}
         />
         <IAIIconButton
