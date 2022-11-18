@@ -17,6 +17,7 @@ from threading import Event
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
+from ldm.invoke.globals import Globals
 
 from backend.modules.parameters import parameters_to_command
 
@@ -24,7 +25,6 @@ from backend.modules.parameters import parameters_to_command
 # Loading Arguments
 opt = Args()
 args = opt.parse_args()
-
 
 class InvokeAIWebServer:
     def __init__(self, generate, gfpgan, codeformer, esrgan) -> None:
@@ -74,6 +74,8 @@ class InvokeAIWebServer:
             return {"message": "Server Running"}
 
         # Outputs Route
+        if not os.path.isabs(args.outdir):
+            args.outdir=os.path.join(Globals.root,args.outdir)
         self.app.config["OUTPUTS_FOLDER"] = os.path.abspath(args.outdir)
 
         @self.app.route("/outputs/<path:file_path>")
