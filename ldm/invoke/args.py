@@ -616,6 +616,18 @@ class Args(object):
             help='Web server: Port to listen on'
         )
         web_server_group.add_argument(
+            '--certfile',
+            type=str,
+            default=None,
+            help='Web server: Path to certificate file to use for SSL. Use together with --keyfile'
+        )
+        web_server_group.add_argument(
+            '--keyfile',
+            type=str,
+            default=None,
+            help='Web server: Path to private key file to use for SSL. Use together with --certfile'
+        )
+        web_server_group.add_argument(
             '--gui',
             dest='gui',
             action='store_true',
