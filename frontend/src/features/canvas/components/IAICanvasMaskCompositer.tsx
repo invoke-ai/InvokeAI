@@ -7,6 +7,7 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
+import { isNumber } from 'lodash';
 
 export const canvasMaskCompositerSelector = createSelector(
   canvasSelector,
@@ -144,14 +145,12 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   }, []);
 
   if (
-    !(
-      fillPatternImage &&
-      stageCoordinates.x !== undefined &&
-      stageCoordinates.y !== undefined &&
-      stageScale !== undefined &&
-      stageDimensions.width !== undefined &&
-      stageDimensions.height !== undefined
-    )
+    !fillPatternImage ||
+    !isNumber(stageCoordinates.x) ||
+    !isNumber(stageCoordinates.y) ||
+    !isNumber(stageScale) ||
+    !isNumber(stageDimensions.width) ||
+    !isNumber(stageDimensions.height)
   )
     return null;
 
@@ -163,7 +162,7 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
       height={stageDimensions.height / stageScale}
       width={stageDimensions.width / stageScale}
       fillPatternImage={fillPatternImage}
-      fillPatternOffsetY={isNaN(offset) ? 0 : offset}
+      fillPatternOffsetY={!isNumber(offset) ? 0 : offset}
       fillPatternRepeat={'repeat'}
       fillPatternScale={{ x: 1 / stageScale, y: 1 / stageScale }}
       listening={true}
