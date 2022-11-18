@@ -47,7 +47,6 @@ const initialCanvasState: CanvasState = {
   canvasContainerDimensions: { width: 0, height: 0 },
   cursorPosition: null,
   doesCanvasNeedScaling: false,
-  eraserSize: 50,
   futureLayerStates: [],
   inpaintReplace: 0.1,
   isCanvasInitialized: false,
@@ -114,9 +113,6 @@ export const canvasSlice = createSlice({
     },
     setBrushSize: (state, action: PayloadAction<number>) => {
       state.brushSize = action.payload;
-    },
-    setEraserSize: (state, action: PayloadAction<number>) => {
-      state.eraserSize = action.payload;
     },
     clearMask: (state) => {
       state.pastLayerStates.push(state.layerState);
@@ -275,11 +271,11 @@ export const canvasSlice = createSlice({
       };
     },
     addLine: (state, action: PayloadAction<number[]>) => {
-      const { tool, layer, brushColor, brushSize, eraserSize } = state;
+      const { tool, layer, brushColor, brushSize } = state;
 
       if (tool === 'move') return;
 
-      const newStrokeWidth = tool === 'brush' ? brushSize / 2 : eraserSize / 2;
+      const newStrokeWidth = brushSize / 2;
 
       // set & then spread this to only conditionally add the "color" key
       const newColor =
@@ -608,7 +604,6 @@ export const {
   setLayer,
   setBrushColor,
   setBrushSize,
-  setEraserSize,
   addLine,
   addPointToCurrentLine,
   setShouldPreserveMaskedArea,

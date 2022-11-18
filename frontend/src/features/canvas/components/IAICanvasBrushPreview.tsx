@@ -13,7 +13,6 @@ const canvasBrushPreviewSelector = createSelector(
       cursorPosition,
       stageDimensions: { width, height },
       brushSize,
-      eraserSize,
       maskColor,
       brushColor,
       tool,
@@ -28,7 +27,7 @@ const canvasBrushPreviewSelector = createSelector(
       cursorPosition,
       width,
       height,
-      radius: tool === 'brush' ? brushSize / 2 : eraserSize / 2,
+      radius: brushSize / 2,
       brushColorString: rgbaColorToString(
         layer === 'mask' ? { ...maskColor, a: 0.5 } : brushColor
       ),

@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { setEraserSize, setTool } from 'features/canvas/store/canvasSlice';
+import { setBrushSize, setTool } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -16,11 +16,11 @@ import {
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],
   (canvas, isStaging) => {
-    const { eraserSize, tool } = canvas;
+    const { brushSize, tool } = canvas;
 
     return {
       tool,
-      eraserSize,
+      brushSize,
       isStaging,
     };
   },
@@ -32,7 +32,7 @@ export const selector = createSelector(
 );
 const IAICanvasEraserButtonPopover = () => {
   const dispatch = useAppDispatch();
-  const { tool, eraserSize, isStaging } = useAppSelector(selector);
+  const { tool, brushSize, isStaging } = useAppSelector(selector);
 
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
 
@@ -51,25 +51,25 @@ const IAICanvasEraserButtonPopover = () => {
   useHotkeys(
     ['['],
     () => {
-      dispatch(setEraserSize(Math.max(eraserSize - 5, 5)));
+      dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
     },
     {
       enabled: () => true,
       preventDefault: true,
     },
-    [eraserSize]
+    [brushSize]
   );
 
   useHotkeys(
     [']'],
     () => {
-      dispatch(setEraserSize(Math.min(eraserSize + 5, 500)));
+      dispatch(setBrushSize(Math.min(brushSize + 5, 500)));
     },
     {
       enabled: () => true,
       preventDefault: true,
     },
-    [eraserSize]
+    [brushSize]
   );
 
   return (
@@ -89,9 +89,9 @@ const IAICanvasEraserButtonPopover = () => {
       <Flex minWidth={'15rem'} direction={'column'} gap={'1rem'}>
         <IAISlider
           label="Size"
-          value={eraserSize}
+          value={brushSize}
           withInput
-          onChange={(newSize) => dispatch(setEraserSize(newSize))}
+          onChange={(newSize) => dispatch(setBrushSize(newSize))}
         />
       </Flex>
     </IAIPopover>

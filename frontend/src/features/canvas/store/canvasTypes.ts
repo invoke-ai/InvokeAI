@@ -76,7 +76,6 @@ export interface CanvasState {
   canvasContainerDimensions: Dimensions;
   cursorPosition: Vector2d | null;
   doesCanvasNeedScaling: boolean;
-  eraserSize: number;
   futureLayerStates: CanvasLayerState[];
   inpaintReplace: number;
   intermediateImage?: InvokeAI.Image;
