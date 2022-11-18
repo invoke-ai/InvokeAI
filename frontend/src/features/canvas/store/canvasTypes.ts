@@ -110,4 +110,5 @@ export interface CanvasState {
   stageDimensions: Dimensions;
   stageScale: number;
   tool: CanvasTool;
+  shouldShowStagingImage: boolean;
 }

@@ -80,6 +80,7 @@ const initialCanvasState: CanvasState = {
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
   tool: 'brush',
+  shouldShowStagingImage: true,
 };
 
 export const canvasSlice = createSlice({
@@ -595,6 +596,9 @@ export const canvasSlice = createSlice({
         state.boundingBoxCoordinates = newBoundingBoxCoordinates;
       }
     },
+    setShouldShowStagingImage: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowStagingImage = action.payload;
+    },
   },
   extraReducers: canvasExtraReducers,
 });
@@ -654,6 +658,7 @@ export const {
   resetCanvasView,
   setCanvasContainerDimensions,
   fitBoundingBoxToStage,
+  setShouldShowStagingImage,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
