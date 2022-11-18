@@ -134,6 +134,7 @@ const IAICanvasStagingAreaToolbar = () => {
           icon={<FaTrash />}
           onClick={() => dispatch(discardStagedImages())}
           data-selected={true}
+          style={{ backgroundColor: 'var(--btn-delete-image)' }}
         />
       </ButtonGroup>
     </Flex>
