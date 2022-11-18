@@ -197,29 +197,29 @@ const IAICanvasOutpaintingControls = () => {
       </ButtonGroup>
       <ButtonGroup isAttached>
         <IAIIconButton
-          aria-label="Merge Visible (Shift + M)"
-          tooltip="Merge Visible (Shift + M)"
+          aria-label="Merge Visible (Shift+M)"
+          tooltip="Merge Visible (Shift+M)"
           icon={<FaLayerGroup />}
           onClick={handleMergeVisible}
           isDisabled={isProcessing}
         />
         <IAIIconButton
-          aria-label="Save to Gallery (Shift + S)"
-          tooltip="Save to Gallery (Shift + S)"
+          aria-label="Save to Gallery (Shift+S)"
+          tooltip="Save to Gallery (Shift+S)"
           icon={<FaSave />}
           onClick={handleSaveToGallery}
           isDisabled={isProcessing}
         />
         <IAIIconButton
-          aria-label="Copy to Clipboard (Cmd/Ctrl + C)"
-          tooltip="Copy to Clipboard (Cmd/Ctrl + C)"
+          aria-label="Copy to Clipboard (Cmd/Ctrl+C)"
+          tooltip="Copy to Clipboard (Cmd/Ctrl+C)"
           icon={<FaCopy />}
           onClick={handleCopyImageToClipboard}
           isDisabled={isProcessing}
         />
         <IAIIconButton
-          aria-label="Download as Image (Shift + D)"
-          tooltip="Download as Image (Shift + D)"
+          aria-label="Download as Image (Shift+D)"
+          tooltip="Download as Image (Shift+D)"
           icon={<FaDownload />}
           onClick={handleDownloadAsImage}
           isDisabled={isProcessing}
@@ -239,8 +239,8 @@ const IAICanvasOutpaintingControls = () => {
           icon={<FaUpload />}
         />
         <IAIIconButton
-          aria-label="Reset Canvas View (R)"
-          tooltip="Reset Canvas View (R)"
+          aria-label="Reset View (R)"
+          tooltip="Reset View (R)"
           icon={<FaCrosshairs />}
           onClick={handleResetCanvasView}
         />

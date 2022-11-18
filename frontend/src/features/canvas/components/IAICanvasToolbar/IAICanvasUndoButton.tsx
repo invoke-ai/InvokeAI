@@ -49,8 +49,8 @@ export default function IAICanvasUndoButton() {
 
   return (
     <IAIIconButton
-      aria-label="Undo"
-      tooltip="Undo"
+      aria-label="Undo (Ctrl+Z)"
+      tooltip="Undo (Ctrl+Z)"
       icon={<FaUndo />}
       onClick={handleUndo}
       isDisabled={!canUndo}

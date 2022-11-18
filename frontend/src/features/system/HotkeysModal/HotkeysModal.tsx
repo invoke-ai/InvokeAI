@@ -149,11 +149,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'E',
     },
     {
-      title: 'Quick Toggle Brush/Eraser',
-      desc: 'Quick toggle between brush and eraser',
-      hotkey: 'X',
-    },
-    {
       title: 'Decrease Brush Size',
       desc: 'Decreases the size of the inpainting brush/eraser',
       hotkey: '[',
@@ -164,29 +159,54 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: ']',
     },
     {
-      title: 'Hide Mask',
-      desc: 'Hide and unhide mask',
-      hotkey: 'H',
+      title: 'Move Tool',
+      desc: 'Allows canvas navigation',
+      hotkey: 'M',
     },
     {
-      title: 'Decrease Mask Opacity',
-      desc: 'Decreases the opacity of the mask',
-      hotkey: 'Shift+[',
+      title: 'Quick Toggle Move',
+      desc: 'Temporarily toggles Move mode',
+      hotkey: 'Hold Space',
     },
     {
-      title: 'Increase Mask Opacity',
-      desc: 'Increases the opacity of the mask',
-      hotkey: 'Shift+]',
-    },
-    {
-      title: 'Invert Mask',
-      desc: 'Invert the mask preview',
-      hotkey: 'Shift+M',
+      title: 'Select Mask Layer',
+      desc: 'Toggles mask layer',
+      hotkey: 'Q',
     },
     {
       title: 'Clear Mask',
       desc: 'Clear the entire mask',
       hotkey: 'Shift+C',
+    },
+    {
+      title: 'Hide Mask',
+      desc: 'Hide and unhide mask',
+      hotkey: 'H',
+    },
+    {
+      title: 'Show/Hide Bounding Box',
+      desc: 'Toggle visibility of bounding box',
+      hotkey: 'Shift+H',
+    },
+    {
+      title: 'Merge Visible',
+      desc: 'Merge all visible layers of canvas',
+      hotkey: 'Shift+M',
+    },
+    {
+      title: 'Save To Gallery',
+      desc: 'Save current canvas to gallery',
+      hotkey: 'Shift+S',
+    },
+    {
+      title: 'Copy to Clipboard',
+      desc: 'Copy current canvas to clipboard',
+      hotkey: 'Ctrl+C',
+    },
+    {
+      title: 'Download Image',
+      desc: 'Download current canvas',
+      hotkey: 'Shift+D',
     },
     {
       title: 'Undo Stroke',
@@ -199,29 +219,9 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Ctrl+Shift+Z, Ctrl+Y',
     },
     {
-      title: 'Lock Bounding Box',
-      desc: 'Locks the bounding box',
-      hotkey: 'Shift+W',
-    },
-    {
-      title: 'Show/Hide Bounding Box',
-      desc: 'Toggle visibility of bounding box',
-      hotkey: 'Shift+H',
-    },
-    {
-      title: 'Quick Toggle Lock Bounding Box',
-      desc: 'Hold to toggle locking the bounding box',
-      hotkey: 'W',
-    },
-    {
-      title: 'Expand Inpainting Area',
-      desc: 'Expand your inpainting work area',
-      hotkey: 'Shift+J',
-    },
-    {
-      title: 'Erase Canvas',
-      desc: 'Erase the images on the canvas',
-      hotkey: 'Shift+E',
+      title: 'Reset View',
+      desc: 'Reset Canvas View',
+      hotkey: 'R',
     },
   ];
 
@@ -289,7 +289,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>Inpainting Hotkeys</h2>
+                  <h2>Unified Canvas Hotkeys</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>

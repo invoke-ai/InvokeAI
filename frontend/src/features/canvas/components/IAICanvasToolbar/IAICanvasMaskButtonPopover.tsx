@@ -92,8 +92,8 @@ const IAICanvasMaskButtonPopover = () => {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          aria-label="Select Mask Layer"
-          tooltip="Select Mask Layer"
+          aria-label="Select Mask Layer (Q)"
+          tooltip="Select Mask Layer (Q)"
           data-alert={layer === 'mask'}
           onClick={handleToggleMaskLayer}
           icon={<FaMask />}
@@ -101,9 +101,11 @@ const IAICanvasMaskButtonPopover = () => {
       }
     >
       <Flex direction={'column'} gap={'0.5rem'}>
-        <IAIButton onClick={handleClearMask}>Clear Mask</IAIButton>
+        <IAIButton onClick={handleClearMask} tooltip={'Clear Mask (Shift+C)'}>
+          Clear Mask
+        </IAIButton>
         <IAICheckbox
-          label="Enable Mask"
+          label="Enable Mask (H)"
           isChecked={isMaskEnabled}
           onChange={handleToggleEnableMask}
         />

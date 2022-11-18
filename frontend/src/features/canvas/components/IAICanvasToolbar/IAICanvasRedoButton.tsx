@@ -48,8 +48,8 @@ export default function IAICanvasRedoButton() {
 
   return (
     <IAIIconButton
-      aria-label="Redo"
-      tooltip="Redo"
+      aria-label="Redo (Ctrl+Shift+Z)"
+      tooltip="Redo (Ctrl+Shift+Z)"
       icon={<FaRedo />}
       onClick={handleRedo}
       isDisabled={!canRedo}
