@@ -67,7 +67,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Change Tabs',
       desc: 'Switch to another workspace',
-      hotkey: '1-6',
+      hotkey: '1-5',
     },
 
     {
