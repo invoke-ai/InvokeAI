@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import {
   resetCanvas,
   resetCanvasView,
+  resizeAndScaleCanvas,
   setTool,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
@@ -131,7 +132,7 @@ const IAICanvasOutpaintingControls = () => {
   const handleSelectMoveTool = () => dispatch(setTool('move'));
 
   const handleResetCanvasView = () => {
-    const canvasBaseLayer = getCanvasBaseLayer()
+    const canvasBaseLayer = getCanvasBaseLayer();
     if (!canvasBaseLayer) return;
     const clientRect = canvasBaseLayer.getClientRect({
       skipTransform: true,
@@ -143,7 +144,10 @@ const IAICanvasOutpaintingControls = () => {
     );
   };
 
-  const handleResetCanvas = () => dispatch(resetCanvas());
+  const handleResetCanvas = () => {
+    dispatch(resetCanvas());
+    dispatch(resizeAndScaleCanvas());
+  };
 
   const handleMergeVisible = () => {
     dispatch(mergeAndUploadCanvas({}));
