@@ -169,10 +169,7 @@ fi
 
 ./python/bin/python3 -E -s -m venv .venv
 _err_exit $? _err_msg
-# In reality, the following is ALL that 'activate.bat' does,
-# aside from setting the prompt, which we don't care about
-export PYTHONPATH=
-export PATH=.venv/bin:$PATH
+source .venv/bin/activate
 
 echo -e "\n***** Created Python virtual environment *****\n"
 
@@ -196,10 +193,6 @@ _err_msg="\n----- main pip install failed -----\n"
 .venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -r requirements.txt
 _err_exit $? _err_msg
 
-_err_msg="\n----- clipseg install failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-_err_exit $? _err_msg
-
 _err_msg="\n----- InvokeAI setup failed -----\n"
 .venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -e .
 _err_exit $? _err_msg
@@ -218,6 +211,8 @@ cp installer/invoke.sh .
 
 # more cleanup
 rm -rf installer/ installer_files/
+
+deactivate
 
 echo "All done! Run the command './invoke.sh' to start InvokeAI."
 read -p "Press any key to exit..."
