@@ -54,9 +54,38 @@ const IAICanvasMaskButtonPopover = () => {
     [layer]
   );
 
+  useHotkeys(
+    ['shift+c'],
+    () => {
+      handleClearMask();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    []
+  );
+
+  useHotkeys(
+    ['h'],
+    () => {
+      handleToggleEnableMask();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [isMaskEnabled]
+  );
+
   const handleToggleMaskLayer = () => {
     dispatch(setLayer(layer === 'mask' ? 'base' : 'mask'));
   };
+
+  const handleClearMask = () => dispatch(clearMask());
+
+  const handleToggleEnableMask = () =>
+    dispatch(setIsMaskEnabled(!isMaskEnabled));
 
   return (
     <IAIPopover
@@ -72,11 +101,11 @@ const IAICanvasMaskButtonPopover = () => {
       }
     >
       <Flex direction={'column'} gap={'0.5rem'}>
-        <IAIButton onClick={() => dispatch(clearMask())}>Clear Mask</IAIButton>
+        <IAIButton onClick={handleClearMask}>Clear Mask</IAIButton>
         <IAICheckbox
           label="Enable Mask"
           isChecked={isMaskEnabled}
-          onChange={(e) => dispatch(setIsMaskEnabled(e.target.checked))}
+          onChange={handleToggleEnableMask}
         />
         <IAICheckbox
           label="Preserve Masked Area"

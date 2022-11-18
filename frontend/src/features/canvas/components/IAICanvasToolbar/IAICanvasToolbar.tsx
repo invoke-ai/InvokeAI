@@ -69,21 +69,9 @@ const IAICanvasOutpaintingControls = () => {
   );
 
   useHotkeys(
-    ['shift+r'],
+    ['r'],
     () => {
       handleResetCanvasView();
-    },
-    {
-      enabled: () => true,
-      preventDefault: true,
-    },
-    [canvasBaseLayer]
-  );
-
-  useHotkeys(
-    ['shift+c'],
-    () => {
-      handleResetCanvas();
     },
     {
       enabled: () => true,
@@ -241,8 +229,8 @@ const IAICanvasOutpaintingControls = () => {
           icon={<FaUpload />}
         />
         <IAIIconButton
-          aria-label="Reset Canvas View"
-          tooltip="Reset Canvas View"
+          aria-label="Reset Canvas View (R)"
+          tooltip="Reset Canvas View (R)"
           icon={<FaCrosshairs />}
           onClick={handleResetCanvasView}
         />
