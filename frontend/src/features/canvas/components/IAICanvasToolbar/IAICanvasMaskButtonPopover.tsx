@@ -16,6 +16,7 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIButton from 'common/components/IAIButton';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 export const selector = createSelector(
   [canvasSelector],
@@ -41,6 +42,22 @@ const IAICanvasMaskButtonPopover = () => {
   const { layer, maskColor, isMaskEnabled, shouldPreserveMaskedArea } =
     useAppSelector(selector);
 
+  useHotkeys(
+    ['q'],
+    () => {
+      handleToggleMaskLayer();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [layer]
+  );
+
+  const handleToggleMaskLayer = () => {
+    dispatch(setLayer(layer === 'mask' ? 'base' : 'mask'));
+  };
+
   return (
     <IAIPopover
       trigger="hover"
@@ -49,7 +66,7 @@ const IAICanvasMaskButtonPopover = () => {
           aria-label="Select Mask Layer"
           tooltip="Select Mask Layer"
           data-alert={layer === 'mask'}
-          onClick={() => dispatch(setLayer(layer === 'mask' ? 'base' : 'mask'))}
+          onClick={handleToggleMaskLayer}
           icon={<FaMask />}
         />
       }

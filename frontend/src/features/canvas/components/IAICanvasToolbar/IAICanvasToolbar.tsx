@@ -1,15 +1,12 @@
 import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  resizeAndScaleCanvas,
   resetCanvas,
   resetCanvasView,
   setTool,
-  fitBoundingBoxToStage,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
-import { canvasImageLayerRef, stageRef } from '../IAICanvas';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   FaArrowsAlt,
@@ -28,12 +25,15 @@ import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
 import { mergeAndUploadCanvas } from 'features/canvas/util/mergeAndUploadCanvas';
-import IAICheckbox from 'common/components/IAICheckbox';
-import { ChangeEvent } from 'react';
 import {
   canvasSelector,
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
+import { useHotkeys } from 'react-hotkeys-hook';
+import {
+  getCanvasBaseLayer,
+  getCanvasStage,
+} from 'features/canvas/util/konvaInstanceProvider';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -54,6 +54,138 @@ export const selector = createSelector(
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
   const { tool, isStaging } = useAppSelector(selector);
+  const canvasBaseLayer = getCanvasBaseLayer();
+
+  useHotkeys(
+    ['m'],
+    () => {
+      handleSelectMoveTool();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    []
+  );
+
+  useHotkeys(
+    ['shift+r'],
+    () => {
+      handleResetCanvasView();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [canvasBaseLayer]
+  );
+
+  useHotkeys(
+    ['shift+c'],
+    () => {
+      handleResetCanvas();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [canvasBaseLayer]
+  );
+
+  useHotkeys(
+    ['shift+m'],
+    () => {
+      handleMergeVisible();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [canvasBaseLayer]
+  );
+
+  useHotkeys(
+    ['shift+s'],
+    () => {
+      handleSaveToGallery();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [canvasBaseLayer]
+  );
+
+  useHotkeys(
+    ['meta+c', 'ctrl+c'],
+    () => {
+      handleCopyImageToClipboard();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [canvasBaseLayer]
+  );
+
+  useHotkeys(
+    ['shift+d'],
+    () => {
+      handleDownloadAsImage();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [canvasBaseLayer]
+  );
+
+  const handleSelectMoveTool = () => dispatch(setTool('move'));
+
+  const handleResetCanvasView = () => {
+    if (!canvasBaseLayer) return;
+    const clientRect = canvasBaseLayer.getClientRect({
+      skipTransform: true,
+    });
+    dispatch(
+      resetCanvasView({
+        contentRect: clientRect,
+      })
+    );
+  };
+
+  const handleResetCanvas = () => dispatch(resetCanvas());
+
+  const handleMergeVisible = () => {
+    dispatch(mergeAndUploadCanvas({}));
+  };
+
+  const handleSaveToGallery = () => {
+    dispatch(
+      mergeAndUploadCanvas({
+        cropVisible: true,
+        saveToGallery: true,
+      })
+    );
+  };
+
+  const handleCopyImageToClipboard = () => {
+    dispatch(
+      mergeAndUploadCanvas({
+        cropVisible: true,
+        copyAfterSaving: true,
+      })
+    );
+  };
+
+  const handleDownloadAsImage = () => {
+    dispatch(
+      mergeAndUploadCanvas({
+        cropVisible: true,
+        downloadAfterSaving: true,
+      })
+    );
+  };
 
   return (
     <div className="inpainting-settings">
@@ -66,63 +198,33 @@ const IAICanvasOutpaintingControls = () => {
           tooltip="Move (M)"
           icon={<FaArrowsAlt />}
           data-selected={tool === 'move' || isStaging}
-          onClick={() => dispatch(setTool('move'))}
+          onClick={handleSelectMoveTool}
         />
       </ButtonGroup>
       <ButtonGroup isAttached>
         <IAIIconButton
-          aria-label="Merge Visible"
-          tooltip="Merge Visible"
+          aria-label="Merge Visible (Shift + M)"
+          tooltip="Merge Visible (Shift + M)"
           icon={<FaLayerGroup />}
-          onClick={() => {
-            dispatch(
-              mergeAndUploadCanvas({
-                canvasImageLayerRef,
-              })
-            );
-          }}
+          onClick={handleMergeVisible}
         />
         <IAIIconButton
-          aria-label="Save to Gallery"
-          tooltip="Save to Gallery"
+          aria-label="Save to Gallery (Shift + S)"
+          tooltip="Save to Gallery (Shift + S)"
           icon={<FaSave />}
-          onClick={() => {
-            dispatch(
-              mergeAndUploadCanvas({
-                canvasImageLayerRef,
-                cropVisible: true,
-                saveToGallery: true,
-              })
-            );
-          }}
+          onClick={handleSaveToGallery}
         />
         <IAIIconButton
-          aria-label="Copy Selection"
-          tooltip="Copy Selection"
+          aria-label="Copy to Clipboard (Cmd/Ctrl + C)"
+          tooltip="Copy to Clipboard (Cmd/Ctrl + C)"
           icon={<FaCopy />}
-          onClick={() => {
-            dispatch(
-              mergeAndUploadCanvas({
-                canvasImageLayerRef,
-                cropVisible: true,
-                copyAfterSaving: true,
-              })
-            );
-          }}
+          onClick={handleCopyImageToClipboard}
         />
         <IAIIconButton
-          aria-label="Download Selection"
-          tooltip="Download Selection"
+          aria-label="Download as Image (Shift + D)"
+          tooltip="Download as Image (Shift + D)"
           icon={<FaDownload />}
-          onClick={() => {
-            dispatch(
-              mergeAndUploadCanvas({
-                canvasImageLayerRef,
-                cropVisible: true,
-                downloadAfterSaving: true,
-              })
-            );
-          }}
+          onClick={handleDownloadAsImage}
         />
       </ButtonGroup>
       <ButtonGroup isAttached>
@@ -142,23 +244,13 @@ const IAICanvasOutpaintingControls = () => {
           aria-label="Reset Canvas View"
           tooltip="Reset Canvas View"
           icon={<FaCrosshairs />}
-          onClick={() => {
-            if (!stageRef.current || !canvasImageLayerRef.current) return;
-            const clientRect = canvasImageLayerRef.current.getClientRect({
-              skipTransform: true,
-            });
-            dispatch(
-              resetCanvasView({
-                contentRect: clientRect,
-              })
-            );
-          }}
+          onClick={handleResetCanvasView}
         />
         <IAIIconButton
           aria-label="Reset Canvas"
           tooltip="Reset Canvas"
           icon={<FaTrash />}
-          onClick={() => dispatch(resetCanvas())}
+          onClick={handleResetCanvas}
         />
       </ButtonGroup>
     </div>

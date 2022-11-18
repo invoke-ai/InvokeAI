@@ -5,10 +5,13 @@ import { SystemState } from 'features/system/systemSlice';
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
-import { CanvasState, isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
+import {
+  CanvasState,
+  isCanvasMaskLine,
+} from 'features/canvas/store/canvasTypes';
 import generateMask from 'features/canvas/util/generateMask';
-import { canvasImageLayerRef } from 'features/canvas/components/IAICanvas';
 import openBase64ImageInTab from './openBase64ImageInTab';
+import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
@@ -25,6 +28,8 @@ export type FrontendToBackendParametersConfig = {
 export const frontendToBackendParameters = (
   config: FrontendToBackendParametersConfig
 ): { [key: string]: any } => {
+  const canvasBaseLayer = getCanvasBaseLayer();
+
   const {
     generationMode,
     optionsState,
@@ -106,7 +111,7 @@ export const frontendToBackendParameters = (
   }
 
   // inpainting exclusive parameters
-  if (generationMode === 'unifiedCanvas' && canvasImageLayerRef.current) {
+  if (generationMode === 'unifiedCanvas' && canvasBaseLayer) {
     const {
       layerState: { objects },
       boundingBoxCoordinates,
@@ -143,16 +148,16 @@ export const frontendToBackendParameters = (
 
     generationParameters.bounding_box = boundingBox;
 
-    const tempScale = canvasImageLayerRef.current.scale();
+    const tempScale = canvasBaseLayer.scale();
 
-    canvasImageLayerRef.current.scale({
+    canvasBaseLayer.scale({
       x: 1 / stageScale,
       y: 1 / stageScale,
     });
 
-    const absPos = canvasImageLayerRef.current.getAbsolutePosition();
+    const absPos = canvasBaseLayer.getAbsolutePosition();
 
-    const imageDataURL = canvasImageLayerRef.current.toDataURL({
+    const imageDataURL = canvasBaseLayer.toDataURL({
       x: boundingBox.x + absPos.x,
       y: boundingBox.y + absPos.y,
       width: boundingBox.width,
@@ -166,7 +171,7 @@ export const frontendToBackendParameters = (
       ]);
     }
 
-    canvasImageLayerRef.current.scale(tempScale);
+    canvasBaseLayer.scale(tempScale);
 
     generationParameters.init_img = imageDataURL;
 

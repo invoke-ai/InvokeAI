@@ -9,9 +9,9 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { useRef } from 'react';
-import { stageRef } from '../components/IAICanvas';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { CanvasTool } from '../store/canvasTypes';
+import { getCanvasStage } from '../util/konvaInstanceProvider';
 
 const selector = createSelector(
   [canvasSelector, activeTabNameSelector],
@@ -44,6 +44,9 @@ const useInpaintingCanvasHotkeys = () => {
     useAppSelector(selector);
 
   const previousToolRef = useRef<CanvasTool | null>(null);
+
+  const canvasStage = getCanvasStage();
+
   //  Toggle lock bounding box
   useHotkeys(
     'shift+w',
@@ -72,7 +75,7 @@ const useInpaintingCanvasHotkeys = () => {
     (e: KeyboardEvent) => {
       if (e.repeat) return;
 
-      stageRef.current?.container().focus();
+      canvasStage?.container().focus();
 
       if (tool !== 'move') {
         previousToolRef.current = tool;
