@@ -118,17 +118,22 @@ class InvokeAIWebServer:
 
                 sys.exit(0)
         else:
+            useSSL = (args.certfile or args.keyfile)
             print(">> Started Invoke AI Web Server!")
             if self.host == "0.0.0.0":
                 print(
-                    f"Point your browser at http://localhost:{self.port} or use the host's DNS name or IP address."
+                    f"Point your browser at http{'s' if useSSL else ''}://localhost:{self.port} or use the host's DNS name or IP address."
                 )
             else:
                 print(
                     ">> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address."
                 )
-                print(f">> Point your browser at http://{self.host}:{self.port}")
-            self.socketio.run(app=self.app, host=self.host, port=self.port)
+                print(f">> Point your browser at http{'s' if useSSL else ''}://{self.host}:{self.port}")
+            if not useSSL:
+                self.socketio.run(app=self.app, host=self.host, port=self.port)
+            else:
+                self.socketio.run(app=self.app, host=self.host, port=self.port,
+                certfile=args.certfile, keyfile=args.keyfile)
 
     def setup_app(self):
         self.result_url = "outputs/"
