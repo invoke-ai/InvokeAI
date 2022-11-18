@@ -31,18 +31,19 @@ import {
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
-import {
-  getCanvasBaseLayer,
-  getCanvasStage,
-} from 'features/canvas/util/konvaInstanceProvider';
+import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
+import { systemSelector } from 'features/system/systemSelectors';
 
 export const selector = createSelector(
-  [canvasSelector, isStagingSelector],
-  (canvas, isStaging) => {
+  [canvasSelector, isStagingSelector, systemSelector],
+  (canvas, isStaging, system) => {
+    const { isProcessing } = system;
     const { tool } = canvas;
+
     return {
       tool,
       isStaging,
+      isProcessing,
     };
   },
   {
@@ -54,7 +55,7 @@ export const selector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging } = useAppSelector(selector);
+  const { tool, isStaging, isProcessing } = useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
 
   useHotkeys(
@@ -87,10 +88,10 @@ const IAICanvasOutpaintingControls = () => {
       handleMergeVisible();
     },
     {
-      enabled: () => true,
+      enabled: () => !isProcessing,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    [canvasBaseLayer, isProcessing]
   );
 
   useHotkeys(
@@ -99,10 +100,10 @@ const IAICanvasOutpaintingControls = () => {
       handleSaveToGallery();
     },
     {
-      enabled: () => true,
+      enabled: () => !isProcessing,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    [canvasBaseLayer, isProcessing]
   );
 
   useHotkeys(
@@ -111,10 +112,10 @@ const IAICanvasOutpaintingControls = () => {
       handleCopyImageToClipboard();
     },
     {
-      enabled: () => true,
+      enabled: () => !isProcessing,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    [canvasBaseLayer, isProcessing]
   );
 
   useHotkeys(
@@ -123,10 +124,10 @@ const IAICanvasOutpaintingControls = () => {
       handleDownloadAsImage();
     },
     {
-      enabled: () => true,
+      enabled: () => !isProcessing,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    [canvasBaseLayer, isProcessing]
   );
 
   const handleSelectMoveTool = () => dispatch(setTool('move'));
@@ -200,24 +201,28 @@ const IAICanvasOutpaintingControls = () => {
           tooltip="Merge Visible (Shift + M)"
           icon={<FaLayerGroup />}
           onClick={handleMergeVisible}
+          isDisabled={isProcessing}
         />
         <IAIIconButton
           aria-label="Save to Gallery (Shift + S)"
           tooltip="Save to Gallery (Shift + S)"
           icon={<FaSave />}
           onClick={handleSaveToGallery}
+          isDisabled={isProcessing}
         />
         <IAIIconButton
           aria-label="Copy to Clipboard (Cmd/Ctrl + C)"
           tooltip="Copy to Clipboard (Cmd/Ctrl + C)"
           icon={<FaCopy />}
           onClick={handleCopyImageToClipboard}
+          isDisabled={isProcessing}
         />
         <IAIIconButton
           aria-label="Download as Image (Shift + D)"
           tooltip="Download as Image (Shift + D)"
           icon={<FaDownload />}
           onClick={handleDownloadAsImage}
+          isDisabled={isProcessing}
         />
       </ButtonGroup>
       <ButtonGroup isAttached>
