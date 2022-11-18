@@ -6,6 +6,7 @@ import layerToDataURL from './layerToDataURL';
 import downloadFile from './downloadFile';
 import copyImage from './copyImage';
 import { getCanvasBaseLayer } from './konvaInstanceProvider';
+import { addToast } from 'features/system/systemSlice';
 
 export const mergeAndUploadCanvas = createAsyncThunk(
   'canvas/mergeAndUploadCanvas',
@@ -21,7 +22,7 @@ export const mergeAndUploadCanvas = createAsyncThunk(
     const { saveToGallery, downloadAfterSaving, cropVisible, copyAfterSaving } =
       args;
 
-    const { getState } = thunkAPI;
+    const { getState, dispatch } = thunkAPI;
 
     const state = getState() as RootState;
 
@@ -60,11 +61,27 @@ export const mergeAndUploadCanvas = createAsyncThunk(
 
     if (downloadAfterSaving) {
       downloadFile(url);
+      dispatch(
+        addToast({
+          title: 'Image Download Started',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
       return;
     }
 
     if (copyAfterSaving) {
       copyImage(url, width, height);
+      dispatch(
+        addToast({
+          title: 'Image Copied',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
       return;
     }
 

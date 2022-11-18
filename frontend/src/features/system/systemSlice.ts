@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { ExpandedIndex } from '@chakra-ui/react';
+import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
 import * as InvokeAI from 'app/invokeai';
 
 export type LogLevel = 'info' | 'warning' | 'error';
@@ -45,6 +45,7 @@ export interface SystemState
   isCancelable: boolean;
   saveIntermediatesInterval: number;
   enableImageDebugging: boolean;
+  toastQueue: UseToastOptions[];
 }
 
 const initialSystemState: SystemState = {
@@ -76,6 +77,7 @@ const initialSystemState: SystemState = {
   isCancelable: true,
   saveIntermediatesInterval: 5,
   enableImageDebugging: false,
+  toastQueue: [],
 };
 
 export const systemSlice = createSlice({
@@ -206,6 +208,12 @@ export const systemSlice = createSlice({
     setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
       state.enableImageDebugging = action.payload;
     },
+    addToast: (state, action: PayloadAction<UseToastOptions>) => {
+      state.toastQueue.push(action.payload);
+    },
+    clearToastQueue: (state) => {
+      state.toastQueue = [];
+    },
   },
 });
 
@@ -231,6 +239,8 @@ export const {
   setSaveIntermediatesInterval,
   setEnableImageDebugging,
   generationRequested,
+  addToast,
+  clearToastQueue,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

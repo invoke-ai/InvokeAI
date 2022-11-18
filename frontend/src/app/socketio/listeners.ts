@@ -23,7 +23,6 @@ import {
   clearIntermediateImage,
   GalleryState,
   removeImage,
-  setCurrentImage,
   setIntermediateImage,
 } from 'features/gallery/gallerySlice';
 

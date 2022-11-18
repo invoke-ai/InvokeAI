@@ -15,6 +15,7 @@ import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import { SystemState } from 'features/system/systemSlice';
 import _ from 'lodash';
 import { Model } from './invokeai';
+import useToastWatcher from 'features/system/hooks/useToastWatcher';
 
 keepGUIAlive();
 
@@ -50,18 +51,13 @@ const appSelector = createSelector(
 
     const shouldShowGalleryButton =
       !(shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)) &&
-      ['txt2img', 'img2img', 'unifiedCanvas'].includes(
-        activeTabName
-      );
+      ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
     const shouldShowOptionsPanelButton =
       !(
         shouldShowOptionsPanel ||
         (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
-      ) &&
-      ['txt2img', 'img2img', 'unifiedCanvas'].includes(
-        activeTabName
-      );
+      ) && ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
     return {
       modelStatusText,
@@ -79,6 +75,8 @@ const appSelector = createSelector(
 const App = () => {
   const { shouldShowGalleryButton, shouldShowOptionsPanelButton } =
     useAppSelector(appSelector);
+
+  useToastWatcher();
 
   return (
     <div className="App">
