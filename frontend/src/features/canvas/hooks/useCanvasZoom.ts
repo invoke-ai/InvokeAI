@@ -1,14 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
-import {
-  canvasSelector,
-  initialCanvasImageSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setStageCoordinates,
   setStageScale,
@@ -20,21 +16,12 @@ import {
 } from '../util/constants';
 
 const selector = createSelector(
-  [activeTabNameSelector, canvasSelector, initialCanvasImageSelector],
-  (activeTabName, canvas, initialCanvasImage) => {
-    const {
-      isMoveStageKeyHeld,
-      stageScale,
-      stageDimensions,
-      minimumStageScale,
-    } = canvas;
+  [canvasSelector],
+  (canvas) => {
+    const { isMoveStageKeyHeld, stageScale } = canvas;
     return {
       isMoveStageKeyHeld,
       stageScale,
-      activeTabName,
-      initialCanvasImage,
-      stageDimensions,
-      minimumStageScale,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -42,20 +29,12 @@ const selector = createSelector(
 
 const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
-  const {
-    isMoveStageKeyHeld,
-    stageScale,
-    activeTabName,
-    initialCanvasImage,
-    stageDimensions,
-    minimumStageScale,
-  } = useAppSelector(selector);
+  const { isMoveStageKeyHeld, stageScale } = useAppSelector(selector);
 
   return useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
       // stop default scrolling
-      if (!stageRef.current || isMoveStageKeyHeld || !initialCanvasImage)
-        return;
+      if (!stageRef.current || isMoveStageKeyHeld) return;
 
       e.evt.preventDefault();
 
@@ -90,7 +69,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       dispatch(setStageScale(newScale));
       dispatch(setStageCoordinates(newCoordinates));
     },
-    [stageRef, isMoveStageKeyHeld, initialCanvasImage, stageScale, dispatch]
+    [stageRef, isMoveStageKeyHeld, stageScale, dispatch]
   );
 };
 

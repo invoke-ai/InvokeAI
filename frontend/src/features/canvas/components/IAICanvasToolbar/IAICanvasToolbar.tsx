@@ -131,6 +131,7 @@ const IAICanvasOutpaintingControls = () => {
   const handleSelectMoveTool = () => dispatch(setTool('move'));
 
   const handleResetCanvasView = () => {
+    const canvasBaseLayer = getCanvasBaseLayer()
     if (!canvasBaseLayer) return;
     const clientRect = canvasBaseLayer.getClientRect({
       skipTransform: true,
