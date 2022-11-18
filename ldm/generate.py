@@ -921,7 +921,7 @@ class Generate:
                 r[0] = image
 
     def apply_textmask(self, image_path:str, prompt:str, callback, threshold:float=0.5):
-        assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+        assert os.path.exists(image_path), f'** "{image_path}" not found. Please enter the name of an existing image file to mask **'
         basename,_ = os.path.splitext(os.path.basename(image_path))
         if self.txt2mask is None:
             self.txt2mask  = Txt2Mask(device = self.device, refined=True)
