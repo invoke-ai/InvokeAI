@@ -8,9 +8,11 @@ import { MutableRefObject, useCallback } from 'react';
 import {
   canvasSelector,
   initialCanvasImageSelector,
-  shouldLockToInitialImageSelector,
 } from 'features/canvas/store/canvasSelectors';
-import { setStageCoordinates, setStageScale } from 'features/canvas/store/canvasSlice';
+import {
+  setStageCoordinates,
+  setStageScale,
+} from 'features/canvas/store/canvasSlice';
 import {
   CANVAS_SCALE_BY,
   MAX_CANVAS_SCALE,
@@ -18,13 +20,8 @@ import {
 } from '../util/constants';
 
 const selector = createSelector(
-  [
-    activeTabNameSelector,
-    canvasSelector,
-    initialCanvasImageSelector,
-    shouldLockToInitialImageSelector,
-  ],
-  (activeTabName, canvas, initialCanvasImage, shouldLockToInitialImage) => {
+  [activeTabNameSelector, canvasSelector, initialCanvasImageSelector],
+  (activeTabName, canvas, initialCanvasImage) => {
     const {
       isMoveStageKeyHeld,
       stageScale,
@@ -36,7 +33,6 @@ const selector = createSelector(
       stageScale,
       activeTabName,
       initialCanvasImage,
-      shouldLockToInitialImage,
       stageDimensions,
       minimumStageScale,
     };
@@ -51,7 +47,6 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
     stageScale,
     activeTabName,
     initialCanvasImage,
-    shouldLockToInitialImage,
     stageDimensions,
     minimumStageScale,
   } = useAppSelector(selector);
@@ -83,7 +78,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       const newScale = _.clamp(
         stageScale * CANVAS_SCALE_BY ** delta,
-        shouldLockToInitialImage ? minimumStageScale : MIN_CANVAS_SCALE,
+        MIN_CANVAS_SCALE,
         MAX_CANVAS_SCALE
       );
 
@@ -92,36 +87,10 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
         y: cursorPos.y - mousePointTo.y * newScale,
       };
 
-      if (shouldLockToInitialImage) {
-        newCoordinates.x = _.clamp(
-          newCoordinates.x,
-          stageDimensions.width -
-            Math.floor(initialCanvasImage.width * newScale),
-          0
-        );
-        newCoordinates.y = _.clamp(
-          newCoordinates.y,
-          stageDimensions.height -
-            Math.floor(initialCanvasImage.height * newScale),
-          0
-        );
-      }
-
       dispatch(setStageScale(newScale));
       dispatch(setStageCoordinates(newCoordinates));
     },
-    [
-      activeTabName,
-      stageRef,
-      isMoveStageKeyHeld,
-      initialCanvasImage,
-      stageScale,
-      shouldLockToInitialImage,
-      minimumStageScale,
-      dispatch,
-      stageDimensions.width,
-      stageDimensions.height,
-    ]
+    [stageRef, isMoveStageKeyHeld, initialCanvasImage, stageScale, dispatch]
   );
 };
 

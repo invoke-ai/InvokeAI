@@ -1,13 +1,11 @@
-import { MutableRefObject, useCallback, useRef } from 'react';
+import { MutableRefObject, useRef } from 'react';
 import Konva from 'konva';
 import { Layer, Stage } from 'react-konva';
 import { Stage as StageType } from 'konva/lib/Stage';
 import { useAppSelector } from 'app/store';
 import {
-  initialCanvasImageSelector,
   canvasSelector,
   isStagingSelector,
-  shouldLockToInitialImageSelector,
 } from 'features/canvas/store/canvasSelectors';
 import IAICanvasMaskLines from './IAICanvasMaskLines';
 import IAICanvasBrushPreview from './IAICanvasBrushPreview';
@@ -16,7 +14,6 @@ import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
 import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
 import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
 import useCanvasWheel from '../hooks/useCanvasZoom';
 import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
@@ -33,20 +30,8 @@ import IAICanvasStagingArea from './IAICanvasStagingArea';
 import IAICanvasStagingAreaToolbar from './IAICanvasStagingAreaToolbar';
 
 const selector = createSelector(
-  [
-    shouldLockToInitialImageSelector,
-    canvasSelector,
-    isStagingSelector,
-    activeTabNameSelector,
-    initialCanvasImageSelector,
-  ],
-  (
-    shouldLockToInitialImage,
-    canvas,
-    isStaging,
-    activeTabName,
-    initialCanvasImage
-  ) => {
+  [canvasSelector, isStagingSelector],
+  (canvas, isStaging) => {
     const {
       isMaskEnabled,
       stageScale,
@@ -90,8 +75,6 @@ const selector = createSelector(
       tool,
       isStaging,
       shouldShowIntermediates,
-      shouldLockToInitialImage,
-      initialCanvasImage,
     };
   },
   {
@@ -118,8 +101,6 @@ const IAICanvas = () => {
     tool,
     isStaging,
     shouldShowIntermediates,
-    shouldLockToInitialImage,
-    initialCanvasImage,
   } = useAppSelector(selector);
   useCanvasHotkeys();
 
@@ -145,34 +126,6 @@ const IAICanvas = () => {
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
 
-  const dragBoundFunc = useCallback(
-    (newCoordinates: Vector2d) => {
-      if (shouldLockToInitialImage && initialCanvasImage) {
-        newCoordinates.x = _.clamp(
-          newCoordinates.x,
-          stageDimensions.width -
-            Math.floor(initialCanvasImage.width * stageScale),
-          0
-        );
-        newCoordinates.y = _.clamp(
-          newCoordinates.y,
-          stageDimensions.height -
-            Math.floor(initialCanvasImage.height * stageScale),
-          0
-        );
-      }
-
-      return newCoordinates;
-    },
-    [
-      initialCanvasImage,
-      shouldLockToInitialImage,
-      stageDimensions.height,
-      stageDimensions.width,
-      stageScale,
-    ]
-  );
-
   return (
     <div className="inpainting-canvas-container">
       <div className="inpainting-canvas-wrapper">
@@ -188,7 +141,6 @@ const IAICanvas = () => {
           width={stageDimensions.width}
           height={stageDimensions.height}
           scale={{ x: stageScale, y: stageScale }}
-          dragBoundFunc={dragBoundFunc}
           onMouseDown={handleMouseDown}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseOut}

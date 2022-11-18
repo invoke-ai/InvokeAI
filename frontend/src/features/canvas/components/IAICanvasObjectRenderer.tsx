@@ -38,22 +38,20 @@ const IAICanvasObjectRenderer = () => {
           );
         } else if (isCanvasBaseLine(obj)) {
           return (
-            <Group {...obj.clipRect}>
-              <Line
-                key={i}
-                points={obj.points}
-                stroke={obj.color ? rgbaColorToString(obj.color) : 'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
-                strokeWidth={obj.strokeWidth * 2}
-                tension={0}
-                lineCap="round"
-                lineJoin="round"
-                shadowForStrokeEnabled={false}
-                listening={false}
-                globalCompositeOperation={
-                  obj.tool === 'brush' ? 'source-over' : 'destination-out'
-                }
-              />
-            </Group>
+            <Line
+              key={i}
+              points={obj.points}
+              stroke={obj.color ? rgbaColorToString(obj.color) : 'rgb(0,0,0)'} // The lines can be any color, just need alpha > 0
+              strokeWidth={obj.strokeWidth * 2}
+              tension={0}
+              lineCap="round"
+              lineJoin="round"
+              shadowForStrokeEnabled={false}
+              listening={false}
+              globalCompositeOperation={
+                obj.tool === 'brush' ? 'source-over' : 'destination-out'
+              }
+            />
           );
         }
       })}

@@ -84,14 +84,14 @@ export const store = configureStore({
   devTools: {
     // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [
-      // 'canvas/setCursorPosition',
-      // 'canvas/setStageCoordinates',
-      // 'canvas/setStageScale',
-      // 'canvas/setIsDrawing',
+      'canvas/setCursorPosition',
+      'canvas/setStageCoordinates',
+      'canvas/setStageScale',
+      'canvas/setIsDrawing',
       // 'canvas/setBoundingBoxCoordinates',
       // 'canvas/setBoundingBoxDimensions',
-      // 'canvas/setIsDrawing',
-      // 'canvas/addPointToCurrentLine',
+      'canvas/setIsDrawing',
+      'canvas/addPointToCurrentLine',
     ],
   },
 });

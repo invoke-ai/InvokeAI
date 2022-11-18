@@ -22,24 +22,12 @@ export const mergeAndUploadCanvas = createAsyncThunk(
     const state = getState() as RootState;
 
     const stageScale = state.canvas.stageScale;
-    const clipRect = state.canvas.initialCanvasImageClipRect;
-
-    const boundingBox =
-      state.canvas.shouldLockToInitialImage && clipRect && saveToGallery
-        ? {
-            x: clipRect.clipX,
-            y: clipRect.clipY,
-            width: clipRect.clipWidth,
-            height: clipRect.clipHeight,
-          }
-        : undefined;
 
     if (!canvasImageLayerRef.current) return;
 
     const { dataURL, boundingBox: originalBoundingBox } = layerToDataURL(
       canvasImageLayerRef.current,
-      stageScale,
-      boundingBox
+      stageScale
     );
 
     if (!dataURL) return;

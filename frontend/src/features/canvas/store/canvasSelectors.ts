@@ -6,9 +6,6 @@ export const canvasSelector = (state: RootState): CanvasState => state.canvas;
 export const isStagingSelector = (state: RootState): boolean =>
   state.canvas.layerState.stagingArea.images.length > 0;
 
-export const shouldLockToInitialImageSelector = (state: RootState): boolean =>
-  state.canvas.shouldLockToInitialImage;
-
 export const initialCanvasImageSelector = (
   state: RootState
 ): CanvasImage | undefined =>

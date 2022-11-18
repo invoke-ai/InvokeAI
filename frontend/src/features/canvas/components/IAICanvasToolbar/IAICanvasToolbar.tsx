@@ -4,7 +4,6 @@ import {
   resizeAndScaleCanvas,
   resetCanvas,
   resetCanvasView,
-  setShouldLockToInitialImage,
   setTool,
   fitBoundingBoxToStage,
 } from 'features/canvas/store/canvasSlice';
@@ -39,11 +38,10 @@ import {
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],
   (canvas, isStaging) => {
-    const { tool, shouldLockToInitialImage } = canvas;
+    const { tool } = canvas;
     return {
       tool,
       isStaging,
-      shouldLockToInitialImage,
     };
   },
   {
@@ -55,16 +53,7 @@ export const selector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging, shouldLockToInitialImage } =
-    useAppSelector(selector);
-
-  const handleToggleShouldLockToInitialImage = (
-    e: ChangeEvent<HTMLInputElement>
-  ) => {
-    dispatch(setShouldLockToInitialImage(e.target.checked));
-    dispatch(resizeAndScaleCanvas());
-    dispatch(fitBoundingBoxToStage());
-  };
+  const { tool, isStaging } = useAppSelector(selector);
 
   return (
     <div className="inpainting-settings">
@@ -151,11 +140,6 @@ const IAICanvasOutpaintingControls = () => {
           onClick={() => dispatch(resetCanvas())}
         />
       </ButtonGroup>
-      <IAICheckbox
-        label={'Lock Canvas to Initial Image'}
-        isChecked={shouldLockToInitialImage}
-        onChange={handleToggleShouldLockToInitialImage}
-      />
     </div>
   );
 };
