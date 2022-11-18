@@ -31,7 +31,7 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const { tool, isStaging } = useAppSelector(selector);
 
   return useCallback(
-    (e: KonvaEventObject<MouseEvent>) => {
+    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
       if (!stageRef.current) return;
 
       stageRef.current.container().focus();
