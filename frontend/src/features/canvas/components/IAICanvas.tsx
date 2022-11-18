@@ -149,6 +149,9 @@ const IAICanvas = () => {
           width={stageDimensions.width}
           height={stageDimensions.height}
           scale={{ x: stageScale, y: stageScale }}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
           onMouseDown={handleMouseDown}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseOut}
