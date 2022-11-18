@@ -24,6 +24,7 @@ import {
   isCanvasMaskLine,
 } from './canvasTypes';
 import roundDimensionsTo64 from '../util/roundDimensionsTo64';
+import { STAGE_PADDING_PERCENTAGE } from '../util/constants';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -410,10 +411,39 @@ export const canvasSlice = createSlice({
       const { width: containerWidth, height: containerHeight } =
         state.canvasContainerDimensions;
 
-      state.stageDimensions = {
+      const initialCanvasImage =
+        state.layerState.objects.find(isCanvasBaseImage);
+
+      const newStageDimensions = {
         width: Math.floor(containerWidth),
         height: Math.floor(containerHeight),
       };
+
+      if (!initialCanvasImage) {
+        const newScale = calculateScale(
+          newStageDimensions.width,
+          newStageDimensions.height,
+          512,
+          512,
+          STAGE_PADDING_PERCENTAGE
+        );
+
+        const newCoordinates = calculateCoordinates(
+          newStageDimensions.width,
+          newStageDimensions.height,
+          0,
+          0,
+          512,
+          512,
+          newScale
+        );
+
+        state.stageScale = newScale;
+
+        state.stageCoordinates = newCoordinates;
+      }
+
+      state.stageDimensions = newStageDimensions;
     },
     resetCanvasView: (
       state,
@@ -433,13 +463,12 @@ export const canvasSlice = createSlice({
 
       const { x, y, width, height } = contentRect;
 
-      const padding = 0.95;
       const newScale = calculateScale(
         stageWidth,
         stageHeight,
         width,
         height,
-        padding
+        STAGE_PADDING_PERCENTAGE
       );
 
       const newCoordinates = calculateCoordinates(
