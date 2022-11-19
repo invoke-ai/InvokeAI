@@ -7,9 +7,9 @@ import storage from 'redux-persist/lib/storage'; // defaults to localStorage for
 
 import { getPersistConfig } from 'redux-deep-persist';
 
-import optionsReducer from 'features/options/optionsSlice';
-import galleryReducer from 'features/gallery/gallerySlice';
-import systemReducer from 'features/system/systemSlice';
+import optionsReducer from 'features/options/store/optionsSlice';
+import galleryReducer from 'features/gallery/store/gallerySlice';
+import systemReducer from 'features/system/store/systemSlice';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 
 import { socketioMiddleware } from './socketio/middleware';

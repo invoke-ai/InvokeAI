@@ -15,7 +15,7 @@ import {
   errorOccurred,
   setModelList,
   setIsCancelable,
-} from 'features/system/systemSlice';
+} from 'features/system/store/systemSlice';
 
 import {
   addGalleryImages,
@@ -24,20 +24,20 @@ import {
   GalleryState,
   removeImage,
   setIntermediateImage,
-} from 'features/gallery/gallerySlice';
+} from 'features/gallery/store/gallerySlice';
 
 import {
   clearInitialImage,
   setInitialImage,
   setMaskPath,
-} from 'features/options/optionsSlice';
+} from 'features/options/store/optionsSlice';
 import {
   requestImages,
   requestNewImages,
   requestSystemConfig,
 } from './actions';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { tabMap } from 'features/tabs/InvokeTabs';
+import { tabMap } from 'features/tabs/components/InvokeTabs';
 
 /**
  * Returns an object containing listener callbacks for socketio events.

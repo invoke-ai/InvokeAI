@@ -6,7 +6,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 import _ from 'lodash';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { undo } from 'features/canvas/store/canvasSlice';
 
 const canvasUndoSelector = createSelector(

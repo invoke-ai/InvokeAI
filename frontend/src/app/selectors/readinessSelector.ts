@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { RootState } from 'app/store';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { OptionsState } from 'features/options/optionsSlice';
-import { SystemState } from 'features/system/systemSlice';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { OptionsState } from 'features/options/store/optionsSlice';
+import { SystemState } from 'features/system/store/systemSlice';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
 

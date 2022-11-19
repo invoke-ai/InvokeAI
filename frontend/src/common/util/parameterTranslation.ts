@@ -1,10 +1,10 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
-import { OptionsState } from 'features/options/optionsSlice';
-import { SystemState } from 'features/system/systemSlice';
+import { OptionsState } from 'features/options/store/optionsSlice';
+import { SystemState } from 'features/system/store/systemSlice';
 
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
-import { InvokeTabName } from 'features/tabs/InvokeTabs';
+import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
 import {
   CanvasState,
   isCanvasMaskLine,

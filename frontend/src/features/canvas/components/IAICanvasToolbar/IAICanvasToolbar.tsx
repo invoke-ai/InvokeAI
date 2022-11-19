@@ -32,7 +32,7 @@ import {
 } from 'features/canvas/store/canvasSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import { systemSelector } from 'features/system/systemSelectors';
+import { systemSelector } from 'features/system/store/systemSelectors';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],

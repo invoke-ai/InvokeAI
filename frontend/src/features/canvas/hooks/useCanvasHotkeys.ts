@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import {
   setShouldShowBoundingBox,
   setTool,

@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import Konva from 'konva';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';

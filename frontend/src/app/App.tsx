@@ -1,18 +1,18 @@
-import ProgressBar from 'features/system/ProgressBar';
-import SiteHeader from 'features/system/SiteHeader';
-import Console from 'features/system/Console';
+import ProgressBar from 'features/system/components/ProgressBar';
+import SiteHeader from 'features/system/components/SiteHeader';
+import Console from 'features/system/components/Console';
 import { keepGUIAlive } from './utils';
-import InvokeTabs from 'features/tabs/InvokeTabs';
+import InvokeTabs from 'features/tabs/components/InvokeTabs';
 import ImageUploader from 'common/components/ImageUploader';
 import { RootState, useAppSelector } from 'app/store';
 
-import FloatingGalleryButton from 'features/tabs/FloatingGalleryButton';
-import FloatingOptionsPanelButtons from 'features/tabs/FloatingOptionsPanelButtons';
+import FloatingGalleryButton from 'features/tabs/components/FloatingGalleryButton';
+import FloatingOptionsPanelButtons from 'features/tabs/components/FloatingOptionsPanelButtons';
 import { createSelector } from '@reduxjs/toolkit';
-import { GalleryState } from 'features/gallery/gallerySlice';
-import { OptionsState } from 'features/options/optionsSlice';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { SystemState } from 'features/system/systemSlice';
+import { GalleryState } from 'features/gallery/store/gallerySlice';
+import { OptionsState } from 'features/options/store/optionsSlice';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { SystemState } from 'features/system/store/systemSlice';
 import _ from 'lodash';
 import { Model } from './invokeai';
 import useToastWatcher from 'features/system/hooks/useToastWatcher';
