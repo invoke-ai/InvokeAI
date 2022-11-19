@@ -88,7 +88,9 @@ const IAICanvasStatusText = () => {
             boxX
           )}, ${roundToHundreth(boxY)})`}</div>
           <div>{`Canvas Dimensions: ${stageWidth}×${stageHeight}`}</div>
-          <div>{`Canvas Position: ${stageX}×${stageY}`}</div>
+          <div>{`Canvas Position: ${roundToHundreth(stageX)}×${roundToHundreth(
+            stageY
+          )}`}</div>
           <div>{`Cursor Position: (${cursorX}, ${cursorY})`}</div>
         </>
       )}
