@@ -98,7 +98,8 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const { shouldLoopback, activeTab } = getState().options;
+        const state = getState();
+        const { shouldLoopback, activeTab } = state.options;
         const { boundingBox: _, generationMode, ...rest } = data;
 
         const newImage = {
@@ -107,24 +108,31 @@ const makeSocketIOListeners = (
         };
 
         if (['txt2img', 'img2img'].includes(generationMode)) {
-          newImage.category = 'result';
           dispatch(
             addImage({
               category: 'result',
-              image: newImage,
+              image: { ...newImage, category: 'result' },
             })
           );
         }
 
         if (generationMode === 'unifiedCanvas' && data.boundingBox) {
-          newImage.category = 'temp';
           const { boundingBox } = data;
           dispatch(
             addImageToStagingArea({
-              image: newImage,
+              image: { ...newImage, category: 'temp' },
               boundingBox,
             })
           );
+
+          if (state.canvas.shouldAutoSave) {
+            dispatch(
+              addImage({
+                image: { ...newImage, category: 'result' },
+                category: 'result',
+              })
+            );
+          }
         }
 
         if (shouldLoopback) {
