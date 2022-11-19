@@ -23,13 +23,10 @@ import {
 import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import {
-  resetCanvasView,
   resizeAndScaleCanvas,
-  setDoesCanvasNeedScaling,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
 import { hoverableImageSelector } from 'features/gallery/store/gallerySliceSelectors';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -54,7 +51,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     isLightBoxOpen,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
-  const { url, uuid, metadata } = image;
+  const { url, thumbnail, uuid, metadata } = image;
 
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
@@ -173,7 +170,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             className="hoverable-image-image"
             objectFit={galleryImageObjectFit}
             rounded={'md'}
-            src={url}
+            src={thumbnail || url}
             loading={'lazy'}
           />
           <div className="hoverable-image-content" onClick={handleSelectImage}>
