@@ -940,7 +940,7 @@ class Args(object):
             '-embiggen_strength',
             type=float,
             help='The strength of the embiggen img2img step, defaults to 0.4',
-            default=0.4,
+            default=None,
         )
         special_effects_group.add_argument(
             '--seamless',
