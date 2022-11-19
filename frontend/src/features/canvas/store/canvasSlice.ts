@@ -73,13 +73,14 @@ const initialCanvasState: CanvasState = {
   shouldShowCheckboardTransparency: false,
   shouldShowGrid: true,
   shouldShowIntermediates: true,
+  shouldShowStagingImage: true,
+  shouldShowStagingOutline: true,
   shouldSnapToGrid: true,
   shouldUseInpaintReplace: false,
   stageCoordinates: { x: 0, y: 0 },
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
   tool: 'brush',
-  shouldShowStagingImage: true,
 };
 
 export const canvasSlice = createSlice({
@@ -636,6 +637,9 @@ export const canvasSlice = createSlice({
     setShouldShowStagingImage: (state, action: PayloadAction<boolean>) => {
       state.shouldShowStagingImage = action.payload;
     },
+    setShouldShowStagingOutline: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowStagingOutline = action.payload;
+    },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
       state.pastLayerStates.push({
         ...state.layerState,
@@ -705,6 +709,7 @@ export const {
   fitBoundingBoxToStage,
   setShouldShowStagingImage,
   setMergedCanvas,
+  setShouldShowStagingOutline,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

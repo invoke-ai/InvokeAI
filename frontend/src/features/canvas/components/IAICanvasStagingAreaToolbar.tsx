@@ -28,6 +28,7 @@ import {
   nextStagingAreaImage,
   prevStagingAreaImage,
   setShouldShowStagingImage,
+  setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
 
 const selector = createSelector(
@@ -37,6 +38,7 @@ const selector = createSelector(
       layerState: {
         stagingArea: { images, selectedImageIndex },
       },
+      shouldShowStagingOutline,
       shouldShowStagingImage,
     } = canvas;
 
@@ -46,6 +48,7 @@ const selector = createSelector(
       isOnFirstImage: selectedImageIndex === 0,
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,
+      shouldShowStagingOutline,
     };
   },
   {
@@ -64,16 +67,13 @@ const IAICanvasStagingAreaToolbar = () => {
     shouldShowStagingImage,
   } = useAppSelector(selector);
 
-  const [shouldShowStagingAreaOutline, setShouldShowStagingAreaOutline] =
-    useState<boolean>(true);
-
   const handleMouseOver = useCallback(() => {
-    setShouldShowStagingAreaOutline(false);
-  }, []);
+    dispatch(setShouldShowStagingOutline(false));
+  }, [dispatch]);
 
   const handleMouseOut = useCallback(() => {
-    setShouldShowStagingAreaOutline(true);
-  }, []);
+    dispatch(setShouldShowStagingOutline(true));
+  }, [dispatch]);
 
   if (!currentStagingAreaImage) return null;
 
@@ -84,6 +84,9 @@ const IAICanvasStagingAreaToolbar = () => {
       w={'100%'}
       align={'center'}
       justify={'center'}
+      filter="drop-shadow(0 0.5rem 1rem rgba(0,0,0))"
+      onMouseOver={handleMouseOver}
+      onMouseOut={handleMouseOut}
     >
       <ButtonGroup isAttached>
         <IAIIconButton
@@ -92,8 +95,6 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label="Previous"
           icon={<FaArrowLeft />}
           onClick={() => dispatch(prevStagingAreaImage())}
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
           data-selected={true}
           isDisabled={isOnFirstImage}
         />
@@ -103,8 +104,6 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label="Next"
           icon={<FaArrowRight />}
           onClick={() => dispatch(nextStagingAreaImage())}
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
           data-selected={true}
           isDisabled={isOnLastImage}
         />

@@ -104,11 +104,12 @@ export interface CanvasState {
   shouldShowCheckboardTransparency: boolean;
   shouldShowGrid: boolean;
   shouldShowIntermediates: boolean;
+  shouldShowStagingImage: boolean;
+  shouldShowStagingOutline: boolean;
   shouldSnapToGrid: boolean;
   shouldUseInpaintReplace: boolean;
   stageCoordinates: Vector2d;
   stageDimensions: Dimensions;
   stageScale: number;
   tool: CanvasTool;
-  shouldShowStagingImage: boolean;
 }

@@ -15,6 +15,7 @@ const selector = createSelector(
         stagingArea: { images, selectedImageIndex },
       },
       shouldShowStagingImage,
+      shouldShowStagingOutline,
     } = canvas;
 
     return {
@@ -23,6 +24,7 @@ const selector = createSelector(
       isOnFirstImage: selectedImageIndex === 0,
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,
+      shouldShowStagingOutline,
     };
   },
   {
@@ -36,11 +38,11 @@ type Props = GroupConfig;
 
 const IAICanvasStagingArea = (props: Props) => {
   const { ...rest } = props;
-  const { currentStagingAreaImage, shouldShowStagingImage } =
-    useAppSelector(selector);
-
-  const [shouldShowStagingAreaOutline, setShouldShowStagingAreaOutline] =
-    useState<boolean>(true);
+  const {
+    currentStagingAreaImage,
+    shouldShowStagingImage,
+    shouldShowStagingOutline,
+  } = useAppSelector(selector);
 
   if (!currentStagingAreaImage) return null;
 
@@ -53,7 +55,7 @@ const IAICanvasStagingArea = (props: Props) => {
   return (
     <Group {...rest}>
       {shouldShowStagingImage && <IAICanvasImage url={url} x={x} y={y} />}
-      {shouldShowStagingAreaOutline && (
+      {shouldShowStagingOutline && (
         <Group>
           <Rect
             x={x}
