@@ -59,7 +59,7 @@ const IAICanvasOutpaintingControls = () => {
   const canvasBaseLayer = getCanvasBaseLayer();
 
   useHotkeys(
-    ['m'],
+    ['v'],
     () => {
       handleSelectMoveTool();
     },
@@ -193,8 +193,8 @@ const IAICanvasOutpaintingControls = () => {
         <IAICanvasBrushButtonPopover />
         <IAICanvasEraserButtonPopover />
         <IAIIconButton
-          aria-label="Move (M)"
-          tooltip="Move (M)"
+          aria-label="Move (V)"
+          tooltip="Move (V)"
           icon={<FaArrowsAlt />}
           data-selected={tool === 'move' || isStaging}
           onClick={handleSelectMoveTool}

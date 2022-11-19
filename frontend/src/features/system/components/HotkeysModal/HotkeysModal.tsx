@@ -52,7 +52,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Toggle Viewer',
       desc: 'Open and close Image Viewer',
-      hotkey: 'V',
+      hotkey: 'Z',
     },
     {
       title: 'Toggle Gallery',
@@ -161,7 +161,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Move Tool',
       desc: 'Allows canvas navigation',
-      hotkey: 'M',
+      hotkey: 'V',
     },
     {
       title: 'Quick Toggle Move',

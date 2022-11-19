@@ -1,7 +1,6 @@
 import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { ReactNode } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { VscSplitHorizontal } from 'react-icons/vsc';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import ImageGallery from 'features/gallery/components/ImageGallery';
@@ -34,29 +33,13 @@ type InvokeWorkareaProps = {
 const InvokeWorkarea = (props: InvokeWorkareaProps) => {
   const dispatch = useAppDispatch();
   const { optionsPanel, children, styleClass } = props;
-  const {
-    showDualDisplay,
-    isLightBoxOpen,
-    shouldShowDualDisplayButton,
-  } = useAppSelector(workareaSelector);
+  const { showDualDisplay, isLightBoxOpen, shouldShowDualDisplayButton } =
+    useAppSelector(workareaSelector);
 
   const handleDualDisplay = () => {
     dispatch(setShowDualDisplay(!showDualDisplay));
     dispatch(setDoesCanvasNeedScaling(true));
   };
-
-  // Hotkeys
-  // Toggle split view
-  useHotkeys(
-    'shift+j',
-    () => {
-      handleDualDisplay();
-    },
-    {
-      enabled: shouldShowDualDisplayButton,
-    },
-    [showDualDisplay]
-  );
 
   return (
     <div

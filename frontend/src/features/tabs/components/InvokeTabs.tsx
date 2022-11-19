@@ -94,13 +94,9 @@ export default function InvokeTabs() {
     dispatch(setActiveTab(4));
   });
 
-  useHotkeys('6', () => {
-    dispatch(setActiveTab(5));
-  });
-
   // Lightbox Hotkey
   useHotkeys(
-    'v',
+    'z',
     () => {
       dispatch(setIsLightBoxOpen(!isLightBoxOpen));
     },
