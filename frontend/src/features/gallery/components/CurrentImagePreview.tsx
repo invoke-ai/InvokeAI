@@ -10,7 +10,10 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { OptionsState, setIsLightBoxOpen } from 'features/options/store/optionsSlice';
+import {
+  OptionsState,
+  setIsLightBoxOpen,
+} from 'features/options/store/optionsSlice';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 
 export const imagesSelector = createSelector(
@@ -30,6 +33,7 @@ export const imagesSelector = createSelector(
 
     return {
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,
+      isIntermediate: Boolean(intermediateImage),
       viewerImageToDisplay: currentImage,
       currentCategory,
       isOnFirstImage: currentImageIndex === 0,
@@ -56,6 +60,7 @@ export default function CurrentImagePreview() {
     isOnLastImage,
     shouldShowImageDetails,
     imageToDisplay,
+    isIntermediate,
   } = useAppSelector(imagesSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
@@ -89,6 +94,9 @@ export default function CurrentImagePreview() {
           width={imageToDisplay.width}
           height={imageToDisplay.height}
           onClick={handleLightBox}
+          style={{
+            imageRendering: isIntermediate ? 'pixelated' : 'initial',
+          }}
         />
       )}
       {!shouldShowImageDetails && (
