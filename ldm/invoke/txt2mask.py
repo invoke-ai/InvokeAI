@@ -29,10 +29,12 @@ work fine.
 
 import torch
 import numpy as  np
+import os
 from clipseg.clipseg import CLIPDensePredT
 from einops import rearrange, repeat
 from PIL import Image, ImageOps
 from torchvision import transforms
+from ldm.invoke.globals import Globals
 
 CLIP_VERSION = 'ViT-B/16'
 CLIPSEG_WEIGHTS = 'models/clipseg/clipseg_weights/rd64-uni.pth'
@@ -80,7 +82,11 @@ class Txt2Mask(object):
         self.model.eval()
         # initially we keep everything in cpu to conserve space
         self.model.to('cpu')
-        self.model.load_state_dict(torch.load(CLIPSEG_WEIGHTS_REFINED if refined else CLIPSEG_WEIGHTS, map_location=torch.device('cpu')), strict=False)
+        self.model.load_state_dict(torch.load(os.path.join(Globals.root,CLIPSEG_WEIGHTS_REFINED)
+                                              if refined
+                                              else os.path.join(Globals.root,CLIPSEG_WEIGHTS),
+                                              map_location=torch.device('cpu')), strict=False
+        )
 
     @torch.no_grad()
     def segment(self, image, prompt:str) -> SegmentedGrayscale:

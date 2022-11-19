@@ -93,6 +93,7 @@ import copy
 import base64
 import functools
 import ldm.invoke.pngwriter
+from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
@@ -118,7 +119,6 @@ PRECISION_CHOICES = [
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
 APP_VERSION = 'v2.1.2'
-INITFILE = os.path.expanduser('~/.invokeai')
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -171,11 +171,13 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             sysargs = sys.argv[1:]
-            if os.path.exists(INITFILE):
-                print(f'>> Initialization file {INITFILE} found. Loading...')
-                sysargs.insert(0,f'@{INITFILE}')
+            initfile = os.path.expanduser(Globals.initfile)
+            if os.path.exists(initfile):
+                print(f'>> Initialization file {initfile} found. Loading...')
+                sysargs.insert(0,f'@{initfile}')
             else:
-                print(f'>> Initialization file {INITFILE} not found. Applying default settings...')
+                print(f'>> Initialization file {INITFILE} not found. Creating a new one...')
+                self._create_init_file(INITFILE)
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
@@ -288,6 +290,8 @@ class Args(object):
             switches.append(f'--embiggen {" ".join([str(u) for u in a["embiggen"]])}')
         if a['embiggen_tiles']:
             switches.append(f'--embiggen_tiles {" ".join([str(u) for u in a["embiggen_tiles"]])}')
+        if a['embiggen_strength']:
+            switches.append(f'--embiggen_strength {a["embiggen_strength"]}')
 
         # outpainting parameters
         if a['out_direction']:
@@ -365,6 +369,17 @@ class Args(object):
             new_dict[k] = value2 if value2 is not None else value1
         return new_dict
 
+    def _create_init_file(self,initfile:str):
+        with open(initfile, mode='w', encoding='utf-8') as f:
+            f.write('''# InvokeAI initialization file
+# Put frequently-used startup commands here, one or more per line
+# Examples:
+# --web --host=0.0.0.0
+# --steps 20
+# -Ak_euler_a -C10.0
+'''
+            )
+
     def _create_arg_parser(self):
         '''
         This defines all the arguments used on the command line when you launch
@@ -391,6 +406,11 @@ class Args(object):
 
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
+        model_group.add_argument(
+            '--root_dir',
+            default=None,
+            help='Path to directory containing "models", "outputs" and "configs". If not present will try to read from ~/.invokeai and then from environment variable INVOKEAI_ROOT. Defaults to the current directory as a last resort.',
+        )
         model_group.add_argument(
             '--config',
             '-c',
@@ -915,6 +935,13 @@ class Args(object):
             nargs='+',
             type=int,
             help='For embiggen, provide list of tiles to process and replace onto the image e.g. `1 3 5`.',
+            default=None,
+        )
+        postprocessing_group.add_argument(
+            '--embiggen_strength',
+            '-embiggen_strength',
+            type=float,
+            help='The strength of the embiggen img2img step, defaults to 0.4',
             default=None,
         )
         special_effects_group.add_argument(

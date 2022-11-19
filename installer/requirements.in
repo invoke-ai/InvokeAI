@@ -1,6 +1,7 @@
 --prefer-binary
 --extra-index-url https://download.pytorch.org/whl/cu116
 --trusted-host https://download.pytorch.org
+accelerate~=0.14
 albumentations
 diffusers
 eventlet
@@ -16,9 +17,13 @@ streamlit
 taming-transformers-rom1504
 test-tube
 torch-fidelity
+torch==1.12.1 ; platform_system == 'Darwin'
+torch==1.12.1+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
 torchvision==0.13.1 ; platform_system == 'Darwin'
 torchvision==0.13.1+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
 transformers
+picklescan
 https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip
+https://github.com/invoke-ai/clipseg/archive/1f754751c85d7d4255fa681f4491ff5711c1c288.zip
 https://github.com/TencentARC/GFPGAN/archive/2eac2033893ca7f427f4035d80fe95b92649ac56.zip
 https://github.com/invoke-ai/k-diffusion/archive/7f16b2c33411f26b3eae78d10648d625cb0c1095.zip

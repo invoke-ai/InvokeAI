@@ -29,6 +29,7 @@ from pytorch_lightning import seed_everything, logging
 
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.util import instantiate_from_config
+from ldm.invoke.globals import Globals
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
@@ -222,8 +223,15 @@ class Generate:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
-                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id, local_files_only=True)
-                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id, local_files_only=True)
+                safety_model_path = os.path.join(Globals.root,'models',safety_model_id)
+                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id,
+                                                                                   local_files_only=True,
+                                                                                   cache_dir=safety_model_path,
+                )
+                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id,
+                                                                                     local_files_only=True,
+                                                                                     cache_dir=safety_model_path,
+                )
                 self.safety_checker.to(self.device)
             except Exception:
                 print('** An error was encountered while installing the safety checker:')
@@ -290,8 +298,9 @@ class Generate:
             strength         = None,
             init_color       = None,
             # these are specific to embiggen (which also relies on img2img args)
-            embiggen       =    None,
-            embiggen_tiles =    None,
+            embiggen          = None,
+            embiggen_tiles    = None,
+            embiggen_strength = None,
             # these are specific to GFPGAN/ESRGAN
             gfpgan_strength=    0,
             facetool         = None,
@@ -346,6 +355,7 @@ class Generate:
            perlin                          // optional 0-1 value to add a percentage of perlin noise to the initial noise
            embiggen                        // scale factor relative to the size of the --init_img (-I), followed by ESRGAN upscaling strength (0-1.0), followed by minimum amount of overlap between tiles as a decimal ratio (0 - 1.0) or number of pixels
            embiggen_tiles                  // list of tiles by number in order to process and replace onto the image e.g. `0 2 4`
+           embiggen_strength               // strength for embiggen. 0.0 preserves image exactly, 1.0 replaces it completely
 
         To use the step callback, define a function that receives two arguments:
         - Image GPU data
@@ -490,6 +500,7 @@ class Generate:
                 perlin=perlin,
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
+                embiggen_strength=embiggen_strength,
                 inpaint_replace=inpaint_replace,
                 mask_blur_radius=mask_blur_radius,
                 safety_checker=checker,
@@ -638,7 +649,7 @@ class Generate:
         elif tool == 'embiggen':
             # fetch the metadata from the image
             generator = self.select_generator(embiggen=True)
-            opt.strength  = 0.40
+            opt.strength = opt.embiggen_strength or 0.40
             print(f'>> Setting img2img strength to {opt.strength} for happy embiggening')
             generator.generate(
                 prompt,
@@ -654,6 +665,7 @@ class Generate:
                 height      = opt.height,
                 embiggen    = opt.embiggen,
                 embiggen_tiles = opt.embiggen_tiles,
+                embiggen_strength = opt.embiggen_strength,
                 image_callback = callback,
             )
         elif tool == 'outpaint':
@@ -914,7 +926,7 @@ class Generate:
                 r[0] = image
 
     def apply_textmask(self, image_path:str, prompt:str, callback, threshold:float=0.5):
-        assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+        assert os.path.exists(image_path), f'** "{image_path}" not found. Please enter the name of an existing image file to mask **'
         basename,_ = os.path.splitext(os.path.basename(image_path))
         if self.txt2mask is None:
             self.txt2mask  = Txt2Mask(device = self.device, refined=True)

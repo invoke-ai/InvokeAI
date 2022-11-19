@@ -1,7 +1,9 @@
 import torch
 import warnings
 import numpy as np
+import os
 
+from ldm.invoke.globals import Globals
 from PIL import Image
 
 
@@ -24,7 +26,7 @@ class ESRGAN():
         from realesrgan import RealESRGANer
 
         model = SRVGGNetCompact(num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type='prelu')
-        model_path = 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth'
+        model_path = os.path.join(Globals.root,'models/realesrgan/realesr-general-x4v3.pth')
         scale = 4
 
         bg_upsampler = RealESRGANer(

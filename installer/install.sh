@@ -29,7 +29,7 @@ OS_NAME=$(uname -s)
 case "${OS_NAME}" in
     Linux*)     OS_NAME="linux";;
     Darwin*)    OS_NAME="darwin";;
-    *)          echo -e "\n----- Unknown OS: $OS_NAME! This script runs only on Linux or MacOS -----\n" && exit
+    *)          echo -e "\n----- Unknown OS: $OS_NAME! This script runs only on Linux or macOS -----\n" && exit
 esac
 
 OS_ARCH=$(uname -m)
@@ -91,7 +91,7 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
     # download micromamba
     echo -e "\n***** Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to micromamba *****\n"
 
-    curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvj bin/micromamba -O > micromamba
+    curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvjO bin/micromamba > micromamba
 
     chmod u+x "micromamba"
 
@@ -154,12 +154,22 @@ echo -e "\n***** Unpacked python-build-standalone *****\n"
 
 # create venv
 _err_msg="\n----- problem creating venv -----\n"
+
+if [ "$OS_NAME" == "darwin" ]; then
+    # patch sysconfig so that extensions can build properly
+    # adapted from https://github.com/cashapp/hermit-packages/commit/fcba384663892f4d9cfb35e8639ff7a28166ee43
+    PYTHON_INSTALL_DIR="$(pwd)/python"
+    SYSCONFIG="$(echo python/lib/python*/_sysconfigdata_*.py)"
+    TMPFILE="$(mktemp)"
+    chmod +w "${SYSCONFIG}"
+    cp "${SYSCONFIG}" "${TMPFILE}"
+    sed "s,'/install,'${PYTHON_INSTALL_DIR},g" "${TMPFILE}" > "${SYSCONFIG}"
+    rm -f ${TMPFILE}
+fi
+
 ./python/bin/python3 -E -s -m venv .venv
 _err_exit $? _err_msg
-# In reality, the following is ALL that 'activate.bat' does,
-# aside from setting the prompt, which we don't care about
-export PYTHONPATH=
-export PATH=.venv/bin:$PATH
+source .venv/bin/activate
 
 echo -e "\n***** Created Python virtual environment *****\n"
 
@@ -183,10 +193,6 @@ _err_msg="\n----- main pip install failed -----\n"
 .venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -r requirements.txt
 _err_exit $? _err_msg
 
-_err_msg="\n----- clipseg install failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-_err_exit $? _err_msg
-
 _err_msg="\n----- InvokeAI setup failed -----\n"
 .venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -e .
 _err_exit $? _err_msg
@@ -205,6 +211,8 @@ cp installer/invoke.sh .
 
 # more cleanup
 rm -rf installer/ installer_files/
+
+deactivate
 
 echo "All done! Run the command './invoke.sh' to start InvokeAI."
 read -p "Press any key to exit..."

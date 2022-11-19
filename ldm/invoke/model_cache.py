@@ -14,15 +14,17 @@ import time
 import gc
 import hashlib
 import psutil
+import sys
 import transformers
 import traceback
 import os
-from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.util import instantiate_from_config
+from ldm.invoke.globals import Globals
+from picklescan.scanner import scan_file_path
 
 DEFAULT_MAX_MODELS=2
 
@@ -198,6 +200,7 @@ class ModelCache(object):
             return None
 
         mconfig = self.config[model_name]
+        config = mconfig.config
 
         # for usage statistics
         if self._has_cuda():
@@ -207,11 +210,13 @@ class ModelCache(object):
         tic = time.time()
 
         # this does the work
+        if not os.path.isabs(config):
+            config = os.path.join(Globals.root,config)
         model_format = mconfig.get('format', 'ckpt')
         if model_format == 'ckpt':
             weights = mconfig.weights
             print(f'>> Loading {model_name} from {weights}')
-            model, width, height, model_hash = self._load_ckpt_model(mconfig)
+            model, width, height, model_hash = self._load_ckpt_model(model_name, mconfig)
         elif model_format == 'diffusers':
             model, width, height, model_hash = self._load_diffusers_model(mconfig)
         else:
@@ -229,12 +234,17 @@ class ModelCache(object):
             )
         return model, width, height, model_hash
 
-    def _load_ckpt_model(self, mconfig):
+    def _load_ckpt_model(self, model_name, mconfig):
         config = mconfig.config
         weights = mconfig.weights
         vae = mconfig.get('vae', None)
         width = mconfig.width
         height = mconfig.height
+
+        if not os.path.isabs(weights):
+            weights = os.path.normpath(os.path.join(Globals.root,weights))
+        # scan model
+        self._scan_model(model_name, weights)
 
         c = OmegaConf.load(config)
         with open(weights, 'rb') as f:
@@ -254,6 +264,8 @@ class ModelCache(object):
 
         # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
         if vae:
+            if not os.path.isabs(vae):
+                vae = os.path.normpath(os.path.join(Globals.root,vae))
             if os.path.exists(vae):
                 print(f'   | Loading VAE weights from: {vae}')
                 vae_ckpt = torch.load(vae, map_location="cpu")
@@ -290,6 +302,8 @@ class ModelCache(object):
             raise ValueError("Model config must specify either repo_name or path.")
 
         print(f'>> Loading diffusers model from {name_or_path}')
+
+        # TODO: scan weights maybe?
 
         if self.precision == 'float16':
             print('   | Using faster float16 precision')
@@ -342,6 +356,30 @@ class ModelCache(object):
         gc.collect()
         if self._has_cuda():
             torch.cuda.empty_cache()
+    
+    def _scan_model(self, model_name, checkpoint):
+        # scan model
+        print(f'>> Scanning Model: {model_name}')
+        scan_result = scan_file_path(checkpoint)
+        if scan_result.infected_files != 0:
+            if scan_result.infected_files == 1:
+                print(f'\n### Issues Found In Model: {scan_result.issues_count}')
+                print('### WARNING: The model you are trying to load seems to be infected.')
+                print('### For your safety, InvokeAI will not load this model.')
+                print('### Please use checkpoints from trusted sources.')
+                print("### Exiting InvokeAI")
+                sys.exit()
+            else:
+                print('\n### WARNING: InvokeAI was unable to scan the model you are using.')
+                from ldm.util import ask_user
+                model_safe_check_fail = ask_user('Do you want to to continue loading the model?', ['y', 'n'])
+                if model_safe_check_fail.lower() == 'y':
+                    pass
+                else:
+                    print("### Exiting InvokeAI")
+                    sys.exit()
+        else:
+            print('>> Model Scanned. OK!!')
 
     def _make_cache_room(self):
         num_loaded_models = len(self.models)
