@@ -154,6 +154,8 @@ export const canvasSlice = createSlice({
     },
     setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
       const image = action.payload;
+      const { stageDimensions } = state;
+
       const newBoundingBoxDimensions = {
         width: roundDownToMultiple(_.clamp(image.width, 64, 512), 64),
         height: roundDownToMultiple(_.clamp(image.height, 64, 512), 64),
@@ -174,6 +176,7 @@ export const canvasSlice = createSlice({
       state.boundingBoxCoordinates = newBoundingBoxCoordinates;
 
       state.pastLayerStates.push(state.layerState);
+
       state.layerState = {
         ...initialLayerState,
         objects: [
@@ -191,6 +194,25 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
 
       state.isCanvasInitialized = false;
+      const newScale = calculateScale(
+        stageDimensions.width,
+        stageDimensions.height,
+        image.width,
+        image.height,
+        STAGE_PADDING_PERCENTAGE
+      );
+
+      const newCoordinates = calculateCoordinates(
+        stageDimensions.width,
+        stageDimensions.height,
+        0,
+        0,
+        image.width,
+        image.height,
+        newScale
+      );
+      state.stageScale = newScale;
+      state.stageCoordinates = newCoordinates;
       state.doesCanvasNeedScaling = true;
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {

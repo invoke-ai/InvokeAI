@@ -8,8 +8,6 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useToast } from '@chakra-ui/react';
-// import { uploadImage } from 'app/socketio/actions';
-import { UploadImagePayload } from 'app/invokeai';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { tabDict } from 'features/tabs/components/InvokeTabs';
@@ -46,8 +44,6 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   const fileAcceptedCallback = useCallback(
     async (file: File) => {
-      // setIsHandlingUpload(true);
-
       dispatch(uploadImage({ imageFile: file }));
     },
     [dispatch]
@@ -122,12 +118,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         return;
       }
 
-      // const payload: UploadImagePayload = { file };
-      // if (['img2img', 'inpainting'].includes(activeTabName)) {
-      //   payload.destination = activeTabName as ImageUploadDestination;
-      // }
-
-      // dispatch(uploadImage(payload));
+      dispatch(uploadImage({ imageFile: file }));
     };
     document.addEventListener('paste', pasteImageListener);
     return () => {
@@ -135,7 +126,9 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [dispatch, toast, activeTabName]);
 
-  const overlaySecondaryText = ['img2img', 'unifiedCanvas'].includes(activeTabName)
+  const overlaySecondaryText = ['img2img', 'unifiedCanvas'].includes(
+    activeTabName
+  )
     ? ` to ${tabDict[activeTabName as keyof typeof tabDict].tooltip}`
     : ``;
 
