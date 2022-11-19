@@ -4,47 +4,36 @@ import {
   resetCanvas,
   resetCanvasView,
   resizeAndScaleCanvas,
-  setTool,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
-  FaArrowsAlt,
   FaCopy,
   FaCrosshairs,
   FaDownload,
   FaLayerGroup,
   FaSave,
-  FaSlidersH,
   FaTrash,
   FaUpload,
 } from 'react-icons/fa';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
 import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
-import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
-import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskOptions from './IAICanvasMaskOptions';
 import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
+import useImageUploader from 'common/hooks/useImageUploader';
 
 export const selector = createSelector(
-  [canvasSelector, isStagingSelector, systemSelector],
-  (canvas, isStaging, system) => {
+  [systemSelector],
+  (system) => {
     const { isProcessing } = system;
-    const { tool } = canvas;
 
     return {
-      tool,
-      isStaging,
       isProcessing,
     };
   },
@@ -57,8 +46,10 @@ export const selector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging, isProcessing } = useAppSelector(selector);
+  const { isProcessing } = useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
+
+  const { openUploader } = useImageUploader();
 
   useHotkeys(
     ['r'],
@@ -219,6 +210,7 @@ const IAICanvasOutpaintingControls = () => {
           aria-label="Upload"
           tooltip="Upload"
           icon={<FaUpload />}
+          onClick={openUploader}
         />
         <IAIIconButton
           aria-label="Reset View (R)"

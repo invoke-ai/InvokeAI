@@ -13,6 +13,7 @@ import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { tabDict } from 'features/tabs/components/InvokeTabs';
 import ImageUploadOverlay from './ImageUploadOverlay';
 import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
+import useImageUploader from 'common/hooks/useImageUploader';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -24,6 +25,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
   const activeTabName = useAppSelector(activeTabNameSelector);
   const toast = useToast({});
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
+  const { setOpenUploader } = useImageUploader();
 
   const fileRejectionCallback = useCallback(
     (rejection: FileRejection) => {
@@ -76,6 +78,8 @@ const ImageUploader = (props: ImageUploaderProps) => {
     onDragOver: () => setIsHandlingUpload(true),
     maxFiles: 1,
   });
+
+  setOpenUploader(open);
 
   useEffect(() => {
     const pasteImageListener = (e: ClipboardEvent) => {
