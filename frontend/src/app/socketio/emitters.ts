@@ -15,7 +15,6 @@ import {
   addLogEntry,
   generationRequested,
   modelChangeRequested,
-  setCurrentStatus,
   setIsProcessing,
 } from 'features/system/store/systemSlice';
 import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
@@ -148,9 +147,9 @@ const makeSocketIOEmitters = (
       );
     },
     emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
-      const { url, uuid, category } = imageToDelete;
+      const { url, uuid, category, thumbnail } = imageToDelete;
       dispatch(removeImage(imageToDelete));
-      socketio.emit('deleteImage', url, uuid, category);
+      socketio.emit('deleteImage', url, thumbnail, uuid, category);
     },
     emitRequestImages: (category: GalleryCategory) => {
       const gallery: GalleryState = getState().gallery;
@@ -165,13 +164,6 @@ const makeSocketIOEmitters = (
     emitCancelProcessing: () => {
       socketio.emit('cancel');
     },
-    // emitUploadImage: (payload: InvokeAI.UploadImagePayload) => {
-    //   const { file, destination } = payload;
-    //   socketio.emit('uploadImage', file, file.name, destination);
-    // },
-    // emitUploadMaskImage: (file: File) => {
-    //   socketio.emit('uploadMaskImage', file, file.name);
-    // },
     emitRequestSystemConfig: () => {
       socketio.emit('requestSystemConfig');
     },

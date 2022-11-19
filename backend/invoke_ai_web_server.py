@@ -172,7 +172,9 @@ class InvokeAIWebServer:
 
                 (width, height) = pil_image.size
 
-                thumbnail_path = save_thumbnail(pil_image, file_path)
+                thumbnail_path = save_thumbnail(
+                    pil_image, os.path.basename(file_path), self.thumbnail_image_path
+                )
 
                 response = {
                     "url": self.get_url_from_image_path(file_path),
@@ -248,6 +250,7 @@ class InvokeAIWebServer:
         self.mask_image_url = "outputs/mask-images/"
         self.intermediate_url = "outputs/intermediates/"
         self.temp_image_url = "outputs/temp-images/"
+        self.thumbnail_image_url = "outputs/thumbnails/"
         # location for "finished" images
         self.result_path = args.outdir
         # temporary path for intermediates
@@ -257,6 +260,8 @@ class InvokeAIWebServer:
         self.mask_image_path = os.path.join(self.result_path, "mask-images/")
         # path for temp images e.g. gallery generations which are not committed
         self.temp_image_path = os.path.join(self.result_path, "temp-images/")
+        # path for thumbnail images
+        self.thumbnail_image_path = os.path.join(self.result_path, "thumbnails/")
         # txt log
         self.log_path = os.path.join(self.result_path, "invoke_log.txt")
         # make all output paths
@@ -268,6 +273,7 @@ class InvokeAIWebServer:
                 self.init_image_path,
                 self.mask_image_path,
                 self.temp_image_path,
+                self.thumbnail_image_path,
             ]
         ]
 
@@ -336,7 +342,9 @@ class InvokeAIWebServer:
                     pil_image = Image.open(path)
                     (width, height) = pil_image.size
 
-                    thumbnail_path = save_thumbnail(pil_image, path)
+                    thumbnail_path = save_thumbnail(
+                        pil_image, os.path.basename(path), self.thumbnail_image_path
+                    )
 
                     image_array.append(
                         {
@@ -400,7 +408,9 @@ class InvokeAIWebServer:
                     pil_image = Image.open(path)
                     (width, height) = pil_image.size
 
-                    thumbnail_path = save_thumbnail(pil_image, path)
+                    thumbnail_path = save_thumbnail(
+                        pil_image, os.path.basename(path), self.thumbnail_image_path
+                    )
 
                     image_array.append(
                         {
@@ -549,7 +559,9 @@ class InvokeAIWebServer:
                     postprocessing=postprocessing_parameters["type"],
                 )
 
-                thumbnail_path = save_thumbnail(image, path)
+                thumbnail_path = save_thumbnail(
+                    image, os.path.basename(path), self.thumbnail_image_path
+                )
 
                 self.write_log_message(
                     f'[Postprocessed] "{original_image_path}" > "{path}": {postprocessing_parameters}'
@@ -584,14 +596,13 @@ class InvokeAIWebServer:
 
         # TODO: I think this needs a safety mechanism.
         @socketio.on("deleteImage")
-        def handle_delete_image(url, uuid, category):
+        def handle_delete_image(url, thumbnail, uuid, category):
             try:
                 print(f'>> Delete requested "{url}"')
                 from send2trash import send2trash
 
                 path = self.get_image_path_from_url(url)
-                base = os.path.splitext(path)[0]
-                thumbnail_path = base + ".webp"
+                thumbnail_path = self.get_image_path_from_url(thumbnail)
 
                 send2trash(path)
                 send2trash(thumbnail_path)
@@ -968,7 +979,9 @@ class InvokeAIWebServer:
                     postprocessing=postprocessing,
                 )
 
-                thumbnail_path = save_thumbnail(image, path)
+                thumbnail_path = save_thumbnail(
+                    image, os.path.basename(path), self.thumbnail_image_path
+                )
 
                 print(f'>> Image generated: "{path}"')
                 self.write_log_message(f'[Generated] "{path}": {command}')
@@ -1281,6 +1294,10 @@ class InvokeAIWebServer:
                 return os.path.abspath(
                     os.path.join(self.temp_image_path, os.path.basename(url))
                 )
+            elif "thumbnails" in url:
+                return os.path.abspath(
+                    os.path.join(self.thumbnail_image_path, os.path.basename(url))
+                )
             else:
                 return os.path.abspath(
                     os.path.join(self.result_path, os.path.basename(url))
@@ -1303,6 +1320,8 @@ class InvokeAIWebServer:
                 return os.path.join(self.intermediate_url, os.path.basename(path))
             elif "temp-images" in path:
                 return os.path.join(self.temp_image_url, os.path.basename(path))
+            elif "thumbnails" in path:
+                return os.path.join(self.thumbnail_image_url, os.path.basename(path))
             else:
                 return os.path.join(self.result_url, os.path.basename(path))
         except Exception as e:
@@ -1488,11 +1507,12 @@ Saves a thumbnail of an image, returning its path.
 
 def save_thumbnail(
     image: ImageType,
+    filename: str,
     path: str,
     size: int = 128,
 ) -> str:
-    base = os.path.splitext(path)[0]
-    thumbnail_path = base + ".webp"
+    base_filename = os.path.splitext(filename)[0]
+    thumbnail_path = os.path.join(path, base_filename + ".webp")
 
     if os.path.exists(thumbnail_path):
         return thumbnail_path
