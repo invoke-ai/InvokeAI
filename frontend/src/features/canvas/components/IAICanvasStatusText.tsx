@@ -21,27 +21,31 @@ const selector = createSelector(
       layer,
     } = canvas;
 
-    const position = cursorPosition
+    const { cursorX, cursorY } = cursorPosition
       ? { cursorX: cursorPosition.x, cursorY: cursorPosition.y }
       : { cursorX: -1, cursorY: -1 };
 
     return {
-      stageWidth,
-      stageHeight,
-      stageX,
-      stageY,
-      boxWidth,
-      boxHeight,
-      boxX,
-      boxY,
-      stageScale,
+      activeLayerColor:
+        layer === 'mask' ? 'var(--status-working-color)' : 'inherit',
+      activeLayerString: layer.charAt(0).toUpperCase() + layer.slice(1),
+      boundingBoxColor:
+        boxWidth < 512 || boxHeight < 512
+          ? 'var(--status-working-color)'
+          : 'inherit',
+      boundingBoxCoordinatesString: `(${roundToHundreth(
+        boxX
+      )}, ${roundToHundreth(boxY)})`,
+      boundingBoxDimensionsString: `${boxWidth}×${boxHeight}`,
+      canvasCoordinatesString: `${roundToHundreth(stageX)}×${roundToHundreth(
+        stageY
+      )}`,
+      canvasDimensionsString: `${stageWidth}×${stageHeight}`,
+      canvasScaleString: Math.round(stageScale * 100),
+      cursorCoordinatesString: `(${cursorX}, ${cursorY})`,
       shouldShowCanvasDebugInfo,
-      layerFormatted: layer.charAt(0).toUpperCase() + layer.slice(1),
-      layer,
-      ...position,
     };
   },
-
   {
     memoizeOptions: {
       resultEqualityCheck: _.isEqual,
@@ -50,48 +54,37 @@ const selector = createSelector(
 );
 const IAICanvasStatusText = () => {
   const {
-    stageWidth,
-    stageHeight,
-    stageX,
-    stageY,
-    boxWidth,
-    boxHeight,
-    boxX,
-    boxY,
-    cursorX,
-    cursorY,
-    stageScale,
+    activeLayerColor,
+    activeLayerString,
+    boundingBoxColor,
+    boundingBoxCoordinatesString,
+    boundingBoxDimensionsString,
+    canvasCoordinatesString,
+    canvasDimensionsString,
+    canvasScaleString,
+    cursorCoordinatesString,
     shouldShowCanvasDebugInfo,
-    layer,
-    layerFormatted,
   } = useAppSelector(selector);
 
   return (
     <div className="canvas-status-text">
       <div
         style={{
-          color: layer === 'mask' ? 'var(--status-working-color)' : 'inherit',
+          color: activeLayerColor,
         }}
-      >{`Active Layer: ${layerFormatted}`}</div>
-      <div>{`Canvas Scale: ${Math.round(stageScale * 100)}%`}</div>
+      >{`Active Layer: ${activeLayerString}`}</div>
+      <div>{`Canvas Scale: ${canvasScaleString}%`}</div>
       <div
         style={{
-          color:
-            boxWidth < 512 || boxHeight < 512
-              ? 'var(--status-working-color)'
-              : 'inherit',
+          color: boundingBoxColor,
         }}
-      >{`Bounding Box: ${boxWidth}×${boxHeight}`}</div>
+      >{`Bounding Box: ${boundingBoxDimensionsString}`}</div>
       {shouldShowCanvasDebugInfo && (
         <>
-          <div>{`Bounding Box Position: (${roundToHundreth(
-            boxX
-          )}, ${roundToHundreth(boxY)})`}</div>
-          <div>{`Canvas Dimensions: ${stageWidth}×${stageHeight}`}</div>
-          <div>{`Canvas Position: ${roundToHundreth(stageX)}×${roundToHundreth(
-            stageY
-          )}`}</div>
-          <div>{`Cursor Position: (${cursorX}, ${cursorY})`}</div>
+          <div>{`Bounding Box Position: ${boundingBoxCoordinatesString}`}</div>
+          <div>{`Canvas Dimensions: ${canvasDimensionsString}`}</div>
+          <div>{`Canvas Position: ${canvasCoordinatesString}`}</div>
+          <div>{`Cursor Position: ${cursorCoordinatesString}`}</div>
         </>
       )}
     </div>
