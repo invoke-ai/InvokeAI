@@ -46,11 +46,9 @@
 
 .lightbox-preview-wrapper {
   overflow: hidden;
-  background-color: red;
   background-color: var(--background-color-secondary);
   display: grid;
   grid-template-columns: auto max-content;
-
   place-items: center;
   width: 100vw;
   height: 100vh;
