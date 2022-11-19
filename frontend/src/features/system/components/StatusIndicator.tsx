@@ -33,8 +33,6 @@ const StatusIndicator = () => {
     wasErrorSeen,
   } = useAppSelector(systemSelector);
   const dispatch = useAppDispatch();
-  // const statusMessageTextColor =
-  //   isConnected && !hasError ? 'green.500' : 'red.500';
 
   let statusStyle;
   if (isConnected && !hasError) {
@@ -84,7 +82,6 @@ const StatusIndicator = () => {
         cursor={statusIndicatorCursor}
         onClick={handleClickStatusIndicator}
         className={`status ${statusStyle}`}
-        // textColor={statusMessageTextColor}
       >
         {statusMessage}
       </Text>
