@@ -8,12 +8,11 @@ import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
-import { canvasExtraReducers } from './reducers/extraReducers';
-import { setInitialCanvasImage as setInitialCanvasImage_reducer } from './reducers/setInitialCanvasImage';
 import calculateScale from '../util/calculateScale';
 import calculateCoordinates from '../util/calculateCoordinates';
 import floorCoordinates from '../util/floorCoordinates';
 import {
+  CanvasImage,
   CanvasLayer,
   CanvasLayerState,
   CanvasState,
@@ -152,7 +151,45 @@ export const canvasSlice = createSlice({
       state.cursorPosition = action.payload;
     },
     setInitialCanvasImage: (state, action: PayloadAction<InvokeAI.Image>) => {
-      setInitialCanvasImage_reducer(state, action.payload);
+      const image = action.payload;
+      const newBoundingBoxDimensions = {
+        width: roundDownToMultiple(_.clamp(image.width, 64, 512), 64),
+        height: roundDownToMultiple(_.clamp(image.height, 64, 512), 64),
+      };
+
+      const newBoundingBoxCoordinates = {
+        x: roundToMultiple(
+          image.width / 2 - newBoundingBoxDimensions.width / 2,
+          64
+        ),
+        y: roundToMultiple(
+          image.height / 2 - newBoundingBoxDimensions.height / 2,
+          64
+        ),
+      };
+
+      state.boundingBoxDimensions = newBoundingBoxDimensions;
+      state.boundingBoxCoordinates = newBoundingBoxCoordinates;
+
+      state.pastLayerStates.push(state.layerState);
+      state.layerState = {
+        ...initialLayerState,
+        objects: [
+          {
+            kind: 'image',
+            layer: 'base',
+            x: 0,
+            y: 0,
+            width: image.width,
+            height: image.height,
+            image: image,
+          },
+        ],
+      };
+      state.futureLayerStates = [];
+
+      state.isCanvasInitialized = false;
+      state.doesCanvasNeedScaling = true;
     },
     setStageDimensions: (state, action: PayloadAction<Dimensions>) => {
       state.stageDimensions = action.payload;
@@ -599,8 +636,16 @@ export const canvasSlice = createSlice({
     setShouldShowStagingImage: (state, action: PayloadAction<boolean>) => {
       state.shouldShowStagingImage = action.payload;
     },
+    setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
+      state.pastLayerStates.push({
+        ...state.layerState,
+      });
+
+      state.futureLayerStates = [];
+
+      state.layerState.objects = [action.payload];
+    },
   },
-  extraReducers: canvasExtraReducers,
 });
 
 export const {
@@ -659,6 +704,7 @@ export const {
   setCanvasContainerDimensions,
   fitBoundingBoxToStage,
   setShouldShowStagingImage,
+  setMergedCanvas,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

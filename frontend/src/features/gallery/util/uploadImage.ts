@@ -1,20 +1,22 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { AnyAction, ThunkAction } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import * as InvokeAI from 'app/invokeai';
 import { v4 as uuidv4 } from 'uuid';
 import { activeTabNameSelector } from 'features/options/optionsSelectors';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { setInitialImage } from 'features/options/optionsSlice';
+import { addImage } from '../gallerySlice';
 
-export const uploadImage = createAsyncThunk(
-  'gallery/uploadImage',
-  async (
-    args: {
-      imageFile: File;
-    },
-    thunkAPI
-  ) => {
-    const { imageFile } = args;
+type UploadImageConfig = {
+  imageFile: File;
+};
 
-    const { getState } = thunkAPI;
+export const uploadImage =
+  (
+    config: UploadImageConfig
+  ): ThunkAction<void, RootState, unknown, AnyAction> =>
+  async (dispatch, getState) => {
+    const { imageFile } = config;
 
     const state = getState() as RootState;
 
@@ -47,10 +49,11 @@ export const uploadImage = createAsyncThunk(
       height: height,
     };
 
-    return {
-      image: newImage,
-      kind: 'init',
-      activeTabName,
-    };
-  }
-);
+    dispatch(addImage({ image: newImage, category: 'user' }));
+
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(setInitialCanvasImage(newImage));
+    } else if (activeTabName === 'img2img') {
+      dispatch(setInitialImage(newImage));
+    }
+  };
