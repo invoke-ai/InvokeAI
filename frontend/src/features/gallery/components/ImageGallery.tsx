@@ -63,6 +63,7 @@ export default function ImageGallery() {
     areMoreImagesAvailable,
     galleryWidth,
     isLightBoxOpen,
+    isStaging,
   } = useAppSelector(imageGallerySelector);
 
   const [galleryMinWidth, setGalleryMinWidth] = useState<number>(300);
@@ -158,13 +159,27 @@ export default function ImageGallery() {
     [shouldShowGallery, shouldPinGallery]
   );
 
-  useHotkeys('left', () => {
-    dispatch(selectPrevImage());
-  });
+  useHotkeys(
+    'left',
+    () => {
+      dispatch(selectPrevImage());
+    },
+    {
+      enabled: !isStaging,
+    },
+    [isStaging]
+  );
 
-  useHotkeys('right', () => {
-    dispatch(selectNextImage());
-  });
+  useHotkeys(
+    'right',
+    () => {
+      dispatch(selectNextImage());
+    },
+    {
+      enabled: !isStaging,
+    },
+    [isStaging]
+  );
 
   useHotkeys(
     'shift+g',
