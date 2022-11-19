@@ -1509,7 +1509,7 @@ def save_thumbnail(
     image: ImageType,
     filename: str,
     path: str,
-    size: int = 128,
+    size: int = 256,
 ) -> str:
     base_filename = os.path.splitext(filename)[0]
     thumbnail_path = os.path.join(path, base_filename + ".webp")
