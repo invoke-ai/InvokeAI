@@ -43,6 +43,7 @@ export default function ThemeChanger() {
             leftIcon={currentTheme === theme ? <FaCheck /> : undefined}
             size={'sm'}
             onClick={() => handleChangeTheme(theme)}
+            key={theme}
           >
             {theme.charAt(0).toUpperCase() + theme.slice(1)}
           </IAIButton>
