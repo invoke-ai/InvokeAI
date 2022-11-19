@@ -16,6 +16,7 @@ import HotkeysModal from './HotkeysModal/HotkeysModal';
 import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 import ThemeChanger from './ThemeChanger';
+import ModelSelect from './ModelSelect';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
@@ -32,6 +33,8 @@ const SiteHeader = () => {
 
       <div className="site-header-right-side">
         <StatusIndicator />
+
+        <ModelSelect />
 
         <HotkeysModal>
           <IAIIconButton
