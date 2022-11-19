@@ -6,7 +6,12 @@ import layerToDataURL from '../../util/layerToDataURL';
 import downloadFile from '../../util/downloadFile';
 import copyImage from '../../util/copyImage';
 import { getCanvasBaseLayer } from '../../util/konvaInstanceProvider';
-import { addToast } from 'features/system/store/systemSlice';
+import {
+  addToast,
+  setCurrentStatus,
+  setIsCancelable,
+  setIsProcessing,
+} from 'features/system/store/systemSlice';
 import { addImage } from 'features/gallery/store/gallerySlice';
 import { setMergedCanvas } from '../canvasSlice';
 
@@ -37,20 +42,33 @@ export const mergeAndUploadCanvas =
       shouldSetAsInitialImage,
     } = config;
 
+    dispatch(setCurrentStatus('Exporting Image'));
+    dispatch(setIsProcessing(true));
+    dispatch(setIsCancelable(false));
+
     const state = getState() as RootState;
 
     const stageScale = state.canvas.stageScale;
 
     const canvasBaseLayer = getCanvasBaseLayer();
 
-    if (!canvasBaseLayer) return;
+    if (!canvasBaseLayer) {
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(true));
+
+      return;
+    }
 
     const { dataURL, boundingBox: originalBoundingBox } = layerToDataURL(
       canvasBaseLayer,
       stageScale
     );
 
-    if (!dataURL) return;
+    if (!dataURL) {
+      dispatch(setIsProcessing(false));
+      dispatch(setIsCancelable(true));
+      return;
+    }
 
     const formData = new FormData();
 
@@ -133,4 +151,8 @@ export const mergeAndUploadCanvas =
         })
       );
     }
+
+    dispatch(setIsProcessing(false));
+    dispatch(setCurrentStatus('Connected'));
+    dispatch(setIsCancelable(true));
   };
