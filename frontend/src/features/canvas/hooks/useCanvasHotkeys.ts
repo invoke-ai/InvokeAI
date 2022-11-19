@@ -5,7 +5,6 @@ import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import {
   setShouldShowBoundingBox,
   setTool,
-  toggleShouldLockBoundingBox,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { useRef } from 'react';
@@ -46,18 +45,6 @@ const useInpaintingCanvasHotkeys = () => {
   const previousToolRef = useRef<CanvasTool | null>(null);
 
   const canvasStage = getCanvasStage();
-
-  //  Toggle lock bounding box
-  useHotkeys(
-    'shift+w',
-    () => {
-      dispatch(toggleShouldLockBoundingBox());
-    },
-    {
-      preventDefault: true,
-    },
-    [activeTabName]
-  );
 
   useHotkeys(
     'shift+h',
