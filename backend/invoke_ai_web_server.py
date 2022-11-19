@@ -215,7 +215,7 @@ class InvokeAIWebServer:
 
                 sys.exit(0)
         else:
-            useSSL = (args.certfile or args.keyfile)
+            useSSL = args.certfile or args.keyfile
             print(">> Started Invoke AI Web Server!")
             if self.host == "0.0.0.0":
                 print(
@@ -225,12 +225,19 @@ class InvokeAIWebServer:
                 print(
                     ">> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address."
                 )
-                print(f">> Point your browser at http{'s' if useSSL else ''}://{self.host}:{self.port}")
+                print(
+                    f">> Point your browser at http{'s' if useSSL else ''}://{self.host}:{self.port}"
+                )
             if not useSSL:
                 self.socketio.run(app=self.app, host=self.host, port=self.port)
             else:
-                self.socketio.run(app=self.app, host=self.host, port=self.port,
-                certfile=args.certfile, keyfile=args.keyfile)
+                self.socketio.run(
+                    app=self.app,
+                    host=self.host,
+                    port=self.port,
+                    certfile=args.certfile,
+                    keyfile=args.keyfile,
+                )
 
     def setup_app(self):
         self.result_url = "outputs/"
@@ -909,8 +916,11 @@ class InvokeAIWebServer:
                 eventlet.sleep(0)
 
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
-                if "init_img" in all_parameters:
-                    all_parameters["init_img"] = ""
+                all_parameters["init_img"] = (
+                    init_img_url
+                    if generation_parameters["generation_mode"] == "img2img"
+                    else ""
+                )
 
                 if "init_mask" in all_parameters:
                     all_parameters["init_mask"] = ""  # TODO: store the mask in metadata
@@ -967,7 +977,7 @@ class InvokeAIWebServer:
                 eventlet.sleep(0)
 
                 progress.set_current_iteration(progress.current_iteration + 1)
-            
+
             print(generation_parameters)
 
             self.generate.prompt2image(
@@ -1023,6 +1033,8 @@ class InvokeAIWebServer:
 
             postprocessing = []
 
+            rfc_dict["type"] = parameters["generation_mode"]
+
             # 'postprocessing' is either null or an
             if "facetool_strength" in parameters:
                 facetool_parameters = {
@@ -1071,25 +1083,17 @@ class InvokeAIWebServer:
 
             rfc_dict["variations"] = variations
 
-            # if "init_img" in parameters:
-            #     rfc_dict["type"] = "img2img"
-            #     rfc_dict["strength"] = parameters["strength"]
-            #     rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
-            #     rfc_dict["orig_hash"] = calculate_init_img_hash(
-            #         self.get_image_path_from_url(parameters["init_img"])
-            #     )
-            #     rfc_dict["init_image_path"] = parameters[
-            #         "init_img"
-            #     ]  # TODO: Noncompliant
-            #     # if 'init_mask' in parameters:
-            #     #     rfc_dict['mask_hash'] = calculate_init_img_hash(
-            #     #         self.get_image_path_from_url(parameters['init_mask'])
-            #     #     )  # TODO: Noncompliant
-            #     #     rfc_dict['mask_image_path'] = parameters[
-            #     #         'init_mask'
-            #     #     ]  # TODO: Noncompliant
-            # else:
-            #     rfc_dict["type"] = "txt2img"
+            print(parameters)
+
+            if rfc_dict["type"] == "img2img":
+                rfc_dict["strength"] = parameters["strength"]
+                rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
+                rfc_dict["orig_hash"] = calculate_init_img_hash(
+                    self.get_image_path_from_url(parameters["init_img"])
+                )
+                rfc_dict["init_image_path"] = parameters[
+                    "init_img"
+                ]  # TODO: Noncompliant
 
             metadata["image"] = rfc_dict
 

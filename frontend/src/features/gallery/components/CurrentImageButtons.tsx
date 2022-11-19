@@ -160,6 +160,11 @@ const CurrentImageButtons = () => {
   const handleClickUseAllParameters = () => {
     if (!currentImage) return;
     currentImage.metadata && dispatch(setAllParameters(currentImage.metadata));
+    if (currentImage.metadata?.image.type === 'img2img') {
+      dispatch(setActiveTab('img2img'));
+    } else if (currentImage.metadata?.image.type === 'txt2img') {
+      dispatch(setActiveTab('txt2img'));
+    }
   };
 
   useHotkeys(
