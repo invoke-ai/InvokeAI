@@ -43,7 +43,6 @@ def get_bert_token_for_string(tokenizer, string):
 def get_embedding_for_clip_token(embedder, token):
     return embedder(token.unsqueeze(0))[0, 0]
 
-
 class EmbeddingManager(nn.Module):
     def __init__(
         self,
@@ -235,10 +234,15 @@ class EmbeddingManager(nn.Module):
         # https://huggingface.co/sd-concepts-library
         else:
             for token_str in list(ckpt.keys()):
+                id = self.embedder.tokenizer.add_tokens(token_str)
+                print(f'adding embedding token "{token_str}" as {id}')
+            self.embedder.transformer.resize_token_embeddings()
+                
+            for token_str in list(ckpt.keys()):
                 token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
                 self.string_to_token_dict[token_str] = token
                 ckpt[token_str] = torch.nn.Parameter(ckpt[token_str])
-                
+
             self.string_to_param_dict.update(ckpt)
 
         if not full:
