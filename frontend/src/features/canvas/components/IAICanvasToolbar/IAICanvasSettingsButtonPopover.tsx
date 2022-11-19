@@ -60,8 +60,6 @@ const IAICanvasSettingsButtonPopover = () => {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          variant="link"
-          data-variant="link"
           tooltip="Canvas Settings"
           aria-label="Canvas Settings"
           icon={<FaWrench />}

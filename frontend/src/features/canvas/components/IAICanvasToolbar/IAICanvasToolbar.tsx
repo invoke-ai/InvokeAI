@@ -16,6 +16,7 @@ import {
   FaDownload,
   FaLayerGroup,
   FaSave,
+  FaSlidersH,
   FaTrash,
   FaUpload,
 } from 'react-icons/fa';
@@ -24,7 +25,7 @@ import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
-import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
+import IAICanvasMaskOptions from './IAICanvasMaskOptions';
 import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import {
   canvasSelector,
@@ -33,6 +34,7 @@ import {
 import { useHotkeys } from 'react-hotkeys-hook';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],
@@ -57,18 +59,6 @@ const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
   const { tool, isStaging, isProcessing } = useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
-
-  useHotkeys(
-    ['v'],
-    () => {
-      handleSelectMoveTool();
-    },
-    {
-      enabled: () => true,
-      preventDefault: true,
-    },
-    []
-  );
 
   useHotkeys(
     ['r'],
@@ -130,8 +120,6 @@ const IAICanvasOutpaintingControls = () => {
     [canvasBaseLayer, isProcessing]
   );
 
-  const handleSelectMoveTool = () => dispatch(setTool('move'));
-
   const handleResetCanvasView = () => {
     const canvasBaseLayer = getCanvasBaseLayer();
     if (!canvasBaseLayer) return;
@@ -188,18 +176,9 @@ const IAICanvasOutpaintingControls = () => {
 
   return (
     <div className="inpainting-settings">
-      <IAICanvasMaskButtonPopover />
-      <ButtonGroup isAttached>
-        <IAICanvasBrushButtonPopover />
-        <IAICanvasEraserButtonPopover />
-        <IAIIconButton
-          aria-label="Move (V)"
-          tooltip="Move (V)"
-          icon={<FaArrowsAlt />}
-          data-selected={tool === 'move' || isStaging}
-          onClick={handleSelectMoveTool}
-        />
-      </ButtonGroup>
+      <IAICanvasMaskOptions />
+      <IAICanvasToolChooserOptions />
+
       <ButtonGroup isAttached>
         <IAIIconButton
           aria-label="Merge Visible (Shift+M)"
@@ -234,9 +213,7 @@ const IAICanvasOutpaintingControls = () => {
         <IAICanvasUndoButton />
         <IAICanvasRedoButton />
       </ButtonGroup>
-      <ButtonGroup isAttached>
-        <IAICanvasSettingsButtonPopover />
-      </ButtonGroup>
+
       <ButtonGroup isAttached>
         <IAIIconButton
           aria-label="Upload"
@@ -250,11 +227,15 @@ const IAICanvasOutpaintingControls = () => {
           onClick={handleResetCanvasView}
         />
         <IAIIconButton
-          aria-label="Reset Canvas"
-          tooltip="Reset Canvas"
+          aria-label="Clear Canvas"
+          tooltip="Clear Canvas"
           icon={<FaTrash />}
           onClick={handleResetCanvas}
+          style={{ backgroundColor: 'var(--btn-delete-image)' }}
         />
+      </ButtonGroup>
+      <ButtonGroup isAttached>
+        <IAICanvasSettingsButtonPopover />
       </ButtonGroup>
     </div>
   );

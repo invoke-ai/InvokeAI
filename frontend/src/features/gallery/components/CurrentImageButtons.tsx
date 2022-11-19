@@ -488,7 +488,7 @@ const CurrentImageButtons = () => {
           tooltip="Delete Image"
           aria-label="Delete Image"
           isDisabled={!currentImage || !isConnected || isProcessing}
-          className="delete-image-btn"
+          style={{ backgroundColor: 'var(--btn-delete-image)' }}
         />
       </DeleteImageModal>
     </div>

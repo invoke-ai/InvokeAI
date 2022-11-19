@@ -1,8 +1,15 @@
 import * as InvokeAI from 'app/invokeai';
-import { IRect, Vector2d } from 'konva/lib/types';
+import { Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 
-export type CanvasLayer = 'base' | 'mask';
+export const LAYER_NAMES_DICT = [
+  { key: 'Base', value: 'base' },
+  { key: 'Mask', value: 'mask' },
+];
+
+export const LAYER_NAMES = ['base', 'mask'] as const;
+
+export type CanvasLayer = typeof LAYER_NAMES[number];
 
 export type CanvasDrawingTool = 'brush' | 'eraser';
 
