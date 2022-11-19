@@ -337,54 +337,6 @@ const makeSocketIOListeners = (
         })
       );
     },
-    // onImageUploaded: (data: InvokeAI.ImageUploadResponse) => {
-    //   const { origin, image, kind } = data;
-    //   const newImage = {
-    //     uuid: uuidv4(),
-    //     ...image,
-    //   };
-
-    //   try {
-    //     dispatch(addImage({ image: newImage, category: 'user' }));
-
-    //     switch (origin) {
-    //       case 'img2img': {
-    //         dispatch(setInitialImage(newImage));
-    //         break;
-    //       }
-    //       case 'inpainting': {
-    //         dispatch(setImageToInpaint(newImage));
-    //         break;
-    //       }
-    //       default: {
-    //         dispatch(setCurrentImage(newImage));
-    //         break;
-    //       }
-    //     }
-
-    //     dispatch(
-    //       addLogEntry({
-    //         timestamp: dateFormat(new Date(), 'isoDateTime'),
-    //         message: `Image uploaded: ${image.url}`,
-    //       })
-    //     );
-    //   } catch (e) {
-    //     console.error(e);
-    //   }
-    // },
-    /**
-     * Callback to run when we receive a 'maskImageUploaded' event.
-     */
-    // onMaskImageUploaded: (data: InvokeAI.ImageUrlResponse) => {
-    //   const { url } = data;
-    //   dispatch(setMaskPath(url));
-    //   dispatch(
-    //     addLogEntry({
-    //       timestamp: dateFormat(new Date(), 'isoDateTime'),
-    //       message: `Mask image uploaded: ${url}`,
-    //     })
-    //   );
-    // },
     onSystemConfig: (data: InvokeAI.SystemConfig) => {
       dispatch(setSystemConfig(data));
     },
