@@ -200,7 +200,7 @@ _err_exit $? _err_msg
 echo -e "\n***** Installed Python dependencies *****\n"
 
 # preload the models
-.venv/bin/python3 scripts/preload_models.py
+.venv/bin/python3 scripts/configure_invokeai.py
 _err_msg="\n----- model download clone failed -----\n"
 _err_exit $? _err_msg
 

@@ -133,7 +133,7 @@ if %errorlevel% neq 0 goto err_exit
 echo ***** Installed Python dependencies *****
 
 @rem preload the models
-call .venv\Scripts\python scripts\preload_models.py
+call .venv\Scripts\python scripts\configure_invokeai.py
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
 
