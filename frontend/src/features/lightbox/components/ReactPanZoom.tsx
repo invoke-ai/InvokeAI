@@ -8,7 +8,7 @@ import {
   BiZoomOut,
 } from 'react-icons/bi';
 import { MdFlip } from 'react-icons/md';
-import { PanViewer } from 'react-image-pan-zoom-rotate';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
 type ReactPanZoomProps = {
   image: string;
@@ -23,28 +23,8 @@ export default function ReactPanZoom({
   ref,
   styleClass,
 }: ReactPanZoomProps) {
-  const [dx, setDx] = React.useState(0);
-  const [dy, setDy] = React.useState(0);
-  const [zoom, setZoom] = React.useState(1);
   const [rotation, setRotation] = React.useState(0);
   const [flip, setFlip] = React.useState(false);
-
-  const resetAll = () => {
-    setDx(0);
-    setDy(0);
-    setZoom(1);
-    setRotation(0);
-    setFlip(false);
-  };
-  const zoomIn = () => {
-    setZoom(zoom + 0.2);
-  };
-
-  const zoomOut = () => {
-    if (zoom >= 0.5) {
-      setZoom(zoom - 0.2);
-    }
-  };
 
   const rotateLeft = () => {
     if (rotation === -3) {
@@ -66,90 +46,90 @@ export default function ReactPanZoom({
     setFlip(!flip);
   };
 
-  const onPan = (dx: number, dy: number) => {
-    setDx(dx);
-    setDy(dy);
-  };
-
   return (
-    <div>
-      <div className="lightbox-image-options">
-        <IAIIconButton
-          icon={<BiZoomIn />}
-          aria-label="Zoom In"
-          tooltip="Zoom In"
-          onClick={zoomIn}
-          fontSize={20}
-        />
-
-        <IAIIconButton
-          icon={<BiZoomOut />}
-          aria-label="Zoom Out"
-          tooltip="Zoom Out"
-          onClick={zoomOut}
-          fontSize={20}
-        />
-
-        <IAIIconButton
-          icon={<BiRotateLeft />}
-          aria-label="Rotate Left"
-          tooltip="Rotate Left"
-          onClick={rotateLeft}
-          fontSize={20}
-        />
-
-        <IAIIconButton
-          icon={<BiRotateRight />}
-          aria-label="Rotate Right"
-          tooltip="Rotate Right"
-          onClick={rotateRight}
-          fontSize={20}
-        />
-
-        <IAIIconButton
-          icon={<MdFlip />}
-          aria-label="Flip Image"
-          tooltip="Flip Image"
-          onClick={flipImage}
-          fontSize={20}
-        />
-
-        <IAIIconButton
-          icon={<BiReset />}
-          aria-label="Reset"
-          tooltip="Reset"
-          onClick={resetAll}
-          fontSize={20}
-        />
-      </div>
-      <PanViewer
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1,
-        }}
-        zoom={zoom}
-        setZoom={setZoom}
-        pandx={dx}
-        pandy={dy}
-        onPan={onPan}
-        rotation={rotation}
-        key={dx}
+    <>
+      <TransformWrapper
+        initialScale={1}
+        initialPositionX={200}
+        initialPositionY={100}
       >
-        <img
-          style={{
-            transform: `rotate(${rotation * 90}deg) scaleX(${flip ? -1 : 1})`,
-            width: '100%',
-          }}
-          src={image}
-          alt={alt}
-          ref={ref}
-          className={styleClass ? styleClass : ''}
-        />
-      </PanViewer>
-    </div>
+        {({ zoomIn, zoomOut, resetTransform }) => (
+          <>
+            <div className="lightbox-image-options">
+              <IAIIconButton
+                icon={<BiZoomIn />}
+                aria-label="Zoom In"
+                tooltip="Zoom In"
+                onClick={() => zoomIn()}
+                fontSize={20}
+              />
+
+              <IAIIconButton
+                icon={<BiZoomOut />}
+                aria-label="Zoom Out"
+                tooltip="Zoom Out"
+                onClick={() => zoomOut()}
+                fontSize={20}
+              />
+
+              <IAIIconButton
+                icon={<BiRotateLeft />}
+                aria-label="Rotate Left"
+                tooltip="Rotate Left"
+                onClick={rotateLeft}
+                fontSize={20}
+              />
+
+              <IAIIconButton
+                icon={<BiRotateRight />}
+                aria-label="Rotate Right"
+                tooltip="Rotate Right"
+                onClick={rotateRight}
+                fontSize={20}
+              />
+
+              <IAIIconButton
+                icon={<MdFlip />}
+                aria-label="Flip Image"
+                tooltip="Flip Image"
+                onClick={flipImage}
+                fontSize={20}
+              />
+
+              <IAIIconButton
+                icon={<BiReset />}
+                aria-label="Reset"
+                tooltip="Reset"
+                onClick={() => {
+                  resetTransform();
+                  setRotation(0);
+                  setFlip(false);
+                }}
+                fontSize={20}
+              />
+            </div>
+
+            <TransformComponent
+              wrapperStyle={{ width: '100%', height: '100%' }}
+            >
+              <div>
+                <img
+                  style={{
+                    transform: `rotate(${rotation * 90}deg) scaleX(${
+                      flip ? -1 : 1
+                    })`,
+                    width: '100%',
+                  }}
+                  src={image}
+                  alt={alt}
+                  ref={ref}
+                  className={styleClass ? styleClass : ''}
+                />
+              </div>
+            </TransformComponent>
+          </>
+        )}
+      </TransformWrapper>
+    </>
   );
 }
