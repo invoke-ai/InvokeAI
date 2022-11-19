@@ -1,0 +1,138 @@
+import { AnyAction, ThunkAction } from '@reduxjs/toolkit';
+import { RootState } from 'app/store';
+import * as InvokeAI from 'app/invokeai';
+import { v4 as uuidv4 } from 'uuid';
+import layerToDataURL from '../../util/layerToDataURL';
+import downloadFile from '../../util/downloadFile';
+import copyImage from '../../util/copyImage';
+import { getCanvasBaseLayer } from '../../util/konvaInstanceProvider';
+import { addToast } from 'features/system/systemSlice';
+import { addImage } from 'features/gallery/gallerySlice';
+import { setMergedCanvas } from '../canvasSlice';
+
+type MergeAndUploadCanvasConfig = {
+  cropVisible?: boolean;
+  shouldSaveToGallery?: boolean;
+  shouldDownload?: boolean;
+  shouldCopy?: boolean;
+  shouldSetAsInitialImage?: boolean;
+};
+
+const defaultConfig: MergeAndUploadCanvasConfig = {
+  cropVisible: false,
+  shouldSaveToGallery: false,
+  shouldDownload: false,
+  shouldCopy: false,
+  shouldSetAsInitialImage: true,
+};
+
+export const mergeAndUploadCanvas =
+  (config = defaultConfig): ThunkAction<void, RootState, unknown, AnyAction> =>
+  async (dispatch, getState) => {
+    const {
+      cropVisible,
+      shouldSaveToGallery,
+      shouldDownload,
+      shouldCopy,
+      shouldSetAsInitialImage,
+    } = config;
+
+    const state = getState() as RootState;
+
+    const stageScale = state.canvas.stageScale;
+
+    const canvasBaseLayer = getCanvasBaseLayer();
+
+    if (!canvasBaseLayer) return;
+
+    const { dataURL, boundingBox: originalBoundingBox } = layerToDataURL(
+      canvasBaseLayer,
+      stageScale
+    );
+
+    if (!dataURL) return;
+
+    const formData = new FormData();
+
+    formData.append(
+      'data',
+      JSON.stringify({
+        dataURL,
+        filename: 'merged_canvas.png',
+        kind: shouldSaveToGallery ? 'result' : 'temp',
+        cropVisible,
+      })
+    );
+
+    const response = await fetch(window.location.origin + '/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const { url, mtime, width, height } =
+      (await response.json()) as InvokeAI.ImageUploadResponse;
+
+    const newImage: InvokeAI.Image = {
+      uuid: uuidv4(),
+      url,
+      mtime,
+      category: shouldSaveToGallery ? 'result' : 'user',
+      width: width,
+      height: height,
+    };
+
+    if (shouldDownload) {
+      downloadFile(url);
+      dispatch(
+        addToast({
+          title: 'Image Download Started',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    }
+
+    if (shouldCopy) {
+      copyImage(url, width, height);
+      dispatch(
+        addToast({
+          title: 'Image Copied',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    }
+
+    if (shouldSaveToGallery) {
+      dispatch(addImage({ image: newImage, category: 'result' }));
+      dispatch(
+        addToast({
+          title: 'Image Saved to Gallery',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    }
+
+    if (shouldSetAsInitialImage) {
+      dispatch(
+        setMergedCanvas({
+          kind: 'image',
+          layer: 'base',
+          ...originalBoundingBox,
+          image: newImage,
+        })
+      );
+      dispatch(
+        addToast({
+          title: 'Canvas Merged',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    }
+  };

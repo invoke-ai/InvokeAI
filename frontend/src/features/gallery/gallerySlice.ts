@@ -4,8 +4,6 @@ import _, { clamp } from 'lodash';
 import * as InvokeAI from 'app/invokeai';
 import { IRect } from 'konva/lib/types';
 import { InvokeTabName } from 'features/tabs/InvokeTabs';
-import { mergeAndUploadCanvas } from 'features/canvas/util/mergeAndUploadCanvas';
-import { uploadImage } from './util/uploadImage';
 
 export type GalleryCategory = 'user' | 'result';
 
@@ -265,46 +263,6 @@ export const gallerySlice = createSlice({
     setGalleryWidth: (state, action: PayloadAction<number>) => {
       state.galleryWidth = action.payload;
     },
-  },
-  extraReducers: (builder) => {
-    builder.addCase(mergeAndUploadCanvas.fulfilled, (state, action) => {
-      if (!action.payload) return;
-      const { image, kind, originalBoundingBox } = action.payload;
-
-      if (kind === 'merged_canvas') {
-        const { uuid, url, mtime } = image;
-
-        state.categories.result.images.unshift(image);
-
-        if (state.shouldAutoSwitchToNewImages) {
-          state.currentImageUuid = uuid;
-          state.currentImage = image;
-          state.currentCategory = 'result';
-        }
-
-        state.intermediateImage = undefined;
-        state.categories.result.latest_mtime = mtime;
-      }
-    });
-    builder.addCase(uploadImage.fulfilled, (state, action) => {
-      if (!action.payload) return;
-      const { image, kind } = action.payload;
-
-      if (kind === 'init') {
-        const { uuid, mtime } = image;
-
-        state.categories.result.images.unshift(image);
-
-        if (state.shouldAutoSwitchToNewImages) {
-          state.currentImageUuid = uuid;
-          state.currentImage = image;
-          state.currentCategory = 'user';
-        }
-
-        state.intermediateImage = undefined;
-        state.categories.result.latest_mtime = mtime;
-      }
-    });
   },
 });
 

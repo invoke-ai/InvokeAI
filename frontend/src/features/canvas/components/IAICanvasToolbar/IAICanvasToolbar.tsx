@@ -25,7 +25,7 @@ import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
 import IAICanvasMaskButtonPopover from './IAICanvasMaskButtonPopover';
-import { mergeAndUploadCanvas } from 'features/canvas/util/mergeAndUploadCanvas';
+import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import {
   canvasSelector,
   isStagingSelector,
@@ -151,14 +151,19 @@ const IAICanvasOutpaintingControls = () => {
   };
 
   const handleMergeVisible = () => {
-    dispatch(mergeAndUploadCanvas({}));
+    dispatch(
+      mergeAndUploadCanvas({
+        cropVisible: false,
+        shouldSetAsInitialImage: true,
+      })
+    );
   };
 
   const handleSaveToGallery = () => {
     dispatch(
       mergeAndUploadCanvas({
         cropVisible: true,
-        saveToGallery: true,
+        shouldSaveToGallery: true,
       })
     );
   };
@@ -167,7 +172,7 @@ const IAICanvasOutpaintingControls = () => {
     dispatch(
       mergeAndUploadCanvas({
         cropVisible: true,
-        copyAfterSaving: true,
+        shouldCopy: true,
       })
     );
   };
@@ -176,7 +181,7 @@ const IAICanvasOutpaintingControls = () => {
     dispatch(
       mergeAndUploadCanvas({
         cropVisible: true,
-        downloadAfterSaving: true,
+        shouldDownload: true,
       })
     );
   };
