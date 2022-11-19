@@ -23,7 +23,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import React, { FocusEvent, useEffect, useState } from 'react';
+import React, { FocusEvent, useEffect, useMemo, useState } from 'react';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 import _ from 'lodash';
@@ -101,6 +101,11 @@ export default function IAISlider(props: IAIFullSliderProps) {
 
   const [localInputValue, setLocalInputValue] = useState<string>(String(value));
 
+  const numberInputMax = useMemo(
+    () => (sliderNumberInputProps?.max ? sliderNumberInputProps.max : max),
+    [max, sliderNumberInputProps?.max]
+  );
+
   useEffect(() => {
     if (String(value) !== localInputValue && localInputValue !== '') {
       setLocalInputValue(String(value));
@@ -108,10 +113,11 @@ export default function IAISlider(props: IAIFullSliderProps) {
   }, [value, localInputValue, setLocalInputValue]);
 
   const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
+    console.log(numberInputMax);
     const clamped = _.clamp(
       isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
       min,
-      max
+      numberInputMax
     );
     setLocalInputValue(String(clamped));
     onChange(clamped);
@@ -202,7 +208,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
         {withInput && (
           <NumberInput
             min={min}
-            max={max}
+            max={numberInputMax}
             step={step}
             value={localInputValue}
             onChange={handleInputChange}

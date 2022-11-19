@@ -77,8 +77,8 @@ const IAICanvasEraserButtonPopover = () => {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          aria-label="Eraser (E)"
-          tooltip="Eraser (E)"
+          aria-label="Eraser Tool (E)"
+          tooltip="Eraser Tool (E)"
           icon={<FaEraser />}
           data-selected={tool === 'eraser' && !isStaging}
           isDisabled={isStaging}

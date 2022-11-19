@@ -84,8 +84,8 @@ const IAICanvasBrushButtonPopover = () => {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          aria-label="Brush (B)"
-          tooltip="Brush (B)"
+          aria-label="Brush Tool (B)"
+          tooltip="Brush Tool (B)"
           icon={<FaPaintBrush />}
           data-selected={tool === 'brush' && !isStaging}
           onClick={handleSelectBrushTool}
