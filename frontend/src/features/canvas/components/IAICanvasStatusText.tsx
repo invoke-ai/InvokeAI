@@ -17,6 +17,8 @@ const selector = createSelector(
       boundingBoxCoordinates: { x: boxX, y: boxY },
       cursorPosition,
       stageScale,
+      shouldShowCanvasDebugInfo,
+      layer,
     } = canvas;
 
     const position = cursorPosition
@@ -33,6 +35,9 @@ const selector = createSelector(
       boxX,
       boxY,
       stageScale,
+      shouldShowCanvasDebugInfo,
+      layerFormatted: layer.charAt(0).toUpperCase() + layer.slice(1),
+      layer,
       ...position,
     };
   },
@@ -56,17 +61,37 @@ const IAICanvasStatusText = () => {
     cursorX,
     cursorY,
     stageScale,
+    shouldShowCanvasDebugInfo,
+    layer,
+    layerFormatted,
   } = useAppSelector(selector);
+
   return (
     <div className="canvas-status-text">
-      <div>{`Stage: ${stageWidth} x ${stageHeight}`}</div>
-      <div>{`Stage: ${roundToHundreth(stageX)}, ${roundToHundreth(
-        stageY
-      )}`}</div>
-      <div>{`Scale: ${roundToHundreth(stageScale)}`}</div>
-      <div>{`Box: ${boxWidth} x ${boxHeight}`}</div>
-      <div>{`Box: ${roundToHundreth(boxX)}, ${roundToHundreth(boxY)}`}</div>
-      <div>{`Cursor: ${cursorX}, ${cursorY}`}</div>
+      <div
+        style={{
+          color: layer === 'mask' ? 'var(--status-working-color)' : 'inherit',
+        }}
+      >{`Active Layer: ${layerFormatted}`}</div>
+      <div>{`Canvas Scale: ${Math.round(stageScale * 100)}%`}</div>
+      <div
+        style={{
+          color:
+            boxWidth < 512 || boxHeight < 512
+              ? 'var(--status-working-color)'
+              : 'inherit',
+        }}
+      >{`Bounding Box: ${boxWidth}×${boxHeight}`}</div>
+      {shouldShowCanvasDebugInfo && (
+        <>
+          <div>{`Bounding Box Position: (${roundToHundreth(
+            boxX
+          )}, ${roundToHundreth(boxY)})`}</div>
+          <div>{`Canvas Dimensions: ${stageWidth}×${stageHeight}`}</div>
+          <div>{`Canvas Position: ${stageX}×${stageY}`}</div>
+          <div>{`Cursor Position: (${cursorX}, ${cursorY})`}</div>
+        </>
+      )}
     </div>
   );
 };
