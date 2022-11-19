@@ -5,14 +5,16 @@ import { OptionsState } from 'features/options/store/optionsSlice';
 import { SystemState } from 'features/system/store/systemSlice';
 import { GalleryState } from './gallerySlice';
 import _ from 'lodash';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 
 export const imageGallerySelector = createSelector(
   [
     (state: RootState) => state.gallery,
     (state: RootState) => state.options,
+    isStagingSelector,
     activeTabNameSelector,
   ],
-  (gallery: GalleryState, options: OptionsState, activeTabName) => {
+  (gallery: GalleryState, options: OptionsState, isStaging, activeTabName) => {
     const {
       categories,
       currentCategory,
@@ -46,6 +48,7 @@ export const imageGallerySelector = createSelector(
       currentCategory,
       galleryWidth,
       isLightBoxOpen,
+      isStaging,
     };
   },
   {

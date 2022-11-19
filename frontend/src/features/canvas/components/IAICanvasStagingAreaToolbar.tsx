@@ -30,6 +30,7 @@ import {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 const selector = createSelector(
   [canvasSelector],
@@ -75,6 +76,43 @@ const IAICanvasStagingAreaToolbar = () => {
     dispatch(setShouldShowStagingOutline(true));
   }, [dispatch]);
 
+  useHotkeys(
+    ['left'],
+    () => {
+      handlePrevImage();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys(
+    ['right'],
+    () => {
+      handleNextImage();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys(
+    ['enter'],
+    () => {
+      handleAccept();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    }
+  );
+
+  const handlePrevImage = () => dispatch(prevStagingAreaImage());
+  const handleNextImage = () => dispatch(nextStagingAreaImage());
+  const handleAccept = () => dispatch(commitStagingAreaImage());
+
   if (!currentStagingAreaImage) return null;
 
   return (
@@ -90,34 +128,30 @@ const IAICanvasStagingAreaToolbar = () => {
     >
       <ButtonGroup isAttached>
         <IAIIconButton
-          tooltip="Previous"
-          tooltipProps={{ placement: 'bottom' }}
-          aria-label="Previous"
+          tooltip="Previous (Left)"
+          aria-label="Previous (Left)"
           icon={<FaArrowLeft />}
-          onClick={() => dispatch(prevStagingAreaImage())}
+          onClick={handlePrevImage}
           data-selected={true}
           isDisabled={isOnFirstImage}
         />
         <IAIIconButton
-          tooltip="Next"
-          tooltipProps={{ placement: 'bottom' }}
-          aria-label="Next"
+          tooltip="Next (Right)"
+          aria-label="Next (Right)"
           icon={<FaArrowRight />}
-          onClick={() => dispatch(nextStagingAreaImage())}
+          onClick={handleNextImage}
           data-selected={true}
           isDisabled={isOnLastImage}
         />
         <IAIIconButton
-          tooltip="Accept"
-          tooltipProps={{ placement: 'bottom' }}
-          aria-label="Accept"
+          tooltip="Accept (Enter)"
+          aria-label="Accept (Enter)"
           icon={<FaCheck />}
-          onClick={() => dispatch(commitStagingAreaImage())}
+          onClick={handleAccept}
           data-selected={true}
         />
         <IAIIconButton
           tooltip="Show/Hide"
-          tooltipProps={{ placement: 'bottom' }}
           aria-label="Show/Hide"
           data-alert={!shouldShowStagingImage}
           icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
@@ -128,7 +162,6 @@ const IAICanvasStagingAreaToolbar = () => {
         />
         <IAIIconButton
           tooltip="Discard All"
-          tooltipProps={{ placement: 'bottom' }}
           aria-label="Discard All"
           icon={<FaTrash />}
           onClick={() => dispatch(discardStagedImages())}

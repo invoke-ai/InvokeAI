@@ -113,12 +113,12 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Previous Image',
       desc: 'Display the previous image in gallery',
-      hotkey: 'Arrow left',
+      hotkey: 'Arrow Left',
     },
     {
       title: 'Next Image',
       desc: 'Display the next image in gallery',
-      hotkey: 'Arrow right',
+      hotkey: 'Arrow Right',
     },
     {
       title: 'Toggle Gallery Pin',
@@ -222,6 +222,21 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       title: 'Reset View',
       desc: 'Reset Canvas View',
       hotkey: 'R',
+    },
+    {
+      title: 'Previous Image',
+      desc: 'Previous Staging Area Image',
+      hotkey: 'Arrow Left',
+    },
+    {
+      title: 'Next Image',
+      desc: 'Next Staging Area Image',
+      hotkey: 'Arrow Right',
+    },
+    {
+      title: 'Accept Image',
+      desc: 'Accept Current Staging Area Image',
+      hotkey: 'Enter',
     },
   ];
 
