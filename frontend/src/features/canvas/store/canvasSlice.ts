@@ -244,7 +244,7 @@ export const canvasSlice = createSlice({
       state.boundingBoxCoordinates = floorCoordinates(action.payload);
     },
     setStageCoordinates: (state, action: PayloadAction<Vector2d>) => {
-      state.stageCoordinates = floorCoordinates(action.payload);
+      state.stageCoordinates = action.payload;
     },
     setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
       state.boundingBoxPreviewFill = action.payload;
