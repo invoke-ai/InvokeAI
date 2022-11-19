@@ -69,16 +69,14 @@ export const mergeAndUploadCanvas =
       body: formData,
     });
 
-    const { url, mtime, width, height } =
-      (await response.json()) as InvokeAI.ImageUploadResponse;
+    const image = (await response.json()) as InvokeAI.ImageUploadResponse;
+
+    const { url, width, height } = image;
 
     const newImage: InvokeAI.Image = {
       uuid: uuidv4(),
-      url,
-      mtime,
       category: shouldSaveToGallery ? 'result' : 'user',
-      width: width,
-      height: height,
+      ...image,
     };
 
     if (shouldDownload) {

@@ -172,8 +172,11 @@ class InvokeAIWebServer:
 
                 (width, height) = pil_image.size
 
+                thumbnail_path = save_thumbnail(pil_image, file_path)
+
                 response = {
                     "url": self.get_url_from_image_path(file_path),
+                    "thumbnail": self.get_url_from_image_path(thumbnail_path),
                     "mtime": mtime,
                     "width": width,
                     "height": height,
@@ -306,6 +309,7 @@ class InvokeAIWebServer:
                 )
 
                 paths = []
+
                 for ext in ("*.png", "*.jpg", "*.jpeg"):
                     paths.extend(glob.glob(os.path.join(base_path, ext)))
 
@@ -329,11 +333,15 @@ class InvokeAIWebServer:
                     else:
                         sd_metadata = {}
 
-                    (width, height) = Image.open(path).size
+                    pil_image = Image.open(path)
+                    (width, height) = pil_image.size
+
+                    thumbnail_path = save_thumbnail(pil_image, path)
 
                     image_array.append(
                         {
                             "url": self.get_url_from_image_path(path),
+                            "thumbnail": self.get_url_from_image_path(thumbnail_path),
                             "mtime": os.path.getmtime(path),
                             "metadata": sd_metadata,
                             "width": width,
@@ -389,11 +397,15 @@ class InvokeAIWebServer:
                     else:
                         sd_metadata = {}
 
-                    (width, height) = Image.open(path).size
+                    pil_image = Image.open(path)
+                    (width, height) = pil_image.size
+
+                    thumbnail_path = save_thumbnail(pil_image, path)
 
                     image_array.append(
                         {
                             "url": self.get_url_from_image_path(path),
+                            "thumbnail": self.get_url_from_image_path(thumbnail_path),
                             "mtime": os.path.getmtime(path),
                             "metadata": sd_metadata,
                             "width": width,
@@ -537,6 +549,8 @@ class InvokeAIWebServer:
                     postprocessing=postprocessing_parameters["type"],
                 )
 
+                thumbnail_path = save_thumbnail(image, path)
+
                 self.write_log_message(
                     f'[Postprocessed] "{original_image_path}" > "{path}": {postprocessing_parameters}'
                 )
@@ -549,6 +563,7 @@ class InvokeAIWebServer:
                     "postprocessingResult",
                     {
                         "url": self.get_url_from_image_path(path),
+                        "thumbnail": self.get_url_from_image_path(thumbnail_path),
                         "mtime": os.path.getmtime(path),
                         "metadata": metadata,
                         "width": width,
@@ -575,8 +590,12 @@ class InvokeAIWebServer:
                 from send2trash import send2trash
 
                 path = self.get_image_path_from_url(url)
+                base = os.path.splitext(path)[0]
+                thumbnail_path = base + ".webp"
 
                 send2trash(path)
+                send2trash(thumbnail_path)
+
                 socketio.emit(
                     "imageDeleted",
                     {"url": url, "uuid": uuid, "category": category},
@@ -949,6 +968,8 @@ class InvokeAIWebServer:
                     postprocessing=postprocessing,
                 )
 
+                thumbnail_path = save_thumbnail(image, path)
+
                 print(f'>> Image generated: "{path}"')
                 self.write_log_message(f'[Generated] "{path}": {command}')
 
@@ -966,6 +987,7 @@ class InvokeAIWebServer:
                     "generationResult",
                     {
                         "url": self.get_url_from_image_path(path),
+                        "thumbnail": self.get_url_from_image_path(thumbnail_path),
                         "mtime": os.path.getmtime(path),
                         "metadata": metadata,
                         "width": width,
@@ -1457,3 +1479,30 @@ def paste_image_into_bounding_box(
         bounds = (x, y, x + width, y + height)
         im.paste(donor_image, bounds)
         return recipient_image
+
+
+"""
+Saves a thumbnail of an image, returning its path.
+"""
+
+
+def save_thumbnail(
+    image: ImageType,
+    path: str,
+    size: int = 128,
+) -> str:
+    base = os.path.splitext(path)[0]
+    thumbnail_path = base + ".webp"
+
+    if os.path.exists(thumbnail_path):
+        return thumbnail_path
+
+    thumbnail_width = size
+    thumbnail_height = round(size * (image.height / image.width))
+
+    image_copy = image.copy()
+    image_copy.thumbnail(size=(thumbnail_width, thumbnail_height))
+
+    image_copy.save(thumbnail_path, "WEBP")
+
+    return thumbnail_path

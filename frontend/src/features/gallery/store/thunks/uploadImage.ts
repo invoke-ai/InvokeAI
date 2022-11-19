@@ -37,16 +37,12 @@ export const uploadImage =
       body: formData,
     });
 
-    const { url, mtime, width, height } =
-      (await response.json()) as InvokeAI.ImageUploadResponse;
-
+    const image = (await response.json()) as InvokeAI.ImageUploadResponse;
+    console.log(image)
     const newImage: InvokeAI.Image = {
       uuid: uuidv4(),
-      url,
-      mtime,
       category: 'user',
-      width: width,
-      height: height,
+      ...image,
     };
 
     dispatch(addImage({ image: newImage, category: 'user' }));
