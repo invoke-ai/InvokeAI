@@ -101,6 +101,7 @@ export interface CanvasState {
   shouldShowBoundingBox: boolean;
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;
+  shouldShowCanvasDebugInfo: boolean;
   shouldShowCheckboardTransparency: boolean;
   shouldShowGrid: boolean;
   shouldShowIntermediates: boolean;

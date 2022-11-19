@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import {
   setShouldAutoSave,
   setShouldDarkenOutsideBoundingBox,
+  setShouldShowCanvasDebugInfo,
   setShouldShowGrid,
   setShouldShowIntermediates,
   setShouldSnapToGrid,
@@ -24,6 +25,7 @@ export const canvasControlsSelector = createSelector(
       shouldShowGrid,
       shouldSnapToGrid,
       shouldAutoSave,
+      shouldShowCanvasDebugInfo,
     } = canvas;
 
     return {
@@ -32,6 +34,7 @@ export const canvasControlsSelector = createSelector(
       shouldAutoSave,
       shouldDarkenOutsideBoundingBox,
       shouldShowIntermediates,
+      shouldShowCanvasDebugInfo,
     };
   },
   {
@@ -49,6 +52,7 @@ const IAICanvasSettingsButtonPopover = () => {
     shouldSnapToGrid,
     shouldAutoSave,
     shouldDarkenOutsideBoundingBox,
+    shouldShowCanvasDebugInfo,
   } = useAppSelector(canvasControlsSelector);
 
   return (
@@ -93,6 +97,13 @@ const IAICanvasSettingsButtonPopover = () => {
           label="Auto Save to Gallery"
           isChecked={shouldAutoSave}
           onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
+        />
+        <IAICheckbox
+          label="Show Canvas Debug Info"
+          isChecked={shouldShowCanvasDebugInfo}
+          onChange={(e) =>
+            dispatch(setShouldShowCanvasDebugInfo(e.target.checked))
+          }
         />
       </Flex>
     </IAIPopover>
