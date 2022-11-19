@@ -143,8 +143,10 @@ const ImageMetadataViewer = memo(
         <Flex gap={1} direction={'column'} width={'100%'}>
           <Flex gap={2}>
             <Text fontWeight={'semibold'}>File:</Text>
-            <Link href={image.url} isExternal>
-              {image.url}
+            <Link href={image.url} isExternal maxW={'calc(100% - 3rem)'}>
+              {image.url.length > 64
+                ? image.url.substring(0, 64).concat('...')
+                : image.url}
               <ExternalLinkIcon mx="2px" />
             </Link>
           </Flex>
