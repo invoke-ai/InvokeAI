@@ -1,0 +1,84 @@
+import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from 'app/store';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { OptionsState } from 'features/options/store/optionsSlice';
+import { SystemState } from 'features/system/store/systemSlice';
+import { GalleryState } from './gallerySlice';
+import _ from 'lodash';
+
+export const imageGallerySelector = createSelector(
+  [
+    (state: RootState) => state.gallery,
+    (state: RootState) => state.options,
+    activeTabNameSelector,
+  ],
+  (gallery: GalleryState, options: OptionsState, activeTabName) => {
+    const {
+      categories,
+      currentCategory,
+      currentImageUuid,
+      shouldPinGallery,
+      shouldShowGallery,
+      galleryScrollPosition,
+      galleryImageMinimumWidth,
+      galleryImageObjectFit,
+      shouldHoldGalleryOpen,
+      shouldAutoSwitchToNewImages,
+      galleryWidth,
+    } = gallery;
+
+    const { isLightBoxOpen } = options;
+
+    return {
+      currentImageUuid,
+      shouldPinGallery,
+      shouldShowGallery,
+      galleryScrollPosition,
+      galleryImageMinimumWidth,
+      galleryImageObjectFit,
+      galleryGridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
+      activeTabName,
+      shouldHoldGalleryOpen,
+      shouldAutoSwitchToNewImages,
+      images: categories[currentCategory].images,
+      areMoreImagesAvailable:
+        categories[currentCategory].areMoreImagesAvailable,
+      currentCategory,
+      galleryWidth,
+      isLightBoxOpen,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
+  }
+);
+
+export const hoverableImageSelector = createSelector(
+  [
+    (state: RootState) => state.options,
+    (state: RootState) => state.gallery,
+    (state: RootState) => state.system,
+    activeTabNameSelector,
+  ],
+  (
+    options: OptionsState,
+    gallery: GalleryState,
+    system: SystemState,
+    activeTabName
+  ) => {
+    return {
+      mayDeleteImage: system.isConnected && !system.isProcessing,
+      galleryImageObjectFit: gallery.galleryImageObjectFit,
+      galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
+      activeTabName,
+      isLightBoxOpen: options.isLightBoxOpen,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
+  }
+);

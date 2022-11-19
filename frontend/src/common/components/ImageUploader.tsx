@@ -11,10 +11,10 @@ import { useToast } from '@chakra-ui/react';
 // import { uploadImage } from 'app/socketio/actions';
 import { UploadImagePayload } from 'app/invokeai';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
-import { activeTabNameSelector } from 'features/options/optionsSelectors';
-import { tabDict } from 'features/tabs/InvokeTabs';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { tabDict } from 'features/tabs/components/InvokeTabs';
 import ImageUploadOverlay from './ImageUploadOverlay';
-import { uploadImage } from 'features/gallery/util/uploadImage';
+import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
 
 type ImageUploaderProps = {
   children: ReactNode;

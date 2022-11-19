@@ -9,16 +9,16 @@ import {
   GalleryCategory,
   GalleryState,
   removeImage,
-} from 'features/gallery/gallerySlice';
-import { OptionsState } from 'features/options/optionsSlice';
+} from 'features/gallery/store/gallerySlice';
+import { OptionsState } from 'features/options/store/optionsSlice';
 import {
   addLogEntry,
   generationRequested,
   modelChangeRequested,
   setCurrentStatus,
   setIsProcessing,
-} from 'features/system/systemSlice';
-import { InvokeTabName } from 'features/tabs/InvokeTabs';
+} from 'features/system/store/systemSlice';
+import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
 import * as InvokeAI from 'app/invokeai';
 import { RootState } from 'app/store';
 

@@ -6,8 +6,8 @@ import layerToDataURL from '../../util/layerToDataURL';
 import downloadFile from '../../util/downloadFile';
 import copyImage from '../../util/copyImage';
 import { getCanvasBaseLayer } from '../../util/konvaInstanceProvider';
-import { addToast } from 'features/system/systemSlice';
-import { addImage } from 'features/gallery/gallerySlice';
+import { addToast } from 'features/system/store/systemSlice';
+import { addImage } from 'features/gallery/store/gallerySlice';
 import { setMergedCanvas } from '../canvasSlice';
 
 type MergeAndUploadCanvasConfig = {
