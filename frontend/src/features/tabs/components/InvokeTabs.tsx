@@ -72,6 +72,13 @@ export default function InvokeTabs() {
   const shouldShowOptionsPanel = useAppSelector(
     (state: RootState) => state.options.shouldShowOptionsPanel
   );
+  const shouldPinGallery = useAppSelector(
+    (state: RootState) => state.gallery.shouldPinGallery
+  );
+  const shouldPinOptionsPanel = useAppSelector(
+    (state: RootState) => state.options.shouldPinOptionsPanel
+  );
+
   const dispatch = useAppDispatch();
 
   useHotkeys('1', () => {
@@ -113,7 +120,8 @@ export default function InvokeTabs() {
         dispatch(setShouldShowOptionsPanel(true));
         dispatch(setShouldShowGallery(true));
       }
-      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+      if (shouldPinGallery || shouldPinOptionsPanel)
+        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
     },
     [shouldShowGallery, shouldShowOptionsPanel]
   );
