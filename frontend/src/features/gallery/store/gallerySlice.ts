@@ -174,7 +174,7 @@ export const gallerySlice = createSlice({
         const currentImageIndex = tempImages.findIndex(
           (i) => i.uuid === currentImage.uuid
         );
-        if (_.inRange(currentImageIndex, 0, tempImages.length - 1)) {
+        if (currentImageIndex < tempImages.length - 1) {
           const newCurrentImage = tempImages[currentImageIndex + 1];
           state.currentImage = newCurrentImage;
           state.currentImageUuid = newCurrentImage.uuid;
@@ -191,7 +191,7 @@ export const gallerySlice = createSlice({
         const currentImageIndex = tempImages.findIndex(
           (i) => i.uuid === currentImage.uuid
         );
-        if (_.inRange(currentImageIndex, 1, tempImages.length + 1)) {
+        if (currentImageIndex > 0) {
           const newCurrentImage = tempImages[currentImageIndex - 1];
           state.currentImage = newCurrentImage;
           state.currentImageUuid = newCurrentImage.uuid;
