@@ -4,11 +4,13 @@ import {
   resetCanvas,
   resetCanvasView,
   resizeAndScaleCanvas,
+  setTool,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
+  FaArrowsAlt,
   FaCopy,
   FaCrosshairs,
   FaDownload,
@@ -27,14 +29,21 @@ import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import useImageUploader from 'common/hooks/useImageUploader';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 
 export const selector = createSelector(
-  [systemSelector],
-  (system) => {
+  [systemSelector, canvasSelector, isStagingSelector],
+  (system, canvas, isStaging) => {
     const { isProcessing } = system;
+    const { tool } = canvas;
 
     return {
       isProcessing,
+      isStaging,
+      tool,
     };
   },
   {
@@ -46,10 +55,22 @@ export const selector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { isProcessing } = useAppSelector(selector);
+  const { isProcessing, isStaging, tool } = useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
 
   const { openUploader } = useImageUploader();
+
+  useHotkeys(
+    ['v'],
+    () => {
+      handleSelectMoveTool();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    []
+  );
 
   useHotkeys(
     ['r'],
@@ -110,6 +131,8 @@ const IAICanvasOutpaintingControls = () => {
     },
     [canvasBaseLayer, isProcessing]
   );
+
+  const handleSelectMoveTool = () => dispatch(setTool('move'));
 
   const handleResetCanvasView = () => {
     const canvasBaseLayer = getCanvasBaseLayer();
@@ -172,6 +195,22 @@ const IAICanvasOutpaintingControls = () => {
 
       <ButtonGroup isAttached>
         <IAIIconButton
+          aria-label="Move Tool (V)"
+          tooltip="Move Tool (V)"
+          icon={<FaArrowsAlt />}
+          data-selected={tool === 'move' || isStaging}
+          onClick={handleSelectMoveTool}
+        />
+        <IAIIconButton
+          aria-label="Reset View (R)"
+          tooltip="Reset View (R)"
+          icon={<FaCrosshairs />}
+          onClick={handleResetCanvasView}
+        />
+      </ButtonGroup>
+
+      <ButtonGroup isAttached>
+        <IAIIconButton
           aria-label="Merge Visible (Shift+M)"
           tooltip="Merge Visible (Shift+M)"
           icon={<FaLayerGroup />}
@@ -211,12 +250,6 @@ const IAICanvasOutpaintingControls = () => {
           tooltip="Upload"
           icon={<FaUpload />}
           onClick={openUploader}
-        />
-        <IAIIconButton
-          aria-label="Reset View (R)"
-          tooltip="Reset View (R)"
-          icon={<FaCrosshairs />}
-          onClick={handleResetCanvasView}
         />
         <IAIIconButton
           aria-label="Clear Canvas"
