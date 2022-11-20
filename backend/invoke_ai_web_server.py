@@ -311,6 +311,29 @@ class InvokeAIWebServer:
                 traceback.print_exc()
                 print("\n")
 
+        @socketio.on("requestEmptyTempFolder")
+        def empty_temp_folder():
+            try:
+                temp_files = glob.glob(os.path.join(self.temp_image_path, "*"))
+                for f in temp_files:
+                    try:
+                        os.remove(f)
+                        thumbnail_path = os.path.join(
+                            self.thumbnail_image_path,
+                            os.path.splitext(os.path.basename(f))[0] + ".webp",
+                        )
+                        os.remove(thumbnail_path)
+                    except Exception as e:
+                        traceback.print_exc()
+                        socketio.emit("error", {"message": f"Unable to delete {f}"})
+                socketio.emit("tempFolderEmptied")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
         @socketio.on("requestSaveStagingAreaImageToGallery")
         def save_temp_image_to_gallery(url):
             try:

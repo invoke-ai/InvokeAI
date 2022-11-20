@@ -37,3 +37,7 @@ export const requestModelChange = createAction<string>(
 export const saveStagingAreaImageToGallery = createAction<string>(
   'socketio/saveStagingAreaImageToGallery'
 );
+
+export const emptyTempFolder = createAction<undefined>(
+  'socketio/requestEmptyTempFolder'
+);
