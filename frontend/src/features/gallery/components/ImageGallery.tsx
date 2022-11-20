@@ -3,6 +3,7 @@ import { NumberSize, Resizable } from 're-resizable';
 
 import {
   ChangeEvent,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -39,7 +40,6 @@ import { BiReset } from 'react-icons/bi';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
-import useClickOutsideWatcher from 'common/hooks/useClickOutsideWatcher';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 
@@ -124,15 +124,15 @@ export default function ImageGallery() {
     shouldPinGallery && dispatch(setDoesCanvasNeedScaling(true));
   };
 
-  const handleCloseGallery = () => {
+  const handleCloseGallery = useCallback(() => {
     dispatch(setShouldShowGallery(false));
+    dispatch(setShouldHoldGalleryOpen(false));
     dispatch(
       setGalleryScrollPosition(
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
       )
     );
-    dispatch(setShouldHoldGalleryOpen(false));
-  };
+  }, [dispatch]);
 
   const handleClickLoadMore = () => {
     dispatch(requestImages(currentCategory));
@@ -144,6 +144,7 @@ export default function ImageGallery() {
   };
 
   const setCloseGalleryTimer = () => {
+    if (shouldHoldGalleryOpen) return;
     timeoutIdRef.current = window.setTimeout(() => handleCloseGallery(), 500);
   };
 
@@ -273,12 +274,25 @@ export default function ImageGallery() {
     setShouldShowButtons(galleryWidth >= 280);
   }, [galleryWidth]);
 
-  useClickOutsideWatcher(galleryRef, handleCloseGallery, !shouldPinGallery);
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        galleryRef.current &&
+        !galleryRef.current.contains(e.target as Node)
+      ) {
+        handleCloseGallery();
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [handleCloseGallery]);
 
   return (
     <CSSTransition
       nodeRef={galleryRef}
-      in={shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)}
+      in={shouldShowGallery || shouldHoldGalleryOpen}
       unmountOnExit
       timeout={200}
       classNames="image-gallery-wrapper"
@@ -288,6 +302,7 @@ export default function ImageGallery() {
         style={{ zIndex: shouldPinGallery ? 1 : 100 }}
         data-pinned={shouldPinGallery}
         ref={galleryRef}
+        // onMouseLeave={setCloseGalleryTimer}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}
         onMouseEnter={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
         onMouseOver={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}

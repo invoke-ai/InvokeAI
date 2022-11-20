@@ -7,7 +7,10 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import { setCurrentImage } from 'features/gallery/store/gallerySlice';
+import {
+  setCurrentImage,
+  setShouldHoldGalleryOpen,
+} from 'features/gallery/store/gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
 import { memo, useState } from 'react';
@@ -153,10 +156,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   return (
     <ContextMenu.Root
-    // onOpenChange={(open: boolean) => {
-    //   dispatch(setShouldHoldGalleryOpen(open));
-    //   dispatch(setShouldShowGallery(true));
-    // }}
+      onOpenChange={(open: boolean) => {
+        dispatch(setShouldHoldGalleryOpen(open));
+      }}
     >
       <ContextMenu.Trigger>
         <Box
@@ -204,6 +206,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       <ContextMenu.Content
         className="hoverable-image-context-menu"
         sticky={'always'}
+        onInteractOutside={(e) => {
+          e.detail.originalEvent.preventDefault();
+        }}
       >
         <ContextMenu.Item
           onClickCapture={handleUsePrompt}
