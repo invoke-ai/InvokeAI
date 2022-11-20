@@ -45,21 +45,16 @@ ARG invokeai_branch=main
 ARG project_name=invokeai
 ARG conda_env_file=environment-lin-cuda.yml
 RUN git clone -b ${invokeai_branch} https://github.com/${invokeai_git}.git "/${project_name}" \
-  && cp \
-    "/${project_name}/configs/models.yaml.example" \
-    "/${project_name}/configs/models.yaml" \
   && ln -sf \
     "/${project_name}/environments-and-requirements/${conda_env_file}" \
     "/${project_name}/environment.yml" \
   && ln -sf \
-    /data/models/v1-5-pruned-emaonly.ckpt \
-    "/${project_name}/models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt" \
-  && ln -sf \
     /data/outputs/ \
     "/${project_name}/outputs"
 
-# set workdir
+# set workdir and copy models.yaml
 WORKDIR "/${project_name}"
+COPY docker-build/models.yaml configs/models.yaml
 
 # install conda env and preload models
 ARG conda_prefix=/opt/conda
