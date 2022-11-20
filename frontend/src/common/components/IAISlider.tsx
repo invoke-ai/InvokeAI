@@ -113,7 +113,6 @@ export default function IAISlider(props: IAIFullSliderProps) {
   }, [value, localInputValue, setLocalInputValue]);
 
   const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
-    console.log(numberInputMax);
     const clamped = _.clamp(
       isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
       min,
