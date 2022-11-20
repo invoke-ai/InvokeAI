@@ -86,7 +86,7 @@ export default function ImageGallery() {
 
     if (activeTabName === 'unifiedCanvas') {
       setGalleryMinWidth(190);
-      setGalleryMaxWidth(450);
+      setGalleryMaxWidth(190);
       dispatch(setDoesCanvasNeedScaling(true));
     } else if (activeTabName === 'img2img') {
       dispatch(
