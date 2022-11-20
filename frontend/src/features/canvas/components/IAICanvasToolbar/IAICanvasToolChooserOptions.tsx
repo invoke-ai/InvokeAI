@@ -1,9 +1,6 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  resetCanvas,
-  resetCanvasView,
-  resizeAndScaleCanvas,
   setBrushColor,
   setBrushSize,
   setTool,
@@ -22,8 +19,6 @@ import {
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import IAICanvasBrushButtonPopover from './IAICanvasBrushButtonPopover';
-import IAICanvasEraserButtonPopover from './IAICanvasEraserButtonPopover';
 import { useHotkeys } from 'react-hotkeys-hook';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
