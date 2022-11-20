@@ -1,18 +1,9 @@
-import {
-  background,
-  ButtonGroup,
-  ChakraProvider,
-  Flex,
-} from '@chakra-ui/react';
-import { CacheProvider } from '@emotion/react';
+import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
-import { emotionCache } from 'main';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import {
   FaArrowLeft,
   FaArrowRight,
