@@ -101,7 +101,7 @@ const IAICanvasMaskOptions = () => {
   return (
     <>
       <IAISelect
-        label={'Layer'}
+        label={'Layer (Q)'}
         tooltipProps={{ hasArrow: true, placement: 'top' }}
         value={isMaskEnabled ? layer : 'base'}
         isDisabled={!isMaskEnabled}
