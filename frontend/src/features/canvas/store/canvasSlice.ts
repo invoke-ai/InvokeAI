@@ -328,9 +328,17 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
     },
     discardStagedImages: (state) => {
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+
+      if (state.pastLayerStates.length > state.maxHistory) {
+        state.pastLayerStates.shift();
+      }
+
       state.layerState.stagingArea = {
         ...initialLayerState.stagingArea,
       };
+
+      state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
     },
     addLine: (state, action: PayloadAction<number[]>) => {
