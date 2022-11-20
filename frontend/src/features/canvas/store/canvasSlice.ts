@@ -331,6 +331,7 @@ export const canvasSlice = createSlice({
       state.layerState.stagingArea = {
         ...initialLayerState.stagingArea,
       };
+      state.shouldShowStagingOutline = true;
     },
     addLine: (state, action: PayloadAction<number[]>) => {
       const { tool, layer, brushColor, brushSize } = state;
@@ -618,6 +619,7 @@ export const canvasSlice = createSlice({
       };
 
       state.futureLayerStates = [];
+      state.shouldShowStagingOutline = true;
     },
     fitBoundingBoxToStage: (state) => {
       const {

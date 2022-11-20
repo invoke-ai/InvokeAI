@@ -214,6 +214,11 @@ export const systemSlice = createSlice({
     clearToastQueue: (state) => {
       state.toastQueue = [];
     },
+    setProcessingIndeterminateTask: (state, action: PayloadAction<string>) => {
+      state.isProcessing = true;
+      state.currentStatus = action.payload;
+      state.currentStatusHasSteps = false;
+    },
   },
 });
 
@@ -241,6 +246,7 @@ export const {
   generationRequested,
   addToast,
   clearToastQueue,
+  setProcessingIndeterminateTask,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
