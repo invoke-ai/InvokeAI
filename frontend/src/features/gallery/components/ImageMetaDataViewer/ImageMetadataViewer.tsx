@@ -136,7 +136,7 @@ const ImageMetadataViewer = memo(
       scale,
     } = metadata;
 
-    const metadataJSON = JSON.stringify(metadata, null, 2);
+    const metadataJSON = JSON.stringify(image.metadata, null, 2);
 
     return (
       <div className={`image-metadata-viewer ${styleClass}`}>
@@ -153,6 +153,12 @@ const ImageMetadataViewer = memo(
           {Object.keys(metadata).length > 0 ? (
             <>
               {type && <MetadataItem label="Generation type" value={type} />}
+              {image.metadata?.model_weights && (
+                <MetadataItem
+                  label="Model"
+                  value={image.metadata.model_weights}
+                />
+              )}
               {['esrgan', 'gfpgan'].includes(type) && (
                 <MetadataItem label="Original image" value={orig_path} />
               )}
