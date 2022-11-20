@@ -21,6 +21,7 @@ pip>=22
 pudb
 pyreadline3
 pytorch-lightning==1.7.7
+realesrgan
 scikit-image>=0.19
 send2trash
 streamlit
@@ -31,7 +32,6 @@ torchmetrics
 transformers==4.21.*
 picklescan
 git+https://github.com/openai/CLIP.git@main#egg=clip
-git+https://github.com/invoke-ai/k-diffusion.git@mps#egg=k_diffusion
-git+https://github.com/invoke-ai/Real-ESRGAN.git#egg=realesrgan
+git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
 git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-git+https://github.com/invoke-ai/GFPGAN.git#egg=gfpgan
+git+https://github.com/invoke-ai/GFPGAN#egg=gfpgan
