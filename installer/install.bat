@@ -139,10 +139,9 @@ copy installer\invoke.bat .\invoke.bat
 rd /s /q installer installer_files
 
 @rem preload the models
-call .venv\Scripts\python scripts\load_models.py
+call .venv\Scripts\python scripts\configure_invokeai.py
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
-deactivate
 
 echo ***** Finished downloading models *****
 
