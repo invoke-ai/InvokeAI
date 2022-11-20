@@ -119,7 +119,7 @@
   --context-menu-bg-color-hover: rgb(30, 32, 42);
 
   // Shadows
-  --floating-button-drop-shadow: drop-shadow(0 0 1rem rgba(140, 101, 255, 0.5));
+  --floating-button-drop-shadow-color: var(--accent-color);
 
   // Canvas
   --inpainting-alerts-bg: rgba(20, 20, 26, 0.75);

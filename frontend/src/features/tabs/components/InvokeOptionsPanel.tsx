@@ -155,6 +155,11 @@ const InvokeOptionsPanel = (props: Props) => {
         onMouseOver={
           !shouldPinOptionsPanel ? cancelCloseOptionsPanelTimer : undefined
         }
+        style={{
+          borderRight: !shouldPinOptionsPanel
+            ? '0.3rem solid var(--tab-list-text-inactive)'
+            : '',
+        }}
       >
         <div className="options-panel-margin">
           <div

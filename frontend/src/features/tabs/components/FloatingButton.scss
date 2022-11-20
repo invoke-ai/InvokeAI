@@ -48,5 +48,8 @@
 }
 
 .show-hide-button-gallery {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
   background-color: var(--background-color) !important;
+  filter: drop-shadow(0.5rem 0px 1rem var(--floating-button-drop-shadow-color));
 }
