@@ -115,9 +115,8 @@ const IAICanvasMaskOptions = () => {
         triggerComponent={
           <ButtonGroup>
             <IAIIconButton
-              aria-label="Inpainting Mask Options"
-              tooltip="Inpainting Mask Options"
-              data-alert={layer === 'mask'}
+              aria-label="Masking Options"
+              tooltip="Masking Options"
               icon={<FaMask />}
             />
           </ButtonGroup>
