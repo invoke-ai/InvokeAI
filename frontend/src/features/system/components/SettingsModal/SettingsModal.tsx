@@ -31,6 +31,7 @@ import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
 import IAISwitch from 'common/components/IAISwitch';
 import IAISelect from 'common/components/IAISelect';
 import IAINumberInput from 'common/components/IAINumberInput';
+import ClearTempFolderButtonModal from '../ClearTempFolderButtonModal';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,

@@ -18,6 +18,7 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import IAIButton from 'common/components/IAIButton';
+import ClearTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],
@@ -123,6 +124,7 @@ const IAICanvasSettingsButtonPopover = () => {
         >
           Clear Canvas History
         </IAIButton>
+        <ClearTempFolderButtonModal />
       </Flex>
     </IAIPopover>
   );

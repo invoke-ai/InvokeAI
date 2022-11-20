@@ -172,8 +172,11 @@ const makeSocketIOEmitters = (
       socketio.emit('requestModelChange', modelName);
     },
     emitSaveStagingAreaImageToGallery: (url: string) => {
-      socketio.emit('requestSaveStagingAreaImageToGallery', url)
-    }
+      socketio.emit('requestSaveStagingAreaImageToGallery', url);
+    },
+    emitRequestEmptyTempFolder: () => {
+      socketio.emit('requestEmptyTempFolder');
+    },
   };
 };
 

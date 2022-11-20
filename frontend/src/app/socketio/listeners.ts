@@ -15,6 +15,7 @@ import {
   errorOccurred,
   setModelList,
   setIsCancelable,
+  addToast,
 } from 'features/system/store/systemSlice';
 
 import {
@@ -365,6 +366,16 @@ const makeSocketIOListeners = (
           timestamp: dateFormat(new Date(), 'isoDateTime'),
           message: `Model change failed: ${model_name}`,
           level: 'error',
+        })
+      );
+    },
+    onTempFolderEmptied: () => {
+      dispatch(
+        addToast({
+          title: 'Temp Folder Emptied',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
         })
       );
     },

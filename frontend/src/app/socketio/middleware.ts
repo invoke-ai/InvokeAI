@@ -46,6 +46,7 @@ export const socketioMiddleware = () => {
       onSystemConfig,
       onModelChanged,
       onModelChangeFailed,
+      onTempFolderEmptied,
     } = makeSocketIOListeners(store);
 
     const {
@@ -59,6 +60,7 @@ export const socketioMiddleware = () => {
       emitRequestSystemConfig,
       emitRequestModelChange,
       emitSaveStagingAreaImageToGallery,
+      emitRequestEmptyTempFolder,
     } = makeSocketIOEmitters(store, socketio);
 
     /**
@@ -111,6 +113,10 @@ export const socketioMiddleware = () => {
 
       socketio.on('modelChangeFailed', (data: InvokeAI.ModelChangeResponse) => {
         onModelChangeFailed(data);
+      });
+
+      socketio.on('tempFolderEmptied', () => {
+        onTempFolderEmptied();
       });
 
       areListenersSet = true;
@@ -167,6 +173,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/saveStagingAreaImageToGallery': {
         emitSaveStagingAreaImageToGallery(action.payload);
+        break;
+      }
+
+      case 'socketio/requestEmptyTempFolder': {
+        emitRequestEmptyTempFolder();
         break;
       }
     }
