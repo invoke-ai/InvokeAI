@@ -103,14 +103,14 @@ const IAICanvasMaskOptions = () => {
       <IAISelect
         label={'Layer (Q)'}
         tooltipProps={{ hasArrow: true, placement: 'top' }}
-        value={isMaskEnabled ? layer : 'base'}
-        isDisabled={!isMaskEnabled}
+        value={layer}
         validValues={LAYER_NAMES_DICT}
         onChange={(e: ChangeEvent<HTMLSelectElement>) =>
           dispatch(setLayer(e.target.value as CanvasLayer))
         }
       />
       <IAIPopover
+        isOpen={layer !== 'mask' ? false : undefined}
         trigger="hover"
         triggerComponent={
           <ButtonGroup>
@@ -118,6 +118,7 @@ const IAICanvasMaskOptions = () => {
               aria-label="Masking Options"
               tooltip="Masking Options"
               icon={<FaMask />}
+              isDisabled={layer !== 'mask'}
             />
           </ButtonGroup>
         }
