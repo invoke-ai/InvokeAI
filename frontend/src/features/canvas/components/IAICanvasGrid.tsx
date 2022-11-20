@@ -21,6 +21,12 @@ const selector = createSelector(
   }
 );
 
+const gridLinesColor = {
+  dark: 'rgba(255, 255, 255, 0.2)',
+  green: 'rgba(255, 255, 255, 0.2)',
+  light: 'rgba(0, 0, 0, 0.2)',
+};
+
 const IAICanvasGrid = () => {
   const { colorMode } = useColorMode();
   const { stageScale, stageCoordinates, stageDimensions } =
@@ -35,8 +41,7 @@ const IAICanvasGrid = () => {
   );
 
   useLayoutEffect(() => {
-    const gridLineColor =
-      colorMode === 'light' ? 'rgba(136, 136, 136, 1)' : 'rgba(84, 84, 84, 1)';
+    const gridLineColor = gridLinesColor[colorMode];
 
     const { width, height } = stageDimensions;
     const { x, y } = stageCoordinates;

@@ -167,6 +167,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           className="hoverable-image"
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
+          userSelect={'none'}
         >
           <Image
             className="hoverable-image-image"
