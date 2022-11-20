@@ -103,7 +103,7 @@ const IAICanvasSettingsButtonPopover = () => {
           onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
         />
         <IAICheckbox
-          label="Crop to Bounding Box"
+          label="Save Box Region Only"
           isChecked={shouldCropToBoundingBoxOnSave}
           onChange={(e) =>
             dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
