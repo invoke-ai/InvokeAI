@@ -64,7 +64,7 @@ const initialCanvasState: CanvasState = {
   minimumStageScale: 1,
   pastLayerStates: [],
   shouldAutoSave: false,
-  shouldCropToBoundingBoxOnSave: true,
+  shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
