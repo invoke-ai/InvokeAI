@@ -102,6 +102,7 @@ export interface CanvasState {
   minimumStageScale: number;
   pastLayerStates: CanvasLayerState[];
   shouldAutoSave: boolean;
+  shouldCropToBoundingBoxOnSave: boolean;
   shouldDarkenOutsideBoundingBox: boolean;
   shouldLockBoundingBox: boolean;
   shouldPreserveMaskedArea: boolean;

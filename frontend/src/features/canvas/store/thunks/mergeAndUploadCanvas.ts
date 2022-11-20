@@ -15,9 +15,11 @@ import {
 } from 'features/system/store/systemSlice';
 import { addImage } from 'features/gallery/store/gallerySlice';
 import { setMergedCanvas } from '../canvasSlice';
+import { CanvasState } from '../canvasTypes';
 
 type MergeAndUploadCanvasConfig = {
   cropVisible?: boolean;
+  cropToBoundingBox?: boolean;
   shouldSaveToGallery?: boolean;
   shouldDownload?: boolean;
   shouldCopy?: boolean;
@@ -26,6 +28,7 @@ type MergeAndUploadCanvasConfig = {
 
 const defaultConfig: MergeAndUploadCanvasConfig = {
   cropVisible: false,
+  cropToBoundingBox: false,
   shouldSaveToGallery: false,
   shouldDownload: false,
   shouldCopy: false,
@@ -37,6 +40,7 @@ export const mergeAndUploadCanvas =
   async (dispatch, getState) => {
     const {
       cropVisible,
+      cropToBoundingBox,
       shouldSaveToGallery,
       shouldDownload,
       shouldCopy,
@@ -48,7 +52,12 @@ export const mergeAndUploadCanvas =
 
     const state = getState() as RootState;
 
-    const stageScale = state.canvas.stageScale;
+    const {
+      stageScale,
+      boundingBoxCoordinates,
+      boundingBoxDimensions,
+      stageCoordinates,
+    } = state.canvas as CanvasState;
 
     const canvasBaseLayer = getCanvasBaseLayer();
 
@@ -61,7 +70,11 @@ export const mergeAndUploadCanvas =
 
     const { dataURL, boundingBox: originalBoundingBox } = layerToDataURL(
       canvasBaseLayer,
-      stageScale
+      stageScale,
+      stageCoordinates,
+      cropToBoundingBox
+        ? { ...boundingBoxCoordinates, ...boundingBoxDimensions }
+        : undefined
     );
 
     if (!dataURL) {
