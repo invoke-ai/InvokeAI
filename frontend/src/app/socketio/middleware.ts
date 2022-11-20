@@ -58,6 +58,7 @@ export const socketioMiddleware = () => {
       emitCancelProcessing,
       emitRequestSystemConfig,
       emitRequestModelChange,
+      emitSaveStagingAreaImageToGallery,
     } = makeSocketIOEmitters(store, socketio);
 
     /**
@@ -161,6 +162,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/requestModelChange': {
         emitRequestModelChange(action.payload);
+        break;
+      }
+
+      case 'socketio/saveStagingAreaImageToGallery': {
+        emitSaveStagingAreaImageToGallery(action.payload);
         break;
       }
     }

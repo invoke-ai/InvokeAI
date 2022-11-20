@@ -10,6 +10,7 @@ import {
   FaCheck,
   FaEye,
   FaEyeSlash,
+  FaSave,
   FaTrash,
 } from 'react-icons/fa';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -22,6 +23,7 @@ import {
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
 
 const selector = createSelector(
   [canvasSelector],
@@ -148,6 +150,17 @@ const IAICanvasStagingAreaToolbar = () => {
           icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
           onClick={() =>
             dispatch(setShouldShowStagingImage(!shouldShowStagingImage))
+          }
+          data-selected={true}
+        />
+        <IAIIconButton
+          tooltip="Save to Gallery"
+          aria-label="Save to Gallery"
+          icon={<FaSave />}
+          onClick={() =>
+            dispatch(
+              saveStagingAreaImageToGallery(currentStagingAreaImage.image.url)
+            )
           }
           data-selected={true}
         />

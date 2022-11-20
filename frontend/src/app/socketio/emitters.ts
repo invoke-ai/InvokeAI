@@ -171,6 +171,9 @@ const makeSocketIOEmitters = (
       dispatch(modelChangeRequested());
       socketio.emit('requestModelChange', modelName);
     },
+    emitSaveStagingAreaImageToGallery: (url: string) => {
+      socketio.emit('requestSaveStagingAreaImageToGallery', url)
+    }
   };
 };
 

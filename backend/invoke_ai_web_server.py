@@ -32,9 +32,10 @@ opt = Args()
 args = opt.parse_args()
 
 # Set the root directory for static files and relative paths
-args.root_dir = os.path.expanduser(args.root_dir or '..')
+args.root_dir = os.path.expanduser(args.root_dir or "..")
 if not os.path.isabs(args.outdir):
-    args.outdir=os.path.join(args.root_dir,args.outdir)
+    args.outdir = os.path.join(args.root_dir, args.outdir)
+
 
 class InvokeAIWebServer:
     def __init__(self, generate, gfpgan, codeformer, esrgan) -> None:
@@ -80,7 +81,9 @@ class InvokeAIWebServer:
             socketio_args["cors_allowed_origins"] = opt.cors
 
         self.app = Flask(
-            __name__, static_url_path="", static_folder=os.path.join(args.root_dir,"frontend/dist")
+            __name__,
+            static_url_path="",
+            static_folder=os.path.join(args.root_dir, "frontend/dist"),
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)
@@ -308,6 +311,50 @@ class InvokeAIWebServer:
                 traceback.print_exc()
                 print("\n")
 
+        @socketio.on("requestSaveStagingAreaImageToGallery")
+        def save_temp_image_to_gallery(url):
+            try:
+                image_path = self.get_image_path_from_url(url)
+                new_path = os.path.join(self.result_path, os.path.basename(image_path))
+                shutil.copy2(image_path, new_path)
+
+                if os.path.splitext(new_path)[1] == ".png":
+                    metadata = retrieve_metadata(new_path)
+                else:
+                    metadata = {}
+
+                pil_image = Image.open(new_path)
+
+                (width, height) = pil_image.size
+
+                thumbnail_path = save_thumbnail(
+                    pil_image, os.path.basename(new_path), self.thumbnail_image_path
+                )
+
+                image_array = [
+                    {
+                        "url": self.get_url_from_image_path(new_path),
+                        "thumbnail": self.get_url_from_image_path(thumbnail_path),
+                        "mtime": os.path.getmtime(new_path),
+                        "metadata": metadata,
+                        "width": width,
+                        "height": height,
+                        "category": "result",
+                    }
+                ]
+
+                socketio.emit(
+                    "galleryImages",
+                    {"images": image_array, "category": "result"},
+                )
+
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
         @socketio.on("requestLatestImages")
         def handle_request_latest_images(category, latest_mtime):
             try:
@@ -431,7 +478,7 @@ class InvokeAIWebServer:
                             }
                         )
                     except:
-                        print(f'>> Unable to load {path}')
+                        print(f">> Unable to load {path}")
                         socketio.emit("error", {"message": f"Unable to load {path}"})
 
                 socketio.emit(
