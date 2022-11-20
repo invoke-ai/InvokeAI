@@ -25,7 +25,10 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { deleteImage } from 'app/socketio/actions';
 import { RootState } from 'app/store';
-import { setShouldConfirmOnDelete, SystemState } from 'features/system/store/systemSlice';
+import {
+  setShouldConfirmOnDelete,
+  SystemState,
+} from 'features/system/store/systemSlice';
 import * as InvokeAI from 'app/invokeai';
 import { useHotkeys } from 'react-hotkeys-hook';
 import _ from 'lodash';
@@ -105,7 +108,7 @@ const DeleteImageModal = forwardRef(
           onClose={onClose}
         >
           <AlertDialogOverlay>
-            <AlertDialogContent>
+            <AlertDialogContent className="modal">
               <AlertDialogHeader fontSize="lg" fontWeight="bold">
                 Delete image
               </AlertDialogHeader>
@@ -127,7 +130,11 @@ const DeleteImageModal = forwardRef(
                 </Flex>
               </AlertDialogBody>
               <AlertDialogFooter>
-                <Button ref={cancelRef} onClick={onClose}>
+                <Button
+                  ref={cancelRef}
+                  onClick={onClose}
+                  className="modal-close-btn"
+                >
                   Cancel
                 </Button>
                 <Button colorScheme="red" onClick={handleDelete} ml={3}>

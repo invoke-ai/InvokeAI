@@ -6,6 +6,7 @@ import {
   AlertDialogHeader,
   AlertDialogOverlay,
   Button,
+  Flex,
   useDisclosure,
 } from '@chakra-ui/react';
 import { emptyTempFolder } from 'app/socketio/actions';
@@ -42,7 +43,7 @@ const ClearTempFolderButtonModal = () => {
         onClose={onClose}
       >
         <AlertDialogOverlay>
-          <AlertDialogContent>
+          <AlertDialogContent className="modal">
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
               Clear Temp Image Folder
             </AlertDialogHeader>
@@ -58,7 +59,11 @@ const ClearTempFolderButtonModal = () => {
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose}>
+              <Button
+                ref={cancelRef}
+                onClick={onClose}
+                className="modal-close-btn"
+              >
                 Cancel
               </Button>
               <Button colorScheme="red" onClick={handleClear} ml={3}>
