@@ -675,6 +675,16 @@ export const canvasSlice = createSlice({
 
       state.layerState.objects = [action.payload];
     },
+    resetCanvasInteractionState: (state) => {
+      state.cursorPosition = null;
+      state.isDrawing = false;
+      state.isMouseOverBoundingBox = false;
+      state.isMoveBoundingBoxKeyHeld = false;
+      state.isMoveStageKeyHeld = false;
+      state.isMovingBoundingBox = false;
+      state.isMovingStage = false;
+      state.isTransformingBoundingBox = false;
+    },
   },
 });
 
@@ -690,6 +700,7 @@ export const {
   prevStagingAreaImage,
   redo,
   resetCanvas,
+  resetCanvasInteractionState,
   resetCanvasView,
   resizeAndScaleCanvas,
   resizeCanvas,

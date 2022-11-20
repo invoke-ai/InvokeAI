@@ -192,9 +192,11 @@ export default function ImageGallery() {
   useHotkeys(
     'esc',
     () => {
-      if (shouldPinGallery) return;
       dispatch(setShouldShowGallery(false));
-      dispatch(setDoesCanvasNeedScaling(true));
+    },
+    {
+      enabled: () => !shouldPinGallery,
+      preventDefault: true,
     },
     [shouldPinGallery]
   );
