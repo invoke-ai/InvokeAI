@@ -199,20 +199,18 @@ _err_exit $? _err_msg
 
 echo -e "\n***** Installed Python dependencies *****\n"
 
-# preload the models
-.venv/bin/python3 scripts/configure_invokeai.py
-_err_msg="\n----- model download clone failed -----\n"
-_err_exit $? _err_msg
-
-echo -e "\n***** Finished downloading models *****\n"
-
 echo -e "\n***** Installing invoke.sh ******\n"
 cp installer/invoke.sh .
 
 # more cleanup
 rm -rf installer/ installer_files/
 
-deactivate
+# preload the models
+.venv/bin/python3 scripts/configure_invokeai.py
+_err_msg="\n----- model download clone failed -----\n"
+_err_exit $? _err_msg
+
+echo -e "\n***** Finished downloading models *****\n"
 
 echo "All done! Run the command './invoke.sh' to start InvokeAI."
 read -p "Press any key to exit..."

@@ -1085,6 +1085,10 @@ pandas==1.5.1 \
 pathtools==0.1.2 \
     --hash=sha256:7c35c5421a39bb82e58018febd90e3b6e5db34c5443aaaf742b3f33d4655f1c0
     # via wandb
+picklescan==0.0.5 \
+    --hash=sha256:368cf1b9a075bc1b6460ad82b694f260532b836c82f99d13846cd36e1bbe7f9a \
+    --hash=sha256:57153eca04d5df5009f2cdd595aef261b8a6f27e03046a1c84f672aa6869c592
+    # via -r installer/requirements.in
 pillow==9.3.0 \
     --hash=sha256:03150abd92771742d4a8cd6f2fa6246d847dcd2e332a18d0c15cc75bf6703040 \
     --hash=sha256:073adb2ae23431d3b9bcbcff3fe698b62ed47211d0716b067385538a1b0f28b8 \
@@ -1822,15 +1826,15 @@ toolz==0.12.0 \
     --hash=sha256:2059bd4148deb1884bb0eb770a3cde70e7f954cfbbdc2285f1f2de01fd21eb6f \
     --hash=sha256:88c570861c440ee3f2f6037c4654613228ff40c93a6c25e0eba70d17282c6194
     # via altair
-torch==1.12.1+cu116 ; platform_system == "Linux" or platform_system == "Windows" \
-    --hash=sha256:7725420dabebfcaf44984edce3283eea91f98f0f7d5874bc68c7a164bd8126e3 \
-    --hash=sha256:832effad8b21109700323a5aa137a2e4bdea711dac3d8491ff542f798dab0101 \
-    --hash=sha256:84f031e4ee25d95368d7531aa58e79da9808d3fa53b4b363ea03a2450b6fd0af \
-    --hash=sha256:b6bc31244aa2818929fbb30c483c221df471e9d856e805c5a1ff72b131ae9e7b \
-    --hash=sha256:b8e8906e770bcad12e67c269e1bcdd7661a8abd96519a4ba643e86440bbcc1bf \
-    --hash=sha256:bca5a77071d7eb901beb775648b125e6d9279f231d1f23e56530b5a189df8975 \
-    --hash=sha256:dda312901220895087cc83d3665464a3dc171d04460c61c31af463efbfb54896 \
-    --hash=sha256:fc9b4786ec54be67eaa8b0c7c9999e2f4ae2b89a1c18e41de1515a190440c691
+torch==1.12.0+cu116 ; platform_system == "Linux" or platform_system == "Windows" \
+    --hash=sha256:1d9557d1e871794a31a71c40dec8589d6c3347f3f2953a8dd74cfd58e1ecb52e \
+    --hash=sha256:72538e4505087668a4642f861578dfed470fae5da20b1758b0f34e4a070d6b21 \
+    --hash=sha256:74f5b137190a6face6859d630f129289e7fae6a4d9a747430b3b5d5c6297a3ae \
+    --hash=sha256:7665e906995328746c6f70016ee90cafe50cbf434b6ef576e1de2678929ee63e \
+    --hash=sha256:7ee1899e9afe5f5e35ba46bc70e17735d2c02cedede1fa69a288cc680b5ab3db \
+    --hash=sha256:97d63afcb6358071737f8325aa933e9db2f30cd2f068591d27d4ea72f3cabad2 \
+    --hash=sha256:aa43d7b54b86f723f17c5c44df1078c59a6149fc4d42fbef08aafab9d61451c9 \
+    --hash=sha256:f772be831447dd01ebd26cbedf619e668d1b269d69bf6b4ff46b1378362bff26
     # via
     #   -r installer/requirements.in
     #   accelerate
@@ -1861,15 +1865,15 @@ torchmetrics==0.10.2 \
     --hash=sha256:43757d82266969906fc74b6e80766fcb2a0d52d6c3d09e3b7c98cf3b733fd20c \
     --hash=sha256:daa29d96bff5cff04d80eec5b9f5076993d6ac9c2d2163e88b6b31f8d38f7c25
     # via pytorch-lightning
-torchvision==0.13.1+cu116 ; platform_system == "Linux" or platform_system == "Windows" \
-    --hash=sha256:0c9a2b605ac30fcf475d60f79ba378af0073a22de585453f8c3dd6c1452ab9bc \
-    --hash=sha256:75986abe572138258eb9795cb4cd73f40b2bdf8374fefa1af6ff6bb0dbc972c6 \
-    --hash=sha256:8a4c395bb72cf51eb4318c6861c9a5ea490d48ec36a3d767220ef182445449cb \
-    --hash=sha256:92e4685c6010b6b1c228ebb5fe93105d0a71e5b586483a942e04529a43e0bb42 \
-    --hash=sha256:9ec5654c56a22fe420dc0af0ff5cd31105f583fdb0240043ff26a7cfed7e05fb \
-    --hash=sha256:ba8b7d3c33f63feb29c7dd8c0db68b735d0c9d924ff4e84121b4b20b17cec7a5 \
-    --hash=sha256:c3ceb2b3f456f0c984af71ef55f8637f178a29dc3e13a66fbb010ceead2891e1 \
-    --hash=sha256:dcf32f6d998493e76ec21a38bbb856b7402295cf7a67fb09ce5bde7e7e725756
+torchvision==0.13.0+cu116 ; platform_system == "Linux" or platform_system == "Windows" \
+    --hash=sha256:1696feadf1921c8fa1549bad774221293298288ebedaa14e44bc3e57e964a369 \
+    --hash=sha256:572544b108eaf12638f3dca0f496a453c4b8d8256bcc8333d5355df641c0380c \
+    --hash=sha256:76dbe71be271e2f246d556a8201c6f73a431851045d866c51bd945521817b892 \
+    --hash=sha256:90b9461f57e1219ca900bfd9e85548b840ec56d57ec331b7a7eb871113b34c0a \
+    --hash=sha256:941a8c958f2fe9184ce522567f4a471b52dd306891870e979fe6569062432258 \
+    --hash=sha256:9ce27c87a8581d00dcef416ec75f8eca9c225d8c36b81150a1f2a60eb70155dc \
+    --hash=sha256:cb6bf0117b8f4b601baeae54e8a6bb5c4942b054835ba997f438ddcb7adcfb90 \
+    --hash=sha256:d1a3c124645e3460b3e50b54eb89a2575a5036bfa618f15dc4f5d635c716069d
     # via
     #   -r installer/requirements.in
     #   basicsr
