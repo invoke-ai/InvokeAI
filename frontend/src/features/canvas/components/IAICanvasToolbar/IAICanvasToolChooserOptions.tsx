@@ -8,12 +8,7 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  FaArrowsAlt,
-  FaEraser,
-  FaPaintBrush,
-  FaSlidersH,
-} from 'react-icons/fa';
+import { FaEraser, FaPaintBrush, FaSlidersH } from 'react-icons/fa';
 import {
   canvasSelector,
   isStagingSelector,
@@ -51,18 +46,6 @@ const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
   const { tool, brushColor, brushSize, brushColorString, isStaging } =
     useAppSelector(selector);
-
-  useHotkeys(
-    ['v'],
-    () => {
-      handleSelectMoveTool();
-    },
-    {
-      enabled: () => true,
-      preventDefault: true,
-    },
-    []
-  );
 
   useHotkeys(
     ['b'],
@@ -114,7 +97,6 @@ const IAICanvasToolChooserOptions = () => {
 
   const handleSelectBrushTool = () => dispatch(setTool('brush'));
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
-  const handleSelectMoveTool = () => dispatch(setTool('move'));
 
   return (
     <ButtonGroup isAttached>
@@ -134,20 +116,12 @@ const IAICanvasToolChooserOptions = () => {
         isDisabled={isStaging}
         onClick={() => dispatch(setTool('eraser'))}
       />
-      <IAIIconButton
-        aria-label="Move Tool (V)"
-        tooltip="Move Tool (V)"
-        icon={<FaArrowsAlt />}
-        data-selected={tool === 'move' || isStaging}
-        onClick={handleSelectMoveTool}
-      />
-
       <IAIPopover
         trigger="hover"
         triggerComponent={
           <IAIIconButton
-            aria-label="Tool Options"
-            tooltip="Tool Options"
+            aria-label="Brush Options"
+            tooltip="Brush Options"
             icon={<FaSlidersH />}
           />
         }
