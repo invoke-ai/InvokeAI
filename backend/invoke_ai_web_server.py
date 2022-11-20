@@ -334,32 +334,34 @@ class InvokeAIWebServer:
                 image_array = []
 
                 for path in image_paths:
-                    if os.path.splitext(path)[1] == ".png":
-                        metadata = retrieve_metadata(path)
-                        # sd_metadata = metadata["sd-metadata"]
-                    else:
-                        # sd_metadata = {}
-                        metadata = {}
+                    try:
+                        if os.path.splitext(path)[1] == ".png":
+                            metadata = retrieve_metadata(path)
+                        else:
+                            metadata = {}
 
-                    pil_image = Image.open(path)
-                    (width, height) = pil_image.size
+                        pil_image = Image.open(path)
+                        (width, height) = pil_image.size
 
-                    thumbnail_path = save_thumbnail(
-                        pil_image, os.path.basename(path), self.thumbnail_image_path
-                    )
+                        thumbnail_path = save_thumbnail(
+                            pil_image, os.path.basename(path), self.thumbnail_image_path
+                        )
 
-                    image_array.append(
-                        {
-                            "url": self.get_url_from_image_path(path),
-                            "thumbnail": self.get_url_from_image_path(thumbnail_path),
-                            "mtime": os.path.getmtime(path),
-                            "metadata": metadata,
-                            # "metadata": sd_metadata,
-                            "width": width,
-                            "height": height,
-                            "category": category,
-                        }
-                    )
+                        image_array.append(
+                            {
+                                "url": self.get_url_from_image_path(path),
+                                "thumbnail": self.get_url_from_image_path(
+                                    thumbnail_path
+                                ),
+                                "mtime": os.path.getmtime(path),
+                                "metadata": metadata,
+                                "width": width,
+                                "height": height,
+                                "category": category,
+                            }
+                        )
+                    except:
+                        socketio.emit("error", {"message": f"Unable to load {path}"})
 
                 socketio.emit(
                     "galleryImages",
@@ -402,32 +404,35 @@ class InvokeAIWebServer:
 
                 image_array = []
                 for path in image_paths:
-                    if os.path.splitext(path)[1] == ".png":
-                        metadata = retrieve_metadata(path)
-                        # sd_metadata = metadata["sd-metadata"]
-                    else:
-                        # sd_metadata = {}
-                        metadata = {}
+                    try:
+                        if os.path.splitext(path)[1] == ".png":
+                            metadata = retrieve_metadata(path)
+                        else:
+                            metadata = {}
 
-                    pil_image = Image.open(path)
-                    (width, height) = pil_image.size
+                        pil_image = Image.open(path)
+                        (width, height) = pil_image.size
 
-                    thumbnail_path = save_thumbnail(
-                        pil_image, os.path.basename(path), self.thumbnail_image_path
-                    )
+                        thumbnail_path = save_thumbnail(
+                            pil_image, os.path.basename(path), self.thumbnail_image_path
+                        )
 
-                    image_array.append(
-                        {
-                            "url": self.get_url_from_image_path(path),
-                            "thumbnail": self.get_url_from_image_path(thumbnail_path),
-                            "mtime": os.path.getmtime(path),
-                            # "metadata": sd_metadata,
-                            "metadata": metadata,
-                            "width": width,
-                            "height": height,
-                            "category": category,
-                        }
-                    )
+                        image_array.append(
+                            {
+                                "url": self.get_url_from_image_path(path),
+                                "thumbnail": self.get_url_from_image_path(
+                                    thumbnail_path
+                                ),
+                                "mtime": os.path.getmtime(path),
+                                "metadata": metadata,
+                                "width": width,
+                                "height": height,
+                                "category": category,
+                            }
+                        )
+                    except:
+                        print(f'>> Unable to load {path}')
+                        socketio.emit("error", {"message": f"Unable to load {path}"})
 
                 socketio.emit(
                     "galleryImages",
