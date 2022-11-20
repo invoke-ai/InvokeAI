@@ -40,6 +40,7 @@ import { BiReset } from 'react-icons/bi';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
+import IAIButton from 'common/components/IAIButton';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 
@@ -84,9 +85,9 @@ export default function ImageGallery() {
     }
 
     if (activeTabName === 'unifiedCanvas') {
-      dispatch(setGalleryWidth(190));
       setGalleryMinWidth(190);
-      setGalleryMaxWidth(190);
+      setGalleryMaxWidth(450);
+      dispatch(setDoesCanvasNeedScaling(true));
     } else if (activeTabName === 'img2img') {
       dispatch(
         setGalleryWidth(Math.min(Math.max(Number(galleryWidth), 0), 490))
@@ -140,7 +141,7 @@ export default function ImageGallery() {
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
-    dispatch(setDoesCanvasNeedScaling(true));
+    // dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const setCloseGalleryTimer = () => {
@@ -277,6 +278,7 @@ export default function ImageGallery() {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
+        !shouldPinGallery &&
         galleryRef.current &&
         !galleryRef.current.contains(e.target as Node)
       ) {
@@ -287,7 +289,7 @@ export default function ImageGallery() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [handleCloseGallery]);
+  }, [handleCloseGallery, shouldPinGallery]);
 
   return (
     <CSSTransition
@@ -302,7 +304,6 @@ export default function ImageGallery() {
         style={{ zIndex: shouldPinGallery ? 1 : 100 }}
         data-pinned={shouldPinGallery}
         ref={galleryRef}
-        // onMouseLeave={setCloseGalleryTimer}
         onMouseLeave={!shouldPinGallery ? setCloseGalleryTimer : undefined}
         onMouseEnter={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
         onMouseOver={!shouldPinGallery ? cancelCloseGalleryTimer : undefined}
@@ -312,16 +313,7 @@ export default function ImageGallery() {
           maxWidth={galleryMaxWidth}
           className={'image-gallery-popup'}
           handleStyles={{ left: { width: '15px' } }}
-          enable={{
-            top: false,
-            right: false,
-            bottom: false,
-            left: true,
-            topRight: false,
-            bottomRight: false,
-            bottomLeft: false,
-            topLeft: false,
-          }}
+          enable={{ left: true }}
           size={{
             width: galleryWidth,
             height: shouldPinGallery ? '100%' : '100vh',
@@ -355,9 +347,9 @@ export default function ImageGallery() {
               Number(galleryMaxWidth)
             );
 
-            if (newWidth >= 280 && !shouldShowButtons) {
+            if (newWidth >= 315 && !shouldShowButtons) {
               setShouldShowButtons(true);
-            } else if (newWidth < 280 && shouldShowButtons) {
+            } else if (newWidth < 315 && shouldShowButtons) {
               setShouldShowButtons(false);
             }
 
@@ -377,24 +369,26 @@ export default function ImageGallery() {
             >
               {shouldShowButtons ? (
                 <>
-                  <Button
+                  <IAIButton
+                    size={'sm'}
                     data-selected={currentCategory === 'result'}
                     onClick={() => dispatch(setCurrentCategory('result'))}
                   >
-                    Invocations
-                  </Button>
-                  <Button
+                    Generations
+                  </IAIButton>
+                  <IAIButton
+                    size={'sm'}
                     data-selected={currentCategory === 'user'}
                     onClick={() => dispatch(setCurrentCategory('user'))}
                   >
-                    User
-                  </Button>
+                    Uploads
+                  </IAIButton>
                 </>
               ) : (
                 <>
                   <IAIIconButton
-                    aria-label="Show Invocations"
-                    tooltip="Show Invocations"
+                    aria-label="Show Generations"
+                    tooltip="Show Generations"
                     data-selected={currentCategory === 'result'}
                     icon={<FaImage />}
                     onClick={() => dispatch(setCurrentCategory('result'))}
@@ -432,12 +426,8 @@ export default function ImageGallery() {
                       onChange={handleChangeGalleryImageMinimumWidth}
                       min={32}
                       max={256}
-                      // width={100}
+                      hideTooltip={true}
                       label={'Image Size'}
-                      // formLabelProps={{ style: { fontSize: '0.9rem' } }}
-                      // sliderThumbTooltipProps={{
-                      //   label: `${galleryImageMinimumWidth}px`,
-                      // }}
                     />
                     <IAIIconButton
                       size={'sm'}
