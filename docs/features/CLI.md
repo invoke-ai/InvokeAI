@@ -1,7 +1,5 @@
 ---
 title: CLI
-hide:
-  - toc
 ---
 
 # :material-bash: CLI
@@ -93,12 +91,15 @@ overridden on a per-prompt basis (see
 | `--port <port>`                           |                                           | `9090`                                         | Which port web server should listen for requests on.                                                 |
 | `--config <path>`                         |                                           | `configs/models.yaml`                          | Configuration file for models and their weights.                                                     |
 | `--iterations <int>`                      | `-n<int>`                                 | `1`                                            | How many images to generate per prompt.                                                              |
+| `--width <int>`                           | `-W<int>`                                 | `512`                                    | Width of generated image                                                                                                                                                                                                                         |
+| `--height <int>`                          | `-H<int>`                                 | `512`                                    | Height of generated image                                                                                                        | `--steps <int>`                           | `-s<int>`                                 | `50`                                     | How many steps of refinement to apply                                                                                                                                                                                                            |
+| `--strength <float>`                      | `-s<float>` | `0.75`  | For img2img: how hard to try to match the prompt to the initial image. Ranges from 0.0-0.99, with higher values replacing the initial image completely. |
+| `--fit`                                   | `-F`        | `False` | For img2img: scale the init image to fit into the specified -H and -W dimensions                                                                             |
 | `--grid`                                  | `-g`                                      | `False`                                        | Save all image series as a grid rather than individually.                                            |
 | `--sampler <sampler>`                     | `-A<sampler>`                             | `k_lms`                                        | Sampler to use. Use `-h` to get list of available samplers.                                          |
 | `--seamless`                              |                                           | `False`                                        | Create interesting effects by tiling elements of the image.                                          |
 | `--embedding_path <path>`                 |                                           | `None`                                         | Path to pre-trained embedding manager checkpoints, for custom models                                 |
-| `--gfpgan_dir`                            |                                           | `src/gfpgan`                                   | Path to where GFPGAN is installed.                                                                   |
-| `--gfpgan_model_path`                     |                                           | `experiments/pretrained_models/GFPGANv1.4.pth` | Path to GFPGAN model file, relative to `--gfpgan_dir`.                                               |
+| `--gfpgan_model_path`                     |                                           | `experiments/pretrained_models/GFPGANv1.4.pth` | Path to GFPGAN model file.                                              |
 | `--free_gpu_mem`                          |                                           | `False`                                        | Free GPU memory after sampling, to allow image decoding and saving in low VRAM conditions            |
 | `--precision`                             |                                           | `auto`                                         | Set model precision, default is selected by device. Options: auto, float32, float16, autocast        |
 
@@ -108,7 +109,7 @@ overridden on a per-prompt basis (see
 
     | Argument           |  Shortcut  |  Default            |  Description |
     |--------------------|------------|---------------------|--------------|
-    | `--weights <path>`   |            | `None`                | Pth to weights file; use `--model stable-diffusion-1.4` instead |
+    | `--weights <path>`   |            | `None`                | Path to weights file; use `--model stable-diffusion-1.4` instead |
     | `--laion400m`        | `-l`         | `False`               | Use older LAION400m weights; use `--model=laion400m` instead |
 
     </div>
@@ -120,6 +121,29 @@ overridden on a per-prompt basis (see
       names because the Python interpreter treats "\" as an escape.
       You can either double your slashes (ick): `C:\\path\\to\\my\\file`, or
       use Linux/Mac style forward slashes (better): `C:/path/to/my/file`.
+
+## The .invokeai initialization file
+
+To start up invoke.py with your preferred settings, place your desired
+startup options in a file in your home directory named `.invokeai` The
+file should contain the startup options as you would type them on the
+command line (`--steps=10 --grid`), one argument per line, or a
+mixture of both using any of the accepted command switch formats:
+
+!!! example ""
+
+    ```bash
+    --web
+    --steps=28
+    --grid
+    -f 0.6 -C 11.0 -A k_euler_a
+    ```
+
+Note that the initialization file only accepts the command line arguments.
+There are additional arguments that you can provide on the `invoke>` command
+line (such as `-n` or `--iterations`) that cannot be entered into this file.
+Also be alert for empty blank lines at the end of the file, which will cause
+an arguments error at startup time.
 
 ## List of prompt arguments
 

@@ -42,7 +42,7 @@ generation process. It runs on Windows, Mac and Linux machines, with
 GPU cards with as little as 4 GB of RAM. It provides both a polished
 Web interface (see below), and an easy-to-use command-line interface.
 
-**Quick links**: [<a href="https://discord.gg/NwVCmKwY">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
+**Quick links**: [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
 
 <div align="center"><img src="docs/assets/invoke-web-server-1.png" width=640></div>
 
@@ -65,14 +65,11 @@ requests. Be sure to use the provided templates. They will help aid diagnose iss
 
 ### Installation
 
-This fork is supported across multiple platforms. You can find individual installation instructions
-below.
-
-- #### [Linux](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_LINUX/)
-
-- #### [Windows](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_WINDOWS/)
-
-- #### [Macintosh](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_MAC/)
+This fork is supported across Linux, Windows and Macintosh. Linux
+users can use either an Nvidia-based card (with CUDA support) or an
+AMD card (using the ROCm driver). For full installation and upgrade
+instructions, please see:
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
 ### Hardware Requirements
 

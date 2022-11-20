@@ -1,5 +1,6 @@
 from ldm.modules.encoders.modules import FrozenCLIPEmbedder, BERTEmbedder
 from ldm.modules.embedding_manager import EmbeddingManager
+from ldm.modules.globals import Globals
 
 import argparse, os
 from functools import partial
@@ -52,6 +53,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
+        "--root_dir", 
+        type=str, 
+        default='.',
+        help="Path to the InvokeAI install directory containing 'models', 'outputs' and 'configs'."
+    )
+
+    parser.add_argument(
         "--manager_ckpts", 
         type=str, 
         nargs="+", 
@@ -73,6 +81,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    Globals.root=args.root_dir
 
     if args.use_bert:
         embedder = BERTEmbedder(n_embed=1280, n_layer=32).cuda()

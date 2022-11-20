@@ -3,6 +3,7 @@ import warnings
 import os
 import sys
 import numpy as np
+from ldm.invoke.globals import Globals
 
 from PIL import Image
 
@@ -10,20 +11,21 @@ from PIL import Image
 class GFPGAN():
     def __init__(
             self,
-            gfpgan_dir='src/gfpgan',
-            gfpgan_model_path='experiments/pretrained_models/GFPGANv1.4.pth') -> None:
-
-        self.model_path = os.path.join(gfpgan_dir, gfpgan_model_path)
+            gfpgan_model_path='models/gfpgan/GFPGANv1.4.pth'
+    ) -> None:
+    
+        if not os.path.isabs(gfpgan_model_path):
+            gfpgan_model_path=os.path.abspath(os.path.join(Globals.root,gfpgan_model_path))
+        self.model_path = gfpgan_model_path
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
-
+        
         if not self.gfpgan_model_exists:
             print('## NOT FOUND: GFPGAN model not found at ' + self.model_path)
             return None
-        sys.path.append(os.path.abspath(gfpgan_dir))
-
+    
     def model_exists(self):
         return os.path.isfile(self.model_path)
-
+    
     def process(self, image, strength: float, seed: str = None):
         if seed is not None:
             print(f'>> GFPGAN - Restoring Faces for image seed:{seed}')
@@ -50,7 +52,7 @@ class GFPGAN():
                 f'>> WARNING: GFPGAN not initialized.'
             )
             print(
-                f'>> Download https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth to {self.model_path}, \nor change GFPGAN directory with --gfpgan_dir.'
+                f'>> Download https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth to {self.model_path}'
             )
 
         image = image.convert('RGB')
@@ -73,6 +75,7 @@ class GFPGAN():
             if restored_img.size != image.size:
                 image = image.resize(res.size)
             res = Image.blend(image, res, strength)
+
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

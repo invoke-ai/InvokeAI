@@ -12,13 +12,15 @@ import time
 import gc
 import hashlib
 import psutil
+import sys
 import transformers
 import traceback
 import os
-from sys import getrefcount
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config
+from ldm.invoke.globals import Globals
+from picklescan.scanner import scan_file_path
 
 DEFAULT_MAX_MODELS=2
 
@@ -41,15 +43,22 @@ class ModelCache(object):
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
 
+    def valid_model(self, model_name:str)->bool:
+        '''
+        Given a model name, returns True if it is a valid
+        identifier.
+        '''
+        return model_name in self.config
+    
     def get_model(self, model_name:str):
         '''
         Given a model named identified in models.yaml, return
         the model object. If in RAM will load into GPU VRAM.
         If on disk, will load from there.
         '''
-        if model_name not in self.config:
+        if not self.valid_model(model_name):
             print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
-            return None
+            return self.current_model
 
         if self.current_model != model_name:
             if model_name not in self.models: # make room for a new one
@@ -102,10 +111,13 @@ class ModelCache(object):
         Set the default model. The change will not take
         effect until you call model_cache.commit()
         '''
+        print(f'DEBUG: before set_default_model()\n{OmegaConf.to_yaml(self.config)}')
         assert model_name in self.models,f"unknown model '{model_name}'"
-        for model in self.models:
-            self.models[model].pop('default',None)
-        self.models[model_name]['default'] = True
+        config = self.config
+        for model in config:
+            config[model].pop('default',None)
+        config[model_name]['default'] = True
+        print(f'DEBUG: after set_default_model():\n{OmegaConf.to_yaml(self.config)}')
 
     def list_models(self) -> dict:
         '''
@@ -190,6 +202,11 @@ class ModelCache(object):
         width = mconfig.width
         height = mconfig.height
 
+        if not os.path.isabs(weights):
+            weights = os.path.normpath(os.path.join(Globals.root,weights))
+        # scan model
+        self._scan_model(model_name, weights)
+
         print(f'>> Loading {model_name} from {weights}')
 
         # for usage statistics
@@ -200,6 +217,8 @@ class ModelCache(object):
         tic = time.time()
 
         # this does the work
+        if not os.path.isabs(config):
+            config = os.path.join(Globals.root,config)
         c     = OmegaConf.load(config)
         with open(weights,'rb') as f:
             weight_bytes = f.read()
@@ -218,6 +237,8 @@ class ModelCache(object):
 
         # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
         if vae:
+            if not os.path.isabs(vae):
+                vae = os.path.normpath(os.path.join(Globals.root,vae))
             if os.path.exists(vae):
                 print(f'   | Loading VAE weights from: {vae}')
                 vae_ckpt = torch.load(vae, map_location="cpu")
@@ -265,6 +286,30 @@ class ModelCache(object):
         gc.collect()
         if self._has_cuda():
             torch.cuda.empty_cache()
+    
+    def _scan_model(self, model_name, checkpoint):
+        # scan model
+        print(f'>> Scanning Model: {model_name}')
+        scan_result = scan_file_path(checkpoint)
+        if scan_result.infected_files != 0:
+            if scan_result.infected_files == 1:
+                print(f'\n### Issues Found In Model: {scan_result.issues_count}')
+                print('### WARNING: The model you are trying to load seems to be infected.')
+                print('### For your safety, InvokeAI will not load this model.')
+                print('### Please use checkpoints from trusted sources.')
+                print("### Exiting InvokeAI")
+                sys.exit()
+            else:
+                print('\n### WARNING: InvokeAI was unable to scan the model you are using.')
+                from ldm.util import ask_user
+                model_safe_check_fail = ask_user('Do you want to to continue loading the model?', ['y', 'n'])
+                if model_safe_check_fail.lower() == 'y':
+                    pass
+                else:
+                    print("### Exiting InvokeAI")
+                    sys.exit()
+        else:
+            print('>> Model Scanned. OK!!')
 
     def _make_cache_room(self):
         num_loaded_models = len(self.models)

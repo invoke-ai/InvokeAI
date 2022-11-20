@@ -150,12 +150,18 @@ class Inpaint(Img2Img):
                        seam_steps: int = 10,
                        tile_size: int = 32,
                        step_callback=None,
-                       inpaint_replace=False, **kwargs):
+                       inpaint_replace=False,
+                       inpaint_width=None,
+                       inpaint_height=None,
+                       **kwargs):
         """
         Returns a function returning an image derived from the prompt and
         the initial image + mask.  Return value depends on the seed at
         the time you call it.  kwargs are 'init_latent' and 'strength'
         """
+
+        self.inpaint_width = inpaint_width
+        self.inpaint_height = inpaint_height
 
         if isinstance(init_image, PIL.Image.Image):
             self.pil_image = init_image
@@ -163,16 +169,26 @@ class Inpaint(Img2Img):
             # Fill missing areas of original image
             init_filled = self.tile_fill_missing(
                 self.pil_image.copy(),
-                seed = self.seed,
+                seed = self.seed if (self.seed is not None
+                                     and self.seed >= 0) else self.new_seed(),
                 tile_size = tile_size
             )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
+
+            # Resize if requested for inpainting
+            if inpaint_width and inpaint_height:
+                init_filled = init_filled.resize((inpaint_width, inpaint_height))
 
             # Create init tensor
             init_image = self._image_to_tensor(init_filled.convert('RGB'))
 
         if isinstance(mask_image, PIL.Image.Image):
             self.pil_mask = mask_image
+
+            # Resize if requested for inpainting
+            if inpaint_width and inpaint_height:
+                mask_image = mask_image.resize((inpaint_width, inpaint_height))
+
             mask_image = mask_image.resize(
                 (
                     mask_image.width // downsampling,
@@ -306,6 +322,10 @@ class Inpaint(Img2Img):
 
     def sample_to_image(self, samples)->Image.Image:
         gen_result = super().sample_to_image(samples).convert('RGB')
+
+        # Resize if necessary
+        if self.inpaint_width and self.inpaint_height:
+            gen_result = gen_result.resize(self.pil_image.size)
 
         if self.pil_image is None or self.pil_mask is None:
             return gen_result

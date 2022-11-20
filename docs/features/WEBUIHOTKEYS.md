@@ -2,7 +2,7 @@
 title: WebUI Hotkey List
 ---
 
-# **WebUI Hotkey List**
+# :material-keyboard: **WebUI Hotkey List**
 
 ## General
 
@@ -19,7 +19,7 @@ title: WebUI Hotkey List
 | ++ctrl+enter++    | Start processing       |
 | ++shift+x++       | cancel Processing      |
 | ++shift+d++       | Toggle Dark Mode       |
-| `                 | Toggle console         |
+| ++"`"++           | Toggle console         |
 
 ## Tabs
 
@@ -48,10 +48,10 @@ title: WebUI Hotkey List
 
 | Setting                      | Hotkey                |
 | ---------------------------- | --------------------- |
-| [                            | Decrease brush size   |
-| ]                            | Increase brush size   |
-| alt + [                      | Decrease mask opacity |
-| alt + ]                      | Increase mask opacity |
+| ++"["++                      | Decrease brush size   |
+| ++"]"++                      | Increase brush size   |
+| ++alt+"["++                  | Decrease mask opacity |
+| ++alt+"]"++                  | Increase mask opacity |
 | ++b++                        | Select brush          |
 | ++e++                        | Select eraser         |
 | ++ctrl+z++                   | Undo brush stroke     |

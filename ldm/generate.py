@@ -27,6 +27,7 @@ from pytorch_lightning import seed_everything, logging
 
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.util import instantiate_from_config
+from ldm.invoke.globals import Globals
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
@@ -220,8 +221,15 @@ class Generate:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
-                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id, local_files_only=True)
-                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id, local_files_only=True)
+                safety_model_path = os.path.join(Globals.root,'models',safety_model_id)
+                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id,
+                                                                                   local_files_only=True,
+                                                                                   cache_dir=safety_model_path,
+                )
+                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id,
+                                                                                     local_files_only=True,
+                                                                                     cache_dir=safety_model_path,
+                )
                 self.safety_checker.to(self.device)
             except Exception:
                 print('** An error was encountered while installing the safety checker:')
@@ -288,8 +296,9 @@ class Generate:
             strength         = None,
             init_color       = None,
             # these are specific to embiggen (which also relies on img2img args)
-            embiggen       =    None,
-            embiggen_tiles =    None,
+            embiggen          = None,
+            embiggen_tiles    = None,
+            embiggen_strength = None,
             # these are specific to GFPGAN/ESRGAN
             gfpgan_strength=    0,
             facetool         = None,
@@ -299,6 +308,9 @@ class Generate:
             upscale          = None,
             # this is specific to inpainting and causes more extreme inpainting
             inpaint_replace  = 0.0,
+            # This controls the size at which inpaint occurs (scaled up for inpaint, then back down for the result)
+            inpaint_width    = None,
+            inpaint_height   = None,
             # This will help match inpainted areas to the original image more smoothly
             mask_blur_radius: int = 8,
             # Set this True to handle KeyboardInterrupt internally
@@ -341,6 +353,7 @@ class Generate:
            perlin                          // optional 0-1 value to add a percentage of perlin noise to the initial noise
            embiggen                        // scale factor relative to the size of the --init_img (-I), followed by ESRGAN upscaling strength (0-1.0), followed by minimum amount of overlap between tiles as a decimal ratio (0 - 1.0) or number of pixels
            embiggen_tiles                  // list of tiles by number in order to process and replace onto the image e.g. `0 2 4`
+           embiggen_strength               // strength for embiggen. 0.0 preserves image exactly, 1.0 replaces it completely
 
         To use the step callback, define a function that receives two arguments:
         - Image GPU data
@@ -482,6 +495,7 @@ class Generate:
                 perlin=perlin,
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
+                embiggen_strength=embiggen_strength,
                 inpaint_replace=inpaint_replace,
                 mask_blur_radius=mask_blur_radius,
                 safety_checker=checker,
@@ -490,7 +504,9 @@ class Generate:
                 seam_strength = seam_strength,
                 seam_steps = seam_steps,
                 tile_size = tile_size,
-                force_outpaint = force_outpaint
+                force_outpaint = force_outpaint,
+                inpaint_width  = inpaint_width,
+                inpaint_height = inpaint_height
             )
 
             if init_color:
@@ -556,17 +572,15 @@ class Generate:
             ):
         # retrieve the seed from the image;
         seed   = None
-        image_metadata = None
         prompt = None
 
-        args   = metadata_from_png(image_path)
-        seed   = args.seed
-        prompt = args.prompt
-        print(f'>> retrieved seed {seed} and prompt "{prompt}" from {image_path}')
-
-        if not seed:
-            print('* Could not recover seed for image. Replacing with 42. This will not affect image quality')
-            seed = 42
+        args = metadata_from_png(image_path)
+        seed = opt.seed or args.seed
+        if seed is None or seed < 0:
+            seed = random.randrange(0, np.iinfo(np.uint32).max)
+        
+        prompt = opt.prompt or args.prompt or ''
+        print(f'>> using seed {seed} and prompt "{prompt}" for {image_path}')
 
         # try to reuse the same filename prefix as the original file.
         # we take everything up to the first period
@@ -613,7 +627,11 @@ class Generate:
                     extend_instructions[direction]=int(pixels)
                 except ValueError:
                     print(f'** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
-            if len(extend_instructions)>0:
+
+            opt.seed = seed
+            opt.prompt = prompt
+            
+            if len(extend_instructions) > 0:
                 restorer = Outcrop(image,self,)
                 return restorer.process (
                     extend_instructions,
@@ -626,7 +644,7 @@ class Generate:
         elif tool == 'embiggen':
             # fetch the metadata from the image
             generator = self.select_generator(embiggen=True)
-            opt.strength  = 0.40
+            opt.strength = opt.embiggen_strength or 0.40
             print(f'>> Setting img2img strength to {opt.strength} for happy embiggening')
             generator.generate(
                 prompt,
@@ -642,6 +660,7 @@ class Generate:
                 height      = opt.height,
                 embiggen    = opt.embiggen,
                 embiggen_tiles = opt.embiggen_tiles,
+                embiggen_strength = opt.embiggen_strength,
                 image_callback = callback,
             )
         elif tool == 'outpaint':
@@ -797,6 +816,10 @@ class Generate:
 
         # the model cache does the loading and offloading
         cache = self.model_cache
+        if not cache.valid_model(model_name):
+            print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
+            return self.model
+        
         cache.print_vram_usage()
 
         # have to get rid of all references to model in order
@@ -898,7 +921,7 @@ class Generate:
                 r[0] = image
 
     def apply_textmask(self, image_path:str, prompt:str, callback, threshold:float=0.5):
-        assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+        assert os.path.exists(image_path), f'** "{image_path}" not found. Please enter the name of an existing image file to mask **'
         basename,_ = os.path.splitext(os.path.basename(image_path))
         if self.txt2mask is None:
             self.txt2mask  = Txt2Mask(device = self.device, refined=True)
@@ -1028,7 +1051,9 @@ class Generate:
                 return True
         return False
 
-    def _check_for_erasure(self, image):
+    def _check_for_erasure(self, image:Image.Image)->bool:
+        if image.mode not in ('RGBA','RGB'):
+            return False
         width, height = image.size
         pixdata = image.load()
         colored = 0
@@ -1063,14 +1088,8 @@ class Generate:
         print(
             f'>> image will be resized to fit inside a box {w}x{h} in size.'
         )
-        if image.width > image.height:
-            h = None   # by setting h to none, we tell InitImageResizer to fit into the width and calculate height
-        elif image.height > image.width:
-            w = None   # ditto for w
-        else:
-            pass
         # note that InitImageResizer does the multiple of 64 truncation internally
-        image = InitImageResizer(image).resize(w, h)
+        image = InitImageResizer(image).resize(width=w, height=h)
         print(
             f'>> after adjusting image dimensions to be multiples of 64, init image is {image.width}x{image.height}'
         )
