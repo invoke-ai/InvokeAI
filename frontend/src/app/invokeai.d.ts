@@ -105,7 +105,7 @@ export declare type PostProcessedImageMetadata =
   | FacetoolMetadata;
 
 // Metadata includes the system config and image metadata.
-export declare type Metadata = SystemConfig & {
+export declare type Metadata = SystemGenerationMetadata & {
   image: GeneratedImageMetadata | PostProcessedImageMetadata;
 };
 
@@ -143,12 +143,16 @@ export declare type SystemStatus = {
   hasError: boolean;
 };
 
-export declare type SystemConfig = {
+export declare type SystemGenerationMetadata = {
   model: string;
-  model_id: string;
+  model_weights?: string;
+  model_id?: string;
   model_hash: string;
   app_id: string;
   app_version: string;
+};
+
+export declare type SystemConfig = SystemGenerationMetadata & {
   model_list: ModelList;
 };
 

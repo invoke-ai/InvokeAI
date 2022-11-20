@@ -282,6 +282,7 @@ class InvokeAIWebServer:
         def handle_request_capabilities():
             print(f">> System config requested")
             config = self.get_system_config()
+            config["model_list"] = self.generate.model_cache.list_models()
             socketio.emit("systemConfig", config)
 
         @socketio.on("requestModelChange")
@@ -335,9 +336,10 @@ class InvokeAIWebServer:
                 for path in image_paths:
                     if os.path.splitext(path)[1] == ".png":
                         metadata = retrieve_metadata(path)
-                        sd_metadata = metadata["sd-metadata"]
+                        # sd_metadata = metadata["sd-metadata"]
                     else:
-                        sd_metadata = {}
+                        # sd_metadata = {}
+                        metadata = {}
 
                     pil_image = Image.open(path)
                     (width, height) = pil_image.size
@@ -351,7 +353,8 @@ class InvokeAIWebServer:
                             "url": self.get_url_from_image_path(path),
                             "thumbnail": self.get_url_from_image_path(thumbnail_path),
                             "mtime": os.path.getmtime(path),
-                            "metadata": sd_metadata,
+                            "metadata": metadata,
+                            # "metadata": sd_metadata,
                             "width": width,
                             "height": height,
                             "category": category,
@@ -401,9 +404,10 @@ class InvokeAIWebServer:
                 for path in image_paths:
                     if os.path.splitext(path)[1] == ".png":
                         metadata = retrieve_metadata(path)
-                        sd_metadata = metadata["sd-metadata"]
+                        # sd_metadata = metadata["sd-metadata"]
                     else:
-                        sd_metadata = {}
+                        # sd_metadata = {}
+                        metadata = {}
 
                     pil_image = Image.open(path)
                     (width, height) = pil_image.size
@@ -417,7 +421,8 @@ class InvokeAIWebServer:
                             "url": self.get_url_from_image_path(path),
                             "thumbnail": self.get_url_from_image_path(thumbnail_path),
                             "mtime": os.path.getmtime(path),
-                            "metadata": sd_metadata,
+                            # "metadata": sd_metadata,
+                            "metadata": metadata,
                             "width": width,
                             "height": height,
                             "category": category,
@@ -492,12 +497,10 @@ class InvokeAIWebServer:
 
                 image = Image.open(original_image_path)
 
-                seed = (
-                    original_image["metadata"]["seed"]
-                    if "metadata" in original_image
-                    and "seed" in original_image["metadata"]
-                    else "unknown_seed"
-                )
+                try:
+                    seed = original_image["metadata"]["image"]["seed"]
+                except (NameError, AttributeError) as e:
+                    seed = "unknown_seed"
 
                 if postprocessing_parameters["type"] == "esrgan":
                     progress.set_current_status("Upscaling (ESRGAN)")
@@ -620,14 +623,19 @@ class InvokeAIWebServer:
 
     # App Functions
     def get_system_config(self):
-        model_list = self.generate.model_cache.list_models()
+        model_list: dict = self.generate.model_cache.list_models()
+        active_model_name = None
+
+        for model_name, model_dict in model_list.items():
+            if model_dict["status"] == "active":
+                active_model_name = model_name
+
         return {
             "model": "stable diffusion",
-            "model_id": args.model,
+            "model_weights": active_model_name,
             "model_hash": self.generate.model_hash,
             "app_id": APP_ID,
             "app_version": APP_VERSION,
-            "model_list": model_list,
         }
 
     def generate_images(
