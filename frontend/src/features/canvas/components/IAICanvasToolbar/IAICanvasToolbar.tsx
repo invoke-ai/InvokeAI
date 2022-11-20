@@ -38,12 +38,13 @@ export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
   (system, canvas, isStaging) => {
     const { isProcessing } = system;
-    const { tool } = canvas;
+    const { tool, shouldCropToBoundingBoxOnSave } = canvas;
 
     return {
       isProcessing,
       isStaging,
       tool,
+      shouldCropToBoundingBoxOnSave,
     };
   },
   {
@@ -55,7 +56,8 @@ export const selector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { isProcessing, isStaging, tool } = useAppSelector(selector);
+  const { isProcessing, isStaging, tool, shouldCropToBoundingBoxOnSave } =
+    useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
 
   const { openUploader } = useImageUploader();
@@ -164,7 +166,8 @@ const IAICanvasOutpaintingControls = () => {
   const handleSaveToGallery = () => {
     dispatch(
       mergeAndUploadCanvas({
-        cropVisible: true,
+        cropVisible: shouldCropToBoundingBoxOnSave ? false : true,
+        cropToBoundingBox: shouldCropToBoundingBoxOnSave,
         shouldSaveToGallery: true,
       })
     );
@@ -173,7 +176,8 @@ const IAICanvasOutpaintingControls = () => {
   const handleCopyImageToClipboard = () => {
     dispatch(
       mergeAndUploadCanvas({
-        cropVisible: true,
+        cropVisible: shouldCropToBoundingBoxOnSave ? false : true,
+        cropToBoundingBox: shouldCropToBoundingBoxOnSave,
         shouldCopy: true,
       })
     );
@@ -182,7 +186,8 @@ const IAICanvasOutpaintingControls = () => {
   const handleDownloadAsImage = () => {
     dispatch(
       mergeAndUploadCanvas({
-        cropVisible: true,
+        cropVisible: shouldCropToBoundingBoxOnSave ? false : true,
+        cropToBoundingBox: shouldCropToBoundingBoxOnSave,
         shouldDownload: true,
       })
     );

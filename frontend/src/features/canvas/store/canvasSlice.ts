@@ -64,6 +64,7 @@ const initialCanvasState: CanvasState = {
   minimumStageScale: 1,
   pastLayerStates: [],
   shouldAutoSave: false,
+  shouldCropToBoundingBoxOnSave: true,
   shouldDarkenOutsideBoundingBox: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
@@ -676,6 +677,12 @@ export const canvasSlice = createSlice({
     setShouldShowCanvasDebugInfo: (state, action: PayloadAction<boolean>) => {
       state.shouldShowCanvasDebugInfo = action.payload;
     },
+    setShouldCropToBoundingBoxOnSave: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldCropToBoundingBoxOnSave = action.payload;
+    },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
       state.pastLayerStates.push({
         ...state.layerState,
@@ -737,6 +744,7 @@ export const {
   setMaskColor,
   setMergedCanvas,
   setShouldAutoSave,
+  setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
   setShouldLockBoundingBox,
   setShouldPreserveMaskedArea,

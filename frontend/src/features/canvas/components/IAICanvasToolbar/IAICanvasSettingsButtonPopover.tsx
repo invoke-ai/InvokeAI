@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import {
   clearCanvasHistory,
   setShouldAutoSave,
+  setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
   setShouldShowCanvasDebugInfo,
   setShouldShowGrid,
@@ -22,21 +23,23 @@ export const canvasControlsSelector = createSelector(
   [canvasSelector],
   (canvas) => {
     const {
-      shouldDarkenOutsideBoundingBox,
-      shouldShowIntermediates,
-      shouldShowGrid,
-      shouldSnapToGrid,
       shouldAutoSave,
+      shouldCropToBoundingBoxOnSave,
+      shouldDarkenOutsideBoundingBox,
       shouldShowCanvasDebugInfo,
+      shouldShowGrid,
+      shouldShowIntermediates,
+      shouldSnapToGrid,
     } = canvas;
 
     return {
-      shouldShowGrid,
-      shouldSnapToGrid,
       shouldAutoSave,
+      shouldCropToBoundingBoxOnSave,
       shouldDarkenOutsideBoundingBox,
-      shouldShowIntermediates,
       shouldShowCanvasDebugInfo,
+      shouldShowGrid,
+      shouldShowIntermediates,
+      shouldSnapToGrid,
     };
   },
   {
@@ -49,12 +52,13 @@ export const canvasControlsSelector = createSelector(
 const IAICanvasSettingsButtonPopover = () => {
   const dispatch = useAppDispatch();
   const {
-    shouldShowIntermediates,
-    shouldShowGrid,
-    shouldSnapToGrid,
     shouldAutoSave,
+    shouldCropToBoundingBoxOnSave,
     shouldDarkenOutsideBoundingBox,
     shouldShowCanvasDebugInfo,
+    shouldShowGrid,
+    shouldShowIntermediates,
+    shouldSnapToGrid,
   } = useAppSelector(canvasControlsSelector);
 
   return (
@@ -97,6 +101,13 @@ const IAICanvasSettingsButtonPopover = () => {
           label="Auto Save to Gallery"
           isChecked={shouldAutoSave}
           onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
+        />
+        <IAICheckbox
+          label="Crop to Bounding Box"
+          isChecked={shouldCropToBoundingBoxOnSave}
+          onChange={(e) =>
+            dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
+          }
         />
         <IAICheckbox
           label="Show Canvas Debug Info"
