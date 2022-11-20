@@ -1,12 +1,11 @@
 import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { MouseEvent, ReactNode, useCallback, useRef } from 'react';
+import React, { ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { CSSTransition } from 'react-transition-group';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
-import useClickOutsideWatcher from 'common/hooks/useClickOutsideWatcher';
 import {
   OptionsState,
   setOptionsPanelScrollPosition,
@@ -101,14 +100,7 @@ const InvokeOptionsPanel = (props: Props) => {
     );
     dispatch(setShouldShowOptionsPanel(false));
     dispatch(setShouldHoldOptionsPanelOpen(false));
-    // dispatch(setDoesCanvasNeedScaling(true));
   }, [dispatch, shouldPinOptionsPanel]);
-
-  useClickOutsideWatcher(
-    optionsPanelRef,
-    handleCloseOptionsPanel,
-    !shouldPinOptionsPanel
-  );
 
   const setCloseOptionsPanelTimer = () => {
     timeoutIdRef.current = window.setTimeout(
@@ -125,6 +117,21 @@ const InvokeOptionsPanel = (props: Props) => {
     dispatch(setShouldPinOptionsPanel(!shouldPinOptionsPanel));
     dispatch(setDoesCanvasNeedScaling(true));
   };
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        optionsPanelRef.current &&
+        !optionsPanelRef.current.contains(e.target as Node)
+      ) {
+        handleCloseOptionsPanel();
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [handleCloseOptionsPanel]);
 
   return (
     <CSSTransition
@@ -153,7 +160,7 @@ const InvokeOptionsPanel = (props: Props) => {
           <div
             className="options-panel"
             ref={optionsPanelContainerRef}
-            onMouseLeave={(e: MouseEvent<HTMLDivElement>) => {
+            onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
               if (e.target !== optionsPanelContainerRef.current) {
                 cancelCloseOptionsPanelTimer();
               } else {

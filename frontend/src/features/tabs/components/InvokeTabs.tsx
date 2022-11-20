@@ -6,9 +6,7 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
 import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
 import ImageToImageIcon from 'common/icons/ImageToImageIcon';
-import InpaintIcon from 'common/icons/InpaintIcon';
 import NodesIcon from 'common/icons/NodesIcon';
-import OutpaintIcon from 'common/icons/OutpaintIcon';
 import PostprocessingIcon from 'common/icons/PostprocessingIcon';
 import TextToImageIcon from 'common/icons/TextToImageIcon';
 import {
