@@ -14,9 +14,9 @@
   }
 
   &:disabled {
-    background-color: rgb(45, 49, 53) !important;
+    background-color: var(--btn-base-color);
     &:hover {
-      background-color: rgb(45, 49, 53) !important;
+      background-color: var(--btn-base-color);
     }
   }
 
