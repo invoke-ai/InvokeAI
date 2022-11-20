@@ -11,6 +11,7 @@ import {
   setCurrentStatus,
   setIsCancelable,
   setIsProcessing,
+  setProcessingIndeterminateTask,
 } from 'features/system/store/systemSlice';
 import { addImage } from 'features/gallery/store/gallerySlice';
 import { setMergedCanvas } from '../canvasSlice';
@@ -42,8 +43,7 @@ export const mergeAndUploadCanvas =
       shouldSetAsInitialImage,
     } = config;
 
-    dispatch(setCurrentStatus('Exporting Image'));
-    dispatch(setIsProcessing(true));
+    dispatch(setProcessingIndeterminateTask('Exporting Image'));
     dispatch(setIsCancelable(false));
 
     const state = getState() as RootState;
