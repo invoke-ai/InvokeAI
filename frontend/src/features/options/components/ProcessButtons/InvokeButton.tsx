@@ -1,4 +1,4 @@
-import { ListItem, UnorderedList } from '@chakra-ui/react';
+import { Flex, ListItem, Tooltip, UnorderedList } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaPlay } from 'react-icons/fa';
 import { readinessSelector } from 'app/selectors/readinessSelector';
@@ -36,7 +36,7 @@ export default function InvokeButton(props: InvokeButton) {
     [isReady, activeTabName]
   );
 
-  const buttonComponent = (
+  return (
     <div style={{ flexGrow: 4 }}>
       {iconButton ? (
         <IAIIconButton
@@ -63,19 +63,5 @@ export default function InvokeButton(props: InvokeButton) {
         </IAIButton>
       )}
     </div>
-  );
-
-  return isReady ? (
-    buttonComponent
-  ) : (
-    <IAIPopover trigger="hover" triggerComponent={buttonComponent}>
-      {reasonsWhyNotReady && (
-        <UnorderedList>
-          {reasonsWhyNotReady.map((reason, i) => (
-            <ListItem key={i}>{reason}</ListItem>
-          ))}
-        </UnorderedList>
-      )}
-    </IAIPopover>
   );
 }
