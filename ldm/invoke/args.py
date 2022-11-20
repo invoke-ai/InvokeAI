@@ -174,8 +174,8 @@ class Args(object):
                 print(f'>> Initialization file {initfile} found. Loading...')
                 sysargs.insert(0,f'@{initfile}')
             else:
-                print(f'>> Initialization file {INITFILE} not found. Creating a new one...')
-                self._create_init_file(INITFILE)
+                print(f'>> Initialization file {initfile} not found. Creating a new one...')
+                self._create_init_file(initfile)
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
