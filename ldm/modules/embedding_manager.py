@@ -227,7 +227,7 @@ class EmbeddingManager(nn.Module):
             ckpt_paths = [ckpt_paths]
         for c in ckpt_paths:
             self._load(c,full)
-        print(f'Added terms: {", ".join(self.string_to_param_dict.keys())}')
+        print(f'>> Embedding manager added terms: {", ".join(self.string_to_param_dict.keys())}')
 
     def _load(self, ckpt_path, full=True):
         ckpt = torch.load(ckpt_path, map_location='cpu')
