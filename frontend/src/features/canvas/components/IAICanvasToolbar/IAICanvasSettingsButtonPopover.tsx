@@ -1,6 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
+  clearCanvasHistory,
   setShouldAutoSave,
   setShouldDarkenOutsideBoundingBox,
   setShouldShowCanvasDebugInfo,
@@ -11,10 +12,11 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { FaWrench } from 'react-icons/fa';
+import { FaTrash, FaWrench } from 'react-icons/fa';
 import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import IAIButton from 'common/components/IAIButton';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],
@@ -103,6 +105,13 @@ const IAICanvasSettingsButtonPopover = () => {
             dispatch(setShouldShowCanvasDebugInfo(e.target.checked))
           }
         />
+        <IAIButton
+          size={'sm'}
+          leftIcon={<FaTrash />}
+          onClick={() => dispatch(clearCanvasHistory())}
+        >
+          Clear Canvas History
+        </IAIButton>
       </Flex>
     </IAIPopover>
   );

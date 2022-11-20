@@ -10,7 +10,7 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { FaMask } from 'react-icons/fa';
+import { FaMask, FaTrash } from 'react-icons/fa';
 import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
@@ -141,8 +141,12 @@ const IAICanvasMaskOptions = () => {
             color={maskColor}
             onChange={(newColor) => dispatch(setMaskColor(newColor))}
           />
-          <IAIButton onClick={handleClearMask} tooltip={'Clear Mask (Shift+C)'}>
-            Clear Mask
+          <IAIButton
+            size={'sm'}
+            leftIcon={<FaTrash />}
+            onClick={handleClearMask}
+          >
+            Clear Mask (Shift+C)
           </IAIButton>
         </Flex>
       </IAIPopover>

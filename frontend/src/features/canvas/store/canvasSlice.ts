@@ -264,7 +264,7 @@ export const canvasSlice = createSlice({
     setIsDrawing: (state, action: PayloadAction<boolean>) => {
       state.isDrawing = action.payload;
     },
-    setClearBrushHistory: (state) => {
+    clearCanvasHistory: (state) => {
       state.pastLayerStates = [];
       state.futureLayerStates = [];
     },
@@ -712,7 +712,7 @@ export const {
   setBrushColor,
   setBrushSize,
   setCanvasContainerDimensions,
-  setClearBrushHistory,
+  clearCanvasHistory,
   setCursorPosition,
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
