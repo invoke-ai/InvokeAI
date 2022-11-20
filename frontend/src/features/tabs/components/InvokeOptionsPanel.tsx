@@ -72,9 +72,11 @@ const InvokeOptionsPanel = (props: Props) => {
   useHotkeys(
     'esc',
     () => {
-      if (shouldPinOptionsPanel) return;
       dispatch(setShouldShowOptionsPanel(false));
-      dispatch(setDoesCanvasNeedScaling(true));
+    },
+    {
+      enabled: () => !shouldPinOptionsPanel,
+      preventDefault: true,
     },
     [shouldPinOptionsPanel]
   );

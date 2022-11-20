@@ -3,6 +3,7 @@ import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import {
+  resetCanvasInteractionState,
   setShouldShowBoundingBox,
   setTool,
 } from 'features/canvas/store/canvasSlice';
@@ -45,6 +46,17 @@ const useInpaintingCanvasHotkeys = () => {
   const previousToolRef = useRef<CanvasTool | null>(null);
 
   const canvasStage = getCanvasStage();
+
+  useHotkeys(
+    'esc',
+    () => {
+      dispatch(resetCanvasInteractionState());
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    }
+  );
 
   useHotkeys(
     'shift+h',
