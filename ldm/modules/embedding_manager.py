@@ -222,7 +222,14 @@ class EmbeddingManager(nn.Module):
             ckpt_path,
         )
 
-    def load(self, ckpt_path, full=True):
+    def load(self, ckpt_paths, full=True):
+        if type(ckpt_paths) != list:
+            ckpt_paths = [ckpt_paths]
+        for c in ckpt_paths:
+            self._load(c,full)
+        print(f'Added terms: {", ".join(self.string_to_param_dict.keys())}')
+
+    def _load(self, ckpt_path, full=True):
         ckpt = torch.load(ckpt_path, map_location='cpu')
 
         # Handle .pt textual inversion files
@@ -234,8 +241,7 @@ class EmbeddingManager(nn.Module):
         # https://huggingface.co/sd-concepts-library
         else:
             for token_str in list(ckpt.keys()):
-                id = self.embedder.tokenizer.add_tokens(token_str)
-                print(f'adding embedding token "{token_str}" as {id}')
+                self.embedder.tokenizer.add_tokens(token_str)
             self.embedder.transformer.resize_token_embeddings()
                 
             for token_str in list(ckpt.keys()):
@@ -249,7 +255,6 @@ class EmbeddingManager(nn.Module):
             for key, value in self.string_to_param_dict.items():
                 self.string_to_param_dict[key] = torch.nn.Parameter(value.half())
 
-        print(f'Added terms: {", ".join(self.string_to_param_dict.keys())}')
 
     def get_embedding_norms_squared(self):
         all_params = torch.cat(

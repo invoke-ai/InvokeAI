@@ -547,6 +547,7 @@ class Args(object):
         )
         render_group.add_argument(
             '--embedding_path',
+            nargs='+',
             type=str,
             help='Path to a pre-trained embedding manager checkpoint - can only be set on command line',
         )
