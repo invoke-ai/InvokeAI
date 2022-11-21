@@ -1,5 +1,4 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { IoMdOptions } from 'react-icons/io';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
@@ -9,8 +8,8 @@ import {
 import CancelButton from 'features/options/components/ProcessButtons/CancelButton';
 import InvokeButton from 'features/options/components/ProcessButtons/InvokeButton';
 import _ from 'lodash';
-import LoopbackButton from 'features/options/components/ProcessButtons/Loopback';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { FaSlidersH } from 'react-icons/fa';
 
 const canInvokeSelector = createSelector(
   (state: RootState) => state.options,
@@ -46,12 +45,11 @@ const FloatingOptionsPanelButtons = () => {
         aria-label="Show Options Panel"
         onClick={handleShowOptionsPanel}
       >
-        <IoMdOptions />
+        <FaSlidersH />
       </IAIIconButton>
       {shouldShowProcessButtons && (
         <>
           <InvokeButton iconButton />
-          <LoopbackButton />
           <CancelButton />
         </>
       )}
