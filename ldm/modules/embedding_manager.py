@@ -1,3 +1,4 @@
+import os.path
 from cmath import log
 import torch
 from torch import nn
@@ -188,7 +189,7 @@ class EmbeddingManager(nn.Module):
                 )
                 sorted_rows = placeholder_rows[sort_idx]
 
-                for idx in range(len(sorted_rows)):
+                for idx in range(sorted_rows.shape[0]):
                     row = sorted_rows[idx]
                     col = sorted_cols[idx]
 
@@ -252,27 +253,40 @@ class EmbeddingManager(nn.Module):
 
         # Handle .pt textual inversion files
         if 'string_to_token' in ckpt and 'string_to_param' in ckpt:
-            self.string_to_token_dict = ckpt["string_to_token"]
-            self.string_to_param_dict = ckpt["string_to_param"]
+            filename = os.path.basename(ckpt_path)
+            token_str = '.'.join(filename.split('.')[:-1]) # filename excluding extension
+            if len(ckpt["string_to_token"]) > 1:
+                print(f">> {ckpt_path} has >1 embedding, only the first will be used")
+
+            string_to_param_dict = ckpt['string_to_param']
+            embedding = list(string_to_param_dict.values())[0]
+            self.add_embedding(token_str, embedding, full)
 
         # Handle .bin textual inversion files from Huggingface Concepts
         # https://huggingface.co/sd-concepts-library
         else:
             for token_str in list(ckpt.keys()):
-                self.embedder.tokenizer.add_tokens(token_str)
-            self.embedder.transformer.resize_token_embeddings()
-                
-            for token_str in list(ckpt.keys()):
-                token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
-                self.string_to_token_dict[token_str] = token
-                ckpt[token_str] = torch.nn.Parameter(ckpt[token_str])
+                embedding = ckpt[token_str]
+                self.add_embedding(token_str, embedding, full)
 
-            self.string_to_param_dict.update(ckpt)
-
+    def add_embedding(self, token_str, embedding, full):
+        if token_str in self.string_to_param_dict:
+            print(f">> Embedding manager refusing to overwrite already-loaded term '{token_str}'")
+            return
         if not full:
-            for key, value in self.string_to_param_dict.items():
-                self.string_to_param_dict[key] = torch.nn.Parameter(value.half())
+            embedding = embedding.half()
+        if len(embedding.shape) == 1:
+            embedding = embedding.unsqueeze(0)
+        #print(f"adding embedding with shape {embedding.shape} for token '{token_str}'")
+        self.embedder.tokenizer.add_tokens(token_str)
+        self.embedder.transformer.resize_token_embeddings()
 
+        token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
+        self.string_to_token_dict[token_str] = token
+        self.string_to_param_dict[token_str] = torch.nn.Parameter(embedding)
+
+    def has_embedding_for_token(self, token_str):
+        return token_str in self.string_to_token_dict
 
     def get_embedding_norms_squared(self):
         all_params = torch.cat(
