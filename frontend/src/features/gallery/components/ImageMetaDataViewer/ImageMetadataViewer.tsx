@@ -45,6 +45,7 @@ type MetadataItemProps = {
   onClick?: () => void;
   value: number | string | boolean;
   labelPosition?: string;
+  withCopy?: boolean;
 };
 
 /**
@@ -56,6 +57,7 @@ const MetadataItem = ({
   onClick,
   isLink,
   labelPosition,
+  withCopy = false,
 }: MetadataItemProps) => {
   return (
     <Flex gap={2}>
@@ -68,6 +70,18 @@ const MetadataItem = ({
             variant={'ghost'}
             fontSize={20}
             onClick={onClick}
+          />
+        </Tooltip>
+      )}
+      {withCopy && (
+        <Tooltip label={`Copy ${label}`}>
+          <IconButton
+            aria-label={`Copy ${label}`}
+            icon={<FaCopy />}
+            size={'xs'}
+            variant={'ghost'}
+            fontSize={14}
+            onClick={() => navigator.clipboard.writeText(value.toString())}
           />
         </Tooltip>
       )}
@@ -115,6 +129,8 @@ const ImageMetadataViewer = memo(
     });
 
     const metadata = image?.metadata?.image || {};
+    const dreamPrompt = image?.dreamPrompt;
+
     const {
       type,
       postprocessing,
@@ -380,6 +396,13 @@ const ImageMetadataViewer = memo(
                     }
                   )}
                 </>
+              )}
+              {dreamPrompt && (
+                <MetadataItem
+                  withCopy
+                  label="Dream Prompt"
+                  value={dreamPrompt}
+                />
               )}
               <Flex gap={2} direction={'column'}>
                 <Flex gap={2}>
