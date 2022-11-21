@@ -4,6 +4,8 @@ import {
   resetCanvas,
   resetCanvasView,
   resizeAndScaleCanvas,
+  setIsMaskEnabled,
+  setLayer,
   setTool,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
@@ -33,17 +35,26 @@ import {
   canvasSelector,
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
+import IAISelect from 'common/components/IAISelect';
+import {
+  CanvasLayer,
+  LAYER_NAMES_DICT,
+} from 'features/canvas/store/canvasTypes';
+import { ChangeEvent } from 'react';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
   (system, canvas, isStaging) => {
     const { isProcessing } = system;
-    const { tool, shouldCropToBoundingBoxOnSave } = canvas;
+    const { tool, shouldCropToBoundingBoxOnSave, layer, isMaskEnabled } =
+      canvas;
 
     return {
       isProcessing,
       isStaging,
+      isMaskEnabled,
       tool,
+      layer,
       shouldCropToBoundingBoxOnSave,
     };
   },
@@ -56,8 +67,14 @@ export const selector = createSelector(
 
 const IAICanvasOutpaintingControls = () => {
   const dispatch = useAppDispatch();
-  const { isProcessing, isStaging, tool, shouldCropToBoundingBoxOnSave } =
-    useAppSelector(selector);
+  const {
+    isProcessing,
+    isStaging,
+    isMaskEnabled,
+    layer,
+    tool,
+    shouldCropToBoundingBoxOnSave,
+  } = useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
 
   const { openUploader } = useImageUploader();
@@ -193,8 +210,24 @@ const IAICanvasOutpaintingControls = () => {
     );
   };
 
+  const handleChangeLayer = (e: ChangeEvent<HTMLSelectElement>) => {
+    const newLayer = e.target.value as CanvasLayer;
+    dispatch(setLayer(newLayer));
+    if (newLayer === 'mask' && !isMaskEnabled) {
+      dispatch(setIsMaskEnabled(true));
+    }
+  };
+
   return (
     <div className="inpainting-settings">
+      <IAISelect
+        tooltip={'Layer (Q)'}
+        tooltipProps={{ hasArrow: true, placement: 'top' }}
+        value={layer}
+        validValues={LAYER_NAMES_DICT}
+        onChange={handleChangeLayer}
+      />
+
       <IAICanvasMaskOptions />
       <IAICanvasToolChooserOptions />
 
