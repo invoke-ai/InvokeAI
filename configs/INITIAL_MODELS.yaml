@@ -1,0 +1,80 @@
+stable-diffusion-1.5:
+   description: The newest Stable Diffusion version 1.5 weight file (4.27 GB)
+   repo_id: runwayml/stable-diffusion-v1-5
+   config: v1-inference.yaml
+   file: v1-5-pruned-emaonly.ckpt
+   recommended: true
+   width: 512
+   height: 512
+inpainting-1.5:
+   description: RunwayML SD 1.5 model optimized for inpainting (4.27 GB)
+   repo_id: runwayml/stable-diffusion-inpainting
+   config: v1-inpainting-inference.yaml
+   file: sd-v1-5-inpainting.ckpt
+   recommended: True
+   width: 512
+   height: 512
+ft-mse-improved-autoencoder-840000:
+   description: StabilityAI improved autoencoder fine-tuned for human faces (recommended; 335 MB)
+   repo_id: stabilityai/sd-vae-ft-mse-original
+   config: VAE/default
+   file: vae-ft-mse-840000-ema-pruned.ckpt
+   recommended: True
+   width: 512
+   height: 512
+stable-diffusion-1.4:
+   description: The original Stable Diffusion version 1.4 weight file (4.27 GB)
+   repo_id: CompVis/stable-diffusion-v-1-4-original
+   config: v1-inference.yaml
+   file: sd-v1-4.ckpt
+   recommended: False
+   width: 512
+   height: 512
+waifu-diffusion-1.3:
+   description: Stable Diffusion 1.4 fine tuned on anime-styled images (4.27)
+   repo_id: hakurei/waifu-diffusion-v1-3
+   config: v1-inference.yaml
+   file: model-epoch09-float32.ckpt
+   recommended: False
+   width: 512
+   height: 512
+trinart-2.0:
+   description: An SD model finetuned with ~40,000 assorted high resolution manga/anime-style pictures (2.13 GB)
+   repo_id: naclbit/trinart_stable_diffusion_v2
+   config: v1-inference.yaml
+   file: trinart2_step95000.ckpt
+   recommended: False
+   width: 512
+   height: 512
+trinart_characters-1.0:
+   description: An SD model finetuned with 19.2M anime/manga style images (2.13 GB)
+   repo_id: naclbit/trinart_characters_19.2m_stable_diffusion_v1
+   config: v1-inference.yaml
+   file: trinart_characters_it4_v1.ckpt
+   recommended: False
+   width: 512
+   height: 512
+trinart_vae:
+   description: Custom autoencoder for trinart_characters
+   repo_id: naclbit/trinart_characters_19.2m_stable_diffusion_v1
+   config: VAE/trinart
+   file: autoencoder_fix_kl-f8-trinart_characters.ckpt
+   recommended: False
+   width: 512
+   height: 512
+papercut-1.0:
+   description: SD 1.5 fine-tuned for papercut art (use "PaperCut" in your prompts) (2.13 GB)
+   repo_id: Fictiverse/Stable_Diffusion_PaperCut_Model
+   config: v1-inference.yaml
+   file: PaperCut_v1.ckpt
+   recommended: False
+   width: 512
+   height: 512
+voxel_art-1.0:
+   description: Stable Diffusion trained on voxel art (use "VoxelArt" in your prompts) (4.27 GB)
+   repo_id: Fictiverse/Stable_Diffusion_VoxelArt_Model
+   config: v1-inference.yaml
+   file: VoxelArt_v1.ckpt
+   recommended: False
+   width: 512
+   height: 512

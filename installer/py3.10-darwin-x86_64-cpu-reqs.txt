@@ -182,13 +182,12 @@ click==8.1.3 \
     #   wandb
 clip @ https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip \
     --hash=sha256:b5842c25da441d6c581b53a5c60e0c2127ebafe0f746f8e15561a006c6c3be6a
-    # via -r installer/requirements.in
-colorama==0.4.6 \
-    --hash=sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44 \
-    --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
     # via
-    #   click
-    #   tqdm
+    #   -r installer/requirements.in
+    #   clipseg
+clipseg @ https://github.com/invoke-ai/clipseg/archive/1f754751c85d7d4255fa681f4491ff5711c1c288.zip \
+    --hash=sha256:14f43ed42f90be3fe57f06de483cb8be0f67f87a6f62a011339d45a39f4b4189
+    # via -r installer/requirements.in
 commonmark==0.9.1 \
     --hash=sha256:452f9dc859be7f06631ddcb328b6919c67984aca654e5fefb3914d54691aed60 \
     --hash=sha256:da2f38c92590f83de410ba1a3cbceafbc74fee9def35f9251ba9a971d6d66fd9
@@ -839,7 +838,9 @@ matplotlib==3.6.2 \
     --hash=sha256:ec9be0f4826cdb3a3a517509dcc5f87f370251b76362051ab59e42b6b765f8c4 \
     --hash=sha256:f04f97797df35e442ed09f529ad1235d1f1c0f30878e2fe09a2676b71a8801e0 \
     --hash=sha256:f41e57ad63d336fe50d3a67bb8eaa26c09f6dda6a59f76777a99b8ccd8e26aec
-    # via filterpy
+    # via
+    #   clipseg
+    #   filterpy
 multidict==6.0.2 \
     --hash=sha256:0327292e745a880459ef71be14e709aaea2f783f3537588fb4ed09b6c01bca60 \
     --hash=sha256:041b81a5f6b38244b34dc18c7b6aba91f9cdaf854d9a39e5ff0b58e2b5773b9c \
@@ -972,6 +973,7 @@ numpy==1.23.4 \
     #   altair
     #   basicsr
     #   clean-fid
+    #   clipseg
     #   contourpy
     #   diffusers
     #   facexlib
@@ -1020,6 +1022,7 @@ opencv-python==4.6.0.66 \
     --hash=sha256:f482e78de6e7b0b060ff994ffd859bddc3f7f382bb2019ef157b0ea8ca8712f5
     # via
     #   basicsr
+    #   clipseg
     #   facexlib
     #   gfpgan
     #   realesrgan
@@ -1082,6 +1085,10 @@ pandas==1.5.1 \
 pathtools==0.1.2 \
     --hash=sha256:7c35c5421a39bb82e58018febd90e3b6e5db34c5443aaaf742b3f33d4655f1c0
     # via wandb
+picklescan==0.0.5 \
+    --hash=sha256:368cf1b9a075bc1b6460ad82b694f260532b836c82f99d13846cd36e1bbe7f9a \
+    --hash=sha256:57153eca04d5df5009f2cdd595aef261b8a6f27e03046a1c84f672aa6869c592
+    # via -r installer/requirements.in
 pillow==9.3.0 \
     --hash=sha256:03150abd92771742d4a8cd6f2fa6246d847dcd2e332a18d0c15cc75bf6703040 \
     --hash=sha256:073adb2ae23431d3b9bcbcff3fe698b62ed47211d0716b067385538a1b0f28b8 \
@@ -1633,6 +1640,7 @@ scipy==1.9.3 \
     #   albumentations
     #   basicsr
     #   clean-fid
+    #   clipseg
     #   facexlib
     #   filterpy
     #   gfpgan
@@ -1818,28 +1826,27 @@ toolz==0.12.0 \
     --hash=sha256:2059bd4148deb1884bb0eb770a3cde70e7f954cfbbdc2285f1f2de01fd21eb6f \
     --hash=sha256:88c570861c440ee3f2f6037c4654613228ff40c93a6c25e0eba70d17282c6194
     # via altair
-torch==1.13.0 ; platform_system == "Darwin" \
-    --hash=sha256:0fdd38c96230947b1ed870fed4a560252f8d23c3a2bf4dab9d2d42b18f2e67c8 \
-    --hash=sha256:220325d0f4e69ee9edf00c04208244ef7cf22ebce083815ce272c7491f0603f5 \
-    --hash=sha256:43db0723fc66ad6486f86dc4890c497937f7cd27429f28f73fb7e4d74b7482e2 \
-    --hash=sha256:47fe6228386bff6d74319a2ffe9d4ed943e6e85473d78e80502518c607d644d2 \
-    --hash=sha256:49a949b8136b32b2ec0724cbf4c6678b54e974b7d68f19f1231eea21cde5c23b \
-    --hash=sha256:4a378f5091307381abfb30eb821174e12986f39b1cf7c4522bf99155256819eb \
-    --hash=sha256:635dbb99d981a6483ca533b3dc7be18ef08dd9e1e96fb0bb0e6a99d79e85a130 \
-    --hash=sha256:6c227c16626e4ce766cca5351cc62a2358a11e8e466410a298487b9dff159eb1 \
-    --hash=sha256:857c7d5b1624c5fd979f66d2b074765733dba3f5e1cc97b7d6909155a2aae3ce \
-    --hash=sha256:9197ec216833b836b67e4d68e513d31fb38d9789d7cd998a08fba5b499c38454 \
-    --hash=sha256:922a4910613b310fbeb87707f00cb76fec328eb60cc1349ed2173e7c9b6edcd8 \
-    --hash=sha256:9ac382cedaf2f70afea41380ad8e7c06acef6b5b7e2aef3971cdad666ca6e185 \
-    --hash=sha256:bb33a911460475d1594a8c8cb73f58c08293211760796d99cae8c2509b86d7f1 \
-    --hash=sha256:cd1e67db6575e1b173a626077a54e4911133178557aac50683db03a34e2b636a \
-    --hash=sha256:d2d2753519415d154de4d3e64d2eaaeefdba6b6fd7d69d5ffaef595988117700 \
-    --hash=sha256:e20df14d874b024851c58e8bb3846249cb120e677f7463f60c986e3661f88680 \
-    --hash=sha256:e643ac8d086706e82f77b5d4dfcf145a9dd37b69e03e64177fc23821754d2ed7 \
-    --hash=sha256:ef934a21da6f6a516d0a9c712a80d09c56128abdc6af8dc151bee5199b4c3b4e \
-    --hash=sha256:f01a9ae0d4b69d2fc4145e8beab45b7877342dddbd4838a7d3c11ca7f6680745 \
-    --hash=sha256:f68edfea71ade3862039ba66bcedf954190a2db03b0c41a9b79afd72210abd97 \
-    --hash=sha256:fa768432ce4b8ffa29184c79a3376ab3de4a57b302cdf3c026a6be4c5a8ab75b
+torch==1.12.0 ; platform_system == "Darwin" \
+    --hash=sha256:0399746f83b4541bcb5b219a18dbe8cade760aba1c660d2748a38c6dc338ebc7 \
+    --hash=sha256:0986685f2ec8b7c4d3593e8cfe96be85d462943f1a8f54112fc48d4d9fbbe903 \
+    --hash=sha256:13c7cca6b2ea3704d775444f02af53c5f072d145247e17b8cd7813ac57869f03 \
+    --hash=sha256:201abf43a99bb4980cc827dd4b38ac28f35e4dddac7832718be3d5479cafd2c1 \
+    --hash=sha256:2143d5fe192fd908b70b494349de5b1ac02854a8a902bd5f47d13d85b410e430 \
+    --hash=sha256:2568f011dddeb5990d8698cc375d237f14568ffa8489854e3b94113b4b6b7c8b \
+    --hash=sha256:3322d33a06e440d715bb214334bd41314c94632d9a2f07d22006bf21da3a2be4 \
+    --hash=sha256:349ea3ba0c0e789e0507876c023181f13b35307aebc2e771efd0e045b8e03e84 \
+    --hash=sha256:44a3804e9bb189574f5d02ccc2dc6e32e26a81b3e095463b7067b786048c6072 \
+    --hash=sha256:5ed69d5af232c5c3287d44cef998880dadcc9721cd020e9ae02f42e56b79c2e4 \
+    --hash=sha256:60d06ee2abfa85f10582d205404d52889d69bcbb71f7e211cfc37e3957ac19ca \
+    --hash=sha256:63341f96840a223f277e498d2737b39da30d9f57c7a1ef88857b920096317739 \
+    --hash=sha256:72207b8733523388c49d43ffcc4416d1d8cd64c40f7826332e714605ace9b1d2 \
+    --hash=sha256:7ddb167827170c4e3ff6a27157414a00b9fef93dea175da04caf92a0619b7aee \
+    --hash=sha256:844f1db41173b53fe40c44b3e04fcca23a6ce00ac328b7099f2800e611766845 \
+    --hash=sha256:a1325c9c28823af497cbf443369bddac9ac59f67f1e600f8ab9b754958e55b76 \
+    --hash=sha256:abbdc5483359b9495dc76e3bd7911ccd2ddc57706c117f8316832e31590af871 \
+    --hash=sha256:c0313438bc36448ffd209f5fb4e5f325b3af158cdf61c8829b8ddaf128c57816 \
+    --hash=sha256:e3e8348edca3e3cee5a67a2b452b85c57712efe1cc3ffdb87c128b3dde54534e \
+    --hash=sha256:fb47291596677570246d723ee6abbcbac07eeba89d8f83de31e3954f21f44879
     # via
     #   -r installer/requirements.in
     #   accelerate
@@ -1870,26 +1877,26 @@ torchmetrics==0.10.2 \
     --hash=sha256:43757d82266969906fc74b6e80766fcb2a0d52d6c3d09e3b7c98cf3b733fd20c \
     --hash=sha256:daa29d96bff5cff04d80eec5b9f5076993d6ac9c2d2163e88b6b31f8d38f7c25
     # via pytorch-lightning
-torchvision==0.13.1 ; platform_system == "Darwin" \
-    --hash=sha256:0298bae3b09ac361866088434008d82b99d6458fe8888c8df90720ef4b347d44 \
-    --hash=sha256:08f592ea61836ebeceb5c97f4d7a813b9d7dc651bbf7ce4401563ccfae6a21fc \
-    --hash=sha256:099874088df104d54d8008f2a28539ca0117b512daed8bf3c2bbfa2b7ccb187a \
-    --hash=sha256:0e77706cc90462653620e336bb90daf03d7bf1b88c3a9a3037df8d111823a56e \
-    --hash=sha256:19286a733c69dcbd417b86793df807bd227db5786ed787c17297741a9b0d0fc7 \
-    --hash=sha256:3567fb3def829229ec217c1e38f08c5128ff7fb65854cac17ebac358ff7aa309 \
-    --hash=sha256:4d8bf321c4380854ef04613935fdd415dce29d1088a7ff99e06e113f0efe9203 \
-    --hash=sha256:5e631241bee3661de64f83616656224af2e3512eb2580da7c08e08b8c965a8ac \
-    --hash=sha256:7552e80fa222252b8b217a951c85e172a710ea4cad0ae0c06fbb67addece7871 \
-    --hash=sha256:7cb789ceefe6dcd0dc8eeda37bfc45efb7cf34770eac9533861d51ca508eb5b3 \
-    --hash=sha256:83e9e2457f23110fd53b0177e1bc621518d6ea2108f570e853b768ce36b7c679 \
-    --hash=sha256:87c137f343197769a51333076e66bfcd576301d2cd8614b06657187c71b06c4f \
-    --hash=sha256:899eec0b9f3b99b96d6f85b9aa58c002db41c672437677b553015b9135b3be7e \
-    --hash=sha256:8e4d02e4d8a203e0c09c10dfb478214c224d080d31efc0dbf36d9c4051f7f3c6 \
-    --hash=sha256:b167934a5943242da7b1e59318f911d2d253feeca0d13ad5d832b58eed943401 \
-    --hash=sha256:c5ed609c8bc88c575226400b2232e0309094477c82af38952e0373edef0003fd \
-    --hash=sha256:e9a563894f9fa40692e24d1aa58c3ef040450017cfed3598ff9637f404f3fe3b \
-    --hash=sha256:ef5fe3ec1848123cd0ec74c07658192b3147dcd38e507308c790d5943e87b88c \
-    --hash=sha256:f230a1a40ed70d51e463ce43df243ec520902f8725de2502e485efc5eea9d864
+torchvision==0.13.0 ; platform_system == "Darwin" \
+    --hash=sha256:01e9e7b2e7724e66561e8d98f900985d80191e977c5c0b3f33ed31800ba0210c \
+    --hash=sha256:0e28740bd5695076f7c449af650fc474d6566722d446461c2ceebf9c9599b37f \
+    --hash=sha256:1b703701f0b99f307ad925b1abda2b3d5bdbf30643ff02102b6aeeb8840ae278 \
+    --hash=sha256:1e2049f1207631d42d743205f663f1d2235796565be3f18b0339d479626faf30 \
+    --hash=sha256:253eb0c67bf88cef4a79ec69058c3e94f9fde28b9e3699ad1afc0b3ed50f8075 \
+    --hash=sha256:42d95ab197d090efc5669fec02fbc603d05c859e50ca2c60180d1a113aa9b3e2 \
+    --hash=sha256:5c31e9b3004142dbfdf32adc4cf2d4fd709b820833e9786f839ae3a91ff65ef0 \
+    --hash=sha256:61d5093a50b7923a4e5bf9e0271001c29e01abec2348b7dd93370a0a9d15836c \
+    --hash=sha256:667cac55afb13cda7d362466e7eba3119e529b210e55507d231bead09aca5e1f \
+    --hash=sha256:6c4c35428c758adc485ff8f239b5ed68c1b6c26efa261a52e431cab0f7f22aec \
+    --hash=sha256:83a4d9d50787d1e886c94486b63b15978391f6cf1892fce6a93132c09b14e128 \
+    --hash=sha256:a20662c11dc14fd4eff102ceb946a7ee80b9f98303bb52435cc903f2c4c1fe10 \
+    --hash=sha256:acb72a40e5dc0cd454d28514dbdd589a5057afd9bb5c785b87a54718b999bfa1 \
+    --hash=sha256:ad458146aca15f652f9b0c227bebd5403602c7341f15f68f20ec119fa8e8f4a5 \
+    --hash=sha256:ada295dbfe55017b02acfab960a997387f5addbadd28ee5e575e24f692992ce4 \
+    --hash=sha256:b620a43df4131ad09f5761c415a016a9ea95aaf8ec8c91d030fb59bad591094a \
+    --hash=sha256:b7a2c9aebc7ef265777fe7e82577364288d98cf6b8cf0a63bb2621df78a7af1a \
+    --hash=sha256:c2278a189663087bb8e65915062aa7a25b8f8e5a3cfaa5879fe277e23e4bbf40 \
+    --hash=sha256:df16abf31e7a5fce8db1f781bf1e4f20c8bc730c7c3f657e946cc5820c04e465
     # via
     #   -r installer/requirements.in
     #   basicsr
@@ -1947,9 +1954,7 @@ typing-extensions==4.4.0 \
 tzdata==2022.6 \
     --hash=sha256:04a680bdc5b15750c39c12a448885a51134a27ec9af83667663f0b3a1bf3f342 \
     --hash=sha256:91f11db4503385928c15598c98573e3af07e7229181bee5375bd30f1695ddcae
-    # via
-    #   pytz-deprecation-shim
-    #   tzlocal
+    # via pytz-deprecation-shim
 tzlocal==4.2 \
     --hash=sha256:89885494684c929d9191c57aa27502afc87a579be5cdd3225c77c463ea043745 \
     --hash=sha256:ee5842fa3a795f023514ac2d801c4a81d1743bbe642e3940143326b3a00addd7
