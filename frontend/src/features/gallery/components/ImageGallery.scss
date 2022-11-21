@@ -43,7 +43,7 @@
     border-radius: 0.5rem;
     border-left-width: 0.3rem;
 
-    border-color: var(--resizeable-handle-border-color);
+    border-color: var(--tab-list-text-inactive);
 
     &[data-resize-alert='true'] {
       border-color: var(--status-bad-color);

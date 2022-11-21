@@ -56,6 +56,8 @@ const GALLERY_TAB_WIDTHS: Record<
   postprocess: { galleryMinWidth: 200, galleryMaxWidth: 500 },
 };
 
+const LIGHTBOX_GALLERY_WIDTH = 400;
+
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
 
@@ -76,10 +78,16 @@ export default function ImageGallery() {
     galleryWidth,
     isLightBoxOpen,
     isStaging,
+    shouldEnableResize,
   } = useAppSelector(imageGallerySelector);
 
-  const { galleryMinWidth, galleryMaxWidth } =
-    GALLERY_TAB_WIDTHS[activeTabName];
+  console.log(isLightBoxOpen);
+  const { galleryMinWidth, galleryMaxWidth } = isLightBoxOpen
+    ? {
+        galleryMinWidth: LIGHTBOX_GALLERY_WIDTH,
+        galleryMaxWidth: LIGHTBOX_GALLERY_WIDTH,
+      }
+    : GALLERY_TAB_WIDTHS[activeTabName];
 
   const [shouldShowButtons, setShouldShowButtons] = useState<boolean>(
     galleryWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH
@@ -91,6 +99,12 @@ export default function ImageGallery() {
   const galleryRef = useRef<HTMLDivElement>(null);
   const galleryContainerRef = useRef<HTMLDivElement>(null);
   const timeoutIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (galleryWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH) {
+      setShouldShowButtons(false);
+    }
+  }, [galleryWidth]);
 
   const handleSetShouldPinGallery = () => {
     dispatch(setShouldPinGallery(!shouldPinGallery));
@@ -256,10 +270,16 @@ export default function ImageGallery() {
       >
         <Resizable
           minWidth={galleryMinWidth}
-          maxWidth={shouldPinGallery ? galleryMaxWidth : undefined}
+          maxWidth={shouldPinGallery ? galleryMaxWidth : window.innerWidth}
           className={'image-gallery-popup'}
-          handleStyles={{ left: { width: '15px' } }}
-          enable={{ left: true }}
+          handleStyles={{
+            left: {
+              width: '15px',
+            },
+          }}
+          enable={{
+            left: shouldEnableResize,
+          }}
           size={{
             width: galleryWidth,
             height: shouldPinGallery ? '100%' : '100vh',
@@ -316,7 +336,9 @@ export default function ImageGallery() {
             const newWidth = _.clamp(
               Number(galleryWidth) + delta.width,
               galleryMinWidth,
-              Number(galleryMaxWidth)
+              Number(
+                shouldPinGallery ? galleryMaxWidth : 0.95 * window.innerWidth
+              )
             );
 
             if (
