@@ -72,7 +72,7 @@ setup(
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
-    scripts = ['scripts/invoke.py','scripts/load_models.py','scripts/sd-metadata.py'],
+    scripts = ['scripts/invoke.py','scripts/preload_models.py','scripts/sd-metadata.py'],
     data_files=[('frontend',frontend_files)],
 )
 
