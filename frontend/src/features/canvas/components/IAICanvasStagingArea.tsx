@@ -2,7 +2,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
-import { useState } from 'react';
 import { Group, Rect } from 'react-konva';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import IAICanvasImage from './IAICanvasImage';

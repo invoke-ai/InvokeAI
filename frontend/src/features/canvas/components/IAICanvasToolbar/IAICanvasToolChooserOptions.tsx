@@ -18,7 +18,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],
@@ -31,7 +30,6 @@ export const selector = createSelector(
       isStaging,
       isProcessing,
       brushColor,
-      brushColorString: rgbaColorToString(brushColor),
       brushSize,
     };
   },
@@ -44,8 +42,7 @@ export const selector = createSelector(
 
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
-  const { tool, brushColor, brushSize, brushColorString, isStaging } =
-    useAppSelector(selector);
+  const { tool, brushColor, brushSize, isStaging } = useAppSelector(selector);
 
   useHotkeys(
     ['b'],

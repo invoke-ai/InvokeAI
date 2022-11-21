@@ -1,4 +1,3 @@
-import { Flex, ListItem, Tooltip, UnorderedList } from '@chakra-ui/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaPlay } from 'react-icons/fa';
 import { readinessSelector } from 'app/selectors/readinessSelector';
@@ -8,7 +7,6 @@ import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 
 interface InvokeButton
@@ -19,7 +17,7 @@ interface InvokeButton
 export default function InvokeButton(props: InvokeButton) {
   const { iconButton = false, ...rest } = props;
   const dispatch = useAppDispatch();
-  const { isReady, reasonsWhyNotReady } = useAppSelector(readinessSelector);
+  const { isReady } = useAppSelector(readinessSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   const handleClickGenerate = () => {
