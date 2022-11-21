@@ -37,6 +37,11 @@ jobs:
       uses: docker/metadata-action@v4
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=tag
+          type=ref,event=pr
+          type=sha
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
