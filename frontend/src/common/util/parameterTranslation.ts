@@ -39,32 +39,38 @@ export const frontendToBackendParameters = (
   } = config;
 
   const {
-    prompt,
-    iterations,
-    steps,
     cfgScale,
-    threshold,
-    perlin,
+    codeformerFidelity,
+    facetoolStrength,
+    facetoolType,
     height,
-    width,
-    sampler,
-    seed,
-    seamless,
     hiresFix,
     img2imgStrength,
     initialImage,
-    shouldFitToWidthHeight,
-    shouldGenerateVariations,
-    variationAmount,
+    iterations,
+    perlin,
+    prompt,
+    sampler,
+    seamBlur,
+    seamless,
+    seamSize,
+    seamSteps,
+    seamStrength,
+    seed,
     seedWeights,
+    shouldFitToWidthHeight,
+    shouldForceOutpaint,
+    shouldGenerateVariations,
+    shouldRandomizeSeed,
     shouldRunESRGAN,
+    shouldRunFacetool,
+    steps,
+    threshold,
+    tileSize,
     upscalingLevel,
     upscalingStrength,
-    shouldRunFacetool,
-    facetoolStrength,
-    codeformerFidelity,
-    facetoolType,
-    shouldRandomizeSeed,
+    variationAmount,
+    width,
   } = optionsState;
 
   const {
@@ -178,12 +184,12 @@ export const frontendToBackendParameters = (
     // TODO: The server metadata generation needs to be changed to fix this.
     generationParameters.progress_images = false;
 
-    generationParameters.seam_size = 96;
-    generationParameters.seam_blur = 16;
-    generationParameters.seam_strength = 0.7;
-    generationParameters.seam_steps = 10;
-    generationParameters.tile_size = 32;
-    generationParameters.force_outpaint = false;
+    generationParameters.seam_size = seamSize;
+    generationParameters.seam_blur = seamBlur;
+    generationParameters.seam_strength = seamStrength;
+    generationParameters.seam_steps = seamSteps;
+    generationParameters.tile_size = tileSize;
+    generationParameters.force_outpaint = shouldForceOutpaint;
   }
 
   if (shouldGenerateVariations) {
