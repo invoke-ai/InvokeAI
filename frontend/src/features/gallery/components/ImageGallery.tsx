@@ -1,11 +1,10 @@
 import { Button } from '@chakra-ui/button';
 import { NumberSize, Resizable } from 're-resizable';
 
-import {
+import React, {
   ChangeEvent,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -29,7 +28,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import HoverableImage from './HoverableImage';
 import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
-import { ButtonGroup, useToast } from '@chakra-ui/react';
+import { ButtonGroup } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
 import { imageGallerySelector } from 'features/gallery/store/gallerySliceSelectors';
@@ -41,12 +40,24 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
 import IAIButton from 'common/components/IAIButton';
+import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
+const GALLERY_IMAGE_WIDTH_OFFSET = 40;
+
+const GALLERY_TAB_WIDTHS: Record<
+  InvokeTabName,
+  { galleryMinWidth: number; galleryMaxWidth: number }
+> = {
+  txt2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+  img2img: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+  unifiedCanvas: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+  nodes: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+  postprocess: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+};
 
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
-  const toast = useToast();
 
   const {
     images,
@@ -67,45 +78,15 @@ export default function ImageGallery() {
     isStaging,
   } = useAppSelector(imageGallerySelector);
 
-  const [galleryMinWidth, setGalleryMinWidth] = useState<number>(300);
-  const [galleryMaxWidth, setGalleryMaxWidth] = useState<number>(590);
+  const { galleryMinWidth, galleryMaxWidth } =
+    GALLERY_TAB_WIDTHS[activeTabName];
 
   const [shouldShowButtons, setShouldShowButtons] = useState<boolean>(
     galleryWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH
   );
 
-  useLayoutEffect(() => {
-    if (!shouldPinGallery) return;
-
-    if (isLightBoxOpen) {
-      dispatch(setGalleryWidth(400));
-      setGalleryMinWidth(400);
-      setGalleryMaxWidth(400);
-      return;
-    }
-
-    if (activeTabName === 'unifiedCanvas') {
-      setGalleryMinWidth(190);
-      setGalleryMaxWidth(190);
-      dispatch(setDoesCanvasNeedScaling(true));
-    } else if (activeTabName === 'img2img') {
-      dispatch(
-        setGalleryWidth(Math.min(Math.max(Number(galleryWidth), 0), 490))
-      );
-      setGalleryMaxWidth(490);
-    } else {
-      dispatch(
-        setGalleryWidth(Math.min(Math.max(Number(galleryWidth), 0), 590))
-      );
-      setGalleryMaxWidth(590);
-    }
-  }, [dispatch, activeTabName, shouldPinGallery, galleryWidth, isLightBoxOpen]);
-
-  useLayoutEffect(() => {
-    if (!shouldPinGallery) {
-      setGalleryMaxWidth(window.innerWidth);
-    }
-  }, [shouldPinGallery, isLightBoxOpen]);
+  const [isResizing, setIsResizing] = useState(false);
+  const [galleryResizeHeight, setGalleryResizeHeight] = useState(0);
 
   const galleryRef = useRef<HTMLDivElement>(null);
   const galleryContainerRef = useRef<HTMLDivElement>(null);
@@ -141,7 +122,6 @@ export default function ImageGallery() {
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
     dispatch(setGalleryImageMinimumWidth(v));
-    // dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const setCloseGalleryTimer = () => {
@@ -208,28 +188,13 @@ export default function ImageGallery() {
   useHotkeys(
     'shift+up',
     () => {
-      if (galleryImageMinimumWidth >= 256) {
-        return;
-      }
       if (galleryImageMinimumWidth < 256) {
-        const newMinWidth = galleryImageMinimumWidth + IMAGE_SIZE_STEP;
-        if (newMinWidth <= 256) {
-          dispatch(setGalleryImageMinimumWidth(newMinWidth));
-          toast({
-            title: `Gallery Thumbnail Size set to ${newMinWidth}`,
-            status: 'success',
-            duration: 1000,
-            isClosable: true,
-          });
-        } else {
-          dispatch(setGalleryImageMinimumWidth(256));
-          toast({
-            title: `Gallery Thumbnail Size set to 256`,
-            status: 'success',
-            duration: 1000,
-            isClosable: true,
-          });
-        }
+        const newMinWidth = _.clamp(
+          galleryImageMinimumWidth + IMAGE_SIZE_STEP,
+          32,
+          256
+        );
+        dispatch(setGalleryImageMinimumWidth(newMinWidth));
       }
     },
     [galleryImageMinimumWidth]
@@ -238,28 +203,13 @@ export default function ImageGallery() {
   useHotkeys(
     'shift+down',
     () => {
-      if (galleryImageMinimumWidth <= 32) {
-        return;
-      }
       if (galleryImageMinimumWidth > 32) {
-        const newMinWidth = galleryImageMinimumWidth - IMAGE_SIZE_STEP;
-        if (newMinWidth > 32) {
-          dispatch(setGalleryImageMinimumWidth(newMinWidth));
-          toast({
-            title: `Gallery Thumbnail Size set to ${newMinWidth}`,
-            status: 'success',
-            duration: 1000,
-            isClosable: true,
-          });
-        } else {
-          dispatch(setGalleryImageMinimumWidth(32));
-          toast({
-            title: `Gallery Thumbnail Size set to 32`,
-            status: 'success',
-            duration: 1000,
-            isClosable: true,
-          });
-        }
+        const newMinWidth = _.clamp(
+          galleryImageMinimumWidth - IMAGE_SIZE_STEP,
+          32,
+          256
+        );
+        dispatch(setGalleryImageMinimumWidth(newMinWidth));
       }
     },
     [galleryImageMinimumWidth]
@@ -270,10 +220,6 @@ export default function ImageGallery() {
     if (!galleryContainerRef.current) return;
     galleryContainerRef.current.scrollTop = galleryScrollPosition;
   }, [galleryScrollPosition, shouldShowGallery]);
-
-  useEffect(() => {
-    setShouldShowButtons(galleryWidth >= 280);
-  }, [galleryWidth]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -310,7 +256,7 @@ export default function ImageGallery() {
       >
         <Resizable
           minWidth={galleryMinWidth}
-          maxWidth={galleryMaxWidth}
+          maxWidth={shouldPinGallery ? galleryMaxWidth : undefined}
           className={'image-gallery-popup'}
           handleStyles={{ left: { width: '15px' } }}
           enable={{ left: true }}
@@ -318,22 +264,48 @@ export default function ImageGallery() {
             width: galleryWidth,
             height: shouldPinGallery ? '100%' : '100vh',
           }}
+          onResizeStart={(
+            _event:
+              | React.MouseEvent<HTMLElement>
+              | React.TouchEvent<HTMLElement>,
+            _direction: Direction,
+            elementRef: HTMLElement
+          ) => {
+            setGalleryResizeHeight(elementRef.clientHeight);
+            elementRef.style.height = `${elementRef.clientHeight}px`;
+            if (shouldPinGallery) {
+              elementRef.style.position = 'fixed';
+              elementRef.style.right = '1rem';
+              setIsResizing(true);
+            }
+          }}
           onResizeStop={(
             _event: MouseEvent | TouchEvent,
             _direction: Direction,
             elementRef: HTMLElement,
             delta: NumberSize
           ) => {
-            dispatch(
-              setGalleryWidth(
-                _.clamp(
+            const newWidth = shouldPinGallery
+              ? _.clamp(
                   Number(galleryWidth) + delta.width,
-                  0,
+                  galleryMinWidth,
                   Number(galleryMaxWidth)
                 )
-              )
-            );
+              : Number(galleryWidth) + delta.width;
+            dispatch(setGalleryWidth(newWidth));
+
             elementRef.removeAttribute('data-resize-alert');
+
+            if (shouldPinGallery) {
+              elementRef.style.position = 'relative';
+              elementRef.style.removeProperty('right');
+              elementRef.style.setProperty(
+                'height',
+                shouldPinGallery ? '100%' : '100vh'
+              );
+              setIsResizing(false);
+              dispatch(setDoesCanvasNeedScaling(true));
+            }
           }}
           onResize={(
             _event: MouseEvent | TouchEvent,
@@ -343,21 +315,42 @@ export default function ImageGallery() {
           ) => {
             const newWidth = _.clamp(
               Number(galleryWidth) + delta.width,
-              0,
+              galleryMinWidth,
               Number(galleryMaxWidth)
             );
 
-            if (newWidth >= 315 && !shouldShowButtons) {
+            if (
+              newWidth >= GALLERY_SHOW_BUTTONS_MIN_WIDTH &&
+              !shouldShowButtons
+            ) {
               setShouldShowButtons(true);
-            } else if (newWidth < 315 && shouldShowButtons) {
+            } else if (
+              newWidth < GALLERY_SHOW_BUTTONS_MIN_WIDTH &&
+              shouldShowButtons
+            ) {
               setShouldShowButtons(false);
             }
 
-            if (newWidth >= galleryMaxWidth) {
-              elementRef.setAttribute('data-resize-alert', 'true');
-            } else {
-              elementRef.removeAttribute('data-resize-alert');
+            if (
+              galleryImageMinimumWidth >
+              newWidth - GALLERY_IMAGE_WIDTH_OFFSET
+            ) {
+              dispatch(
+                setGalleryImageMinimumWidth(
+                  newWidth - GALLERY_IMAGE_WIDTH_OFFSET
+                )
+              );
             }
+
+            if (shouldPinGallery) {
+              if (newWidth >= galleryMaxWidth) {
+                elementRef.setAttribute('data-resize-alert', 'true');
+              } else {
+                elementRef.removeAttribute('data-resize-alert');
+              }
+            }
+
+            elementRef.style.height = `${galleryResizeHeight}px`;
           }}
         >
           <div className="image-gallery-header">
@@ -513,6 +506,14 @@ export default function ImageGallery() {
             )}
           </div>
         </Resizable>
+        {isResizing && (
+          <div
+            style={{
+              width: galleryWidth + 'px',
+              height: '100%',
+            }}
+          />
+        )}
       </div>
     </CSSTransition>
   );
