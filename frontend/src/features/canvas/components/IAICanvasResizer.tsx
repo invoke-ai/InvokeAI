@@ -3,7 +3,6 @@ import { useLayoutEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import {
-  resizeAndScaleCanvas,
   resizeCanvas,
   setCanvasContainerDimensions,
   setDoesCanvasNeedScaling,

@@ -1,4 +1,4 @@
-import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
+import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
   clearMask,
@@ -17,16 +17,7 @@ import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIButton from 'common/components/IAIButton';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
-import IAISelect from 'common/components/IAISelect';
-import {
-  CanvasLayer,
-  LAYER_NAMES_DICT,
-} from 'features/canvas/store/canvasTypes';
-import { ChangeEvent } from 'react';
-import {
-  rgbaColorToRgbString,
-  rgbaColorToString,
-} from 'features/canvas/util/colorToString';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 
 export const selector = createSelector(
   [canvasSelector],

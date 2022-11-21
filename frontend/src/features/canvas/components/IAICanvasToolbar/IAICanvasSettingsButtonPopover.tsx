@@ -1,7 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  clearCanvasHistory,
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
@@ -13,11 +12,10 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { FaTrash, FaWrench } from 'react-icons/fa';
+import { FaWrench } from 'react-icons/fa';
 import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import IAIButton from 'common/components/IAIButton';
 import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
 import ClearCanvasHistoryButtonModal from '../ClearCanvasHistoryButtonModal';
 

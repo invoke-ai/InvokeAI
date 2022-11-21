@@ -24,14 +24,12 @@ import {
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
-  SystemState,
 } from 'features/system/store/systemSlice';
 import ModelList from './ModelList';
 import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
 import IAISwitch from 'common/components/IAISwitch';
 import IAISelect from 'common/components/IAISelect';
 import IAINumberInput from 'common/components/IAINumberInput';
-import EmptyTempFolderButtonModal from '../ClearTempFolderButtonModal';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { optionsSelector } from 'features/options/store/optionsSelectors';
 import { setShouldLoopback } from 'features/options/store/optionsSlice';
