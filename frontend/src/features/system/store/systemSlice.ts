@@ -59,7 +59,7 @@ const initialSystemState: SystemState = {
   isESRGANAvailable: true,
   socketId: '',
   shouldConfirmOnDelete: true,
-  openAccordions: [0],
+  openAccordions: [],
   currentStep: 0,
   totalSteps: 0,
   currentIteration: 0,

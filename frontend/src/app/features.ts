@@ -13,6 +13,7 @@ export enum Feature {
   UPSCALE,
   FACE_CORRECTION,
   IMAGE_TO_IMAGE,
+  OUTPAINTING,
 }
 /** For each tooltip in the UI, the below feature definitions & props will pull relevant information into the tooltip.
  *
@@ -56,6 +57,11 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
   },
   [Feature.IMAGE_TO_IMAGE]: {
     text: 'ImageToImage allows the upload of an initial image, which InvokeAI will use to guide the generation process, along with a prompt. A lower value for this setting will more closely resemble the original image. Values between 0-1 are accepted, and a range of .25-.75 is recommended ',
+    href: 'link/to/docs/feature3.html',
+    guideImage: 'asset/path.gif',
+  },
+  [Feature.OUTPAINTING]: {
+    text: '', // TODO
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },

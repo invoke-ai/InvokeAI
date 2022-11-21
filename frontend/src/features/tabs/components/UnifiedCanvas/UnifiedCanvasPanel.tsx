@@ -5,6 +5,8 @@ import FaceRestoreHeader from 'features/options/components/AdvancedOptions/FaceR
 import FaceRestoreOptions from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import ImageToImageStrength from 'features/options/components/AdvancedOptions/ImageToImage/ImageToImageStrength';
 import InpaintingSettings from 'features/options/components/AdvancedOptions/Inpainting/InpaintingSettings';
+import OutpaintingOptions from 'features/options/components/AdvancedOptions/Inpainting/OutpaintingOptions';
+import OutpaintingHeader from 'features/options/components/AdvancedOptions/Inpainting/OutpaintingOptionsHeader';
 import SeedHeader from 'features/options/components/AdvancedOptions/Seed/SeedHeader';
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
 import UpscaleHeader from 'features/options/components/AdvancedOptions/Upscale/UpscaleHeader';
@@ -24,6 +26,11 @@ export default function UnifiedCanvasPanel() {
   );
 
   const imageToImageAccordions = {
+    outpainting: {
+      header: <OutpaintingHeader />,
+      feature: Feature.OUTPAINTING,
+      options: <OutpaintingOptions />,
+    },
     seed: {
       header: <SeedHeader />,
       feature: Feature.SEED,

@@ -11,84 +11,96 @@ export type UpscalingLevel = 2 | 4;
 export type FacetoolType = typeof FACETOOL_TYPES[number];
 
 export interface OptionsState {
-  prompt: string;
-  iterations: number;
-  steps: number;
-  cfgScale: number;
-  height: number;
-  width: number;
-  sampler: string;
-  threshold: number;
-  perlin: number;
-  seed: number;
-  img2imgStrength: number;
-  facetoolType: FacetoolType;
-  facetoolStrength: number;
-  codeformerFidelity: number;
-  upscalingLevel: UpscalingLevel;
-  upscalingStrength: number;
-  initialImage?: InvokeAI.Image | string; // can be an Image or url
-  maskPath: string;
-  seamless: boolean;
-  hiresFix: boolean;
-  shouldFitToWidthHeight: boolean;
-  shouldGenerateVariations: boolean;
-  variationAmount: number;
-  seedWeights: string;
-  shouldRunESRGAN: boolean;
-  shouldRunFacetool: boolean;
-  shouldRandomizeSeed: boolean;
-  showAdvancedOptions: boolean;
   activeTab: number;
-  shouldShowImageDetails: boolean;
-  showDualDisplay: boolean;
-  shouldShowOptionsPanel: boolean;
-  shouldPinOptionsPanel: boolean;
+  cfgScale: number;
+  codeformerFidelity: number;
+  currentTheme: string;
+  facetoolStrength: number;
+  facetoolType: FacetoolType;
+  height: number;
+  hiresFix: boolean;
+  img2imgStrength: number;
+  initialImage?: InvokeAI.Image | string; // can be an Image or url
+  isLightBoxOpen: boolean;
+  iterations: number;
+  maskPath: string;
   optionsPanelScrollPosition: number;
+  perlin: number;
+  prompt: string;
+  sampler: string;
+  seamBlur: number;
+  seamless: boolean;
+  seamSize: number;
+  seamSteps: number;
+  seamStrength: number;
+  seed: number;
+  seedWeights: string;
+  shouldFitToWidthHeight: boolean;
+  shouldForceOutpaint: boolean;
+  shouldGenerateVariations: boolean;
   shouldHoldOptionsPanelOpen: boolean;
   shouldLoopback: boolean;
-  currentTheme: string;
-  isLightBoxOpen: boolean;
+  shouldPinOptionsPanel: boolean;
+  shouldRandomizeSeed: boolean;
+  shouldRunESRGAN: boolean;
+  shouldRunFacetool: boolean;
+  shouldShowImageDetails: boolean;
+  shouldShowOptionsPanel: boolean;
+  showAdvancedOptions: boolean;
+  showDualDisplay: boolean;
+  steps: number;
+  threshold: number;
+  tileSize: number;
+  upscalingLevel: UpscalingLevel;
+  upscalingStrength: number;
+  variationAmount: number;
+  width: number;
 }
 
 const initialOptionsState: OptionsState = {
-  prompt: '',
-  iterations: 1,
-  steps: 50,
+  activeTab: 0,
   cfgScale: 7.5,
-  height: 512,
-  width: 512,
-  sampler: 'k_lms',
-  threshold: 0,
-  perlin: 0,
-  seed: 0,
-  seamless: false,
-  hiresFix: false,
-  img2imgStrength: 0.75,
-  maskPath: '',
-  shouldFitToWidthHeight: true,
-  shouldGenerateVariations: false,
-  variationAmount: 0.1,
-  seedWeights: '',
-  shouldRunESRGAN: false,
-  upscalingLevel: 4,
-  upscalingStrength: 0.75,
-  shouldRunFacetool: false,
+  codeformerFidelity: 0.75,
+  currentTheme: 'dark',
   facetoolStrength: 0.8,
   facetoolType: 'gfpgan',
-  codeformerFidelity: 0.75,
-  shouldRandomizeSeed: true,
-  showAdvancedOptions: true,
-  activeTab: 0,
-  shouldShowImageDetails: false,
-  showDualDisplay: true,
-  shouldShowOptionsPanel: true,
-  shouldPinOptionsPanel: true,
+  height: 512,
+  hiresFix: false,
+  img2imgStrength: 0.75,
+  isLightBoxOpen: false,
+  iterations: 1,
+  maskPath: '',
   optionsPanelScrollPosition: 0,
+  perlin: 0,
+  prompt: '',
+  sampler: 'k_lms',
+  seamBlur: 16,
+  seamless: false,
+  seamSize: 96,
+  seamSteps: 10,
+  seamStrength: 0.7,
+  seed: 0,
+  seedWeights: '',
+  shouldFitToWidthHeight: true,
+  shouldForceOutpaint: false,
+  shouldGenerateVariations: false,
   shouldHoldOptionsPanelOpen: false,
   shouldLoopback: false,
-  currentTheme: 'dark',
-  isLightBoxOpen: false,
+  shouldPinOptionsPanel: true,
+  shouldRandomizeSeed: true,
+  shouldRunESRGAN: false,
+  shouldRunFacetool: false,
+  shouldShowImageDetails: false,
+  shouldShowOptionsPanel: true,
+  showAdvancedOptions: true,
+  showDualDisplay: true,
+  steps: 50,
+  threshold: 0,
+  tileSize: 32,
+  upscalingLevel: 4,
+  upscalingStrength: 0.75,
+  variationAmount: 0.1,
+  width: 512,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -360,55 +372,79 @@ export const optionsSlice = createSlice({
     setIsLightBoxOpen: (state, action: PayloadAction<boolean>) => {
       state.isLightBoxOpen = action.payload;
     },
+    setSeamSize: (state, action: PayloadAction<number>) => {
+      state.seamSize = action.payload;
+    },
+    setSeamBlur: (state, action: PayloadAction<number>) => {
+      state.seamBlur = action.payload;
+    },
+    setSeamStrength: (state, action: PayloadAction<number>) => {
+      state.seamStrength = action.payload;
+    },
+    setSeamSteps: (state, action: PayloadAction<number>) => {
+      state.seamSteps = action.payload;
+    },
+    setTileSize: (state, action: PayloadAction<number>) => {
+      state.tileSize = action.payload;
+    },
+    setShouldForceOutpaint: (state, action: PayloadAction<boolean>) => {
+      state.shouldForceOutpaint = action.payload;
+    },
   },
 });
 
 export const {
-  setPrompt,
-  setIterations,
-  setSteps,
+  clearInitialImage,
+  resetOptionsState,
+  resetSeed,
+  setActiveTab,
+  setAllImageToImageParameters,
+  setAllParameters,
+  setAllTextToImageParameters,
   setCfgScale,
-  setThreshold,
-  setPerlin,
-  setHeight,
-  setWidth,
-  setSampler,
-  setSeed,
-  setSeamless,
-  setHiresFix,
-  setImg2imgStrength,
+  setCodeformerFidelity,
+  setCurrentTheme,
   setFacetoolStrength,
   setFacetoolType,
-  setCodeformerFidelity,
-  setUpscalingLevel,
-  setUpscalingStrength,
-  setMaskPath,
-  resetSeed,
-  resetOptionsState,
-  setShouldFitToWidthHeight,
-  setParameter,
-  setShouldGenerateVariations,
-  setSeedWeights,
-  setVariationAmount,
-  setAllParameters,
-  setShouldRunFacetool,
-  setShouldRunESRGAN,
-  setShouldRandomizeSeed,
-  setShowAdvancedOptions,
-  setActiveTab,
-  setShouldShowImageDetails,
-  setAllTextToImageParameters,
-  setAllImageToImageParameters,
-  setShowDualDisplay,
+  setHeight,
+  setHiresFix,
+  setImg2imgStrength,
   setInitialImage,
-  clearInitialImage,
-  setShouldShowOptionsPanel,
-  setShouldPinOptionsPanel,
+  setIsLightBoxOpen,
+  setIterations,
+  setMaskPath,
   setOptionsPanelScrollPosition,
+  setParameter,
+  setPerlin,
+  setPrompt,
+  setSampler,
+  setSeamBlur,
+  setSeamless,
+  setSeamSize,
+  setSeamSteps,
+  setSeamStrength,
+  setSeed,
+  setSeedWeights,
+  setShouldFitToWidthHeight,
+  setShouldForceOutpaint,
+  setShouldGenerateVariations,
   setShouldHoldOptionsPanelOpen,
   setShouldLoopback,
-  setCurrentTheme,
-  setIsLightBoxOpen,
+  setShouldPinOptionsPanel,
+  setShouldRandomizeSeed,
+  setShouldRunESRGAN,
+  setShouldRunFacetool,
+  setShouldShowImageDetails,
+  setShouldShowOptionsPanel,
+  setShowAdvancedOptions,
+  setShowDualDisplay,
+  setSteps,
+  setThreshold,
+  setTileSize,
+  setUpscalingLevel,
+  setUpscalingStrength,
+  setVariationAmount,
+  setWidth,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
