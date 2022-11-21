@@ -152,68 +152,55 @@ class EmbeddingManager(nn.Module):
                 placeholder_string
             ].to(device)
 
-            if (
-                self.max_vectors_per_token == 1
-            ):   # If there's only one vector per token, we can do a simple replacement
-                placeholder_idx = torch.where(
-                    tokenized_text == placeholder_token.to(device)
+            if self.progressive_words:
+                self.progressive_counter += 1
+                max_step_tokens = (
+                    1 + self.progressive_counter // PROGRESSIVE_SCALE
                 )
-                embedded_text[placeholder_idx] = placeholder_embedding
-            else:   # otherwise, need to insert and keep track of changing indices
-                if self.progressive_words:
-                    self.progressive_counter += 1
-                    max_step_tokens = (
-                        1 + self.progressive_counter // PROGRESSIVE_SCALE
-                    )
-                else:
-                    max_step_tokens = self.max_vectors_per_token
+            else:
+                max_step_tokens = self.max_vectors_per_token
 
-                num_vectors_for_token = min(
-                    placeholder_embedding.shape[0], max_step_tokens
-                )
+            num_vectors_for_token = min(
+                placeholder_embedding.shape[0], max_step_tokens
+            )
 
-                if torch.cuda.is_available():
-                    placeholder_rows, placeholder_cols = torch.where(
-                        tokenized_text == placeholder_token.to(device)
-                    )
-                else:
-                    placeholder_rows, placeholder_cols = torch.where(
-                        tokenized_text == placeholder_token
-                    )
+            placeholder_rows, placeholder_cols = torch.where(
+                tokenized_text == placeholder_token.to(tokenized_text.device)
+            )
 
-                if placeholder_rows.nelement() == 0:
-                    continue
+            if placeholder_rows.nelement() == 0:
+                continue
 
-                sorted_cols, sort_idx = torch.sort(
-                    placeholder_cols, descending=True
-                )
-                sorted_rows = placeholder_rows[sort_idx]
+            sorted_cols, sort_idx = torch.sort(
+                placeholder_cols, descending=True
+            )
+            sorted_rows = placeholder_rows[sort_idx]
 
-                for idx in range(sorted_rows.shape[0]):
-                    row = sorted_rows[idx]
-                    col = sorted_cols[idx]
+            for idx in range(sorted_rows.shape[0]):
+                row = sorted_rows[idx]
+                col = sorted_cols[idx]
 
-                    new_token_row = torch.cat(
-                        [
-                            tokenized_text[row][:col],
-                            placeholder_token.repeat(num_vectors_for_token).to(
-                                device
-                            ),
-                            tokenized_text[row][col + 1 :],
-                        ],
-                        axis=0,
-                    )[:n]
-                    new_embed_row = torch.cat(
-                        [
-                            embedded_text[row][:col],
-                            placeholder_embedding[:num_vectors_for_token],
-                            embedded_text[row][col + 1 :],
-                        ],
-                        axis=0,
-                    )[:n]
+                new_token_row = torch.cat(
+                    [
+                        tokenized_text[row][:col],
+                        placeholder_token.repeat(num_vectors_for_token).to(
+                            device
+                        ),
+                        tokenized_text[row][col + 1 :],
+                    ],
+                    axis=0,
+                )[:n]
+                new_embed_row = torch.cat(
+                    [
+                        embedded_text[row][:col],
+                        placeholder_embedding[:num_vectors_for_token],
+                        embedded_text[row][col + 1 :],
+                    ],
+                    axis=0,
+                )[:n]
 
-                    embedded_text[row] = new_embed_row
-                    tokenized_text[row] = new_token_row
+                embedded_text[row] = new_embed_row
+                tokenized_text[row] = new_token_row
 
         return embedded_text
 
