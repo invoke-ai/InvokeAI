@@ -49,6 +49,11 @@ export const imageGallerySelector = createSelector(
       galleryWidth,
       isLightBoxOpen,
       isStaging,
+      shouldEnableResize:
+        isLightBoxOpen ||
+        (activeTabName === 'unifiedCanvas' && shouldPinGallery)
+          ? false
+          : true,
     };
   },
   {
