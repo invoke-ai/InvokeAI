@@ -6,6 +6,7 @@ The interface is through the Concepts() object.
 """
 import os
 import re
+import traceback
 from urllib import request
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
 from ldm.invoke.globals import Globals
@@ -15,9 +16,7 @@ class Concepts(object):
         '''
         Initialize the Concepts object. May optionally pass a root directory.
         '''
-        # this is a placeholder while HuggingFace fixes their server
         self.root = root or Globals.root
-        self.concept_list_file = os.path.join(self.root,'configs/sd-concepts.txt')
         self.hf_api = HfApi()
         self.concept_list = None
         self.concepts_loaded = dict()
@@ -27,27 +26,15 @@ class Concepts(object):
     def list_concepts(self)->list:
         '''
         Return a list of all the concepts by name, without the 'sd-concepts-library' part.
-        Note that this currently is reading the list from a static file, but it will retrieve
-        from the HuggingFace API as soon as that is working again. (currently giving a 500 
-        error!)
         '''
         if self.concept_list is not None:
             return self.concept_list
-
-        self.concept_list = list()
         try:
-            with open(self.concept_list_file,'r') as clf:
-                concepts = clf.read().splitlines()
-            for line in concepts:
-                a = line.split('/')
-                if len(a)<2:
-                    continue
-                library, model_name = a
-                assert library == 'sd-concepts-library', f'** invalid line in {self.concept_list_file}: "{line}"'
-                self.concept_list.append(model_name)
-        except OSError as e:
-            print(f'** An operating system error occurred while retrieving SD concepts: {str(e)}')
-            return None
+            models = self.hf_api.list_models(filter=ModelFilter(model_name='sd-concepts-library/'))
+            self.concept_list = [a.id.split('/')[1] for a in models]
+        except Exception as e:
+            print(' ** WARNING: Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}.')
+            print(' ** You may load .bin and .pt file(s) manually using the --embedding_manager argument.')
         return self.concept_list
 
     def get_concept_model_path(self, concept_name:str)->str:
@@ -82,7 +69,8 @@ class Concepts(object):
         on this library. There needs to be a persistent database for
         this.
         '''
-        return f'<{self.concept_names.get(trigger,None)}>'
+        concept = self.concept_names.get(trigger,None)
+        return f'<{concept}>' if concept else f'{trigger}'
 
     def replace_triggers_with_concepts(self, prompt:str)->str:
         '''
@@ -120,15 +108,21 @@ class Concepts(object):
         repo_id = self._concept_id(concept_name)
         dest = self._concept_path(concept_name)
 
+        access_token = HfFolder.get_token()
+        header = [("Authorization", f'Bearer {access_token}')] if access_token else []
+        opener = request.build_opener()
+        opener.addheaders = header
+        request.install_opener(opener)
+
         os.makedirs(dest, exist_ok=True)
         succeeded = True
+        
         bytes = 0
-
         def tally_download_size(chunk, size, total):
             nonlocal bytes
             if chunk==0:
                 bytes += total
-            
+
         print(f'>> Downloading {repo_id}...',end='')
         try:
             for file in ('README.md','learned_embeds.bin','token_identifier.txt','type_of_concept.txt'):
@@ -136,6 +130,8 @@ class Concepts(object):
                 request.urlretrieve(url, os.path.join(dest,file),reporthook=tally_download_size)
         except Exception as e:
             print(f'failed to download {concept_name}/{file} ({str(e)})')
+            print(traceback.format_exc())
+            os.rmdir(dest)
             return False
         print('...{:.2f}Kb'.format(bytes/1024))
         return succeeded
