@@ -99,58 +99,41 @@ const IAICanvasMaskOptions = () => {
     dispatch(setIsMaskEnabled(!isMaskEnabled));
 
   return (
-    <>
-      <IAISelect
-        label={'Layer (Q)'}
-        tooltipProps={{ hasArrow: true, placement: 'top' }}
-        value={layer}
-        validValues={LAYER_NAMES_DICT}
-        onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-          dispatch(setLayer(e.target.value as CanvasLayer))
-        }
-      />
-      <IAIPopover
-        isOpen={layer !== 'mask' ? false : undefined}
-        trigger="hover"
-        triggerComponent={
-          <ButtonGroup>
-            <IAIIconButton
-              aria-label="Masking Options"
-              tooltip="Masking Options"
-              icon={<FaMask />}
-              isDisabled={layer !== 'mask'}
-            />
-          </ButtonGroup>
-        }
-      >
-        <Flex direction={'column'} gap={'0.5rem'}>
-          <IAICheckbox
-            label="Enable Mask (H)"
-            isChecked={isMaskEnabled}
-            onChange={handleToggleEnableMask}
+    <IAIPopover
+      trigger="hover"
+      triggerComponent={
+        <ButtonGroup>
+          <IAIIconButton
+            aria-label="Masking Options"
+            tooltip="Masking Options"
+            icon={<FaMask />}
           />
-          <IAICheckbox
-            label="Preserve Masked Area"
-            isChecked={shouldPreserveMaskedArea}
-            onChange={(e) =>
-              dispatch(setShouldPreserveMaskedArea(e.target.checked))
-            }
-          />
-          <IAIColorPicker
-            style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}
-            color={maskColor}
-            onChange={(newColor) => dispatch(setMaskColor(newColor))}
-          />
-          <IAIButton
-            size={'sm'}
-            leftIcon={<FaTrash />}
-            onClick={handleClearMask}
-          >
-            Clear Mask (Shift+C)
-          </IAIButton>
-        </Flex>
-      </IAIPopover>
-    </>
+        </ButtonGroup>
+      }
+    >
+      <Flex direction={'column'} gap={'0.5rem'}>
+        <IAICheckbox
+          label="Enable Mask (H)"
+          isChecked={isMaskEnabled}
+          onChange={handleToggleEnableMask}
+        />
+        <IAICheckbox
+          label="Preserve Masked Area"
+          isChecked={shouldPreserveMaskedArea}
+          onChange={(e) =>
+            dispatch(setShouldPreserveMaskedArea(e.target.checked))
+          }
+        />
+        <IAIColorPicker
+          style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}
+          color={maskColor}
+          onChange={(newColor) => dispatch(setMaskColor(newColor))}
+        />
+        <IAIButton size={'sm'} leftIcon={<FaTrash />} onClick={handleClearMask}>
+          Clear Mask (Shift+C)
+        </IAIButton>
+      </Flex>
+    </IAIPopover>
   );
 };
 

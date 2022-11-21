@@ -33,29 +33,28 @@ const IAISelect = (props: IAISelectProps) => {
     ...rest
   } = props;
   return (
-    <Tooltip label={tooltip} {...tooltipProps}>
-      <FormControl
-        isDisabled={isDisabled}
-        className={`invokeai__select ${styleClass}`}
-        onClick={(e: MouseEvent<HTMLDivElement>) => {
-          e.stopPropagation();
-          e.nativeEvent.stopImmediatePropagation();
-          e.nativeEvent.stopPropagation();
-          e.nativeEvent.cancelBubble = true;
-        }}
-      >
-        {label && (
-          <FormLabel
-            className="invokeai__select-label"
-            fontSize={fontSize}
-            marginBottom={1}
-            flexGrow={2}
-            whiteSpace="nowrap"
-          >
-            {label}
-          </FormLabel>
-        )}
-
+    <FormControl
+      isDisabled={isDisabled}
+      className={`invokeai__select ${styleClass}`}
+      onClick={(e: MouseEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
+        e.nativeEvent.stopPropagation();
+        e.nativeEvent.cancelBubble = true;
+      }}
+    >
+      {label && (
+        <FormLabel
+          className="invokeai__select-label"
+          fontSize={fontSize}
+          marginBottom={1}
+          flexGrow={2}
+          whiteSpace="nowrap"
+        >
+          {label}
+        </FormLabel>
+      )}
+      <Tooltip label={tooltip} {...tooltipProps}>
         <Select
           className="invokeai__select-picker"
           fontSize={fontSize}
@@ -78,8 +77,8 @@ const IAISelect = (props: IAISelectProps) => {
             );
           })}
         </Select>
-      </FormControl>
-    </Tooltip>
+      </Tooltip>
+    </FormControl>
   );
 };
 
