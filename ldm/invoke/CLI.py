@@ -15,6 +15,7 @@ from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_f
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
+from ldm.invoke.concepts_lib import Concepts
 from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
@@ -297,6 +298,7 @@ def main_loop(gen, opt):
                     if use_prefix is not None:
                         prefix = use_prefix
                     postprocessed = upscaled if upscaled else operation=='postprocess'
+                    opt.prompt = triggers_to_concepts(gen, opt.prompt)  # to avoid the problem of non-unique concept triggers
                     filename, formatted_dream_prompt = prepare_image_metadata(
                         opt,
                         prefix,
@@ -340,6 +342,8 @@ def main_loop(gen, opt):
                 last_results.append([path, seed])
 
             if operation == 'generate':
+                # load any <embeddings> from the SD concepts library
+                opt.prompt = concepts_to_triggers(gen, opt.prompt)
                 catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
                 opt.last_operation='generate'
                 try:
@@ -488,6 +492,19 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         command = '-h'
     return command, operation
 
+def concepts_to_triggers(gen, prompt:str)->str:
+    concepts = re.findall('<([^>]+)>',prompt)
+    if not concepts:
+        return prompt
+    gen.load_concepts(concepts)
+    return gen.concept_lib().replace_concepts_with_triggers(prompt)
+
+def triggers_to_concepts(gen,prompt:str)->str:
+    concepts = re.findall('<([^>]+)>',prompt)
+    if not concepts:
+        return prompt
+    return gen.concept_lib().replace_triggers_with_concepts(prompt)
+        
 def set_default_output_dir(opt:Args, completer:Completer):
     '''
     If opt.outdir is relative, we add the root directory to it

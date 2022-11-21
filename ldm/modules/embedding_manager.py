@@ -4,6 +4,7 @@ from torch import nn
 
 import sys
 
+from ldm.invoke.concepts_lib import Concepts
 from ldm.data.personalized import per_img_token_list
 from transformers import CLIPTokenizer
 from functools import partial
@@ -57,6 +58,8 @@ class EmbeddingManager(nn.Module):
         super().__init__()
 
         self.embedder = embedder
+        self.concepts_library=Concepts()
+        self.concepts_loaded = dict()
 
         self.string_to_token_dict = {}
         self.string_to_param_dict = nn.ParameterDict()
@@ -222,12 +225,27 @@ class EmbeddingManager(nn.Module):
             ckpt_path,
         )
 
+    def load_concepts(self, concepts:list[str], full=True):
+        bin_files = list()
+        for concept_name in concepts:
+            if concept_name in self.concepts_loaded:
+                continue
+            else:
+                bin_file = self.concepts_library.get_concept_model_path(concept_name)
+                if not bin_file:
+                    continue
+                bin_files.append(bin_file)
+                self.concepts_loaded[concept_name]=True
+        self.load(bin_files, full)
+
     def load(self, ckpt_paths, full=True):
+        if len(ckpt_paths) == 0:
+            return
         if type(ckpt_paths) != list:
             ckpt_paths = [ckpt_paths]
         for c in ckpt_paths:
             self._load(c,full)
-        print(f'>> Embedding manager added terms: {", ".join(self.string_to_param_dict.keys())}')
+        print(f'>> Current embedding manager terms: {", ".join(self.string_to_param_dict.keys())}')
 
     def _load(self, ckpt_path, full=True):
         ckpt = torch.load(ckpt_path, map_location='cpu')

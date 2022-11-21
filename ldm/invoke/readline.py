@@ -12,6 +12,7 @@ import os
 import re
 import atexit
 from ldm.invoke.args import Args
+from ldm.invoke.concepts_lib import Concepts
 
 # ---------------readline utilities---------------------
 try:
@@ -84,6 +85,7 @@ IMG_FILE_COMMANDS=(
     '--init_color[=\s]',
     '--embedding_path[=\s]',
     )
+
 path_regexp   = '(' + '|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
 weight_regexp = '(' + '|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
 text_regexp = '(' + '|'.join(TEXT_PATH_COMMANDS) + ')\s*\S*$'
@@ -98,6 +100,7 @@ class Completer(object):
         self.linebuffer  = None
         self.auto_history_active = True
         self.extensions = None
+        self.concepts = Concepts().list_concepts()
         return
 
     def complete(self, text, state):
@@ -122,6 +125,9 @@ class Completer(object):
             elif re.search('(-S\s*|--seed[=\s])\d*$',buffer): 
                 self.matches= self._seed_completions(text,state)
 
+            elif re.search('<[\w-]*$',buffer): 
+                self.matches= self._concept_completions(text,state)
+            
             # looking for a model
             elif re.match('^'+'|'.join(MODEL_COMMANDS),buffer):
                 self.matches= self._model_completions(text, state)
@@ -255,6 +261,22 @@ class Completer(object):
             if s.startswith(partial):
                 matches.append(switch+s)
         matches.sort()
+        return matches
+
+    def _concept_completions(self, text, state):
+        partial = text[1:]  # this removes the leading '<'
+        if len(partial) == 0:
+            return self.concepts  # whole dump - think if user wants this!
+
+        matches = list()
+        for concept in self.concepts:
+            if concept == partial:
+                matches.append(f'<{concept}>')
+            elif concept.startswith(partial):
+                matches.append(f'<{concept}')
+        matches.sort()
+        if len(matches)==1:
+            matches[0] = matches[0]+'>'
         return matches
 
     def _model_completions(self, text, state):
