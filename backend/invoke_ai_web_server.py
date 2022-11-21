@@ -324,8 +324,9 @@ class InvokeAIWebServer:
                         )
                         os.remove(thumbnail_path)
                     except Exception as e:
-                        traceback.print_exc()
-                        socketio.emit("error", {"message": f"Unable to delete {f}"})
+                        socketio.emit("error", {"message": f"Unable to delete {f}: {str(e)}"})
+                        pass
+
                 socketio.emit("tempFolderEmptied")
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
@@ -430,8 +431,9 @@ class InvokeAIWebServer:
                                 "category": category,
                             }
                         )
-                    except:
-                        socketio.emit("error", {"message": f"Unable to load {path}"})
+                    except Exception as e:
+                        socketio.emit("error", {"message": f"Unable to load {path}: {str(e)}"})
+                        pass
 
                 socketio.emit(
                     "galleryImages",
@@ -500,9 +502,10 @@ class InvokeAIWebServer:
                                 "category": category,
                             }
                         )
-                    except:
+                    except Exception as e:
                         print(f">> Unable to load {path}")
-                        socketio.emit("error", {"message": f"Unable to load {path}"})
+                        socketio.emit("error", {"message": f"Unable to load {path}: {str(e)}"})
+                        pass
 
                 socketio.emit(
                     "galleryImages",
@@ -574,8 +577,9 @@ class InvokeAIWebServer:
 
                 try:
                     seed = original_image["metadata"]["image"]["seed"]
-                except (NameError, AttributeError) as e:
+                except (KeyError) as e:
                     seed = "unknown_seed"
+                    pass
 
                 if postprocessing_parameters["type"] == "esrgan":
                     progress.set_current_status("Upscaling (ESRGAN)")
