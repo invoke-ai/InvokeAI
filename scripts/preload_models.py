@@ -5,8 +5,8 @@
 # two machines must share a common .cache directory.
 
 import warnings
-import load_models
+import configure_invokeai
 
 if __name__ == '__main__':
-    load_models.main()
+    configure_invokeai.main()
 

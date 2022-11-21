@@ -44,7 +44,7 @@ def main():
             args.max_loaded_models = 1
 
     # alert - setting a global here
-    Globals.root = os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or '.')
+    Globals.root = os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or os.path.abspath('.'))
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
