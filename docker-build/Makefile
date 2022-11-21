@@ -1,56 +1,52 @@
 # Copyright (c) 2022 Eugene Brodsky (https://github.com/ebr)
 
-# InvokeAI root directory in the container
-INVOKEAI_ROOT=/invokeai
-# Destination directory for cache on the host
+# Directory in the container where the INVOKEAI_ROOT will be mounted
+INVOKEAI_ROOT=/mnt/invokeai
+# Host directory to contain the model cache. Will be mounted at INVOKEAI_ROOT path in the container
 INVOKEAI_CACHEDIR=${HOME}/invokeai
 
 DOCKER_BUILDKIT=1
 IMAGE=local/invokeai:latest
 
-# Downloads will end up in ${INVOKEAI_CACHEDIR}.
-# Contents can be moved to a persistent storage and used to rehydrate the cache,
-# to be mounted into the container.
+USER=$(shell id -u)
+GROUP=$(shell id -g)
 
-# TBD: cache dir may be modified at runtime due to checksum calculations
-# for custom models. Ideally the checksums would be precomputed and stored in the cache.
-# Also CLI requires RW on first run when populating torch cache.
+# All downloaded models and config will end up in ${INVOKEAI_CACHEDIR}.
+# Contents can be moved to a persistent storage and used to rehydrate the cache on another host
 
 build:
 	docker buildx build -t local/invokeai:latest -f Dockerfile.cloud ..
 
-# Populate the cache. Config is copied first, so it's there for the model preload step.
-load-models: _copy-config
+# Populate the cache.
+# First, pre-seed the config dir on the host with the content from the image,
+# such that the model preload step can run with the config mounted and pre-populated.
+# Then, run `load-models` to cache models, VAE, other static data.
+load-models:
+	docker run --rm -it \
+		-v ${INVOKEAI_CACHEDIR}/configs:/mnt/configs \
+		--entrypoint bash ${IMAGE} \
+		-c "cp -r ./configs/* /mnt/configs/"
 	docker run --rm -it --runtime=nvidia --gpus=all \
 		-v ${INVOKEAI_CACHEDIR}:${INVOKEAI_ROOT} \
-		-v ${INVOKEAI_CACHEDIR}/root-cache:/root/.cache \
-		${IMAGE} \
-		-c "micromamba -r /opt/conda -n invokeai run python scripts/load_models.py"
+		-v ${INVOKEAI_CACHEDIR}/.cache:/root/.cache \
+		--entrypoint bash ${IMAGE} \
+		-c "micromamba -n invokeai run python scripts/load_models.py --root ${INVOKEAI_ROOT}"
+	sudo chown -R ${USER}:${GROUP} ${INVOKEAI_CACHEDIR}
 
+# Run the container with the cache mounted and the web server exposed on port 9090
 run:
 	docker run --rm -it --runtime=nvidia --gpus=all \
 		-v ${INVOKEAI_CACHEDIR}:${INVOKEAI_ROOT} \
-		-v ${INVOKEAI_CACHEDIR}/root-cache:/root/.cache \
-		--entrypoint bash -p9090:9090 \
-		${IMAGE} \
-		-c "micromamba -r /opt/conda -n invokeai run python scripts/invoke.py --web --host 0.0.0.0"
+		-v ${INVOKEAI_CACHEDIR}/.cache:/root/.cache \
+		--entrypoint bash -p9090:9090 ${IMAGE} \
+		-c "micromamba -n invokeai run python scripts/invoke.py --web --host 0.0.0.0 --root ${INVOKEAI_ROOT}"
 
+# Run the container with the cache mounted and open a bash shell instead of the Invoke CLI or webserver
 shell:
 	docker run --rm -it --runtime=nvidia --gpus=all \
 		-v ${INVOKEAI_CACHEDIR}:${INVOKEAI_ROOT} \
-		-v ${INVOKEAI_CACHEDIR}/root-cache:/root/.cache \
-		--entrypoint bash \
-		${IMAGE} --
+		-v ${INVOKEAI_CACHEDIR}/.cache:/root/.cache \
+		-e INVOKEAI_ROOT=${INVOKEAI_ROOT} \
+		--entrypoint bash ${IMAGE} --
 
-# This is an intermediate task that copies the contents of the config dir into the cache.
-# This prepares the cached config dir, so that when we run the model preload with the config mounted,
-# it is already populated.
-_copy-config:
-	docker run --rm -it \
-		-v ${INVOKEAI_CACHEDIR}/config:${INVOKEAI_ROOT}/tmp/config \
-		--workdir ${INVOKEAI_ROOT} \
-		--entrypoint bash ${IMAGE} \
-		-c "cp -r ./tmp/config/* ./config/"
-
-
-.PHONY: build preload run shell _copy-config
+.PHONY: build preload run shell
