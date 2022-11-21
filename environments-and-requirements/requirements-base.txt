@@ -1,6 +1,5 @@
 # pip will resolve the version which matches torch
 albumentations
-basicsr>=1.4.2
 dependency_injector==4.40.0
 diffusers
 einops
