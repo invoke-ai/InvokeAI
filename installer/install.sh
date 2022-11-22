@@ -22,6 +22,15 @@ function _err_exit {
 
 # This enables a user to install this project without manually installing git or Python
 
+export no_cache_dir="--no-cache-dir"
+if [ $# -ge 1 ]; then
+    if [ "$1" = "use-cache" ]; then
+        export no_cache_dir=""
+    fi
+fi
+
+echo "$no_cache_dir"
+
 echo -e "\n***** Installing InvokeAI... *****\n"
 
 
@@ -93,20 +102,20 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
 
     curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvjO bin/micromamba > micromamba
 
-    chmod u+x "micromamba"
+    chmod u+x ./micromamba
 
     # test the mamba binary
     echo -e "\n***** Micromamba version: *****\n"
-    "micromamba" --version
+    ./micromamba --version
 
     # create the installer env
     if [ ! -e "$INSTALL_ENV_DIR" ]; then
-        "micromamba" create -y --prefix "$INSTALL_ENV_DIR"
+        ./micromamba create -y --prefix "$INSTALL_ENV_DIR"
     fi
 
     echo -e "\n***** Packages to install:$PACKAGES_TO_INSTALL *****\n"
 
-    "micromamba" install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge $PACKAGES_TO_INSTALL
+    ./micromamba install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge "$PACKAGES_TO_INSTALL"
 
     if [ ! -e "$INSTALL_ENV_DIR" ]; then
         echo -e "\n----- There was a problem while initializing micromamba. Cannot continue. -----\n"
@@ -164,7 +173,7 @@ if [ "$OS_NAME" == "darwin" ]; then
     chmod +w "${SYSCONFIG}"
     cp "${SYSCONFIG}" "${TMPFILE}"
     sed "s,'/install,'${PYTHON_INSTALL_DIR},g" "${TMPFILE}" > "${SYSCONFIG}"
-    rm -f ${TMPFILE}
+    rm -f "${TMPFILE}"
 fi
 
 ./python/bin/python3 -E -s -m venv .venv
@@ -180,7 +189,7 @@ echo -e "We're running under"
 _err_exit $? _err_msg
 
 _err_msg="\n----- pip update failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location --upgrade pip
+.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location --upgrade pip wheel
 _err_exit $? _err_msg
 
 echo -e "\n***** Updated pip *****\n"
@@ -190,11 +199,11 @@ cp installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt
 _err_exit $? _err_msg
 
 _err_msg="\n----- main pip install failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -r requirements.txt
+.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location -r requirements.txt
 _err_exit $? _err_msg
 
 _err_msg="\n----- InvokeAI setup failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -e .
+.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location -e .
 _err_exit $? _err_msg
 
 echo -e "\n***** Installed Python dependencies *****\n"
