@@ -10,7 +10,7 @@
 
   // App Colors
   --root-bg-color: rgb(10, 10, 10);
-  --background-color: rgb(20, 20, 26);
+  --background-color: rgb(26, 26, 32);
   --background-color-light: rgb(40, 44, 48);
   --background-color-secondary: rgb(16, 16, 22);
 
@@ -40,7 +40,7 @@
   // Tabs
   --tab-color: rgb(30, 32, 42);
   --tab-hover-color: rgb(36, 38, 48);
-  --tab-panel-bg: rgb(20, 22, 28);
+  --tab-panel-bg: var(--background-color-secondary);
   --tab-list-bg: var(--accent-color);
   --tab-list-text: rgb(202, 204, 216);
   --tab-list-text-inactive: rgb(92, 94, 114);
