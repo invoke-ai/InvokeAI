@@ -12,7 +12,7 @@
   border: none;
   border-top: 0px;
   border-radius: 0.4rem;
-  background-color: var(--background-color-secondary);
+  background-color: var(--tab-panel-bg);
 
   &[aria-expanded='true'] {
     background-color: var(--tab-hover-color);
