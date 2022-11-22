@@ -1,16 +1,15 @@
 // import { Feature } from 'app/features';
 import { Feature } from 'app/features';
 import { RootState, useAppSelector } from 'app/store';
-import FaceRestoreHeader from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreHeader';
-import FaceRestoreOptions from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import ImageToImageStrength from 'features/options/components/AdvancedOptions/ImageToImage/ImageToImageStrength';
-import InpaintingSettings from 'features/options/components/AdvancedOptions/Inpainting/InpaintingSettings';
-import OutpaintingOptions from 'features/options/components/AdvancedOptions/Inpainting/OutpaintingOptions';
-import OutpaintingHeader from 'features/options/components/AdvancedOptions/Inpainting/OutpaintingOptionsHeader';
+import BoundingBoxSettings, {
+  BoundingBoxSettingsHeader,
+} from 'features/options/components/AdvancedOptions/Inpainting/BoundingBoxSettings/BoundingBoxSettings';
+import OutpaintingOptions, {
+  OutpaintingHeader,
+} from 'features/options/components/AdvancedOptions/Inpainting/OutpaintingOptions';
 import SeedHeader from 'features/options/components/AdvancedOptions/Seed/SeedHeader';
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
-import UpscaleHeader from 'features/options/components/AdvancedOptions/Upscale/UpscaleHeader';
-import UpscaleOptions from 'features/options/components/AdvancedOptions/Upscale/UpscaleOptions';
 import VariationsHeader from 'features/options/components/AdvancedOptions/Variations/VariationsHeader';
 import VariationsOptions from 'features/options/components/AdvancedOptions/Variations/VariationsOptions';
 import MainAdvancedOptionsCheckbox from 'features/options/components/MainOptions/MainAdvancedOptionsCheckbox';
@@ -26,6 +25,11 @@ export default function UnifiedCanvasPanel() {
   );
 
   const imageToImageAccordions = {
+    boundingBox: {
+      header: <BoundingBoxSettingsHeader />,
+      feature: Feature.BOUNDING_BOX,
+      options: <BoundingBoxSettings />,
+    },
     outpainting: {
       header: <OutpaintingHeader />,
       feature: Feature.OUTPAINTING,
@@ -41,16 +45,6 @@ export default function UnifiedCanvasPanel() {
       feature: Feature.VARIATIONS,
       options: <VariationsOptions />,
     },
-    face_restore: {
-      header: <FaceRestoreHeader />,
-      feature: Feature.FACE_CORRECTION,
-      options: <FaceRestoreOptions />,
-    },
-    upscale: {
-      header: <UpscaleHeader />,
-      feature: Feature.UPSCALE,
-      options: <UpscaleOptions />,
-    },
   };
 
   return (
@@ -62,11 +56,7 @@ export default function UnifiedCanvasPanel() {
         label="Image To Image Strength"
         styleClass="main-option-block image-to-image-strength-main-option"
       />
-      <InpaintingSettings />
-      <MainAdvancedOptionsCheckbox />
-      {showAdvancedOptions && (
-        <OptionsAccordion accordionInfo={imageToImageAccordions} />
-      )}
+      <OptionsAccordion accordionInfo={imageToImageAccordions} />
     </InvokeOptionsPanel>
   );
 }

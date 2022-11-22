@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAISlider from 'common/components/IAISlider';
@@ -12,6 +12,7 @@ import {
   setTileSize,
   setShouldForceOutpaint,
 } from 'features/options/store/optionsSlice';
+import InpaintReplace from './InpaintReplace';
 
 const selector = createSelector([optionsSelector], (options) => {
   const {
@@ -46,6 +47,8 @@ const OutpaintingOptions = () => {
 
   return (
     <Flex direction="column" gap="1rem">
+      <InpaintReplace />
+
       <IAISlider
         sliderMarkRightOffset={-6}
         label={'Seam Size'}
@@ -141,3 +144,11 @@ const OutpaintingOptions = () => {
 };
 
 export default OutpaintingOptions;
+
+export const OutpaintingHeader = () => {
+  return (
+    <Box flex="1" textAlign="left">
+      Outpainting Composition
+    </Box>
+  );
+};

@@ -62,10 +62,7 @@ export default function ImageToImagePanel() {
         styleClass="main-option-block image-to-image-strength-main-option"
       />
       <ImageFit />
-      <MainAdvancedOptionsCheckbox />
-      {showAdvancedOptions ? (
-        <OptionsAccordion accordionInfo={imageToImageAccordions} />
-      ) : null}
+      <OptionsAccordion accordionInfo={imageToImageAccordions} />
     </InvokeOptionsPanel>
   );
 }
