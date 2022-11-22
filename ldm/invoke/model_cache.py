@@ -334,7 +334,7 @@ class ModelCache(object):
         '''
         Returns the preamble for the config file.
         '''
-        return textwrap.dedent('''
+        return textwrap.dedent('''\
             # This file describes the alternative machine learning models
             # available to InvokeAI script.
             #
