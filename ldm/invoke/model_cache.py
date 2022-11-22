@@ -155,7 +155,7 @@ class ModelCache(object):
         for name in models:
             line = f'{name:25s} {models[name]["status"]:>10s}  {models[name]["description"]}'
             if models[name]['status'] == 'active':
-                line = f'\033[1m{line}\033[0m')
+                line = f'\033[1m{line}\033[0m'
             print(line)
 
     def del_model(self, model_name:str) -> None:
