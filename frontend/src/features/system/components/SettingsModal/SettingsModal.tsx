@@ -32,11 +32,10 @@ import IAISelect from 'common/components/IAISelect';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { optionsSelector } from 'features/options/store/optionsSelectors';
-import { setShouldLoopback } from 'features/options/store/optionsSlice';
 
 const selector = createSelector(
   [systemSelector, optionsSelector],
-  (system, options) => {
+  (system) => {
     const {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
@@ -46,8 +45,6 @@ const selector = createSelector(
       enableImageDebugging,
     } = system;
 
-    const { shouldLoopback } = options;
-
     return {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
@@ -55,7 +52,6 @@ const selector = createSelector(
       models: _.map(model_list, (_model, key) => key),
       saveIntermediatesInterval,
       enableImageDebugging,
-      shouldLoopback,
     };
   },
   {
@@ -97,7 +93,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldDisplayGuides,
     saveIntermediatesInterval,
     enableImageDebugging,
-    shouldLoopback,
   } = useAppSelector(selector);
 
   /**
@@ -176,14 +171,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 isChecked={shouldDisplayGuides}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldDisplayGuides(e.target.checked))
-                }
-              />
-              <IAISwitch
-                styleClass="settings-modal-item"
-                label={'Image to Image Loopback'}
-                isChecked={shouldLoopback}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  dispatch(setShouldLoopback(e.target.checked))
                 }
               />
             </div>
