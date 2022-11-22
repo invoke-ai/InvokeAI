@@ -10,16 +10,28 @@ import InvokeButton from 'features/options/components/ProcessButtons/InvokeButto
 import _ from 'lodash';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import { FaSlidersH } from 'react-icons/fa';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 
-const canInvokeSelector = createSelector(
-  (state: RootState) => state.options,
+const floatingOptionsSelector = createSelector(
+  [(state: RootState) => state.options, activeTabNameSelector],
+  (options: OptionsState, activeTabName) => {
+    const {
+      shouldPinOptionsPanel,
+      shouldShowOptionsPanel,
+      shouldHoldOptionsPanelOpen,
+    } = options;
 
-  (options: OptionsState) => {
-    const { shouldPinOptionsPanel, shouldShowOptionsPanel } = options;
+    const shouldShowOptionsPanelButton =
+      !(
+        shouldShowOptionsPanel ||
+        (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
+      ) && ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
+
     return {
       shouldPinOptionsPanel,
       shouldShowProcessButtons:
         !shouldPinOptionsPanel || !shouldShowOptionsPanel,
+      shouldShowOptionsPanelButton,
     };
   },
   { memoizeOptions: { resultEqualityCheck: _.isEqual } }
@@ -27,8 +39,11 @@ const canInvokeSelector = createSelector(
 
 const FloatingOptionsPanelButtons = () => {
   const dispatch = useAppDispatch();
-  const { shouldShowProcessButtons, shouldPinOptionsPanel } =
-    useAppSelector(canInvokeSelector);
+  const {
+    shouldShowOptionsPanelButton,
+    shouldShowProcessButtons,
+    shouldPinOptionsPanel,
+  } = useAppSelector(floatingOptionsSelector);
 
   const handleShowOptionsPanel = () => {
     dispatch(setShouldShowOptionsPanel(true));
@@ -37,7 +52,7 @@ const FloatingOptionsPanelButtons = () => {
     }
   };
 
-  return (
+  return shouldShowOptionsPanelButton ? (
     <div className="show-hide-button-options">
       <IAIIconButton
         tooltip="Show Options Panel (O)"
@@ -54,7 +69,7 @@ const FloatingOptionsPanelButtons = () => {
         </>
       )}
     </div>
-  );
+  ) : null;
 };
 
 export default FloatingOptionsPanelButtons;
