@@ -1,5 +1,7 @@
-from setuptools import setup, find_packages
 import os
+import re
+
+from setuptools import setup, find_packages
 
 def frontend_files(directory):
      paths = []
@@ -7,6 +9,20 @@ def frontend_files(directory):
          for filename in filenames:
              paths.append(os.path.join(path, filename))
      return paths
+
+
+def _get_requirements(path):
+    try:
+        with open(path) as f:
+            packages = f.read().splitlines()
+    except (IOError, OSError) as ex:
+        raise RuntimeError("Can't open file with requirements: %s", repr(ex))
+ 
+    # Drop option lines
+    packages = [package for package in packages if not re.match(r"^--", package)]
+    packages = [package for package in packages if not re.match(r"^http", package)]
+    return packages
+
 
 frontend_files = frontend_files('frontend/dist')
 print(f'DEBUG: {frontend_files}')
@@ -30,25 +46,7 @@ setup(
     url=HOMEPAGE,
     license='MIT',
     packages=find_packages(exclude=['tests.*']),
-    install_requires=[
-        'accelerate',
-        'albumentations',
-        'diffusers',
-        'eventlet',
-        'flask_cors',
-        'flask_socketio',
-        'flaskwebgui',
-        'getpass_asterisk',
-        'imageio-ffmpeg',
-        'pyreadline3',
-        'realesrgan',
-        'send2trash',
-        'streamlit',
-        'taming-transformers-rom1504',
-        'test-tube',
-        'torch-fidelity',
-        'transformers'
-    ],
+    install_requires=_get_requirements('installer/requirements.in'),
     python_requires='>=3.8, <4',
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -72,7 +70,7 @@ setup(
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
-    scripts = ['scripts/invoke.py','scripts/load_models.py','scripts/sd-metadata.py'],
+    scripts = ['scripts/invoke.py','scripts/configure_invokeai.py','scripts/sd-metadata.py'],
     data_files=[('frontend',frontend_files)],
 )
 
