@@ -328,7 +328,7 @@ class ModelCache(object):
         with open(tmpfile, 'w') as outfile:
             outfile.write(self.preamble())
             outfile.write(yaml_str)
-        os.rename(tmpfile,config_file_path)
+        os.replace(tmpfile,config_file_path)
 
     def preamble(self) -> str:
         '''
