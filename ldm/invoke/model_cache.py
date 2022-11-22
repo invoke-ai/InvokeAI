@@ -17,6 +17,7 @@ import transformers
 import traceback
 import textwrap
 import contextlib
+from typing import Union
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config, ask_user
@@ -388,7 +389,7 @@ class ModelCache(object):
     def _has_cuda(self) -> bool:
         return self.device.type == 'cuda'
 
-    def _cached_sha256(self,path,data) -> str | bytes:
+    def _cached_sha256(self,path,data) -> Union[str, bytes]:
         dirname    = os.path.dirname(path)
         basename   = os.path.basename(path)
         base, _    = os.path.splitext(basename)
