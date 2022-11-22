@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
 
 const roundToHundreth = (val: number): number => {
   return Math.round(val * 100) / 100;
@@ -15,15 +16,10 @@ const selector = createSelector(
       stageCoordinates: { x: stageX, y: stageY },
       boundingBoxDimensions: { width: boxWidth, height: boxHeight },
       boundingBoxCoordinates: { x: boxX, y: boxY },
-      cursorPosition,
       stageScale,
       shouldShowCanvasDebugInfo,
       layer,
     } = canvas;
-
-    const { cursorX, cursorY } = cursorPosition
-      ? { cursorX: cursorPosition.x, cursorY: cursorPosition.y }
-      : { cursorX: -1, cursorY: -1 };
 
     return {
       activeLayerColor:
@@ -42,7 +38,6 @@ const selector = createSelector(
       )}`,
       canvasDimensionsString: `${stageWidth}×${stageHeight}`,
       canvasScaleString: Math.round(stageScale * 100),
-      cursorCoordinatesString: `(${cursorX}, ${cursorY})`,
       shouldShowCanvasDebugInfo,
     };
   },
@@ -52,6 +47,7 @@ const selector = createSelector(
     },
   }
 );
+
 const IAICanvasStatusText = () => {
   const {
     activeLayerColor,
@@ -62,7 +58,6 @@ const IAICanvasStatusText = () => {
     canvasCoordinatesString,
     canvasDimensionsString,
     canvasScaleString,
-    cursorCoordinatesString,
     shouldShowCanvasDebugInfo,
   } = useAppSelector(selector);
 
@@ -84,7 +79,7 @@ const IAICanvasStatusText = () => {
           <div>{`Bounding Box Position: ${boundingBoxCoordinatesString}`}</div>
           <div>{`Canvas Dimensions: ${canvasDimensionsString}`}</div>
           <div>{`Canvas Position: ${canvasCoordinatesString}`}</div>
-          <div>{`Cursor Position: ${cursorCoordinatesString}`}</div>
+          <IAICanvasStatusTextCursorPos />
         </>
       )}
     </div>
