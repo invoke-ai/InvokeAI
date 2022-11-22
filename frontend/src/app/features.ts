@@ -14,6 +14,7 @@ export enum Feature {
   FACE_CORRECTION,
   IMAGE_TO_IMAGE,
   OUTPAINTING,
+  BOUNDING_BOX,
 }
 /** For each tooltip in the UI, the below feature definitions & props will pull relevant information into the tooltip.
  *
@@ -61,7 +62,12 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     guideImage: 'asset/path.gif',
   },
   [Feature.OUTPAINTING]: {
-    text: 'Outpainting settings control the process used to cleanly manage seams between existing compositions and new invocations, using larger areas of the image for seam guidance, or applying various configurations on the generation process.', 
+    text: 'Outpainting settings control the process used to cleanly manage seams between existing compositions and new invocations, using larger areas of the image for seam guidance, or applying various configurations on the generation process.',
+    href: 'link/to/docs/feature3.html',
+    guideImage: 'asset/path.gif',
+  },
+  [Feature.BOUNDING_BOX]: {
+    text: 'The Bounding Box is analogous to the Width and Height settings for Text to Image or Image to Image. Only the area in the box will be processed.',
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },

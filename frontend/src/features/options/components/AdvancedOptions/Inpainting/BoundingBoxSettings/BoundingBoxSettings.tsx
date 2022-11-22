@@ -1,3 +1,4 @@
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAISlider from 'common/components/IAISlider';
@@ -61,40 +62,43 @@ const BoundingBoxSettings = () => {
   };
 
   return (
-    <div className="inpainting-bounding-box-settings">
-      <div className="inpainting-bounding-box-header">
-        <p>Canvas Bounding Box</p>
-      </div>
-      <div className="inpainting-bounding-box-settings-items">
-        <IAISlider
-          label={'Width'}
-          min={64}
-          max={1024}
-          step={64}
-          value={boundingBoxDimensions.width}
-          onChange={handleChangeWidth}
-          handleReset={handleResetWidth}
-          sliderNumberInputProps={{ max: 4096 }}
-          withSliderMarks
-          withInput
-          withReset
-        />
-        <IAISlider
-          label={'Height'}
-          min={64}
-          max={1024}
-          step={64}
-          value={boundingBoxDimensions.height}
-          onChange={handleChangeHeight}
-          handleReset={handleResetHeight}
-          sliderNumberInputProps={{ max: 4096 }}
-          withSliderMarks
-          withInput
-          withReset
-        />
-      </div>
-    </div>
+    <Flex direction="column" gap="1rem">
+      <IAISlider
+        label={'Width'}
+        min={64}
+        max={1024}
+        step={64}
+        value={boundingBoxDimensions.width}
+        onChange={handleChangeWidth}
+        handleReset={handleResetWidth}
+        sliderNumberInputProps={{ max: 4096 }}
+        withSliderMarks
+        withInput
+        withReset
+      />
+      <IAISlider
+        label={'Height'}
+        min={64}
+        max={1024}
+        step={64}
+        value={boundingBoxDimensions.height}
+        onChange={handleChangeHeight}
+        handleReset={handleResetHeight}
+        sliderNumberInputProps={{ max: 4096 }}
+        withSliderMarks
+        withInput
+        withReset
+      />
+    </Flex>
   );
 };
 
 export default BoundingBoxSettings;
+
+export const BoundingBoxSettingsHeader = () => {
+  return (
+    <Box flex="1" textAlign="left">
+      Bounding Box
+    </Box>
+  );
+};

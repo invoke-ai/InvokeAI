@@ -55,10 +55,7 @@ export default function TextToImagePanel() {
       <PromptInput />
       <ProcessButtons />
       <MainOptions />
-      <MainAdvancedOptionsCheckbox />
-      {showAdvancedOptions ? (
-        <OptionsAccordion accordionInfo={textToImageAccordions} />
-      ) : null}
+      <OptionsAccordion accordionInfo={textToImageAccordions} />
     </InvokeOptionsPanel>
   );
 }
