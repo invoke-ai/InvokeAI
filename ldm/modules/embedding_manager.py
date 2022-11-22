@@ -262,9 +262,12 @@ class EmbeddingManager(nn.Module):
             embedding = embedding.half()
         if len(embedding.shape) == 1:
             embedding = embedding.unsqueeze(0)
-        #print(f"adding embedding with shape {embedding.shape} for token '{token_str}'")
-        self.embedder.tokenizer.add_tokens(token_str)
-        self.embedder.transformer.resize_token_embeddings()
+
+        num_tokens_added = self.embedder.tokenizer.add_tokens(token_str)
+        current_embeddings = self.embedder.transformer.resize_token_embeddings(None)
+        current_token_count = current_embeddings.num_embeddings
+        new_token_count = current_token_count + num_tokens_added
+        self.embedder.transformer.resize_token_embeddings(new_token_count)
 
         token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
         self.string_to_token_dict[token_str] = token
