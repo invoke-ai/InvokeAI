@@ -117,7 +117,8 @@ export default function ImageGallery() {
 
   const handleOpenGallery = () => {
     dispatch(setShouldShowGallery(true));
-    shouldPinGallery && dispatch(setDoesCanvasNeedScaling(true));
+    shouldPinGallery &&
+      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
   };
 
   const handleCloseGallery = useCallback(() => {
@@ -128,6 +129,7 @@ export default function ImageGallery() {
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
       )
     );
+    setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
   }, [dispatch]);
 
   const handleClickLoadMore = () => {
