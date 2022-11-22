@@ -1,6 +1,5 @@
 // import { Feature } from 'app/features';
 import { Feature } from 'app/features';
-import { RootState, useAppSelector } from 'app/store';
 import ImageToImageStrength from 'features/options/components/AdvancedOptions/ImageToImage/ImageToImageStrength';
 import BoundingBoxSettings, {
   BoundingBoxSettingsHeader,
@@ -12,7 +11,6 @@ import SeedHeader from 'features/options/components/AdvancedOptions/Seed/SeedHea
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
 import VariationsHeader from 'features/options/components/AdvancedOptions/Variations/VariationsHeader';
 import VariationsOptions from 'features/options/components/AdvancedOptions/Variations/VariationsOptions';
-import MainAdvancedOptionsCheckbox from 'features/options/components/MainOptions/MainAdvancedOptionsCheckbox';
 import MainOptions from 'features/options/components/MainOptions/MainOptions';
 import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
@@ -20,11 +18,7 @@ import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 
 export default function UnifiedCanvasPanel() {
-  const showAdvancedOptions = useAppSelector(
-    (state: RootState) => state.options.showAdvancedOptions
-  );
-
-  const imageToImageAccordions = {
+  const unifiedCanvasAccordions = {
     boundingBox: {
       header: <BoundingBoxSettingsHeader />,
       feature: Feature.BOUNDING_BOX,
@@ -56,7 +50,7 @@ export default function UnifiedCanvasPanel() {
         label="Image To Image Strength"
         styleClass="main-option-block image-to-image-strength-main-option"
       />
-      <OptionsAccordion accordionInfo={imageToImageAccordions} />
+      <OptionsAccordion accordionInfo={unifiedCanvasAccordions} />
     </InvokeOptionsPanel>
   );
 }

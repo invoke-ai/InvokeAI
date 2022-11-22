@@ -15,8 +15,8 @@ import {
   setInfillMethod,
 } from 'features/options/store/optionsSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { ChangeEvent } from 'react';
 import InpaintReplace from './InpaintReplace';
+import _ from 'lodash';
 
 const selector = createSelector(
   [optionsSelector, systemSelector],
@@ -43,6 +43,11 @@ const selector = createSelector(
       infillMethod,
       availableInfillMethods,
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 
