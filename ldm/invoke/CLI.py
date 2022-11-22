@@ -91,10 +91,7 @@ def main():
             safety_checker=opt.safety_checker,
             max_loaded_models=opt.max_loaded_models,
             )
-    except (FileNotFoundError, TypeError):
-        print('** You appear to have missing or misconfigured model files')
-        print('** The script will now exit and run configure_invokeai.py to help fix the problem.')
-        print('** After reconfiguration is done, please relaunch invoke.py.')
+    except (FileNotFoundError, TypeError, AssertionError):
         emergency_model_reconfigure(opt)
         sys.exit(-1)
     except (IOError, KeyError) as e:
@@ -105,7 +102,11 @@ def main():
         print(">> changed to seamless tiling mode")
 
     # preload the model
-    gen.load_model()
+    try:
+        gen.load_model()
+    except AssertionError:
+        emergency_model_reconfigure()
+        sys.exit(-1)
 
     # web server loops forever
     if opt.web or opt.gui:
@@ -912,35 +913,12 @@ def write_commands(opt, file_path:str, outfilepath:str):
         print(f'>> File {outfilepath} with commands created')
 
 def emergency_model_reconfigure():
+    print()
+    print('----------------------------------------------------------------------------------')
+    print('   You appear to have a missing or misconfigured model file(s).                   ')
+    print('   The script will now exit and run configure_invokeai.py to help fix the problem.')
+    print('   After reconfiguration is done, please relaunch invoke.py.                      ')
+    print('----------------------------------------------------------------------------------')
     import configure_invokeai
     configure_invokeai.main()
 
-def emergency_model_create(opt:Args):
-    completer   = get_completer(opt)
-    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
-    completer.set_default_dir('.')
-    valid_path = False
-    while not valid_path:
-        weights_file = input('Enter the path to a downloaded models file, or ^C to exit: ')
-        valid_path = os.path.exists(weights_file)
-    dir,basename = os.path.split(weights_file)
-
-    valid_name = False
-    while not valid_name:
-        name = input('Enter a short name for this model (no spaces): ')
-        name = 'unnamed model' if len(name)==0 else name
-        valid_name = ' ' not in name
-
-    description = input('Enter a description for this model: ')
-    description = 'no description' if len(description)==0 else description
-
-    with open(opt.conf, 'w', encoding='utf-8') as f:
-        f.write(f'{name}:\n')
-        f.write(f'  description: {description}\n')
-        f.write(f'  weights: {weights_file}\n')
-        f.write(f'  config: ./configs/stable-diffusion/v1-inference.yaml\n')
-        f.write(f'  width: 512\n')
-        f.write(f'  height: 512\n')
-        f.write(f'  default: true\n')
-    print(f'Config file {opt.conf} is created. This script will now exit.')
-    print(f'After restarting you may examine the entry with !models and edit it with !edit.')

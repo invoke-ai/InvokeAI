@@ -87,6 +87,7 @@ class ModelCache(object):
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
                 print(traceback.format_exc())
+                assert self.current_model,'** FATAL: no current model to restore to'
                 print(f'** restoring {self.current_model}')
                 self.get_model(self.current_model)
                 return
