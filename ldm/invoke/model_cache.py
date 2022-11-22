@@ -130,6 +130,7 @@ class ModelCache(object):
                        },
           model_name2: { etc }
         '''
+        result = dict()
         for name in self.config:
             try:
                 description = self.config[name].description
@@ -143,12 +144,12 @@ class ModelCache(object):
             else:
                 status = 'not loaded'
 
-            return {
-                name: {
-                    'status': status,
-                    'description': description,
-                }}
-    
+            result[name]={
+                'status' : status,
+                'description' : description
+            }
+        return result
+
     def print_models(self) -> None:
         '''
         Print a table of models, their descriptions, and load status
