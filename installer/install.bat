@@ -132,22 +132,20 @@ if %errorlevel% neq 0 goto err_exit
 
 echo ***** Installed Python dependencies *****
 
+echo ***** Installing invoke.bat ******
+copy installer\invoke.bat .\invoke.bat
+
+@rem more cleanup
+rd /s /q installer installer_files
+
 @rem preload the models
-call .venv\Scripts\python scripts\preload_models.py
+call .venv\Scripts\python scripts\configure_invokeai.py
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
 
 echo ***** Finished downloading models *****
 
-echo ***** Installing invoke.bat ******
-copy installer\invoke.bat .\invoke.bat
 echo All done! Execute the file invoke.bat in this directory to start InvokeAI
-
-@rem more cleanup
-rd /s /q installer installer_files
-
-deactivate
-
 pause
 exit
 

@@ -21,7 +21,7 @@ LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, a
 HOMEPAGE = 'https://github.com/invoke-ai/InvokeAI'
 
 setup(
-    name='invoke-ai',
+    name='InvokeAI',
     version=VERSION,
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
