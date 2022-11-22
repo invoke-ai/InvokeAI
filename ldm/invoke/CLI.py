@@ -91,10 +91,11 @@ def main():
             safety_checker=opt.safety_checker,
             max_loaded_models=opt.max_loaded_models,
             )
-    except FileNotFoundError:
-        print('** You appear to be missing configs/models.yaml')
-        print('** You can either exit this script and run scripts/preload_models.py, or fix the problem now.')
-        emergency_model_create(opt)
+    except (FileNotFoundError, TypeError):
+        print('** You appear to have missing or misconfigured model files')
+        print('** The script will now exit and run configure_invokeai.py to help fix the problem.')
+        print('** After reconfiguration is done, please relaunch invoke.py.')
+        emergency_model_reconfigure(opt)
         sys.exit(-1)
     except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
@@ -909,6 +910,10 @@ def write_commands(opt, file_path:str, outfilepath:str):
         with open(outfilepath, 'w', encoding='utf-8') as f:
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
+
+def emergency_model_reconfigure():
+    import configure_invokeai
+    configure_invokeai.main()
 
 def emergency_model_create(opt:Args):
     completer   = get_completer(opt)
