@@ -81,7 +81,6 @@ export default function ImageGallery() {
     shouldEnableResize,
   } = useAppSelector(imageGallerySelector);
 
-  console.log(isLightBoxOpen);
   const { galleryMinWidth, galleryMaxWidth } = isLightBoxOpen
     ? {
         galleryMinWidth: LIGHTBOX_GALLERY_WIDTH,
