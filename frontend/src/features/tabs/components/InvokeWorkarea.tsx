@@ -10,6 +10,7 @@ import {
   setShowDualDisplay,
 } from 'features/options/store/optionsSlice';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import _ from 'lodash';
 
 const workareaSelector = createSelector(
   [(state: RootState) => state.options, activeTabNameSelector],
@@ -21,6 +22,11 @@ const workareaSelector = createSelector(
       isLightBoxOpen,
       shouldShowDualDisplayButton: ['inpainting'].includes(activeTabName),
     };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 
