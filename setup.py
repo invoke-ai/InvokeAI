@@ -3,24 +3,25 @@ import re
 
 from setuptools import setup, find_packages
 
+
 def frontend_files(directory):
-     paths = []
-     for (path, directories, filenames) in os.walk(directory):
-         for filename in filenames:
-             paths.append(os.path.join(path, filename))
-     return paths
+    paths = []
+    for (path, _, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append(os.path.join(path, filename))
+    return paths
 
 
 def _get_requirements(path):
     try:
         with open(path) as f:
             packages = f.read().splitlines()
-    except (IOError, OSError) as ex:
-        raise RuntimeError("Can't open file with requirements: %s", repr(ex))
- 
+    except OSError as ex:
+        raise RuntimeError('Cannot open file with requirements: %s', repr(ex))
+
     # Drop option lines
-    packages = [package for package in packages if not re.match(r"^--", package)]
-    packages = [package for package in packages if not re.match(r"^http", package)]
+    packages = [package for package in packages if not re.match(r'^--', package)]
+    print(f'Packages found for "install_requires":\n{packages}')
     return packages
 
 
@@ -31,9 +32,9 @@ VERSION = '2.1.4'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
 LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, an'
-                     ' interactive command-line script that combines text2img and img2img'
-                     ' functionality in a "dream bot" style interface, and multiple features'
-                     ' and other enhancements.')
+                    ' interactive command-line script that combines text2img and img2img'
+                    ' functionality in a "dream bot" style interface, and multiple features'
+                    ' and other enhancements.')
 HOMEPAGE = 'https://github.com/invoke-ai/InvokeAI'
 
 setup(
@@ -47,6 +48,9 @@ setup(
     license='MIT',
     packages=find_packages(exclude=['tests.*']),
     install_requires=_get_requirements('installer/requirements.in'),
+    dependency_links=['https://download.pytorch.org/whl/torch_stable.html'],
+    scripts=['scripts/invoke.py', 'scripts/configure_invokeai.py', 'scripts/sd-metadata.py'],
+    data_files=[('frontend', frontend_files)],
     python_requires='>=3.8, <4',
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -70,7 +74,4 @@ setup(
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
-    scripts = ['scripts/invoke.py','scripts/configure_invokeai.py','scripts/sd-metadata.py'],
-    data_files=[('frontend',frontend_files)],
 )
-
