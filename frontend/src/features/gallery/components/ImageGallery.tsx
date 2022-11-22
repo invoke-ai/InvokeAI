@@ -117,8 +117,7 @@ export default function ImageGallery() {
 
   const handleOpenGallery = () => {
     dispatch(setShouldShowGallery(true));
-    shouldPinGallery &&
-      setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
+    shouldPinGallery && dispatch(setDoesCanvasNeedScaling(true));
   };
 
   const handleCloseGallery = useCallback(() => {
