@@ -7,23 +7,31 @@ import _ from 'lodash';
 import { ChangeEvent } from 'react';
 import { systemSelector } from '../store/systemSelectors';
 
-const selector = createSelector([systemSelector], (system) => {
-  const { isProcessing, model_list } = system;
-  const models = _.map(model_list, (model, key) => key);
-  const activeModel = _.reduce(
-    model_list,
-    (acc, model, key) => {
-      if (model.status === 'active') {
-        acc = key;
-      }
+const selector = createSelector(
+  [systemSelector],
+  (system) => {
+    const { isProcessing, model_list } = system;
+    const models = _.map(model_list, (model, key) => key);
+    const activeModel = _.reduce(
+      model_list,
+      (acc, model, key) => {
+        if (model.status === 'active') {
+          acc = key;
+        }
 
-      return acc;
+        return acc;
+      },
+      ''
+    );
+
+    return { models, activeModel, isProcessing };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
     },
-    ''
-  );
-
-  return { models, activeModel, isProcessing };
-});
+  }
+);
 
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
