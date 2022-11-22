@@ -44,7 +44,7 @@
   font-weight: bold;
 
   &[aria-expanded='true'] {
-    background-color: var(--tab-color);
+    background-color: var(--tab-hover-color);
     border-radius: 0.4rem 0.4rem 0 0;
   }
 
