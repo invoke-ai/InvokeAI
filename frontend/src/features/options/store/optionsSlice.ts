@@ -20,6 +20,7 @@ export interface OptionsState {
   height: number;
   hiresFix: boolean;
   img2imgStrength: number;
+  infillMethod: string;
   initialImage?: InvokeAI.Image | string; // can be an Image or url
   isLightBoxOpen: boolean;
   iterations: number;
@@ -67,6 +68,7 @@ const initialOptionsState: OptionsState = {
   height: 512,
   hiresFix: false,
   img2imgStrength: 0.75,
+  infillMethod: 'patchmatch',
   isLightBoxOpen: false,
   iterations: 1,
   maskPath: '',
@@ -390,6 +392,9 @@ export const optionsSlice = createSlice({
     setShouldForceOutpaint: (state, action: PayloadAction<boolean>) => {
       state.shouldForceOutpaint = action.payload;
     },
+    setInfillMethod: (state, action: PayloadAction<string>) => {
+      state.infillMethod = action.payload;
+    },
   },
 });
 
@@ -409,6 +414,7 @@ export const {
   setHeight,
   setHiresFix,
   setImg2imgStrength,
+  setInfillMethod,
   setInitialImage,
   setIsLightBoxOpen,
   setIterations,

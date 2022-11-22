@@ -72,6 +72,7 @@ const initialSystemState: SystemState = {
   app_id: '',
   app_version: '',
   model_list: {},
+  infill_methods: [],
   hasError: false,
   wasErrorSeen: true,
   isCancelable: true,

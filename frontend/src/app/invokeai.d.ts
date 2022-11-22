@@ -155,6 +155,7 @@ export declare type SystemGenerationMetadata = {
 
 export declare type SystemConfig = SystemGenerationMetadata & {
   model_list: ModelList;
+  infill_methods: string[];
 };
 
 export declare type ModelStatus = 'active' | 'cached' | 'not loaded';

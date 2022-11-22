@@ -29,6 +29,7 @@ import {
 
 import {
   clearInitialImage,
+  setInfillMethod,
   setInitialImage,
   setMaskPath,
 } from 'features/options/store/optionsSlice';
@@ -340,6 +341,9 @@ const makeSocketIOListeners = (
     },
     onSystemConfig: (data: InvokeAI.SystemConfig) => {
       dispatch(setSystemConfig(data));
+      if (!data.infill_methods.includes('patchmatch')) {
+        dispatch(setInfillMethod(data.infill_methods[0]));
+      }
     },
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
