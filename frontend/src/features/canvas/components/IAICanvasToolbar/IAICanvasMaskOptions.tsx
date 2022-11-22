@@ -98,6 +98,11 @@ const IAICanvasMaskOptions = () => {
             aria-label="Masking Options"
             tooltip="Masking Options"
             icon={<FaMask />}
+            style={
+              layer === 'mask'
+                ? { backgroundColor: 'var(--accent-color)' }
+                : { backgroundColor: 'var(--btn-base-color)' }
+            }
           />
         </ButtonGroup>
       }
