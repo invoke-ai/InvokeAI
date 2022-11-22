@@ -1094,7 +1094,7 @@ def metadata_from_png(png_file_path) -> Args:
     returns a single Args object, not multiple.
     '''
     args_list = args_from_png(png_file_path)
-    return args_list[0]
+    return args_list[0] if len(args_list)>0 else Args()  # empty args
 
 def dream_cmd_from_png(png_file_path):
     opt = metadata_from_png(png_file_path)

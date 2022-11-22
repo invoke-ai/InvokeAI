@@ -66,7 +66,6 @@ class InvokeAIWebServer:
         if opt.cors:
             socketio_args["cors_allowed_origins"] = opt.cors
 
-        print(f'DEBUG: static_folder should be at {os.path.join(args.root_dir,"frontend/dist")}')
         self.app = Flask(
             __name__, static_url_path="", static_folder=os.path.join(args.root_dir,"frontend/dist")
         )

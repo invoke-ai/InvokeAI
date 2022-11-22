@@ -22,6 +22,7 @@ from pathlib import Path
 from getpass_asterisk import getpass_asterisk
 from transformers import CLIPTokenizer, CLIPTextModel
 from ldm.invoke.globals import Globals
+from ldm.invoke.readline import generic_completer
 
 import traceback
 import requests
@@ -41,55 +42,13 @@ except ImportError:
 #--------------------------globals-----------------------
 Model_dir = 'models'
 Weights_dir = 'ldm/stable-diffusion-v1/'
+Dataset_path = './configs/INITIAL_MODELS.yaml'
 Default_config_file = './configs/models.yaml'
 SD_Configs = './configs/stable-diffusion'
-Datasets = {
-    'stable-diffusion-1.5':  {
-        'description': 'The newest Stable Diffusion version 1.5 weight file (4.27 GB)',
-        'repo_id': 'runwayml/stable-diffusion-v1-5',
-        'config': 'v1-inference.yaml',
-        'file': 'v1-5-pruned-emaonly.ckpt',
-        'recommended': True,
-        'width': 512,
-        'height': 512,
-    },
-    'inpainting-1.5': {
-        'description': 'RunwayML SD 1.5 model optimized for inpainting (4.27 GB)',
-        'repo_id': 'runwayml/stable-diffusion-inpainting',
-        'config': 'v1-inpainting-inference.yaml',
-        'file': 'sd-v1-5-inpainting.ckpt',
-        'recommended': True,
-        'width': 512,
-        'height': 512,
-    },
-    'stable-diffusion-1.4': {
-        'description': 'The original Stable Diffusion version 1.4 weight file (4.27 GB)',
-        'repo_id': 'CompVis/stable-diffusion-v-1-4-original',
-        'config': 'v1-inference.yaml',
-        'file': 'sd-v1-4.ckpt',
-        'recommended': False,
-        'width': 512,
-        'height': 512,
-    },
-    'waifu-diffusion-1.3': {
-        'description': 'Stable Diffusion 1.4 fine tuned on anime-styled images (4.27)',
-        'repo_id': 'hakurei/waifu-diffusion-v1-3',
-        'config': 'v1-inference.yaml',
-        'file': 'model-epoch09-float32.ckpt',
-        'recommended': False,
-        'width': 512,
-        'height': 512,
-    },
-    'ft-mse-improved-autoencoder-840000': {
-        'description': 'StabilityAI improved autoencoder fine-tuned for human faces (recommended; 335 MB)',
-        'repo_id': 'stabilityai/sd-vae-ft-mse-original',
-        'config': 'VAE',
-        'file': 'vae-ft-mse-840000-ema-pruned.ckpt',
-        'recommended': True,
-        'width': 512,
-        'height': 512,
-    },
-}
+
+Datasets = OmegaConf.load(Dataset_path)
+completer = generic_completer(['yes','no'])
+
 Config_preamble = '''# This file describes the alternative machine learning models
 # available to InvokeAI script.
 #
@@ -127,6 +86,8 @@ Have fun!
 
 #---------------------------------------------
 def yes_or_no(prompt:str, default_yes=True):
+    completer.set_options(['yes','no'])
+    completer.complete_extensions(None)  # turn off path-completion mode
     default = "y" if default_yes else 'n'
     response = input(f'{prompt} [{default}] ') or default
     if default_yes:
@@ -148,6 +109,8 @@ You may download the recommended models (about 10GB total), select a customized 
 completely skip this step.
 '''
     )
+    completer.set_options(['recommended','customized','skip'])
+    completer.complete_extensions(None)  # turn off path-completion mode
     selection = None
     while selection is None:
         choice = input('Download <r>ecommended models, <c>ustomize the list, or <s>kip this step? [r]: ')
@@ -276,7 +239,7 @@ def migrate_models_ckpt():
     rename = yes_or_no(f'Ok to rename it to "{new_name}" for future reference?')
     if rename:
         print(f'model.ckpt => {new_name}')
-        os.rename(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
+        os.replace(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
             
 #---------------------------------------------
 def download_weight_datasets(models:dict, access_token:str):
@@ -446,12 +409,12 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
     try:
         if os.path.exists(config_file):
             print(f'** {config_file} exists. Renaming to {config_file}.orig')
-            os.rename(config_file,f'{config_file}.orig')
+            os.replace(config_file,f'{config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
             outfile.write(Config_preamble)
             outfile.write(yaml)
-        os.rename(tmpfile,config_file)
+        os.replace(tmpfile,config_file)
 
     except Exception as e:
         print(f'**Error creating config file {config_file}: {str(e)} **')
@@ -468,15 +431,18 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
         conf = OmegaConf.create()
 
     # find the VAE file, if there is one
-    vae = None
+    vaes = {}
     default_selected = False
     
     for model in successfully_downloaded:
-        if Datasets[model]['config'] == 'VAE':
-            vae = Datasets[model]['file']
+        a = Datasets[model]['config'].split('/')
+        if a[0] != 'VAE':
+            continue
+        vae_target = a[1] if len(a)>1 else 'default'
+        vaes[vae_target] = Datasets[model]['file']
     
     for model in successfully_downloaded:
-        if Datasets[model]['config'] == 'VAE': # skip VAE entries
+        if Datasets[model]['config'].startswith('VAE'): # skip VAE entries
             continue
         stanza = conf[model] if model in conf else { }
         
@@ -486,8 +452,12 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
         stanza['width'] = Datasets[model]['width']
         stanza['height'] = Datasets[model]['height']
         stanza.pop('default',None)  # this will be set later
-        if vae:
-            stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vae))
+        if vaes:
+            for target in vaes:
+                if re.search(target, model, flags=re.IGNORECASE):
+                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes[target]))
+                else:
+                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes['default']))
         # BUG - the first stanza is always the default. User should select.
         if not default_selected:
             stanza['default'] = True
@@ -644,7 +614,7 @@ def get_root(root:str=None)->str:
     else:
         init_file = os.path.expanduser(Globals.initfile)
         if not os.path.exists(init_file):
-            return '.'
+            return None
 
     # if we get here, then we read from initfile
     root = None
@@ -656,31 +626,63 @@ def get_root(root:str=None)->str:
             match = re.search('--root\s*=?\s*"?([^"]+)"?',l)
             if match:
                 root = match.groups()[0]
-    root = root or '.'
-    return root.strip()
+                root = root.strip()
+    return root
 
 #-------------------------------------
-def initialize_rootdir(root:str):
+def select_root(yes_to_all:bool=False):
+    default = os.path.expanduser('~/invokeai')
+    if (yes_to_all):
+        return default
+    completer.set_default_dir(default)
+    completer.complete_extensions(())
+    completer.set_line(default)
+    return input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ")
+
+#-------------------------------------
+def select_outputs(root:str,yes_to_all:bool=False):
+    default = os.path.normpath(os.path.join(root,'outputs'))
+    if (yes_to_all):
+        return default
+    completer.set_default_dir(os.path.expanduser('~'))
+    completer.complete_extensions(())
+    completer.set_line(default)
+    return input('Select the default directory for image outputs [{default}]: ')
+
+#-------------------------------------
+def initialize_rootdir(root:str,yes_to_all:bool=False):
     assert os.path.exists('./configs'),'Run this script from within the top level of the InvokeAI source code directory, "InvokeAI"'
-    print(f'** INITIALIZING INVOKEAI ROOT DIRECTORY **')
-    print(f'Creating a directory named {root} to contain InvokeAI models, configuration files and outputs.')
-    print(f'If you move this directory, please change its location using the --root option in "{Globals.initfile},')
-    print(f'or set the environment variable INVOKEAI_ROOT to the new location.\n')
-    for name in ('models','configs','outputs','scripts','frontend/dist'):
+    
+    print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
+    root = root or select_root(yes_to_all)
+    outputs = select_outputs(root,yes_to_all)
+    Globals.root = root
+        
+    print(f'InvokeAI models and configuration files will be placed into {root} and image outputs will be placed into {outputs}.')
+    print(f'\nYou may change these values at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
+    print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
+    for name in ('models','configs','scripts','frontend/dist'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
     for src in ('configs','scripts','frontend/dist'):
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
+    os.makedirs(outputs)
 
     init_file = os.path.expanduser(Globals.initfile)
     if not os.path.exists(init_file):
-        print(f'Creating a basic initialization file at "{init_file}".\n')
+        print(f'Creating the initialization file at "{init_file}".\n')
         with open(init_file,'w') as f:
             f.write(f'''# InvokeAI initialization file
+# This is the InvokeAI initialization file, which contains command-line default values.
+# Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
+# or renaming it and then running configure_invokeai.py again.
+
 # The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
-# Don't change it unless you know what you are doing!
---root="{Globals.root}"
+--root="{root}"
+
+# the --outdir option controls the default location of image files.
+--outdir="{outputs}"
 
 # You may place other  frequently-used startup commands here, one or more per line.
 # Examples:
@@ -690,6 +692,7 @@ def initialize_rootdir(root:str):
 #
 '''
             )
+    
     
 #-------------------------------------
 class ProgressBar():
@@ -738,8 +741,9 @@ def main():
                         help='path to root of install directory')
     opt = parser.parse_args()
 
+
     # setting a global here
-    Globals.root = os.path.expanduser(get_root(opt.root))
+    Globals.root = os.path.expanduser(get_root(opt.root) or '')
 
     try:
         introduction()
@@ -747,9 +751,12 @@ def main():
         # We check for two files to see if the runtime directory is correctly initialized.
         # 1. a key stable diffusion config file
         # 2. the web front end static files
-        if not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
+        if Globals.root == '' \
+           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
            or not os.path.exists(os.path.join(Globals.root,'frontend/dist')):
-            initialize_rootdir(Globals.root)
+            initialize_rootdir(Globals.root,opt.yes_to_all)
+
+        print(f'(Initializing with runtime root {Globals.root})\n')
 
         if opt.interactive:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
