@@ -10,6 +10,7 @@ import NodesIcon from 'common/icons/NodesIcon';
 import PostprocessingIcon from 'common/icons/PostprocessingIcon';
 import TextToImageIcon from 'common/icons/TextToImageIcon';
 import {
+  OptionsState,
   setActiveTab,
   setIsLightBoxOpen,
   setShouldShowOptionsPanel,
@@ -19,8 +20,12 @@ import TextToImageWorkarea from './TextToImage';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
-import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
+import {
+  GalleryState,
+  setShouldShowGallery,
+} from 'features/gallery/store/gallerySlice';
 import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
+import { createSelector } from '@reduxjs/toolkit';
 
 export const tabDict = {
   txt2img: {
@@ -57,6 +62,26 @@ export const tabMap = _.map(tabDict, (tab, key) => key);
 const tabMapTypes = [...tabMap] as const;
 export type InvokeTabName = typeof tabMapTypes[number];
 
+const fullScreenSelector = createSelector(
+  [(state: RootState) => state.gallery, (state: RootState) => state.options],
+  (gallery: GalleryState, options: OptionsState) => {
+    const { shouldShowGallery, shouldPinGallery } = gallery;
+    const { shouldShowOptionsPanel, shouldPinOptionsPanel } = options;
+
+    return {
+      shouldShowGallery,
+      shouldPinGallery,
+      shouldShowOptionsPanel,
+      shouldPinOptionsPanel,
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
+  }
+);
+
 export default function InvokeTabs() {
   const activeTab = useAppSelector(
     (state: RootState) => state.options.activeTab
@@ -64,18 +89,13 @@ export default function InvokeTabs() {
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.options.isLightBoxOpen
   );
-  const shouldShowGallery = useAppSelector(
-    (state: RootState) => state.gallery.shouldShowGallery
-  );
-  const shouldShowOptionsPanel = useAppSelector(
-    (state: RootState) => state.options.shouldShowOptionsPanel
-  );
-  const shouldPinGallery = useAppSelector(
-    (state: RootState) => state.gallery.shouldPinGallery
-  );
-  const shouldPinOptionsPanel = useAppSelector(
-    (state: RootState) => state.options.shouldPinOptionsPanel
-  );
+
+  const {
+    shouldPinGallery,
+    shouldShowGallery,
+    shouldPinOptionsPanel,
+    shouldShowOptionsPanel,
+  } = useAppSelector(fullScreenSelector);
 
   const dispatch = useAppDispatch();
 
