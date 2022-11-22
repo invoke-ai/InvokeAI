@@ -1,6 +1,7 @@
 @use '../../../../styles/Mixins/' as *;
 
 .advanced-settings {
+  padding-top: 0.5rem;
   display: grid;
   row-gap: 0.5rem;
 }
@@ -11,6 +12,7 @@
   border: none;
   border-top: 0px;
   border-radius: 0.4rem;
+  background-color: var(--background-color-secondary);
 
   &[aria-expanded='true'] {
     background-color: var(--tab-hover-color);
@@ -39,6 +41,7 @@
 
 .advanced-settings-header {
   border-radius: 0.4rem;
+  font-weight: bold;
 
   &[aria-expanded='true'] {
     background-color: var(--tab-color);
