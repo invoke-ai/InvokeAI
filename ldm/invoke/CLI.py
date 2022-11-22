@@ -92,7 +92,7 @@ def main():
             max_loaded_models=opt.max_loaded_models,
             )
     except (FileNotFoundError, TypeError, AssertionError):
-        emergency_model_reconfigure(opt)
+        emergency_model_reconfigure()
         sys.exit(-1)
     except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
@@ -914,11 +914,14 @@ def write_commands(opt, file_path:str, outfilepath:str):
 
 def emergency_model_reconfigure():
     print()
-    print('----------------------------------------------------------------------------------')
+    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('   You appear to have a missing or misconfigured model file(s).                   ')
     print('   The script will now exit and run configure_invokeai.py to help fix the problem.')
     print('   After reconfiguration is done, please relaunch invoke.py.                      ')
-    print('----------------------------------------------------------------------------------')
+    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+    print('configure_invokeai is launching....\n')
+    
+    sys.argv = ['configure_invokeai','--interactive']
     import configure_invokeai
     configure_invokeai.main()
 
