@@ -116,6 +116,7 @@ export default function ReactPanZoom({
               alt={alt}
               ref={ref}
               className={styleClass ? styleClass : ''}
+              onLoad={() => centerView()}
             />
           </TransformComponent>
         </>
