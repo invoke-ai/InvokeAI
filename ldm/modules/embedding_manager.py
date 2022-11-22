@@ -10,8 +10,6 @@ from ldm.data.personalized import per_img_token_list
 from transformers import CLIPTokenizer
 from functools import partial
 
-DEFAULT_PLACEHOLDER_TOKEN = ['*']
-
 PROGRESSIVE_SCALE = 2000
 
 
