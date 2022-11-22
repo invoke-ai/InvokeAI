@@ -17,7 +17,7 @@ export enum Feature {
 }
 /** For each tooltip in the UI, the below feature definitions & props will pull relevant information into the tooltip.
  *
- * To-do: href & GuideImages are placeholders, and are not currently utilized, but will be updated (along with the tooltip UI) as feature and UI development and we get a better idea on where things "forever homes" will be .
+ * To-do: href & GuideImages are placeholders, and are not currently utilized, but will be updated (along with the tooltip UI) as feature and UI develop and we get a better idea on where things "forever homes" will be .
  */
 export const FEATURES: Record<Feature, FeatureHelpInfo> = {
   [Feature.PROMPT]: {
@@ -61,7 +61,7 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     guideImage: 'asset/path.gif',
   },
   [Feature.OUTPAINTING]: {
-    text: '', // TODO
+    text: 'Outpainting settings control the process used to cleanly manage seams between existing compositions and new invocations, using larger areas of the image for seam guidance, or applying various configurations on the generation process.', 
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },
