@@ -1,6 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
+import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import { optionsSelector } from 'features/options/store/optionsSelectors';
@@ -11,28 +12,39 @@ import {
   setSeamSteps,
   setTileSize,
   setShouldForceOutpaint,
+  setInfillMethod,
 } from 'features/options/store/optionsSlice';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { ChangeEvent } from 'react';
 import InpaintReplace from './InpaintReplace';
 
-const selector = createSelector([optionsSelector], (options) => {
-  const {
-    seamSize,
-    seamBlur,
-    seamStrength,
-    seamSteps,
-    tileSize,
-    shouldForceOutpaint,
-  } = options;
+const selector = createSelector(
+  [optionsSelector, systemSelector],
+  (options, system) => {
+    const {
+      seamSize,
+      seamBlur,
+      seamStrength,
+      seamSteps,
+      tileSize,
+      shouldForceOutpaint,
+      infillMethod,
+    } = options;
 
-  return {
-    seamSize,
-    seamBlur,
-    seamStrength,
-    seamSteps,
-    tileSize,
-    shouldForceOutpaint,
-  };
-});
+    const { infill_methods: availableInfillMethods } = system;
+
+    return {
+      seamSize,
+      seamBlur,
+      seamStrength,
+      seamSteps,
+      tileSize,
+      shouldForceOutpaint,
+      infillMethod,
+      availableInfillMethods,
+    };
+  }
+);
 
 const OutpaintingOptions = () => {
   const dispatch = useAppDispatch();
@@ -43,6 +55,8 @@ const OutpaintingOptions = () => {
     seamSteps,
     tileSize,
     shouldForceOutpaint,
+    infillMethod,
+    availableInfillMethods,
   } = useAppSelector(selector);
 
   return (
@@ -115,7 +129,23 @@ const OutpaintingOptions = () => {
         withSliderMarks
         withReset
       />
+      <IAISwitch
+        label={'Force Outpaint'}
+        isChecked={shouldForceOutpaint}
+        onChange={(e) => {
+          dispatch(setShouldForceOutpaint(e.target.checked));
+        }}
+      />
+      <IAISelect
+        label="Infill Method"
+        value={infillMethod}
+        validValues={availableInfillMethods}
+        onChange={(e) => dispatch(setInfillMethod(e.target.value))}
+      />
       <IAISlider
+        isInputDisabled={infillMethod !== 'tile'}
+        isResetDisabled={infillMethod !== 'tile'}
+        isSliderDisabled={infillMethod !== 'tile'}
         sliderMarkRightOffset={-4}
         label={'Tile Size'}
         min={16}
@@ -131,13 +161,6 @@ const OutpaintingOptions = () => {
         withInput
         withSliderMarks
         withReset
-      />
-      <IAISwitch
-        label={'Force Outpaint'}
-        isChecked={shouldForceOutpaint}
-        onChange={(e) => {
-          dispatch(setShouldForceOutpaint(e.target.checked));
-        }}
       />
     </Flex>
   );

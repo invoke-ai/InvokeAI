@@ -21,6 +21,7 @@ from threading import Event
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
+from ldm.invoke.generator.inpaint import infill_methods
 
 from backend.modules.parameters import parameters_to_command
 from backend.modules.get_canvas_generation_mode import (
@@ -286,6 +287,7 @@ class InvokeAIWebServer:
             print(f">> System config requested")
             config = self.get_system_config()
             config["model_list"] = self.generate.model_cache.list_models()
+            config["infill_methods"] = infill_methods
             socketio.emit("systemConfig", config)
 
         @socketio.on("requestModelChange")
@@ -821,6 +823,7 @@ class InvokeAIWebServer:
                     generation_parameters.pop("seam_steps", None)
                     generation_parameters.pop("tile_size", None)
                     generation_parameters.pop("force_outpaint", None)
+                    generation_parameters.pop("infill_method", None)
                 elif actual_generation_mode == "txt2img":
                     generation_parameters["height"] = original_bounding_box["height"]
                     generation_parameters["width"] = original_bounding_box["width"]
@@ -834,6 +837,7 @@ class InvokeAIWebServer:
                     generation_parameters.pop("seam_steps", None)
                     generation_parameters.pop("tile_size", None)
                     generation_parameters.pop("force_outpaint", None)
+                    generation_parameters.pop("infill_method", None)
 
             elif generation_parameters["generation_mode"] == "img2img":
                 init_img_url = generation_parameters["init_img"]

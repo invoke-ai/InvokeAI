@@ -46,6 +46,7 @@ export const frontendToBackendParameters = (
     height,
     hiresFix,
     img2imgStrength,
+    infillMethod,
     initialImage,
     iterations,
     perlin,
@@ -190,6 +191,7 @@ export const frontendToBackendParameters = (
     generationParameters.seam_steps = seamSteps;
     generationParameters.tile_size = tileSize;
     generationParameters.force_outpaint = shouldForceOutpaint;
+    generationParameters.infill_method = infillMethod;
   }
 
   if (shouldGenerateVariations) {
