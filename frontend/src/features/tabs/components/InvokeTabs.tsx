@@ -10,22 +10,15 @@ import NodesIcon from 'common/icons/NodesIcon';
 import PostprocessingIcon from 'common/icons/PostprocessingIcon';
 import TextToImageIcon from 'common/icons/TextToImageIcon';
 import {
-  OptionsState,
   setActiveTab,
   setIsLightBoxOpen,
-  setShouldShowOptionsPanel,
 } from 'features/options/store/optionsSlice';
 import ImageToImageWorkarea from './ImageToImage';
 import TextToImageWorkarea from './TextToImage';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
-import {
-  GalleryState,
-  setShouldShowGallery,
-} from 'features/gallery/store/gallerySlice';
 import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
-import { createSelector } from '@reduxjs/toolkit';
 import TrainingWIP from 'common/components/WorkInProgress/Training';
 import TrainingIcon from 'common/icons/TrainingIcon';
 
@@ -69,26 +62,6 @@ export const tabMap = _.map(tabDict, (tab, key) => key);
 const tabMapTypes = [...tabMap] as const;
 export type InvokeTabName = typeof tabMapTypes[number];
 
-const fullScreenSelector = createSelector(
-  [(state: RootState) => state.gallery, (state: RootState) => state.options],
-  (gallery: GalleryState, options: OptionsState) => {
-    const { shouldShowGallery, shouldPinGallery } = gallery;
-    const { shouldShowOptionsPanel, shouldPinOptionsPanel } = options;
-
-    return {
-      shouldShowGallery,
-      shouldPinGallery,
-      shouldShowOptionsPanel,
-      shouldPinOptionsPanel,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
-    },
-  }
-);
-
 export default function InvokeTabs() {
   const activeTab = useAppSelector(
     (state: RootState) => state.options.activeTab
@@ -96,13 +69,6 @@ export default function InvokeTabs() {
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.options.isLightBoxOpen
   );
-
-  const {
-    shouldPinGallery,
-    shouldShowGallery,
-    shouldPinOptionsPanel,
-    shouldShowOptionsPanel,
-  } = useAppSelector(fullScreenSelector);
 
   const dispatch = useAppDispatch();
 
@@ -137,22 +103,6 @@ export default function InvokeTabs() {
       dispatch(setIsLightBoxOpen(!isLightBoxOpen));
     },
     [isLightBoxOpen]
-  );
-
-  useHotkeys(
-    'f',
-    () => {
-      if (shouldShowGallery || shouldShowOptionsPanel) {
-        dispatch(setShouldShowOptionsPanel(false));
-        dispatch(setShouldShowGallery(false));
-      } else {
-        dispatch(setShouldShowOptionsPanel(true));
-        dispatch(setShouldShowGallery(true));
-      }
-      if (shouldPinGallery || shouldPinOptionsPanel)
-        setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
-    },
-    [shouldShowGallery, shouldShowOptionsPanel]
   );
 
   const renderTabs = () => {
