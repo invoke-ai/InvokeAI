@@ -214,7 +214,6 @@ def main_loop(gen, opt):
         set_default_output_dir(opt,completer)
 
         # try to relativize pathnames
-        #        for attr in ('init_img','init_mask','init_color','embedding_path'):
         for attr in ('init_img','init_mask','init_color'):
             if getattr(opt,attr) and not os.path.exists(getattr(opt,attr)):
                 basename = getattr(opt,attr)

@@ -22,6 +22,8 @@ class Concepts(object):
         self.concepts_loaded = dict()
         self.triggers = dict()            # concept name to trigger phrase
         self.concept_names = dict()       # trigger phrase to concept name
+        self.match_trigger = re.compile('(<[\w\-]+>)')
+        self.match_concept = re.compile('<([\w\-]+)>')
 
     def list_concepts(self)->list:
         '''
@@ -83,7 +85,7 @@ class Concepts(object):
         '''
         def do_replace(match)->str:
             return self.trigger_to_concept(match.group(1)) or f'<{match.group(1)}>'
-        return re.sub('(<[^>]+>)', do_replace, prompt)
+        return self.match_trigger.sub(do_replace, prompt)
 
     def replace_concepts_with_triggers(self, prompt:str)->str:
         '''
@@ -92,7 +94,7 @@ class Concepts(object):
         '''
         def do_replace(match)->str:
             return self.concept_to_trigger(match.group(1)) or f'<{match.group(1)}>'
-        return re.sub('<([^>]+)>', do_replace, prompt)
+        return self.match_concept.sub(do_replace, prompt)
 
     def get_concept_file(self, concept_name:str, file_name:str='learned_embeds.bin')->str:
         if not self.concept_is_downloaded(concept_name):

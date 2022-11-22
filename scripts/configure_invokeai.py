@@ -594,7 +594,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
     for name in ('models','configs','scripts','frontend/dist'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in ('configs','frontend/dist'):
+    for src in ('configs','scripts','frontend/dist'):
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
