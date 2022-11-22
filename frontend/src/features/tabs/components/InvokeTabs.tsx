@@ -27,6 +27,7 @@ import {
 import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
 import { createSelector } from '@reduxjs/toolkit';
 import TrainingWIP from 'common/components/WorkInProgress/Training';
+import TrainingIcon from 'common/icons/TrainingIcon';
 
 export const tabDict = {
   txt2img: {
@@ -55,7 +56,7 @@ export const tabDict = {
     tooltip: 'Post Processing',
   },
   training: {
-    title: <PostprocessingIcon fill={'black'} boxSize={'2.5rem'} />,
+    title: <TrainingIcon fill={'black'} boxSize={'2.5rem'} />,
     workarea: <TrainingWIP />,
     tooltip: 'Training',
   },
