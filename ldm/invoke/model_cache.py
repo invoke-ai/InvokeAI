@@ -4,29 +4,28 @@ They are moved between GPU and CPU as necessary. If CPU memory falls
 below a preset minimum, the least recently used model will be
 cleared and loaded from disk when next needed.
 '''
+import gc
+import hashlib
+import io
+import os
+import sys
+import time
+import traceback
 import warnings
 from pathlib import Path
 
 import torch
-import os
-import io
-import time
-import gc
-import hashlib
-import psutil
-import sys
 import transformers
-import traceback
 import textwrap
 import contextlib
 from typing import Union
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
+from picklescan.scanner import scan_file_path
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from ldm.util import instantiate_from_config, ask_user
 from ldm.invoke.globals import Globals
-from picklescan.scanner import scan_file_path
+from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
 
@@ -239,6 +238,13 @@ class ModelCache(object):
         vae = mconfig.get('vae', None)
         width = mconfig.width
         height = mconfig.height
+
+        if not os.path.isabs(config):
+            config = os.path.join(Globals.root,config)
+        if not os.path.isabs(weights):
+            weights = os.path.normpath(os.path.join(Globals.root,weights))
+        # scan model
+        self._scan_model(model_name, weights)
 
         c = OmegaConf.load(config)
         with open(weights, 'rb') as f:
