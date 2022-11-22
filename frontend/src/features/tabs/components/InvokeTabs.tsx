@@ -26,6 +26,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
 import { createSelector } from '@reduxjs/toolkit';
+import TrainingWIP from 'common/components/WorkInProgress/Training';
 
 export const tabDict = {
   txt2img: {
@@ -52,6 +53,11 @@ export const tabDict = {
     title: <PostprocessingIcon fill={'black'} boxSize={'2.5rem'} />,
     workarea: <PostProcessingWIP />,
     tooltip: 'Post Processing',
+  },
+  training: {
+    title: <PostprocessingIcon fill={'black'} boxSize={'2.5rem'} />,
+    workarea: <TrainingWIP />,
+    tooltip: 'Training',
   },
 };
 
@@ -117,6 +123,10 @@ export default function InvokeTabs() {
 
   useHotkeys('5', () => {
     dispatch(setActiveTab(4));
+  });
+
+  useHotkeys('6', () => {
+    dispatch(setActiveTab(5));
   });
 
   // Lightbox Hotkey
