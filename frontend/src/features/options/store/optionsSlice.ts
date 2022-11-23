@@ -309,6 +309,9 @@ export const optionsSlice = createSlice({
       if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix;
       if (width) state.width = width;
       if (height) state.height = height;
+
+      state.shouldRunESRGAN = false;
+      state.shouldRunFacetool = false;
     },
     resetOptionsState: (state) => {
       return {
