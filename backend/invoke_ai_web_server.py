@@ -842,7 +842,7 @@ class InvokeAIWebServer:
             elif generation_parameters["generation_mode"] == "img2img":
                 init_img_url = generation_parameters["init_img"]
                 init_img_path = self.get_image_path_from_url(init_img_url)
-                generation_parameters["init_img"] = init_img_path
+                generation_parameters["init_img"] = Image.open(init_img_path).convert('RGB')
 
             def image_progress(sample, step):
                 if self.canceled.is_set():
