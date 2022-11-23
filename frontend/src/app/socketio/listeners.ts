@@ -168,6 +168,7 @@ const makeSocketIOListeners = (
           setIntermediateImage({
             uuid: uuidv4(),
             ...data,
+            category: 'result',
           })
         );
         if (!data.isBase64) {
