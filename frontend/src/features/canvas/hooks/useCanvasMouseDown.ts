@@ -11,10 +11,8 @@ import {
 } from 'features/canvas/store/canvasSelectors';
 import {
   addLine,
-  commitColorPickerColor,
   setIsDrawing,
   setIsMovingStage,
-  setTool,
 } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
@@ -64,7 +62,7 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       // Add a new line starting from the current cursor position.
       dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));
     },
-    [stageRef, tool, isStaging, dispatch]
+    [stageRef, tool, isStaging, dispatch, commitColorUnderCursor]
   );
 };
 
