@@ -3,10 +3,7 @@ import { useAppSelector } from 'app/store';
 import _ from 'lodash';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
-
-const roundToHundreth = (val: number): number => {
-  return Math.round(val * 100) / 100;
-};
+import roundToHundreth from '../util/roundToHundreth';
 
 const selector = createSelector(
   [canvasSelector],

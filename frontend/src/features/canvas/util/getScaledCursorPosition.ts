@@ -10,8 +10,8 @@ const getScaledCursorPosition = (stage: Stage) => {
   const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
 
   return {
-    x: Math.floor(scaledCursorPosition.x),
-    y: Math.floor(scaledCursorPosition.y),
+    x: scaledCursorPosition.x,
+    y: scaledCursorPosition.y,
   };
 };
 
