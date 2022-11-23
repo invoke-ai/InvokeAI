@@ -15,10 +15,12 @@ import psutil
 import sys
 import transformers
 import traceback
-import os
+import textwrap
+import contextlib
+from typing import Union
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
-from ldm.util import instantiate_from_config
+from ldm.util import instantiate_from_config, ask_user
 from ldm.invoke.globals import Globals
 from picklescan.scanner import scan_file_path
 
@@ -72,6 +74,7 @@ class ModelCache(object):
             width = self.models[model_name]['width']
             height = self.models[model_name]['height']
             hash = self.models[model_name]['hash']
+
         else: # we're about to load a new model, so potentially offload the least recently used one
             try:
                 requested_model, width, height, hash = self._load_model(model_name)
@@ -80,12 +83,14 @@ class ModelCache(object):
                 self.models[model_name]['width'] = width
                 self.models[model_name]['height'] = height
                 self.models[model_name]['hash'] = hash
+
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
                 print(traceback.format_exc())
+                assert self.current_model,'** FATAL: no current model to restore to'
                 print(f'** restoring {self.current_model}')
                 self.get_model(self.current_model)
-                return None
+                return
         
         self.current_model = model_name
         self._push_newest_model(model_name)
@@ -102,16 +107,16 @@ class ModelCache(object):
         if none is defined.
         '''
         for model_name in self.config:
-            if self.config[model_name].get('default',False):
+            if self.config[model_name].get('default'):
                 return model_name
-        return None
 
-    def set_default_model(self,model_name:str):
+    def set_default_model(self,model_name:str) -> None:
         '''
         Set the default model. The change will not take
         effect until you call model_cache.commit()
         '''
         assert model_name in self.models,f"unknown model '{model_name}'"
+
         config = self.config
         for model in config:
             config[model].pop('default',None)
@@ -125,24 +130,27 @@ class ModelCache(object):
                        },
           model_name2: { etc }
         '''
-        result = {}
+        result = dict()
         for name in self.config:
             try:
                 description = self.config[name].description
             except ConfigAttributeError:
                 description = '<no description>'
+
             if self.current_model == name:
                 status = 'active'
             elif name in self.models:
                 status = 'cached'
             else:
                 status = 'not loaded'
-            result[name]={}
-            result[name]['status']=status
-            result[name]['description']=description
+
+            result[name]={
+                'status' : status,
+                'description' : description
+            }
         return result
-    
-    def print_models(self):
+
+    def print_models(self) -> None:
         '''
         Print a table of models, their descriptions, and load status
         '''
@@ -150,11 +158,10 @@ class ModelCache(object):
         for name in models:
             line = f'{name:25s} {models[name]["status"]:>10s}  {models[name]["description"]}'
             if models[name]['status'] == 'active':
-                print(f'\033[1m{line}\033[0m')
-            else:
-                print(line)
+                line = f'\033[1m{line}\033[0m'
+            print(line)
 
-    def del_model(self, model_name:str) ->bool:
+    def del_model(self, model_name:str) -> None:
         '''
         Delete the named model.
         '''
@@ -162,9 +169,8 @@ class ModelCache(object):
         del omega[model_name]
         if model_name in self.stack:
             self.stack.remove(model_name)
-        return True
 
-    def add_model(self, model_name:str, model_attributes:dict, clobber=False) ->True:
+    def add_model(self, model_name:str, model_attributes:dict, clobber=False) -> None:
         '''
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -172,12 +178,11 @@ class ModelCache(object):
         method will return True. Will fail with an assertion error if provided
         attributes are incorrect or the model name is missing.
         '''
-        omega = self.config
-        # check that all the required fields are present
         for field in ('description','weights','height','width','config'):
             assert field in model_attributes, f'required field {field} is missing'
-
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
+
+        omega = self.config
         config = omega[model_name] if model_name in omega else {}
         for field in model_attributes:
             config[field] = model_attributes[field]
@@ -185,18 +190,16 @@ class ModelCache(object):
         omega[model_name] = config
         if clobber:
             self._invalidate_cached_model(model_name)
-        return True
     
     def _load_model(self, model_name:str):
         """Load and initialize the model from configuration variables passed at object creation time"""
         if model_name not in self.config:
             print(f'"{model_name}" is not a known model name. Please check your models.yaml file')
-            return None
 
         mconfig = self.config[model_name]
         config = mconfig.config
         weights = mconfig.weights
-        vae = mconfig.get('vae',None)
+        vae = mconfig.get('vae')
         width = mconfig.width
         height = mconfig.height
 
@@ -217,15 +220,15 @@ class ModelCache(object):
         # this does the work
         if not os.path.isabs(config):
             config = os.path.join(Globals.root,config)
-        c     = OmegaConf.load(config)
+        omega_config = OmegaConf.load(config)
         with open(weights,'rb') as f:
             weight_bytes = f.read()
         model_hash  = self._cached_sha256(weights,weight_bytes)
-        pl_sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
+        sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
         del weight_bytes
-        sd    = pl_sd['state_dict']
-        model = instantiate_from_config(c.model)
-        m, u  = model.load_state_dict(sd, strict=False)
+        sd = sd['state_dict']
+        model = instantiate_from_config(omega_config.model)
+        model.load_state_dict(sd, strict=False)
 
         if self.precision == 'float16':
             print('   | Using faster float16 precision')
@@ -251,13 +254,14 @@ class ModelCache(object):
         
         model.eval()
 
-        for m in model.modules():
-            if isinstance(m, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
-                m._orig_padding_mode = m.padding_mode
+        for module in model.modules():
+            if isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
+                module._orig_padding_mode = module.padding_mode
 
         # usage statistics
         toc = time.time()
         print(f'>> Model loaded in', '%4.2fs' % (toc - tic))
+
         if self._has_cuda():
             print(
                 '>> Max VRAM used to load the model:',
@@ -265,19 +269,18 @@ class ModelCache(object):
                 '\n>> Current VRAM usage:'
                 '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
             )
+
         return model, width, height, model_hash
         
-    def offload_model(self, model_name:str):
+    def offload_model(self, model_name:str) -> None:
         '''
         Offload the indicated model to CPU. Will call
         _make_cache_room() to free space if needed.
         '''
-        
         if model_name not in self.models:
             return
 
-        message = f'>> Offloading {model_name} to CPU'
-        print(message)
+        print(f'>> Offloading {model_name} to CPU')
         model = self.models[model_name]['model']
         self.models[model_name]['model'] = self._model_to_cpu(model)
 
@@ -299,17 +302,14 @@ class ModelCache(object):
                 sys.exit()
             else:
                 print('\n### WARNING: InvokeAI was unable to scan the model you are using.')
-                from ldm.util import ask_user
                 model_safe_check_fail = ask_user('Do you want to to continue loading the model?', ['y', 'n'])
-                if model_safe_check_fail.lower() == 'y':
-                    pass
-                else:
+                if model_safe_check_fail.lower() != 'y':
                     print("### Exiting InvokeAI")
                     sys.exit()
         else:
             print('>> Model Scanned. OK!!')
 
-    def _make_cache_room(self):
+    def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
         if num_loaded_models >= self.max_loaded_models:
             least_recent_model = self._pop_oldest_model()
@@ -318,11 +318,11 @@ class ModelCache(object):
                 del self.models[least_recent_model]
                 gc.collect()
         
-    def print_vram_usage(self):
+    def print_vram_usage(self) -> None:
         if self._has_cuda:
-            print ('>> Current VRAM usage: ','%4.2fG' % (torch.cuda.memory_allocated() / 1e9))
+            print('>> Current VRAM usage: ','%4.2fG' % (torch.cuda.memory_allocated() / 1e9))
 
-    def commit(self,config_file_path:str):
+    def commit(self,config_file_path:str) -> None:
         '''
         Write current configuration out to the indicated file.
         '''
@@ -333,20 +333,21 @@ class ModelCache(object):
             outfile.write(yaml_str)
         os.replace(tmpfile,config_file_path)
 
-    def preamble(self):
+    def preamble(self) -> str:
         '''
         Returns the preamble for the config file.
         '''
-        return '''# This file describes the alternative machine learning models
-# available to InvokeAI script.
-#
-# To add a new model, follow the examples below. Each
-# model requires a model config file, a weights file,
-# and the width and height of the images it
-# was trained on.
-'''
+        return textwrap.dedent('''\
+            # This file describes the alternative machine learning models
+            # available to InvokeAI script.
+            #
+            # To add a new model, follow the examples below. Each
+            # model requires a model config file, a weights file,
+            # and the width and height of the images it
+            # was trained on.
+        ''')
 
-    def _invalidate_cached_model(self,model_name:str):
+    def _invalidate_cached_model(self,model_name:str) -> None:
         self.offload_model(model_name)
         if model_name in self.stack:
             self.stack.remove(model_name)
@@ -378,29 +379,29 @@ class ModelCache(object):
         '''
         return self.stack.pop(0)
 
-    def _push_newest_model(self,model_name:str):
+    def _push_newest_model(self,model_name:str) -> None:
         '''
         Maintain a simple FIFO. First element is always the
         least recent, and last element is always the most recent.
         '''
-        try:
+        with contextlib.suppress(ValueError):
             self.stack.remove(model_name)
-        except ValueError:
-            pass
         self.stack.append(model_name)
         
-    def _has_cuda(self):
+    def _has_cuda(self) -> bool:
         return self.device.type == 'cuda'
 
-    def _cached_sha256(self,path,data):
+    def _cached_sha256(self,path,data) -> Union[str, bytes]:
         dirname    = os.path.dirname(path)
         basename   = os.path.basename(path)
         base, _    = os.path.splitext(basename)
         hashpath   = os.path.join(dirname,base+'.sha256')
+
         if os.path.exists(hashpath) and os.path.getmtime(path) <= os.path.getmtime(hashpath):
             with open(hashpath) as f:
                 hash = f.read()
             return hash
+
         print(f'>> Calculating sha256 hash of weights file')
         tic = time.time()
         sha = hashlib.sha256()
@@ -408,6 +409,7 @@ class ModelCache(object):
         hash = sha.hexdigest()
         toc = time.time()
         print(f'>> sha256 = {hash}','(%4.2fs)' % (toc - tic))
+
         with open(hashpath,'w') as f:
             f.write(hash)
         return hash
