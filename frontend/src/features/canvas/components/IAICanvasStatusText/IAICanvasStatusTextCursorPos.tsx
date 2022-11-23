@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import React from 'react';
 import _ from 'lodash';
+import roundToHundreth from 'features/canvas/util/roundToHundreth';
 
 const cursorPositionSelector = createSelector(
   [canvasSelector],
@@ -14,7 +15,9 @@ const cursorPositionSelector = createSelector(
       : { cursorX: -1, cursorY: -1 };
 
     return {
-      cursorCoordinatesString: `(${cursorX}, ${cursorY})`,
+      cursorCoordinatesString: `(${roundToHundreth(cursorX)}, ${roundToHundreth(
+        cursorY
+      )})`,
     };
   },
   {

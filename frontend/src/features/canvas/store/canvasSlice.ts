@@ -689,7 +689,6 @@ export const canvasSlice = createSlice({
     },
     commitColorPickerColor: (state) => {
       state.brushColor = state.colorPickerColor;
-      state.tool = 'brush';
     },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
       state.pastLayerStates.push({
