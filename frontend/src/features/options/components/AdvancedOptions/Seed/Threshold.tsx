@@ -17,7 +17,7 @@ export default function Threshold() {
 
   return (
     <IAINumberInput
-      label="Threshold"
+      label="Noise Threshold"
       min={0}
       max={1000}
       step={0.1}
