@@ -52,6 +52,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     galleryImageMinimumWidth,
     mayDeleteImage,
     isLightBoxOpen,
+    shouldUseSingleGalleryColumn,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
   const { url, thumbnail, uuid, metadata } = image;
@@ -171,7 +172,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         >
           <Image
             className="hoverable-image-image"
-            objectFit={galleryImageObjectFit}
+            objectFit={
+              shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
+            }
             rounded={'md'}
             src={thumbnail || url}
             loading={'lazy'}

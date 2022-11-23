@@ -42,6 +42,7 @@ export interface GalleryState {
   };
   currentCategory: GalleryCategory;
   galleryWidth: number;
+  shouldUseSingleGalleryColumn: boolean;
 }
 
 const initialState: GalleryState = {
@@ -69,6 +70,7 @@ const initialState: GalleryState = {
     },
   },
   galleryWidth: 300,
+  shouldUseSingleGalleryColumn: false,
 };
 
 export const gallerySlice = createSlice({
@@ -263,6 +265,12 @@ export const gallerySlice = createSlice({
     setGalleryWidth: (state, action: PayloadAction<number>) => {
       state.galleryWidth = action.payload;
     },
+    setShouldUseSingleGalleryColumn: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldUseSingleGalleryColumn = action.payload;
+    },
   },
 });
 
@@ -284,6 +292,7 @@ export const {
   setShouldAutoSwitchToNewImages,
   setCurrentCategory,
   setGalleryWidth,
+  setShouldUseSingleGalleryColumn,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

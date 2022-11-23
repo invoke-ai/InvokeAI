@@ -27,6 +27,7 @@ export const imageGallerySelector = createSelector(
       shouldHoldGalleryOpen,
       shouldAutoSwitchToNewImages,
       galleryWidth,
+      shouldUseSingleGalleryColumn,
     } = gallery;
 
     const { isLightBoxOpen } = options;
@@ -38,7 +39,9 @@ export const imageGallerySelector = createSelector(
       galleryScrollPosition,
       galleryImageMinimumWidth,
       galleryImageObjectFit,
-      galleryGridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
+      galleryGridTemplateColumns: shouldUseSingleGalleryColumn
+        ? 'auto'
+        : `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, auto))`,
       activeTabName,
       shouldHoldGalleryOpen,
       shouldAutoSwitchToNewImages,
@@ -54,6 +57,7 @@ export const imageGallerySelector = createSelector(
         (activeTabName === 'unifiedCanvas' && shouldPinGallery)
           ? false
           : true,
+      shouldUseSingleGalleryColumn,
     };
   },
   {
@@ -80,6 +84,7 @@ export const hoverableImageSelector = createSelector(
       mayDeleteImage: system.isConnected && !system.isProcessing,
       galleryImageObjectFit: gallery.galleryImageObjectFit,
       galleryImageMinimumWidth: gallery.galleryImageMinimumWidth,
+      shouldUseSingleGalleryColumn: gallery.shouldUseSingleGalleryColumn,
       activeTabName,
       isLightBoxOpen: options.isLightBoxOpen,
     };
