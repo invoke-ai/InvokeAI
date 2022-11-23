@@ -44,6 +44,7 @@ const initialCanvasState: CanvasState = {
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
   canvasContainerDimensions: { width: 0, height: 0 },
+  colorPickerColor: { r: 90, g: 90, b: 255, a: 1 },
   cursorPosition: null,
   doesCanvasNeedScaling: false,
   futureLayerStates: [],
@@ -345,7 +346,7 @@ export const canvasSlice = createSlice({
     addLine: (state, action: PayloadAction<number[]>) => {
       const { tool, layer, brushColor, brushSize } = state;
 
-      if (tool === 'move') return;
+      if (tool === 'move' || tool === 'colorPicker') return;
 
       const newStrokeWidth = brushSize / 2;
 
@@ -683,6 +684,13 @@ export const canvasSlice = createSlice({
     ) => {
       state.shouldCropToBoundingBoxOnSave = action.payload;
     },
+    setColorPickerColor: (state, action: PayloadAction<RgbaColor>) => {
+      state.colorPickerColor = action.payload;
+    },
+    commitColorPickerColor: (state) => {
+      state.brushColor = state.colorPickerColor;
+      state.tool = 'brush';
+    },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
       state.pastLayerStates.push({
         ...state.layerState,
@@ -710,6 +718,8 @@ export const {
   addLine,
   addPointToCurrentLine,
   clearMask,
+  commitColorPickerColor,
+  setColorPickerColor,
   commitStagingAreaImage,
   discardStagedImages,
   fitBoundingBoxToStage,

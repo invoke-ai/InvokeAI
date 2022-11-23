@@ -5,12 +5,16 @@ import Konva from 'konva';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
-import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import {
   addPointToCurrentLine,
   setCursorPosition,
 } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
+import useColorPicker from './useColorUnderCursor';
 
 const selector = createSelector(
   [activeTabNameSelector, canvasSelector, isStagingSelector],
@@ -33,6 +37,7 @@ const useCanvasMouseMove = (
 ) => {
   const dispatch = useAppDispatch();
   const { isDrawing, tool, isStaging } = useAppSelector(selector);
+  const { updateColorUnderCursor } = useColorPicker();
 
   return useCallback(() => {
     if (!stageRef.current) return;
@@ -44,6 +49,11 @@ const useCanvasMouseMove = (
     dispatch(setCursorPosition(scaledCursorPosition));
 
     lastCursorPositionRef.current = scaledCursorPosition;
+
+    if (tool === 'colorPicker') {
+      updateColorUnderCursor();
+      return;
+    }
 
     if (!isDrawing || tool === 'move' || isStaging) return;
 
@@ -59,6 +69,7 @@ const useCanvasMouseMove = (
     lastCursorPositionRef,
     stageRef,
     tool,
+    updateColorUnderCursor,
   ]);
 };
 

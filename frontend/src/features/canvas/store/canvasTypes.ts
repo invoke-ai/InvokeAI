@@ -13,7 +13,7 @@ export type CanvasLayer = typeof LAYER_NAMES[number];
 
 export type CanvasDrawingTool = 'brush' | 'eraser';
 
-export type CanvasTool = CanvasDrawingTool | 'move';
+export type CanvasTool = CanvasDrawingTool | 'move' | 'colorPicker';
 
 export type Dimensions = {
   width: number;
@@ -81,6 +81,7 @@ export interface CanvasState {
   brushColor: RgbaColor;
   brushSize: number;
   canvasContainerDimensions: Dimensions;
+  colorPickerColor: RgbaColor,
   cursorPosition: Vector2d | null;
   doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];

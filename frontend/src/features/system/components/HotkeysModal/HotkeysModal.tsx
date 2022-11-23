@@ -140,28 +140,33 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
   const unifiedCanvasHotkeys = [
     {
       title: 'Select Brush',
-      desc: 'Selects the inpainting brush',
+      desc: 'Selects the canvas brush',
       hotkey: 'B',
     },
     {
       title: 'Select Eraser',
-      desc: 'Selects the inpainting eraser',
+      desc: 'Selects the canvas eraser',
       hotkey: 'E',
     },
     {
       title: 'Decrease Brush Size',
-      desc: 'Decreases the size of the inpainting brush/eraser',
+      desc: 'Decreases the size of the canvas brush/eraser',
       hotkey: '[',
     },
     {
       title: 'Increase Brush Size',
-      desc: 'Increases the size of the inpainting brush/eraser',
+      desc: 'Increases the size of the canvas brush/eraser',
       hotkey: ']',
     },
     {
       title: 'Move Tool',
       desc: 'Allows canvas navigation',
       hotkey: 'V',
+    },
+    {
+      title: 'Select Color Picker',
+      desc: 'Selects the canvas color picker',
+      hotkey: 'C',
     },
     {
       title: 'Quick Toggle Move',
