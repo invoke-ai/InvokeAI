@@ -1,5 +1,4 @@
 import { Feature } from 'app/features';
-import { RootState, useAppSelector } from 'app/store';
 import FaceRestoreHeader from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreHeader';
 import FaceRestoreOptions from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import ImageFit from 'features/options/components/AdvancedOptions/ImageToImage/ImageFit';
@@ -12,7 +11,6 @@ import UpscaleHeader from 'features/options/components/AdvancedOptions/Upscale/U
 import UpscaleOptions from 'features/options/components/AdvancedOptions/Upscale/UpscaleOptions';
 import VariationsHeader from 'features/options/components/AdvancedOptions/Variations/VariationsHeader';
 import VariationsOptions from 'features/options/components/AdvancedOptions/Variations/VariationsOptions';
-import MainAdvancedOptionsCheckbox from 'features/options/components/MainOptions/MainAdvancedOptionsCheckbox';
 import MainOptions from 'features/options/components/MainOptions/MainOptions';
 import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
@@ -20,10 +18,6 @@ import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 
 export default function ImageToImagePanel() {
-  const showAdvancedOptions = useAppSelector(
-    (state: RootState) => state.options.showAdvancedOptions
-  );
-
   const imageToImageAccordions = {
     seed: {
       header: <SeedHeader />,
