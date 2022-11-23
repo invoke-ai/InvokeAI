@@ -33,6 +33,8 @@ import {
   setWidth,
   setInitialImage,
   setShouldShowImageDetails,
+  setThreshold,
+  setPerlin,
 } from 'features/options/store/optionsSlice';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
@@ -132,24 +134,26 @@ const ImageMetadataViewer = memo(
     const dreamPrompt = image?.dreamPrompt;
 
     const {
-      type,
-      postprocessing,
-      sampler,
-      prompt,
-      seed,
-      variations,
-      steps,
       cfg_scale,
-      seamless,
-      hires_fix,
-      width,
-      height,
-      strength,
       fit,
+      height,
+      hires_fix,
       init_image_path,
       mask_image_path,
       orig_path,
+      perlin,
+      postprocessing,
+      prompt,
+      sampler,
       scale,
+      seamless,
+      seed,
+      steps,
+      strength,
+      threshold,
+      type,
+      variations,
+      width,
     } = metadata;
 
     const metadataJSON = JSON.stringify(image.metadata, null, 2);
@@ -212,6 +216,20 @@ const ImageMetadataViewer = memo(
                   label="Seed"
                   value={seed}
                   onClick={() => dispatch(setSeed(seed))}
+                />
+              )}
+              {threshold !== undefined && (
+                <MetadataItem
+                  label="Noise Threshold"
+                  value={threshold}
+                  onClick={() => dispatch(setThreshold(threshold))}
+                />
+              )}
+              {perlin !== undefined && (
+                <MetadataItem
+                  label="Perlin Noise"
+                  value={perlin}
+                  onClick={() => dispatch(setPerlin(perlin))}
                 />
               )}
               {sampler && (
