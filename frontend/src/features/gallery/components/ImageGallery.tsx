@@ -25,6 +25,7 @@ import {
   setShouldAutoSwitchToNewImages,
   setShouldHoldGalleryOpen,
   setShouldPinGallery,
+  setShouldUseSingleGalleryColumn,
 } from 'features/gallery/store/gallerySlice';
 import HoverableImage from './HoverableImage';
 import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
@@ -79,6 +80,7 @@ export default function ImageGallery() {
     isLightBoxOpen,
     isStaging,
     shouldEnableResize,
+    shouldUseSingleGalleryColumn,
   } = useAppSelector(imageGallerySelector);
 
   const { galleryMinWidth, galleryMaxWidth } = isLightBoxOpen
@@ -476,6 +478,17 @@ export default function ImageGallery() {
                       onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         dispatch(
                           setShouldAutoSwitchToNewImages(e.target.checked)
+                        )
+                      }
+                    />
+                  </div>
+                  <div>
+                    <IAICheckbox
+                      label="Single Column Layout"
+                      isChecked={shouldUseSingleGalleryColumn}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        dispatch(
+                          setShouldUseSingleGalleryColumn(e.target.checked)
                         )
                       }
                     />
