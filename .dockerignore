@@ -10,6 +10,7 @@
 !setup.py
 !docker-build
 !ldm
+!installer
 
 # Guard against pulling in any models that might exist in the directory tree
 **/*.pt*
