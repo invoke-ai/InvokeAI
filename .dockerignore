@@ -8,7 +8,8 @@
 !server
 !static
 !setup.py
-!LICENSE*
+!docker-build
+docker-build/Dockerfile
 
 # Guard against pulling in any models that might exist in the directory tree
 **/*.pt*

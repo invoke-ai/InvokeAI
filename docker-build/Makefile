@@ -15,13 +15,12 @@ GROUP=$(shell id -g)
 # Contents can be moved to a persistent storage and used to rehydrate the cache on another host
 
 build:
-	docker buildx build -t local/invokeai:latest -f Dockerfile.cloud ..
+	docker build -t local/invokeai:latest -f Dockerfile.cloud ..
 
-# Populate the cache.
-# First, pre-seed the config dir on the host with the content from the image,
-# such that the model preload step can run with the config mounted and pre-populated.
-# Then, run `load-models` to cache models, VAE, other static data.
-load-models:
+# Copy only the content of config dir first, such that the configuration
+# script can run with the expected config dir already populated.
+# Then, run the configuration script.
+configure:
 	docker run --rm -it \
 		-v ${INVOKEAI_CACHEDIR}/configs:/mnt/configs \
 		--entrypoint bash ${IMAGE} \
@@ -29,17 +28,24 @@ load-models:
 	docker run --rm -it --runtime=nvidia --gpus=all \
 		-v ${INVOKEAI_CACHEDIR}:${INVOKEAI_ROOT} \
 		-v ${INVOKEAI_CACHEDIR}/.cache:/root/.cache \
-		--entrypoint bash ${IMAGE} \
-		-c "micromamba -n invokeai run python scripts/load_models.py --root ${INVOKEAI_ROOT}"
+		${IMAGE} \
+		-c "scripts/configure_invokeai.py --root ${INVOKEAI_ROOT}"
 	sudo chown -R ${USER}:${GROUP} ${INVOKEAI_CACHEDIR}
 
 # Run the container with the cache mounted and the web server exposed on port 9090
-run:
+web:
 	docker run --rm -it --runtime=nvidia --gpus=all \
 		-v ${INVOKEAI_CACHEDIR}:${INVOKEAI_ROOT} \
 		-v ${INVOKEAI_CACHEDIR}/.cache:/root/.cache \
 		--entrypoint bash -p9090:9090 ${IMAGE} \
-		-c "micromamba -n invokeai run python scripts/invoke.py --web --host 0.0.0.0 --root ${INVOKEAI_ROOT}"
+		-c "scripts/invoke.py --web --host 0.0.0.0 --root ${INVOKEAI_ROOT}"
+
+cli:
+	docker run --rm -it --runtime=nvidia --gpus=all \
+		-v ${INVOKEAI_CACHEDIR}:${INVOKEAI_ROOT} \
+		-v ${INVOKEAI_CACHEDIR}/.cache:/root/.cache \
+		--entrypoint bash ${IMAGE} \
+		-c "scripts/invoke.py --root ${INVOKEAI_ROOT}"
 
 # Run the container with the cache mounted and open a bash shell instead of the Invoke CLI or webserver
 shell:
@@ -49,4 +55,4 @@ shell:
 		-e INVOKEAI_ROOT=${INVOKEAI_ROOT} \
 		--entrypoint bash ${IMAGE} --
 
-.PHONY: build preload run shell
+.PHONY: build configure web cli shell

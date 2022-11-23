@@ -1,13 +1,42 @@
 # Copyright (c) 2022 Eugene Brodsky (https://github.com/ebr)
 
-FROM nvidia/cuda:11.7.1-runtime-ubuntu22.04 AS base
+#### Builder stage ####
+
+FROM library/ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
-# # no __pycache__ - unclear if there is a benefit
-# ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONDONTWRITEBYTECODE=1
 # unbuffered output, ensures stdout and stderr are printed in the correct order
 ENV PYTHONUNBUFFERED=1
 
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt update && apt install -y \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    python3-venv \
+    python3-pip
+
+
+ARG APP_ROOT=/invokeai
+WORKDIR ${APP_ROOT}
+
+ENV VIRTUAL_ENV=${APP_ROOT}/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    cp installer/py3.10-linux-x86_64-cuda-reqs.txt requirements.txt && \
+    python3 -m venv ${VIRTUAL_ENV} &&\
+    pip install --extra-index-url https://download.pytorch.org/whl/cu116 \
+        torch==1.12.0+cu116 \
+        torchvision==0.13.0+cu116 &&\
+    pip install -r requirements.txt &&\
+    pip install -e .
+
+
+#### Runtime stage ####
+
+FROM ubuntu:22.04 as runtime
 RUN apt update && apt install -y \
     git \
     curl \
@@ -16,36 +45,18 @@ RUN apt update && apt install -y \
     bzip2 \
     libglib2.0-0 \
     libgl1-mesa-glx \
+    python3-venv \
+    python3-pip \
     && apt-get clean
 
-# Micromamba is a minimal conda implementation
-ENV MAMBA_ROOT_PREFIX=/opt/conda
-RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+ARG APP_ROOT=/invokeai
+WORKDIR ${APP_ROOT}
 
-WORKDIR /invokeai
+ENV VIRTUAL_ENV=${APP_ROOT}/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-### Cache the dependencies first
-# Avoid re-downloading the dependencies when unrelated files change in context
-#
-# We could use relative paths in the environment file, but it's not currently set up that way.
-# So we copy it to the working directory to maintain compatibility with other installation methods
-COPY environments-and-requirements/environment-lin-cuda.yml environment.yml
+COPY --from=builder ${APP_ROOT} ${APP_ROOT}
 
-# Patch the env file to remove installation of local package
-RUN sed -i '/-e \./d' environment.yml
-RUN micromamba create -y -f environment.yml &&\
-    micromamba clean --all -f -y &&\
-    rm -rf ${MAMBA_ROOT_PREFIX}/pkgs
+ENTRYPOINT ["bash", "-c", "python3 scripts/invoke.py" ]
 
-### Copy the rest of the context and install local package
-COPY . .
-RUN micromamba -n invokeai run pip install -e .
-
-### Default model config
-RUN cp configs/models.yaml.example configs/models.yaml
-
-ENTRYPOINT ["bash"]
-
-EXPOSE 9090
-
-CMD [ "-c", "micromamba -r ${MAMBA_ROOT_PREFIX} -n invokeai run python scripts/invoke.py --web --host 0.0.0.0"]
+CMD ["--web", "--host 0.0.0.0"]
