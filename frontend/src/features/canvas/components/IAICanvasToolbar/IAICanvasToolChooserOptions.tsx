@@ -8,7 +8,12 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { FaEraser, FaPaintBrush, FaSlidersH } from 'react-icons/fa';
+import {
+  FaEraser,
+  FaEyeDropper,
+  FaPaintBrush,
+  FaSlidersH,
+} from 'react-icons/fa';
 import {
   canvasSelector,
   isStagingSelector,
@@ -69,6 +74,18 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
+    ['c'],
+    () => {
+      handleSelectColorPickerTool();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [tool]
+  );
+
+  useHotkeys(
     ['['],
     () => {
       dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
@@ -94,6 +111,7 @@ const IAICanvasToolChooserOptions = () => {
 
   const handleSelectBrushTool = () => dispatch(setTool('brush'));
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
+  const handleSelectColorPickerTool = () => dispatch(setTool('colorPicker'));
 
   return (
     <ButtonGroup isAttached>
@@ -111,7 +129,15 @@ const IAICanvasToolChooserOptions = () => {
         icon={<FaEraser />}
         data-selected={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
-        onClick={() => dispatch(setTool('eraser'))}
+        onClick={handleSelectEraserTool}
+      />
+      <IAIIconButton
+        aria-label="Color Picker (C)"
+        tooltip="Color Picker (C)"
+        icon={<FaEyeDropper />}
+        data-selected={tool === 'colorPicker' && !isStaging}
+        isDisabled={isStaging}
+        onClick={handleSelectColorPickerTool}
       />
       <IAIPopover
         trigger="hover"

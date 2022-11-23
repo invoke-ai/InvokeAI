@@ -5,13 +5,19 @@ import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
-import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import {
   addLine,
+  commitColorPickerColor,
   setIsDrawing,
   setIsMovingStage,
+  setTool,
 } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
+import useColorPicker from './useColorUnderCursor';
 
 const selector = createSelector(
   [activeTabNameSelector, canvasSelector, isStagingSelector],
@@ -29,6 +35,7 @@ const selector = createSelector(
 const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
   const { tool, isStaging } = useAppSelector(selector);
+  const { commitColorUnderCursor } = useColorPicker();
 
   return useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -38,6 +45,11 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       if (tool === 'move' || isStaging) {
         dispatch(setIsMovingStage(true));
+        return;
+      }
+
+      if (tool === 'colorPicker') {
+        commitColorUnderCursor();
         return;
       }
 

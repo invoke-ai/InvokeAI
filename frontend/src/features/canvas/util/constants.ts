@@ -12,3 +12,5 @@ export const MAX_CANVAS_SCALE = 20;
 
 // padding given to initial image/bounding box when stage view is reset
 export const STAGE_PADDING_PERCENTAGE = 0.95;
+
+export const COLOR_PICKER_SIZE = 60;

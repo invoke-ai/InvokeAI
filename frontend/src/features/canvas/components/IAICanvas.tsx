@@ -7,7 +7,7 @@ import {
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
 import IAICanvasMaskLines from './IAICanvasMaskLines';
-import IAICanvasBrushPreview from './IAICanvasBrushPreview';
+import IAICanvasToolPreview from './IAICanvasToolPreview';
 import { Vector2d } from 'konva/lib/types';
 import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
 import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
@@ -183,7 +183,7 @@ const IAICanvas = () => {
           </Layer>
           <Layer id="preview" imageSmoothingEnabled={false}>
             {!isStaging && (
-              <IAICanvasBrushPreview
+              <IAICanvasToolPreview
                 visible={tool !== 'move'}
                 listening={false}
               />
