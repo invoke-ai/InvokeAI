@@ -9,6 +9,7 @@
 !main.py
 !setup.py
 !docker-build
+docker-build/Dockerfile
 !ldm
 !installer
 
