@@ -17,15 +17,19 @@ jobs:
       matrix:
         stable-diffusion-model:
           - 'stable-diffusion-1.5'
-        os:
-          - ubuntu-latest
-          - macOS-12
+        environment-yaml:
+          - environment-lin-amd.yml
+          - environment-lin-cuda.yml
+          - environment-mac.yml
         include:
-          - os: ubuntu-latest
-            environment-file: environment-lin-cuda.yml
+          - environment-yaml: environment-lin-amd.yml
+            os: ubuntu-latest
             default-shell: bash -l {0}
-          - os: macOS-12
-            environment-file: environment-mac.yml
+          - environment-yaml: environment-lin-cuda.yml
+            os: ubuntu-latest
+            default-shell: bash -l {0}
+          - environment-yaml: environment-mac.yml
+            os: macos-12
             default-shell: bash -l {0}
           - stable-diffusion-model: stable-diffusion-1.5
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
@@ -50,21 +54,21 @@ jobs:
           cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
 
       - name: create environment.yml
-        run: cp environments-and-requirements/${{ matrix.environment-file }} environment.yml
+        run: cp environments-and-requirements/${{ matrix.environment-yaml }} environment.yml
 
       - name: Use cached conda packages
         id: use-cached-conda-packages
         uses: actions/cache@v3
         with:
           path: ~/conda_pkgs_dir
-          key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
+          key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-yaml) }}
 
       - name: Activate Conda Env
         id: activate-conda-env
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: ${{ env.CONDA_ENV_NAME }}
-          environment-file: environment.yml
+          environment-yaml: environment.yml
           miniconda-version: latest
 
       - name: set test prompt to main branch validation
