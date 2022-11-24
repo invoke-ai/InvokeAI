@@ -1,43 +1,26 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
-import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
 import { optionsSelector } from 'features/options/store/optionsSelectors';
 import {
-  setInfillMethod,
   setSeamBlur,
   setSeamSize,
   setSeamSteps,
   setSeamStrength,
-  setTileSize,
 } from 'features/options/store/optionsSlice';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import _ from 'lodash';
-import InpaintReplace from './InpaintReplace';
 
 const selector = createSelector(
-  [optionsSelector, systemSelector],
-  (options, system) => {
-    const {
-      seamSize,
-      seamBlur,
-      seamStrength,
-      seamSteps,
-      tileSize,
-      infillMethod,
-    } = options;
-
-    const { infill_methods: availableInfillMethods } = system;
+  [optionsSelector],
+  (options) => {
+    const { seamSize, seamBlur, seamStrength, seamSteps } = options;
 
     return {
       seamSize,
       seamBlur,
       seamStrength,
       seamSteps,
-      tileSize,
-      infillMethod,
-      availableInfillMethods,
     };
   },
   {
@@ -47,22 +30,13 @@ const selector = createSelector(
   }
 );
 
-const CompositionOptions = () => {
+const SeamCorrectionOptions = () => {
   const dispatch = useAppDispatch();
-  const {
-    seamSize,
-    seamBlur,
-    seamStrength,
-    seamSteps,
-    tileSize,
-    infillMethod,
-    availableInfillMethods,
-  } = useAppSelector(selector);
+  const { seamSize, seamBlur, seamStrength, seamSteps } =
+    useAppSelector(selector);
 
   return (
     <Flex direction="column" gap="1rem">
-      <InpaintReplace />
-
       <IAISlider
         sliderMarkRightOffset={-6}
         label={'Seam Size'}
@@ -129,33 +103,8 @@ const CompositionOptions = () => {
         withSliderMarks
         withReset
       />
-      <IAISelect
-        label="Infill Method"
-        value={infillMethod}
-        validValues={availableInfillMethods}
-        onChange={(e) => dispatch(setInfillMethod(e.target.value))}
-      />
-      {infillMethod === 'tile' && (
-        <IAISlider
-          sliderMarkRightOffset={-4}
-          label={'Tile Size'}
-          min={16}
-          max={64}
-          sliderNumberInputProps={{ max: 256 }}
-          value={tileSize}
-          onChange={(v) => {
-            dispatch(setTileSize(v));
-          }}
-          handleReset={() => {
-            dispatch(setTileSize(32));
-          }}
-          withInput
-          withSliderMarks
-          withReset
-        />
-      )}
     </Flex>
   );
 };
 
-export default CompositionOptions;
+export default SeamCorrectionOptions;

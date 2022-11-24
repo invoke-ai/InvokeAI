@@ -12,10 +12,15 @@ const selector = createSelector(
       stageDimensions: { width: stageWidth, height: stageHeight },
       stageCoordinates: { x: stageX, y: stageY },
       boundingBoxDimensions: { width: boxWidth, height: boxHeight },
+      scaledBoundingBoxDimensions: {
+        width: scaledBoxWidth,
+        height: scaledBoxHeight,
+      },
       boundingBoxCoordinates: { x: boxX, y: boxY },
       stageScale,
       shouldShowCanvasDebugInfo,
       layer,
+      boundingBoxScaleMethod,
     } = canvas;
 
     return {
@@ -30,12 +35,14 @@ const selector = createSelector(
         boxX
       )}, ${roundToHundreth(boxY)})`,
       boundingBoxDimensionsString: `${boxWidth}×${boxHeight}`,
+      scaledBoundingBoxDimensionsString: `${scaledBoxWidth}×${scaledBoxHeight}`,
       canvasCoordinatesString: `${roundToHundreth(stageX)}×${roundToHundreth(
         stageY
       )}`,
       canvasDimensionsString: `${stageWidth}×${stageHeight}`,
       canvasScaleString: Math.round(stageScale * 100),
       shouldShowCanvasDebugInfo,
+      shouldShowScaledBoundingBox: boundingBoxScaleMethod !== 'none',
     };
   },
   {
@@ -52,6 +59,8 @@ const IAICanvasStatusText = () => {
     boundingBoxColor,
     boundingBoxCoordinatesString,
     boundingBoxDimensionsString,
+    scaledBoundingBoxDimensionsString,
+    shouldShowScaledBoundingBox,
     canvasCoordinatesString,
     canvasDimensionsString,
     canvasScaleString,
@@ -71,6 +80,13 @@ const IAICanvasStatusText = () => {
           color: boundingBoxColor,
         }}
       >{`Bounding Box: ${boundingBoxDimensionsString}`}</div>
+      {shouldShowScaledBoundingBox && (
+        <div
+          style={{
+            color: boundingBoxColor,
+          }}
+        >{`Scaled Bounding Box: ${scaledBoundingBoxDimensionsString}`}</div>
+      )}
       {shouldShowCanvasDebugInfo && (
         <>
           <div>{`Bounding Box Position: ${boundingBoxCoordinatesString}`}</div>

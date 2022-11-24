@@ -1,8 +1,7 @@
 // import { Feature } from 'app/features';
 import { Feature } from 'app/features';
 import ImageToImageStrength from 'features/options/components/AdvancedOptions/ImageToImage/ImageToImageStrength';
-import BoundingBoxSettings from 'features/options/components/AdvancedOptions/Canvas/BoundingBoxSettings/BoundingBoxSettings';
-import CompositionOptions from 'features/options/components/AdvancedOptions/Canvas/CompositionOptions';
+import SeamCorrectionOptions from 'features/options/components/AdvancedOptions/Canvas/SeamCorrectionOptions';
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
 import GenerateVariationsToggle from 'features/options/components/AdvancedOptions/Variations/GenerateVariations';
 import VariationsOptions from 'features/options/components/AdvancedOptions/Variations/VariationsOptions';
@@ -11,6 +10,8 @@ import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
+import BoundingBoxSettings from 'features/options/components/AdvancedOptions/Canvas/BoundingBoxSettings/BoundingBoxSettings';
+import InfillAndScalingOptions from 'features/options/components/AdvancedOptions/Canvas/InfillAndScalingOptions';
 
 export default function UnifiedCanvasPanel() {
   const unifiedCanvasAccordions = {
@@ -19,10 +20,15 @@ export default function UnifiedCanvasPanel() {
       feature: Feature.BOUNDING_BOX,
       content: <BoundingBoxSettings />,
     },
-    composition: {
-      header: 'Composition',
-      feature: Feature.CANVAS_COMPOSITION,
-      content: <CompositionOptions />,
+    seamCorrection: {
+      header: 'Seam Correction',
+      feature: Feature.SEAM_CORRECTION,
+      content: <SeamCorrectionOptions />,
+    },
+    infillAndScaling: {
+      header: 'Infill and Scaling',
+      feature: Feature.INFILL_AND_SCALING,
+      content: <InfillAndScalingOptions />,
     },
     seed: {
       header: 'Seed',

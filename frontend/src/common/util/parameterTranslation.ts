@@ -127,7 +127,7 @@ export const frontendToBackendParameters = (
       stageScale,
       isMaskEnabled,
       shouldPreserveMaskedArea,
-      shouldScaleBoundingBox,
+      boundingBoxScaleMethod: boundingBoxScale,
       scaledBoundingBoxDimensions,
     } = canvasState;
 
@@ -185,7 +185,7 @@ export const frontendToBackendParameters = (
 
     generationParameters.progress_images = false;
 
-    if (shouldScaleBoundingBox) {
+    if (boundingBoxScale !== 'none') {
       generationParameters.inpaint_width = scaledBoundingBoxDimensions.width;
       generationParameters.inpaint_height = scaledBoundingBoxDimensions.height;
     }

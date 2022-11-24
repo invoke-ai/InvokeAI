@@ -179,13 +179,18 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'C',
     },
     {
+      title: 'Toggle Snap',
+      desc: 'Toggles Snap to Grid',
+      hotkey: 'N',
+    },
+    {
       title: 'Quick Toggle Move',
       desc: 'Temporarily toggles Move mode',
       hotkey: 'Hold Space',
     },
     {
-      title: 'Select Mask Layer',
-      desc: 'Toggles mask layer',
+      title: 'Toggle Layer',
+      desc: 'Toggles mask/base layer selection',
       hotkey: 'Q',
     },
     {
