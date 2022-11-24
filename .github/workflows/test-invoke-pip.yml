@@ -78,8 +78,8 @@ jobs:
 
       - name: install requirements
         run: |
-          ${{ env.pythonLocation }}/bin/pip install -e .
           ${{ env.pythonLocation }}/bin/pip install --upgrade -r '${{ matrix.requirements-file }}'
+          ${{ env.pythonLocation }}/bin/pip install -e .
 
       - name: Use Cached Stable Diffusion Model
         id: cache-sd-model
