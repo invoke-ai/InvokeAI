@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import {
+  resizeAndScaleCanvas,
   resizeCanvas,
   setCanvasContainerDimensions,
   setDoesCanvasNeedScaling,
@@ -52,7 +53,11 @@ const IAICanvasResizer = () => {
         })
       );
 
-      dispatch(resizeCanvas());
+      if (!isCanvasInitialized) {
+        dispatch(resizeAndScaleCanvas());
+      } else {
+        dispatch(resizeCanvas());
+      }
 
       dispatch(setDoesCanvasNeedScaling(false));
     }, 0);
