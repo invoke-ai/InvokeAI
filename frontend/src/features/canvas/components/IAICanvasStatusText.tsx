@@ -23,14 +23,24 @@ const selector = createSelector(
       boundingBoxScaleMethod,
     } = canvas;
 
+    let boundingBoxColor = 'inherit';
+
+    if (
+      (boundingBoxScaleMethod === 'none' &&
+        (boxWidth < 512 || boxHeight < 512)) ||
+      (boundingBoxScaleMethod === 'manual' &&
+        scaledBoxWidth * scaledBoxHeight < 512 * 512)
+    ) {
+      boundingBoxColor = 'var(--status-working-color)';
+    }
+
+    const activeLayerColor =
+      layer === 'mask' ? 'var(--status-working-color)' : 'inherit';
+
     return {
-      activeLayerColor:
-        layer === 'mask' ? 'var(--status-working-color)' : 'inherit',
+      activeLayerColor,
       activeLayerString: layer.charAt(0).toUpperCase() + layer.slice(1),
-      boundingBoxColor:
-        boxWidth < 512 || boxHeight < 512
-          ? 'var(--status-working-color)'
-          : 'inherit',
+      boundingBoxColor,
       boundingBoxCoordinatesString: `(${roundToHundreth(
         boxX
       )}, ${roundToHundreth(boxY)})`,
@@ -42,6 +52,7 @@ const selector = createSelector(
       canvasDimensionsString: `${stageWidth}×${stageHeight}`,
       canvasScaleString: Math.round(stageScale * 100),
       shouldShowCanvasDebugInfo,
+      shouldShowBoundingBox: boundingBoxScaleMethod !== 'auto',
       shouldShowScaledBoundingBox: boundingBoxScaleMethod !== 'none',
     };
   },
@@ -65,6 +76,7 @@ const IAICanvasStatusText = () => {
     canvasDimensionsString,
     canvasScaleString,
     shouldShowCanvasDebugInfo,
+    shouldShowBoundingBox,
   } = useAppSelector(selector);
 
   return (
@@ -75,11 +87,13 @@ const IAICanvasStatusText = () => {
         }}
       >{`Active Layer: ${activeLayerString}`}</div>
       <div>{`Canvas Scale: ${canvasScaleString}%`}</div>
-      <div
-        style={{
-          color: boundingBoxColor,
-        }}
-      >{`Bounding Box: ${boundingBoxDimensionsString}`}</div>
+      {shouldShowBoundingBox && (
+        <div
+          style={{
+            color: boundingBoxColor,
+          }}
+        >{`Bounding Box: ${boundingBoxDimensionsString}`}</div>
+      )}
       {shouldShowScaledBoundingBox && (
         <div
           style={{
