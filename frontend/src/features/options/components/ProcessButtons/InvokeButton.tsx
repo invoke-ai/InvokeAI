@@ -27,9 +27,12 @@ export default function InvokeButton(props: InvokeButton) {
   useHotkeys(
     ['ctrl+enter', 'meta+enter'],
     () => {
-      if (isReady) {
-        dispatch(generateImage(activeTabName));
-      }
+      dispatch(generateImage(activeTabName));
+    },
+    {
+      enabled: () => isReady,
+      preventDefault: true,
+      enableOnFormTags: ['input', 'textarea', 'select'],
     },
     [isReady, activeTabName]
   );
