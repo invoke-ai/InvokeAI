@@ -13,7 +13,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { FaCheck, FaTrashAlt } from 'react-icons/fa';
 import DeleteImageModal from './DeleteImageModal';
-import { memo, useState } from 'react';
+import { DragEvent, memo, useState } from 'react';
 import {
   setActiveTab,
   setAllImageToImageParameters,
@@ -129,7 +129,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseInitialImage = async () => {
-    // check if the image exists before setting it as initial image
     if (metadata?.image?.init_image_path) {
       const response = await fetch(metadata.image.init_image_path);
       if (response.ok) {
@@ -155,6 +154,11 @@ const HoverableImage = memo((props: HoverableImageProps) => {
 
   const handleSelectImage = () => dispatch(setCurrentImage(image));
 
+  const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData('invokeai/imageUuid', uuid);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <ContextMenu.Root
       onOpenChange={(open: boolean) => {
@@ -169,6 +173,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
           userSelect={'none'}
+          draggable={true}
+          onDragStart={handleDragStart}
         >
           <Image
             className="hoverable-image-image"

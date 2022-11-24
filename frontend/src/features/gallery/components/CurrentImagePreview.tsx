@@ -1,5 +1,5 @@
 import { IconButton, Image } from '@chakra-ui/react';
-import { useState } from 'react';
+import { DragEvent, useState } from 'react';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import {
@@ -12,13 +12,19 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import {
   OptionsState,
+  setInitialImage,
   setIsLightBoxOpen,
 } from 'features/options/store/optionsSlice';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 
 export const imagesSelector = createSelector(
-  [(state: RootState) => state.gallery, (state: RootState) => state.options],
-  (gallery: GalleryState, options: OptionsState) => {
+  [
+    (state: RootState) => state.gallery,
+    (state: RootState) => state.options,
+    activeTabNameSelector,
+  ],
+  (gallery: GalleryState, options: OptionsState, activeTabName) => {
     const { currentCategory, currentImage, intermediateImage } = gallery;
     const { shouldShowImageDetails } = options;
 
@@ -32,6 +38,7 @@ export const imagesSelector = createSelector(
     const imagesLength = tempImages.length;
 
     return {
+      activeTabName,
       imageToDisplay: intermediateImage ? intermediateImage : currentImage,
       isIntermediate: Boolean(intermediateImage),
       viewerImageToDisplay: currentImage,
@@ -61,6 +68,7 @@ export default function CurrentImagePreview() {
     shouldShowImageDetails,
     imageToDisplay,
     isIntermediate,
+    activeTabName,
   } = useAppSelector(imagesSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =

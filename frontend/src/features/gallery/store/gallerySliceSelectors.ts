@@ -95,3 +95,5 @@ export const hoverableImageSelector = createSelector(
     },
   }
 );
+
+export const gallerySelector = (state: RootState) => state.gallery;
