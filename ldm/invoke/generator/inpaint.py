@@ -178,6 +178,8 @@ class Inpaint(Img2Img):
                        step_callback=None,
                        inpaint_replace=False, enable_image_debugging=False,
                        infill_method = infill_methods[0], # The infill method to use
+                       inpaint_width=None,
+                       inpaint_height=None,
                        **kwargs):
         """
         Returns a function returning an image derived from the prompt and
@@ -200,6 +202,11 @@ class Inpaint(Img2Img):
                     tile_size = tile_size
                 )
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
+
+            # Resize if requested for inpainting
+            if inpaint_width and inpaint_height:
+                init_filled = init_filled.resize((inpaint_width, inpaint_height))
+
             debug_image(init_filled, "init_filled", debug_status=self.enable_image_debugging)
             
             # Create init tensor
@@ -210,6 +217,12 @@ class Inpaint(Img2Img):
             debug_image(mask_image, "mask_image BEFORE multiply with pil_image", debug_status=self.enable_image_debugging)
 
             mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert('RGB'))
+            self.pil_mask = mask_image
+
+            # Resize if requested for inpainting
+            if inpaint_width and inpaint_height:
+                mask_image = mask_image.resize((inpaint_width, inpaint_height))
+
             debug_image(mask_image, "mask_image AFTER multiply with pil_image", debug_status=self.enable_image_debugging)
             mask_image = mask_image.resize(
                 (
@@ -278,6 +291,10 @@ class Inpaint(Img2Img):
             )
 
             result = self.sample_to_image(samples)
+
+            # Resize if necessary
+            if inpaint_width and inpaint_height:
+                result = result.resize(self.pil_image.size)
 
             # Seam paint if this is our first pass (seam_size set to 0 during seam painting)
             if seam_size > 0:
