@@ -64,7 +64,7 @@ jobs:
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
       - name: create requirements.txt
-        run: cp environments-and-requirements/${{ matrix.requirements-file }} requirements.txt
+        run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
 
       - name: setup python
         uses: actions/setup-python@v4
@@ -77,8 +77,7 @@ jobs:
 
       - name: install requirements
         run: |
-          ${{ env.pythonLocation }}/bin/pip uninstall wheel -y
-          ${{ env.pythonLocation }}/bin/pip install -r requirements.txt
+          ${{ env.pythonLocation }}/bin/pip install -r '${{ matrix.requirements-file }}'
 
       - name: Use Cached Stable Diffusion Model
         id: cache-sd-model
