@@ -16,8 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         stable-diffusion-model:
-          # - 'https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt'
-          - 'https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt'
+          - 'stable-diffusion-1.5'
         os:
           - ubuntu-latest
           - macOS-12
@@ -28,9 +27,6 @@ jobs:
           - os: macOS-12
             environment-file: environment-mac.yml
             default-shell: bash -l {0}
-          # - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
-          #   stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
-          #   stable-diffusion-model-switch: stable-diffusion-1.4
           - stable-diffusion-model: stable-diffusion-1.5
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
