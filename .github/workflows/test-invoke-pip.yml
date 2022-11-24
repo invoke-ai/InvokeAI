@@ -76,7 +76,7 @@ jobs:
       #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
 
       - name: install requirements
-        run: ${{ env.pythonLocation }}/bin/pip install -r requirements.txt
+        run: ${{ env.pythonLocation }}/bin/pip install -r requirements.txt --no-binary=":all:"
 
       - name: Use Cached Stable Diffusion Model
         id: cache-sd-model
