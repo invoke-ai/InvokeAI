@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
-import { Circle, Group, Rect } from 'react-konva';
+import { Circle, Group } from 'react-konva';
 import { useAppSelector } from 'app/store';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
@@ -154,50 +154,3 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
 };
 
 export default IAICanvasToolPreview;
-{
-  /* <>
-          <Rect
-            x={
-              cursorPosition ? cursorPosition.x - colorPickerOffset : width / 2
-            }
-            y={
-              cursorPosition ? cursorPosition.y - colorPickerOffset : height / 2
-            }
-            width={colorPickerSize}
-            height={colorPickerSize}
-            fill={brushColorString}
-            cornerRadius={colorPickerCornerRadius}
-            listening={false}
-          />
-          <Rect
-            x={
-              cursorPosition ? cursorPosition.x - colorPickerOffset : width / 2
-            }
-            y={
-              cursorPosition ? cursorPosition.y - colorPickerOffset : height / 2
-            }
-            width={colorPickerSize}
-            height={colorPickerSize}
-            cornerRadius={colorPickerCornerRadius}
-            stroke={'rgba(255,255,255,0.4)'}
-            strokeWidth={strokeWidth * 2}
-            strokeEnabled={true}
-            listening={false}
-          />
-          <Rect
-            x={
-              cursorPosition ? cursorPosition.x - colorPickerOffset : width / 2
-            }
-            y={
-              cursorPosition ? cursorPosition.y - colorPickerOffset : height / 2
-            }
-            width={colorPickerSize}
-            height={colorPickerSize}
-            cornerRadius={colorPickerCornerRadius}
-            stroke={'rgba(0,0,0,1)'}
-            strokeWidth={strokeWidth}
-            strokeEnabled={true}
-            listening={false}
-          />
-        </> */
-}
