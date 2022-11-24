@@ -1,16 +1,18 @@
-import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { IRect, Vector2d } from 'konva/lib/types';
-import { RgbaColor } from 'react-colorful';
+import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
-import _ from 'lodash';
 import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
-import calculateScale from '../util/calculateScale';
+import { IRect, Vector2d } from 'konva/lib/types';
+import _ from 'lodash';
+import { RgbaColor } from 'react-colorful';
 import calculateCoordinates from '../util/calculateCoordinates';
+import calculateScale from '../util/calculateScale';
+import { STAGE_PADDING_PERCENTAGE } from '../util/constants';
 import floorCoordinates from '../util/floorCoordinates';
+import roundDimensionsTo64 from '../util/roundDimensionsTo64';
 import {
   CanvasImage,
   CanvasLayer,
@@ -22,8 +24,6 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
-import roundDimensionsTo64 from '../util/roundDimensionsTo64';
-import { STAGE_PADDING_PERCENTAGE } from '../util/constants';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -64,11 +64,13 @@ const initialCanvasState: CanvasState = {
   maxHistory: 128,
   minimumStageScale: 1,
   pastLayerStates: [],
+  scaledBoundingBoxDimensions: { width: 512, height: 512 },
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
+  shouldScaleBoundingBox: false,
   shouldShowBoundingBox: true,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
@@ -669,6 +671,15 @@ export const canvasSlice = createSlice({
         state.boundingBoxCoordinates = newBoundingBoxCoordinates;
       }
     },
+    setShouldScaleBoundingBox: (state, action: PayloadAction<boolean>) => {
+      state.shouldScaleBoundingBox = action.payload;
+    },
+    setScaledBoundingBoxDimensions: (
+      state,
+      action: PayloadAction<Dimensions>
+    ) => {
+      state.scaledBoundingBoxDimensions = action.payload;
+    },
     setShouldShowStagingImage: (state, action: PayloadAction<boolean>) => {
       state.shouldShowStagingImage = action.payload;
     },
@@ -720,9 +731,9 @@ export const {
   addImageToStagingArea,
   addLine,
   addPointToCurrentLine,
+  clearCanvasHistory,
   clearMask,
   commitColorPickerColor,
-  setColorPickerColor,
   commitStagingAreaImage,
   discardStagedImages,
   fitBoundingBoxToStage,
@@ -740,7 +751,7 @@ export const {
   setBrushColor,
   setBrushSize,
   setCanvasContainerDimensions,
-  clearCanvasHistory,
+  setColorPickerColor,
   setCursorPosition,
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
@@ -761,6 +772,7 @@ export const {
   setShouldDarkenOutsideBoundingBox,
   setShouldLockBoundingBox,
   setShouldPreserveMaskedArea,
+  setShouldScaleBoundingBox,
   setShouldShowBoundingBox,
   setShouldShowBrush,
   setShouldShowBrushPreview,
@@ -779,6 +791,7 @@ export const {
   toggleShouldLockBoundingBox,
   toggleTool,
   undo,
+  setScaledBoundingBoxDimensions,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

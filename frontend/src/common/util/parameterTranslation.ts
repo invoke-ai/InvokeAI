@@ -127,6 +127,8 @@ export const frontendToBackendParameters = (
       stageScale,
       isMaskEnabled,
       shouldPreserveMaskedArea,
+      shouldScaleBoundingBox,
+      scaledBoundingBoxDimensions,
     } = canvasState;
 
     const boundingBox = {
@@ -181,8 +183,12 @@ export const frontendToBackendParameters = (
 
     generationParameters.init_img = imageDataURL;
 
-    // TODO: The server metadata generation needs to be changed to fix this.
     generationParameters.progress_images = false;
+
+    if (shouldScaleBoundingBox) {
+      generationParameters.inpaint_width = scaledBoundingBoxDimensions.width;
+      generationParameters.inpaint_height = scaledBoundingBoxDimensions.height;
+    }
 
     generationParameters.seam_size = seamSize;
     generationParameters.seam_blur = seamBlur;
