@@ -81,7 +81,7 @@ export interface CanvasState {
   brushColor: RgbaColor;
   brushSize: number;
   canvasContainerDimensions: Dimensions;
-  colorPickerColor: RgbaColor,
+  colorPickerColor: RgbaColor;
   cursorPosition: Vector2d | null;
   doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];
@@ -102,11 +102,13 @@ export interface CanvasState {
   maxHistory: number;
   minimumStageScale: number;
   pastLayerStates: CanvasLayerState[];
+  scaledBoundingBoxDimensions: Dimensions;
   shouldAutoSave: boolean;
   shouldCropToBoundingBoxOnSave: boolean;
   shouldDarkenOutsideBoundingBox: boolean;
   shouldLockBoundingBox: boolean;
   shouldPreserveMaskedArea: boolean;
+  shouldScaleBoundingBox: boolean;
   shouldShowBoundingBox: boolean;
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;

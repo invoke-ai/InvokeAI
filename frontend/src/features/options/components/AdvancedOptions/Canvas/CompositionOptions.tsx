@@ -135,26 +135,25 @@ const CompositionOptions = () => {
         validValues={availableInfillMethods}
         onChange={(e) => dispatch(setInfillMethod(e.target.value))}
       />
-      <IAISlider
-        isInputDisabled={infillMethod !== 'tile'}
-        isResetDisabled={infillMethod !== 'tile'}
-        isSliderDisabled={infillMethod !== 'tile'}
-        sliderMarkRightOffset={-4}
-        label={'Tile Size'}
-        min={16}
-        max={64}
-        sliderNumberInputProps={{ max: 256 }}
-        value={tileSize}
-        onChange={(v) => {
-          dispatch(setTileSize(v));
-        }}
-        handleReset={() => {
-          dispatch(setTileSize(32));
-        }}
-        withInput
-        withSliderMarks
-        withReset
-      />
+      {infillMethod === 'tile' && (
+        <IAISlider
+          sliderMarkRightOffset={-4}
+          label={'Tile Size'}
+          min={16}
+          max={64}
+          sliderNumberInputProps={{ max: 256 }}
+          value={tileSize}
+          onChange={(v) => {
+            dispatch(setTileSize(v));
+          }}
+          handleReset={() => {
+            dispatch(setTileSize(32));
+          }}
+          withInput
+          withSliderMarks
+          withReset
+        />
+      )}
     </Flex>
   );
 };
