@@ -111,7 +111,9 @@ jobs:
         run: |
           time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
             --model ${{ matrix.stable-diffusion-model }} \
-            --from_file ${{ env.TEST_PROMPTS }}
+            --from_file ${{ env.TEST_PROMPTS }} \
+            --root="${{ env.INVOKEAI_ROOT }}" \
+            --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
 
       - name: Archive results
         id: archive-results
