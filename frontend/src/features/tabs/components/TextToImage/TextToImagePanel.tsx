@@ -1,13 +1,11 @@
 import { Feature } from 'app/features';
-import FaceRestoreHeader from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreHeader';
 import FaceRestoreOptions from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreOptions';
-import OutputHeader from 'features/options/components/AdvancedOptions/Output/OutputHeader';
+import FaceRestoreToggle from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreToggle';
 import OutputOptions from 'features/options/components/AdvancedOptions/Output/OutputOptions';
-import SeedHeader from 'features/options/components/AdvancedOptions/Seed/SeedHeader';
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
-import UpscaleHeader from 'features/options/components/AdvancedOptions/Upscale/UpscaleHeader';
 import UpscaleOptions from 'features/options/components/AdvancedOptions/Upscale/UpscaleOptions';
-import VariationsHeader from 'features/options/components/AdvancedOptions/Variations/VariationsHeader';
+import UpscaleToggle from 'features/options/components/AdvancedOptions/Upscale/UpscaleToggle';
+import GenerateVariationsToggle from 'features/options/components/AdvancedOptions/Variations/GenerateVariations';
 import VariationsOptions from 'features/options/components/AdvancedOptions/Variations/VariationsOptions';
 import MainOptions from 'features/options/components/MainOptions/MainOptions';
 import OptionsAccordion from 'features/options/components/OptionsAccordion';
@@ -18,29 +16,32 @@ import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 export default function TextToImagePanel() {
   const textToImageAccordions = {
     seed: {
-      header: <SeedHeader />,
+      header: 'Seed',
       feature: Feature.SEED,
-      options: <SeedOptions />,
+      content: <SeedOptions />,
     },
     variations: {
-      header: <VariationsHeader />,
+      header: 'Variations',
       feature: Feature.VARIATIONS,
-      options: <VariationsOptions />,
+      content: <VariationsOptions />,
+      additionalHeaderComponents: <GenerateVariationsToggle />,
     },
     face_restore: {
-      header: <FaceRestoreHeader />,
+      header: 'Face Restoration',
       feature: Feature.FACE_CORRECTION,
-      options: <FaceRestoreOptions />,
+      content: <FaceRestoreOptions />,
+      additionalHeaderComponents: <FaceRestoreToggle />,
     },
     upscale: {
-      header: <UpscaleHeader />,
+      header: 'Upscaling',
       feature: Feature.UPSCALE,
-      options: <UpscaleOptions />,
+      content: <UpscaleOptions />,
+      additionalHeaderComponents: <UpscaleToggle />,
     },
     other: {
-      header: <OutputHeader />,
+      header: 'Other Options',
       feature: Feature.OTHER,
-      options: <OutputOptions />,
+      content: <OutputOptions />,
     },
   };
 

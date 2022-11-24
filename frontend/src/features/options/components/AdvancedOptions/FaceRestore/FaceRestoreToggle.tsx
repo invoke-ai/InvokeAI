@@ -1,14 +1,9 @@
-import { Flex } from '@chakra-ui/layout';
-import React, { ChangeEvent } from 'react';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { ChangeEvent } from 'react';
+import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldRunFacetool } from 'features/options/store/optionsSlice';
 
-export default function FaceRestoreHeader() {
+export default function FaceRestoreToggle() {
   const isGFPGANAvailable = useAppSelector(
     (state: RootState) => state.system.isGFPGANAvailable
   );
@@ -23,18 +18,10 @@ export default function FaceRestoreHeader() {
     dispatch(setShouldRunFacetool(e.target.checked));
 
   return (
-    <Flex
-      justifyContent={'space-between'}
-      alignItems={'center'}
-      width={'100%'}
-      mr={2}
-    >
-      <p>Restore Face</p>
-      <IAISwitch
-        isDisabled={!isGFPGANAvailable}
-        isChecked={shouldRunFacetool}
-        onChange={handleChangeShouldRunFacetool}
-      />
-    </Flex>
+    <IAISwitch
+      isDisabled={!isGFPGANAvailable}
+      isChecked={shouldRunFacetool}
+      onChange={handleChangeShouldRunFacetool}
+    />
   );
 }

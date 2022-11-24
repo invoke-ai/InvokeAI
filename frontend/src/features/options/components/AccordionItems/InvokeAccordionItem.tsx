@@ -3,31 +3,37 @@ import {
   AccordionIcon,
   AccordionItem,
   AccordionPanel,
+  Box,
+  Flex,
 } from '@chakra-ui/react';
-import React, { ReactElement } from 'react';
+import { ReactNode } from 'react';
 import { Feature } from 'app/features';
 import GuideIcon from 'common/components/GuideIcon';
 
 export interface InvokeAccordionItemProps {
-  header: ReactElement;
-  feature: Feature;
-  options: ReactElement;
+  header: string;
+  content: ReactNode;
+  feature?: Feature;
+  additionalHeaderComponents?: ReactNode;
 }
 
 export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
-  const { header, feature, options } = props;
+  const { header, feature, content, additionalHeaderComponents } = props;
 
   return (
     <AccordionItem className="advanced-settings-item">
-      <h2>
-        <AccordionButton className="advanced-settings-header">
-          {header}
-          <GuideIcon feature={feature} />
+      <AccordionButton className="advanced-settings-header">
+        <Flex width={'100%'} gap={'0.5rem'} align={'center'}>
+          <Box flexGrow={1} textAlign={'left'}>
+            {header}
+          </Box>
+          {additionalHeaderComponents}
+          {feature && <GuideIcon feature={feature} />}
           <AccordionIcon />
-        </AccordionButton>
-      </h2>
+        </Flex>
+      </AccordionButton>
       <AccordionPanel className="advanced-settings-panel">
-        {options}
+        {content}
       </AccordionPanel>
     </AccordionItem>
   );
