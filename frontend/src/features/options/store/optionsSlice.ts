@@ -37,7 +37,6 @@ export interface OptionsState {
   seed: number;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
-  shouldForceOutpaint: boolean;
   shouldGenerateVariations: boolean;
   shouldHoldOptionsPanelOpen: boolean;
   shouldLoopback: boolean;
@@ -84,7 +83,6 @@ const initialOptionsState: OptionsState = {
   seed: 0,
   seedWeights: '',
   shouldFitToWidthHeight: true,
-  shouldForceOutpaint: false,
   shouldGenerateVariations: false,
   shouldHoldOptionsPanelOpen: false,
   shouldLoopback: false,
@@ -395,9 +393,6 @@ export const optionsSlice = createSlice({
     setTileSize: (state, action: PayloadAction<number>) => {
       state.tileSize = action.payload;
     },
-    setShouldForceOutpaint: (state, action: PayloadAction<boolean>) => {
-      state.shouldForceOutpaint = action.payload;
-    },
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
     },
@@ -438,7 +433,6 @@ export const {
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,
-  setShouldForceOutpaint,
   setShouldGenerateVariations,
   setShouldHoldOptionsPanelOpen,
   setShouldLoopback,

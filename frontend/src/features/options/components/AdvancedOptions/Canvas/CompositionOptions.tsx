@@ -1,22 +1,20 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
-import IAISwitch from 'common/components/IAISwitch';
 import { optionsSelector } from 'features/options/store/optionsSelectors';
 import {
-  setSeamSize,
-  setSeamBlur,
-  setSeamStrength,
-  setSeamSteps,
-  setTileSize,
-  setShouldForceOutpaint,
   setInfillMethod,
+  setSeamBlur,
+  setSeamSize,
+  setSeamSteps,
+  setSeamStrength,
+  setTileSize,
 } from 'features/options/store/optionsSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import InpaintReplace from './InpaintReplace';
 import _ from 'lodash';
+import InpaintReplace from './InpaintReplace';
 
 const selector = createSelector(
   [optionsSelector, systemSelector],
@@ -27,7 +25,6 @@ const selector = createSelector(
       seamStrength,
       seamSteps,
       tileSize,
-      shouldForceOutpaint,
       infillMethod,
     } = options;
 
@@ -39,7 +36,6 @@ const selector = createSelector(
       seamStrength,
       seamSteps,
       tileSize,
-      shouldForceOutpaint,
       infillMethod,
       availableInfillMethods,
     };
@@ -59,7 +55,6 @@ const CompositionOptions = () => {
     seamStrength,
     seamSteps,
     tileSize,
-    shouldForceOutpaint,
     infillMethod,
     availableInfillMethods,
   } = useAppSelector(selector);
@@ -134,13 +129,6 @@ const CompositionOptions = () => {
         withSliderMarks
         withReset
       />
-      <IAISwitch
-        label={'Force Outpaint'}
-        isChecked={shouldForceOutpaint}
-        onChange={(e) => {
-          dispatch(setShouldForceOutpaint(e.target.checked));
-        }}
-      />
       <IAISelect
         label="Infill Method"
         value={infillMethod}
@@ -172,11 +160,3 @@ const CompositionOptions = () => {
 };
 
 export default CompositionOptions;
-
-export const OutpaintingHeader = () => {
-  return (
-    <Box flex="1" textAlign="left">
-      Outpainting Composition
-    </Box>
-  );
-};
