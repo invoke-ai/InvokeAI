@@ -669,6 +669,7 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
+      state.shouldShowStagingImage = true;
     },
     fitBoundingBoxToStage: (state) => {
       const {
