@@ -71,6 +71,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
+          cache-dependency-path: ${{ matrix.requirements-file }}
 
       # - name: install dependencies
       #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
