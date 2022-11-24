@@ -105,12 +105,12 @@ jobs:
       - name: run configure_invokeai.py
         id: run-preload-models
         run: |
-          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
+          python scripts/configure_invokeai.py --no-interactive --yes
 
       - name: Run the tests
         id: run-tests
         run: |
-          time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
+          time python scripts/invoke.py \
             --model ${{ matrix.stable-diffusion-model }} \
             --from_file ${{ env.TEST_PROMPTS }} \
             --root="${{ env.INVOKEAI_ROOT }}" \
