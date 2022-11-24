@@ -43,7 +43,7 @@ jobs:
       run:
         shell: ${{ matrix.default-shell }}
     env:
-      INVOKEAI_ROOT: '${{ env.GITHUB_WORKSPACE }}/invokeai'
+      INVOKEAI_ROOT: '${{ GITHUB_WORKSPACE }}/invokeai'
     steps:
       - name: Checkout sources
         id: checkout-sources
