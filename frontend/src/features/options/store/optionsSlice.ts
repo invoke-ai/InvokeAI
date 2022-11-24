@@ -197,6 +197,8 @@ export const optionsSlice = createSlice({
     },
     setSeedWeights: (state, action: PayloadAction<string>) => {
       state.seedWeights = action.payload;
+      state.shouldGenerateVariations = true;
+      state.variationAmount = 0;
     },
     setAllTextToImageParameters: (
       state,
@@ -220,6 +222,7 @@ export const optionsSlice = createSlice({
       if (variations && variations.length > 0) {
         state.seedWeights = seedWeightsToString(variations);
         state.shouldGenerateVariations = true;
+        state.variationAmount = 0;
       } else {
         state.shouldGenerateVariations = false;
       }
