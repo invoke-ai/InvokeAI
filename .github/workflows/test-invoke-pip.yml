@@ -122,4 +122,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
-          path: outputs/img-samples
+          path: ${{ env.INVOKEAI_ROOT }}/outputs/img-samples
