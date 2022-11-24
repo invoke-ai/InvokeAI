@@ -5,6 +5,7 @@ accelerate~=0.14
 albumentations
 diffusers
 eventlet
+facexlib
 flask_cors
 flask_socketio
 flaskwebgui
