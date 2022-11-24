@@ -54,7 +54,7 @@ jobs:
           cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
 
       - name: create environment.yml
-        run: cp environments-and-requirements/${{ matrix.environment-yaml }} environment.yml
+        run: cp "environments-and-requirements/${{ matrix.environment-yaml }}" environment.yml
 
       - name: Use cached conda packages
         id: use-cached-conda-packages
@@ -68,7 +68,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: ${{ env.CONDA_ENV_NAME }}
-          environment-yaml: environment.yml
+          environment-file: environment.yml
           miniconda-version: latest
 
       - name: set test prompt to main branch validation
