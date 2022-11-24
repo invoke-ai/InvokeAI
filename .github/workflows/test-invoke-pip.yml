@@ -42,8 +42,8 @@ jobs:
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
-    # env:
-    #   INVOKEAI_ROOT: /home/runner/invokeai
+    env:
+      INVOKEAI_ROOT_PATH: /home/runner/invokeai
     steps:
       - name: Checkout sources
         id: checkout-sources
