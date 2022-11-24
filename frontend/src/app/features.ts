@@ -14,7 +14,8 @@ export enum Feature {
   FACE_CORRECTION,
   IMAGE_TO_IMAGE,
   BOUNDING_BOX,
-  CANVAS_COMPOSITION,
+  SEAM_CORRECTION,
+  INFILL_AND_SCALING,
 }
 /** For each tooltip in the UI, the below feature definitions & props will pull relevant information into the tooltip.
  *
@@ -57,17 +58,22 @@ export const FEATURES: Record<Feature, FeatureHelpInfo> = {
     guideImage: 'asset/path.gif',
   },
   [Feature.IMAGE_TO_IMAGE]: {
-    text: 'ImageToImage allows the upload of an initial image, which InvokeAI will use to guide the generation process, along with a prompt. A lower value for this setting will more closely resemble the original image. Values between 0-1 are accepted, and a range of .25-.75 is recommended ',
+    text: 'Image to Image allows the upload of an initial image, which InvokeAI will use to guide the generation process, along with a prompt. A lower value for this setting will more closely resemble the original image. Values between 0-1 are accepted, and a range of .25-.75 is recommended ',
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },
   [Feature.BOUNDING_BOX]: {
-    text: 'The Bounding Box is analogous to the Width and Height settings for Text to Image or Image to Image. Only the area in the box will be processed.',
+    text: 'The bounding box is analogous to the Width and Height settings for Text to Image or Image to Image. Only the area in the box will be processed.',
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },
-  [Feature.CANVAS_COMPOSITION]: {
-    text: 'Control the process used to cleanly manage seams between existing compositions and new invocations, using larger areas of the image for seam guidance, or applying various configurations on the generation process.',
+  [Feature.SEAM_CORRECTION]: {
+    text: 'Control the handling of visible seams which may occur when a generated image is pasted back onto the canvas.',
+    href: 'link/to/docs/feature3.html',
+    guideImage: 'asset/path.gif',
+  },
+  [Feature.INFILL_AND_SCALING]: {
+    text: 'Manage infill methods (used on masked or erased areas of the canvas) and scaling (useful for small bounding box sizes).',
     href: 'link/to/docs/feature3.html',
     guideImage: 'asset/path.gif',
   },

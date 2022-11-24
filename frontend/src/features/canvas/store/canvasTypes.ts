@@ -11,6 +11,16 @@ export const LAYER_NAMES = ['base', 'mask'] as const;
 
 export type CanvasLayer = typeof LAYER_NAMES[number];
 
+export const BOUNDING_BOX_SCALES_DICT = [
+  { key: 'Auto', value: 'auto' },
+  { key: 'Manual', value: 'manual' },
+  { key: 'None', value: 'none' },
+];
+
+export const BOUNDING_BOX_SCALES = ['none', 'auto', 'manual'] as const;
+
+export type BoundingBoxScale = typeof BOUNDING_BOX_SCALES[number];
+
 export type CanvasDrawingTool = 'brush' | 'eraser';
 
 export type CanvasTool = CanvasDrawingTool | 'move' | 'colorPicker';
@@ -78,6 +88,7 @@ export interface CanvasState {
   boundingBoxCoordinates: Vector2d;
   boundingBoxDimensions: Dimensions;
   boundingBoxPreviewFill: RgbaColor;
+  boundingBoxScaleMethod: BoundingBoxScale;
   brushColor: RgbaColor;
   brushSize: number;
   canvasContainerDimensions: Dimensions;
@@ -108,7 +119,6 @@ export interface CanvasState {
   shouldDarkenOutsideBoundingBox: boolean;
   shouldLockBoundingBox: boolean;
   shouldPreserveMaskedArea: boolean;
-  shouldScaleBoundingBox: boolean;
   shouldShowBoundingBox: boolean;
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;

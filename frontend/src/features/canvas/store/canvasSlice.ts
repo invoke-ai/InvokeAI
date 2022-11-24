@@ -14,6 +14,7 @@ import { STAGE_PADDING_PERCENTAGE } from '../util/constants';
 import floorCoordinates from '../util/floorCoordinates';
 import roundDimensionsTo64 from '../util/roundDimensionsTo64';
 import {
+  BoundingBoxScale,
   CanvasImage,
   CanvasLayer,
   CanvasLayerState,
@@ -41,6 +42,7 @@ const initialCanvasState: CanvasState = {
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
+  boundingBoxScaleMethod: 'auto',
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
   canvasContainerDimensions: { width: 0, height: 0 },
@@ -70,7 +72,6 @@ const initialCanvasState: CanvasState = {
   shouldDarkenOutsideBoundingBox: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
-  shouldScaleBoundingBox: false,
   shouldShowBoundingBox: true,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
@@ -242,7 +243,43 @@ export const canvasSlice = createSlice({
       };
     },
     setBoundingBoxDimensions: (state, action: PayloadAction<Dimensions>) => {
-      state.boundingBoxDimensions = roundDimensionsTo64(action.payload);
+      const newDimensions = roundDimensionsTo64(action.payload);
+      state.boundingBoxDimensions = newDimensions;
+
+      if (state.boundingBoxScaleMethod === 'auto') {
+        const { width, height } = newDimensions;
+        const newScaledDimensions = { width, height };
+        const targetArea = 512 * 512;
+        const aspectRatio = width / height;
+        let currentArea = width * height;
+        let maxDimension = 448;
+        while (currentArea < targetArea) {
+          maxDimension += 64;
+          if (width === height) {
+            newScaledDimensions.width = 512;
+            newScaledDimensions.height = 512;
+            break;
+          } else {
+            if (aspectRatio > 1) {
+              newScaledDimensions.width = maxDimension;
+              newScaledDimensions.height = roundToMultiple(
+                maxDimension / aspectRatio,
+                64
+              );
+            } else if (aspectRatio < 1) {
+              newScaledDimensions.height = maxDimension;
+              newScaledDimensions.width = roundToMultiple(
+                maxDimension * aspectRatio,
+                64
+              );
+            }
+            currentArea =
+              newScaledDimensions.width * newScaledDimensions.height;
+          }
+        }
+
+        state.scaledBoundingBoxDimensions = newScaledDimensions;
+      }
     },
     setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
       state.boundingBoxCoordinates = floorCoordinates(action.payload);
@@ -671,8 +708,11 @@ export const canvasSlice = createSlice({
         state.boundingBoxCoordinates = newBoundingBoxCoordinates;
       }
     },
-    setShouldScaleBoundingBox: (state, action: PayloadAction<boolean>) => {
-      state.shouldScaleBoundingBox = action.payload;
+    setBoundingBoxScaleMethod: (
+      state,
+      action: PayloadAction<BoundingBoxScale>
+    ) => {
+      state.boundingBoxScaleMethod = action.payload;
     },
     setScaledBoundingBoxDimensions: (
       state,
@@ -748,6 +788,7 @@ export const {
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
   setBoundingBoxPreviewFill,
+  setBoundingBoxScaleMethod,
   setBrushColor,
   setBrushSize,
   setCanvasContainerDimensions,
@@ -772,7 +813,6 @@ export const {
   setShouldDarkenOutsideBoundingBox,
   setShouldLockBoundingBox,
   setShouldPreserveMaskedArea,
-  setShouldScaleBoundingBox,
   setShouldShowBoundingBox,
   setShouldShowBrush,
   setShouldShowBrushPreview,
