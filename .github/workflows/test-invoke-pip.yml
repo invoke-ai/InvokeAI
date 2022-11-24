@@ -109,8 +109,7 @@ jobs:
       - name: run preload_models.py
         id: run-preload-models
         run: |
-          ${{ env.pythonLocation }}/bin/python scripts/preload_models.py \
-            --no-interactive
+          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
 
       - name: Run the tests
         id: run-tests
