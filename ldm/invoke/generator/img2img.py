@@ -2,14 +2,10 @@
 ldm.invoke.generator.img2img descends from ldm.invoke.generator
 '''
 
-import PIL
-import numpy as np
 import torch
-from PIL import Image
-from torch import Tensor
 
-from ldm.invoke.devices import choose_autocast
 from ldm.invoke.generator.base import Generator
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 
 class Img2Img(Generator):
@@ -25,66 +21,51 @@ class Img2Img(Generator):
         """
         self.perlin = perlin
 
-        sampler.make_schedule(
-            ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
-        )
-
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = self._image_to_tensor(init_image.convert('RGB'))
-
-        scope = choose_autocast(self.precision)
-        with scope(self.model.device.type):
-            self.init_latent = self.model.get_first_stage_encoding(
-                self.model.encode_first_stage(init_image)
-            ) # move to latent space
-
-        t_enc = int(strength * steps)
         uc, c, extra_conditioning_info   = conditioning
 
+        # noinspection PyTypeChecker
+        pipeline: StableDiffusionGeneratorPipeline = self.model
+        pipeline.scheduler = sampler
+
         def make_image(x_T):
-            # encode (scaled latent)
-            z_enc = sampler.stochastic_encode(
-                self.init_latent,
-                torch.tensor([t_enc]).to(self.model.device),
-                noise=x_T
-            )
-            # decode it
-            samples = sampler.decode(
-                z_enc,
-                c,
-                t_enc,
-                img_callback = step_callback,
-                unconditional_guidance_scale=cfg_scale,
-                unconditional_conditioning=uc,
-                init_latent = self.init_latent, # changes how noising is performed in ksampler
-                extra_conditioning_info = extra_conditioning_info,
-                all_timesteps_count = steps
+            # FIXME: use x_T for initial seeded noise
+            pipeline_output = pipeline.img2img_from_embeddings(
+                init_image, strength, steps, c, uc, cfg_scale,
+                extra_conditioning_info=extra_conditioning_info,
+                noise_func=self.get_noise_like,
+                callback=step_callback
             )
 
-            return self.sample_to_image(samples)
+            return pipeline.numpy_to_pil(pipeline_output.images)[0]
 
         return make_image
 
-    def get_noise(self,width,height):
-        device      = self.model.device
-        init_latent = self.init_latent
-        assert init_latent is not None,'call to get_noise() when init_latent not set'
+    def get_noise_like(self, like: torch.Tensor):
+        device = like.device
         if device.type == 'mps':
-            x = torch.randn_like(init_latent, device='cpu').to(device)
+            x = torch.randn_like(like, device='cpu').to(device)
         else:
-            x = torch.randn_like(init_latent, device=device)
+            x = torch.randn_like(like, device=device)
         if self.perlin > 0.0:
-            shape = init_latent.shape
+            shape = like.shape
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(shape[3], shape[2])
         return x
 
-    def _image_to_tensor(self, image:Image, normalize:bool=True)->Tensor:
-        image = np.array(image).astype(np.float32) / 255.0
-        if len(image.shape) == 2:  # 'L' image, as in a mask
-            image = image[None,None]
-        else:                      # 'RGB' image
-            image = image[None].transpose(0, 3, 1, 2)
-        image = torch.from_numpy(image)
-        if normalize:
-            image = 2.0 * image - 1.0
-        return image.to(self.model.device)    
+    def get_noise(self,width,height):
+        # copy of the Txt2Img.get_noise
+        device         = self.model.device
+        if self.use_mps_noise or device.type == 'mps':
+            x = torch.randn([1,
+                                self.latent_channels,
+                                height // self.downsampling_factor,
+                                width  // self.downsampling_factor],
+                               device='cpu').to(device)
+        else:
+            x = torch.randn([1,
+                                self.latent_channels,
+                                height // self.downsampling_factor,
+                                width  // self.downsampling_factor],
+                               device=device)
+        if self.perlin > 0.0:
+            x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(width  // self.downsampling_factor, height // self.downsampling_factor)
+        return x
