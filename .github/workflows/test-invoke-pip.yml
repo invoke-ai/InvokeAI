@@ -77,12 +77,8 @@ jobs:
 
       - name: install requirements
         run: |
-          ${{ env.pythonLocation }}/bin/python -m venv .venv
-          source .venv/bin/activate
-          .venv/bin/python -m pip install -r requirements.txt
-
-      # - name: install requirements
-      #   run: ${{ env.pythonLocation }}/bin/pip install -r requirements.txt --no-binary=":all:"
+          ${{ env.pythonLocation }}/bin/pip uninstall wheel -y
+          ${{ env.pythonLocation }}/bin/pip install -r requirements.txt
 
       - name: Use Cached Stable Diffusion Model
         id: cache-sd-model
