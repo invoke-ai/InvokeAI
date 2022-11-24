@@ -35,7 +35,7 @@ jobs:
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
             stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
-    name: ${{ matrix.os }} with ${{ matrix.stable-diffusion-model }}
+    name: ${{ matrix.environment-yaml }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
