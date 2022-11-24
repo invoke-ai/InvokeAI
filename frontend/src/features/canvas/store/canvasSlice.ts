@@ -122,7 +122,7 @@ export const canvasSlice = createSlice({
       state.brushSize = action.payload;
     },
     clearMask: (state) => {
-      state.pastLayerStates.push(state.layerState);
+      state.pastLayerStates.push({ ...state.layerState });
       state.layerState.objects = state.layerState.objects.filter(
         (obj) => !isCanvasMaskLine(obj)
       );
