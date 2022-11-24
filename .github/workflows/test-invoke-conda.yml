@@ -31,9 +31,10 @@ jobs:
           # - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
           #   stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
           #   stable-diffusion-model-switch: stable-diffusion-1.4
-          - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-switch: stable-diffusion-1.5
+          - stable-diffusion-model: stable-diffusion-1.5
+            stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
+            stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
     name: ${{ matrix.os }} with ${{ matrix.stable-diffusion-model-switch }}
     runs-on: ${{ matrix.os }}
     env:
@@ -48,12 +49,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: create models.yaml from example
-        run: cp configs/models.yaml.example configs/models.yaml
-
-      - name: create models.yaml from example
         run: |
           mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
           cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
+
+      - name: create environment.yml
+        run: cp environments-and-requirements/${{ matrix.environment-file }} environment.yml
 
       - name: Use cached conda packages
         id: use-cached-conda-packages
