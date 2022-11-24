@@ -60,7 +60,6 @@ export const frontendToBackendParameters = (
     seed,
     seedWeights,
     shouldFitToWidthHeight,
-    shouldForceOutpaint,
     shouldGenerateVariations,
     shouldRandomizeSeed,
     shouldRunESRGAN,
@@ -190,8 +189,8 @@ export const frontendToBackendParameters = (
     generationParameters.seam_strength = seamStrength;
     generationParameters.seam_steps = seamSteps;
     generationParameters.tile_size = tileSize;
-    generationParameters.force_outpaint = shouldForceOutpaint;
     generationParameters.infill_method = infillMethod;
+    generationParameters.force_outpaint = false;
   }
 
   if (shouldGenerateVariations) {
