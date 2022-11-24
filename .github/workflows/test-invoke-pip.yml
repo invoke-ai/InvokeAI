@@ -95,8 +95,7 @@ jobs:
         id: download-stable-diffusion-model
         if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
         run: |
-          [[ -d models/ldm/stable-diffusion-v1 ]] \
-            || mkdir -p models/ldm/stable-diffusion-v1
+          mkdir -p ${{ matrix.stable-diffusion-model-dl-path }}
           curl \
             -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
             -o "${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" \
