@@ -104,6 +104,7 @@ class DDPM(pl.LightningModule):
         assert parameterization in [
             'eps',
             'x0',
+            'v',
         ], 'currently only supporting "eps" and "x0"'
         self.parameterization = parameterization
         print(
@@ -258,6 +259,9 @@ class DDPM(pl.LightningModule):
                 * np.sqrt(torch.Tensor(alphas_cumprod))
                 / (2.0 * 1 - torch.Tensor(alphas_cumprod))
             )
+        elif self.parameterization == "v":
+            lvlb_weights = torch.ones_like(self.betas ** 2 / (
+                    2 * self.posterior_variance * to_torch(alphas) * (1 - self.alphas_cumprod)))
         else:
             raise NotImplementedError('mu not supported')
         # TODO how to choose this term
@@ -357,6 +361,9 @@ class DDPM(pl.LightningModule):
             x_recon = self.predict_start_from_noise(x, t=t, noise=model_out)
         elif self.parameterization == 'x0':
             x_recon = model_out
+        elif self.parameterization == 'v': ## this was just copied from above... needs serious attention
+            x_recon = model_out 
+        
         if clip_denoised:
             x_recon.clamp_(-1.0, 1.0)
 
@@ -453,6 +460,8 @@ class DDPM(pl.LightningModule):
             target = noise
         elif self.parameterization == 'x0':
             target = x_start
+        elif self.parameterization == "v":
+            target = self.get_v(x_start, noise, t)
         else:
             raise NotImplementedError(
                 f'Paramterization {self.parameterization} not yet supported'
@@ -1482,6 +1491,8 @@ class LatentDiffusion(DDPM):
             target = x_start
         elif self.parameterization == 'eps':
             target = noise
+        elif self.parameterization == "v":
+            target = self.get_v(x_start, noise, t)
         else:
             raise NotImplementedError()
 

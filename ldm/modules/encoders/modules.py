@@ -10,6 +10,9 @@ import kornia
 from ldm.invoke.devices import choose_torch_device
 from ldm.invoke.globals import Globals
 
+import open_clip
+from ldm.util import default, count_params
+
 from ldm.modules.x_transformer import (
     Encoder,
     TransformerWrapper,
@@ -460,6 +463,255 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     def encode(self, text, **kwargs):
         return self(text, **kwargs)
 
+class FrozenOpenCLIPEmbedder(AbstractEncoder):
+    """
+    Uses the OpenCLIP transformer encoder for text
+    """
+    LAYERS = [
+        #"pooled",
+        "last",
+        "penultimate"
+    ]
+    def __init__(self, arch="ViT-H-14", version="laion2b_s32b_b79k", device="cuda", max_length=77,
+                 freeze=True, layer="last"):
+        super().__init__()
+        assert layer in self.LAYERS
+        model, _, _ = open_clip.create_model_and_transforms(arch, device=torch.device('cpu'), pretrained=version)
+        del model.visual
+        self.model = model
+        self.tokenizer = CLIPTokenizer.from_pretrained(
+            version, local_files_only=True
+        )
+        self.transformer = CLIPTextModel.from_pretrained(
+            version, local_files_only=True
+        )
+        self.device = device
+        self.max_length = max_length
+        self.freeze()
+    
+        def embedding_forward(
+            self,
+            input_ids=None,
+            position_ids=None,
+            inputs_embeds=None,
+            embedding_manager=None,
+        ) -> torch.Tensor:
+
+            seq_length = (
+                input_ids.shape[-1]
+                if input_ids is not None
+                else inputs_embeds.shape[-2]
+            )
+
+            if position_ids is None:
+                position_ids = self.position_ids[:, :seq_length]
+
+            if inputs_embeds is None:
+                inputs_embeds = self.token_embedding(input_ids)
+
+            if embedding_manager is not None:
+                inputs_embeds = embedding_manager(input_ids, inputs_embeds)
+
+            position_embeddings = self.position_embedding(position_ids)
+            embeddings = inputs_embeds + position_embeddings
+
+            return embeddings
+
+        self.transformer.text_model.embeddings.forward = (
+            embedding_forward.__get__(self.transformer.text_model.embeddings)
+        )
+
+        def encoder_forward(
+            self,
+            inputs_embeds,
+            attention_mask=None,
+            causal_attention_mask=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+        ):
+            output_attentions = (
+                output_attentions
+                if output_attentions is not None
+                else self.config.output_attentions
+            )
+            output_hidden_states = (
+                output_hidden_states
+                if output_hidden_states is not None
+                else self.config.output_hidden_states
+            )
+            return_dict = (
+                return_dict
+                if return_dict is not None
+                else self.config.use_return_dict
+            )
+
+            encoder_states = () if output_hidden_states else None
+            all_attentions = () if output_attentions else None
+
+            hidden_states = inputs_embeds
+            for idx, encoder_layer in enumerate(self.layers):
+                if output_hidden_states:
+                    encoder_states = encoder_states + (hidden_states,)
+
+                layer_outputs = encoder_layer(
+                    hidden_states,
+                    attention_mask,
+                    causal_attention_mask,
+                    output_attentions=output_attentions,
+                )
+
+                hidden_states = layer_outputs[0]
+
+                if output_attentions:
+                    all_attentions = all_attentions + (layer_outputs[1],)
+
+            if output_hidden_states:
+                encoder_states = encoder_states + (hidden_states,)
+
+            return hidden_states
+
+        self.transformer.text_model.encoder.forward = encoder_forward.__get__(
+            self.transformer.text_model.encoder
+        )
+
+        def text_encoder_forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            embedding_manager=None,
+        ):
+            output_attentions = (
+                output_attentions
+                if output_attentions is not None
+                else self.config.output_attentions
+            )
+            output_hidden_states = (
+                output_hidden_states
+                if output_hidden_states is not None
+                else self.config.output_hidden_states
+            )
+            return_dict = (
+                return_dict
+                if return_dict is not None
+                else self.config.use_return_dict
+            )
+
+            if input_ids is None:
+                raise ValueError('You have to specify either input_ids')
+
+            input_shape = input_ids.size()
+            input_ids = input_ids.view(-1, input_shape[-1])
+
+            hidden_states = self.embeddings(
+                input_ids=input_ids,
+                position_ids=position_ids,
+                embedding_manager=embedding_manager,
+            )
+
+            bsz, seq_len = input_shape
+            # CLIP's text model uses causal mask, prepare it here.
+            # https://github.com/openai/CLIP/blob/cfcffb90e69f37bf2ff1e988237a0fbe41f33c04/clip/model.py#L324
+            causal_attention_mask = _build_causal_attention_mask(
+                bsz, seq_len, hidden_states.dtype
+            ).to(hidden_states.device)
+
+            # expand attention_mask
+            if attention_mask is not None:
+                # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                attention_mask = _expand_mask(
+                    attention_mask, hidden_states.dtype
+                )
+
+            last_hidden_state = self.encoder(
+                inputs_embeds=hidden_states,
+                attention_mask=attention_mask,
+                causal_attention_mask=causal_attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+
+            last_hidden_state = self.final_layer_norm(last_hidden_state)
+
+            return last_hidden_state
+
+        self.transformer.text_model.forward = text_encoder_forward.__get__(
+            self.transformer.text_model
+        )
+
+        def transformer_forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            embedding_manager=None,
+        ):
+            return self.text_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                embedding_manager=embedding_manager,
+            )
+
+        self.transformer.forward = transformer_forward.__get__(
+            self.transformer
+        )
+
+        self.device = device
+        self.max_length = max_length
+        if freeze:
+            self.freeze()
+        self.layer = layer
+        if self.layer == "last":
+            self.layer_idx = 0
+        elif self.layer == "penultimate":
+            self.layer_idx = 1
+        else:
+            raise NotImplementedError()
+
+        def freeze(self):
+            self.model = self.model.eval()
+            for param in self.parameters():
+                param.requires_grad = False
+
+        def forward(self, text):
+            tokens = open_clip.tokenize(text)
+            z = self.encode_with_transformer(tokens.to(self.device))
+            return z
+
+        def encode_with_transformer(self, text):
+            x = self.model.token_embedding(text)  # [batch_size, n_ctx, d_model]
+            x = x + self.model.positional_embedding
+            x = x.permute(1, 0, 2)  # NLD -> LND
+            x = self.text_transformer_forward(x, attn_mask=self.model.attn_mask)
+            x = x.permute(1, 0, 2)  # LND -> NLD
+            x = self.model.ln_final(x)
+            return x
+
+        def text_transformer_forward(self, x: torch.Tensor, attn_mask = None):
+            for i, r in enumerate(self.model.transformer.resblocks):
+                if i == len(self.model.transformer.resblocks) - self.layer_idx:
+                    break
+                if self.model.transformer.grad_checkpointing and not torch.jit.is_scripting():
+                    x = checkpoint(r, x, attn_mask)
+                else:
+                    x = r(x, attn_mask=attn_mask)
+            return x
+
+        def encode(self, text):
+            return self(text)
+
 class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
     fragment_weights_key = "fragment_weights"
@@ -764,6 +1016,22 @@ class FrozenClipImageEmbedder(nn.Module):
         # x is assumed to be in range [-1,1]
         return self.model.encode_image(self.preprocess(x))
 
+class FrozenCLIPT5Encoder(AbstractEncoder):
+    def __init__(self, clip_version="openai/clip-vit-large-patch14", t5_version="google/t5-v1_1-xl", device="cuda",
+                 clip_max_length=77, t5_max_length=77):
+        super().__init__()
+        self.clip_encoder = FrozenCLIPEmbedder(clip_version, device, max_length=clip_max_length)
+        self.t5_encoder = FrozenT5Embedder(t5_version, device, max_length=t5_max_length)
+        print(f"{self.clip_encoder.__class__.__name__} has {count_params(self.clip_encoder)*1.e-6:.2f} M parameters, "
+              f"{self.t5_encoder.__class__.__name__} comes with {count_params(self.t5_encoder)*1.e-6:.2f} M params.")
+
+    def encode(self, text):
+        return self(text)
+
+    def forward(self, text):
+        clip_z = self.clip_encoder.encode(text)
+        t5_z = self.t5_encoder.encode(text)
+        return [clip_z, t5_z]
 
 if __name__ == '__main__':
     from ldm.util import count_params
