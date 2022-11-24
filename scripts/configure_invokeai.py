@@ -598,7 +598,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
-    os.makedirs(outputs)
+    os.makedirs(outputs, exist_ok=True)
 
     init_file = os.path.expanduser(Globals.initfile)
     if not os.path.exists(init_file):
