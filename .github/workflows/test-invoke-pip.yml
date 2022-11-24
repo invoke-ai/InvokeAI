@@ -35,7 +35,7 @@ jobs:
             default-shell: bash -l {0}
           - stable-diffusion-model: stable-diffusion-1.5
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-dl-path: /home/runner/invokeai/models/ldm/stable-diffusion-v1
+            stable-diffusion-model-dl-path: ${{ env.GITHUB_WORKSPACE }}/invokeai/models/ldm/stable-diffusion-v1
             stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
     name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -43,7 +43,7 @@ jobs:
       run:
         shell: ${{ matrix.default-shell }}
     env:
-      INVOKEAI_ROOT_PATH: /home/runner/invokeai
+      INVOKEAI_ROOT: '${{ env.GITHUB_WORKSPACE }}/invokeai'
     steps:
       - name: Checkout sources
         id: checkout-sources
