@@ -35,7 +35,8 @@ jobs:
             default-shell: bash -l {0}
           - stable-diffusion-model: stable-diffusion-1.5
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-dl-path: /home/runner/invokeai/models/ldm/stable-diffusion-v1
+            stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
     name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     defaults:
@@ -101,7 +102,7 @@ jobs:
             -o ${{ matrix.stable-diffusion-model-dl-path }} \
             -L ${{ matrix.stable-diffusion-model-url }}
 
-      - name: run preload_models.py
+      - name: run configure_invokeai.py
         id: run-preload-models
         run: |
           ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
