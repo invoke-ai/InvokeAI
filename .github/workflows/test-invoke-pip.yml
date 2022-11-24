@@ -81,7 +81,7 @@ jobs:
       - name: install requirements
         run: |
           source .venv/bin/activate
-          pip install --prefer-binary -r requirements.txt
+          .venv/bin/pip install --prefer-binary -r requirements.txt
 
       # - name: install requirements
       #   run: ${{ env.pythonLocation }}/bin/pip install --prefer-binary -r requirements.txt
