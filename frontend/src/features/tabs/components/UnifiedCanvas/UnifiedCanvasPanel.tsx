@@ -1,15 +1,10 @@
 // import { Feature } from 'app/features';
 import { Feature } from 'app/features';
 import ImageToImageStrength from 'features/options/components/AdvancedOptions/ImageToImage/ImageToImageStrength';
-import BoundingBoxSettings, {
-  BoundingBoxSettingsHeader,
-} from 'features/options/components/AdvancedOptions/Inpainting/BoundingBoxSettings/BoundingBoxSettings';
-import OutpaintingOptions, {
-  OutpaintingHeader,
-} from 'features/options/components/AdvancedOptions/Inpainting/OutpaintingOptions';
-import SeedHeader from 'features/options/components/AdvancedOptions/Seed/SeedHeader';
+import BoundingBoxSettings from 'features/options/components/AdvancedOptions/Canvas/BoundingBoxSettings/BoundingBoxSettings';
+import CompositionOptions from 'features/options/components/AdvancedOptions/Canvas/CompositionOptions';
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
-import VariationsHeader from 'features/options/components/AdvancedOptions/Variations/VariationsHeader';
+import GenerateVariationsToggle from 'features/options/components/AdvancedOptions/Variations/GenerateVariations';
 import VariationsOptions from 'features/options/components/AdvancedOptions/Variations/VariationsOptions';
 import MainOptions from 'features/options/components/MainOptions/MainOptions';
 import OptionsAccordion from 'features/options/components/OptionsAccordion';
@@ -20,24 +15,25 @@ import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 export default function UnifiedCanvasPanel() {
   const unifiedCanvasAccordions = {
     boundingBox: {
-      header: <BoundingBoxSettingsHeader />,
+      header: 'Bounding Box',
       feature: Feature.BOUNDING_BOX,
-      options: <BoundingBoxSettings />,
+      content: <BoundingBoxSettings />,
     },
-    outpainting: {
-      header: <OutpaintingHeader />,
-      feature: Feature.OUTPAINTING,
-      options: <OutpaintingOptions />,
+    composition: {
+      header: 'Composition',
+      feature: Feature.CANVAS_COMPOSITION,
+      content: <CompositionOptions />,
     },
     seed: {
-      header: <SeedHeader />,
+      header: 'Seed',
       feature: Feature.SEED,
-      options: <SeedOptions />,
+      content: <SeedOptions />,
     },
     variations: {
-      header: <VariationsHeader />,
+      header: 'Variations',
       feature: Feature.VARIATIONS,
-      options: <VariationsOptions />,
+      content: <VariationsOptions />,
+      additionalHeaderComponents: <GenerateVariationsToggle />,
     },
   };
 

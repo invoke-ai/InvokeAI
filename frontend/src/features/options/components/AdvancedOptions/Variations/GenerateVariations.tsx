@@ -7,7 +7,7 @@ import {
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldGenerateVariations } from 'features/options/store/optionsSlice';
 
-export default function GenerateVariations() {
+export default function GenerateVariationsToggle() {
   const shouldGenerateVariations = useAppSelector(
     (state: RootState) => state.options.shouldGenerateVariations
   );

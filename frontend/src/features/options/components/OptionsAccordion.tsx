@@ -36,12 +36,15 @@ const OptionsAccordion = (props: OptionAccordionsType) => {
     const accordionsToRender: ReactElement[] = [];
     if (accordionInfo) {
       Object.keys(accordionInfo).forEach((key) => {
+        const { header, feature, content, additionalHeaderComponents } =
+          accordionInfo[key];
         accordionsToRender.push(
           <InvokeAccordionItem
             key={key}
-            header={accordionInfo[key as keyof typeof accordionInfo].header}
-            feature={accordionInfo[key as keyof typeof accordionInfo].feature}
-            options={accordionInfo[key as keyof typeof accordionInfo].options}
+            header={header}
+            feature={feature}
+            content={content}
+            additionalHeaderComponents={additionalHeaderComponents}
           />
         );
       });

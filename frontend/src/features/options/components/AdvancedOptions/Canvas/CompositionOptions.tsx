@@ -51,7 +51,7 @@ const selector = createSelector(
   }
 );
 
-const OutpaintingOptions = () => {
+const CompositionOptions = () => {
   const dispatch = useAppDispatch();
   const {
     seamSize,
@@ -171,7 +171,7 @@ const OutpaintingOptions = () => {
   );
 };
 
-export default OutpaintingOptions;
+export default CompositionOptions;
 
 export const OutpaintingHeader = () => {
   return (
