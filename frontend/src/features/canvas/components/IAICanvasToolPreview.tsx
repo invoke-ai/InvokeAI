@@ -28,24 +28,11 @@ const canvasBrushPreviewSelector = createSelector(
       stageScale,
     } = canvas;
 
-    let fill = '';
-
-    if (layer === 'mask') {
-      fill = rgbaColorToString({ ...maskColor, a: 0.5 });
-    } else if (tool === 'colorPicker') {
-      fill = rgbaColorToString(colorPickerColor);
-    } else {
-      fill = rgbaColorToString(brushColor);
-    }
-
     return {
       cursorPosition,
       width,
       height,
       radius: brushSize / 2,
-      colorPickerSize: COLOR_PICKER_SIZE / stageScale,
-      colorPickerOffset: COLOR_PICKER_SIZE / 2 / stageScale,
-      colorPickerCornerRadius: COLOR_PICKER_SIZE / 5 / stageScale,
       colorPickerOuterRadius: COLOR_PICKER_SIZE / stageScale,
       colorPickerInnerRadius:
         (COLOR_PICKER_SIZE - COLOR_PICKER_STROKE_RADIUS + 1) / stageScale,
@@ -53,6 +40,7 @@ const canvasBrushPreviewSelector = createSelector(
       brushColorString: rgbaColorToString(brushColor),
       colorPickerColorString: rgbaColorToString(colorPickerColor),
       tool,
+      layer,
       shouldShowBrush,
       shouldDrawBrushPreview:
         !(
@@ -83,12 +71,10 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
     radius,
     maskColorString,
     tool,
+    layer,
     shouldDrawBrushPreview,
     dotRadius,
     strokeWidth,
-    colorPickerSize,
-    colorPickerOffset,
-    colorPickerCornerRadius,
     brushColorString,
     colorPickerColorString,
     colorPickerInnerRadius,
@@ -124,7 +110,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             x={cursorPosition ? cursorPosition.x : width / 2}
             y={cursorPosition ? cursorPosition.y : height / 2}
             radius={radius}
-            fill={brushColorString}
+            fill={layer === 'mask' ? maskColorString : brushColorString}
             globalCompositeOperation={
               tool === 'eraser' ? 'destination-out' : 'source-over'
             }
