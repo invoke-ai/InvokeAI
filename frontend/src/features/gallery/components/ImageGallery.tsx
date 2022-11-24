@@ -129,8 +129,11 @@ export default function ImageGallery() {
         galleryContainerRef.current ? galleryContainerRef.current.scrollTop : 0
       )
     );
-    setTimeout(() => dispatch(setDoesCanvasNeedScaling(true)), 400);
-  }, [dispatch]);
+    setTimeout(
+      () => shouldPinGallery && dispatch(setDoesCanvasNeedScaling(true)),
+      400
+    );
+  }, [dispatch, shouldPinGallery]);
 
   const handleClickLoadMore = () => {
     dispatch(requestImages(currentCategory));
