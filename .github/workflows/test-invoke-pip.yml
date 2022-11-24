@@ -99,7 +99,7 @@ jobs:
             || mkdir -p models/ldm/stable-diffusion-v1
           curl \
             -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
-            -o ${{ matrix.stable-diffusion-model-dl-path }} \
+            -o "${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" \
             -L ${{ matrix.stable-diffusion-model-url }}
 
       - name: run configure_invokeai.py
