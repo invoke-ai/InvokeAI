@@ -75,16 +75,8 @@ jobs:
       # - name: install dependencies
       #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
 
-      - name: create venv
-        run: ${{ env.pythonLocation }}/bin/python -m venv .venv
-
       - name: install requirements
-        run: |
-          source .venv/bin/activate
-          .venv/bin/pip install --prefer-binary -r requirements.txt
-
-      # - name: install requirements
-      #   run: ${{ env.pythonLocation }}/bin/pip install --prefer-binary -r requirements.txt
+        run: ${{ env.pythonLocation }}/bin/pip install --prefer-binary -r requirements.txt
 
       - name: Use Cached Stable Diffusion Model
         id: cache-sd-model
