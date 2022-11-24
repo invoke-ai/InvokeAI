@@ -48,8 +48,8 @@ jobs:
         id: checkout-sources
         uses: actions/checkout@v3
 
-      - name: create models.yaml from example
-        run: cp configs/models.yaml.example configs/models.yaml
+      # - name: create models.yaml from example
+      #   run: cp configs/models.yaml.example configs/models.yaml
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
