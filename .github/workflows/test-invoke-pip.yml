@@ -41,8 +41,8 @@ jobs:
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
-    env:
-      INVOKEAI_ROOT: /home/runner/invokeai
+    # env:
+    #   INVOKEAI_ROOT: /home/runner/invokeai
     steps:
       - name: Checkout sources
         id: checkout-sources
@@ -72,8 +72,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
-      - name: install dependencies
-        run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
+      # - name: install dependencies
+      #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
 
       - name: install requirements
         run: ${{ env.pythonLocation }}/bin/pip install --prefer-binary -r requirements.txt
