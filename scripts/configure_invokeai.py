@@ -663,11 +663,11 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
     for name in ('models','configs','scripts','frontend/dist'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in ('configs','scripts','frontend/dist'):
+    for src in ['configs']:
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
-    os.makedirs(outputs)
+    os.makedirs(outputs, exist_ok=True)
 
     init_file = os.path.expanduser(Globals.initfile)
     if not os.path.exists(init_file):
@@ -754,7 +754,7 @@ def main():
         if Globals.root == '' \
            or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
            or not os.path.exists(os.path.join(Globals.root,'frontend/dist')):
-            initialize_rootdir(Globals.root,opt.yes_to_all)
+            initialize_rootdir(Globals.root,(not opt.interactive) or opt.yes_to_all)
 
         print(f'(Initializing with runtime root {Globals.root})\n')
 
