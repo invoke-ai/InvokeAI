@@ -159,6 +159,16 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: ']',
     },
     {
+      title: 'Decrease Brush Opacity',
+      desc: 'Decreases the opacity of the canvas brush',
+      hotkey: 'Shift + [',
+    },
+    {
+      title: 'Increase Brush Opacity',
+      desc: 'Increases the opacity of the canvas brush',
+      hotkey: 'Shift + ]',
+    },
+    {
       title: 'Move Tool',
       desc: 'Allows canvas navigation',
       hotkey: 'V',
