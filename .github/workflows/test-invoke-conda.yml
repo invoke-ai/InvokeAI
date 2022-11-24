@@ -4,6 +4,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'fix-gh-actions-fork'
   pull_request:
     branches:
       - 'main'
@@ -37,6 +38,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
+      INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
@@ -48,8 +50,10 @@ jobs:
       - name: create models.yaml from example
         run: cp configs/models.yaml.example configs/models.yaml
 
-      - name: create environment.yml
-        run: cp environments-and-requirements/${{ matrix.environment-file }} environment.yml
+      - name: create models.yaml from example
+        run: |
+          mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
+          cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
 
       - name: Use cached conda packages
         id: use-cached-conda-packages
@@ -82,34 +86,34 @@ jobs:
         id: cache-sd-model
         uses: actions/cache@v3
         env:
-          cache-name: cache-${{ matrix.stable-diffusion-model-switch }}
+          cache-name: cache-${{ matrix.stable-diffusion-model }}
         with:
           path: ${{ matrix.stable-diffusion-model-dl-path }}
           key: ${{ env.cache-name }}
 
-      - name: Download ${{ matrix.stable-diffusion-model-switch }}
+      - name: Download ${{ matrix.stable-diffusion-model }}
         id: download-stable-diffusion-model
         if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
         run: |
-          [[ -d models/ldm/stable-diffusion-v1 ]] \
-            || mkdir -p models/ldm/stable-diffusion-v1
+          mkdir -p "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}"
           curl \
             -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
-            -o ${{ matrix.stable-diffusion-model-dl-path }} \
-            -L ${{ matrix.stable-diffusion-model }}
+            -o "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" \
+            -L ${{ matrix.stable-diffusion-model-url }}
 
-      - name: run preload_models.py
+      - name: run configure_invokeai.py
         id: run-preload-models
         run: |
-          python scripts/preload_models.py \
-            --no-interactive
+          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
 
       - name: Run the tests
         id: run-tests
         run: |
-          time python scripts/invoke.py \
-            --model ${{ matrix.stable-diffusion-model-switch }} \
-            --from_file ${{ env.TEST_PROMPTS }}
+          time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
+            --model ${{ matrix.stable-diffusion-model }} \
+            --from_file ${{ env.TEST_PROMPTS }} \
+            --root="${{ env.INVOKEAI_ROOT }}" \
+            --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
 
       - name: export conda env
         id: export-conda-env
@@ -121,5 +125,5 @@ jobs:
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ matrix.os }}_${{ matrix.stable-diffusion-model-switch }}
-          path: outputs/img-samples
+          name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
+          path: ${{ env.INVOKEAI_ROOT }}/outputs/img-samples
