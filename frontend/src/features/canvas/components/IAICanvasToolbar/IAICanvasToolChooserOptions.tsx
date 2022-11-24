@@ -86,7 +86,7 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
-    ['['],
+    ['BracketLeft'],
     () => {
       dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
     },
@@ -98,7 +98,7 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
-    [']'],
+    ['BracketRight'],
     () => {
       dispatch(setBrushSize(Math.min(brushSize + 5, 500)));
     },
@@ -107,6 +107,40 @@ const IAICanvasToolChooserOptions = () => {
       preventDefault: true,
     },
     [brushSize]
+  );
+
+  useHotkeys(
+    ['shift+BracketLeft'],
+    () => {
+      dispatch(
+        setBrushColor({
+          ...brushColor,
+          a: _.clamp(brushColor.a - 0.05, 0.05, 1),
+        })
+      );
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [brushColor]
+  );
+
+  useHotkeys(
+    ['shift+BracketRight'],
+    () => {
+      dispatch(
+        setBrushColor({
+          ...brushColor,
+          a: _.clamp(brushColor.a + 0.05, 0.05, 1),
+        })
+      );
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    },
+    [brushColor]
   );
 
   const handleSelectBrushTool = () => dispatch(setTool('brush'));
