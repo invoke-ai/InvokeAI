@@ -49,8 +49,7 @@ setup(
     packages=find_packages(exclude=['tests.*']),
     install_requires=_get_requirements('installer/requirements.in'),
     dependency_links=['https://download.pytorch.org/whl/torch_stable.html'],
-    data_files=[('frontend', frontend_files)],
-    python_requires='>=3.8, <4',
+    python_requires='>=3.9, <4',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: GPU',
