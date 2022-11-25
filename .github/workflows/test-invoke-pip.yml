@@ -1,16 +1,16 @@
 name: Test invoke.py pip
-on:
-  push:
-    branches:
-      - 'main'
-      - 'development'
-  pull_request:
-    branches:
-      - 'main'
-      - 'development'
+on: [push, pull_request]
 
 jobs:
   matrix:
+    # Run on:
+    # - pull requests
+    # - pushes to forks (will run in the forked project with that fork's secrets)
+    # - pushes to branches that are *not* pull requests
+    if: |
+      github.event_name == 'pull_request'
+      || github.repository != 'invoke-ai/InvokeAI'
+      || github.ref_protected
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +44,8 @@ jobs:
         shell: ${{ matrix.default-shell }}
     env:
       INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
+      PYTHONUNBUFFERED: 1
+      HAVE_SECRETS: ${{ secrets.HUGGINGFACE_TOKEN != '' }}
     steps:
       - name: Checkout sources
         id: checkout-sources
@@ -53,6 +55,19 @@ jobs:
         run: |
           mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
           cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
+
+      - name: Use Cached Stable Diffusion Model
+        id: cache-sd-model
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-${{ matrix.stable-diffusion-model }}
+        with:
+          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          key: ${{ env.cache-name }}
+
+      - name: Check model availability
+        if: steps.cache-sd-model.outputs.cache-hit != true && env.HAVE_SECRETS != 'true'
+        run: echo -e '\a ⛔ GitHub model cache not found, and no HUGGINGFACE_TOKEN is available. Will not be able to load Stable Diffusion.' ; exit 1
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -84,32 +99,20 @@ jobs:
           ${{ env.pythonLocation }}/bin/pip install --upgrade -r '${{ matrix.requirements-file }}'
           ${{ env.pythonLocation }}/bin/pip install -e .
 
-      - name: Use Cached Stable Diffusion Model
-        id: cache-sd-model
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-${{ matrix.stable-diffusion-model }}
-        with:
-          path: ${{ matrix.stable-diffusion-model-dl-path }}
-          key: ${{ env.cache-name }}
-
-      - name: Download ${{ matrix.stable-diffusion-model }}
-        id: download-stable-diffusion-model
-        if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
-        run: |
-          mkdir -p "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}"
-          curl \
-            -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
-            -o "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" \
-            -L ${{ matrix.stable-diffusion-model-url }}
-
       - name: run configure_invokeai.py
         id: run-preload-models
         run: |
-          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
+          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py \
+              --no-interactive --yes \
+              --full-precision  # can't use fp16 weights without a GPU
 
       - name: Run the tests
         id: run-tests
+        env:
+          # Set offline mode to make sure configure preloaded successfully.
+          HF_HUB_OFFLINE: 1
+          HF_DATASETS_OFFLINE: 1
+          TRANSFORMERS_OFFLINE: 1
         run: |
           time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
             --model ${{ matrix.stable-diffusion-model }} \

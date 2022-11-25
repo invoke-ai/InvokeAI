@@ -61,7 +61,7 @@ jobs:
         id: cache-sd-model
         uses: actions/cache@v3
         env:
-          cache-name: huggingface-${{ matrix.stable-diffusion-model-switch }}
+          cache-name: huggingface-${{ matrix.stable-diffusion-model }}
         with:
           path: ~/.cache/huggingface
           key: ${{ env.cache-name }}
@@ -105,12 +105,13 @@ jobs:
             echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
           fi
           python scripts/configure_invokeai.py \
-            --no-interactive \
+            --no-interactive --yes \
             --full-precision  # can't use fp16 weights without a GPU
 
       - name: Run the tests
         id: run-tests
         env:
+          # Set offline mode to make sure configure preloaded successfully.
           HF_HUB_OFFLINE: 1
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
