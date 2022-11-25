@@ -1,8 +1,0 @@
-stable-diffusion-1.5:
-  description: The newest Stable Diffusion version 1.5 weight file (4.27 GB)
-  weights: /data/models/v1-5-pruned-emaonly.ckpt
-  config: ./configs/stable-diffusion/v1-inference.yaml
-  width: 512
-  height: 512
-  vae: ./models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
-  default: true
