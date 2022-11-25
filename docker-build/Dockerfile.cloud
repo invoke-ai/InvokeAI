@@ -57,6 +57,6 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 COPY --from=builder ${APP_ROOT} ${APP_ROOT}
 
-ENTRYPOINT ["bash", "-c", "python3 scripts/invoke.py" ]
+ENTRYPOINT ["bash"]
 
-CMD ["--web", "--host 0.0.0.0"]
+CMD ["-c", "python3 scripts/invoke.py --web --host 0.0.0.0"]
