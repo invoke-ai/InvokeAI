@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         stable-diffusion-model:
-          - diffusers-1.5
+          - diffusers-1.4
         requirements-file:
           - requirements-lin-cuda.txt
           - requirements-lin-amd.txt
@@ -59,10 +59,6 @@ jobs:
         with:
           path: ~/.cache/huggingface
           key: ${{ env.cache-name }}
-
-      - name: Check model availability
-        if: steps.cache-sd-model.outputs.cache-hit != true && env.HAVE_SECRETS != 'true'
-        run: echo -e '\a ⛔ GitHub model cache not found, and no HUGGINGFACE_TOKEN is available. Will not be able to load Stable Diffusion.' ; exit 1
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
