@@ -49,7 +49,6 @@ setup(
     packages=find_packages(exclude=['tests.*']),
     install_requires=_get_requirements('installer/requirements.in'),
     dependency_links=['https://download.pytorch.org/whl/torch_stable.html'],
-    scripts=['scripts/invoke.py', 'scripts/configure_invokeai.py', 'scripts/sd-metadata.py'],
     data_files=[('frontend', frontend_files)],
     python_requires='>=3.8, <4',
     classifiers=[
