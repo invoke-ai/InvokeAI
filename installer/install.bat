@@ -122,7 +122,7 @@ set err_msg=----- pip update failed -----
 .venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location --upgrade pip wheel
 if %errorlevel% neq 0 goto err_exit
 
-echo ***** Updated pip *****
+echo ***** Updated pip and wheel *****
 
 set err_msg=----- requirements file copy failed -----
 copy installer\py3.10-windows-x86_64-cuda-reqs.txt requirements.txt
@@ -132,14 +132,16 @@ set err_msg=----- main pip install failed -----
 .venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location -r requirements.txt
 if %errorlevel% neq 0 goto err_exit
 
+echo ***** Installed Python dependencies *****
+
 set err_msg=----- InvokeAI setup failed -----
 .venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location -e .
 if %errorlevel% neq 0 goto err_exit
 
-echo ***** Installed Python dependencies *****
+echo ***** Installed InvokeAI *****
 
-echo ***** Installing invoke.bat ******
 copy installer\invoke.bat .\invoke.bat
+echo ***** Installed invoke launcher script ******
 
 @rem more cleanup
 rd /s /q installer installer_files
