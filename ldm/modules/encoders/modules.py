@@ -497,7 +497,7 @@ class FrozenOpenCLIPEmbedder(AbstractEncoder):
         for param in self.parameters():
             param.requires_grad = False
 
-    def forward(self, text):
+    def forward(self, text, **kwargs):
         tokens = open_clip.tokenize(text)
         z = self.encode_with_transformer(tokens.to(self.device))
         return z
@@ -521,8 +521,9 @@ class FrozenOpenCLIPEmbedder(AbstractEncoder):
                 x = r(x, attn_mask=attn_mask)
         return x
 
-    def encode(self, text):
-        return self(text)
+    def encode(self, text, **kwargs):
+        return self(text, **kwargs)
+
 class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
     fragment_weights_key = "fragment_weights"

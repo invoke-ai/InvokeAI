@@ -684,6 +684,9 @@ class LatentDiffusion(DDPM):
         for param in self.model.parameters():
             param.requires_grad = False
 
+        # v2- disable unsupported embedding_manager
+        self.embedding_manager = None
+        """
         self.embedding_manager = self.instantiate_embedding_manager(
             personalization_config, self.cond_stage_model
         )
@@ -695,6 +698,8 @@ class LatentDiffusion(DDPM):
 
         for param in self.embedding_manager.embedding_parameters():
             param.requires_grad = True
+        """
+
 
     def make_cond_schedule(
         self,
@@ -836,7 +841,10 @@ class LatentDiffusion(DDPM):
                 self.cond_stage_model.encode
             ):
                 c = self.cond_stage_model.encode(
-                    c, embedding_manager=self.embedding_manager,**kwargs
+                    c,
+                    # disabled for sd2
+                    #embedding_manager=self.embedding_manager,
+                    **kwargs
                 )
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()

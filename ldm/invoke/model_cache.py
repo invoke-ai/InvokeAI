@@ -223,7 +223,7 @@ class ModelCache(object):
         omega_config = OmegaConf.load(config)
         with open(weights,'rb') as f:
             weight_bytes = f.read()
-        model_hash  = self._cached_sha256(weights,weight_bytes)
+        model_hash = self._cached_sha256(weights,weight_bytes)
         sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
         del weight_bytes
         sd = sd['state_dict']
