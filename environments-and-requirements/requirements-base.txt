@@ -1,7 +1,7 @@
 # pip will resolve the version which matches torch
 albumentations
 dependency_injector==4.40.0
-diffusers[torch]~=0.8
+diffusers[torch]~=0.9
 einops
 eventlet
 facexlib
