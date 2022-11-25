@@ -16,8 +16,8 @@ def _get_requirements(path):
     try:
         with open(path) as f:
             packages = f.read().splitlines()
-    except OSError as ex:
-        raise RuntimeError('Cannot open file with requirements: %s', repr(ex))
+    except (IOError, OSError) as ex:
+        raise RuntimeError("Can't open file with requirements: %s", repr(ex))
 
     # Drop option lines
     packages = [package for package in packages if not re.match(r'^--', package)]
@@ -74,4 +74,6 @@ setup(
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
+    scripts = ['scripts/invoke.py','scripts/configure_invokeai.py', 'scripts/preload_models.py', 'scripts/sd-metadata.py'],
+    data_files=[('frontend',frontend_files)],
 )
