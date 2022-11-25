@@ -4,15 +4,20 @@ They are moved between GPU and CPU as necessary. If CPU memory falls
 below a preset minimum, the least recently used model will be
 cleared and loaded from disk when next needed.
 '''
+from __future__ import annotations
+
+import contextlib
 import gc
 import hashlib
 import io
 import os
 import sys
+import textwrap
 import time
 import traceback
 import warnings
 from pathlib import Path
+from typing import Union
 
 import torch
 import transformers
