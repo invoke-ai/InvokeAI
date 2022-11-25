@@ -1,0 +1,125 @@
+name: Test invoke.py pip
+on:
+  push:
+    branches:
+      - 'main'
+      - 'development'
+  pull_request:
+    branches:
+      - 'main'
+      - 'development'
+
+jobs:
+  matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        stable-diffusion-model:
+          - stable-diffusion-1.5
+        requirements-file:
+          - requirements-lin-cuda.txt
+          - requirements-lin-amd.txt
+          - requirements-mac-mps-cpu.txt
+        python-version:
+          - '3.9'
+          - '3.10'
+        include:
+          - requirements-file: requirements-lin-cuda.txt
+            os: ubuntu-latest
+            default-shell: bash -l {0}
+          - requirements-file: requirements-lin-amd.txt
+            os: ubuntu-latest
+            default-shell: bash -l {0}
+          - requirements-file: requirements-mac-mps-cpu.txt
+            os: macOS-12
+            default-shell: bash -l {0}
+          - stable-diffusion-model: stable-diffusion-1.5
+            stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
+            stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
+    name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.default-shell }}
+    env:
+      INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
+    steps:
+      - name: Checkout sources
+        id: checkout-sources
+        uses: actions/checkout@v3
+
+      - name: create models.yaml from example
+        run: |
+          mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
+          cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
+
+      - name: set test prompt to main branch validation
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_ENV
+
+      - name: set test prompt to development branch validation
+        if: ${{ github.ref == 'refs/heads/development' }}
+        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_ENV
+
+      - name: set test prompt to Pull Request validation
+        if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
+        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
+
+      - name: create requirements.txt
+        run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
+
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: ${{ matrix.requirements-file }}
+
+      # - name: install dependencies
+      #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
+
+      - name: install requirements
+        run: |
+          ${{ env.pythonLocation }}/bin/pip install --upgrade -r '${{ matrix.requirements-file }}'
+          ${{ env.pythonLocation }}/bin/pip install -e .
+
+      - name: Use Cached Stable Diffusion Model
+        id: cache-sd-model
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-${{ matrix.stable-diffusion-model }}
+        with:
+          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          key: ${{ env.cache-name }}
+
+      - name: Download ${{ matrix.stable-diffusion-model }}
+        id: download-stable-diffusion-model
+        if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
+        run: |
+          mkdir -p "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}"
+          curl \
+            -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
+            -o "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" \
+            -L ${{ matrix.stable-diffusion-model-url }}
+
+      - name: run configure_invokeai.py
+        id: run-preload-models
+        run: |
+          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
+
+      - name: Run the tests
+        id: run-tests
+        run: |
+          time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
+            --model ${{ matrix.stable-diffusion-model }} \
+            --from_file ${{ env.TEST_PROMPTS }} \
+            --root="${{ env.INVOKEAI_ROOT }}" \
+            --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
+
+      - name: Archive results
+        id: archive-results
+        uses: actions/upload-artifact@v3
+        with:
+          name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
+          path: ${{ env.INVOKEAI_ROOT }}/outputs/img-samples
