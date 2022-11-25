@@ -4,12 +4,16 @@
 accelerate~=0.14
 albumentations
 diffusers
+einops
 eventlet
+facexlib
 flask_cors
 flask_socketio
 flaskwebgui
 getpass_asterisk
 imageio-ffmpeg
+kornia
+numpy
 pyreadline3
 realesrgan
 send2trash
@@ -17,10 +21,8 @@ streamlit
 taming-transformers-rom1504
 test-tube
 torch-fidelity
-torch==1.12.1 ; platform_system == 'Darwin'
-torch==1.12.0+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
-torchvision==0.13.0 ; platform_system == 'Darwin'
-torchvision==0.13.0+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
+torch
+torchvision
 transformers
 picklescan
 https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip
