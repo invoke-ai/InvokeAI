@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         stable-diffusion-model:
-          - 'stable-diffusion-1.5'
+          - 'diffusers-1.5'
         environment-yaml:
           - environment-lin-amd.yml
           - environment-lin-cuda.yml
@@ -29,13 +29,7 @@ jobs:
           - environment-yaml: environment-mac.yml
             os: macos-12
             default-shell: bash -l {0}
-          # - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
-          #   stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
-          #   stable-diffusion-model-switch: stable-diffusion-1.4
-          - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-switch: diffusers-1.5
-    name: ${{ matrix.os }} with ${{ matrix.stable-diffusion-model-switch }}
+    name: ${{ matrix.environment-yaml }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
@@ -62,7 +56,7 @@ jobs:
         id: cache-sd-model
         uses: actions/cache@v3
         env:
-          cache-name: huggingface-${{ matrix.stable-diffusion-model-switch }}
+          cache-name: huggingface-${{ matrix.stable-diffusion-model }}
         with:
           path: ~/.cache/huggingface
           key: ${{ env.cache-name }}
@@ -106,7 +100,7 @@ jobs:
             echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
           fi
           python scripts/preload_models.py \
-            --no-interactive \
+            --no-interactive --yes \
             --full-precision  # can't use fp16 weights without a GPU
 
       - name: cat ~/.invokeai
@@ -116,6 +110,7 @@ jobs:
       - name: Run the tests
         id: run-tests
         env:
+          # Set offline mode to make sure configure preloaded successfully.
           HF_HUB_OFFLINE: 1
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
