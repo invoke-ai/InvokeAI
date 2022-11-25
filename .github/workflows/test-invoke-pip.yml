@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         stable-diffusion-model:
-          - stable-diffusion-1.5
+          - diffusers-1.5
         requirements-file:
           - requirements-lin-cuda.txt
           - requirements-lin-amd.txt
@@ -33,10 +33,6 @@ jobs:
           - requirements-file: requirements-mac-mps-cpu.txt
             os: macOS-12
             default-shell: bash -l {0}
-          - stable-diffusion-model: stable-diffusion-1.5
-            stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
-            stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
     name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     defaults:
@@ -60,9 +56,9 @@ jobs:
         id: cache-sd-model
         uses: actions/cache@v3
         env:
-          cache-name: cache-${{ matrix.stable-diffusion-model }}
+          cache-name: huggingface-${{ matrix.stable-diffusion-model }}
         with:
-          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          path: ~/.cache/huggingface
           key: ${{ env.cache-name }}
 
       - name: Check model availability
