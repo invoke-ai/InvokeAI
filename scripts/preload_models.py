@@ -260,7 +260,7 @@ def migrate_models_ckpt():
     rename = yes_or_no(f'Ok to rename it to "{new_name}" for future reference?')
     if rename:
         print(f'model.ckpt => {new_name}')
-        os.rename(os.path.join(Model_dir,'model.ckpt'),os.path.join(Model_dir,new_name))
+        os.replace(os.path.join(Model_dir,'model.ckpt'),os.path.join(Model_dir,new_name))
             
 #---------------------------------------------
 def download_weight_datasets(models:dict, access_token:str):
@@ -347,12 +347,12 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
     try:
         if os.path.exists(Config_file):
             print(f'** {Config_file} exists. Renaming to {Config_file}.orig')
-            os.rename(Config_file,f'{Config_file}.orig')
+            os.replace(Config_file,f'{Config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(Config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
             outfile.write(Config_preamble)
             outfile.write(yaml)
-        os.rename(tmpfile,Config_file)
+        os.replace(tmpfile,Config_file)
 
     except Exception as e:
         print(f'**Error creating config file {Config_file}: {str(e)} **')
