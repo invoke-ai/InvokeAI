@@ -3,13 +3,8 @@ import re
 
 from setuptools import setup, find_packages
 
-def frontend_files(directory):
-     paths = []
-     for (path, directories, filenames) in os.walk(directory):
-         for filename in filenames:
-             paths.append(os.path.join(path, filename))
-     return paths
-
+def list_files(directory):
+    return [os.path.join(directory,x) for x in os.listdir(directory) if os.path.isfile(os.path.join(directory,x))]
 
 def _get_requirements(path):
     try:
@@ -23,9 +18,6 @@ def _get_requirements(path):
     packages = [package for package in packages if not re.match(r"^http", package)]
     return packages
 
-
-frontend_files = frontend_files('frontend/dist')
-print(f'DEBUG: {frontend_files}')
 
 VERSION = '2.1.4'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
@@ -70,7 +62,11 @@ setup(
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
-    scripts = ['scripts/invoke.py','scripts/configure_invokeai.py', 'scripts/sd-metadata.py'],
-    data_files=[('frontend',frontend_files)],
+    scripts = ['scripts/invoke.py','scripts/configure_invokeai.py', 'scripts/sd-metadata.py',
+               'scripts/preload_models.py', 'scripts/images2prompt.py','scripts/merge_embeddings.py'
+    ],
+    data_files=[('frontend/dist',list_files('frontend/dist')),
+                ('frontend/dist/assets',list_files('frontend/dist/assets'))
+    ],
 )
 
