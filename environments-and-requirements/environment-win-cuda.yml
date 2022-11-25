@@ -15,7 +15,7 @@ dependencies:
     - albumentations==0.4.3
     - basicsr==1.4.1
     - dependency_injector==4.40.0
-    - diffusers~=0.8
+    - diffusers~=0.9
     - einops==0.3.0
     - eventlet
     - flask==2.1.3
