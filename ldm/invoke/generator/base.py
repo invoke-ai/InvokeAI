@@ -2,6 +2,8 @@
 Base class for ldm.invoke.generator.*
 including img2img, txt2img, and inpaint
 '''
+from __future__ import annotations
+
 import os
 import random
 import traceback
