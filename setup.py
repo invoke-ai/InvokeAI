@@ -17,7 +17,7 @@ def _get_requirements(path):
             packages = f.read().splitlines()
     except (IOError, OSError) as ex:
         raise RuntimeError("Can't open file with requirements: %s", repr(ex))
- 
+
     # Drop option lines
     packages = [package for package in packages if not re.match(r"^--", package)]
     packages = [package for package in packages if not re.match(r"^http", package)]
@@ -70,7 +70,7 @@ setup(
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
-    scripts = ['scripts/invoke.py','scripts/configure_invokeai.py','scripts/sd-metadata.py'],
+    scripts = ['scripts/invoke.py','scripts/configure_invokeai.py', 'scripts/sd-metadata.py'],
     data_files=[('frontend',frontend_files)],
 )
 
