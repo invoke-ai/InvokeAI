@@ -78,11 +78,12 @@ class ModelCache(object):
         else: # we're about to load a new model, so potentially offload the least recently used one
             try:
                 requested_model, width, height, hash = self._load_model(model_name)
-                self.models[model_name] = {}
-                self.models[model_name]['model'] = requested_model
-                self.models[model_name]['width'] = width
-                self.models[model_name]['height'] = height
-                self.models[model_name]['hash'] = hash
+                self.models[model_name] = {
+                    'model': requested_model,
+                    'width': width,
+                    'height': height,
+                    'hash': hash,
+                }
 
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')

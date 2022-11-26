@@ -832,6 +832,7 @@ class Generate:
         model_data = cache.get_model(model_name)
         if model_data is None:  # restore previous
             model_data = cache.get_model(self.model_name)
+            model_name = self.model_name # addresses Issue #1547
 
         self.model = model_data['model']
         self.width = model_data['width']
