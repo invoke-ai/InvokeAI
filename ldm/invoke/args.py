@@ -552,6 +552,11 @@ class Args(object):
             type=str,
             help='Path to a pre-trained embedding manager checkpoint - can only be set on command line',
         )
+        render_group.add_argument(
+            '--enable_image_debugging',
+            action='store_true',
+            help='Generates debugging image to display'
+        )
         # Restoration related args
         postprocessing_group.add_argument(
             '--no_restore',
@@ -611,6 +616,18 @@ class Args(object):
             type=int,
             default='9090',
             help='Web server: Port to listen on'
+        )
+        web_server_group.add_argument(
+            '--certfile',
+            type=str,
+            default=None,
+            help='Web server: Path to certificate file to use for SSL. Use together with --keyfile'
+        )
+        web_server_group.add_argument(
+            '--keyfile',
+            type=str,
+            default=None,
+            help='Web server: Path to private key file to use for SSL. Use together with --certfile'
         )
         web_server_group.add_argument(
             '--gui',
