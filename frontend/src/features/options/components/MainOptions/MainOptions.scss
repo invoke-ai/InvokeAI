@@ -1,0 +1,42 @@
+@use '../../../../styles/Mixins/' as *;
+
+.main-options {
+  display: grid;
+  row-gap: 1rem;
+}
+
+.main-options-list {
+  display: grid;
+  row-gap: 1rem;
+}
+
+.main-options-row {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  column-gap: 0.5rem;
+  max-width: $options-bar-max-width;
+}
+
+.main-option-block {
+  border-radius: 0.5rem;
+  display: grid !important;
+  grid-template-columns: auto !important;
+  row-gap: 0.5rem;
+
+  .invokeai__number-input-form-label,
+  .invokeai__select-label {
+    font-weight: bold;
+    font-size: 0.9rem !important;
+  }
+
+  .invokeai__select-label {
+    margin: 0;
+  }
+}
+
+.advanced-options-checkbox {
+  background-color: var(--background-color-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
+  font-weight: bold;
+}

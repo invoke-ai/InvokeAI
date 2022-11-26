@@ -4,23 +4,22 @@ import { Socket } from 'socket.io-client';
 import {
   frontendToBackendParameters,
   FrontendToBackendParametersConfig,
-} from '../../common/util/parameterTranslation';
+} from 'common/util/parameterTranslation';
 import {
   GalleryCategory,
   GalleryState,
   removeImage,
-} from '../../features/gallery/gallerySlice';
-import { OptionsState } from '../../features/options/optionsSlice';
+} from 'features/gallery/store/gallerySlice';
+import { OptionsState } from 'features/options/store/optionsSlice';
 import {
   addLogEntry,
-  errorOccurred,
+  generationRequested,
   modelChangeRequested,
   setIsProcessing,
-} from '../../features/system/systemSlice';
-import { inpaintingImageElementRef } from '../../features/tabs/Inpainting/InpaintingCanvas';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import * as InvokeAI from '../invokeai';
-import { RootState } from '../store';
+} from 'features/system/store/systemSlice';
+import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import * as InvokeAI from 'app/invokeai';
+import { RootState } from 'app/store';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -42,7 +41,7 @@ const makeSocketIOEmitters = (
       const {
         options: optionsState,
         system: systemState,
-        inpainting: inpaintingState,
+        canvas: canvasState,
         gallery: galleryState,
       } = state;
 
@@ -50,32 +49,13 @@ const makeSocketIOEmitters = (
         {
           generationMode,
           optionsState,
-          inpaintingState,
+          canvasState,
           systemState,
         };
 
-      if (generationMode === 'inpainting') {
-        if (
-          !inpaintingImageElementRef.current ||
-          !inpaintingState.imageToInpaint?.url
-        ) {
-          dispatch(
-            addLogEntry({
-              timestamp: dateFormat(new Date(), 'isoDateTime'),
-              message: 'Inpainting image not loaded, cannot generate image.',
-              level: 'error',
-            })
-          );
-          dispatch(errorOccurred());
-          return;
-        }
+      dispatch(generationRequested());
 
-        frontendToBackendParametersConfig.imageToProcessUrl =
-          inpaintingState.imageToInpaint.url;
-
-        frontendToBackendParametersConfig.maskImageElement =
-          inpaintingImageElementRef.current;
-      } else if (!['txt2img', 'img2img'].includes(generationMode)) {
+      if (!['txt2img', 'img2img'].includes(generationMode)) {
         if (!galleryState.currentImage?.url) return;
 
         frontendToBackendParametersConfig.imageToProcessUrl =
@@ -96,7 +76,12 @@ const makeSocketIOEmitters = (
       // TODO: handle maintaining masks for reproducibility in future
       if (generationParameters.init_mask) {
         generationParameters.init_mask = generationParameters.init_mask
-          .substr(0, 20)
+          .substr(0, 64)
+          .concat('...');
+      }
+      if (generationParameters.init_img) {
+        generationParameters.init_img = generationParameters.init_img
+          .substr(0, 64)
           .concat('...');
       }
 
@@ -162,9 +147,9 @@ const makeSocketIOEmitters = (
       );
     },
     emitDeleteImage: (imageToDelete: InvokeAI.Image) => {
-      const { url, uuid, category } = imageToDelete;
+      const { url, uuid, category, thumbnail } = imageToDelete;
       dispatch(removeImage(imageToDelete));
-      socketio.emit('deleteImage', url, uuid, category);
+      socketio.emit('deleteImage', url, thumbnail, uuid, category);
     },
     emitRequestImages: (category: GalleryCategory) => {
       const gallery: GalleryState = getState().gallery;
@@ -179,19 +164,18 @@ const makeSocketIOEmitters = (
     emitCancelProcessing: () => {
       socketio.emit('cancel');
     },
-    emitUploadImage: (payload: InvokeAI.UploadImagePayload) => {
-      const { file, destination } = payload;
-      socketio.emit('uploadImage', file, file.name, destination);
-    },
-    emitUploadMaskImage: (file: File) => {
-      socketio.emit('uploadMaskImage', file, file.name);
-    },
     emitRequestSystemConfig: () => {
       socketio.emit('requestSystemConfig');
     },
     emitRequestModelChange: (modelName: string) => {
       dispatch(modelChangeRequested());
       socketio.emit('requestModelChange', modelName);
+    },
+    emitSaveStagingAreaImageToGallery: (url: string) => {
+      socketio.emit('requestSaveStagingAreaImageToGallery', url);
+    },
+    emitRequestEmptyTempFolder: () => {
+      socketio.emit('requestEmptyTempFolder');
     },
   };
 };
