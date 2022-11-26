@@ -1,7 +1,6 @@
 *
 !backend
 !configs
-!docker-build/entrypoint.sh
 !environments-and-requirements
 !frontend
 !installer
