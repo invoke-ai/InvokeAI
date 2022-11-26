@@ -232,7 +232,7 @@ def migrate_models_ckpt():
     rename = yes_or_no(f'Ok to rename it to "{new_name}" for future reference?')
     if rename:
         print(f'model.ckpt => {new_name}')
-        os.rename(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
+        os.replace(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
             
 #---------------------------------------------
 def download_weight_datasets(models:dict, access_token:str):
@@ -340,12 +340,12 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
     try:
         if os.path.exists(config_file):
             print(f'** {config_file} exists. Renaming to {config_file}.orig')
-            os.rename(config_file,f'{config_file}.orig')
+            os.replace(config_file,f'{config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
             outfile.write(Config_preamble)
             outfile.write(yaml)
-        os.rename(tmpfile,config_file)
+        os.replace(tmpfile,config_file)
 
     except Exception as e:
         print(f'**Error creating config file {config_file}: {str(e)} **')
@@ -592,13 +592,13 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'InvokeAI models and configuration files will be placed into {root} and image outputs will be placed into {outputs}.')
     print(f'\nYou may change these values at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
-    for name in ('models','configs','scripts','frontend/dist'):
+    for name in ('models','configs'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in ('configs','scripts','frontend/dist'):
+    for src in ['configs']:
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
-    os.makedirs(outputs)
+    os.makedirs(outputs, exist_ok=True)
 
     init_file = os.path.expanduser(Globals.initfile)
     if not os.path.exists(init_file):
@@ -679,7 +679,7 @@ def main():
         if Globals.root == '' \
            or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
            or not os.path.exists(os.path.join(Globals.root,'frontend/dist')):
-            initialize_rootdir(Globals.root,opt.yes_to_all)
+            initialize_rootdir(Globals.root,(not opt.interactive) or opt.yes_to_all)
 
         print(f'(Initializing with runtime root {Globals.root})\n')
 
