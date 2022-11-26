@@ -192,7 +192,7 @@ _err_msg="\n----- pip update failed -----\n"
 .venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location --upgrade pip wheel
 _err_exit $? _err_msg
 
-echo -e "\n***** Updated pip *****\n"
+echo -e "\n***** Updated pip and wheel *****\n"
 
 _err_msg="\n----- requirements file copy failed -----\n"
 cp installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt
@@ -202,14 +202,16 @@ _err_msg="\n----- main pip install failed -----\n"
 .venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location -r requirements.txt
 _err_exit $? _err_msg
 
+echo -e "\n***** Installed Python dependencies *****\n"
+
 _err_msg="\n----- InvokeAI setup failed -----\n"
 .venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location -e .
 _err_exit $? _err_msg
 
-echo -e "\n***** Installed Python dependencies *****\n"
+echo -e "\n***** Installed InvokeAI *****\n"
 
-echo -e "\n***** Installing invoke.sh ******\n"
 cp installer/invoke.sh .
+echo -e "\n***** Installed invoke launcher script ******\n"
 
 # more cleanup
 rm -rf installer/ installer_files/

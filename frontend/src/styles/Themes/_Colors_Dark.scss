@@ -1,0 +1,134 @@
+[data-theme='dark'] {
+  // General Colors
+  --white: rgb(255, 255, 255);
+
+  // Accent Colors
+  --accent-color-dim: rgb(57, 25, 153);
+  --accent-color: rgb(80, 40, 200);
+  --accent-color-bright: rgb(104, 60, 230);
+  --accent-color-hover: var(--accent-color-bright);
+
+  // App Colors
+  --root-bg-color: rgb(10, 10, 10);
+  --background-color: rgb(26, 26, 32);
+  --background-color-light: rgb(40, 44, 48);
+  --background-color-secondary: rgb(16, 16, 22);
+
+  --text-color: rgb(255, 255, 255);
+  --text-color-secondary: rgb(160, 162, 188);
+  --subtext-color: rgb(24, 24, 34);
+  --subtext-color-bright: rgb(48, 48, 64);
+
+  --border-color: rgb(30, 30, 46);
+  --border-color-light: rgb(60, 60, 76);
+
+  --svg-color: rgb(255, 255, 255);
+
+  --invalid: rgb(255, 75, 75);
+  --invalid-secondary: rgb(120, 5, 5);
+
+  --destructive-color: rgb(185, 55, 55);
+  --destructive-color-hover: rgb(255, 75, 75);
+
+  --warning-color: rgb(200, 88, 40);
+  --warning-color-hover: rgb(230, 117, 60);
+
+  // Error status colors
+  --border-color-invalid: rgb(255, 80, 50);
+  --box-shadow-color-invalid: rgb(210, 30, 10);
+
+  // Tabs
+  --tab-color: rgb(30, 32, 42);
+  --tab-hover-color: rgb(46, 48, 58);
+  --tab-panel-bg: rgb(36, 38, 48);
+  --tab-list-bg: var(--accent-color);
+  --tab-list-text: rgb(202, 204, 216);
+  --tab-list-text-inactive: rgb(92, 94, 114);
+
+  // Button Colors
+  --btn-base-color: rgb(30, 32, 42);
+  --btn-base-color-hover: rgb(46, 48, 68);
+
+  --btn-load-more: rgb(30, 32, 42);
+  --btn-load-more-hover: rgb(54, 56, 66);
+
+  --btn-svg-color: rgb(255, 255, 255);
+  --btn-delete-image: rgb(182, 46, 46);
+
+  // IAI Button Colors
+  --btn-checkbox-border-hover: rgb(46, 48, 68);
+
+  // Progress Bar Color
+  --progress-bar-color: var(--accent-color);
+
+  // Prompt Box Colors
+  --prompt-bg-color: rgb(10, 10, 10);
+
+  // Switch
+  --switch-bg-color: rgb(100, 102, 110);
+  --switch-bg-active-color: var(--accent-color);
+
+  // Slider
+  --slider-color: var(--accent-color-bright);
+
+  // Slider
+  --slider-color: rgb(151, 113, 255);
+
+  // Resizable
+  --resizeable-handle-border-color: var(--accent-color);
+
+  // Metadata Viewer
+  --metadata-bg-color: rgba(0, 0, 0, 0.7);
+  --metadata-json-bg-color: rgba(255, 255, 255, 0.1);
+
+  // Status Message
+  --status-good-color: rgb(125, 255, 100);
+  --status-good-glow: rgb(40, 215, 40);
+  --status-working-color: rgb(255, 175, 55);
+  --status-working-glow: rgb(255, 160, 55);
+  --status-bad-color: rgb(255, 90, 90);
+  --status-bad-glow: rgb(255, 40, 40);
+
+  // Settings Modal
+  --settings-modal-bg: rgb(30, 32, 42);
+
+  // Input
+  --input-checkbox-bg: rgb(60, 64, 68);
+  --input-checkbox-checked-bg: var(--accent-color);
+  --input-checkbox-checked-tick: rgb(0, 0, 0);
+
+  --input-border-color: var(--accent-color-bright);
+  --input-box-shadow-color: var(--accent-color);
+
+  // Console
+  --error-level-info: rgb(200, 202, 224);
+  --error-level-warning: rgb(255, 225, 105);
+  --error-level-error: rgb(255, 81, 46);
+  --console-bg-color: rgb(30, 30, 36);
+  --console-icon-button-bg-color: rgb(50, 53, 64);
+  --console-icon-button-bg-color-hover: rgb(70, 73, 84);
+
+  // Img2Img
+  --img2img-img-bg-color: rgb(30, 32, 42);
+
+  // Gallery
+
+  // Context Menus
+  --context-menu-bg-color: rgb(46, 48, 58);
+  --context-menu-box-shadow: none;
+  --context-menu-bg-color-hover: rgb(30, 32, 42);
+
+  // Shadows
+  --floating-button-drop-shadow-color: var(--accent-color);
+
+  // Canvas
+  --inpainting-alerts-bg: rgba(20, 20, 26, 0.75);
+  --inpainting-alerts-icon-color: rgb(255, 255, 255);
+  --inpainting-alerts-bg-active: var(--accent-color);
+  --inpainting-alerts-icon-active: rgb(255, 255, 255);
+  --inpainting-alerts-bg-alert: var(--invalid);
+  --inpainting-alerts-icon-alert: rgb(255, 255, 255);
+
+  // Checkerboard
+  --checkboard-dots-color: rgb(35, 35, 39);
+}

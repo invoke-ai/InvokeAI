@@ -14,8 +14,8 @@ def _get_requirements(path):
         raise RuntimeError("Can't open file with requirements: %s", repr(ex))
 
     # Drop option lines
-    packages = [package for package in packages if not re.match(r"^--", package)]
-    packages = [package for package in packages if not re.match(r"^http", package)]
+    packages = [package for package in packages if not re.match(r'^--', package)]
+    print(f'Packages found for "install_requires":\n{packages}')
     return packages
 
 
@@ -23,9 +23,9 @@ VERSION = '2.1.4'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
 LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, an'
-                     ' interactive command-line script that combines text2img and img2img'
-                     ' functionality in a "dream bot" style interface, and multiple features'
-                     ' and other enhancements.')
+                    ' interactive command-line script that combines text2img and img2img'
+                    ' functionality in a "dream bot" style interface, and multiple features'
+                    ' and other enhancements.')
 HOMEPAGE = 'https://github.com/invoke-ai/InvokeAI'
 
 setup(
@@ -39,7 +39,8 @@ setup(
     license='MIT',
     packages=find_packages(exclude=['tests.*']),
     install_requires=_get_requirements('installer/requirements.in'),
-    python_requires='>=3.8, <4',
+    dependency_links=['https://download.pytorch.org/whl/torch_stable.html'],
+    python_requires='>=3.9, <4',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: GPU',
@@ -69,4 +70,3 @@ setup(
                 ('frontend/dist/assets',list_files('frontend/dist/assets'))
     ],
 )
-
