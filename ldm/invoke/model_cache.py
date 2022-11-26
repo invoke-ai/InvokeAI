@@ -126,18 +126,15 @@ class ModelCache(object):
     def list_models(self) -> dict:
         '''
         Return a dict of models in the format:
-        {
-            model_name1: {
-                'status': ('active'|'cached'|'not loaded'),
-                'description': description,
-               },
-            model_name2: { etc },
-        }
+        { model_name1: {'status': ('active'|'cached'|'not loaded'),
+                        'description': description,
+                       },
+          model_name2: { etc }
         '''
-        models = {}
-        for name, config in self.config.items():
+        result = dict()
+        for name in self.config:
             try:
-                description = config.description
+                description = self.config[name].description
             except ConfigAttributeError:
                 description = '<no description>'
 
@@ -148,13 +145,11 @@ class ModelCache(object):
             else:
                 status = 'not loaded'
 
-            models = models.update(
-                name = {
-                    'status': status,
-                    'description': description,
-                })
-
-        return models
+            result[name]={
+                'status' : status,
+                'description' : description
+            }
+        return result
 
     def print_models(self) -> None:
         '''
