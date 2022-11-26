@@ -89,7 +89,7 @@ jobs:
         env:
           cache-name: cache-${{ matrix.stable-diffusion-model }}
         with:
-          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          path: ${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}
           key: ${{ env.cache-name }}
 
       - name: Download ${{ matrix.stable-diffusion-model }}
