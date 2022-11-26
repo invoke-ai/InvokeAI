@@ -202,22 +202,16 @@ class InvokeAIWebServer:
 
         if args.gui:
             print(">> Launching Invoke AI GUI")
-            close_server_on_exit = True
-            if args.web_develop:
-                close_server_on_exit = False
             try:
                 from flaskwebgui import FlaskUI
 
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
-                    start_server="flask-socketio",
-                    host=self.host,
-                    port=self.port,
+                    server="flask_socketio",
                     width=1600,
                     height=1000,
-                    idle_interval=10,
-                    close_server_on_exit=close_server_on_exit,
+                    port=self.port
                 ).run()
             except KeyboardInterrupt:
                 import sys
