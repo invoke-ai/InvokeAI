@@ -1,20 +1,24 @@
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from '../../app/constants';
-import { OptionsState } from '../../features/options/optionsSlice';
-import { SystemState } from '../../features/system/systemSlice';
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
+import { OptionsState } from 'features/options/store/optionsSlice';
+import { SystemState } from 'features/system/store/systemSlice';
 
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import { InpaintingState } from '../../features/tabs/Inpainting/inpaintingSlice';
-import generateMask from '../../features/tabs/Inpainting/util/generateMask';
+import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import {
+  CanvasState,
+  isCanvasMaskLine,
+} from 'features/canvas/store/canvasTypes';
+import generateMask from 'features/canvas/util/generateMask';
+import openBase64ImageInTab from './openBase64ImageInTab';
+import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
   optionsState: OptionsState;
-  inpaintingState: InpaintingState;
+  canvasState: CanvasState;
   systemState: SystemState;
   imageToProcessUrl?: string;
-  maskImageElement?: HTMLImageElement;
 };
 
 /**
@@ -24,46 +28,56 @@ export type FrontendToBackendParametersConfig = {
 export const frontendToBackendParameters = (
   config: FrontendToBackendParametersConfig
 ): { [key: string]: any } => {
+  const canvasBaseLayer = getCanvasBaseLayer();
+
   const {
     generationMode,
     optionsState,
-    inpaintingState,
+    canvasState,
     systemState,
     imageToProcessUrl,
-    maskImageElement,
   } = config;
 
   const {
-    prompt,
-    iterations,
-    steps,
     cfgScale,
-    threshold,
-    perlin,
+    codeformerFidelity,
+    facetoolStrength,
+    facetoolType,
     height,
-    width,
-    sampler,
-    seed,
-    seamless,
     hiresFix,
     img2imgStrength,
+    infillMethod,
     initialImage,
+    iterations,
+    perlin,
+    prompt,
+    sampler,
+    seamBlur,
+    seamless,
+    seamSize,
+    seamSteps,
+    seamStrength,
+    seed,
+    seedWeights,
     shouldFitToWidthHeight,
     shouldGenerateVariations,
-    variationAmount,
-    seedWeights,
+    shouldRandomizeSeed,
     shouldRunESRGAN,
+    shouldRunFacetool,
+    steps,
+    threshold,
+    tileSize,
     upscalingLevel,
     upscalingStrength,
-    shouldRunFacetool,
-    facetoolStrength,
-    codeformerFidelity,
-    facetoolType,
-    shouldRandomizeSeed,
+    variationAmount,
+    width,
   } = optionsState;
 
-  const { shouldDisplayInProgressType, saveIntermediatesInterval } =
-    systemState;
+  const {
+    shouldDisplayInProgressType,
+    saveIntermediatesInterval,
+    enableImageDebugging,
+  } = systemState;
 
   const generationParameters: { [k: string]: any } = {
     prompt,
@@ -80,6 +94,8 @@ export const frontendToBackendParameters = (
     progress_images: shouldDisplayInProgressType === 'full-res',
     progress_latents: shouldDisplayInProgressType === 'latents',
     save_intermediates: saveIntermediatesInterval,
+    generation_mode: generationMode,
+    init_mask: '',
   };
 
   generationParameters.seed = shouldRandomizeSeed
@@ -101,35 +117,38 @@ export const frontendToBackendParameters = (
   }
 
   // inpainting exclusive parameters
-  if (generationMode === 'inpainting' && maskImageElement) {
+  if (generationMode === 'unifiedCanvas' && canvasBaseLayer) {
     const {
-      lines,
-      boundingBoxCoordinate,
+      layerState: { objects },
+      boundingBoxCoordinates,
       boundingBoxDimensions,
       inpaintReplace,
       shouldUseInpaintReplace,
-    } = inpaintingState;
+      stageScale,
+      isMaskEnabled,
+      shouldPreserveMaskedArea,
+      boundingBoxScaleMethod: boundingBoxScale,
+      scaledBoundingBoxDimensions,
+    } = canvasState;
 
     const boundingBox = {
-      ...boundingBoxCoordinate,
+      ...boundingBoxCoordinates,
       ...boundingBoxDimensions,
     };
 
-    generationParameters.init_img = imageToProcessUrl;
-    generationParameters.strength = img2imgStrength;
-    generationParameters.fit = false;
-
-    const { maskDataURL, isMaskEmpty } = generateMask(
-      maskImageElement,
-      lines,
+    const maskDataURL = generateMask(
+      isMaskEnabled ? objects.filter(isCanvasMaskLine) : [],
       boundingBox
     );
 
-    generationParameters.is_mask_empty = isMaskEmpty;
+    generationParameters.init_mask = maskDataURL;
 
-    generationParameters.init_mask = maskDataURL.split(
-      'data:image/png;base64,'
-    )[1];
+    generationParameters.fit = false;
+
+    generationParameters.init_img = imageToProcessUrl;
+    generationParameters.strength = img2imgStrength;
+
+    generationParameters.invert_mask = shouldPreserveMaskedArea;
 
     if (shouldUseInpaintReplace) {
       generationParameters.inpaint_replace = inpaintReplace;
@@ -137,8 +156,47 @@ export const frontendToBackendParameters = (
 
     generationParameters.bounding_box = boundingBox;
 
-    // TODO: The server metadata generation needs to be changed to fix this.
+    const tempScale = canvasBaseLayer.scale();
+
+    canvasBaseLayer.scale({
+      x: 1 / stageScale,
+      y: 1 / stageScale,
+    });
+
+    const absPos = canvasBaseLayer.getAbsolutePosition();
+
+    const imageDataURL = canvasBaseLayer.toDataURL({
+      x: boundingBox.x + absPos.x,
+      y: boundingBox.y + absPos.y,
+      width: boundingBox.width,
+      height: boundingBox.height,
+    });
+
+    if (enableImageDebugging) {
+      openBase64ImageInTab([
+        { base64: maskDataURL, caption: 'mask sent as init_mask' },
+        { base64: imageDataURL, caption: 'image sent as init_img' },
+      ]);
+    }
+
+    canvasBaseLayer.scale(tempScale);
+
+    generationParameters.init_img = imageDataURL;
+
     generationParameters.progress_images = false;
+
+    if (boundingBoxScale !== 'none') {
+      generationParameters.inpaint_width = scaledBoundingBoxDimensions.width;
+      generationParameters.inpaint_height = scaledBoundingBoxDimensions.height;
+    }
+
+    generationParameters.seam_size = seamSize;
+    generationParameters.seam_blur = seamBlur;
+    generationParameters.seam_strength = seamStrength;
+    generationParameters.seam_steps = seamSteps;
+    generationParameters.tile_size = tileSize;
+    generationParameters.infill_method = infillMethod;
+    generationParameters.force_outpaint = false;
   }
 
   if (shouldGenerateVariations) {
@@ -169,6 +227,10 @@ export const frontendToBackendParameters = (
     if (facetoolType === 'codeformer') {
       facetoolParameters.codeformer_fidelity = codeformerFidelity;
     }
+  }
+
+  if (enableImageDebugging) {
+    generationParameters.enable_image_debugging = enableImageDebugging;
   }
 
   return {

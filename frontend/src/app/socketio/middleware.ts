@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import makeSocketIOListeners from './listeners';
 import makeSocketIOEmitters from './emitters';
 
-import * as InvokeAI from '../invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 /**
  * Creates a socketio middleware to handle communication with server.
@@ -43,11 +43,10 @@ export const socketioMiddleware = () => {
       onGalleryImages,
       onProcessingCanceled,
       onImageDeleted,
-      onImageUploaded,
-      onMaskImageUploaded,
       onSystemConfig,
       onModelChanged,
       onModelChangeFailed,
+      onTempFolderEmptied,
     } = makeSocketIOListeners(store);
 
     const {
@@ -58,10 +57,10 @@ export const socketioMiddleware = () => {
       emitRequestImages,
       emitRequestNewImages,
       emitCancelProcessing,
-      emitUploadImage,
-      emitUploadMaskImage,
       emitRequestSystemConfig,
       emitRequestModelChange,
+      emitSaveStagingAreaImageToGallery,
+      emitRequestEmptyTempFolder,
     } = makeSocketIOEmitters(store, socketio);
 
     /**
@@ -104,17 +103,6 @@ export const socketioMiddleware = () => {
         onImageDeleted(data);
       });
 
-      socketio.on(
-        'imageUploaded',
-        (data: InvokeAI.ImageUploadResponse) => {
-          onImageUploaded(data);
-        }
-      );
-
-      socketio.on('maskImageUploaded', (data: InvokeAI.ImageUrlResponse) => {
-        onMaskImageUploaded(data);
-      });
-
       socketio.on('systemConfig', (data: InvokeAI.SystemConfig) => {
         onSystemConfig(data);
       });
@@ -125,6 +113,10 @@ export const socketioMiddleware = () => {
 
       socketio.on('modelChangeFailed', (data: InvokeAI.ModelChangeResponse) => {
         onModelChangeFailed(data);
+      });
+
+      socketio.on('tempFolderEmptied', () => {
+        onTempFolderEmptied();
       });
 
       areListenersSet = true;
@@ -169,16 +161,6 @@ export const socketioMiddleware = () => {
         break;
       }
 
-      case 'socketio/uploadImage': {
-        emitUploadImage(action.payload);
-        break;
-      }
-
-      case 'socketio/uploadMaskImage': {
-        emitUploadMaskImage(action.payload);
-        break;
-      }
-
       case 'socketio/requestSystemConfig': {
         emitRequestSystemConfig();
         break;
@@ -186,6 +168,16 @@ export const socketioMiddleware = () => {
 
       case 'socketio/requestModelChange': {
         emitRequestModelChange(action.payload);
+        break;
+      }
+
+      case 'socketio/saveStagingAreaImageToGallery': {
+        emitSaveStagingAreaImageToGallery(action.payload);
+        break;
+      }
+
+      case 'socketio/requestEmptyTempFolder': {
+        emitRequestEmptyTempFolder();
         break;
       }
     }

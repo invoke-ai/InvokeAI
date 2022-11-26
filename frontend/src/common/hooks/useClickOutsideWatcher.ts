@@ -1,25 +1,37 @@
-import { RefObject, useEffect } from 'react';
+import { RefObject, useEffect, useRef } from 'react';
+import { Rect } from 'react-konva';
 
-const useClickOutsideWatcher = (
-  ref: RefObject<HTMLElement>,
-  callback: () => void,
-  req = true
-) => {
+const watchers: {
+  ref: RefObject<HTMLElement>;
+  enable: boolean;
+  callback: () => void;
+}[] = [];
+
+const useClickOutsideWatcher = () => {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        callback();
-      }
+      watchers.forEach(({ ref, enable, callback }) => {
+        if (enable && ref.current && !ref.current.contains(e.target as Node)) {
+          console.log('callback');
+          callback();
+        }
+      });
     }
-    if (req) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      if (req) {
-        document.removeEventListener('mousedown', handleClickOutside);
-      }
+      document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [ref, req, callback]);
+  }, []);
+
+  return {
+    addWatcher: (watcher: {
+      ref: RefObject<HTMLElement>;
+      callback: () => void;
+      enable: boolean;
+    }) => {
+      watchers.push(watcher);
+    },
+  };
 };
 
 export default useClickOutsideWatcher;
