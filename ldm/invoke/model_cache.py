@@ -134,12 +134,14 @@ class ModelCache(object):
         }
         '''
         models = {}
-        for name, config in self.config.items():
+        for config_entry in self.config.items():
+            (name, config) = config_entry
+
             try:
                 description = config.description
             except ConfigAttributeError:
                 description = '<no description>'
-
+            
             if self.current_model == name:
                 status = 'active'
             elif name in self.models:
@@ -147,12 +149,9 @@ class ModelCache(object):
             else:
                 status = 'not loaded'
 
-            models = models.update(
-                name = {
-                    'status': status,
-                    'description': description,
-                })
-
+            model_details = {name: {'status': status, 'description': description,}}
+            models.update(model_details)
+        
         return models
 
     def print_models(self) -> None:
