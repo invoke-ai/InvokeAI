@@ -8,27 +8,28 @@
 #
 print('Loading Python libraries...\n')
 import argparse
-import sys
 import os
 import re
-from typing import Dict
 import shutil
-from urllib import request
-from tqdm import tqdm
-from diffusers import StableDiffusionPipeline, AutoencoderKL
-from omegaconf import OmegaConf
-from huggingface_hub import HfFolder, hf_hub_url, whoami as hf_whoami
+import sys
+import traceback
+import warnings
 from pathlib import Path
+from typing import Dict
+from urllib import request
+
+import requests
+import transformers
+from diffusers import StableDiffusionPipeline, AutoencoderKL
 from getpass_asterisk import getpass_asterisk
+from huggingface_hub import HfFolder, hf_hub_url, whoami as hf_whoami
+from omegaconf import OmegaConf
+from tqdm import tqdm
 from transformers import CLIPTokenizer, CLIPTextModel
+
 from ldm.invoke.globals import Globals
 from ldm.invoke.readline import generic_completer
 
-import traceback
-import requests
-import clip
-import transformers
-import warnings
 warnings.filterwarnings('ignore')
 import torch
 transformers.logging.set_verbosity_error()
@@ -386,6 +387,9 @@ def download_diffusers_in_config(config_path: Path, full_precision: bool):
     # This is a minimal implementation until https://github.com/invoke-ai/InvokeAI/pull/1490 lands,
     # which moves a bunch of stuff.
     # We can be more complete after we know it won't be all merge conflicts.
+    if not is_huggingface_authenticated():
+        print("*⚠ No Hugging Face access token; some downloads may be blocked.")
+
     precision = 'full' if full_precision else 'float16'
     cache = ModelCache(OmegaConf.load(config_path), precision=precision,
                        device_type='cpu', max_loaded_models=1)
@@ -471,7 +475,7 @@ def download_bert():
     print('Installing bert tokenizer (ignore deprecation errors)...', end='',file=sys.stderr)
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=DeprecationWarning)
-        from transformers import BertTokenizerFast, AutoFeatureExtractor
+        from transformers import BertTokenizerFast
         download_from_hf(BertTokenizerFast,'bert-base-uncased')
         print('...success',file=sys.stderr)
 
@@ -761,14 +765,12 @@ def main():
         if opt.interactive:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
             download_weights(opt)
-        elif is_huggingface_authenticated():
+        else:
             config_path = Path(opt.config_file or Default_config_file)
             if config_path.exists():
                 download_diffusers_in_config(config_path, full_precision=opt.full_precision)
             else:
                 print("*⚠ No config file found; downloading no weights.")
-        else:
-            print("*⚠ No Hugging Face access; downloading no weights.")
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
         download_clip()
