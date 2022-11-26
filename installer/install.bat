@@ -142,6 +142,7 @@ rd /s /q installer installer_files
 call .venv\Scripts\python scripts\configure_invokeai.py
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
+deactivate
 
 echo ***** Finished downloading models *****
 

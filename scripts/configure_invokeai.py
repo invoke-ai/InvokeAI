@@ -578,7 +578,7 @@ def select_outputs(root:str,yes_to_all:bool=False):
     completer.set_default_dir(os.path.expanduser('~'))
     completer.complete_extensions(())
     completer.set_line(default)
-    return input('Select the default directory for image outputs [{default}]: ')
+    return input(f'Select the default directory for image outputs [{default}]: ')
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
@@ -587,14 +587,15 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root = root or select_root(yes_to_all)
     outputs = select_outputs(root,yes_to_all)
-    Globals.root = root
+    Globals.root = os.path.abspath(root)
+    outputs = outputs if os.path.isabs(outputs) else os.path.abspath(os.path.join(Globals.root,outputs))
         
     print(f'InvokeAI models and configuration files will be placed into {root} and image outputs will be placed into {outputs}.')
     print(f'\nYou may change these values at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
-    for name in ('models','configs','scripts','frontend/dist'):
+    for name in ['models','configs']:
         os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in ('configs','scripts','frontend/dist'):
+    for src in (['configs']):
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
@@ -610,7 +611,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 # or renaming it and then running configure_invokeai.py again.
 
 # The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
---root="{root}"
+--root="{Globals.root}"
 
 # the --outdir option controls the default location of image files.
 --outdir="{outputs}"
@@ -673,12 +674,9 @@ def main():
     try:
         introduction()
 
-        # We check for two files to see if the runtime directory is correctly initialized.
-        # 1. a key stable diffusion config file
-        # 2. the web front end static files
+        # We check for to see if the runtime directory is correctly initialized.
         if Globals.root == '' \
-           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
-           or not os.path.exists(os.path.join(Globals.root,'frontend/dist')):
+           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
             initialize_rootdir(Globals.root,opt.yes_to_all)
 
         print(f'(Initializing with runtime root {Globals.root})\n')
@@ -698,7 +696,8 @@ def main():
     except KeyboardInterrupt:
         print('\nGoodbye! Come back soon.')
     except Exception as e:
-        print(f'\nA problem occurred during download.\nThe error was: "{str(e)}"')
+        print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
+        print(traceback.format_exc())
     
 #-------------------------------------
 if __name__ == '__main__':
