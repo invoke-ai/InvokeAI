@@ -4,3 +4,4 @@ scripts/legacy_api.py @CapableWeb
 tests/legacy_tests.sh @CapableWeb
 installer/ @tildebyte
 .github/workflows/ @mauwii
+docker_build/ @mauwii
