@@ -3,7 +3,7 @@
 --trusted-host https://download.pytorch.org
 accelerate~=0.14
 albumentations
-diffusers
+diffusers[torch]~=0.9
 einops
 eventlet
 facexlib
