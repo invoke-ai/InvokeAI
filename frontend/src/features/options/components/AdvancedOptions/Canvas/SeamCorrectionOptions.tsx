@@ -72,8 +72,8 @@ const SeamCorrectionOptions = () => {
       <IAISlider
         sliderMarkRightOffset={-2}
         label={'Seam Strength'}
-        min={0}
-        max={1}
+        min={0.01}
+        max={0.99}
         step={0.01}
         value={seamStrength}
         onChange={(v) => {
