@@ -31,7 +31,7 @@ taming-transformers-rom1504
 test-tube>=0.7.5
 torch-fidelity
 torchmetrics
-transformers==4.21.*
+transformers~=4.24
 picklescan
 git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan ; platform_system == 'Windows'
 git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan ; platform_system != 'Windows'
