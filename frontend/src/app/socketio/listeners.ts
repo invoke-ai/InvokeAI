@@ -2,7 +2,7 @@ import { AnyAction, MiddlewareAPI, Dispatch } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 import dateFormat from 'dateformat';
 
-import * as InvokeAI from '../invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 import {
   addLogEntry,
@@ -15,7 +15,8 @@ import {
   errorOccurred,
   setModelList,
   setIsCancelable,
-} from '../../features/system/systemSlice';
+  addToast,
+} from 'features/system/store/systemSlice';
 
 import {
   addGalleryImages,
@@ -23,21 +24,22 @@ import {
   clearIntermediateImage,
   GalleryState,
   removeImage,
-  setCurrentImage,
   setIntermediateImage,
-} from '../../features/gallery/gallerySlice';
+} from 'features/gallery/store/gallerySlice';
 
 import {
   clearInitialImage,
+  setInfillMethod,
   setInitialImage,
   setMaskPath,
-} from '../../features/options/optionsSlice';
-import { requestImages, requestNewImages } from './actions';
+} from 'features/options/store/optionsSlice';
 import {
-  clearImageToInpaint,
-  setImageToInpaint,
-} from '../../features/tabs/Inpainting/inpaintingSlice';
-import { tabMap } from '../../features/tabs/InvokeTabs';
+  requestImages,
+  requestNewImages,
+  requestSystemConfig,
+} from './actions';
+import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
+import { tabMap } from 'features/tabs/components/InvokeTabs';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -56,6 +58,7 @@ const makeSocketIOListeners = (
       try {
         dispatch(setIsConnected(true));
         dispatch(setCurrentStatus('Connected'));
+        dispatch(requestSystemConfig());
         const gallery: GalleryState = getState().gallery;
 
         if (gallery.categories.user.latest_mtime) {
@@ -97,19 +100,42 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const { shouldLoopback, activeTab } = getState().options;
+        const state = getState();
+        const { shouldLoopback, activeTab } = state.options;
+        const { boundingBox: _, generationMode, ...rest } = data;
+
         const newImage = {
           uuid: uuidv4(),
-          ...data,
-          category: 'result',
+          ...rest,
         };
 
-        dispatch(
-          addImage({
-            category: 'result',
-            image: newImage,
-          })
-        );
+        if (['txt2img', 'img2img'].includes(generationMode)) {
+          dispatch(
+            addImage({
+              category: 'result',
+              image: { ...newImage, category: 'result' },
+            })
+          );
+        }
+
+        if (generationMode === 'unifiedCanvas' && data.boundingBox) {
+          const { boundingBox } = data;
+          dispatch(
+            addImageToStagingArea({
+              image: { ...newImage, category: 'temp' },
+              boundingBox,
+            })
+          );
+
+          if (state.canvas.shouldAutoSave) {
+            dispatch(
+              addImage({
+                image: { ...newImage, category: 'result' },
+                category: 'result',
+              })
+            );
+          }
+        }
 
         if (shouldLoopback) {
           const activeTabName = tabMap[activeTab];
@@ -118,12 +144,10 @@ const makeSocketIOListeners = (
               dispatch(setInitialImage(newImage));
               break;
             }
-            case 'inpainting': {
-              dispatch(setImageToInpaint(newImage));
-              break;
-            }
           }
         }
+
+        dispatch(clearIntermediateImage());
 
         dispatch(
           addLogEntry({
@@ -144,6 +168,7 @@ const makeSocketIOListeners = (
           setIntermediateImage({
             uuid: uuidv4(),
             ...data,
+            category: 'result',
           })
         );
         if (!data.isBase64) {
@@ -299,14 +324,9 @@ const makeSocketIOListeners = (
 
       // remove references to image in options
       const { initialImage, maskPath } = getState().options;
-      const { imageToInpaint } = getState().inpainting;
 
       if (initialImage?.url === url || initialImage === url) {
         dispatch(clearInitialImage());
-      }
-
-      if (imageToInpaint?.url === url) {
-        dispatch(clearImageToInpaint());
       }
 
       if (maskPath === url) {
@@ -320,56 +340,11 @@ const makeSocketIOListeners = (
         })
       );
     },
-    onImageUploaded: (data: InvokeAI.ImageUploadResponse) => {
-      const { destination, ...rest } = data;
-      const image = {
-        uuid: uuidv4(),
-        ...rest,
-      };
-
-      try {
-        dispatch(addImage({ image, category: 'user' }));
-
-        switch (destination) {
-          case 'img2img': {
-            dispatch(setInitialImage(image));
-            break;
-          }
-          case 'inpainting': {
-            dispatch(setImageToInpaint(image));
-            break;
-          }
-          default: {
-            dispatch(setCurrentImage(image));
-            break;
-          }
-        }
-
-        dispatch(
-          addLogEntry({
-            timestamp: dateFormat(new Date(), 'isoDateTime'),
-            message: `Image uploaded: ${data.url}`,
-          })
-        );
-      } catch (e) {
-        console.error(e);
-      }
-    },
-    /**
-     * Callback to run when we receive a 'maskImageUploaded' event.
-     */
-    onMaskImageUploaded: (data: InvokeAI.ImageUrlResponse) => {
-      const { url } = data;
-      dispatch(setMaskPath(url));
-      dispatch(
-        addLogEntry({
-          timestamp: dateFormat(new Date(), 'isoDateTime'),
-          message: `Mask image uploaded: ${url}`,
-        })
-      );
-    },
     onSystemConfig: (data: InvokeAI.SystemConfig) => {
       dispatch(setSystemConfig(data));
+      if (!data.infill_methods.includes('patchmatch')) {
+        dispatch(setInfillMethod(data.infill_methods[0]));
+      }
     },
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
@@ -396,6 +371,16 @@ const makeSocketIOListeners = (
           timestamp: dateFormat(new Date(), 'isoDateTime'),
           message: `Model change failed: ${model_name}`,
           level: 'error',
+        })
+      );
+    },
+    onTempFolderEmptied: () => {
+      dispatch(
+        addToast({
+          title: 'Temp Folder Emptied',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
         })
       );
     },

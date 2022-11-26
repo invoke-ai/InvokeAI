@@ -1,0 +1,187 @@
+@use '../../../styles/Mixins/' as *;
+
+.image-gallery-wrapper-enter {
+  transform: translateX(150%);
+}
+
+.image-gallery-wrapper-enter-active {
+  transform: translateX(0);
+  transition: all 120ms ease-out;
+}
+
+.image-gallery-wrapper-exit {
+  transform: translateX(0);
+}
+
+.image-gallery-wrapper-exit-active {
+  transform: translateX(150%);
+  transition: all 120ms ease-out;
+}
+
+.image-gallery-wrapper {
+  &[data-pinned='false'] {
+    position: fixed;
+    height: 100vh;
+    top: 0;
+    right: 0;
+
+    .image-gallery-popup {
+      border-radius: 0;
+      box-shadow: 0 0 1rem var(--text-color-a3);
+      .image-gallery-container {
+        max-height: calc($app-height + 5rem);
+      }
+    }
+  }
+
+  .image-gallery-popup {
+    background-color: var(--background-color-secondary);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    row-gap: 1rem;
+    border-radius: 0.5rem;
+    border-left-width: 0.3rem;
+
+    border-color: var(--tab-list-text-inactive);
+
+    &[data-resize-alert='true'] {
+      border-color: var(--status-bad-color);
+    }
+
+    .image-gallery-header {
+      display: flex;
+      align-items: center;
+      column-gap: 0.5rem;
+      justify-content: space-between;
+
+      .image-gallery-header-right-icons {
+        display: flex;
+        flex-direction: row;
+        column-gap: 0.5rem;
+      }
+
+      .image-gallery-icon-btn {
+        background-color: var(--btn-load-more);
+        &:hover {
+          background-color: var(--btn-load-more-hover);
+        }
+      }
+
+      .image-gallery-settings-popover {
+        display: flex;
+        flex-direction: column;
+        row-gap: 0.5rem;
+
+        div {
+          display: flex;
+          column-gap: 0.5rem;
+          align-items: center;
+          justify-content: space-between;
+        }
+      }
+
+      h1 {
+        font-weight: bold;
+      }
+    }
+
+    .image-gallery-container {
+      display: flex;
+      flex-direction: column;
+      max-height: $app-gallery-popover-height;
+      overflow-y: scroll;
+      @include HideScrollbar;
+
+      .image-gallery-container-placeholder {
+        display: flex;
+        flex-direction: column;
+        row-gap: 0.5rem;
+        background-color: var(--background-color);
+        border-radius: 0.5rem;
+        place-items: center;
+        padding: 2rem;
+        text-align: center;
+
+        p {
+          color: var(--subtext-color-bright);
+          font-family: Inter;
+        }
+
+        svg {
+          width: 4rem;
+          height: 4rem;
+          color: var(--svg-color);
+        }
+      }
+
+      .image-gallery-load-more-btn {
+        background-color: var(--btn-load-more);
+        font-size: 0.85rem;
+        padding: 0.5rem;
+        margin-top: 1rem;
+
+        &:disabled {
+          &:hover {
+            background-color: var(--btn-load-more);
+          }
+        }
+
+        &:hover {
+          background-color: var(--btn-load-more-hover);
+        }
+      }
+    }
+  }
+}
+
+.image-gallery-category-btn-group {
+  width: max-content;
+  column-gap: 0;
+  justify-content: stretch;
+
+  button {
+    background-color: var(--btn-base-color);
+    &:hover {
+      background-color: var(--btn-base-color-hover);
+    }
+    flex-grow: 1;
+    &[data-selected='true'] {
+      background-color: var(--accent-color);
+      &:hover {
+        background-color: var(--accent-color-hover);
+      }
+    }
+  }
+}
+
+// from https://css-tricks.com/a-grid-of-logos-in-squares/
+.image-gallery {
+  display: grid;
+  grid-gap: 0.5rem;
+  .hoverable-image {
+    padding: 0.5rem;
+    position: relative;
+    &::before {
+      // for apsect ratio
+      content: '';
+      display: block;
+      padding-bottom: 100%;
+    }
+    .hoverable-image-image {
+      position: absolute;
+      max-width: 100%;
+
+      // Alternate Version
+      // top: 0;
+      // bottom: 0;
+      // right: 0;
+      // left: 0;
+      // margin: auto;
+
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+}
