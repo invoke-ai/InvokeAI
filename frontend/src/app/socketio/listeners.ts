@@ -61,16 +61,16 @@ const makeSocketIOListeners = (
         dispatch(requestSystemConfig());
         const gallery: GalleryState = getState().gallery;
 
-        if (gallery.categories.user.latest_mtime) {
-          dispatch(requestNewImages('user'));
-        } else {
-          dispatch(requestImages('user'));
-        }
-
         if (gallery.categories.result.latest_mtime) {
           dispatch(requestNewImages('result'));
         } else {
           dispatch(requestImages('result'));
+        }
+
+        if (gallery.categories.user.latest_mtime) {
+          dispatch(requestNewImages('user'));
+        } else {
+          dispatch(requestImages('user'));
         }
       } catch (e) {
         console.error(e);
