@@ -593,12 +593,13 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
         outputs = outputs if os.path.isabs(outputs) else os.path.abspath(os.path.join(Globals.root,outputs))
 
         print(f'\nInvokeAI models and configuration files will be placed into "{root}" and image outputs will be placed into "{outputs}".')
-        print(f'\nYou may change these values at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
-        print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
         if not yes_to_all:
-            root_selected = yes_or_no('accept these locations?')
+            root_selected = yes_or_no('Accept these locations?')
         else:
             root_selected = True
+
+    print(f'\nYou may change the chosen directories at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
+    print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
         
     for name in ['models','configs']:
         os.makedirs(os.path.join(root,name), exist_ok=True)
