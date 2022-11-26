@@ -28,9 +28,11 @@ import { socketioMiddleware } from './socketio/middleware';
  * The necesssary nested persistors with blacklists are configured below.
  */
 
-const canvasBlacklist = ['cursorPosition'].map(
-  (blacklistItem) => `canvas.${blacklistItem}`
-);
+const canvasBlacklist = [
+  'cursorPosition',
+  'isCanvasInitialized',
+  'doesCanvasNeedScaling',
+].map((blacklistItem) => `canvas.${blacklistItem}`);
 
 const systemBlacklist = [
   'currentIteration',
