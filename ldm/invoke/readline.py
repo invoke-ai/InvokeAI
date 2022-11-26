@@ -263,6 +263,10 @@ class Completer(object):
         matches.sort()
         return matches
 
+    def add_embedding_terms(self, terms:list[str]):
+        self.concepts = Concepts().list_concepts()
+        self.concepts.extend(terms)
+
     def _concept_completions(self, text, state):
         partial = text[1:]  # this removes the leading '<'
         if len(partial) == 0:

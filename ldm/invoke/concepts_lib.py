@@ -36,7 +36,7 @@ class Concepts(object):
             self.concept_list = [a.id.split('/')[1] for a in models]
         except Exception as e:
             print(' ** WARNING: Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}.')
-            print(' ** You may load .bin and .pt file(s) manually using the --embedding_manager argument.')
+            print(' ** You may load .bin and .pt file(s) manually using the --embedding_directory argument.')
         return self.concept_list
 
     def get_concept_model_path(self, concept_name:str)->str:
@@ -54,7 +54,7 @@ class Concepts(object):
         '''
         if concept_name in self.triggers:
             return self.triggers[concept_name]
-        file = self.get_concept_file(concept_name, 'token_identifier.txt')
+        file = self.get_concept_file(concept_name, 'token_identifier.txt', local_only=True)
         if not file:
             return None
         with open(file,'r') as f:
@@ -96,8 +96,8 @@ class Concepts(object):
             return self.concept_to_trigger(match.group(1)) or f'<{match.group(1)}>'
         return self.match_concept.sub(do_replace, prompt)
 
-    def get_concept_file(self, concept_name:str, file_name:str='learned_embeds.bin')->str:
-        if not self.concept_is_downloaded(concept_name):
+    def get_concept_file(self, concept_name:str, file_name:str='learned_embeds.bin' , local_only:bool=False)->str:
+        if not self.concept_is_downloaded(concept_name) and not local_only:
             self.download_concept(concept_name)
         path = os.path.join(self._concept_path(concept_name), file_name)
         return path if os.path.exists(path) else None
@@ -131,8 +131,10 @@ class Concepts(object):
                 url = hf_hub_url(repo_id, file)
                 request.urlretrieve(url, os.path.join(dest,file),reporthook=tally_download_size)
         except Exception as e:
-            print(f'failed to download {concept_name}/{file} ({str(e)})')
-            print(traceback.format_exc())
+            if e.code==404:
+                print(f'This concept is not known to the Hugging Face library. Generation will continue without the concept.')
+            else:
+                print(f'Failed to download {concept_name}/{file} ({str(e)}. This may be due to a network error. Generation will continue without the concept.)')
             os.rmdir(dest)
             return False
         print('...{:.2f}Kb'.format(bytes/1024))

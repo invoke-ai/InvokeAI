@@ -9,6 +9,7 @@ from ldm.invoke.concepts_lib import Concepts
 from ldm.data.personalized import per_img_token_list
 from transformers import CLIPTokenizer
 from functools import partial
+from picklescan.scanner import scan_file_path
 
 PROGRESSIVE_SCALE = 2000
 
@@ -224,16 +225,44 @@ class EmbeddingManager(nn.Module):
                 self.concepts_loaded[concept_name]=True
         self.load(bin_files, full)
 
+    def list_terms(self) -> list[str]:
+        return self.concepts_loaded.keys()
+
     def load(self, ckpt_paths, full=True):
         if len(ckpt_paths) == 0:
             return
         if type(ckpt_paths) != list:
             ckpt_paths = [ckpt_paths]
+        ckpt_paths = self._expand_directories(ckpt_paths)
         for c in ckpt_paths:
             self._load(c,full)
+        # remember that we know this term and don't try to download it again from the concepts library
+        # note that if the concept name is also provided and different from the trigger term, they
+        # both will be stored in this dictionary
+        for term in self.string_to_param_dict.keys():
+            term = term.strip('<').strip('>')
+            self.concepts_loaded[term] = True  
         print(f'>> Current embedding manager terms: {", ".join(self.string_to_param_dict.keys())}')
 
+    def _expand_directories(self, paths:list[str]):
+        expanded_paths = list()
+        for path in paths:
+            if os.path.isfile(path):
+                expanded_paths.append(path)
+            elif os.path.isdir(path):
+                for root, _, files in os.walk(path):
+                    for name in files:
+                        expanded_paths.append(os.path.join(root,name))
+        return [x for x in expanded_paths if os.path.splitext(x)[1] in ('.pt','.bin')]
+
     def _load(self, ckpt_path, full=True):
+
+        scan_result = scan_file_path(ckpt_path)
+        if scan_result.infected_files == 1:
+            print(f'\n### Security Issues Found in Model: {scan_result.issues_count}')
+            print('### For your safety, InvokeAI will not load this embed.')
+            return
+        
         ckpt = torch.load(ckpt_path, map_location='cpu')
 
         # Handle .pt textual inversion files

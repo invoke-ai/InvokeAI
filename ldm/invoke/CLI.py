@@ -63,6 +63,12 @@ def main():
     if not os.path.isabs(opt.conf):
         opt.conf = os.path.normpath(os.path.join(Globals.root,opt.conf))
 
+    if opt.embeddings:
+        if not os.path.isabs(opt.embedding_path):
+            embedding_path = os.path.normpath(os.path.join(Globals.root,opt.embedding_path))
+    else:
+        embedding_path = None
+
     # load the infile as a list of lines
     if opt.infile:
         try:
@@ -82,7 +88,7 @@ def main():
             conf = opt.conf,
             model = opt.model,
             sampler_name = opt.sampler_name,
-            embedding_path = opt.embedding_path,
+            embedding_path = embedding_path,
             full_precision = opt.full_precision,
             precision = opt.precision,
             gfpgan=gfpgan,
@@ -137,6 +143,7 @@ def main_loop(gen, opt):
     # changing the history file midstream when the output directory is changed.
     completer   = get_completer(opt, models=list(model_config.keys()))
     set_default_output_dir(opt, completer)
+    add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length()+1
 
     # os.pathconf is not available on Windows
@@ -418,6 +425,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
     elif command.startswith('!switch'):
         model_name = command.replace('!switch ','',1)
         gen.set_model(model_name)
+        add_embedding_terms(gen, completer)
         completer.add_history(command)
         operation = None
         
@@ -805,7 +813,13 @@ def invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan):
     except KeyboardInterrupt:
         pass
     
-
+def add_embedding_terms(gen,completer):
+    '''
+    Called after setting the model, updates the autocompleter with
+    any terms loaded by the embedding manager.
+    '''
+    completer.add_embedding_terms(gen.model.embedding_manager.list_terms())
+    
 def split_variations(variations_string) -> list:
     # shotgun parsing, woo
     parts = []
