@@ -12,7 +12,6 @@ on:
 jobs:
   matrix:
     strategy:
-      fail-fast: false
       matrix:
         stable-diffusion-model:
           - stable-diffusion-1.5
