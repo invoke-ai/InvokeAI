@@ -16,7 +16,6 @@ import {
 import ImageToImageWorkarea from './ImageToImage';
 import TextToImageWorkarea from './TextToImage';
 import Lightbox from 'features/lightbox/components/Lightbox';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
 import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
 import TrainingWIP from 'common/components/WorkInProgress/Training';
@@ -143,7 +142,6 @@ export default function InvokeTabs() {
       index={activeTab}
       onChange={(index: number) => {
         dispatch(setActiveTab(index));
-        dispatch(setDoesCanvasNeedScaling(true));
       }}
     >
       <div className="app-tabs-list">{renderTabs()}</div>

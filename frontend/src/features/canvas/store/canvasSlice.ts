@@ -503,6 +503,7 @@ export const canvasSlice = createSlice({
 
         state.stageScale = newScale;
         state.stageCoordinates = newCoordinates;
+        state.stageDimensions = newStageDimensions;
         state.boundingBoxCoordinates = { x: 0, y: 0 };
         state.boundingBoxDimensions = { width: 512, height: 512 };
         return;

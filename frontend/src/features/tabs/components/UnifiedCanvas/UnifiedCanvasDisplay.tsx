@@ -26,13 +26,18 @@ const selector = createSelector(
 
 const UnifiedCanvasDisplay = () => {
   const dispatch = useAppDispatch();
+
   const { doesCanvasNeedScaling } = useAppSelector(selector);
 
   useLayoutEffect(() => {
+    dispatch(setDoesCanvasNeedScaling(true));
+
     const resizeCallback = _.debounce(() => {
       dispatch(setDoesCanvasNeedScaling(true));
     }, 250);
+
     window.addEventListener('resize', resizeCallback);
+
     return () => window.removeEventListener('resize', resizeCallback);
   }, [dispatch]);
 
