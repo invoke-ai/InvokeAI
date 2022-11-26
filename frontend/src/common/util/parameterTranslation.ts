@@ -81,8 +81,7 @@ export const frontendToBackendParameters = (
 
   const generationParameters: { [k: string]: any } = {
     prompt,
-    iterations:
-      shouldRandomizeSeed || shouldGenerateVariations ? iterations : 1,
+    iterations,
     steps,
     cfg_scale: cfgScale,
     threshold,
