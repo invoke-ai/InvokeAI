@@ -1,11 +1,11 @@
 @use '../../styles/Mixins/' as *;
 
 .invokeai__icon-button {
-  background-color: var(--btn-grey);
+  background: var(--btn-base-color);
   cursor: pointer;
 
   &:hover {
-    background-color: var(--btn-grey-hover);
+    background-color: var(--btn-base-color-hover);
   }
 
   &[data-selected='true'] {
@@ -20,16 +20,39 @@
   }
 
   &[data-variant='link'] {
-    background: none !important;
+    background: none;
     &:hover {
-      background: none !important;
+      background: none;
     }
   }
 
-  &[data-selected='true'] {
-    border-color: var(--accent-color);
+  // Check Box Style
+  &[data-as-checkbox='true'] {
+    background-color: var(--btn-base-color);
+    border: 3px solid var(--btn-base-color);
+
+    svg {
+      fill: var(--text-color);
+    }
+
     &:hover {
-      border-color: var(--accent-color-hover);
+      background-color: var(--btn-base-color);
+      border-color: var(--btn-checkbox-border-hover);
+      svg {
+        fill: var(--text-color);
+      }
+    }
+
+    &[data-selected='true'] {
+      border-color: var(--accent-color);
+      svg {
+        fill: var(--accent-color-hover);
+      }
+      &:hover {
+        svg {
+          fill: var(--accent-color-hover);
+        }
+      }
     }
   }
 
@@ -38,26 +61,10 @@
     animation-duration: 1s;
     animation-timing-function: ease-in-out;
     animation-iteration-count: infinite;
+
     &:hover {
       animation: none;
       background-color: var(--accent-color-hover);
-    }
-  }
-
-  &[data-as-checkbox='true'] {
-    background-color: var(--btn-grey);
-    border: 3px solid var(--btn-grey);
-
-    svg {
-      fill: var(--text-color);
-    }
-
-    &:hover {
-      background-color: var(--btn-grey);
-      border-color: var(--btn-checkbox-border-hover);
-      svg {
-        fill: var(--text-color);
-      }
     }
   }
 }

@@ -5,12 +5,12 @@ import {
   PopoverTrigger,
   Box,
 } from '@chakra-ui/react';
-import { SystemState } from '../../features/system/systemSlice';
-import { useAppSelector } from '../../app/store';
-import { RootState } from '../../app/store';
+import { SystemState } from 'features/system/store/systemSlice';
+import { useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import { ReactElement } from 'react';
-import { Feature, FEATURES } from '../../app/features';
+import { Feature, FEATURES } from 'app/features';
 
 type GuideProps = {
   children: ReactElement;
