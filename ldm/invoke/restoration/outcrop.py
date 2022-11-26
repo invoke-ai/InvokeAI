@@ -28,11 +28,9 @@ class Outcrop(object):
         self.generate._set_sampler()
 
         def wrapped_callback(img,seed,**kwargs):
-            preferred_seed = orig_opt.seed if orig_opt.seed >= 0 else seed
+            preferred_seed = orig_opt.seed if orig_opt.seed is not None and orig_opt.seed >= 0 else seed
             image_callback(img,preferred_seed,use_prefix=prefix,**kwargs)
 
-        print(f'DEBUG: seed={opt.seed or orig_opt.seed}')
-        print(f'DEBUG: prompt={opt.prompt}')
         result= self.generate.prompt2image(
             opt.prompt,
             seed        = opt.seed or orig_opt.seed,

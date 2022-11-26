@@ -10,6 +10,11 @@
 
 @rem This enables a user to install this project without manually installing git or Python
 
+set "no_cache_dir=--no-cache-dir"
+if "%1" == "use-cache" (
+    set "no_cache_dir="
+)
+
 echo ***** Installing InvokeAI.. *****
 
 @rem Config
@@ -63,7 +68,8 @@ set PATH=%INSTALL_ENV_DIR%\Library\bin;%PATH%
 
 @rem Download/unpack/clean up InvokeAI release sourceball
 set err_msg=----- InvokeAI source download failed -----
-curl -L %RELEASE_URL%/%RELEASE_SOURCEBALL% --output InvokeAI.tgz
+echo Trying to download "%RELEASE_URL%%RELEASE_SOURCEBALL%"
+curl -L %RELEASE_URL%%RELEASE_SOURCEBALL% --output InvokeAI.tgz
 if %errorlevel% neq 0 goto err_exit
 
 set err_msg=----- InvokeAI source unpack failed -----
@@ -113,41 +119,41 @@ echo We're running under
 if %errorlevel% neq 0 goto err_exit
 
 set err_msg=----- pip update failed -----
-.venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location --upgrade pip
+.venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location --upgrade pip wheel
 if %errorlevel% neq 0 goto err_exit
 
-echo ***** Updated pip *****
+echo ***** Updated pip and wheel *****
 
 set err_msg=----- requirements file copy failed -----
 copy installer\py3.10-windows-x86_64-cuda-reqs.txt requirements.txt
 if %errorlevel% neq 0 goto err_exit
 
 set err_msg=----- main pip install failed -----
-.venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location -r requirements.txt
-if %errorlevel% neq 0 goto err_exit
-
-set err_msg=----- InvokeAI setup failed -----
-.venv\Scripts\python -m pip install --no-cache-dir --no-warn-script-location -e .
+.venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location -r requirements.txt
 if %errorlevel% neq 0 goto err_exit
 
 echo ***** Installed Python dependencies *****
 
+set err_msg=----- InvokeAI setup failed -----
+.venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location -e .
+if %errorlevel% neq 0 goto err_exit
+
+echo ***** Installed InvokeAI *****
+
+copy installer\invoke.bat .\invoke.bat
+echo ***** Installed invoke launcher script ******
+
+@rem more cleanup
+rd /s /q installer installer_files
+
 @rem preload the models
-call .venv\Scripts\python scripts\preload_models.py
+call .venv\Scripts\python scripts\configure_invokeai.py
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
 
 echo ***** Finished downloading models *****
 
-echo ***** Installing invoke.bat ******
-copy installer\invoke.bat .\invoke.bat
 echo All done! Execute the file invoke.bat in this directory to start InvokeAI
-
-@rem more cleanup
-rd /s /q installer installer_files
-
-deactivate
-
 pause
 exit
 

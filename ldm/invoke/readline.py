@@ -188,6 +188,9 @@ class Completer(object):
     def set_default_dir(self, path):
         self.default_dir=path
 
+    def set_options(self,options):
+        self.options = options
+
     def get_line(self,index):
         try:
             line = self.get_history_item(index)
@@ -283,6 +286,7 @@ class Completer(object):
             partial_path = text
         else:
             switch,partial_path  = match.groups()
+
         partial_path = partial_path.lstrip()
 
         matches = list()
@@ -308,7 +312,7 @@ class Completer(object):
             if not (node.endswith(extensions) or os.path.isdir(full_path)):
                 continue
 
-            if not full_path.startswith(path):
+            if path and not full_path.startswith(path):
                 continue
 
             if switch is None:
@@ -347,6 +351,21 @@ class DummyCompleter(Completer):
 
     def set_line(self,line):
         print(f'# {line}')
+
+def generic_completer(commands:list)->Completer:
+    if readline_available:
+        completer = Completer(commands,[])
+        readline.set_completer(completer.complete)
+        readline.set_pre_input_hook(completer._pre_input_hook)
+        readline.set_completer_delims(' ')
+        readline.parse_and_bind('tab: complete')
+        readline.parse_and_bind('set print-completions-horizontally off')
+        readline.parse_and_bind('set page-completions on')
+        readline.parse_and_bind('set skip-completed-text on')
+        readline.parse_and_bind('set show-all-if-ambiguous on')
+    else:
+        completer = DummyCompleter(commands)
+    return completer
 
 def get_completer(opt:Args, models=[])->Completer:
     if readline_available:

@@ -174,8 +174,8 @@ class Args(object):
                 print(f'>> Initialization file {initfile} found. Loading...')
                 sysargs.insert(0,f'@{initfile}')
             else:
-                print(f'>> Initialization file {INITFILE} not found. Creating a new one...')
-                self._create_init_file(INITFILE)
+                print(f'>> Initialization file {initfile} not found. Creating a new one...')
+                self._create_init_file(initfile)
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
@@ -952,7 +952,7 @@ class Args(object):
             '-embiggen_strength',
             type=float,
             help='The strength of the embiggen img2img step, defaults to 0.4',
-            default=0.4,
+            default=None,
         )
         special_effects_group.add_argument(
             '--seamless',
@@ -1104,7 +1104,7 @@ def metadata_from_png(png_file_path) -> Args:
     returns a single Args object, not multiple.
     '''
     args_list = args_from_png(png_file_path)
-    return args_list[0]
+    return args_list[0] if len(args_list)>0 else Args()  # empty args
 
 def dream_cmd_from_png(png_file_path):
     opt = metadata_from_png(png_file_path)

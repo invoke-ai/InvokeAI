@@ -1,10 +1,9 @@
-name: Test invoke.py
+name: Test invoke.py pip
 on:
   push:
     branches:
       - 'main'
       - 'development'
-      - 'fix-gh-actions-fork'
   pull_request:
     branches:
       - 'main'
@@ -16,33 +15,35 @@ jobs:
       fail-fast: false
       matrix:
         stable-diffusion-model:
-          - 'stable-diffusion-1.5'
-        environment-yaml:
-          - environment-lin-amd.yml
-          - environment-lin-cuda.yml
-          - environment-mac.yml
+          - stable-diffusion-1.5
+        requirements-file:
+          - requirements-lin-cuda.txt
+          - requirements-lin-amd.txt
+          - requirements-mac-mps-cpu.txt
+        python-version:
+          - '3.9'
+          - '3.10'
         include:
-          - environment-yaml: environment-lin-amd.yml
+          - requirements-file: requirements-lin-cuda.txt
             os: ubuntu-latest
             default-shell: bash -l {0}
-          - environment-yaml: environment-lin-cuda.yml
+          - requirements-file: requirements-lin-amd.txt
             os: ubuntu-latest
             default-shell: bash -l {0}
-          - environment-yaml: environment-mac.yml
-            os: macos-12
+          - requirements-file: requirements-mac-mps-cpu.txt
+            os: macOS-12
             default-shell: bash -l {0}
           - stable-diffusion-model: stable-diffusion-1.5
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
             stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
-    name: ${{ matrix.environment-yaml }} on ${{ matrix.os }}
+    name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
-    env:
-      CONDA_ENV_NAME: invokeai
-      INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
+    env:
+      INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
     steps:
       - name: Checkout sources
         id: checkout-sources
@@ -52,24 +53,6 @@ jobs:
         run: |
           mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
           cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
-
-      - name: create environment.yml
-        run: cp "environments-and-requirements/${{ matrix.environment-yaml }}" environment.yml
-
-      - name: Use cached conda packages
-        id: use-cached-conda-packages
-        uses: actions/cache@v3
-        with:
-          path: ~/conda_pkgs_dir
-          key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-yaml) }}
-
-      - name: Activate Conda Env
-        id: activate-conda-env
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          activate-environment: ${{ env.CONDA_ENV_NAME }}
-          environment-file: environment.yml
-          miniconda-version: latest
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -82,6 +65,24 @@ jobs:
       - name: set test prompt to Pull Request validation
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
+
+      - name: create requirements.txt
+        run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
+
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: ${{ matrix.requirements-file }}
+
+      # - name: install dependencies
+      #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
+
+      - name: install requirements
+        run: |
+          ${{ env.pythonLocation }}/bin/pip install --upgrade -r '${{ matrix.requirements-file }}'
+          ${{ env.pythonLocation }}/bin/pip install -e .
 
       - name: Use Cached Stable Diffusion Model
         id: cache-sd-model
@@ -105,22 +106,16 @@ jobs:
       - name: run configure_invokeai.py
         id: run-preload-models
         run: |
-          python scripts/configure_invokeai.py --no-interactive --yes
+          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
 
       - name: Run the tests
         id: run-tests
         run: |
-          time python scripts/invoke.py \
+          time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
             --model ${{ matrix.stable-diffusion-model }} \
             --from_file ${{ env.TEST_PROMPTS }} \
             --root="${{ env.INVOKEAI_ROOT }}" \
             --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
-
-      - name: export conda env
-        id: export-conda-env
-        run: |
-          mkdir -p outputs/img-samples
-          conda env export --name ${{ env.CONDA_ENV_NAME }} > outputs/img-samples/environment-${{ runner.os }}-${{ runner.arch }}.yml
 
       - name: Archive results
         id: archive-results
