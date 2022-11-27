@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Eugene Brodsky (https://github.com/ebr)
-
 # Directory in the container where the INVOKEAI_ROOT (runtime dir) will be mounted
 INVOKEAI_ROOT=/mnt/invokeai
 # Host directory to contain the runtime dir. Will be mounted at INVOKEAI_ROOT path in the container
