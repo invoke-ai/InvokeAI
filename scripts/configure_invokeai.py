@@ -39,6 +39,8 @@ Dataset_path = './configs/INITIAL_MODELS.yaml'
 Default_config_file = './configs/models.yaml'
 SD_Configs = './configs/stable-diffusion'
 
+assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the InvokeAI distribution directory, or from within the invokeai runtime directory."
+
 Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(['yes','no'])
 
