@@ -7,7 +7,7 @@ The interface is through the Concepts() object.
 import os
 import re
 import traceback
-from urllib import request
+from urllib import request, error as ul_error
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
 from ldm.invoke.globals import Globals
 
@@ -130,11 +130,15 @@ class Concepts(object):
             for file in ('README.md','learned_embeds.bin','token_identifier.txt','type_of_concept.txt'):
                 url = hf_hub_url(repo_id, file)
                 request.urlretrieve(url, os.path.join(dest,file),reporthook=tally_download_size)
-        except Exception as e:
+        except ul_error.HTTPError as e:
             if e.code==404:
                 print(f'This concept is not known to the Hugging Face library. Generation will continue without the concept.')
             else:
-                print(f'Failed to download {concept_name}/{file} ({str(e)}. This may be due to a network error. Generation will continue without the concept.)')
+                print(f'Failed to download {concept_name}/{file} ({str(e)}. Generation will continue without the concept.)')
+            os.rmdir(dest)
+            return False
+        except ul_error.URLError as e:
+            print(f'str(e). This may reflect a network issue. Generation will continue without the concept.')
             os.rmdir(dest)
             return False
         print('...{:.2f}Kb'.format(bytes/1024))
