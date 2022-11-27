@@ -6,7 +6,7 @@ software tools which support cutting edge AI text-to-image
 applications. This community is open to anyone who wishes to
 contribute to the effort and has the skill and time to do so.
 
-#Our Values
+# Our Values
 
 The InvokeAI team is a diverse community which includes individuals
 from various parts of the world and many walks of life. Despite our
