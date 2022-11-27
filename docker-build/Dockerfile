@@ -7,6 +7,7 @@ SHELL [ "/bin/bash", "-c" ]
 RUN apt-get update \
   && apt-get install -y \
     --no-install-recommends \
+    build-essential \
     gcc \
     git \
     libgl1-mesa-glx \
