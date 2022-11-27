@@ -32,12 +32,12 @@ the composition of their training sets, current AI-generated image
 models are biased against certain ethnic groups, cultural concepts of
 beauty, ethnic stereotypes, and gender roles.
 
- -We recognize the potential for harm to these groups that these biases
-  represent and trust that future AI models will take steps towards
-  reducing or eliminating the biases noted above, respect and give due
-  credit to the artists whose work is sourced, and call on developers
-  and users to favor these models over the older ones as they become
-  available.
+ - We recognize the potential for harm to these groups that these biases
+    represent and trust that future AI models will take steps towards
+    reducing or eliminating the biases noted above, respect and give due
+    credit to the artists whose work is sourced, and call on developers
+    and users to favor these models over the older ones as they become
+    available.
 
 4. We are deeply committed to ensuring that this technology benefits
 everyone, including artists. We see AI art not as a replacement for
