@@ -782,7 +782,7 @@ def main():
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
             download_weights(opt)
         else:
-            config_path = Path(opt.config_file or Default_config_file)
+            config_path = Path(Globals.root, opt.config_file or Default_config_file)
             if config_path.exists():
                 download_diffusers_in_config(config_path, full_precision=opt.full_precision)
             else:
