@@ -7,7 +7,6 @@ import {
   setShouldShowCanvasDebugInfo,
   setShouldShowGrid,
   setShouldShowIntermediates,
-  setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import _ from 'lodash';
@@ -18,8 +17,6 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
 import ClearCanvasHistoryButtonModal from '../ClearCanvasHistoryButtonModal';
-import { ChangeEvent } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],
@@ -60,23 +57,7 @@ const IAICanvasSettingsButtonPopover = () => {
     shouldShowCanvasDebugInfo,
     shouldShowGrid,
     shouldShowIntermediates,
-    shouldSnapToGrid,
   } = useAppSelector(canvasControlsSelector);
-
-  useHotkeys(
-    ['n'],
-    () => {
-      dispatch(setShouldSnapToGrid(!shouldSnapToGrid));
-    },
-    {
-      enabled: true,
-      preventDefault: true,
-    },
-    [shouldSnapToGrid]
-  );
-
-  const handleChangeShouldSnapToGrid = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldSnapToGrid(e.target.checked));
 
   return (
     <IAIPopover
@@ -101,11 +82,6 @@ const IAICanvasSettingsButtonPopover = () => {
           label="Show Grid"
           isChecked={shouldShowGrid}
           onChange={(e) => dispatch(setShouldShowGrid(e.target.checked))}
-        />
-        <IAICheckbox
-          label="Snap to Grid"
-          isChecked={shouldSnapToGrid}
-          onChange={handleChangeShouldSnapToGrid}
         />
         <IAICheckbox
           label="Darken Outside Selection"
