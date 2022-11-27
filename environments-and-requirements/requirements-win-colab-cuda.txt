@@ -5,4 +5,5 @@
 basicsr==1.4.1
 torch==1.12.1
 torchvision==0.13.1
+git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan
 -e .
