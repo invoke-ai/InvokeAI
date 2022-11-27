@@ -7,9 +7,11 @@ set -e
 source ./docker-build/env.sh || echo "please run from repository root" || exit 1
 
 pip_requirements=${PIP_REQUIREMENTS:-requirements-lin-cuda.txt}
+dockerfile=${INVOKE_DOCKERFILE:-docker-build/Dockerfile}
 
 # print the settings
 echo "You are using these values:"
+echo -e "Dockerfile:\t\t ${dockerfile}"
 echo -e "project_name:\t\t ${project_name}"
 echo -e "volumename:\t\t ${volumename}"
 echo -e "arch:\t\t\t ${arch}"
@@ -43,7 +45,7 @@ docker build \
   --tag "${invokeai_tag}" \
   --build-arg project_name="${project_name}" \
   --build-arg pip_requirements="${pip_requirements}" \
-  --file ./docker-build/Dockerfile \
+  --file "${dockerfile}" \
   .
 
 docker run \
