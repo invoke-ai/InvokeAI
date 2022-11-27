@@ -157,10 +157,14 @@ class Inpaint(Img2Img):
             strength = strength,
             mask_blur_radius = 0,
             seam_size = 0,
-            step_callback = step_callback
+            step_callback = step_callback,
+            inpaint_width = im.width,
+            inpaint_height = im.height
         )
 
-        result = make_image(noise)
+        seam_noise = self.get_noise(im.width, im.height)
+
+        result = make_image(seam_noise)
 
         return result
 
