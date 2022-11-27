@@ -22,7 +22,7 @@ jobs:
       - name: install requirements
         run: |
           python -m \
-            pip install -r requirements-mkdocs.txt
+            pip install -r docs/requirements-mkdocs.txt
 
       - name: confirm buildability
         run: |
