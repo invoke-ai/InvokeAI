@@ -1,0 +1,55 @@
+@use '../../../styles/Mixins/' as *;
+
+.floating-show-hide-button {
+  position: absolute;
+  top: 50%;
+  transform: translate(0, -50%);
+  z-index: 20;
+  padding: 0;
+  background-color: red !important;
+
+  &.left {
+    left: 0;
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  &.right {
+    right: 0;
+    border-radius: 0.5rem 0 0 0.5rem;
+  }
+
+  @include Button(
+    $btn-width: 2rem,
+    $btn-height: 12rem,
+    $icon-size: 20px,
+    $btn-color: var(--btn-btn-base-color),
+    $btn-color-hover: var(--btn-btn-base-color-hover)
+  );
+}
+
+.show-hide-button-options {
+  position: absolute;
+  transform: translate(0, -50%);
+  z-index: 20;
+  min-width: 2rem;
+
+  top: 50%;
+  left: calc(42px + 2rem);
+
+  border-radius: 0 0.5rem 0.5rem 0;
+
+  display: flex;
+  flex-direction: column;
+  row-gap: 0.5rem;
+
+  button {
+    border-radius: 0 0.3rem 0.3rem 0;
+  }
+}
+
+.show-hide-button-gallery {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  background-color: var(--background-color) !important;
+  // filter: drop-shadow(0.5rem 0px 1rem var(--floating-button-drop-shadow-color));
+}
