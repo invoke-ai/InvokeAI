@@ -274,13 +274,9 @@ class Completer(object):
 
         matches = list()
         for concept in self.concepts:
-            if concept == partial:
+            if concept.startswith(partial):
                 matches.append(f'<{concept}>')
-            elif concept.startswith(partial):
-                matches.append(f'<{concept}')
         matches.sort()
-        if len(matches)==1:
-            matches[0] = matches[0]+'>'
         return matches
 
     def _model_completions(self, text, state):
