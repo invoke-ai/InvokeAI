@@ -27,13 +27,14 @@ ENV INVOKEAI_ROOT=${INVOKEAI_ROOT}
 WORKDIR /${PROJECT_NAME}
 COPY . .
 
-# install requirements
+# install requirements and link outputs folder
 RUN cp \
   ./environments-and-requirements/${PIP_REQUIREMENTS} \
   ${PIP_REQUIREMENTS} \
   && pip install \
     --no-cache-dir \
-    -r ${PIP_REQUIREMENTS}
+    -r ${PIP_REQUIREMENTS} \
+  && ln -sf /data/outputs /${PROJECT_NAME}/outputs
 
 # set Entrypoint and default CMD
 ENTRYPOINT [ "python3" ]
