@@ -43,6 +43,6 @@ dependencies:
     - git+https://github.com/openai/CLIP.git@main#egg=clip
     - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
     - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-    - git+https://github.com/invoke-ai/GFPGAN#egg=gfpgan
+    - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan
     - git+https://github.com/invoke-ai/PyPatchMatch@0.1.3#egg=pypatchmatch
     - -e .
