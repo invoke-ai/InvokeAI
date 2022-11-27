@@ -1,4 +1,4 @@
-FROM ubuntu AS invokeai
+FROM ubuntu:22.10
 
 # use bash
 SHELL [ "/bin/bash", "-c" ]
