@@ -82,7 +82,6 @@ const initialCanvasState: CanvasState = {
   shouldShowStagingImage: true,
   shouldShowStagingOutline: true,
   shouldSnapToGrid: true,
-  gridSnapThreshold: 64,
   shouldUseInpaintReplace: false,
   stageCoordinates: { x: 0, y: 0 },
   stageDimensions: { width: 0, height: 0 },
@@ -452,9 +451,6 @@ export const canvasSlice = createSlice({
     },
     setShouldSnapToGrid: (state, action: PayloadAction<boolean>) => {
       state.shouldSnapToGrid = action.payload;
-    },
-    setGridSnapThreshold: (state, action: PayloadAction<number>) => {
-      state.gridSnapThreshold = action.payload;
     },
     setShouldAutoSave: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSave = action.payload;
@@ -829,7 +825,6 @@ export const {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
   setShouldSnapToGrid,
-  setGridSnapThreshold,
   setShouldUseInpaintReplace,
   setStageCoordinates,
   setStageDimensions,

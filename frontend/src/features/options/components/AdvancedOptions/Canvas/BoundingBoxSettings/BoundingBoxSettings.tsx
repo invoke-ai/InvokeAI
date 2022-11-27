@@ -1,30 +1,16 @@
-import { ChangeEvent } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import IAISlider from 'common/components/IAISlider';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  setBoundingBoxDimensions,
-  setGridSnapThreshold,
-  setShouldSnapToGrid,
-} from 'features/canvas/store/canvasSlice';
+import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
-import IAICheckbox from 'common/components/IAICheckbox';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 const selector = createSelector(
   canvasSelector,
   (canvas) => {
-    const {
-      boundingBoxDimensions,
-      boundingBoxScaleMethod: boundingBoxScale,
-      shouldSnapToGrid,
-      gridSnapThreshold,
-    } = canvas;
+    const { boundingBoxDimensions, boundingBoxScaleMethod: boundingBoxScale } = canvas;
     return {
-      shouldSnapToGrid,
-      gridSnapThreshold,
       boundingBoxDimensions,
       boundingBoxScale,
     };
@@ -38,8 +24,7 @@ const selector = createSelector(
 
 const BoundingBoxSettings = () => {
   const dispatch = useAppDispatch();
-  const { boundingBoxDimensions, shouldSnapToGrid, gridSnapThreshold } =
-    useAppSelector(selector);
+  const { boundingBoxDimensions } = useAppSelector(selector);
 
   const handleChangeWidth = (v: number) => {
     dispatch(
@@ -77,29 +62,6 @@ const BoundingBoxSettings = () => {
     );
   };
 
-  const handleChangeShouldSnapToGrid = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldSnapToGrid(e.target.checked));
-
-  const handleChangeGridSnapThreshold = (v: number) => {
-    dispatch(setGridSnapThreshold(v));
-  };
-
-  const handleResetGridSnapThreshold = () => {
-    dispatch(setGridSnapThreshold(64));
-  };
-
-  useHotkeys(
-    ['n'],
-    () => {
-      dispatch(setShouldSnapToGrid(!shouldSnapToGrid));
-    },
-    {
-      enabled: true,
-      preventDefault: true,
-    },
-    [shouldSnapToGrid]
-  );
-
   return (
     <Flex direction="column" gap="1rem">
       <IAISlider
@@ -123,27 +85,6 @@ const BoundingBoxSettings = () => {
         value={boundingBoxDimensions.height}
         onChange={handleChangeHeight}
         handleReset={handleResetHeight}
-        sliderNumberInputProps={{ max: 4096 }}
-        withSliderMarks
-        withInput
-        withReset
-      />
-      <IAICheckbox
-        label="Snap Bounding Box to Grid (N)"
-        isChecked={shouldSnapToGrid}
-        onChange={handleChangeShouldSnapToGrid}
-      />
-      <IAISlider
-        label={'Snap Threshold'}
-        min={2}
-        max={256}
-        step={2}
-        value={gridSnapThreshold}
-        onChange={handleChangeGridSnapThreshold}
-        handleReset={handleResetGridSnapThreshold}
-        isSliderDisabled={!shouldSnapToGrid}
-        isInputDisabled={!shouldSnapToGrid}
-        isResetDisabled={!shouldSnapToGrid}
         sliderNumberInputProps={{ max: 4096 }}
         withSliderMarks
         withInput
