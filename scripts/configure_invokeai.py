@@ -536,7 +536,7 @@ def download_weights(opt:dict) -> Union[str, None]:
     if not (access_token := HfFolder.get_token()):
         # If unable to find an existing token or expected environment, try the non-canonical environment variable (widely used in the community and supported as per docs)
         if (access_token := os.getenv("HUGGINGFACE_TOKEN")):
-            HfFolder.save_token(access_token)
+            os.environ['HUGGING_FACE_HUB_TOKEN'] = access_token
 
     if opt.yes_to_all:
         models = recommended_datasets()
