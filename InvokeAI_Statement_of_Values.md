@@ -46,7 +46,7 @@ in mind, we are constantly debating how to build systems that put
 artists’ needs first: tools which can be readily integrated into an
 artist’s existing workflows and practices, enhancing their work and
 helping them to push it further. Every decision we take as a team,
-which includes many artists, aims to build towards that goal
+which includes many artists, aims to build towards that goal.
 
 5. That artificial intelligence can be a force for good in the world,
 but must be used responsibly. Artificial intelligence technologies
