@@ -212,8 +212,7 @@ This involves a few easy steps.
     access_token = HfFolder.get_token()
     if access_token is not None:
         print('found')
-
-    if access_token is None:
+    else:
         print('not found')
         print('''
 4. Thank you! The last step is to enter your HuggingFace access token so that
@@ -231,6 +230,7 @@ This involves a few easy steps.
    Token: '''
         )
         access_token = getpass_asterisk.getpass_asterisk()
+        HfFolder.save_token(access_token)
     return access_token
 
 #---------------------------------------------
@@ -521,10 +521,16 @@ def download_safety_checker():
     print('...success',file=sys.stderr)
 
 #-------------------------------------
-def download_weights(opt:dict):
+    # Authenticate to Huggingface using environment variables.
+    # If successful, authentication will persist for either interactive or non-interactive use.
+    # Default env var expected by HuggingFace is HUGGING_FACE_HUB_TOKEN.
+    if not (access_token := HfFolder.get_token()):
+        # If unable to find an existing token or expected environment, try the non-canonical environment variable (widely used in the community and supported as per docs)
+        if (access_token := os.getenv("HUGGINGFACE_TOKEN")):
+            HfFolder.save_token(access_token)
+
     if opt.yes_to_all:
         models = recommended_datasets()
-        access_token = HfFolder.get_token()
         if len(models)>0 and access_token is not None:
             successfully_downloaded = download_weight_datasets(models, access_token)
             update_config_file(successfully_downloaded,opt)
@@ -547,6 +553,7 @@ def download_weights(opt:dict):
         return
 
     print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+    # We are either already authenticated, or will be asked to provide the token interactively
     access_token = authenticate()
     print('\n** DOWNLOADING WEIGHTS **')
     successfully_downloaded = download_weight_datasets(models, access_token)
