@@ -598,7 +598,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
         else:
             root_selected = True
 
-    print(f'\nYou may change the chosen directories at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
+    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
         
     for name in ['models','configs']:
