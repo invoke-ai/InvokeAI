@@ -159,6 +159,11 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const handleLightBox = () => {
+    dispatch(setIsLightBoxOpen(true));
+    dispatch(setCurrentImage(image));
+  };
+
   return (
     <ContextMenu.Root
       onOpenChange={(open: boolean) => {
@@ -220,6 +225,9 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           e.detail.originalEvent.preventDefault();
         }}
       >
+        <ContextMenu.Item onClickCapture={handleLightBox}>
+          Open In Viewer
+        </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUsePrompt}
           disabled={image?.metadata?.image?.prompt === undefined}

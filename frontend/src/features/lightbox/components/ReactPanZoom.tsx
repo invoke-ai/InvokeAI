@@ -47,7 +47,12 @@ export default function ReactPanZoom({
   };
 
   return (
-    <TransformWrapper centerOnInit minScale={0.1}>
+    <TransformWrapper
+      centerOnInit
+      minScale={0.1}
+      initialPositionX={50}
+      initialPositionY={50}
+    >
       {({ zoomIn, zoomOut, resetTransform, centerView }) => (
         <>
           <div className="lightbox-image-options">
@@ -103,8 +108,12 @@ export default function ReactPanZoom({
               fontSize={20}
             />
           </div>
-
-          <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
+          <TransformComponent
+            wrapperStyle={{
+              width: '100%',
+              height: '100%',
+            }}
+          >
             <img
               style={{
                 transform: `rotate(${rotation * 90}deg) scaleX(${
@@ -116,7 +125,7 @@ export default function ReactPanZoom({
               alt={alt}
               ref={ref}
               className={styleClass ? styleClass : ''}
-              onLoad={() => centerView()}
+              onLoad={() => centerView(1, 0, 'easeOut')}
             />
           </TransformComponent>
         </>
