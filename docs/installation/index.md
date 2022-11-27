@@ -60,3 +60,10 @@ experience and preferences.
     account. It is recommended for individuals who have previously
     worked on the Colab and are comfortable with the Jupyter notebook
     environment.
+
+6. [Patchmatch Installation](INSTALL_PATCHMATCH.md)
+
+   These installation instructions are for users of Linux and Macintosh
+   systems that wish to use the `Patchmatch` module to improve the
+   quality of inpainting and outpainting. Windows users should get the
+   module automatically at install time.
