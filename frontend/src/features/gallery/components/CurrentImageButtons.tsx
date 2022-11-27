@@ -27,6 +27,7 @@ import {
   FaCode,
   FaCopy,
   FaDownload,
+  FaExpand,
   FaExpandArrowsAlt,
   FaGrinStars,
   FaQuoteRight,
@@ -357,6 +358,10 @@ const CurrentImageButtons = () => {
     [currentImage, shouldShowImageDetails]
   );
 
+  const handleLightBox = () => {
+    dispatch(setIsLightBoxOpen(!isLightBoxOpen));
+  };
+
   return (
     <div className="current-image-options">
       <ButtonGroup isAttached={true}>
@@ -396,29 +401,38 @@ const CurrentImageButtons = () => {
             </IAIButton>
           </div>
         </IAIPopover>
+        <IAIIconButton
+          icon={<FaExpand />}
+          tooltip={!isLightBoxOpen ? 'Open In Viewer (Z)' : 'Close Viewer (Z)'}
+          aria-label={
+            !isLightBoxOpen ? 'Open In Viewer (Z)' : 'Close Viewer (Z)'
+          }
+          data-selected={isLightBoxOpen}
+          onClick={handleLightBox}
+        />
       </ButtonGroup>
 
       <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaQuoteRight />}
-          tooltip="Use Prompt"
-          aria-label="Use Prompt"
+          tooltip="Use Prompt (P)"
+          aria-label="Use Prompt (P)"
           isDisabled={!currentImage?.metadata?.image?.prompt}
           onClick={handleClickUsePrompt}
         />
 
         <IAIIconButton
           icon={<FaSeedling />}
-          tooltip="Use Seed"
-          aria-label="Use Seed"
+          tooltip="Use Seed (S)"
+          aria-label="Use Seed (S)"
           isDisabled={!currentImage?.metadata?.image?.seed}
           onClick={handleClickUseSeed}
         />
 
         <IAIIconButton
           icon={<FaAsterisk />}
-          tooltip="Use All"
-          aria-label="Use All"
+          tooltip="Use All (A)"
+          aria-label="Use All (A)"
           isDisabled={
             !['txt2img', 'img2img'].includes(
               currentImage?.metadata?.image?.type
@@ -474,13 +488,15 @@ const CurrentImageButtons = () => {
         </IAIPopover>
       </ButtonGroup>
 
-      <IAIIconButton
-        icon={<FaCode />}
-        tooltip="Details"
-        aria-label="Details"
-        data-selected={shouldShowImageDetails}
-        onClick={handleClickShowImageDetails}
-      />
+      <ButtonGroup isAttached={true}>
+        <IAIIconButton
+          icon={<FaCode />}
+          tooltip="Info (I)"
+          aria-label="Info (I)"
+          data-selected={shouldShowImageDetails}
+          onClick={handleClickShowImageDetails}
+        />
+      </ButtonGroup>
 
       <DeleteImageModal image={currentImage}>
         <IAIIconButton

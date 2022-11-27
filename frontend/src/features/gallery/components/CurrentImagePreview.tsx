@@ -10,10 +10,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import {
-  OptionsState,
-  setIsLightBoxOpen,
-} from 'features/options/store/optionsSlice';
+import { OptionsState } from 'features/options/store/optionsSlice';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 
 export const imagesSelector = createSelector(
@@ -82,10 +79,6 @@ export default function CurrentImagePreview() {
     dispatch(selectNextImage());
   };
 
-  const handleLightBox = () => {
-    dispatch(setIsLightBoxOpen(true));
-  };
-
   return (
     <div className={'current-image-preview'}>
       {imageToDisplay && (
@@ -93,7 +86,6 @@ export default function CurrentImagePreview() {
           src={imageToDisplay.url}
           width={imageToDisplay.width}
           height={imageToDisplay.height}
-          onClick={handleLightBox}
           style={{
             imageRendering: isIntermediate ? 'pixelated' : 'initial',
           }}
