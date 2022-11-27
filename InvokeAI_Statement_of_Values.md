@@ -53,23 +53,23 @@ but must be used responsibly. Artificial intelligence technologies
 have the potential to improve society, in everything from cancer care,
 to customer service, to creative writing.
 
-While we do not believe that software should arbitrarily limit what
-users can do with it, we recognize that when used irresponsibly, AI
-has the potential to do much harm. Our Discord server is actively
-moderated in order to minimize the potential of harm from
-user-contributed images. In addition, we ask users of our software to
-refrain from using it in any way that would cause mental, emotional or
-physical harm to individuals and vulnerable populations including (but
-not limited to) women; minors; ethnic minorities; religious groups;
-members of LGBTQIA communities; and people with disabilities or
-impairments.
+  - While we do not believe that software should arbitrarily limit what
+  users can do with it, we recognize that when used irresponsibly, AI
+  has the potential to do much harm. Our Discord server is actively
+  moderated in order to minimize the potential of harm from
+  user-contributed images. In addition, we ask users of our software to
+  refrain from using it in any way that would cause mental, emotional or
+  physical harm to individuals and vulnerable populations including (but
+  not limited to) women; minors; ethnic minorities; religious groups;
+  members of LGBTQIA communities; and people with disabilities or
+  impairments.
 
-Note that some of the image generation AI models which the Invoke-AI
-toolkit supports carry licensing agreements which impose restrictions
-on how the model is used. We ask that our users read and agree to
-these terms if they wish to make use of these models. These agreements
-are distinct from the MIT license which applies to the InvokeAI
-software and source code.
+  - Note that some of the image generation AI models which the Invoke-AI
+  toolkit supports carry licensing agreements which impose restrictions
+  on how the model is used. We ask that our users read and agree to
+  these terms if they wish to make use of these models. These agreements
+  are distinct from the MIT license which applies to the InvokeAI
+  software and source code.
 
 6. That mutual respect is key to a healthy software development
 community. Members of the InvokeAI community are expected to treat
