@@ -82,10 +82,9 @@ class InvokeAIWebServer:
         if opt.cors:
             socketio_args["cors_allowed_origins"] = opt.cors
 
+        frontend_path = self.find_frontend()
         self.app = Flask(
-            __name__,
-            static_url_path="",
-            static_folder=os.path.join(args.root_dir, "frontend/dist"),
+            __name__, static_url_path="", static_folder=frontend_path
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)
@@ -243,6 +242,16 @@ class InvokeAIWebServer:
                     keyfile=args.keyfile,
                 )
 
+    def find_frontend(self):
+        my_dir = os.path.dirname(__file__)
+        for candidate in (os.path.join(my_dir,'..','frontend','dist'),         # pip install -e .
+                          os.path.join(my_dir,'../../../../frontend','dist')   # pip install .
+        ):
+            if os.path.exists(candidate):
+                return candidate
+        assert "Frontend files cannot be found. Cannot continue"
+
+                                        
     def setup_app(self):
         self.result_url = "outputs/"
         self.init_image_url = "outputs/init-images/"

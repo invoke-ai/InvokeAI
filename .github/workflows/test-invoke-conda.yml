@@ -12,7 +12,6 @@ jobs:
       || github.repository != 'invoke-ai/InvokeAI'
       || github.ref_protected
     strategy:
-      fail-fast: false
       matrix:
         stable-diffusion-model:
           - diffusers-1.4
@@ -125,4 +124,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
-          path: ${{ env.INVOKEAI_ROOT }}/outputs/img-samples
+          path: ${{ env.INVOKEAI_ROOT }}/outputs
