@@ -11,7 +11,6 @@ import {
   FaEye,
   FaEyeSlash,
   FaSave,
-  FaTrash,
 } from 'react-icons/fa';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
@@ -24,6 +23,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
+import { MdClear } from 'react-icons/md';
 
 const selector = createSelector(
   [canvasSelector],
@@ -167,10 +167,11 @@ const IAICanvasStagingAreaToolbar = () => {
         <IAIIconButton
           tooltip="Discard All"
           aria-label="Discard All"
-          icon={<FaTrash />}
+          icon={<MdClear />}
           onClick={() => dispatch(discardStagedImages())}
           data-selected={true}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}
+          fontSize={20}
         />
       </ButtonGroup>
     </Flex>
