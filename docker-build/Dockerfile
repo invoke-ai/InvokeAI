@@ -30,13 +30,10 @@ COPY . .
 RUN cp \
   ./environments-and-requirements/${PIP_REQUIREMENTS} \
   ${PIP_REQUIREMENTS} \
-  && pip install -r ${PIP_REQUIREMENTS}
-RUN pip install --no-cache-dir -e .
+  && pip install \
+    --no-cache-dir \
+    -r ${PIP_REQUIREMENTS}
 
-# RUN source ~/.bashrc \
-#   && python scripts/preload_models.py \
-#     --no-interactive
-
-# copy and set Entrypoint
+# set Entrypoint and default CMD
 ENTRYPOINT [ "python3" ]
 CMD [ "scripts/invoke.py", "--web", "--host", "0.0.0.0" ]
