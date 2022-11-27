@@ -786,7 +786,7 @@ def main():
             if config_path.exists():
                 download_diffusers_in_config(config_path, full_precision=opt.full_precision)
             else:
-                print("*⚠ No config file found; downloading no weights.")
+                print(f"*⚠ No config file found; downloading no weights. Looked in {config_path}")
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
         download_clip()
