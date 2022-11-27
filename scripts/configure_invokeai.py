@@ -592,7 +592,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'InvokeAI models and configuration files will be placed into {root} and image outputs will be placed into {outputs}.')
     print(f'\nYou may change these values at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
-    for name in ('models','configs','scripts','frontend/dist'):
+    for name in ('models','configs'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
     for src in ['configs']:
         dest = os.path.join(root,src)

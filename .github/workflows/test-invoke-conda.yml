@@ -13,7 +13,6 @@ on:
 jobs:
   matrix:
     strategy:
-      fail-fast: false
       matrix:
         stable-diffusion-model:
           - 'stable-diffusion-1.5'
@@ -89,7 +88,7 @@ jobs:
         env:
           cache-name: cache-${{ matrix.stable-diffusion-model }}
         with:
-          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          path: ${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}
           key: ${{ env.cache-name }}
 
       - name: Download ${{ matrix.stable-diffusion-model }}
@@ -127,4 +126,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
-          path: ${{ env.INVOKEAI_ROOT }}/outputs/img-samples
+          path: ${{ env.INVOKEAI_ROOT }}/outputs
