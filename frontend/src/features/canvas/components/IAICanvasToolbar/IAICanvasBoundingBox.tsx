@@ -36,7 +36,6 @@ const boundingBoxPreviewSelector = createSelector(
       tool,
       stageCoordinates,
       shouldSnapToGrid,
-      gridSnapThreshold,
     } = canvas;
 
     return {
@@ -50,7 +49,6 @@ const boundingBoxPreviewSelector = createSelector(
       stageDimensions,
       stageScale,
       shouldSnapToGrid,
-      gridSnapThreshold,
       tool,
       stageCoordinates,
       boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
@@ -82,7 +80,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     stageDimensions,
     stageScale,
     shouldSnapToGrid,
-    gridSnapThreshold,
     tool,
     boundingBoxStrokeWidth,
     hitStrokeWidth,
@@ -114,8 +111,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       const dragX = e.target.x();
       const dragY = e.target.y();
 
-      const newX = roundToMultiple(dragX, gridSnapThreshold);
-      const newY = roundToMultiple(dragY, gridSnapThreshold);
+      const newX = roundToMultiple(dragX, 64);
+      const newY = roundToMultiple(dragY, 64);
 
       e.target.x(newX);
       e.target.y(newY);
@@ -127,7 +124,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         })
       );
     },
-    [dispatch, shouldSnapToGrid, gridSnapThreshold]
+    [dispatch, shouldSnapToGrid]
   );
 
   const handleOnTransform = useCallback(() => {

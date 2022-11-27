@@ -129,7 +129,6 @@ export interface CanvasState {
   shouldShowStagingImage: boolean;
   shouldShowStagingOutline: boolean;
   shouldSnapToGrid: boolean;
-  gridSnapThreshold: number;
   shouldUseInpaintReplace: boolean;
   stageCoordinates: Vector2d;
   stageDimensions: Dimensions;
