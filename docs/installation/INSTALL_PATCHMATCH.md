@@ -38,7 +38,7 @@ steps:
 
    ```
    cd /usr/lib/x86_64-linux-gnu/pkgconfig/
-   ln -sf opencv4.pc opencv.pc
+   sudo ln -sf opencv4.pc opencv.pc
 
 4. Activate the environment you use for invokeai, either with
 `conda` or with a virtual environment.
