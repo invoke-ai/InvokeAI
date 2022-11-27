@@ -12,7 +12,7 @@ repo_url: 'https://github.com/invoke-ai/InvokeAI'
 edit_uri: edit/main/docs/
 
 # Copyright
-copyright: Copyright &copy; 2022 Lincoln D. Stein <lincoln.stein@gmail.com>
+copyright: Copyright &copy; 2022 InvokeAI Team
 
 # Configuration
 theme:
