@@ -86,9 +86,7 @@ jobs:
       #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
 
       - name: install requirements
-        run: |
-          ${{ env.pythonLocation }}/bin/pip install --upgrade -r '${{ matrix.requirements-file }}'
-          ${{ env.pythonLocation }}/bin/pip install -e .
+        run: ${{ env.pythonLocation }}/bin/pip install -r '${{ matrix.requirements-file }}'
 
       - name: run configure_invokeai.py
         id: run-preload-models
