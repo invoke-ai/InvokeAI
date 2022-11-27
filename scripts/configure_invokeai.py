@@ -65,7 +65,7 @@ this program and resume later.\n'''
 def postscript():
     print(
         '''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
-Web version: 
+Web version:
     python scripts/invoke.py --web  (connect to http://localhost:9090)
 Command-line version:
    python scripts/invoke.py
@@ -129,7 +129,7 @@ def select_datasets(action:str):
 
         if action == 'customized':
             print('''
-Choose the weight file(s) you wish to download. Before downloading you 
+Choose the weight file(s) you wish to download. Before downloading you
 will be given the option to view and change your selections.
 '''
         )
@@ -144,7 +144,7 @@ will be given the option to view and change your selections.
                 if Datasets[ds]['recommended']:
                     datasets[ds]=counter
                     counter += 1
-                
+
         print('The following weight files will be downloaded:')
         for ds in datasets:
             dflt = '*' if dflt is None else ''
@@ -179,7 +179,7 @@ def all_datasets()->dict:
 #-------------------------------Authenticate against Hugging Face
 def authenticate():
     print('''
-To download the Stable Diffusion weight files from the official Hugging Face 
+To download the Stable Diffusion weight files from the official Hugging Face
 repository, you need to read and accept the CreativeML Responsible AI license.
 
 This involves a few easy steps.
@@ -212,18 +212,18 @@ This involves a few easy steps.
     access_token = HfFolder.get_token()
     if access_token is not None:
         print('found')
-    
+
     if access_token is None:
         print('not found')
         print('''
 4. Thank you! The last step is to enter your HuggingFace access token so that
    this script is authorized to initiate the download. Go to the access tokens
-   page of your Hugging Face account and create a token by clicking the 
+   page of your Hugging Face account and create a token by clicking the
    "New token" button:
 
    https://huggingface.co/settings/tokens
 
-   (You can enter anything you like in the token creation field marked "Name". 
+   (You can enter anything you like in the token creation field marked "Name".
    "Role" should be "read").
 
    Now copy the token to your clipboard and paste it at the prompt. Windows
@@ -246,7 +246,7 @@ def migrate_models_ckpt():
     if rename:
         print(f'model.ckpt => {new_name}')
         os.replace(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
-            
+
 #---------------------------------------------
 def download_weight_datasets(models:dict, access_token:str):
     migrate_models_ckpt()
@@ -273,9 +273,9 @@ def download_weight_datasets(models:dict, access_token:str):
 
     HfFolder.save_token(access_token)
     keys = ', '.join(successful.keys())
-    print(f'Successfully installed {keys}') 
+    print(f'Successfully installed {keys}')
     return successful
-    
+
 #---------------------------------------------
 def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_token:str=None)->bool:
     model_dest = os.path.join(model_dir, model_name)
@@ -286,7 +286,7 @@ def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_t
     header = {"Authorization": f'Bearer {access_token}'} if access_token else {}
     open_mode = 'wb'
     exist_size = 0
-    
+
     if os.path.exists(model_dest):
         exist_size = os.path.getsize(model_dest)
         header['Range'] = f'bytes={exist_size}-'
@@ -294,7 +294,7 @@ def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_t
 
     resp = requests.get(url, headers=header, stream=True)
     total = int(resp.headers.get('content-length', 0))
-    
+
     if resp.status_code==416:  # "range not satisfiable", which means nothing to return
         print(f'* {model_name}: complete file found. Skipping.')
         return True
@@ -342,12 +342,12 @@ def download_with_progress_bar(model_url:str, model_dest:str, label:str='the'):
         print(f'Error downloading {label} model')
         print(traceback.format_exc())
 
-                             
+
 #---------------------------------------------
 def update_config_file(successfully_downloaded:dict,opt:dict):
     config_file = opt.config_file or Default_config_file
     config_file = os.path.normpath(os.path.join(Globals.root,config_file))
-    
+
     yaml = new_config_file_contents(successfully_downloaded,config_file)
 
     try:
@@ -366,8 +366,8 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
 
     print(f'Successfully created new configuration file {config_file}')
 
-    
-#---------------------------------------------    
+
+#---------------------------------------------
 def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str:
     if os.path.exists(config_file):
         conf = OmegaConf.load(config_file)
@@ -377,19 +377,19 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
     # find the VAE file, if there is one
     vaes = {}
     default_selected = False
-    
+
     for model in successfully_downloaded:
         a = Datasets[model]['config'].split('/')
         if a[0] != 'VAE':
             continue
         vae_target = a[1] if len(a)>1 else 'default'
         vaes[vae_target] = Datasets[model]['file']
-    
+
     for model in successfully_downloaded:
         if Datasets[model]['config'].startswith('VAE'): # skip VAE entries
             continue
         stanza = conf[model] if model in conf else { }
-        
+
         stanza['description'] = Datasets[model]['description']
         stanza['weights'] = os.path.join(Model_dir,Weights_dir,Datasets[model]['file'])
         stanza['config'] = os.path.normpath(os.path.join(SD_Configs, Datasets[model]['config']))
@@ -408,7 +408,7 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
             default_selected = True
         conf[model] = stanza
     return OmegaConf.to_yaml(conf)
-    
+
 #---------------------------------------------
 # this will preload the Bert tokenizer fles
 def download_bert():
@@ -478,7 +478,7 @@ def download_clipseg():
         model_url = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
         model_dest = os.path.join(Globals.root,'models/clipseg/clipseg_weights')
         weights_zip = 'models/clipseg/weights.zip'
-        
+
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
         if not os.path.exists(f'{model_dest}/rd64-uni-refined.pth'):
@@ -601,7 +601,7 @@ def select_outputs(root:str,yes_to_all:bool=False):
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
     assert os.path.exists('./configs'),'Run this script from within the InvokeAI source code directory, "InvokeAI" or the runtime directory "invokeai".'
-    
+
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root_selected = False
     while not root_selected:
@@ -685,7 +685,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 # -Ak_euler_a -C10.0
 #
 ''')
-    
+
 #-------------------------------------
 class ProgressBar():
     def __init__(self,model_name='file'):
@@ -756,7 +756,7 @@ def main():
     except Exception as e:
         print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
         print(traceback.format_exc())
-    
+
 #-------------------------------------
 if __name__ == '__main__':
     main()
