@@ -1,5 +1,5 @@
 import * as InvokeAI from 'app/invokeai';
-import { Vector2d } from 'konva/lib/types';
+import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 
 export const LAYER_NAMES_DICT = [
@@ -35,6 +35,7 @@ export type CanvasAnyLine = {
   tool: CanvasDrawingTool;
   strokeWidth: number;
   points: number[];
+  clip?: IRect;
 };
 
 export type CanvasImage = {
@@ -119,6 +120,7 @@ export interface CanvasState {
   shouldDarkenOutsideBoundingBox: boolean;
   shouldLockBoundingBox: boolean;
   shouldPreserveMaskedArea: boolean;
+  shouldRestrictStrokesToBox: boolean;
   shouldShowBoundingBox: boolean;
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;

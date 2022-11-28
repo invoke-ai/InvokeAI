@@ -37,7 +37,7 @@ const IAICanvasObjectRenderer = () => {
             <IAICanvasImage key={i} x={obj.x} y={obj.y} url={obj.image.url} />
           );
         } else if (isCanvasBaseLine(obj)) {
-          return (
+          const line = (
             <Line
               key={i}
               points={obj.points}
@@ -53,6 +53,20 @@ const IAICanvasObjectRenderer = () => {
               }
             />
           );
+          if (obj.clip) {
+            return (
+              <Group
+                clipX={obj.clip.x}
+                clipY={obj.clip.y}
+                clipWidth={obj.clip.width}
+                clipHeight={obj.clip.height}
+              >
+                {line}
+              </Group>
+            );
+          } else {
+            return line;
+          }
         }
       })}
     </Group>

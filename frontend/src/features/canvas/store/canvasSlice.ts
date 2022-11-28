@@ -15,9 +15,12 @@ import floorCoordinates from '../util/floorCoordinates';
 import roundDimensionsTo64 from '../util/roundDimensionsTo64';
 import {
   BoundingBoxScale,
+  CanvasAnyLine,
   CanvasImage,
   CanvasLayer,
   CanvasLayerState,
+  CanvasLine,
+  CanvasMaskLine,
   CanvasState,
   CanvasTool,
   Dimensions,
@@ -72,6 +75,7 @@ const initialCanvasState: CanvasState = {
   shouldDarkenOutsideBoundingBox: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
+  shouldRestrictStrokesToBox: true,
   shouldShowBoundingBox: true,
   shouldShowBrush: true,
   shouldShowBrushPreview: false,
@@ -383,7 +387,8 @@ export const canvasSlice = createSlice({
       state.shouldShowStagingOutline = true;
     },
     addLine: (state, action: PayloadAction<number[]>) => {
-      const { tool, layer, brushColor, brushSize } = state;
+      const { tool, layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
+        state;
 
       if (tool === 'move' || tool === 'colorPicker') return;
 
@@ -399,14 +404,23 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.objects.push({
+      const newLine: CanvasMaskLine | CanvasLine = {
         kind: 'line',
         layer,
         tool,
         strokeWidth: newStrokeWidth,
         points: action.payload,
         ...newColor,
-      });
+      };
+
+      if (shouldRestrictStrokesToBox) {
+        newLine.clip = {
+          ...state.boundingBoxCoordinates,
+          ...state.boundingBoxDimensions,
+        };
+      }
+
+      state.layerState.objects.push(newLine);
 
       state.futureLayerStates = [];
     },
@@ -731,6 +745,9 @@ export const canvasSlice = createSlice({
     setShouldShowCanvasDebugInfo: (state, action: PayloadAction<boolean>) => {
       state.shouldShowCanvasDebugInfo = action.payload;
     },
+    setShouldRestrictStrokesToBox: (state, action: PayloadAction<boolean>) => {
+      state.shouldRestrictStrokesToBox = action.payload;
+    },
     setShouldCropToBoundingBoxOnSave: (
       state,
       action: PayloadAction<boolean>
@@ -834,6 +851,7 @@ export const {
   toggleTool,
   undo,
   setScaledBoundingBoxDimensions,
+  setShouldRestrictStrokesToBox,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
