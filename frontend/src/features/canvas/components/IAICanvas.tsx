@@ -30,6 +30,7 @@ import {
   setCanvasBaseLayer,
   setCanvasStage,
 } from '../util/konvaInstanceProvider';
+import { KonvaEventObject } from 'konva/lib/Node';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -158,6 +159,9 @@ const IAICanvas = () => {
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
+          onContextMenu={(e: KonvaEventObject<MouseEvent>) =>
+            e.evt.preventDefault()
+          }
           onWheel={handleWheel}
           listening={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
