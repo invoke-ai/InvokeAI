@@ -643,6 +643,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     os.makedirs(outputs, exist_ok=True)
 
     init_file = os.path.expanduser(Globals.initfile)
+
     print(f'Creating the initialization file at "{init_file}".\n')
     with open(init_file,'w') as f:
         f.write(f'''# InvokeAI initialization file
@@ -667,17 +668,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 # --steps=20
 # -Ak_euler_a -C10.0
 #
-'''
-            )
-    else:
-        print(f'Updating the initialization file at "{init_file}".\n')
-        with open(init_file,'r') as infile, open(f'{init_file}.tmp','w') as outfile:
-            for line in infile.readlines():
-                if not line.startswith('--root') and not line.startswith('--outdir'):
-                    outfile.write(line)
-            outfile.write(f'--root="{root}"\n')
-            outfile.write(f'--outdir="{outputs}"\n')
-        os.replace(f'{init_file}.tmp',init_file)
+''')
     
 #-------------------------------------
 class ProgressBar():
