@@ -23,7 +23,7 @@ class Concepts(object):
         self.concepts_loaded = dict()
         self.triggers = dict()            # concept name to trigger phrase
         self.concept_names = dict()       # trigger phrase to concept name
-        self.match_trigger = re.compile('(<[^>]+>)') # trigger is less restrictive than HF concept name
+        self.match_trigger = re.compile('(<[\w\- >]+>)') # trigger is slightly less restrictive than HF concept name
         self.match_concept = re.compile('<([\w\-]+)>') # HF concept name can only contain A-Za-z0-9_-
 
     def list_concepts(self)->list:
