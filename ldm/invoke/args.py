@@ -174,8 +174,9 @@ class Args(object):
                 print(f'>> Initialization file {initfile} found. Loading...')
                 sysargs.insert(0,f'@{initfile}')
             else:
-                print(f'>> Initialization file {initfile} not found. Creating a new one...')
-                self._create_init_file(initfile)
+                from ldm.invoke.CLI import emergency_model_reconfigure
+                emergency_model_reconfigure()
+                sys.exit(-1)
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
@@ -367,17 +368,6 @@ class Args(object):
             new_dict[k] = value2 if value2 is not None else value1
         return new_dict
 
-    def _create_init_file(self,initfile:str):
-        with open(initfile, mode='w', encoding='utf-8') as f:
-            f.write('''# InvokeAI initialization file
-# Put frequently-used startup commands here, one or more per line
-# Examples:
-# --web --host=0.0.0.0
-# --steps 20
-# -Ak_euler_a -C10.0
-'''
-            )
-
     def _create_arg_parser(self):
         '''
         This defines all the arguments used on the command line when you launch
@@ -460,8 +450,9 @@ class Args(object):
         )
         model_group.add_argument(
             '--safety_checker',
-            action='store_true',
-            help='Check for and blur potentially NSFW images',
+            action=argparse.BooleanOptionalAction,
+            default=False,
+            help='Check for and blur potentially NSFW images. Use --no-safety_checker to disable.',
         )
         file_group.add_argument(
             '--from_file',

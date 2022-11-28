@@ -243,10 +243,10 @@ def download_weight_datasets(models:dict, access_token:str):
     for mod in models.keys():
         repo_id = Datasets[mod]['repo_id']
         filename = Datasets[mod]['file']
-        print(os.path.join(Globals.root,Model_dir,Weights_dir), file=sys.stderr)
+        dest = os.path.join(Globals.root,Model_dir,Weights_dir)
         success = hf_download_with_resume(
             repo_id=repo_id,
-            model_dir=os.path.join(Globals.root,Model_dir,Weights_dir),
+            model_dir=dest,
             model_name=filename,
             access_token=access_token
         )
@@ -520,6 +520,7 @@ def download_weights(opt:dict):
             return
         else:
             print('** Cannot download models because no Hugging Face access token could be found. Please re-run without --yes')
+            return
     else:
         choice = user_wants_to_download_weights()
 
@@ -584,8 +585,8 @@ def select_outputs(root:str,yes_to_all:bool=False):
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
-    assert os.path.exists('./configs'),'Run this script from within the top level of the InvokeAI source code directory, "InvokeAI"'
-    
+    assert os.path.exists('./configs'),'Run this script from within the InvokeAI source code directory, "InvokeAI" or the runtime directory "invokeai".'
+
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root_selected = False
     while not root_selected:
@@ -602,7 +603,28 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
+
+    enable_safety_checker = False
+    default_sampler = 'k_euler_a'
+    default_steps = '30'  # deliberately a string - see test below
+
+    sampler_choices =['ddim','k_dpm_2_a','k_dpm_2','k_euler_a','k_euler','k_heun','k_lms','plms']
+    if not yes_to_all:
+        enable_safety_checker = yes_or_no('Enable the image "safety" checker by default?',enable_safety_checker)
+
+        sampler = None
+        while sampler not in sampler_choices:
+            sampler = input(f'Default sampler to use? ({", ".join(sampler_choices)}) [{default_sampler}]:') or default_sampler
+
+        steps = ''
+        while not steps.isnumeric():
+            steps = input(f'Default number of steps to use during generation? [{default_steps}]:') or default_steps
+    else:
+        sampler = default_sampler
+        steps = default_steps
         
+    safety_checker = '--safety_checker' if enable_safety_checker else '--no-safety_checker'
+
     for name in ['models','configs']:
         os.makedirs(os.path.join(root,name), exist_ok=True)
     for src in (['configs']):
@@ -612,10 +634,9 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     os.makedirs(outputs, exist_ok=True)
 
     init_file = os.path.expanduser(Globals.initfile)
-    if not os.path.exists(init_file):
-        print(f'Creating the initialization file at "{init_file}".\n')
-        with open(init_file,'w') as f:
-            f.write(f'''# InvokeAI initialization file
+    print(f'Creating the initialization file at "{init_file}".\n')
+    with open(init_file,'w') as f:
+        f.write(f'''# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
 # or renaming it and then running configure_invokeai.py again.
@@ -625,6 +646,11 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
 # the --outdir option controls the default location of image files.
 --outdir="{outputs}"
+
+# generation arguments
+{safety_checker}
+--sampler={sampler}
+--steps={steps}
 
 # You may place other  frequently-used startup commands here, one or more per line.
 # Examples:
