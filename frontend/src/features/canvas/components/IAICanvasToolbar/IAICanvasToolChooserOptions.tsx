@@ -1,6 +1,7 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
+  addEraseRect,
   addFillRect,
   setBrushColor,
   setBrushSize,
@@ -14,7 +15,10 @@ import {
   FaEyeDropper,
   FaFillDrip,
   FaPaintBrush,
+  FaPlus,
   FaSlidersH,
+  FaXbox,
+  FaXing,
 } from 'react-icons/fa';
 import {
   canvasSelector,
@@ -25,6 +29,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import IAIColorPicker from 'common/components/IAIColorPicker';
+import { MdClear } from 'react-icons/md';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],
@@ -99,6 +104,17 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
+    ['delete', 'backspace'],
+    () => {
+      handleEraseBoundingBox();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys(
     ['BracketLeft'],
     () => {
       dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
@@ -160,6 +176,7 @@ const IAICanvasToolChooserOptions = () => {
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
   const handleSelectColorPickerTool = () => dispatch(setTool('colorPicker'));
   const handleFillRect = () => dispatch(addFillRect());
+  const handleEraseBoundingBox = () => dispatch(addEraseRect());
 
   return (
     <ButtonGroup isAttached>
@@ -185,6 +202,13 @@ const IAICanvasToolChooserOptions = () => {
         icon={<FaFillDrip />}
         isDisabled={isStaging}
         onClick={handleFillRect}
+      />
+      <IAIIconButton
+        aria-label="Erase Bounding Box Area (Delete/Backspace)"
+        tooltip="Erase Bounding Box Area (Delete/Backspace)"
+        icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
+        isDisabled={isStaging}
+        onClick={handleEraseBoundingBox}
       />
       <IAIIconButton
         aria-label="Color Picker (C)"
