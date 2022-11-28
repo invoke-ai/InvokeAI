@@ -26,15 +26,12 @@ const boundingBoxPreviewSelector = createSelector(
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
-      stageDimensions,
       stageScale,
       isDrawing,
       isTransformingBoundingBox,
       isMovingBoundingBox,
       isMouseOverBoundingBox,
-      shouldDarkenOutsideBoundingBox,
       tool,
-      stageCoordinates,
       shouldSnapToGrid,
     } = canvas;
 
@@ -43,14 +40,11 @@ const boundingBoxPreviewSelector = createSelector(
       boundingBoxDimensions,
       isDrawing,
       isMouseOverBoundingBox,
-      shouldDarkenOutsideBoundingBox,
       isMovingBoundingBox,
       isTransformingBoundingBox,
-      stageDimensions,
       stageScale,
       shouldSnapToGrid,
       tool,
-      stageCoordinates,
       boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
       hitStrokeWidth: 20 / stageScale,
     };
@@ -73,11 +67,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     boundingBoxDimensions,
     isDrawing,
     isMouseOverBoundingBox,
-    shouldDarkenOutsideBoundingBox,
     isMovingBoundingBox,
     isTransformingBoundingBox,
-    stageCoordinates,
-    stageDimensions,
     stageScale,
     shouldSnapToGrid,
     tool,
@@ -230,25 +221,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
   return (
     <Group {...rest}>
-      <Rect
-        offsetX={stageCoordinates.x / stageScale}
-        offsetY={stageCoordinates.y / stageScale}
-        height={stageDimensions.height / stageScale}
-        width={stageDimensions.width / stageScale}
-        fill={'rgba(0,0,0,0.4)'}
-        listening={false}
-        visible={shouldDarkenOutsideBoundingBox}
-      />
-      <Rect
-        x={boundingBoxCoordinates.x}
-        y={boundingBoxCoordinates.y}
-        width={boundingBoxDimensions.width}
-        height={boundingBoxDimensions.height}
-        fill={'rgb(255,255,255)'}
-        listening={false}
-        visible={shouldDarkenOutsideBoundingBox}
-        globalCompositeOperation={'destination-out'}
-      />
       <Rect
         draggable={true}
         fillEnabled={false}
