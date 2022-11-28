@@ -12,6 +12,7 @@ dockerfile=${INVOKE_DOCKERFILE:-docker-build/Dockerfile}
 # print the settings
 echo "You are using these values:"
 echo -e "Dockerfile:\t\t ${dockerfile}"
+echo -e "requirements:\t\t ${pip_requirements}"
 echo -e "project_name:\t\t ${project_name}"
 echo -e "volumename:\t\t ${volumename}"
 echo -e "arch:\t\t\t ${arch}"
@@ -42,19 +43,19 @@ fi
 # Build Container
 docker build \
   --platform="${platform}" \
-  --tag "${invokeai_tag}" \
-  --build-arg project_name="${project_name}" \
-  --build-arg pip_requirements="${pip_requirements}" \
-  --file "${dockerfile}" \
+  --tag="${invokeai_tag}" \
+  --build-arg="PROJECT_NAME=${project_name}" \
+  --build-arg="PIP_REQUIREMENTS=${pip_requirements}" \
+  --file="${dockerfile}" \
   .
 
 docker run \
   --rm \
-  --platform "$platform" \
-  --name "$project_name" \
-  --hostname "$project_name" \
-  --mount source="$volumename",target=/data \
-  --mount type=bind,source="$HOME/.huggingface",target=/root/.huggingface \
-  --env HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN} \
+  --platform="$platform" \
+  --name="$project_name" \
+  --hostname="$project_name" \
+  --mount="source=$volumename,target=/data" \
+  --mount="type=bind,source=$HOME/.huggingface,target=/root/.huggingface" \
+  --env="HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}" \
   "${invokeai_tag}" \
   scripts/configure_invokeai.py --yes
