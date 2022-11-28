@@ -15,11 +15,11 @@ read choice
 case $choice in
     1)
         printf "\nStarting the InvokeAI command-line..\n";
-        .venv/bin/python scripts/invoke.py;
+        .venv/bin/python scripts/invoke.py $*;
     ;;
     2)
         printf "\nStarting the InvokeAI browser-based UI..\n";
-        .venv/bin/python scripts/invoke.py --web;
+        .venv/bin/python scripts/invoke.py --web $*;
     ;;
     3)
         printf "\nDeveloper Console:\n";

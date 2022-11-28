@@ -10,10 +10,10 @@ echo 3. open the developer console
 set /p choice="Please enter 1, 2 or 3: "
 if /i "%choice%" == "1" (
     echo Starting the InvokeAI command-line.
-    .venv\Scripts\python scripts\invoke.py
+    .venv\Scripts\python scripts\invoke.py %*
 ) else if /i "%choice%" == "2" (
     echo Starting the InvokeAI browser-based UI.
-    .venv\Scripts\python scripts\invoke.py --web
+    .venv\Scripts\python scripts\invoke.py --web %*
 ) else if /i "%choice%" == "3" (
     echo Developer Console
     echo Python command is:
