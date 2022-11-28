@@ -352,8 +352,6 @@ def main_loop(gen, opt):
                 last_results.append([path, seed])
 
             if operation == 'generate':
-                # load any <embeddings> from the SD concepts library
-                opt.prompt = gen.concept_lib().replace_concepts_with_triggers(opt.prompt, lambda concepts: gen.load_concepts(concepts))
                 catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
                 opt.last_operation='generate'
                 try:
