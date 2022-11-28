@@ -12,6 +12,7 @@ import os
 import re
 import atexit
 from ldm.invoke.args import Args
+from ldm.invoke.globals import Globals
 
 # ---------------readline utilities---------------------
 try:
@@ -127,7 +128,12 @@ class Completer(object):
                 self.matches= self._model_completions(text, state)
 
             elif re.search(weight_regexp,buffer):
-                self.matches = self._path_completions(text, state, WEIGHT_EXTENSIONS)
+                self.matches = self._path_completions(
+                    text,
+                    state,
+                    WEIGHT_EXTENSIONS,
+                    default_dir=Globals.root,
+                )
 
             elif re.search(text_regexp,buffer):
                 self.matches = self._path_completions(text, state, TEXT_EXTENSIONS)
@@ -278,7 +284,7 @@ class Completer(object):
             readline.redisplay()
             self.linebuffer = None
 
-    def _path_completions(self, text, state, extensions, shortcut_ok=True):
+    def _path_completions(self, text, state, extensions, shortcut_ok=True, default_dir:str=''):
         # separate the switch from the partial path
         match = re.search('^(-\w|--\w+=?)(.*)',text)
         if match is None:
@@ -297,7 +303,7 @@ class Completer(object):
         elif os.path.dirname(path) != '':
             dir = os.path.dirname(path)
         else:
-            dir = ''
+            dir = default_dir if os.path.exists(default_dir)  else ''
             path= os.path.join(dir,path)
 
         dir_list = os.listdir(dir or '.')

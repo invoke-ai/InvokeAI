@@ -178,11 +178,11 @@ class ModelCache(object):
         method will return True. Will fail with an assertion error if provided
         attributes are incorrect or the model name is missing.
         '''
+        omega = self.config
         for field in ('description','weights','height','width','config'):
             assert field in model_attributes, f'required field {field} is missing'
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
 
-        omega = self.config
         config = omega[model_name] if model_name in omega else {}
         for field in model_attributes:
             config[field] = model_attributes[field]
