@@ -76,7 +76,6 @@ export type CanvasEraseRect = {
   y: number;
   width: number;
   height: number;
-  color: 'rgb(255, 255, 255)';
 };
 
 export type CanvasObject =

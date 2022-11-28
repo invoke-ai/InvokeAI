@@ -5,6 +5,7 @@ import { Group, Line, Rect } from 'react-konva';
 import {
   isCanvasBaseImage,
   isCanvasBaseLine,
+  isCanvasEraseRect,
   isCanvasFillRect,
 } from '../store/canvasTypes';
 import IAICanvasImage from './IAICanvasImage';
@@ -79,6 +80,17 @@ const IAICanvasObjectRenderer = () => {
               width={obj.width}
               height={obj.height}
               fill={rgbaColorToString(obj.color)}
+            />
+          );
+        } else if (isCanvasEraseRect(obj)) {
+          return (
+            <Rect
+              x={obj.x}
+              y={obj.y}
+              width={obj.width}
+              height={obj.height}
+              fill={'rgb(255, 255, 255)'}
+              globalCompositeOperation={'destination-out'}
             />
           );
         }

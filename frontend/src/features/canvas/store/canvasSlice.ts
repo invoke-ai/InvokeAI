@@ -405,6 +405,25 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates = [];
     },
+    addEraseRect: (state) => {
+      const { boundingBoxCoordinates, boundingBoxDimensions } =
+        state;
+
+      state.pastLayerStates.push(state.layerState);
+
+      if (state.pastLayerStates.length > state.maxHistory) {
+        state.pastLayerStates.shift();
+      }
+
+      state.layerState.objects.push({
+        kind: 'eraseRect',
+        layer: 'base',
+        ...boundingBoxCoordinates,
+        ...boundingBoxDimensions,
+      });
+
+      state.futureLayerStates = [];
+    },
     addLine: (state, action: PayloadAction<number[]>) => {
       const { tool, layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
         state;
@@ -806,6 +825,7 @@ export const canvasSlice = createSlice({
 });
 
 export const {
+  addEraseRect,
   addFillRect,
   addImageToStagingArea,
   addLine,

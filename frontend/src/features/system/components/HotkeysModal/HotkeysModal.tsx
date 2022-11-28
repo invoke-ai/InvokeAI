@@ -179,6 +179,11 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'F',
     },
     {
+      title: 'Erase Bounding Box',
+      desc: 'Erases the bounding box area',
+      hotkey: 'Delete / Backspace',
+    },
+    {
       title: 'Select Color Picker',
       desc: 'Selects the canvas color picker',
       hotkey: 'C',
