@@ -18,3 +18,7 @@ Globals.root = '.'
 
 # Where to look for the initialization file
 Globals.initfile = os.path.expanduser('~/.invokeai')
+
+# Awkward workaround to disable attempted loading of pypatchmatch
+# which is causing CI tests to error out.
+Globals.try_patchmatch = True
