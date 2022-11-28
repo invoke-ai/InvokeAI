@@ -604,18 +604,28 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
 
-    enable_safety_checker = False
+    enable_safety_checker = True
     default_sampler = 'k_euler_a'
     default_steps = '30'  # deliberately a string - see test below
 
     sampler_choices =['ddim','k_dpm_2_a','k_dpm_2','k_euler_a','k_euler','k_heun','k_lms','plms']
-    if not yes_to_all:
-        enable_safety_checker = yes_or_no('Enable the image NSFW (not safe for work) checker by default?',enable_safety_checker)
 
+    if not yes_to_all:
+        print('The NSFW (not safe for work) checker blurs out images that potentially contain sexual imagery.')
+        print('It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker.')
+        print('The following option will set whether the checker is enabled by default. Like other options, you can')
+        print(f'change this setting later by editing the file {Globals.initfile}.')
+        enable_safety_checker = yes_or_no('Enable the NSFW checker by default?',enable_safety_checker)
+
+        print('\nThe next choice selects the sampler to use by default. Samplers have different speed/performance')
+        print('tradeoffs. If you are not sure what to select, accept the default.')
         sampler = None
         while sampler not in sampler_choices:
             sampler = input(f'Default sampler to use? ({", ".join(sampler_choices)}) [{default_sampler}]:') or default_sampler
 
+        print('\nThe number of denoising steps affects both the speed and quality of the images generated.')
+        print('Higher steps often (but not always) increases the quality of the image, but increases image')
+        print('generation time. This can be changed at run time. Accept the default if you are unsure.')
         steps = ''
         while not steps.isnumeric():
             steps = input(f'Default number of steps to use during generation? [{default_steps}]:') or default_steps
