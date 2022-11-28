@@ -18,6 +18,9 @@ automatically on Windows systems with no extra intervention.
 
 ## Linux
 
+These instructions are for Debian versions of Linux, such as Ubuntu
+and Mint.
+
 Prior to installing PyPatchMatch, you need to take the following
 steps:
 
