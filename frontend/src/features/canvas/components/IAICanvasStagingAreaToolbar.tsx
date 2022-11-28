@@ -10,6 +10,7 @@ import {
   FaCheck,
   FaEye,
   FaEyeSlash,
+  FaPlus,
   FaSave,
 } from 'react-icons/fa';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -23,7 +24,6 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
-import { MdClear } from 'react-icons/md';
 
 const selector = createSelector(
   [canvasSelector],
@@ -167,7 +167,7 @@ const IAICanvasStagingAreaToolbar = () => {
         <IAIIconButton
           tooltip="Discard All"
           aria-label="Discard All"
-          icon={<MdClear />}
+          icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
           onClick={() => dispatch(discardStagedImages())}
           data-selected={true}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}
