@@ -92,6 +92,7 @@ import shlex
 import copy
 import base64
 import functools
+import warnings
 import ldm.invoke.pngwriter
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
@@ -116,7 +117,7 @@ PRECISION_CHOICES = [
 
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
-APP_VERSION = 'v2.1.2'
+APP_VERSION = 'v2.2.0'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -539,9 +540,18 @@ class Args(object):
             help='generate a grid'
         )
         render_group.add_argument(
+            '--embedding_directory',
             '--embedding_path',
+            dest='embedding_path',
+            default='embeddings',
             type=str,
-            help='Path to a pre-trained embedding manager checkpoint - can only be set on command line',
+            help='Path to a directory containing .bin and/or .pt files, or a single .bin/.pt file. You may use subdirectories. (default is ROOTDIR/embeddings)'
+        )
+        render_group.add_argument(
+            '--embeddings',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Enable embedding directory (default). Use --no-embeddings to disable.',
         )
         render_group.add_argument(
             '--enable_image_debugging',

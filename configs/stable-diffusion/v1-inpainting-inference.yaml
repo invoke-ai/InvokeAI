@@ -32,7 +32,7 @@ model:
         placeholder_strings: ["*"]
         initializer_words: ['sculpture']
         per_image_tokens: false
-        num_vectors_per_token: 1
+        num_vectors_per_token: 8
         progressive_words: False
 
     unet_config:
