@@ -15,11 +15,10 @@ import floorCoordinates from '../util/floorCoordinates';
 import roundDimensionsTo64 from '../util/roundDimensionsTo64';
 import {
   BoundingBoxScale,
-  CanvasAnyLine,
   CanvasImage,
   CanvasLayer,
   CanvasLayerState,
-  CanvasLine,
+  CanvasBaseLine,
   CanvasMaskLine,
   CanvasState,
   CanvasTool,
@@ -386,6 +385,26 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
     },
+    addFillRect: (state) => {
+      const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } =
+        state;
+
+      state.pastLayerStates.push(state.layerState);
+
+      if (state.pastLayerStates.length > state.maxHistory) {
+        state.pastLayerStates.shift();
+      }
+
+      state.layerState.objects.push({
+        kind: 'fillRect',
+        layer: 'base',
+        ...boundingBoxCoordinates,
+        ...boundingBoxDimensions,
+        color: brushColor,
+      });
+
+      state.futureLayerStates = [];
+    },
     addLine: (state, action: PayloadAction<number[]>) => {
       const { tool, layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
         state;
@@ -404,7 +423,7 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      const newLine: CanvasMaskLine | CanvasLine = {
+      const newLine: CanvasMaskLine | CanvasBaseLine = {
         kind: 'line',
         layer,
         tool,
@@ -787,6 +806,7 @@ export const canvasSlice = createSlice({
 });
 
 export const {
+  addFillRect,
   addImageToStagingArea,
   addLine,
   addPointToCurrentLine,

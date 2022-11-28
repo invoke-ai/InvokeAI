@@ -174,6 +174,11 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'V',
     },
     {
+      title: 'Fill Bounding Box',
+      desc: 'Fills the bounding box with brush color',
+      hotkey: 'F',
+    },
+    {
       title: 'Select Color Picker',
       desc: 'Selects the canvas color picker',
       hotkey: 'C',

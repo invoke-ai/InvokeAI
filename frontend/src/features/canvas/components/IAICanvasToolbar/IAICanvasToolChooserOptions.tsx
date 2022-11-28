@@ -1,6 +1,7 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
+  addFillRect,
   setBrushColor,
   setBrushSize,
   setTool,
@@ -11,6 +12,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import {
   FaEraser,
   FaEyeDropper,
+  FaFillDrip,
   FaPaintBrush,
   FaSlidersH,
 } from 'react-icons/fa';
@@ -86,6 +88,17 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
+    ['f'],
+    () => {
+      handleFillRect();
+    },
+    {
+      enabled: () => true,
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys(
     ['BracketLeft'],
     () => {
       dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
@@ -146,6 +159,7 @@ const IAICanvasToolChooserOptions = () => {
   const handleSelectBrushTool = () => dispatch(setTool('brush'));
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
   const handleSelectColorPickerTool = () => dispatch(setTool('colorPicker'));
+  const handleFillRect = () => dispatch(addFillRect());
 
   return (
     <ButtonGroup isAttached>
@@ -164,6 +178,13 @@ const IAICanvasToolChooserOptions = () => {
         data-selected={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
+      />
+      <IAIIconButton
+        aria-label="Fill Bounding Box (F)"
+        tooltip="Fill Bounding Box (F)"
+        icon={<FaFillDrip />}
+        isDisabled={isStaging}
+        onClick={handleFillRect}
       />
       <IAIIconButton
         aria-label="Color Picker (C)"

@@ -1,8 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store';
 import _ from 'lodash';
-import { Group, Line } from 'react-konva';
-import { isCanvasBaseImage, isCanvasBaseLine } from '../store/canvasTypes';
+import { Group, Line, Rect } from 'react-konva';
+import {
+  isCanvasBaseImage,
+  isCanvasBaseLine,
+  isCanvasFillRect,
+} from '../store/canvasTypes';
 import IAICanvasImage from './IAICanvasImage';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
@@ -67,6 +71,16 @@ const IAICanvasObjectRenderer = () => {
           } else {
             return line;
           }
+        } else if (isCanvasFillRect(obj)) {
+          return (
+            <Rect
+              x={obj.x}
+              y={obj.y}
+              width={obj.width}
+              height={obj.height}
+              fill={rgbaColorToString(obj.color)}
+            />
+          );
         }
       })}
     </Group>
