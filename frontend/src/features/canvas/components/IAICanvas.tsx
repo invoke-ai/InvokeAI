@@ -31,6 +31,7 @@ import {
   setCanvasStage,
 } from '../util/konvaInstanceProvider';
 import { KonvaEventObject } from 'konva/lib/Node';
+import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -183,6 +184,7 @@ const IAICanvas = () => {
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
           <Layer id="preview" imageSmoothingEnabled={false}>
+            <IAICanvasBoundingBoxOverlay />
             {!isStaging && (
               <IAICanvasToolPreview
                 visible={tool !== 'move'}
