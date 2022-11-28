@@ -147,7 +147,7 @@ class ModelCache(object):
             else:
                 status = 'not loaded'
 
-            models = models.update(
+            models.update(
                 name = {
                     'status': status,
                     'description': description,
