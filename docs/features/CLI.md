@@ -269,6 +269,12 @@ value, we are insisting on a more stringent classification.
 invoke> a piece of cake -I /path/to/breakfast.png -tm bagel 0.6
 ```
 
+### Custom Styles and Subjects
+
+You can load and use hundreds of community-contributed Textual
+Inversion models just by typing the appropriate trigger phrase. Please
+see [Concepts Library](CONCEPTS.md) for more details.
+
 # Other Commands
 
 The CLI offers a number of commands that begin with "!".
