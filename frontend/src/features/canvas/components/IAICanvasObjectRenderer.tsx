@@ -61,6 +61,7 @@ const IAICanvasObjectRenderer = () => {
           if (obj.clip) {
             return (
               <Group
+                key={i}
                 clipX={obj.clip.x}
                 clipY={obj.clip.y}
                 clipWidth={obj.clip.width}
@@ -75,6 +76,7 @@ const IAICanvasObjectRenderer = () => {
         } else if (isCanvasFillRect(obj)) {
           return (
             <Rect
+              key={i}
               x={obj.x}
               y={obj.y}
               width={obj.width}
@@ -85,6 +87,7 @@ const IAICanvasObjectRenderer = () => {
         } else if (isCanvasEraseRect(obj)) {
           return (
             <Rect
+              key={i}
               x={obj.x}
               y={obj.y}
               width={obj.width}
