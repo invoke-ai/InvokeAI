@@ -494,12 +494,12 @@ def download_clipseg():
 
 #-------------------------------------
 def download_safety_checker():
-    print('Installing safety model for NSFW content detection...',file=sys.stderr)
+    print('Installing model for NSFW content detection...',file=sys.stderr)
     try:
         from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
         from transformers import AutoFeatureExtractor
     except ModuleNotFoundError:
-        print('Error installing safety checker model:')
+        print('Error installing NSFW checker model:')
         print(traceback.format_exc())
         return
     safety_model_id = "CompVis/stable-diffusion-safety-checker"
@@ -610,7 +610,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     sampler_choices =['ddim','k_dpm_2_a','k_dpm_2','k_euler_a','k_euler','k_heun','k_lms','plms']
     if not yes_to_all:
-        enable_safety_checker = yes_or_no('Enable the image "safety" checker by default?',enable_safety_checker)
+        enable_safety_checker = yes_or_no('Enable the image NSFW (not safe for work) checker by default?',enable_safety_checker)
 
         sampler = None
         while sampler not in sampler_choices:
@@ -623,7 +623,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
         sampler = default_sampler
         steps = default_steps
         
-    safety_checker = '--safety_checker' if enable_safety_checker else '--no-safety_checker'
+    safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
     for name in ['models','configs']:
         os.makedirs(os.path.join(root,name), exist_ok=True)

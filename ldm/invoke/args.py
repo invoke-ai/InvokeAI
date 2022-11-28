@@ -449,10 +449,12 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
+            '--nsfw-checker',
             '--safety_checker',
             action=argparse.BooleanOptionalAction,
+            dest='safety_checker',
             default=False,
-            help='Check for and blur potentially NSFW images. Use --no-safety_checker to disable.',
+            help='Check for and blur potentially NSFW images. Use --no-nsfw-checker to disable.',
         )
         file_group.add_argument(
             '--from_file',
