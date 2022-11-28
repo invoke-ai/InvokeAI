@@ -125,7 +125,7 @@ export const canvasSlice = createSlice({
       state.brushSize = action.payload;
     },
     clearMask: (state) => {
-      state.pastLayerStates.push({ ...state.layerState });
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
       state.layerState.objects = state.layerState.objects.filter(
         (obj) => !isCanvasMaskLine(obj)
       );
@@ -183,7 +183,7 @@ export const canvasSlice = createSlice({
       state.boundingBoxDimensions = newBoundingBoxDimensions;
       state.boundingBoxCoordinates = newBoundingBoxCoordinates;
 
-      state.pastLayerStates.push(state.layerState);
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
       state.layerState = {
         ...initialLayerState,
@@ -389,7 +389,7 @@ export const canvasSlice = createSlice({
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } =
         state;
 
-      state.pastLayerStates.push(state.layerState);
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -406,10 +406,9 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
     },
     addEraseRect: (state) => {
-      const { boundingBoxCoordinates, boundingBoxDimensions } =
-        state;
+      const { boundingBoxCoordinates, boundingBoxDimensions } = state;
 
-      state.pastLayerStates.push(state.layerState);
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -436,7 +435,7 @@ export const canvasSlice = createSlice({
       const newColor =
         layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
 
-      state.pastLayerStates.push(state.layerState);
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -474,7 +473,7 @@ export const canvasSlice = createSlice({
 
       if (!targetState) return;
 
-      state.futureLayerStates.unshift(state.layerState);
+      state.futureLayerStates.unshift(_.cloneDeep(state.layerState));
 
       if (state.futureLayerStates.length > state.maxHistory) {
         state.futureLayerStates.pop();
@@ -487,7 +486,7 @@ export const canvasSlice = createSlice({
 
       if (!targetState) return;
 
-      state.pastLayerStates.push(state.layerState);
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -511,7 +510,7 @@ export const canvasSlice = createSlice({
       state.shouldShowIntermediates = action.payload;
     },
     resetCanvas: (state) => {
-      state.pastLayerStates.push(state.layerState);
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
       state.layerState = initialLayerState;
       state.futureLayerStates = [];
@@ -803,9 +802,7 @@ export const canvasSlice = createSlice({
       state.tool = 'brush';
     },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
-      state.pastLayerStates.push({
-        ...state.layerState,
-      });
+      state.pastLayerStates.push(_.cloneDeep(state.layerState));
 
       state.futureLayerStates = [];
 
