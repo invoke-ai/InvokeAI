@@ -32,12 +32,12 @@ the composition of their training sets, current AI-generated image
 models are biased against certain ethnic groups, cultural concepts of
 beauty, ethnic stereotypes, and gender roles.
 
- - We recognize the potential for harm to these groups that these biases
-    represent and trust that future AI models will take steps towards
-    reducing or eliminating the biases noted above, respect and give due
-    credit to the artists whose work is sourced, and call on developers
-    and users to favor these models over the older ones as they become
-    available.
+      * We recognize the potential for harm to these groups that these biases
+       represent and trust that future AI models will take steps towards
+       reducing or eliminating the biases noted above, respect and give due
+       credit to the artists whose work is sourced, and call on developers
+       and users to favor these models over the older ones as they become
+       available.
 
 4. We are deeply committed to ensuring that this technology benefits
 everyone, including artists. We see AI art not as a replacement for
@@ -53,23 +53,23 @@ but must be used responsibly. Artificial intelligence technologies
 have the potential to improve society, in everything from cancer care,
 to customer service, to creative writing.
 
-  - While we do not believe that software should arbitrarily limit what
-  users can do with it, we recognize that when used irresponsibly, AI
-  has the potential to do much harm. Our Discord server is actively
-  moderated in order to minimize the potential of harm from
-  user-contributed images. In addition, we ask users of our software to
-  refrain from using it in any way that would cause mental, emotional or
-  physical harm to individuals and vulnerable populations including (but
-  not limited to) women; minors; ethnic minorities; religious groups;
-  members of LGBTQIA communities; and people with disabilities or
-  impairments.
+     * While we do not believe that software should arbitrarily limit what
+     users can do with it, we recognize that when used irresponsibly, AI
+     has the potential to do much harm. Our Discord server is actively
+     moderated in order to minimize the potential of harm from
+     user-contributed images. In addition, we ask users of our software to
+     refrain from using it in any way that would cause mental, emotional or
+     physical harm to individuals and vulnerable populations including (but
+     not limited to) women; minors; ethnic minorities; religious groups;
+     members of LGBTQIA communities; and people with disabilities or
+     impairments.
 
-  - Note that some of the image generation AI models which the Invoke-AI
-  toolkit supports carry licensing agreements which impose restrictions
-  on how the model is used. We ask that our users read and agree to
-  these terms if they wish to make use of these models. These agreements
-  are distinct from the MIT license which applies to the InvokeAI
-  software and source code.
+     * Note that some of the image generation AI models which the Invoke-AI
+     toolkit supports carry licensing agreements which impose restrictions
+     on how the model is used. We ask that our users read and agree to
+     these terms if they wish to make use of these models. These agreements
+     are distinct from the MIT license which applies to the InvokeAI
+     software and source code.
 
 6. That mutual respect is key to a healthy software development
 community. Members of the InvokeAI community are expected to treat
@@ -79,7 +79,8 @@ each other grow and gain new skills, and we apportion expectations in
 a way that balances the members' time, skillset, and interest
 area. Disputes are resolved by open and honest communication.
 
-## Who's Who in InvokeAI:
+## Who's Who in InvokeAI
+
 * lstein (Lincoln Stein) - Co-maintainer
 * blessedcoolant - Co-maintainer
 * hipsterusername (Kent Keirsey) - Product Manager
