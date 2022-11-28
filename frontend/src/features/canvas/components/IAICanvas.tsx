@@ -18,7 +18,6 @@ import useCanvasWheel from '../hooks/useCanvasZoom';
 import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
 import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
 import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
-import useCanvasMouseEnter from '../hooks/useCanvasMouseEnter';
 import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
 import useCanvasDragMove from '../hooks/useCanvasDragMove';
 import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
@@ -129,7 +128,6 @@ const IAICanvas = () => {
     didMouseMoveRef,
     lastCursorPositionRef
   );
-  const handleMouseEnter = useCanvasMouseEnter(stageRef);
   const handleMouseOut = useCanvasMouseOut();
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
@@ -153,7 +151,6 @@ const IAICanvas = () => {
           onTouchMove={handleMouseMove}
           onTouchEnd={handleMouseUp}
           onMouseDown={handleMouseDown}
-          onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseOut}
           onMouseMove={handleMouseMove}
           onMouseOut={handleMouseOut}
