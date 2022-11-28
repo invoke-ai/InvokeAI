@@ -39,6 +39,8 @@ Dataset_path = './configs/INITIAL_MODELS.yaml'
 Default_config_file = './configs/models.yaml'
 SD_Configs = './configs/stable-diffusion'
 
+assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the InvokeAI distribution directory, or from within the invokeai runtime directory."
+
 Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(['yes','no'])
 
@@ -561,14 +563,14 @@ def get_root(root:str=None)->str:
     return root
 
 #-------------------------------------
-def select_root(yes_to_all:bool=False):
-    default = os.path.expanduser('~/invokeai')
+def select_root(root:str, yes_to_all:bool=False):
+    default = root or os.path.expanduser('~/invokeai')
     if (yes_to_all):
         return default
     completer.set_default_dir(default)
     completer.complete_extensions(())
     completer.set_line(default)
-    return input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ")
+    return input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ") or default
 
 #-------------------------------------
 def select_outputs(root:str,yes_to_all:bool=False):
@@ -578,23 +580,32 @@ def select_outputs(root:str,yes_to_all:bool=False):
     completer.set_default_dir(os.path.expanduser('~'))
     completer.complete_extensions(())
     completer.set_line(default)
-    return input('Select the default directory for image outputs [{default}]: ')
+    return input(f'Select the default directory for image outputs [{default}]: ') or default
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
     assert os.path.exists('./configs'),'Run this script from within the top level of the InvokeAI source code directory, "InvokeAI"'
     
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
-    root = root or select_root(yes_to_all)
-    outputs = select_outputs(root,yes_to_all)
-    Globals.root = root
-        
-    print(f'InvokeAI models and configuration files will be placed into {root} and image outputs will be placed into {outputs}.')
-    print(f'\nYou may change these values at any time by editing the --root and --output_dir options in "{Globals.initfile}",')
+    root_selected = False
+    while not root_selected:
+        root = select_root(root,yes_to_all)
+        outputs = select_outputs(root,yes_to_all)
+        Globals.root = os.path.abspath(root)
+        outputs = outputs if os.path.isabs(outputs) else os.path.abspath(os.path.join(Globals.root,outputs))
+
+        print(f'\nInvokeAI models and configuration files will be placed into "{root}" and image outputs will be placed into "{outputs}".')
+        if not yes_to_all:
+            root_selected = yes_or_no('Accept these locations?')
+        else:
+            root_selected = True
+
+    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
-    for name in ('models','configs'):
+
+    for name in ('models','configs','embeddings'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in ['configs']:
+    for src in (['configs']):
         dest = os.path.join(root,src)
         if not os.path.samefile(src,dest):
             shutil.copytree(src,dest,dirs_exist_ok=True)
@@ -610,7 +621,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 # or renaming it and then running configure_invokeai.py again.
 
 # The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
---root="{root}"
+--root="{Globals.root}"
 
 # the --outdir option controls the default location of image files.
 --outdir="{outputs}"
@@ -623,7 +634,15 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 #
 '''
             )
-    
+    else:
+        print(f'Updating the initialization file at "{init_file}".\n')
+        with open(init_file,'r') as infile, open(f'{init_file}.tmp','w') as outfile:
+            for line in infile.readlines():
+                if not line.startswith('--root') and not line.startswith('--outdir'):
+                    outfile.write(line)
+            outfile.write(f'--root="{root}"\n')
+            outfile.write(f'--outdir="{outputs}"\n')
+        os.replace(f'{init_file}.tmp',init_file)
     
 #-------------------------------------
 class ProgressBar():
@@ -673,15 +692,10 @@ def main():
     try:
         introduction()
 
-        # We check for two files to see if the runtime directory is correctly initialized.
-        # 1. a key stable diffusion config file
-        # 2. the web front end static files
+        # We check for to see if the runtime directory is correctly initialized.
         if Globals.root == '' \
-           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')) \
-           or not os.path.exists(os.path.join(Globals.root,'frontend/dist')):
-            initialize_rootdir(Globals.root,(not opt.interactive) or opt.yes_to_all)
-
-        print(f'(Initializing with runtime root {Globals.root})\n')
+           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
+            initialize_rootdir(Globals.root,opt.yes_to_all)
 
         if opt.interactive:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
@@ -698,10 +712,9 @@ def main():
     except KeyboardInterrupt:
         print('\nGoodbye! Come back soon.')
     except Exception as e:
-        print(f'\nA problem occurred during download.\nThe error was: "{str(e)}"')
+        print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
+        print(traceback.format_exc())
     
 #-------------------------------------
 if __name__ == '__main__':
     main()
-
-    
