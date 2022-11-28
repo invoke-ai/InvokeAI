@@ -206,7 +206,7 @@ class ModelCache(object):
         if not os.path.isabs(weights):
             weights = os.path.normpath(os.path.join(Globals.root,weights))
         # scan model
-        self._scan_model(model_name, weights)
+        self.scan_model(model_name, weights)
 
         print(f'>> Loading {model_name} from {weights}')
 
@@ -288,7 +288,7 @@ class ModelCache(object):
         if self._has_cuda():
             torch.cuda.empty_cache()
     
-    def _scan_model(self, model_name, checkpoint):
+    def scan_model(self, model_name, checkpoint):
         # scan model
         print(f'>> Scanning Model: {model_name}')
         scan_result = scan_file_path(checkpoint)
