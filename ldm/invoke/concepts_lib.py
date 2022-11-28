@@ -138,7 +138,7 @@ class Concepts(object):
             os.rmdir(dest)
             return False
         except ul_error.URLError as e:
-            print(f'str(e). This may reflect a network issue. Generation will continue without the concept.')
+            print(f'ERROR: {str(e)}. This may reflect a network issue. Generation will continue without the concept.')
             os.rmdir(dest)
             return False
         print('...{:.2f}Kb'.format(bytes/1024))
