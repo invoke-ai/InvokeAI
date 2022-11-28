@@ -1,6 +1,6 @@
 from ldm.modules.encoders.modules import FrozenCLIPEmbedder, BERTEmbedder
 from ldm.modules.embedding_manager import EmbeddingManager
-from ldm.modules.globals import Globals
+from ldm.invoke.globals import Globals
 
 import argparse, os
 from functools import partial

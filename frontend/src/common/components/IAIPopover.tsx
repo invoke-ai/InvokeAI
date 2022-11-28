@@ -29,7 +29,7 @@ const IAIPopover = (props: IAIPopoverProps) => {
     <Popover {...rest}>
       <PopoverTrigger>{triggerComponent}</PopoverTrigger>
       <PopoverContent className={`invokeai__popover-content ${styleClass}`}>
-        {hasArrow && <PopoverArrow className={'invokeai__popover-arrow'} />}
+        {hasArrow && <PopoverArrow className="invokeai__popover-arrow" />}
         {children}
       </PopoverContent>
     </Popover>

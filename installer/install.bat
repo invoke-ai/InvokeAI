@@ -138,8 +138,6 @@ set err_msg=----- InvokeAI setup failed -----
 .venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location -e .
 if %errorlevel% neq 0 goto err_exit
 
-echo ***** Installed InvokeAI *****
-
 copy installer\invoke.bat .\invoke.bat
 echo ***** Installed invoke launcher script ******
 
@@ -150,6 +148,7 @@ rd /s /q installer installer_files
 call .venv\Scripts\python scripts\configure_invokeai.py
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
+deactivate
 
 echo ***** Finished downloading models *****
 
