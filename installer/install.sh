@@ -220,6 +220,7 @@ rm -rf installer/ installer_files/
 .venv/bin/python3 scripts/configure_invokeai.py
 _err_msg="\n----- model download clone failed -----\n"
 _err_exit $? _err_msg
+deactivate
 
 echo -e "\n***** Finished downloading models *****\n"
 
