@@ -450,7 +450,7 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
-            '--nsfw-checker',
+            '--nsfw_checker',
             '--safety_checker',
             action=argparse.BooleanOptionalAction,
             dest='safety_checker',
