@@ -32,7 +32,7 @@ the composition of their training sets, current AI-generated image
 models are biased against certain ethnic groups, cultural concepts of
 beauty, ethnic stereotypes, and gender roles.
 
-      * We recognize the potential for harm to these groups that these biases
+      1. We recognize the potential for harm to these groups that these biases
        represent and trust that future AI models will take steps towards
        reducing or eliminating the biases noted above, respect and give due
        credit to the artists whose work is sourced, and call on developers
@@ -53,7 +53,7 @@ but must be used responsibly. Artificial intelligence technologies
 have the potential to improve society, in everything from cancer care,
 to customer service, to creative writing.
 
-     * While we do not believe that software should arbitrarily limit what
+     1. While we do not believe that software should arbitrarily limit what
      users can do with it, we recognize that when used irresponsibly, AI
      has the potential to do much harm. Our Discord server is actively
      moderated in order to minimize the potential of harm from
@@ -64,7 +64,7 @@ to customer service, to creative writing.
      members of LGBTQIA communities; and people with disabilities or
      impairments.
 
-     * Note that some of the image generation AI models which the Invoke-AI
+     2. Note that some of the image generation AI models which the Invoke-AI
      toolkit supports carry licensing agreements which impose restrictions
      on how the model is used. We ask that our users read and agree to
      these terms if they wish to make use of these models. These agreements
