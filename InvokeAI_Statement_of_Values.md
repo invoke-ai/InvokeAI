@@ -79,30 +79,7 @@ each other grow and gain new skills, and we apportion expectations in
 a way that balances the members' time, skillset, and interest
 area. Disputes are resolved by open and honest communication.
 
-## Who's Who in InvokeAI
+## Signature
 
-* lstein (Lincoln Stein) - Co-maintainer
-* blessedcoolant - Co-maintainer
-* hipsterusername (Kent Keirsey) - Product Manager
-* psychedelicious - Web Team Leader
-* Kyle0654 (Kyle Schouviller) - Node Architect and General Backend Wizard
-* damian0815 - Attention Systems and Gameplay Engineer
-* mauwii (Matthias Wild) - Continuous integration and product maintenance engineer
-* Netsvetaev (Artur Netsvetaev) - UI/UX Developer
-* tildebyte - general gadfly and resident (self-appointed) know-it-all
-* keturn - Lead for Diffusers port
+This document has been collectively crafted and approved by the current InvokeAI team members, as of 28 Nov 2022: **lstein** (Lincoln Stein), **blessedoolant**, **hipsterusername** (Kent Keirsey), **Kyle0654** (Kyle Schouviller), **damian0815**, **mauwii** (Matthias Wild), **Netsvetaev** (Artur Netsvetaev), **tildebyte**, and **keturn**. Although individuals within the group may hold differing views on particular details and/or their implications, we are all in agreement about its fundamental statements, as well as their significance and importance to this project moving forward.  
 
-## Joining Us
-
-This is the easy part. To join, just raise your hand on the InvokeAI
-Discord server or discussion board. Tell us who you are and how you
-would like to help.  Or you can simply start contributing by making a
-local copy of the code repository you're interested in helping out
-with (right now, just the InvokeAI application!), fixing code or
-documentation, and issuing a pull request. If you are unfamiliar with
-the GitHub pull request process, check out the Getting Started Guide.
-We hope you enjoy using our software as much as we enjoy creating it,
-and we hope that some of those of you who are reading this will elect
-to become part of our community.
-
-Welcome to InvokeAI!
