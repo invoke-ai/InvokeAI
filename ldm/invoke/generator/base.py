@@ -6,6 +6,7 @@ import torch
 import numpy as  np
 import random
 import os
+import os.path as osp
 import traceback
 from tqdm import tqdm, trange
 from PIL import Image, ImageFilter, ImageChops
@@ -32,6 +33,7 @@ class Generator():
         self.with_variations = []
         self.use_mps_noise = False
         self.free_gpu_mem = None
+        self.caution_img = None
 
     # this is going to be overridden in img2img.py, txt2img.py and inpaint.py
     def get_make_image(self,prompt,**kwargs):
@@ -287,13 +289,29 @@ class Generator():
     def blur(self,input):
         blurry = input.filter(filter=ImageFilter.GaussianBlur(radius=32))
         try:
-            caution = Image.open(CAUTION_IMG)
-            caution = caution.resize((caution.width // 2, caution.height //2))
-            blurry.paste(caution,(0,0),caution)
+            caution = self.get_caution_img()
+            if caution:
+                blurry.paste(caution,(0,0),caution)
         except FileNotFoundError:
             pass
         return blurry
 
+    def get_caution_img(self):
+        if self.caution_img:
+            return self.caution_img
+        # Find the caution image. If we are installed in the package directory it will
+        # be six levels up. If we are in the repo directory it will be three levels up.
+        for dots in ('../../..','../../../../../..'):
+            caution_path = osp.join(osp.dirname(__file__),dots,CAUTION_IMG)
+            if osp.exists(caution_path):
+                path = caution_path
+                break
+        if not path:
+            return
+        caution = Image.open(path)
+        self.caution_img = caution.resize((caution.width // 2, caution.height //2))
+        return self.caution_img
+        
     # this is a handy routine for debugging use. Given a generated sample,
     # convert it into a PNG image and store it at the indicated path
     def save_sample(self, sample, filepath):
