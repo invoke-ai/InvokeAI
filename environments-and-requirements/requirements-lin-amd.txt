@@ -1,10 +1,6 @@
 -r environments-and-requirements/requirements-base.txt
-
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
-
 # Get hardware-appropriate torch/torchvision
 --extra-index-url https://download.pytorch.org/whl/rocm5.1.1 --trusted-host https://download.pytorch.org
 torch
 torchvision
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
 -e .

@@ -1,9 +1,7 @@
 -r environments-and-requirements/requirements-base.txt
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan
 # Get hardware-appropriate torch/torchvision
 --extra-index-url https://download.pytorch.org/whl/cu116 --trusted-host https://download.pytorch.org
 basicsr==1.4.1
 torch==1.12.1
 torchvision==0.13.1
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan
 -e .
