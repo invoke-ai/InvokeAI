@@ -1,14 +1,15 @@
+import os.path
 from cmath import log
 import torch
 from torch import nn
 
 import sys
 
+from ldm.invoke.concepts_lib import Concepts
 from ldm.data.personalized import per_img_token_list
 from transformers import CLIPTokenizer
 from functools import partial
-
-DEFAULT_PLACEHOLDER_TOKEN = ['*']
+from picklescan.scanner import scan_file_path
 
 PROGRESSIVE_SCALE = 2000
 
@@ -43,7 +44,6 @@ def get_bert_token_for_string(tokenizer, string):
 def get_embedding_for_clip_token(embedder, token):
     return embedder(token.unsqueeze(0))[0, 0]
 
-
 class EmbeddingManager(nn.Module):
     def __init__(
         self,
@@ -58,6 +58,8 @@ class EmbeddingManager(nn.Module):
         super().__init__()
 
         self.embedder = embedder
+        self.concepts_library=Concepts()
+        self.concepts_loaded = dict()
 
         self.string_to_token_dict = {}
         self.string_to_param_dict = nn.ParameterDict()
@@ -149,68 +151,55 @@ class EmbeddingManager(nn.Module):
                 placeholder_string
             ].to(device)
 
-            if (
-                self.max_vectors_per_token == 1
-            ):   # If there's only one vector per token, we can do a simple replacement
-                placeholder_idx = torch.where(
-                    tokenized_text == placeholder_token.to(device)
+            if self.progressive_words:
+                self.progressive_counter += 1
+                max_step_tokens = (
+                    1 + self.progressive_counter // PROGRESSIVE_SCALE
                 )
-                embedded_text[placeholder_idx] = placeholder_embedding
-            else:   # otherwise, need to insert and keep track of changing indices
-                if self.progressive_words:
-                    self.progressive_counter += 1
-                    max_step_tokens = (
-                        1 + self.progressive_counter // PROGRESSIVE_SCALE
-                    )
-                else:
-                    max_step_tokens = self.max_vectors_per_token
+            else:
+                max_step_tokens = self.max_vectors_per_token
 
-                num_vectors_for_token = min(
-                    placeholder_embedding.shape[0], max_step_tokens
-                )
+            num_vectors_for_token = min(
+                placeholder_embedding.shape[0], max_step_tokens
+            )
 
-                if torch.cuda.is_available():
-                    placeholder_rows, placeholder_cols = torch.where(
-                        tokenized_text == placeholder_token.to(device)
-                    )
-                else:
-                    placeholder_rows, placeholder_cols = torch.where(
-                        tokenized_text == placeholder_token
-                    )
+            placeholder_rows, placeholder_cols = torch.where(
+                tokenized_text == placeholder_token.to(tokenized_text.device)
+            )
 
-                if placeholder_rows.nelement() == 0:
-                    continue
+            if placeholder_rows.nelement() == 0:
+                continue
 
-                sorted_cols, sort_idx = torch.sort(
-                    placeholder_cols, descending=True
-                )
-                sorted_rows = placeholder_rows[sort_idx]
+            sorted_cols, sort_idx = torch.sort(
+                placeholder_cols, descending=True
+            )
+            sorted_rows = placeholder_rows[sort_idx]
 
-                for idx in range(len(sorted_rows)):
-                    row = sorted_rows[idx]
-                    col = sorted_cols[idx]
+            for idx in range(sorted_rows.shape[0]):
+                row = sorted_rows[idx]
+                col = sorted_cols[idx]
 
-                    new_token_row = torch.cat(
-                        [
-                            tokenized_text[row][:col],
-                            placeholder_token.repeat(num_vectors_for_token).to(
-                                device
-                            ),
-                            tokenized_text[row][col + 1 :],
-                        ],
-                        axis=0,
-                    )[:n]
-                    new_embed_row = torch.cat(
-                        [
-                            embedded_text[row][:col],
-                            placeholder_embedding[:num_vectors_for_token],
-                            embedded_text[row][col + 1 :],
-                        ],
-                        axis=0,
-                    )[:n]
+                new_token_row = torch.cat(
+                    [
+                        tokenized_text[row][:col],
+                        placeholder_token.repeat(num_vectors_for_token).to(
+                            device
+                        ),
+                        tokenized_text[row][col + 1 :],
+                    ],
+                    axis=0,
+                )[:n]
+                new_embed_row = torch.cat(
+                    [
+                        embedded_text[row][:col],
+                        placeholder_embedding[:num_vectors_for_token],
+                        embedded_text[row][col + 1 :],
+                    ],
+                    axis=0,
+                )[:n]
 
-                    embedded_text[row] = new_embed_row
-                    tokenized_text[row] = new_token_row
+                embedded_text[row] = new_embed_row
+                tokenized_text[row] = new_token_row
 
         return embedded_text
 
@@ -223,29 +212,98 @@ class EmbeddingManager(nn.Module):
             ckpt_path,
         )
 
-    def load(self, ckpt_path, full=True):
+    def load_concepts(self, concepts:list[str], full=True):
+        bin_files = list()
+        for concept_name in concepts:
+            if concept_name in self.concepts_loaded:
+                continue
+            else:
+                bin_file = self.concepts_library.get_concept_model_path(concept_name)
+                if not bin_file:
+                    continue
+                bin_files.append(bin_file)
+                self.concepts_loaded[concept_name]=True
+        self.load(bin_files, full)
+
+    def list_terms(self) -> list[str]:
+        return self.concepts_loaded.keys()
+
+    def load(self, ckpt_paths, full=True):
+        if len(ckpt_paths) == 0:
+            return
+        if type(ckpt_paths) != list:
+            ckpt_paths = [ckpt_paths]
+        ckpt_paths = self._expand_directories(ckpt_paths)
+        for c in ckpt_paths:
+            self._load(c,full)
+        # remember that we know this term and don't try to download it again from the concepts library
+        # note that if the concept name is also provided and different from the trigger term, they
+        # both will be stored in this dictionary
+        for term in self.string_to_param_dict.keys():
+            term = term.strip('<').strip('>')
+            self.concepts_loaded[term] = True  
+        print(f'>> Current embedding manager terms: {", ".join(self.string_to_param_dict.keys())}')
+
+    def _expand_directories(self, paths:list[str]):
+        expanded_paths = list()
+        for path in paths:
+            if os.path.isfile(path):
+                expanded_paths.append(path)
+            elif os.path.isdir(path):
+                for root, _, files in os.walk(path):
+                    for name in files:
+                        expanded_paths.append(os.path.join(root,name))
+        return [x for x in expanded_paths if os.path.splitext(x)[1] in ('.pt','.bin')]
+
+    def _load(self, ckpt_path, full=True):
+
+        scan_result = scan_file_path(ckpt_path)
+        if scan_result.infected_files == 1:
+            print(f'\n### Security Issues Found in Model: {scan_result.issues_count}')
+            print('### For your safety, InvokeAI will not load this embed.')
+            return
+        
         ckpt = torch.load(ckpt_path, map_location='cpu')
 
         # Handle .pt textual inversion files
         if 'string_to_token' in ckpt and 'string_to_param' in ckpt:
-            self.string_to_token_dict = ckpt["string_to_token"]
-            self.string_to_param_dict = ckpt["string_to_param"]
+            filename = os.path.basename(ckpt_path)
+            token_str = '.'.join(filename.split('.')[:-1]) # filename excluding extension
+            if len(ckpt["string_to_token"]) > 1:
+                print(f">> {ckpt_path} has >1 embedding, only the first will be used")
+
+            string_to_param_dict = ckpt['string_to_param']
+            embedding = list(string_to_param_dict.values())[0]
+            self.add_embedding(token_str, embedding, full)
 
         # Handle .bin textual inversion files from Huggingface Concepts
         # https://huggingface.co/sd-concepts-library
         else:
             for token_str in list(ckpt.keys()):
-                token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
-                self.string_to_token_dict[token_str] = token
-                ckpt[token_str] = torch.nn.Parameter(ckpt[token_str])
-                
-            self.string_to_param_dict.update(ckpt)
+                embedding = ckpt[token_str]
+                self.add_embedding(token_str, embedding, full)
 
+    def add_embedding(self, token_str, embedding, full):
+        if token_str in self.string_to_param_dict:
+            print(f">> Embedding manager refusing to overwrite already-loaded term '{token_str}'")
+            return
         if not full:
-            for key, value in self.string_to_param_dict.items():
-                self.string_to_param_dict[key] = torch.nn.Parameter(value.half())
+            embedding = embedding.half()
+        if len(embedding.shape) == 1:
+            embedding = embedding.unsqueeze(0)
 
-        print(f'Added terms: {", ".join(self.string_to_param_dict.keys())}')
+        num_tokens_added = self.embedder.tokenizer.add_tokens(token_str)
+        current_embeddings = self.embedder.transformer.resize_token_embeddings(None)
+        current_token_count = current_embeddings.num_embeddings
+        new_token_count = current_token_count + num_tokens_added
+        self.embedder.transformer.resize_token_embeddings(new_token_count)
+
+        token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
+        self.string_to_token_dict[token_str] = token
+        self.string_to_param_dict[token_str] = torch.nn.Parameter(embedding)
+
+    def has_embedding_for_token(self, token_str):
+        return token_str in self.string_to_token_dict
 
     def get_embedding_norms_squared(self):
         all_params = torch.cat(

@@ -602,8 +602,8 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
-        
-    for name in ['models','configs']:
+
+    for name in ('models','configs','embeddings'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
     for src in (['configs']):
         dest = os.path.join(root,src)
@@ -634,7 +634,15 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 #
 '''
             )
-    
+    else:
+        print(f'Updating the initialization file at "{init_file}".\n')
+        with open(init_file,'r') as infile, open(f'{init_file}.tmp','w') as outfile:
+            for line in infile.readlines():
+                if not line.startswith('--root') and not line.startswith('--outdir'):
+                    outfile.write(line)
+            outfile.write(f'--root="{root}"\n')
+            outfile.write(f'--outdir="{outputs}"\n')
+        os.replace(f'{init_file}.tmp',init_file)
     
 #-------------------------------------
 class ProgressBar():
@@ -710,5 +718,3 @@ def main():
 #-------------------------------------
 if __name__ == '__main__':
     main()
-
-    

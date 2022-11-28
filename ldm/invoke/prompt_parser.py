@@ -646,13 +646,13 @@ def split_weighted_subprompts(text, skip_normalize=False)->list:
 # usually tokens have '</w>' to indicate end-of-word,
 # but for readability it has been replaced with ' '
 def log_tokenization(text, model, display_label=None):
-    tokens    = model.cond_stage_model.tokenizer._tokenize(text)
+    tokens    = model.cond_stage_model.tokenizer.tokenize(text)
     tokenized = ""
     discarded = ""
     usedTokens = 0
     totalTokens = len(tokens)
     for i in range(0, totalTokens):
-        token = tokens[i].replace('</w>', 'x` ')
+        token = tokens[i].replace('</w>', ' ')
         # alternate color
         s = (usedTokens % 6) + 1
         if i < model.cond_stage_model.max_length:
