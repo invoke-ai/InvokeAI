@@ -457,6 +457,12 @@ class Args(object):
             default=False,
             help='Check for and blur potentially NSFW images. Use --no-nsfw-checker to disable.',
         )
+        model_group.add_argument(
+            '--patchmatch',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Load the patchmatch extension for outpainting. Use --no-patchmatch to disable.',
+        )
         file_group.add_argument(
             '--from_file',
             dest='infile',
