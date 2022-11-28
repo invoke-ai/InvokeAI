@@ -1,34 +1,13 @@
-FROM ubuntu AS get_miniconda
-
-SHELL ["/bin/bash", "-c"]
-
-# install wget
-RUN apt-get update \
-  && apt-get install -y \
-    wget \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
-# download and install miniconda
-ARG conda_version=py39_4.12.0-Linux-x86_64
-ARG conda_prefix=/opt/conda
-RUN wget --progress=dot:giga -O /miniconda.sh \
-  https://repo.anaconda.com/miniconda/Miniconda3-${conda_version}.sh \
-  && bash /miniconda.sh -b -p ${conda_prefix} \
-  && rm -f /miniconda.sh
-
-FROM ubuntu AS invokeai
+FROM ubuntu:22.10
 
 # use bash
 SHELL [ "/bin/bash", "-c" ]
-
-# clean bashrc
-RUN echo "" > ~/.bashrc
 
 # Install necesarry packages
 RUN apt-get update \
   && apt-get install -y \
     --no-install-recommends \
+    build-essential \
     gcc \
     git \
     libgl1-mesa-glx \
@@ -39,41 +18,24 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# clone repository, create models.yaml and create symlinks
-ARG invokeai_git=invoke-ai/InvokeAI
-ARG invokeai_branch=main
-ARG project_name=invokeai
-ARG conda_env_file=environment-lin-cuda.yml
-RUN git clone -b ${invokeai_branch} https://github.com/${invokeai_git}.git "/${project_name}" \
-  && ln -sf \
-    "/${project_name}/environments-and-requirements/${conda_env_file}" \
-    "/${project_name}/environment.yml" \
-  && ln -sf \
-    /data/outputs/ \
-    "/${project_name}/outputs"
+ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
+ARG PROJECT_NAME=invokeai
+ARG INVOKEAI_ROOT=/data
+ENV INVOKEAI_ROOT=${INVOKEAI_ROOT}
 
-# set workdir and copy models.yaml
-WORKDIR "/${project_name}"
-COPY docker-build/models.yaml configs/models.yaml
+# set workdir and copy sources
+WORKDIR /${PROJECT_NAME}
+COPY . .
 
-# install conda env and preload models
-ARG conda_prefix=/opt/conda
-COPY --from=get_miniconda "${conda_prefix}" "${conda_prefix}"
-RUN source "${conda_prefix}/etc/profile.d/conda.sh" \
-  && conda init bash \
-  && source ~/.bashrc \
-  && conda env create \
-    --name "${project_name}" \
-  && rm -Rf ~/.cache \
-  && conda clean -afy \
-  && echo "conda activate ${project_name}" >> ~/.bashrc
+# install requirements and link outputs folder
+RUN cp \
+  ./environments-and-requirements/${PIP_REQUIREMENTS} \
+  ${PIP_REQUIREMENTS} \
+  && pip install \
+    --no-cache-dir \
+    -r ${PIP_REQUIREMENTS} \
+  && ln -sf /data/outputs /${PROJECT_NAME}/outputs
 
-RUN source ~/.bashrc \
-  && python scripts/preload_models.py \
-    --no-interactive
-
-# Copy entrypoint and set env
-ENV CONDA_PREFIX="${conda_prefix}"
-ENV PROJECT_NAME="${project_name}"
-COPY docker-build/entrypoint.sh /
-ENTRYPOINT [ "/entrypoint.sh" ]
+# set Entrypoint and default CMD
+ENTRYPOINT [ "python3" ]
+CMD [ "scripts/invoke.py", "--web", "--host", "0.0.0.0" ]
