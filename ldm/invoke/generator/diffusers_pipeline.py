@@ -16,6 +16,7 @@ from diffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMSchedu
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+from ldm.modules.embedding_manager import EmbeddingManager
 from ldm.modules.encoders.modules import WeightedFrozenCLIPEmbedder
 
 
@@ -26,6 +27,16 @@ class PipelineIntermediateState:
     timestep: int
     latents: torch.Tensor
     predicted_original: Optional[torch.Tensor] = None
+
+
+# copied from configs/stable-diffusion/v1-inference.yaml
+_default_personalization_config_params = dict(
+    placeholder_strings=["*"],
+    initializer_wods=["sculpture"],
+    per_image_tokens=False,
+    num_vectors_per_token=8,
+    progressive_words=False
+)
 
 
 class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
@@ -89,6 +100,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             transformer=self.text_encoder
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
+        self.embedding_manager = EmbeddingManager(self.clip_embedder, **_default_personalization_config_params)
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               text_embeddings: torch.Tensor, unconditioned_embeddings: torch.Tensor,
