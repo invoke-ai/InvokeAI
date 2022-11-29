@@ -170,9 +170,13 @@ class Args(object):
 
     def parse_args(self):
         '''Parse the shell switches and store.'''
+        from configure_invokeai import get_root
         try:
             sysargs = sys.argv[1:]
-            initfile = os.path.expanduser(Globals.initfile)
+            if not os.path.exists(os.path.expanduser(Globals.initfile)):
+                initfile = os.path.join(get_root(), ".invokeai")
+            else:
+                initfile = os.path.expanduser(Globals.initfile)
             if os.path.exists(initfile):
                 print(f'>> Initialization file {initfile} found. Loading...')
                 sysargs.insert(0,f'@{initfile}')
