@@ -21,6 +21,6 @@ case "${OS_NAME}" in
     *)          echo "Unknown OS: $OS_NAME! This script runs only on Linux or Mac" && exit
 esac
 
-python scripts/preload_models.py
+python scripts/configure_invokeai.py
 
 

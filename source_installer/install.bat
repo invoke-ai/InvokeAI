@@ -72,7 +72,7 @@ if not exist ".git" (
     call git config --local init.defaultBranch main
     call git remote add origin %REPO_URL%
     call git fetch
-    call git checkout origin/main -ft
+    call git checkout origin/development -ft
 )
 
 @rem activate the base env
@@ -97,10 +97,10 @@ copy source_installer\update.bat update.bat
 
 call conda activate invokeai
 @rem preload the models
-call python scripts\preload_models.py
+call python scripts\configure_invokeai.py
 if "%ERRORLEVEL%" NEQ "0" (
    echo ""
-   echo "The preload_models.py script crashed or was cancelled."
+   echo "The configure_invokeai.py script crashed or was cancelled."
    echo "InvokeAI is not ready to run. To run preload_models.py again,"
    echo "run the command 'update.bat' in this directory."
    echo "Press any key to continue"

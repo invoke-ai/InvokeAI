@@ -11,7 +11,7 @@ if exist ".git" (
 
 conda env update
 conda activate invokeai
-python scripts/preload_models.py
+python scripts/configure_invokeai.py
 
 echo "Press any key to continue"
 pause

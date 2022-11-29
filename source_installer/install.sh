@@ -86,7 +86,7 @@ if [ ! -e ".git" ]; then
     git config --local init.defaultBranch main
     git remote add origin "$REPO_URL"
     git fetch
-    git checkout origin/main -ft
+    git checkout origin/development -ft
 fi
 
 # create the environment
@@ -121,12 +121,12 @@ else
 
     conda activate invokeai
     # preload the models
-    echo "Calling the preload_models.py script"
-    python scripts/preload_models.py
+    echo "Calling the configure_invokeai.py script"
+    python scripts/configure_invokeai.py
     status=$?
     if test $status -ne 0
        then
-	   echo "The preload_models.py script crashed or was cancelled."
+	   echo "The configure_invokeai.py script crashed or was cancelled."
            echo "InvokeAI is not ready to run. Try again by running"
            echo "update.sh in this directory."
        else
