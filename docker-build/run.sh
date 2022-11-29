@@ -7,9 +7,9 @@ docker run \
   --interactive \
   --tty \
   --rm \
-  --platform "$platform" \
-  --name "$project_name" \
-  --hostname "$project_name" \
-  --mount source="$volumename",target=/data \
-  --publish 9090:9090 \
+  --platform="$platform" \
+  --name="$project_name" \
+  --hostname="$project_name" \
+  --mount="source=$volumename,target=/data" \
+  --publish=9090:9090 \
   "$invokeai_tag" ${1:+$@}

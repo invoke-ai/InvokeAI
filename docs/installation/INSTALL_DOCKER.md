@@ -78,7 +78,7 @@ Some Suggestions of variables you may want to change besides the Token:
 | -------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
 | `HUGGINGFACE_TOKEN`  | No default, but **required**! | This is the only **required** variable, without it you can't download the huggingface models |
 | `PROJECT_NAME`       | `invokeai`                    | affects the project folder, tag- and volume name                                             |
-| `VOLUMENAME`         | `${PROJECT_NAME}_data`        | affects the project folder, tag- and volume name                                             |
+| `VOLUMENAME`         | `${PROJECT_NAME}_data`        | Name of the Docker Volume where model files will be stored                                   |
 | `ARCH`               | `x86_64`                      | can be changed to f.e. aarch64 if you are using a ARM based CPU                              |
 | `INVOKEAI_TAG`       | `${PROJECT_NAME}:${ARCH}`     | the Container Repository / Tag which will be used                                            |
 | `PIP_REQUIREMENTS`   | `requirements-lin-cuda.txt`   | the requirements file to use (from `environments-and-requirements`)                          |
@@ -111,13 +111,13 @@ When used without arguments, the container will start the webserver and provide
 you the link to open it. But if you want to use some other parameters you can
 also do so.
 
-!!! example ""
+!!! example "run script example"
 
     ```bash
-    ./docker-build/run.sh scripts/invoke.py
+    ./docker-build/run.sh "banana sushi" -Ak_lms -S42 -s10
     ```
 
-    This would start the CLI instead of the default command that starts the webserver.
+    This would generate the legendary "banana sushi" with Seed 42, k_lms Sampler and 10 steps. 
 
     Find out more about available CLI-Parameters at [features/CLI.md](../../features/CLI/#arguments)
 
