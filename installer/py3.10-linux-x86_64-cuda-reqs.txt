@@ -286,9 +286,7 @@ docker-pycreds==0.4.0 \
 einops==0.5.0 \
     --hash=sha256:055de7eeb3cb9e9710ef3085a811090c6b52e809b7044e8785824ed185f486d1 \
     --hash=sha256:8b7a83cffc1ea88e306df099b7cbb9c3ba5003bd84d05ae44be5655864abb8d3
-    # via
-    #   -r installer/requirements.in
-    #   k-diffusion
+    # via k-diffusion
 entrypoints==0.4 \
     --hash=sha256:b706eddaa9218a19ebcd67b56818f05bb27589b1ca9e8d797b74affad4ccacd4 \
     --hash=sha256:f174b5ff827504fd3cd97cc3f8649f3693f51538c7e4bdf3ef002c8429d42f9f
@@ -301,7 +299,6 @@ facexlib==0.2.5 \
     --hash=sha256:31e20cc4ed5d63562d380e4564bae14ac0d5d1899a079bad87621e13564567e4 \
     --hash=sha256:cc7ceb56c5424319c47223cf75eef6828c34c66082707c6eb35b95d39779f02d
     # via
-    #   -r installer/requirements.in
     #   gfpgan
     #   realesrgan
 filelock==3.8.0 \
@@ -689,9 +686,7 @@ kiwisolver==1.4.4 \
 kornia==0.6.8 \
     --hash=sha256:0985e02453c0ab4f030e8d22a3a7554dab312ffa8f8a54ec872190e6f0b58c56 \
     --hash=sha256:0d6d69330b4fd24da742337b8134da0ce01b4d7da66770db5498d58e8b4a0832
-    # via
-    #   -r installer/requirements.in
-    #   k-diffusion
+    # via k-diffusion
 llvmlite==0.39.1 \
     --hash=sha256:03aee0ccd81735696474dc4f8b6be60774892a2929d6c05d093d17392c237f32 \
     --hash=sha256:1578f5000fdce513712e99543c50e93758a954297575610f48cb1fd71b27c08a \
@@ -975,7 +970,6 @@ numpy==1.23.4 \
     --hash=sha256:f2f390aa4da44454db40a1f0201401f9036e8d578a25f01a6e237cea238337ef \
     --hash=sha256:f76025acc8e2114bb664294a07ede0727aa75d63a06d2fae96bf29a81747e4a7
     # via
-    #   -r installer/requirements.in
     #   accelerate
     #   albumentations
     #   altair
@@ -1304,8 +1298,8 @@ pyparsing==3.0.9 \
     # via
     #   matplotlib
     #   packaging
-pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/511dbd482e3986b13ee08efabfc22ca78cdf3165.zip \
-    --hash=sha256:8cb47195a48b8f29a9dbfcd3da47659fcbe22a3a99f4ebae08bb9c95999e73cc
+pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/129863937a8ab37f6bbcec327c994c0f932abdbc.zip \
+    --hash=sha256:4ad6ec95379e7d122d494ff76633cc7cf9b71330d5efda147fceba81e3dc6cd2
     # via -r installer/requirements.in
 pyreadline3==3.4.1 \
     --hash=sha256:6f3d1f7b8a31ba32b73917cefc1f28cc660562f39aea8646d30bd6eff21f7bae \
@@ -1839,7 +1833,7 @@ toolz==0.12.0 \
     --hash=sha256:2059bd4148deb1884bb0eb770a3cde70e7f954cfbbdc2285f1f2de01fd21eb6f \
     --hash=sha256:88c570861c440ee3f2f6037c4654613228ff40c93a6c25e0eba70d17282c6194
     # via altair
-torch==1.12.0+cu116 \
+torch==1.12.0+cu116 ; platform_system == "Linux" or platform_system == "Windows" \
     --hash=sha256:1d9557d1e871794a31a71c40dec8589d6c3347f3f2953a8dd74cfd58e1ecb52e \
     --hash=sha256:72538e4505087668a4642f861578dfed470fae5da20b1758b0f34e4a070d6b21 \
     --hash=sha256:74f5b137190a6face6859d630f129289e7fae6a4d9a747430b3b5d5c6297a3ae \
@@ -1878,7 +1872,7 @@ torchmetrics==0.10.2 \
     --hash=sha256:43757d82266969906fc74b6e80766fcb2a0d52d6c3d09e3b7c98cf3b733fd20c \
     --hash=sha256:daa29d96bff5cff04d80eec5b9f5076993d6ac9c2d2163e88b6b31f8d38f7c25
     # via pytorch-lightning
-torchvision==0.13.0+cu116 \
+torchvision==0.13.0+cu116 ; platform_system == "Linux" or platform_system == "Windows" \
     --hash=sha256:1696feadf1921c8fa1549bad774221293298288ebedaa14e44bc3e57e964a369 \
     --hash=sha256:572544b108eaf12638f3dca0f496a453c4b8d8256bcc8333d5355df641c0380c \
     --hash=sha256:76dbe71be271e2f246d556a8201c6f73a431851045d866c51bd945521817b892 \
