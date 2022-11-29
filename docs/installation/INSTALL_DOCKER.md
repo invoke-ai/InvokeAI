@@ -72,14 +72,19 @@ created in the last step.
 
 Some Suggestions of variables you may want to change besides the Token:
 
-| Environment-Variable      | Default value                 | Description                                                                  |
-| ------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `HUGGINGFACE_TOKEN`       | No default, but **required**! | This is the only **required** variable, without you can't get the checkpoint |
-| `ARCH`                    | x86_64                        | if you are using a ARM based CPU                                             |
-| `INVOKEAI_TAG`            | invokeai-x86_64               | the Container Repository / Tag which will be used                            |
-| `INVOKEAI_CONDA_ENV_FILE` | environment-lin-cuda.yml      | since environment.yml wouldn't work with aarch                               |
-| `INVOKEAI_GIT`            | invoke-ai/InvokeAI            | the repository to use                                                        |
-| `INVOKEAI_BRANCH`         | main                          | the branch to checkout                                                       |
+<figure markdown>
+
+| Environment-Variable | Default value                 | Description                                                                                  |
+| -------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
+| `HUGGINGFACE_TOKEN`  | No default, but **required**! | This is the only **required** variable, without it you can't download the huggingface models |
+| `PROJECT_NAME`       | `invokeai`                    | affects the project folder, tag- and volume name                                             |
+| `VOLUMENAME`         | `${PROJECT_NAME}_data`        | Name of the Docker Volume where model files will be stored                                   |
+| `ARCH`               | `x86_64`                      | can be changed to f.e. aarch64 if you are using a ARM based CPU                              |
+| `INVOKEAI_TAG`       | `${PROJECT_NAME}:${ARCH}`     | the Container Repository / Tag which will be used                                            |
+| `PIP_REQUIREMENTS`   | `requirements-lin-cuda.txt`   | the requirements file to use (from `environments-and-requirements`)                          |
+| `INVOKE_DOCKERFILE`  | `docker-build/Dockerfile`     | the Dockerfile which should be built, handy for development                                  |
+
+</figure>
 
 #### Build the Image
 
@@ -106,15 +111,15 @@ When used without arguments, the container will start the webserver and provide
 you the link to open it. But if you want to use some other parameters you can
 also do so.
 
-!!! example ""
+!!! example "run script example"
 
     ```bash
-    ./docker-build/run.sh --from_file tests/validate_pr_prompt.txt
+    ./docker-build/run.sh "banana sushi" -Ak_lms -S42 -s10
     ```
 
-    The output folder is located on the volume which is also used to store the model.
+    This would generate the legendary "banana sushi" with Seed 42, k_lms Sampler and 10 steps. 
 
-    Find out more about available CLI-Parameters at [features/CLI.md](../features/CLI.md/#arguments)
+    Find out more about available CLI-Parameters at [features/CLI.md](../../features/CLI/#arguments)
 
 ---
 

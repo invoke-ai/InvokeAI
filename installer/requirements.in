@@ -16,6 +16,7 @@ kornia
 numpy
 pyreadline3
 realesrgan
+requests==2.25.1
 send2trash
 streamlit
 taming-transformers-rom1504
@@ -29,4 +30,4 @@ clip
 clipseg
 gfpgan
 k-diffusion
-
+pypatchmatch

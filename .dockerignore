@@ -1,3 +1,12 @@
 *
-!environment*.yml
-!docker-build
+!backend
+!configs
+!environments-and-requirements
+!frontend
+!installer
+!ldm
+!main.py
+!scripts
+!server
+!static
+!setup.py
