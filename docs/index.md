@@ -121,6 +121,8 @@ You wil need one of the following:
     ```
 ## :octicons-gift-24: InvokeAI Features
 
+- [InvokeAI and the NSFW ("safety") checker](features/NSFW.md)
+
 - [The InvokeAI Web Interface](features/WEB.md)
   - [WebGUI hotkey reference guide](features/WEBUIHOTKEYS.md)
   - [WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
