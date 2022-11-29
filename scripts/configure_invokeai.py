@@ -686,16 +686,22 @@ def main():
     opt = parser.parse_args()
 
 
-    # setting a global here
-    Globals.root = os.path.expanduser(get_root(opt.root) or '')
+    # setting globals here
+    root_dir = get_root(opt.root) or '~/invokeai'
+    Globals.root = Path(root_dir).expanduser().resolve()
+    if not Path("~/.invokeai").expanduser().exists():
+        Globals.initfile = (Path(Globals.root) / '.invokeai').resolve()
+    else:
+        # legacy / deprecated initfile location, supported for backwards compatibility
+        Globals.initfile = Path('~/.invokeai').expanduser().resolve()
 
     try:
         introduction()
 
         # We check for to see if the runtime directory is correctly initialized.
-        if Globals.root == '' \
-           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
-            initialize_rootdir(Globals.root,opt.yes_to_all)
+        if not (Path(Globals.root) / 'configs/stable-diffusion/v1-inference.yaml').exists() \
+        or not Path(Globals.initfile).exists():
+            initialize_rootdir(Globals.root, opt.yes_to_all)
 
         if opt.interactive:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
