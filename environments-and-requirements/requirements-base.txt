@@ -23,6 +23,7 @@ pudb
 pyreadline3
 pytorch-lightning==1.7.7
 realesrgan
+requests==2.25.1
 scikit-image>=0.19
 send2trash
 streamlit
