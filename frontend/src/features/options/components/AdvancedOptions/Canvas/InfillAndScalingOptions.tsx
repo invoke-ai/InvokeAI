@@ -105,7 +105,6 @@ const InfillAndScalingOptions = () => {
     e: ChangeEvent<HTMLSelectElement>
   ) => {
     dispatch(setBoundingBoxScaleMethod(e.target.value as BoundingBoxScale));
-    dispatch(setBoundingBoxDimensions(boundingBoxDimensions));
   };
 
   return (
