@@ -422,6 +422,10 @@ def get_completer(opt:Args, models=[])->Completer:
             readline.set_history_length(1000)
         except FileNotFoundError:
             pass
+        except OSError: # file likely corrupted
+            newname = f'{histfile}.old'
+            print(f'## Your history file {histfile} couldn\'t be loaded and may be corrupted. Renaming it to {newname}')
+            os.replace(histfile,newname)
         atexit.register(readline.write_history_file, histfile)
 
     else:

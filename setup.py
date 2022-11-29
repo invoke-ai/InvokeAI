@@ -6,19 +6,6 @@ from setuptools import setup, find_packages
 def list_files(directory):
     return [os.path.join(directory,x) for x in os.listdir(directory) if os.path.isfile(os.path.join(directory,x))]
 
-def _get_requirements(path):
-    try:
-        with open(path) as f:
-            packages = f.read().splitlines()
-    except (IOError, OSError) as ex:
-        raise RuntimeError("Can't open file with requirements: %s", repr(ex))
-
-    # Drop option lines
-    packages = [package for package in packages if not re.match(r'^--', package)]
-    print(f'Packages found for "install_requires":\n{packages}')
-    return packages
-
-
 VERSION = '2.2.0'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
@@ -27,6 +14,33 @@ LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, a
                     ' functionality in a "dream bot" style interface, and multiple features'
                     ' and other enhancements.')
 HOMEPAGE = 'https://github.com/invoke-ai/InvokeAI'
+REQUIREMENTS=[
+    'accelerate',
+    'albumentations',
+    'diffusers',
+    'eventlet',
+    'flask_cors',
+    'flask_socketio',
+    'flaskwebgui',
+    'getpass_asterisk',
+    'imageio-ffmpeg',
+    'pyreadline3',
+    'realesrgan',
+    'send2trash',
+    'streamlit',
+    'taming-transformers-rom1504',
+    'test-tube',
+    'torch-fidelity',
+    'torch',
+    'torchvision',
+    'transformers',
+    'picklescan',
+    'clip',
+    'clipseg',
+    'gfpgan',
+    'k-diffusion',
+    'pypatchmatch',
+]
 
 setup(
     name='InvokeAI',
@@ -38,7 +52,7 @@ setup(
     url=HOMEPAGE,
     license='MIT',
     packages=find_packages(exclude=['tests.*']),
-    install_requires=_get_requirements('installer/requirements.in'),
+    install_requires=REQUIREMENTS,
     dependency_links=['https://download.pytorch.org/whl/torch_stable.html'],
     python_requires='>=3.9, <4',
     classifiers=[
