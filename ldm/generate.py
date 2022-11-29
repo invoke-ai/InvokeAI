@@ -436,6 +436,9 @@ class Generate:
             self.sampler_name = sampler_name
             self._set_sampler()
 
+        # apply the concepts library to the prompt
+        prompt = self.concept_lib().replace_concepts_with_triggers(prompt, lambda concepts: self.load_concepts(concepts))
+
         # bit of a hack to change the cached sampler's karras threshold to
         # whatever the user asked for
         if karras_max is not None and isinstance(self.sampler,KSampler):
@@ -840,6 +843,7 @@ class Generate:
         model_data = cache.get_model(model_name)
         if model_data is None:  # restore previous
             model_data = cache.get_model(self.model_name)
+            model_name = self.model_name # addresses Issue #1547
 
         self.model = model_data['model']
         self.width = model_data['width']

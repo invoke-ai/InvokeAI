@@ -4,7 +4,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python>=3.9
+  - python=3.9.*
   - pip=22.2.2
   - numpy=1.23.3
   - pip:
@@ -44,5 +44,5 @@ dependencies:
     - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
     - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
     - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
-    - git+https://github.com/invoke-ai/PyPatchMatch@0.1.1#egg=pypatchmatch
+    - -e git+https://github.com/invoke-ai/PyPatchMatch@0.1.4#egg=pypatchmatch
     - -e .
