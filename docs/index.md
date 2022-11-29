@@ -122,23 +122,22 @@ You wil need one of the following:
 ## :octicons-gift-24: InvokeAI Features
 
 - [The InvokeAI Web Interface](features/WEB.md)
-  - [WebGUI hotkey reference guide](features/WEBUIHOTKEYS.md)
-  - [WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
-
+    - [WebGUI hotkey reference guide](features/WEBUIHOTKEYS.md)
+<!-- this link does not exist    - [WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md) -->
 - [The Command Line Interace](features/CLI.md)
-  - [Image2Image](features/IMG2IMG.md)
-  - [Inpainting][(features/INPAINTING.md)
-  - [Outpainting](features/OUTPAINTING.md)
-  - [Adding custom styles and subjects](features/CONCEPTS.md)
-  - [Upscaling and Face Reconstruction](features/POSTPROCESS.md)
-
+    - [Image2Image](features/IMG2IMG.md)
+    - [Inpainting](features/INPAINTING.md)
+    - [Outpainting](features/OUTPAINTING.md)
+    - [Adding custom styles and subjects](features/CONCEPTS.md)
+    - [Upscaling and Face Reconstruction](features/POSTPROCESS.md)
+<!-- seperator -->
 - [Generating Variations](features/VARIATIONS.md)
-
+<!-- seperator -->
 - [Prompt Engineering](features/PROMPTS.md)
-
+<!-- seperator -->
 - Miscellaneous
-  - [Embiggen upscaling](features/EMBIGGEN.md)
-  - [Other](features/OTHER.md)
+    - [Embiggen upscaling](features/EMBIGGEN.md)
+    - [Other](features/OTHER.md)
 
 ## :octicons-log-16: Latest Changes
 

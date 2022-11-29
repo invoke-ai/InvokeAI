@@ -141,15 +141,18 @@ class Generator():
         np_init_rgb_pixels_masked = init_rgb_pixels[mask_pixels, :]
         np_image_masked = np_image[mask_pixels, :]
 
-        init_means = np_init_rgb_pixels_masked.mean(axis=0)
-        init_std = np_init_rgb_pixels_masked.std(axis=0)
-        gen_means = np_image_masked.mean(axis=0)
-        gen_std = np_image_masked.std(axis=0)
+        if np_init_rgb_pixels_masked.size > 0:
+            init_means = np_init_rgb_pixels_masked.mean(axis=0)
+            init_std = np_init_rgb_pixels_masked.std(axis=0)
+            gen_means = np_image_masked.mean(axis=0)
+            gen_std = np_image_masked.std(axis=0)
 
-        # Color correct
-        np_matched_result = np_image.copy()
-        np_matched_result[:,:,:] = (((np_matched_result[:,:,:].astype(np.float32) - gen_means[None,None,:]) / gen_std[None,None,:]) * init_std[None,None,:] + init_means[None,None,:]).clip(0, 255).astype(np.uint8)
-        matched_result = Image.fromarray(np_matched_result, mode='RGB')
+            # Color correct
+            np_matched_result = np_image.copy()
+            np_matched_result[:,:,:] = (((np_matched_result[:,:,:].astype(np.float32) - gen_means[None,None,:]) / gen_std[None,None,:]) * init_std[None,None,:] + init_means[None,None,:]).clip(0, 255).astype(np.uint8)
+            matched_result = Image.fromarray(np_matched_result, mode='RGB')
+        else:
+            matched_result = Image.fromarray(np_image, mode='RGB')
 
         # Blur the mask out (into init image) by specified amount
         if mask_blur_radius > 0:

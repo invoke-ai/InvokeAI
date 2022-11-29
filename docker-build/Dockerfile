@@ -18,24 +18,17 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
-ARG PROJECT_NAME=invokeai
-ARG INVOKEAI_ROOT=/data
-ENV INVOKEAI_ROOT=${INVOKEAI_ROOT}
-
 # set workdir and copy sources
-WORKDIR /${PROJECT_NAME}
-COPY . .
+WORKDIR /invokeai
+ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
+COPY . ./environments-and-requirements/${PIP_REQUIREMENTS} ./
 
 # install requirements and link outputs folder
-RUN cp \
-  ./environments-and-requirements/${PIP_REQUIREMENTS} \
-  ${PIP_REQUIREMENTS} \
-  && pip install \
-    --no-cache-dir \
-    -r ${PIP_REQUIREMENTS} \
-  && ln -sf /data/outputs /${PROJECT_NAME}/outputs
+RUN pip install \
+  --no-cache-dir \
+  -r ${PIP_REQUIREMENTS}
 
-# set Entrypoint and default CMD
-ENTRYPOINT [ "python3" ]
-CMD [ "scripts/invoke.py", "--web", "--host", "0.0.0.0" ]
+# set Environment, Entrypoint and default CMD
+ENV INVOKEAI_ROOT /data
+ENTRYPOINT [ "python3", "scripts/invoke.py", "--outdir=/data/outputs" ]
+CMD [ "--web", "--host=0.0.0.0" ]
