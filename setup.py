@@ -14,7 +14,7 @@ def _get_requirements(path):
         raise RuntimeError("Can't open file with requirements: %s", repr(ex))
 
     # Drop option lines
-    packages = [package for package in packages if not re.match(r'^--', package)]
+    packages = [package for package in packages if not re.match(r'^(--|http)', package)]
     print(f'Packages found for "install_requires":\n{packages}')
     return packages
 
