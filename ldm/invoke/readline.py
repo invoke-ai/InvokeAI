@@ -12,6 +12,8 @@ import os
 import re
 import atexit
 from ldm.invoke.args import Args
+from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.globals import Globals
 
 # ---------------readline utilities---------------------
 try:
@@ -84,6 +86,7 @@ IMG_FILE_COMMANDS=(
     '--init_color[=\s]',
     '--embedding_path[=\s]',
     )
+
 path_regexp   = '(' + '|'.join(IMG_PATH_COMMANDS+IMG_FILE_COMMANDS) + ')\s*\S*$'
 weight_regexp = '(' + '|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
 text_regexp = '(' + '|'.join(TEXT_PATH_COMMANDS) + ')\s*\S*$'
@@ -98,6 +101,7 @@ class Completer(object):
         self.linebuffer  = None
         self.auto_history_active = True
         self.extensions = None
+        self.concepts = Concepts().list_concepts()
         return
 
     def complete(self, text, state):
@@ -122,12 +126,20 @@ class Completer(object):
             elif re.search('(-S\s*|--seed[=\s])\d*$',buffer): 
                 self.matches= self._seed_completions(text,state)
 
+            elif re.search('<[\w-]*$',buffer): 
+                self.matches= self._concept_completions(text,state)
+            
             # looking for a model
             elif re.match('^'+'|'.join(MODEL_COMMANDS),buffer):
                 self.matches= self._model_completions(text, state)
 
             elif re.search(weight_regexp,buffer):
-                self.matches = self._path_completions(text, state, WEIGHT_EXTENSIONS)
+                self.matches = self._path_completions(
+                    text,
+                    state,
+                    WEIGHT_EXTENSIONS,
+                    default_dir=Globals.root,
+                )
 
             elif re.search(text_regexp,buffer):
                 self.matches = self._path_completions(text, state, TEXT_EXTENSIONS)
@@ -257,6 +269,22 @@ class Completer(object):
         matches.sort()
         return matches
 
+    def add_embedding_terms(self, terms:list[str]):
+        self.concepts = Concepts().list_concepts()
+        self.concepts.extend(terms)
+
+    def _concept_completions(self, text, state):
+        partial = text[1:]  # this removes the leading '<'
+        if len(partial) == 0:
+            return self.concepts  # whole dump - think if user wants this!
+
+        matches = list()
+        for concept in self.concepts:
+            if concept.startswith(partial):
+                matches.append(f'<{concept}>')
+        matches.sort()
+        return matches
+
     def _model_completions(self, text, state):
         m = re.search('(!switch\s+)(\w*)',text)
         if m:
@@ -278,7 +306,7 @@ class Completer(object):
             readline.redisplay()
             self.linebuffer = None
 
-    def _path_completions(self, text, state, extensions, shortcut_ok=True):
+    def _path_completions(self, text, state, extensions, shortcut_ok=True, default_dir:str=''):
         # separate the switch from the partial path
         match = re.search('^(-\w|--\w+=?)(.*)',text)
         if match is None:
@@ -297,7 +325,7 @@ class Completer(object):
         elif os.path.dirname(path) != '':
             dir = os.path.dirname(path)
         else:
-            dir = ''
+            dir = default_dir if os.path.exists(default_dir)  else ''
             path= os.path.join(dir,path)
 
         dir_list = os.listdir(dir or '.')

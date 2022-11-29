@@ -11,15 +11,17 @@ inpainting and outpainting and is recommended.
 Unfortunately, it is a C++ optimized module and installation
 can be somewhat challenging. This guide leads you through the steps.
 
-## Windows
+## Windows and Macintosh
 
-You're in luck! On Windows platforms PyPatchMatch will install
-automatically on Windows systems with no extra intervention.
+You're in luck! On these platforms PyPatchMatch will install
+automatically with no extra intervention.
 
 ## Linux
 
-These instructions are for Debian versions of Linux, such as Ubuntu
-and Mint.
+A little work needs to be done to get PyPatchMatch running on Linux.
+These instructions are for Debian versions of Linux, including Ubuntu
+and Mint. Instructions for other Linux flavors are pending (and
+volunteers to write them are greatly welcomed!)
 
 Prior to installing PyPatchMatch, you need to take the following
 steps:
@@ -78,7 +80,3 @@ steps:
    ```
 
 If you see no errors, then you're ready to go!
-
-## Macintosh
-
-THIS NEEDS TO BE WRITTEN!
