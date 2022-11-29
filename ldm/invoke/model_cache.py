@@ -148,11 +148,11 @@ class ModelCache(object):
             else:
                 status = 'not loaded'
 
-            models.update(
-                name = {
+            models.update({
+                name: {
                     'status': status,
                     'description': description,
-                })
+                }})
 
         return models
 
