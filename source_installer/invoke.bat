@@ -12,10 +12,10 @@ echo 3. open the developer console
 set /P restore="Please enter 1, 2 or 3: "
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
-    python scripts\invoke.py
+    python scripts\invoke.py %*
 ) ELSE IF /I "%restore%" == "2" (
     echo Starting the InvokeAI browser-based UI..
-    python scripts\invoke.py --web
+    python scripts\invoke.py --web %*
 ) ELSE IF /I "%restore%" == "3" (
     echo Developer Console
     call where python
