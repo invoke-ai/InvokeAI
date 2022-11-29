@@ -17,9 +17,9 @@ streamlit
 taming-transformers-rom1504
 test-tube
 torch-fidelity
-torch==1.12.0 ; platform_system == 'Darwin'
+torch==1.12.1 ; platform_system == 'Darwin'
 torch==1.12.0+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
-torchvision==0.13.0 ; platform_system == 'Darwin'
+torchvision==0.13.1 ; platform_system == 'Darwin'
 torchvision==0.13.0+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
 transformers
 picklescan
