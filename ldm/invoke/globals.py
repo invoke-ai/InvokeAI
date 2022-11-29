@@ -5,7 +5,9 @@ otherwise have to be passed through long and complex call chains.
 It defines a Namespace object named "Globals" that contains
 the attributes:
 
-  - root    - the root directory under which "models" and "outputs" can be found
+  - root           - the root directory under which "models" and "outputs" can be found
+  - initfile       - path to the initialization file
+  - try_patchmatch - option to globally disable loading of 'patchmatch' module
 '''
 
 import os
