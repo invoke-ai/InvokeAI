@@ -178,6 +178,17 @@ export declare type ModelChangeResponse = {
   model_list: ModelList;
 };
 
+export declare type ModelAddedResponse = {
+  new_model_name: string;
+  model_list: ModelList;
+  update: boolean;
+};
+
+export declare type ModelDeletedResponse = {
+  deleted_model_name: string;
+  model_list: ModelList;
+};
+
 export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;
@@ -226,4 +237,15 @@ export declare type UploadImagePayload = {
 export declare type UploadOutpaintingMergeImagePayload = {
   dataURL: string;
   name: string;
+};
+
+export declare type InvokeModelConfigProps = {
+  name: string;
+  description: string;
+  config: string;
+  weights: string;
+  vae: string;
+  width: number;
+  height: number;
+  default: boolean;
 };

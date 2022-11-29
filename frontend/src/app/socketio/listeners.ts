@@ -346,6 +346,48 @@ const makeSocketIOListeners = (
         dispatch(setInfillMethod(data.infill_methods[0]));
       }
     },
+    onNewModelAdded: (data: InvokeAI.ModelAddedResponse) => {
+      const { new_model_name, model_list, update } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setIsProcessing(false));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model Added: ${new_model_name}`,
+          level: 'info',
+        })
+      );
+      dispatch(
+        addToast({
+          title: !update
+            ? `Model Added: ${new_model_name}`
+            : `Model Updated: ${new_model_name}`,
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    },
+    onModelDeleted: (data: InvokeAI.ModelDeletedResponse) => {
+      const { deleted_model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setIsProcessing(false));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model Added: ${deleted_model_name}`,
+          level: 'info',
+        })
+      );
+      dispatch(
+        addToast({
+          title: `Model Entry Deleted: ${deleted_model_name}`,
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    },
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
       dispatch(setModelList(model_list));

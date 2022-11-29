@@ -294,6 +294,54 @@ class InvokeAIWebServer:
             config["infill_methods"] = infill_methods
             socketio.emit("systemConfig", config)
 
+        @socketio.on("addNewModel")
+        def handle_add_model(new_model_config: dict):           
+            try: 
+                model_name = new_model_config['name']
+                del new_model_config['name']
+                model_attributes = new_model_config
+                update = False
+                current_model_list = self.generate.model_cache.list_models()
+                if model_name in current_model_list:
+                    update = True
+
+                print(f">> Adding New Model: {model_name}")
+
+                self.generate.model_cache.add_model(model_name=model_name, model_attributes=model_attributes, clobber=True)
+                self.generate.model_cache.commit(opt.conf)
+                
+                new_model_list = self.generate.model_cache.list_models()
+                socketio.emit(
+                        "newModelAdded",
+                        {"new_model_name": model_name, "model_list": new_model_list, 'update': update},
+                    )
+                print(f">> New Model Added: {model_name}")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
+        @socketio.on("deleteModel")
+        def handle_delete_model(model_name: str):
+            try:
+                print(f">> Deleting Model: {model_name}")
+                self.generate.model_cache.del_model(model_name)
+                self.generate.model_cache.commit(opt.conf)
+                updated_model_list = self.generate.model_cache.list_models()
+                socketio.emit(
+                        "modelDeleted",
+                        {"deleted_model_name": model_name, "model_list": updated_model_list},
+                    )                
+                print(f">> Model Deleted: {model_name}")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
         @socketio.on("requestModelChange")
         def handle_set_model(model_name: str):
             try:
