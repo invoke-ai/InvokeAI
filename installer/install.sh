@@ -192,10 +192,10 @@ echo -e "We're running under"
 _err_exit $? _err_msg
 
 _err_msg="\n----- pip update failed -----\n"
-.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location --upgrade pip wheel
+.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location --upgrade pip
 _err_exit $? _err_msg
 
-echo -e "\n***** Updated pip and wheel *****\n"
+echo -e "\n***** Updated pip *****\n"
 
 _err_msg="\n----- requirements file copy failed -----\n"
 cp installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt

@@ -121,10 +121,10 @@ echo We're running under
 if %errorlevel% neq 0 goto err_exit
 
 set err_msg=----- pip update failed -----
-.venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location --upgrade pip wheel
+.venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location --upgrade pip
 if %errorlevel% neq 0 goto err_exit
 
-echo ***** Updated pip and wheel *****
+echo ***** Updated pip *****
 
 set err_msg=----- requirements file copy failed -----
 copy installer\py3.10-windows-x86_64-cuda-reqs.txt requirements.txt
