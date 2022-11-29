@@ -187,8 +187,12 @@ class Args(object):
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
-            print(f'An exception has occurred: {e}')
-            return None
+            # this is a one-off right now; team should discuss a global flag for setting debug verbosity level
+            if os.getenv("INVOKEAI_DEBUG") is not None:
+                raise
+            else:
+                print(f'An exception has occurred: {e}.\nSet INVOKEAI_DEBUG=1 env variable for more detail')
+                return None
 
     def parse_cmd(self,cmd_string):
         '''Parse a invoke>-style command string '''
