@@ -167,6 +167,12 @@ const makeSocketIOEmitters = (
     emitRequestSystemConfig: () => {
       socketio.emit('requestSystemConfig');
     },
+    emitAddNewModel: (modelConfig: InvokeAI.InvokeModelConfigProps) => {
+      socketio.emit('addNewModel', modelConfig);
+    },
+    emitDeleteModel: (modelName: string) => {
+      socketio.emit('deleteModel', modelName);
+    },
     emitRequestModelChange: (modelName: string) => {
       dispatch(modelChangeRequested());
       socketio.emit('requestModelChange', modelName);

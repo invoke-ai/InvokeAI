@@ -7,13 +7,17 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  IconButton,
+  Flex,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { ModelStatus } from 'app/invokeai';
-import { requestModelChange } from 'app/socketio/actions';
+import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { SystemState } from 'features/system/store/systemSlice';
+import AddModel from './AddModel';
+import { DeleteIcon } from '@chakra-ui/icons';
 
 type ModelListItemProps = {
   name: string;
@@ -28,9 +32,15 @@ const ModelListItem = (props: ModelListItemProps) => {
 
   const dispatch = useAppDispatch();
   const { name, status, description } = props;
+
   const handleChangeModel = () => {
     dispatch(requestModelChange(name));
   };
+
+  const handleModelDelete = () => {
+    dispatch(deleteModel(name));
+  };
+
   return (
     <div className="model-list-item">
       <Tooltip label={description} hasArrow placement="bottom">
@@ -40,15 +50,24 @@ const ModelListItem = (props: ModelListItemProps) => {
       <div className={`model-list-item-status ${status.split(' ').join('-')}`}>
         {status}
       </div>
-      <div className="model-list-item-load-btn">
+      <Flex gap={2}>
         <Button
           size={'sm'}
           onClick={handleChangeModel}
           isDisabled={status === 'active' || isProcessing || !isConnected}
+          className="model-list-item-load-btn"
         >
           Load
         </Button>
-      </div>
+        <IconButton
+          icon={<DeleteIcon />}
+          size={'sm'}
+          aria-label="Delete Config"
+          onClick={handleModelDelete}
+          isDisabled={status === 'active' || isProcessing || !isConnected}
+          className="model-list-item-load-btn"
+        />
+      </Flex>
     </div>
   );
 };
@@ -78,10 +97,15 @@ const ModelList = () => {
       className="model-list-accordion"
       variant={'unstyled'}
     >
+      <div className="model-list-header">
+        <h2>Models</h2>
+        <AddModel />
+      </div>
+
       <AccordionItem>
         <AccordionButton>
           <div className="model-list-button">
-            <h2>Models</h2>
+            <h2>Available Models</h2>
             <AccordionIcon />
           </div>
         </AccordionButton>

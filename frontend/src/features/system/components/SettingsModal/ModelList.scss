@@ -18,7 +18,10 @@
 
 .model-list-accordion {
   outline: none;
-  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  row-gap: 1rem;
+  position: relative;
 
   button {
     padding: 0;
@@ -28,8 +31,23 @@
     }
   }
 
+  .model-list-header {
+    display: grid;
+    align-items: center;
+
+    h2 {
+      font-weight: bold;
+    }
+  }
+
   div {
     border: none;
+  }
+
+  .model-list-header {
+    display: flex;
+    justify-content: space-between;
+    column-gap: 1rem;
   }
 
   .model-list-button {
@@ -58,8 +76,6 @@
       justify-content: space-between;
       align-items: center;
 
-      .model-list-item-name {
-      }
       .model-list-item-description {
         font-size: 0.9rem;
       }
@@ -77,15 +93,13 @@
         }
       }
       .model-list-item-load-btn {
-        button {
-          padding: 0.5rem;
-          background-color: var(--btn-base-color);
-          color: var(--text-color);
-          border-radius: 0.2rem;
+        padding: 0.5rem;
+        background-color: var(--btn-base-color);
+        color: var(--text-color);
+        border-radius: 0.2rem;
 
-          &:hover {
-            background-color: var(--btn-base-color-hover);
-          }
+        &:hover {
+          background-color: var(--btn-base-color-hover);
         }
       }
     }
