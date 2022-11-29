@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=installer/py3.10-darwin-x86_64-cpu-reqs.txt installer/requirements.in
 #
---extra-index-url https://download.pytorch.org/whl/cu116
+--extra-index-url https://download.pytorch.org/whl/torch_stable.html
 --trusted-host https
 
 absl-py==1.3.0 \
@@ -987,6 +987,7 @@ numpy==1.23.4 \
     #   pandas
     #   pyarrow
     #   pydeck
+    #   pypatchmatch
     #   pytorch-lightning
     #   pywavelets
     #   qudida
@@ -1159,6 +1160,7 @@ pillow==9.3.0 \
     #   imageio
     #   k-diffusion
     #   matplotlib
+    #   pypatchmatch
     #   realesrgan
     #   scikit-image
     #   streamlit
@@ -1294,6 +1296,9 @@ pyparsing==3.0.9 \
     # via
     #   matplotlib
     #   packaging
+pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/129863937a8ab37f6bbcec327c994c0f932abdbc.zip \
+    --hash=sha256:4ad6ec95379e7d122d494ff76633cc7cf9b71330d5efda147fceba81e3dc6cd2
+    # via -r installer/requirements.in
 pyreadline3==3.4.1 \
     --hash=sha256:6f3d1f7b8a31ba32b73917cefc1f28cc660562f39aea8646d30bd6eff21f7bae \
     --hash=sha256:b0efb6516fd4fb07b45949053826a62fa4cb353db5be2bbb4a7aa1fdd1e345fb
