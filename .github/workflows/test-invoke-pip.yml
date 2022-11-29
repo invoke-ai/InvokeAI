@@ -1,16 +1,13 @@
 name: Test invoke.py pip
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - 'main'
+      - 'development'
+  pull_request:
 
 jobs:
   matrix:
-    # Run on:
-    # - pull requests
-    # - pushes to forks (will run in the forked project with that fork's secrets)
-    # - pushes to branches that are *not* pull requests
-    if: |
-      github.event_name == 'pull_request'
-      || github.repository != 'invoke-ai/InvokeAI'
-      || github.ref_protected
     strategy:
       matrix:
         stable-diffusion-model:
