@@ -1,5 +1,5 @@
 --prefer-binary
---extra-index-url https://download.pytorch.org/whl/cu116
+--extra-index-url https://download.pytorch.org/whl/torch_stable.html
 --trusted-host https://download.pytorch.org
 accelerate~=0.14
 albumentations
