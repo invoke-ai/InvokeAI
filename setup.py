@@ -19,7 +19,7 @@ def _get_requirements(path):
     return packages
 
 
-VERSION = '2.1.4'
+VERSION = '2.2.0'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
 LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, an'
