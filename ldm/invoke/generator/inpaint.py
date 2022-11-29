@@ -17,13 +17,19 @@ from ldm.models.diffusion.ddim     import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.invoke.generator.base import downsampling
 from ldm.util import debug_image
-from patchmatch import patch_match
-
+from ldm.invoke.globals import Globals
 
 infill_methods: list[str] = list()
 
-if patch_match.patchmatch_available:
-    infill_methods.append('patchmatch')
+if Globals.try_patchmatch:
+    from patchmatch import patch_match
+    if patch_match.patchmatch_available:
+        print('>> Patchmatch initialized')
+        infill_methods.append('patchmatch')
+    else:
+        print('>> Patchmatch not loaded, please see https://github.com/invoke-ai/InvokeAI/blob/patchmatch-install-docs/docs/installation/INSTALL_PATCHMATCH.md')
+else:
+    print('>> Patchmatch loading disabled')
 
 infill_methods.append('tile')
 

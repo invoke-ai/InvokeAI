@@ -7,6 +7,7 @@ The interface is through the Concepts() object.
 import os
 import re
 import traceback
+from typing import Callable
 from urllib import request, error as ul_error
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
 from ldm.invoke.globals import Globals
@@ -22,8 +23,8 @@ class Concepts(object):
         self.concepts_loaded = dict()
         self.triggers = dict()            # concept name to trigger phrase
         self.concept_names = dict()       # trigger phrase to concept name
-        self.match_trigger = re.compile('(<[\w\-]+>)')
-        self.match_concept = re.compile('<([\w\-]+)>')
+        self.match_trigger = re.compile('(<[\w\- >]+>)') # trigger is slightly less restrictive than HF concept name
+        self.match_concept = re.compile('<([\w\-]+)>') # HF concept name can only contain A-Za-z0-9_-
 
     def list_concepts(self)->list:
         '''
@@ -83,15 +84,27 @@ class Concepts(object):
         better to store the concept name (unique) than the concept trigger
         (not necessarily unique!)
         '''
+        triggers = self.match_trigger.findall(prompt)
+        if not triggers:
+            return prompt
+
         def do_replace(match)->str:
             return self.trigger_to_concept(match.group(1)) or f'<{match.group(1)}>'
         return self.match_trigger.sub(do_replace, prompt)
 
-    def replace_concepts_with_triggers(self, prompt:str)->str:
+    def replace_concepts_with_triggers(self, prompt:str, load_concepts_callback: Callable[[list], any])->str:
         '''
-        Given a prompt string that contains <concept_name> tags, replace
+        Given a prompt string that contains `<concept_name>` tags, replace
         these tags with the appropriate trigger.
+
+        If any `<concept_name>` tags are found, `load_concepts_callback()` is called with a list
+        of `concepts_name` strings.
         '''
+        concepts = self.match_concept.findall(prompt)
+        if not concepts:
+            return prompt
+        load_concepts_callback(concepts)
+
         def do_replace(match)->str:
             return self.concept_to_trigger(match.group(1)) or f'<{match.group(1)}>'
         return self.match_concept.sub(do_replace, prompt)

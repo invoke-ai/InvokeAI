@@ -44,8 +44,10 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
-    # alert - setting a global here
+    # alert - setting globals here
     Globals.root = os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or os.path.abspath('.'))
+    Globals.try_patchmatch = args.patchmatch
+    
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
@@ -306,7 +308,7 @@ def main_loop(gen, opt):
                     if use_prefix is not None:
                         prefix = use_prefix
                     postprocessed = upscaled if upscaled else operation=='postprocess'
-                    opt.prompt = triggers_to_concepts(gen, opt.prompt)  # to avoid the problem of non-unique concept triggers
+                    opt.prompt = gen.concept_lib().replace_triggers_with_concepts(opt.prompt)  # to avoid the problem of non-unique concept triggers
                     filename, formatted_dream_prompt = prepare_image_metadata(
                         opt,
                         prefix,
@@ -351,7 +353,7 @@ def main_loop(gen, opt):
 
             if operation == 'generate':
                 # load any <embeddings> from the SD concepts library
-                opt.prompt = concepts_to_triggers(gen, opt.prompt)
+                opt.prompt = gen.concept_lib().replace_concepts_with_triggers(opt.prompt, lambda concepts: gen.load_concepts(concepts))
                 catch_ctrl_c = infile is None # if running interactively, we catch keyboard interrupts
                 opt.last_operation='generate'
                 try:
@@ -501,19 +503,6 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         command = '-h'
     return command, operation
 
-def concepts_to_triggers(gen, prompt:str)->str:
-    concepts = re.findall('<([^>]+)>',prompt)
-    if not concepts:
-        return prompt
-    gen.load_concepts(concepts)
-    return gen.concept_lib().replace_concepts_with_triggers(prompt)
-
-def triggers_to_concepts(gen,prompt:str)->str:
-    concepts = re.findall('<([^>]+)>',prompt)
-    if not concepts:
-        return prompt
-    return gen.concept_lib().replace_triggers_with_concepts(prompt)
-        
 def set_default_output_dir(opt:Args, completer:Completer):
     '''
     If opt.outdir is relative, we add the root directory to it
