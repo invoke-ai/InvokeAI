@@ -1,13 +1,12 @@
 import { useAppDispatch } from 'app/store';
 import { useCallback } from 'react';
-import { setCursorPosition, setIsDrawing } from 'features/canvas/store/canvasSlice';
+import { mouseLeftCanvas } from 'features/canvas/store/canvasSlice';
 
 const useCanvasMouseOut = () => {
   const dispatch = useAppDispatch();
 
   return useCallback(() => {
-    dispatch(setCursorPosition(null));
-    dispatch(setIsDrawing(false));
+    dispatch(mouseLeftCanvas());
   }, [dispatch]);
 };
 

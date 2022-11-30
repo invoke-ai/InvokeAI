@@ -813,6 +813,13 @@ export const canvasSlice = createSlice({
       state.isMovingStage = false;
       state.isTransformingBoundingBox = false;
     },
+    mouseLeftCanvas: (state) => {
+      state.cursorPosition = null;
+      state.isDrawing = false;
+      state.isMouseOverBoundingBox = false;
+      state.isMovingBoundingBox = false;
+      state.isTransformingBoundingBox = false;
+    },
   },
 });
 
@@ -828,6 +835,7 @@ export const {
   commitStagingAreaImage,
   discardStagedImages,
   fitBoundingBoxToStage,
+  mouseLeftCanvas,
   nextStagingAreaImage,
   prevStagingAreaImage,
   redo,
