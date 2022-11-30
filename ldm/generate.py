@@ -1,48 +1,47 @@
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
-import pyparsing
 # Derived from source code carrying the following copyrights
 # Copyright (c) 2022 Machine Vision and Learning Group, LMU Munich
 # Copyright (c) 2022 Robin Rombach and Patrick Esser and contributors
 
-import torch
-import numpy as np
-import random
+import gc
 import os
-import time
+import random
 import re
 import sys
+import time
 import traceback
-import transformers
-import io
-import gc
-import hashlib
-import cv2
-import skimage
-from diffusers import DiffusionPipeline, DDIMScheduler, LMSDiscreteScheduler, EulerDiscreteScheduler, \
-    EulerAncestralDiscreteScheduler, PNDMScheduler, IPNDMScheduler
 
-from omegaconf import OmegaConf
-from ldm.invoke.generator.base import downsampling
+import cv2
+import numpy as np
+import skimage
+import torch
+import transformers
 from PIL import Image, ImageOps
-from torch import nn
+from diffusers.pipeline_utils import DiffusionPipeline
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler
+from diffusers.schedulers.scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
+from diffusers.schedulers.scheduling_euler_discrete import EulerDiscreteScheduler
+from diffusers.schedulers.scheduling_ipndm import IPNDMScheduler
+from diffusers.schedulers.scheduling_lms_discrete import LMSDiscreteScheduler
+from diffusers.schedulers.scheduling_pndm import PNDMScheduler
+from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything, logging
 
-from ldm.invoke.prompt_parser import PromptParser
-from ldm.util import instantiate_from_config
-from ldm.invoke.globals import Globals
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.plms import PLMSSampler
-from ldm.models.diffusion.ksampler import KSampler
-from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.args import metadata_from_png
-from ldm.invoke.image_util import InitImageResizer
-from ldm.invoke.devices import choose_torch_device, choose_precision
-from ldm.invoke.conditioning import get_uc_and_c_and_ec
-from ldm.invoke.model_cache import ModelCache
-from ldm.invoke.seamless import configure_model_padding
-from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
 from ldm.invoke.concepts_lib import Concepts
-    
+from ldm.invoke.conditioning import get_uc_and_c_and_ec
+from ldm.invoke.devices import choose_torch_device, choose_precision
+from ldm.invoke.globals import Globals
+from ldm.invoke.image_util import InitImageResizer
+from ldm.invoke.model_cache import ModelCache
+from ldm.invoke.pngwriter import PngWriter
+from ldm.invoke.seamless import configure_model_padding
+from ldm.invoke.txt2mask import Txt2Mask
+from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.ksampler import KSampler
+from ldm.models.diffusion.plms import PLMSSampler
+
+
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         def new_func(*args, **kw):
