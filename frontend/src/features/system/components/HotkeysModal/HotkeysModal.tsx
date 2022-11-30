@@ -176,7 +176,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: 'Fill Bounding Box',
       desc: 'Fills the bounding box with brush color',
-      hotkey: 'F',
+      hotkey: 'Shift + F',
     },
     {
       title: 'Erase Bounding Box',
