@@ -15,6 +15,8 @@ class DDIMSampler(Sampler):
     def prepare_to_sample(self, t_enc, **kwargs):
         super().prepare_to_sample(t_enc, **kwargs)
 
+        # SD2.0 :(
+        """
         extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
         all_timesteps_count = kwargs.get('all_timesteps_count', t_enc)
 
@@ -22,6 +24,7 @@ class DDIMSampler(Sampler):
             self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = all_timesteps_count)
         else:
             self.invokeai_diffuser.remove_cross_attention_control()
+        """
 
 
     # This is the central routine
@@ -55,17 +58,25 @@ class DDIMSampler(Sampler):
         else:
             # step_index counts in the opposite direction to index
             step_index = step_count-(index+1)
-            e_t = self.invokeai_diffuser.do_diffusion_step(
+            model_output = self.invokeai_diffuser.do_diffusion_step(
                 x, t,
                 unconditional_conditioning, c,
                 unconditional_guidance_scale,
                 step_index=step_index
             )
+
+        if self.model.parameterization == 'v':
+            e_t = self.model.predict_eps_from_z_and_v(x, t, model_output)
+        else:
+            e_t = model_output
+
         if score_corrector is not None:
             assert self.model.parameterization == 'eps'
             e_t = score_corrector.modify_score(
                 self.model, e_t, x, t, c, **corrector_kwargs
             )
+
+
 
         alphas = (
             self.model.alphas_cumprod
@@ -96,7 +107,11 @@ class DDIMSampler(Sampler):
         )
 
         # current prediction for x_0
-        pred_x0 = (x - sqrt_one_minus_at * e_t) / a_t.sqrt()
+        if self.model.parameterization != "v":
+            pred_x0 = (x - sqrt_one_minus_at * e_t) / a_t.sqrt()
+        else:
+            pred_x0 = self.model.predict_start_from_z_and_v(x, t, model_output)
+
         if quantize_denoised:
             pred_x0, _, *_ = self.model.first_stage_model.quantize(pred_x0)
         # direction pointing to x_t

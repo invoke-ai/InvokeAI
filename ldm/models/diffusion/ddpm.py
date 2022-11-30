@@ -104,6 +104,7 @@ class DDPM(pl.LightningModule):
         assert parameterization in [
             'eps',
             'x0',
+            'v',
         ], 'currently only supporting "eps" and "x0"'
         self.parameterization = parameterization
         print(
@@ -258,6 +259,9 @@ class DDPM(pl.LightningModule):
                 * np.sqrt(torch.Tensor(alphas_cumprod))
                 / (2.0 * 1 - torch.Tensor(alphas_cumprod))
             )
+        elif self.parameterization == "v":
+            lvlb_weights = torch.ones_like(self.betas ** 2 / (
+                    2 * self.posterior_variance * to_torch(alphas) * (1 - self.alphas_cumprod)))
         else:
             raise NotImplementedError('mu not supported')
         # TODO how to choose this term
@@ -357,6 +361,9 @@ class DDPM(pl.LightningModule):
             x_recon = self.predict_start_from_noise(x, t=t, noise=model_out)
         elif self.parameterization == 'x0':
             x_recon = model_out
+        elif self.parameterization == 'v': ## this was just copied from above... needs serious attention
+            x_recon = model_out 
+        
         if clip_denoised:
             x_recon.clamp_(-1.0, 1.0)
 
@@ -365,7 +372,21 @@ class DDPM(pl.LightningModule):
             posterior_variance,
             posterior_log_variance,
         ) = self.q_posterior(x_start=x_recon, x_t=x, t=t)
-        return model_mean, posterior_variance, posterior_log_variance
+        return model_mean, posterior_variance, posterior_log_varianc
+
+    def predict_start_from_z_and_v(self, x_t, t, v):
+        # self.register_buffer('sqrt_alphas_cumprod', to_torch(np.sqrt(alphas_cumprod)))
+        # self.register_buffer('sqrt_one_minus_alphas_cumprod', to_torch(np.sqrt(1. - alphas_cumprod)))
+        return (
+                extract_into_tensor(self.sqrt_alphas_cumprod, t, x_t.shape) * x_t -
+                extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_t.shape) * v
+        )
+
+    def predict_eps_from_z_and_v(self, x_t, t, v):
+        return (
+                extract_into_tensor(self.sqrt_alphas_cumprod, t, x_t.shape) * v +
+                extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_t.shape) * x_t
+        )
 
     @torch.no_grad()
     def p_sample(self, x, t, clip_denoised=True, repeat_noise=False):
@@ -453,6 +474,8 @@ class DDPM(pl.LightningModule):
             target = noise
         elif self.parameterization == 'x0':
             target = x_start
+        elif self.parameterization == "v":
+            target = self.get_v(x_start, noise, t)
         else:
             raise NotImplementedError(
                 f'Paramterization {self.parameterization} not yet supported'
@@ -675,6 +698,9 @@ class LatentDiffusion(DDPM):
         for param in self.model.parameters():
             param.requires_grad = False
 
+        # v2- disable unsupported embedding_manager
+        self.embedding_manager = None
+        """
         self.embedding_manager = self.instantiate_embedding_manager(
             personalization_config, self.cond_stage_model
         )
@@ -686,6 +712,8 @@ class LatentDiffusion(DDPM):
 
         for param in self.embedding_manager.embedding_parameters():
             param.requires_grad = True
+        """
+
 
     def make_cond_schedule(
         self,
@@ -827,7 +855,10 @@ class LatentDiffusion(DDPM):
                 self.cond_stage_model.encode
             ):
                 c = self.cond_stage_model.encode(
-                    c, embedding_manager=self.embedding_manager,**kwargs
+                    c,
+                    # disabled for sd2
+                    #embedding_manager=self.embedding_manager,
+                    **kwargs
                 )
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()
@@ -1482,6 +1513,8 @@ class LatentDiffusion(DDPM):
             target = x_start
         elif self.parameterization == 'eps':
             target = noise
+        elif self.parameterization == "v":
+            target = self.get_v(x_start, noise, t)
         else:
             raise NotImplementedError()
 

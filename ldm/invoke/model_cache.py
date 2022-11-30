@@ -182,6 +182,7 @@ class ModelCache(object):
         omega = self.config
         for field in ('description','weights','height','width','config'):
             assert field in model_attributes, f'required field {field} is missing'
+        omega = self.config
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
 
         config = omega[model_name] if model_name in omega else {}
@@ -224,7 +225,7 @@ class ModelCache(object):
         omega_config = OmegaConf.load(config)
         with open(weights,'rb') as f:
             weight_bytes = f.read()
-        model_hash  = self._cached_sha256(weights,weight_bytes)
+        model_hash = self._cached_sha256(weights,weight_bytes)
         sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
         del weight_bytes
         sd = sd['state_dict']
