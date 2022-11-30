@@ -2,7 +2,7 @@
 title: The NSFW Checker
 ---
 
-# :material-file-document: NSFW Checker
+# :material-image-off: NSFW Checker
 
 ## The NSFW ("Safety") Checker
 
