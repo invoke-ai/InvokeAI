@@ -116,7 +116,8 @@ const DeleteImageModal = forwardRef(
               <AlertDialogBody>
                 <Flex direction={'column'} gap={5}>
                   <Text>
-                    Are you sure? You can't undo this action afterwards.
+                    Are you sure? Deleted images will be sent to the Bin. You
+                    can restore from there if you wish to.
                   </Text>
                   <FormControl>
                     <Flex alignItems={'center'}>

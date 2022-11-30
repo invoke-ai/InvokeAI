@@ -166,7 +166,7 @@ export default function ImageGallery() {
       dispatch(selectPrevImage());
     },
     {
-      enabled: !isStaging,
+      enabled: !isStaging || activeTabName !== 'unifiedCanvas',
     },
     [isStaging]
   );
@@ -177,7 +177,7 @@ export default function ImageGallery() {
       dispatch(selectNextImage());
     },
     {
-      enabled: !isStaging,
+      enabled: !isStaging || activeTabName !== 'unifiedCanvas',
     },
     [isStaging]
   );

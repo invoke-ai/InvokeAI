@@ -81,8 +81,7 @@ export const frontendToBackendParameters = (
 
   const generationParameters: { [k: string]: any } = {
     prompt,
-    iterations:
-      shouldRandomizeSeed || shouldGenerateVariations ? iterations : 1,
+    iterations,
     steps,
     cfg_scale: cfgScale,
     threshold,
@@ -98,6 +97,9 @@ export const frontendToBackendParameters = (
     init_mask: '',
   };
 
+  let esrganParameters: false | { [k: string]: any } = false;
+  let facetoolParameters: false | { [k: string]: any } = false;
+
   generationParameters.seed = shouldRandomizeSeed
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
     : seed;
@@ -106,6 +108,23 @@ export const frontendToBackendParameters = (
   if (['txt2img', 'img2img'].includes(generationMode)) {
     generationParameters.seamless = seamless;
     generationParameters.hires_fix = hiresFix;
+
+    if (shouldRunESRGAN) {
+      esrganParameters = {
+        level: upscalingLevel,
+        strength: upscalingStrength,
+      };
+    }
+
+    if (shouldRunFacetool) {
+      facetoolParameters = {
+        type: facetoolType,
+        strength: facetoolStrength,
+      };
+      if (facetoolType === 'codeformer') {
+        facetoolParameters.codeformer_fidelity = codeformerFidelity;
+      }
+    }
   }
 
   // img2img exclusive parameters
@@ -207,26 +226,6 @@ export const frontendToBackendParameters = (
     }
   } else {
     generationParameters.variation_amount = 0;
-  }
-
-  let esrganParameters: false | { [k: string]: any } = false;
-  let facetoolParameters: false | { [k: string]: any } = false;
-
-  if (shouldRunESRGAN) {
-    esrganParameters = {
-      level: upscalingLevel,
-      strength: upscalingStrength,
-    };
-  }
-
-  if (shouldRunFacetool) {
-    facetoolParameters = {
-      type: facetoolType,
-      strength: facetoolStrength,
-    };
-    if (facetoolType === 'codeformer') {
-      facetoolParameters.codeformer_fidelity = codeformerFidelity;
-    }
   }
 
   if (enableImageDebugging) {

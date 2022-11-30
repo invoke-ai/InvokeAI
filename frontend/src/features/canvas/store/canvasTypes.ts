@@ -1,5 +1,5 @@
 import * as InvokeAI from 'app/invokeai';
-import { Vector2d } from 'konva/lib/types';
+import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
 
 export const LAYER_NAMES_DICT = [
@@ -30,13 +30,6 @@ export type Dimensions = {
   height: number;
 };
 
-export type CanvasAnyLine = {
-  kind: 'line';
-  tool: CanvasDrawingTool;
-  strokeWidth: number;
-  points: number[];
-};
-
 export type CanvasImage = {
   kind: 'image';
   layer: 'base';
@@ -47,24 +40,54 @@ export type CanvasImage = {
   image: InvokeAI.Image;
 };
 
-export type CanvasMaskLine = CanvasAnyLine & {
+export type CanvasMaskLine = {
   layer: 'mask';
+  kind: 'line';
+  tool: CanvasDrawingTool;
+  strokeWidth: number;
+  points: number[];
+  clip?: IRect;
 };
 
-export type CanvasLine = CanvasAnyLine & {
+export type CanvasBaseLine = {
   layer: 'base';
   color?: RgbaColor;
+  kind: 'line';
+  tool: CanvasDrawingTool;
+  strokeWidth: number;
+  points: number[];
+  clip?: IRect;
 };
 
-export type CanvasObject = CanvasImage | CanvasLine | CanvasMaskLine;
+export type CanvasFillRect = {
+  kind: 'fillRect';
+  layer: 'base';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: RgbaColor;
+};
+
+export type CanvasEraseRect = {
+  kind: 'eraseRect';
+  layer: 'base';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type CanvasObject =
+  | CanvasImage
+  | CanvasBaseLine
+  | CanvasMaskLine
+  | CanvasFillRect
+  | CanvasEraseRect;
 
 export type CanvasLayerState = {
   objects: CanvasObject[];
   stagingArea: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
     images: CanvasImage[];
     selectedImageIndex: number;
   };
@@ -74,15 +97,21 @@ export type CanvasLayerState = {
 export const isCanvasMaskLine = (obj: CanvasObject): obj is CanvasMaskLine =>
   obj.kind === 'line' && obj.layer === 'mask';
 
-export const isCanvasBaseLine = (obj: CanvasObject): obj is CanvasLine =>
+export const isCanvasBaseLine = (obj: CanvasObject): obj is CanvasBaseLine =>
   obj.kind === 'line' && obj.layer === 'base';
 
 export const isCanvasBaseImage = (obj: CanvasObject): obj is CanvasImage =>
   obj.kind === 'image' && obj.layer === 'base';
 
+export const isCanvasFillRect = (obj: CanvasObject): obj is CanvasFillRect =>
+  obj.kind === 'fillRect' && obj.layer === 'base';
+
+export const isCanvasEraseRect = (obj: CanvasObject): obj is CanvasEraseRect =>
+  obj.kind === 'eraseRect' && obj.layer === 'base';
+
 export const isCanvasAnyLine = (
   obj: CanvasObject
-): obj is CanvasMaskLine | CanvasLine => obj.kind === 'line';
+): obj is CanvasMaskLine | CanvasBaseLine => obj.kind === 'line';
 
 export interface CanvasState {
   boundingBoxCoordinates: Vector2d;
@@ -119,6 +148,7 @@ export interface CanvasState {
   shouldDarkenOutsideBoundingBox: boolean;
   shouldLockBoundingBox: boolean;
   shouldPreserveMaskedArea: boolean;
+  shouldRestrictStrokesToBox: boolean;
   shouldShowBoundingBox: boolean;
   shouldShowBrush: boolean;
   shouldShowBrushPreview: boolean;

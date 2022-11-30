@@ -1,6 +1,8 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import {
+  addEraseRect,
+  addFillRect,
   setBrushColor,
   setBrushSize,
   setTool,
@@ -11,7 +13,9 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import {
   FaEraser,
   FaEyeDropper,
+  FaFillDrip,
   FaPaintBrush,
+  FaPlus,
   FaSlidersH,
 } from 'react-icons/fa';
 import {
@@ -55,7 +59,7 @@ const IAICanvasToolChooserOptions = () => {
       handleSelectBrushTool();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     []
@@ -67,7 +71,7 @@ const IAICanvasToolChooserOptions = () => {
       handleSelectEraserTool();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [tool]
@@ -79,10 +83,32 @@ const IAICanvasToolChooserOptions = () => {
       handleSelectColorPickerTool();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [tool]
+  );
+
+  useHotkeys(
+    ['shift+f'],
+    () => {
+      handleFillRect();
+    },
+    {
+      enabled: () => !isStaging,
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys(
+    ['delete', 'backspace'],
+    () => {
+      handleEraseBoundingBox();
+    },
+    {
+      enabled: () => !isStaging,
+      preventDefault: true,
+    }
   );
 
   useHotkeys(
@@ -91,7 +117,7 @@ const IAICanvasToolChooserOptions = () => {
       dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushSize]
@@ -103,7 +129,7 @@ const IAICanvasToolChooserOptions = () => {
       dispatch(setBrushSize(Math.min(brushSize + 5, 500)));
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushSize]
@@ -120,7 +146,7 @@ const IAICanvasToolChooserOptions = () => {
       );
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushColor]
@@ -137,7 +163,7 @@ const IAICanvasToolChooserOptions = () => {
       );
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushColor]
@@ -146,6 +172,8 @@ const IAICanvasToolChooserOptions = () => {
   const handleSelectBrushTool = () => dispatch(setTool('brush'));
   const handleSelectEraserTool = () => dispatch(setTool('eraser'));
   const handleSelectColorPickerTool = () => dispatch(setTool('colorPicker'));
+  const handleFillRect = () => dispatch(addFillRect());
+  const handleEraseBoundingBox = () => dispatch(addEraseRect());
 
   return (
     <ButtonGroup isAttached>
@@ -164,6 +192,20 @@ const IAICanvasToolChooserOptions = () => {
         data-selected={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
+      />
+      <IAIIconButton
+        aria-label="Fill Bounding Box (Shift+F)"
+        tooltip="Fill Bounding Box (Shift+F)"
+        icon={<FaFillDrip />}
+        isDisabled={isStaging}
+        onClick={handleFillRect}
+      />
+      <IAIIconButton
+        aria-label="Erase Bounding Box Area (Delete/Backspace)"
+        tooltip="Erase Bounding Box Area (Delete/Backspace)"
+        icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
+        isDisabled={isStaging}
+        onClick={handleEraseBoundingBox}
       />
       <IAIIconButton
         aria-label="Color Picker (C)"

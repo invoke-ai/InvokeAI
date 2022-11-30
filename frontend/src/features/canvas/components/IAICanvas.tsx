@@ -18,7 +18,6 @@ import useCanvasWheel from '../hooks/useCanvasZoom';
 import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
 import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
 import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
-import useCanvasMouseEnter from '../hooks/useCanvasMouseEnter';
 import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
 import useCanvasDragMove from '../hooks/useCanvasDragMove';
 import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
@@ -31,6 +30,8 @@ import {
   setCanvasBaseLayer,
   setCanvasStage,
 } from '../util/konvaInstanceProvider';
+import { KonvaEventObject } from 'konva/lib/Node';
+import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -48,9 +49,10 @@ const selector = createSelector(
       isMovingStage,
       shouldShowIntermediates,
       shouldShowGrid,
+      shouldRestrictStrokesToBox,
     } = canvas;
 
-    let stageCursor: string | undefined = '';
+    let stageCursor: string | undefined = 'none';
 
     if (tool === 'move' || isStaging) {
       if (isMovingStage) {
@@ -60,10 +62,8 @@ const selector = createSelector(
       }
     } else if (isTransformingBoundingBox) {
       stageCursor = undefined;
-    } else if (isMouseOverBoundingBox) {
-      stageCursor = 'move';
-    } else {
-      stageCursor = 'none';
+    } else if (shouldRestrictStrokesToBox && !isMouseOverBoundingBox) {
+      stageCursor = 'default';
     }
 
     return {
@@ -129,7 +129,6 @@ const IAICanvas = () => {
     didMouseMoveRef,
     lastCursorPositionRef
   );
-  const handleMouseEnter = useCanvasMouseEnter(stageRef);
   const handleMouseOut = useCanvasMouseOut();
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
@@ -153,16 +152,16 @@ const IAICanvas = () => {
           onTouchMove={handleMouseMove}
           onTouchEnd={handleMouseUp}
           onMouseDown={handleMouseDown}
-          onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseOut}
           onMouseMove={handleMouseMove}
-          onMouseOut={handleMouseOut}
           onMouseUp={handleMouseUp}
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
+          onContextMenu={(e: KonvaEventObject<MouseEvent>) =>
+            e.evt.preventDefault()
+          }
           onWheel={handleWheel}
-          listening={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
           <Layer id={'grid'} visible={shouldShowGrid}>
@@ -180,6 +179,9 @@ const IAICanvas = () => {
           <Layer id={'mask'} visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
+          </Layer>
+          <Layer>
+            <IAICanvasBoundingBoxOverlay />
           </Layer>
           <Layer id="preview" imageSmoothingEnabled={false}>
             {!isStaging && (
