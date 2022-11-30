@@ -106,6 +106,10 @@ jobs:
         run: |
           python scripts/configure_invokeai.py --no-interactive --yes
 
+      - name: cat ~/.invokeai
+        id: cat-invokeai
+        run: cat ~/.invokeai
+
       - name: Run the tests
         id: run-tests
         run: |
