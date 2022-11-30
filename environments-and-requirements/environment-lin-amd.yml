@@ -4,7 +4,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python>=3.9
+  - python=3.9.*
   - pip=22.2.2
   - numpy=1.23.3
   - pip:
@@ -23,6 +23,7 @@ dependencies:
     - kornia==0.6.0
     - omegaconf==2.2.3
     - opencv-python==4.5.5.64
+    - picklescan
     - pillow==9.2.0
     - pudb==2019.2
     - pyreadline3
@@ -32,6 +33,7 @@ dependencies:
     - streamlit==1.12.0
     - taming-transformers-rom1504
     - test-tube>=0.7.5
+    - tqdm
     - torch
     - torch-fidelity==0.3.0
     - torchaudio
@@ -39,7 +41,8 @@ dependencies:
     - torchvision
     - transformers==4.21.3
     - git+https://github.com/openai/CLIP.git@main#egg=clip
-    - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
+    - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
     - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-    - git+https://github.com/invoke-ai/GFPGAN#egg=gfpgan
+    - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
+    - -e git+https://github.com/invoke-ai/PyPatchMatch@0.1.4#egg=pypatchmatch
     - -e .

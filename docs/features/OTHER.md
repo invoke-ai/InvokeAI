@@ -133,29 +133,6 @@ outputs = g.txt2img("a unicorn in manhattan")
 
 Outputs is a list of lists in the format [filename1,seed1],[filename2,seed2]...].
 
-Please see ldm/generate.py for more information. A set of example scripts is coming RSN.
+Please see the documentation in ldm/generate.py for more information.
 
 ---
-
-## **Preload Models**
-
-In situations where you have limited internet connectivity or are blocked behind a firewall, you can
-use the preload script to preload the required files for Stable Diffusion to run.
-
-The preload script `scripts/preload_models.py` needs to be run once at least while connected to the
-internet. In the following runs, it will load up the cached versions of the required files from the
-`.cache` directory of the system.
-
-```bash
-(invokeai) ~/stable-diffusion$ python3 ./scripts/preload_models.py
-preloading bert tokenizer...
-Downloading: 100%|██████████████████████████████████| 28.0/28.0 [00:00<00:00, 49.3kB/s]
-Downloading: 100%|██████████████████████████████████| 226k/226k [00:00<00:00, 2.79MB/s]
-Downloading: 100%|██████████████████████████████████| 455k/455k [00:00<00:00, 4.36MB/s]
-Downloading: 100%|██████████████████████████████████| 570/570 [00:00<00:00, 477kB/s]
-...success
-preloading kornia requirements...
-Downloading: "https://github.com/DagnyT/hardnet/raw/master/pretrained/train_liberty_with_aug/checkpoint_liberty_with_aug.pth" to /u/lstein/.cache/torch/hub/checkpoints/checkpoint_liberty_with_aug.pth
-100%|███████████████████████████████████████████████| 5.10M/5.10M [00:00<00:00, 101MB/s]
-...success
-```

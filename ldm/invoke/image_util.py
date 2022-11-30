@@ -31,10 +31,10 @@ class InitImageResizer():
         elif not width:            # width missing
             width  = int(height*ar)
 
-        # rw and rh are the resizing width and height for the image
-        # they maintain the aspect ratio, but may not completelyl fill up
-        # the requested destination size
-        (rw,rh) = (width,int(width/ar)) if im.width>=im.height else (int(height*ar),height)
+        w_scale = width/im.width
+        h_scale = height/im.height
+        scale = min(w_scale,h_scale)
+        (rw,rh) = (int(scale*im.width),int(scale*im.height))
 
         #round everything to multiples of 64
         width,height,rw,rh = map(

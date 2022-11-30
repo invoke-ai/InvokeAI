@@ -1,8 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
-import { GalleryCategory } from '../../features/gallery/gallerySlice';
-import { InvokeTabName } from '../../features/tabs/InvokeTabs';
-import * as InvokeAI from '../invokeai';
-
+import { GalleryCategory } from 'features/gallery/store/gallerySlice';
+import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import * as InvokeAI from 'app/invokeai';
 
 /**
  * We can't use redux-toolkit's createSlice() to make these actions,
@@ -26,8 +25,6 @@ export const requestNewImages = createAction<GalleryCategory>(
 export const cancelProcessing = createAction<undefined>(
   'socketio/cancelProcessing'
 );
-export const uploadImage = createAction<InvokeAI.UploadImagePayload>('socketio/uploadImage');
-export const uploadMaskImage = createAction<File>('socketio/uploadMaskImage');
 
 export const requestSystemConfig = createAction<undefined>(
   'socketio/requestSystemConfig'
@@ -35,4 +32,12 @@ export const requestSystemConfig = createAction<undefined>(
 
 export const requestModelChange = createAction<string>(
   'socketio/requestModelChange'
+);
+
+export const saveStagingAreaImageToGallery = createAction<string>(
+  'socketio/saveStagingAreaImageToGallery'
+);
+
+export const emptyTempFolder = createAction<undefined>(
+  'socketio/requestEmptyTempFolder'
 );

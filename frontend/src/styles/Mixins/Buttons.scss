@@ -1,6 +1,6 @@
 @mixin Button(
-  $btn-color: rgb(45, 45, 55),
-  $btn-color-hover: rgb(65, 65, 75),
+  $btn-color: rgb(45, 49, 53),
+  $btn-color-hover: rgb(65, 69, 73),
   $btn-width: 100%,
   $btn-height: 100%,
   $icon-size: 20px
@@ -10,13 +10,13 @@
   background-color: $btn-color !important;
 
   &:hover {
-    background-color: $btn-color-hover !important;
+    background-color: $btn-color-hover;
   }
 
   &:disabled {
-    background-color: rgb(45, 45, 55) !important;
+    background-color: var(--btn-base-color);
     &:hover {
-      background-color: rgb(45, 45, 55) !important;
+      background-color: var(--btn-base-color);
     }
   }
 
@@ -24,5 +24,17 @@
     width: $icon-size;
     height: $icon-size;
     color: var(--btn-svg-color);
+  }
+}
+
+@mixin BaseButton {
+  background-color: var(--btn-base-color);
+  &:hover {
+    background-color: var(--btn-base-color-hover);
+  }
+  &:disabled {
+    &:hover {
+      background-color: var(--btn-base-color);
+    }
   }
 }

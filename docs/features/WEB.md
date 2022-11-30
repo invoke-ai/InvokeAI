@@ -303,6 +303,8 @@ The WebGUI is only rapid development. Check back regularly for updates!
 | `--cors [CORS ...]`                     | Additional allowed origins, comma-separated                                                                                                |
 | `--host HOST`                           | Web server: Host or IP to listen on. Set to 0.0.0.0 to accept traffic from other devices on your network.                                  |
 | `--port PORT`                           | Web server: Port to listen on                                                                                                              |
+| `--certfile CERTFILE`                   | Web server: Path to certificate file to use for SSL. Use together with --keyfile                                                           |
+| `--keyfile KEYFILE`                     | Web server: Path to private key file to use for SSL. Use together with --certfile'                                                         |
 | `--gui`                                 | Start InvokeAI GUI - This is the "desktop mode" version of the web app. It uses Flask to create a desktop app experience of the webserver. |
 
 ### Web Specific Features

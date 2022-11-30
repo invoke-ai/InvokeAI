@@ -1,3 +1,8 @@
 .invokeai__button {
-  justify-content: space-between;
+  background-color: var(--btn-base-color);
+  place-content: center;
+
+  &:hover {
+    background-color: var(--btn-base-color-hover);
+  }
 }

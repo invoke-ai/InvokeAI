@@ -27,6 +27,7 @@ from pytorch_lightning import seed_everything, logging
 
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.util import instantiate_from_config
+from ldm.invoke.globals import Globals
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.models.diffusion.ksampler import KSampler
@@ -38,6 +39,7 @@ from ldm.invoke.conditioning import get_uc_and_c_and_ec
 from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
+from ldm.invoke.concepts_lib import Concepts
     
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -118,7 +120,7 @@ gr = Generate(
           safety_checker:bool = activate safety checker [False]
 
           # this value is sticky and maintained between generation calls
-          sampler_name:str  = ['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms']  // k_lms
+          sampler_name:str  = ['ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_dpmpp_2', 'k_dpmpp_2_a', 'k_euler_a', 'k_euler', 'k_heun', 'k_lms', 'plms']  // k_lms
 
           # these are deprecated - use conf and model instead
           weights     = path to model weights ('models/ldm/stable-diffusion-v1/model.ckpt')
@@ -220,8 +222,15 @@ class Generate:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
-                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id, local_files_only=True)
-                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id, local_files_only=True)
+                safety_model_path = os.path.join(Globals.root,'models',safety_model_id)
+                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id,
+                                                                                   local_files_only=True,
+                                                                                   cache_dir=safety_model_path,
+                )
+                self.safety_feature_extractor = AutoFeatureExtractor.from_pretrained(safety_model_id,
+                                                                                     local_files_only=True,
+                                                                                     cache_dir=safety_model_path,
+                )
                 self.safety_checker.to(self.device)
             except Exception:
                 print('** An error was encountered while installing the safety checker:')
@@ -254,6 +263,8 @@ class Generate:
             'init_img' in kwargs
         ), 'call to img2img() must include the init_img argument'
         return self.prompt2png(prompt, outdir, **kwargs)
+
+    from ldm.invoke.generator.inpaint import infill_methods
 
     def prompt2image(
             self,
@@ -288,8 +299,9 @@ class Generate:
             strength         = None,
             init_color       = None,
             # these are specific to embiggen (which also relies on img2img args)
-            embiggen       =    None,
-            embiggen_tiles =    None,
+            embiggen          = None,
+            embiggen_tiles    = None,
+            embiggen_strength = None,
             # these are specific to GFPGAN/ESRGAN
             gfpgan_strength=    0,
             facetool         = None,
@@ -314,7 +326,10 @@ class Generate:
             seam_strength: float = 0.7,
             seam_steps: int  = 10,
             tile_size: int   = 32,
+            infill_method = infill_methods[0], # The infill method to use
             force_outpaint: bool = False,
+            enable_image_debugging = False,
+            
             **args,
     ):   # eat up additional cruft
         """
@@ -344,6 +359,7 @@ class Generate:
            perlin                          // optional 0-1 value to add a percentage of perlin noise to the initial noise
            embiggen                        // scale factor relative to the size of the --init_img (-I), followed by ESRGAN upscaling strength (0-1.0), followed by minimum amount of overlap between tiles as a decimal ratio (0 - 1.0) or number of pixels
            embiggen_tiles                  // list of tiles by number in order to process and replace onto the image e.g. `0 2 4`
+           embiggen_strength               // strength for embiggen. 0.0 preserves image exactly, 1.0 replaces it completely
 
         To use the step callback, define a function that receives two arguments:
         - Image GPU data
@@ -420,6 +436,9 @@ class Generate:
             self.sampler_name = sampler_name
             self._set_sampler()
 
+        # apply the concepts library to the prompt
+        prompt = self.concept_lib().replace_concepts_with_triggers(prompt, lambda concepts: self.load_concepts(concepts))
+
         # bit of a hack to change the cached sampler's karras threshold to
         # whatever the user asked for
         if karras_max is not None and isinstance(self.sampler,KSampler):
@@ -452,7 +471,7 @@ class Generate:
             )
 
             # TODO: Hacky selection of operation to perform. Needs to be refactored.
-            generator = self.select_generator(init_image, mask_image, embiggen, hires_fix)
+            generator = self.select_generator(init_image, mask_image, embiggen, hires_fix, force_outpaint)
 
             generator.set_variation(
                 self.seed, variation_amount, with_variations
@@ -485,6 +504,7 @@ class Generate:
                 perlin=perlin,
                 embiggen=embiggen,
                 embiggen_tiles=embiggen_tiles,
+                embiggen_strength=embiggen_strength,
                 inpaint_replace=inpaint_replace,
                 mask_blur_radius=mask_blur_radius,
                 safety_checker=checker,
@@ -493,9 +513,11 @@ class Generate:
                 seam_strength = seam_strength,
                 seam_steps = seam_steps,
                 tile_size = tile_size,
+                infill_method = infill_method,
                 force_outpaint = force_outpaint,
-                inpaint_width  = inpaint_width,
-                inpaint_height = inpaint_height
+                inpaint_height = inpaint_height,
+                inpaint_width = inpaint_width,
+                enable_image_debugging = enable_image_debugging,
             )
 
             if init_color:
@@ -633,7 +655,7 @@ class Generate:
         elif tool == 'embiggen':
             # fetch the metadata from the image
             generator = self.select_generator(embiggen=True)
-            opt.strength  = 0.40
+            opt.strength = opt.embiggen_strength or 0.40
             print(f'>> Setting img2img strength to {opt.strength} for happy embiggening')
             generator.generate(
                 prompt,
@@ -649,6 +671,7 @@ class Generate:
                 height      = opt.height,
                 embiggen    = opt.embiggen,
                 embiggen_tiles = opt.embiggen_tiles,
+                embiggen_strength = opt.embiggen_strength,
                 image_callback = callback,
             )
         elif tool == 'outpaint':
@@ -820,6 +843,7 @@ class Generate:
         model_data = cache.get_model(model_name)
         if model_data is None:  # restore previous
             model_data = cache.get_model(self.model_name)
+            model_name = self.model_name # addresses Issue #1547
 
         self.model = model_data['model']
         self.width = model_data['width']
@@ -838,6 +862,12 @@ class Generate:
         self._set_sampler()
         self.model_name = model_name
         return self.model
+
+    def load_concepts(self,concepts:list[str]):
+        self.model.embedding_manager.load_concepts(concepts, self.precision=='float32' or self.precision=='autocast')
+
+    def concept_lib(self)->Concepts:
+        return self.model.embedding_manager.concepts_library
 
     def correct_colors(self,
                        image_list,
@@ -909,7 +939,7 @@ class Generate:
                 r[0] = image
 
     def apply_textmask(self, image_path:str, prompt:str, callback, threshold:float=0.5):
-        assert os.path.exists(image_path), '** "{image_path}" not found. Please enter the name of an existing image file to mask **'
+        assert os.path.exists(image_path), f'** "{image_path}" not found. Please enter the name of an existing image file to mask **'
         basename,_ = os.path.splitext(os.path.basename(image_path))
         if self.txt2mask is None:
             self.txt2mask  = Txt2Mask(device = self.device, refined=True)
@@ -944,6 +974,10 @@ class Generate:
             self.sampler = KSampler(self.model, 'dpm_2_ancestral', device=self.device)
         elif self.sampler_name == 'k_dpm_2':
             self.sampler = KSampler(self.model, 'dpm_2', device=self.device)
+        elif self.sampler_name == 'k_dpmpp_2_a':
+            self.sampler = KSampler(self.model, 'dpmpp_2s_ancestral', device=self.device)
+        elif self.sampler_name == 'k_dpmpp_2':
+            self.sampler = KSampler(self.model, 'dpmpp_2m', device=self.device)
         elif self.sampler_name == 'k_euler_a':
             self.sampler = KSampler(self.model, 'euler_ancestral', device=self.device)
         elif self.sampler_name == 'k_euler':
@@ -1072,14 +1106,8 @@ class Generate:
         print(
             f'>> image will be resized to fit inside a box {w}x{h} in size.'
         )
-        if image.width > image.height:
-            h = None   # by setting h to none, we tell InitImageResizer to fit into the width and calculate height
-        elif image.height > image.width:
-            w = None   # ditto for w
-        else:
-            pass
         # note that InitImageResizer does the multiple of 64 truncation internally
-        image = InitImageResizer(image).resize(w, h)
+        image = InitImageResizer(image).resize(width=w, height=h)
         print(
             f'>> after adjusting image dimensions to be multiples of 64, init image is {image.width}x{image.height}'
         )

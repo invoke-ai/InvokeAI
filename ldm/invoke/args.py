@@ -92,13 +92,17 @@ import shlex
 import copy
 import base64
 import functools
+import warnings
 import ldm.invoke.pngwriter
+from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 SAMPLER_CHOICES = [
     'ddim',
     'k_dpm_2_a',
     'k_dpm_2',
+    'k_dpmpp_2_a',
+    'k_dpmpp_2',
     'k_euler_a',
     'k_euler',
     'k_heun',
@@ -115,8 +119,7 @@ PRECISION_CHOICES = [
 
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
-APP_VERSION = 'v2.1.2'
-INITFILE = os.path.expanduser('~/.invokeai')
+APP_VERSION = 'v2.2.0'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -169,11 +172,14 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             sysargs = sys.argv[1:]
-            if os.path.exists(INITFILE):
-                print(f'>> Initialization file {INITFILE} found. Loading...')
-                sysargs.insert(0,f'@{INITFILE}')
+            initfile = os.path.expanduser(Globals.initfile)
+            if os.path.exists(initfile):
+                print(f'>> Initialization file {initfile} found. Loading...')
+                sysargs.insert(0,f'@{initfile}')
             else:
-                print(f'>> Initialization file {INITFILE} not found. Applying default settings...')
+                from ldm.invoke.CLI import emergency_model_reconfigure
+                emergency_model_reconfigure()
+                sys.exit(-1)
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
@@ -286,6 +292,8 @@ class Args(object):
             switches.append(f'--embiggen {" ".join([str(u) for u in a["embiggen"]])}')
         if a['embiggen_tiles']:
             switches.append(f'--embiggen_tiles {" ".join([str(u) for u in a["embiggen_tiles"]])}')
+        if a['embiggen_strength']:
+            switches.append(f'--embiggen_strength {a["embiggen_strength"]}')
 
         # outpainting parameters
         if a['out_direction']:
@@ -363,6 +371,17 @@ class Args(object):
             new_dict[k] = value2 if value2 is not None else value1
         return new_dict
 
+    def _create_init_file(self,initfile:str):
+        with open(initfile, mode='w', encoding='utf-8') as f:
+            f.write('''# InvokeAI initialization file
+# Put frequently-used startup commands here, one or more per line
+# Examples:
+# --web --host=0.0.0.0
+# --steps 20
+# -Ak_euler_a -C10.0
+'''
+            )
+
     def _create_arg_parser(self):
         '''
         This defines all the arguments used on the command line when you launch
@@ -389,6 +408,11 @@ class Args(object):
 
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
+        model_group.add_argument(
+            '--root_dir',
+            default=None,
+            help='Path to directory containing "models", "outputs" and "configs". If not present will try to read from ~/.invokeai and then from environment variable INVOKEAI_ROOT. Defaults to the current directory as a last resort.',
+        )
         model_group.add_argument(
             '--config',
             '-c',
@@ -439,9 +463,18 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
+            '--nsfw_checker'
             '--safety_checker',
-            action='store_true',
-            help='Check for and blur potentially NSFW images',
+            action=argparse.BooleanOptionalAction,
+            dest='safety_checker',
+            default=False,
+            help='Check for and blur potentially NSFW images. Use --no-nsfw_checker to disable.',
+        )
+        model_group.add_argument(
+            '--patchmatch',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Load the patchmatch extension for outpainting. Use --no-patchmatch to disable.',
         )
         file_group.add_argument(
             '--from_file',
@@ -526,9 +559,23 @@ class Args(object):
             help='generate a grid'
         )
         render_group.add_argument(
+            '--embedding_directory',
             '--embedding_path',
+            dest='embedding_path',
+            default='embeddings',
             type=str,
-            help='Path to a pre-trained embedding manager checkpoint - can only be set on command line',
+            help='Path to a directory containing .bin and/or .pt files, or a single .bin/.pt file. You may use subdirectories. (default is ROOTDIR/embeddings)'
+        )
+        render_group.add_argument(
+            '--embeddings',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Enable embedding directory (default). Use --no-embeddings to disable.',
+        )
+        render_group.add_argument(
+            '--enable_image_debugging',
+            action='store_true',
+            help='Generates debugging image to display'
         )
         # Restoration related args
         postprocessing_group.add_argument(
@@ -589,6 +636,18 @@ class Args(object):
             type=int,
             default='9090',
             help='Web server: Port to listen on'
+        )
+        web_server_group.add_argument(
+            '--certfile',
+            type=str,
+            default=None,
+            help='Web server: Path to certificate file to use for SSL. Use together with --keyfile'
+        )
+        web_server_group.add_argument(
+            '--keyfile',
+            type=str,
+            default=None,
+            help='Web server: Path to private key file to use for SSL. Use together with --certfile'
         )
         web_server_group.add_argument(
             '--gui',
@@ -915,6 +974,13 @@ class Args(object):
             help='For embiggen, provide list of tiles to process and replace onto the image e.g. `1 3 5`.',
             default=None,
         )
+        postprocessing_group.add_argument(
+            '--embiggen_strength',
+            '-embiggen_strength',
+            type=float,
+            help='The strength of the embiggen img2img step, defaults to 0.4',
+            default=None,
+        )
         special_effects_group.add_argument(
             '--seamless',
             action='store_true',
@@ -1065,7 +1131,7 @@ def metadata_from_png(png_file_path) -> Args:
     returns a single Args object, not multiple.
     '''
     args_list = args_from_png(png_file_path)
-    return args_list[0]
+    return args_list[0] if len(args_list)>0 else Args()  # empty args
 
 def dream_cmd_from_png(png_file_path):
     opt = metadata_from_png(png_file_path)

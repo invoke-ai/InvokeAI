@@ -1,0 +1,20 @@
+@use '../../../styles/Mixins/' as *;
+
+.progress-bar {
+  background-color: var(--root-bg-color);
+  height: $progress-bar-thickness;
+  z-index: 99;
+
+  div {
+    background-color: var(--progress-bar-color);
+    &[data-indeterminate] {
+      background-color: unset;
+      background-image: linear-gradient(
+        to right,
+        transparent 0%,
+        var(--progress-bar-color) 50%,
+        transparent 100%
+      );
+    }
+  }
+}

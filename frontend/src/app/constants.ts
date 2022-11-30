@@ -1,6 +1,6 @@
 // TODO: use Enums?
 
-import { InProgressImageType } from '../features/system/systemSlice';
+import { InProgressImageType } from 'features/system/store/systemSlice';
 
 // Valid samplers
 export const SAMPLERS: Array<string> = [
@@ -9,6 +9,8 @@ export const SAMPLERS: Array<string> = [
   'k_lms',
   'k_dpm_2',
   'k_dpm_2_a',
+  'k_dpmpp_2',
+  'k_dpmpp_2_a',
   'k_euler',
   'k_euler_a',
   'k_heun',

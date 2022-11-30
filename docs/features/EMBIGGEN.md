@@ -85,7 +85,7 @@ increasing size, every tile after the first in a row or column
 effectively only covers an extra `1 - overlap_ratio` on each axis. If
 the input/`--init_img` is same size as a tile, the ideal (for time)
 scaling factors with the default overlap (0.25) are 1.75, 2.5, 3.25,
-4.0 etc..
+4.0, etc.
 
 `-embiggen_tiles <spaced list of tiles>`
 
@@ -99,6 +99,15 @@ coherency reasons.
 Tiles are numbered starting with one, and left-to-right,
 top-to-bottom.  So, if you are generating a 3x3 tiled image, the
 middle row would be `4 5 6`.
+
+`-embiggen_strength <strength>`
+
+Another advanced option if you want to experiment with the strength parameter
+that embiggen uses when it calls Img2Img. Values range from 0.0 to 1.0
+and lower values preserve more of the character of the initial image.
+Values that are too high will result in a completely different end image,
+while values that are too low will result in an image not dissimilar to one
+you would get with ESRGAN upscaling alone. The default value is 0.4.
 
 ### Examples
 
