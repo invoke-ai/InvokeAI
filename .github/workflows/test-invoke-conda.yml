@@ -114,6 +114,7 @@ jobs:
         id: run-tests
         run: |
           time python scripts/invoke.py \
+            --no-patchmatch \
             --model ${{ matrix.stable-diffusion-model }} \
             --from_file ${{ env.TEST_PROMPTS }} \
             --root="${{ env.INVOKEAI_ROOT }}" \
