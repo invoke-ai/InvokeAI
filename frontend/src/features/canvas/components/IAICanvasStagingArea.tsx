@@ -15,6 +15,8 @@ const selector = createSelector(
       },
       shouldShowStagingImage,
       shouldShowStagingOutline,
+      boundingBoxCoordinates: { x, y },
+      boundingBoxDimensions: { width, height },
     } = canvas;
 
     return {
@@ -24,6 +26,10 @@ const selector = createSelector(
       isOnLastImage: selectedImageIndex === images.length - 1,
       shouldShowStagingImage,
       shouldShowStagingOutline,
+      x,
+      y,
+      width,
+      height,
     };
   },
   {
@@ -41,19 +47,17 @@ const IAICanvasStagingArea = (props: Props) => {
     currentStagingAreaImage,
     shouldShowStagingImage,
     shouldShowStagingOutline,
-  } = useAppSelector(selector);
-
-  if (!currentStagingAreaImage) return null;
-
-  const {
     x,
     y,
-    image: { width, height, url },
-  } = currentStagingAreaImage;
+    width,
+    height,
+  } = useAppSelector(selector);
 
   return (
     <Group {...rest}>
-      {shouldShowStagingImage && <IAICanvasImage url={url} x={x} y={y} />}
+      {shouldShowStagingImage && currentStagingAreaImage && (
+        <IAICanvasImage url={currentStagingAreaImage.image.url} x={x} y={y} />
+      )}
       {shouldShowStagingOutline && (
         <Group>
           <Rect
@@ -62,7 +66,7 @@ const IAICanvasStagingArea = (props: Props) => {
             width={width}
             height={height}
             strokeWidth={1}
-            stroke={'black'}
+            stroke={'white'}
             strokeScaleEnabled={false}
           />
           <Rect
@@ -72,7 +76,7 @@ const IAICanvasStagingArea = (props: Props) => {
             height={height}
             dash={[4, 4]}
             strokeWidth={1}
-            stroke={'white'}
+            stroke={'black'}
             strokeScaleEnabled={false}
           />
         </Group>

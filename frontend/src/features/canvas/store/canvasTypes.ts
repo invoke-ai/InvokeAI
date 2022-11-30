@@ -88,10 +88,6 @@ export type CanvasObject =
 export type CanvasLayerState = {
   objects: CanvasObject[];
   stagingArea: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
     images: CanvasImage[];
     selectedImageIndex: number;
   };

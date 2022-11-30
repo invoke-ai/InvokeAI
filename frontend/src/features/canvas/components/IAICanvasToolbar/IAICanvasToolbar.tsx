@@ -85,7 +85,7 @@ const IAICanvasOutpaintingControls = () => {
       handleSelectMoveTool();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     []
@@ -109,7 +109,7 @@ const IAICanvasOutpaintingControls = () => {
       handleMergeVisible();
     },
     {
-      enabled: () => !isProcessing,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [canvasBaseLayer, isProcessing]
@@ -121,7 +121,7 @@ const IAICanvasOutpaintingControls = () => {
       handleSaveToGallery();
     },
     {
-      enabled: () => !isProcessing,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [canvasBaseLayer, isProcessing]
@@ -133,7 +133,7 @@ const IAICanvasOutpaintingControls = () => {
       handleCopyImageToClipboard();
     },
     {
-      enabled: () => !isProcessing,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [canvasBaseLayer, isProcessing]
@@ -145,7 +145,7 @@ const IAICanvasOutpaintingControls = () => {
       handleDownloadAsImage();
     },
     {
-      enabled: () => !isProcessing,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [canvasBaseLayer, isProcessing]
@@ -226,6 +226,7 @@ const IAICanvasOutpaintingControls = () => {
         value={layer}
         validValues={LAYER_NAMES_DICT}
         onChange={handleChangeLayer}
+        isDisabled={isStaging}
       />
 
       <IAICanvasMaskOptions />
@@ -253,28 +254,28 @@ const IAICanvasOutpaintingControls = () => {
           tooltip="Merge Visible (Shift+M)"
           icon={<FaLayerGroup />}
           onClick={handleMergeVisible}
-          isDisabled={isProcessing}
+          isDisabled={isStaging}
         />
         <IAIIconButton
           aria-label="Save to Gallery (Shift+S)"
           tooltip="Save to Gallery (Shift+S)"
           icon={<FaSave />}
           onClick={handleSaveToGallery}
-          isDisabled={isProcessing}
+          isDisabled={isStaging}
         />
         <IAIIconButton
           aria-label="Copy to Clipboard (Cmd/Ctrl+C)"
           tooltip="Copy to Clipboard (Cmd/Ctrl+C)"
           icon={<FaCopy />}
           onClick={handleCopyImageToClipboard}
-          isDisabled={isProcessing}
+          isDisabled={isStaging}
         />
         <IAIIconButton
           aria-label="Download as Image (Shift+D)"
           tooltip="Download as Image (Shift+D)"
           icon={<FaDownload />}
           onClick={handleDownloadAsImage}
-          isDisabled={isProcessing}
+          isDisabled={isStaging}
         />
       </ButtonGroup>
       <ButtonGroup isAttached>
@@ -288,6 +289,7 @@ const IAICanvasOutpaintingControls = () => {
           tooltip="Upload"
           icon={<FaUpload />}
           onClick={openUploader}
+          isDisabled={isStaging}
         />
         <IAIIconButton
           aria-label="Clear Canvas"
@@ -295,6 +297,7 @@ const IAICanvasOutpaintingControls = () => {
           icon={<FaTrash />}
           onClick={handleResetCanvas}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}
+          isDisabled={isStaging}
         />
       </ButtonGroup>
       <ButtonGroup isAttached>

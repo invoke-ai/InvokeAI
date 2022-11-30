@@ -32,10 +32,6 @@ import {
 export const initialLayerState: CanvasLayerState = {
   objects: [],
   stagingArea: {
-    x: -1,
-    y: -1,
-    width: -1,
-    height: -1,
     images: [],
     selectedImageIndex: -1,
   },
@@ -340,7 +336,7 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
-      state.shouldShowStagingImage = true;
+      state.shouldShowStagingOutline = true;
     },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } =

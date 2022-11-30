@@ -62,11 +62,11 @@ const IAICanvasStagingAreaToolbar = () => {
   } = useAppSelector(selector);
 
   const handleMouseOver = useCallback(() => {
-    dispatch(setShouldShowStagingOutline(false));
+    dispatch(setShouldShowStagingOutline(true));
   }, [dispatch]);
 
   const handleMouseOut = useCallback(() => {
-    dispatch(setShouldShowStagingOutline(true));
+    dispatch(setShouldShowStagingOutline(false));
   }, [dispatch]);
 
   useHotkeys(

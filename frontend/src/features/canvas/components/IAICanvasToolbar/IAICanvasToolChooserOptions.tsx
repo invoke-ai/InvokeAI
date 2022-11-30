@@ -62,7 +62,7 @@ const IAICanvasToolChooserOptions = () => {
       handleSelectBrushTool();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     []
@@ -74,7 +74,7 @@ const IAICanvasToolChooserOptions = () => {
       handleSelectEraserTool();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [tool]
@@ -86,7 +86,7 @@ const IAICanvasToolChooserOptions = () => {
       handleSelectColorPickerTool();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [tool]
@@ -98,7 +98,7 @@ const IAICanvasToolChooserOptions = () => {
       handleFillRect();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     }
   );
@@ -109,7 +109,7 @@ const IAICanvasToolChooserOptions = () => {
       handleEraseBoundingBox();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     }
   );
@@ -120,7 +120,7 @@ const IAICanvasToolChooserOptions = () => {
       dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushSize]
@@ -132,7 +132,7 @@ const IAICanvasToolChooserOptions = () => {
       dispatch(setBrushSize(Math.min(brushSize + 5, 500)));
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushSize]
@@ -149,7 +149,7 @@ const IAICanvasToolChooserOptions = () => {
       );
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushColor]
@@ -166,7 +166,7 @@ const IAICanvasToolChooserOptions = () => {
       );
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [brushColor]
