@@ -10,6 +10,7 @@ source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains abou
 
 conda activate invokeai
 
+export PYTORCH_ENABLE_MPS_FALLBACK=1
 if [ "$0" != "bash" ]; then
     echo "Do you want to generate images using the"
     echo "1. command-line"
