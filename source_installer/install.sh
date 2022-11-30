@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script will install git and conda (if not found on the PATH variable)
 #  using micromamba (an 8mb static-linked single-file binary, conda replacement).
@@ -86,7 +86,7 @@ if [ ! -e ".git" ]; then
     git config --local init.defaultBranch main
     git remote add origin "$REPO_URL"
     git fetch
-    git checkout origin/development -ft
+    git checkout origin/main -ft
 fi
 
 # create the environment
