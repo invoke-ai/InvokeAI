@@ -17,8 +17,6 @@ import {
   FaPaintBrush,
   FaPlus,
   FaSlidersH,
-  FaXbox,
-  FaXing,
 } from 'react-icons/fa';
 import {
   canvasSelector,
@@ -29,7 +27,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import { MdClear } from 'react-icons/md';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],

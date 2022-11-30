@@ -30,7 +30,6 @@ const boundingBoxPreviewSelector = createSelector(
       isDrawing,
       isTransformingBoundingBox,
       isMovingBoundingBox,
-      isMouseOverBoundingBox,
       tool,
       shouldSnapToGrid,
     } = canvas;
@@ -39,7 +38,6 @@ const boundingBoxPreviewSelector = createSelector(
       boundingBoxCoordinates,
       boundingBoxDimensions,
       isDrawing,
-      isMouseOverBoundingBox,
       isMovingBoundingBox,
       isTransformingBoundingBox,
       stageScale,
@@ -65,7 +63,6 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     boundingBoxCoordinates,
     boundingBoxDimensions,
     isDrawing,
-    isMouseOverBoundingBox,
     isMovingBoundingBox,
     isTransformingBoundingBox,
     stageScale,
