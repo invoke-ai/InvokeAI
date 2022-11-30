@@ -102,8 +102,11 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
         both_conditionings = torch.cat([unconditioning, conditioning])
-        unconditioned_next_x, conditioned_next_x = self.model_forward_callback(x_twice, sigma_twice,
-                                                                               both_conditionings).chunk(2)
+        both_results = self.model_forward_callback(x_twice, sigma_twice, both_conditionings)
+        unconditioned_next_x, conditioned_next_x = both_results.chunk(2)
+        if conditioned_next_x.device.type == 'mps':
+            # prevent a result filled with zeros. seems to be a torch bug.
+            conditioned_next_x = conditioned_next_x.clone()
         return unconditioned_next_x, conditioned_next_x
 
 
