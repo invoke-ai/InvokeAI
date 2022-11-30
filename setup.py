@@ -81,6 +81,7 @@ setup(
                'scripts/preload_models.py', 'scripts/images2prompt.py','scripts/merge_embeddings.py'
     ],
     data_files=[('frontend/dist',list_files('frontend/dist')),
-                ('frontend/dist/assets',list_files('frontend/dist/assets'))
+                ('frontend/dist/assets',list_files('frontend/dist/assets')),
+                ('assets',['assets/caution.png']),
     ],
 )
