@@ -333,6 +333,9 @@ class Inpaint(Img2Img):
                        mask_blur_radius, seam_size, seam_blur, seam_strength,
                        seam_steps, tile_size, step_callback,
                        inpaint_replace, enable_image_debugging,
+                       inpaint_width = inpaint_width,
+                       inpaint_height = inpaint_height,
+                       infill_method = infill_method,
                        **kwargs)
 
             return result
