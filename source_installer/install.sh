@@ -17,7 +17,7 @@ echo ""
 OS_NAME=$(uname -s)
 case "${OS_NAME}" in
     Linux*)     OS_NAME="linux";;
-    Darwin*)    OS_NAME="mac";;
+    Darwin*)    OS_NAME="osx";;
     *)          echo "Unknown OS: $OS_NAME! This script runs only on Linux or Mac" && exit
 esac
 
@@ -54,7 +54,7 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
         echo "Downloading micromamba from $MICROMAMBA_DOWNLOAD_URL to $MAMBA_ROOT_PREFIX/micromamba"
 
         mkdir -p "$MAMBA_ROOT_PREFIX"
-        curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvj bin/micromamba -O > "$MAMBA_ROOT_PREFIX/micromamba"
+        curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvjO bin/micromamba > "$MAMBA_ROOT_PREFIX/micromamba"
 
         chmod u+x "$MAMBA_ROOT_PREFIX/micromamba"
 
@@ -94,7 +94,7 @@ CONDA_BASEPATH=$(conda info --base)
 source "$CONDA_BASEPATH/etc/profile.d/conda.sh" # otherwise conda complains about 'shell not initialized' (needed when running in a script)
 
 conda activate
-if [ "$OS_NAME" == "mac" ]; then
+if [ "$OS_NAME" == "osx" ]; then
     echo "macOS detected. Installing MPS and CPU support."
     ln -sf environments-and-requirements/environment-mac.yml environment.yml
 else
