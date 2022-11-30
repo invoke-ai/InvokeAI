@@ -463,9 +463,12 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
+            '--nsfw_checker'
             '--safety_checker',
-            action='store_true',
-            help='Check for and blur potentially NSFW images',
+            action=argparse.BooleanOptionalAction,
+            dest='safety_checker',
+            default=False,
+            help='Check for and blur potentially NSFW images.',
         )
         model_group.add_argument(
             '--patchmatch',
