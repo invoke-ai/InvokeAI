@@ -1023,7 +1023,7 @@ class Generate:
         if self.sampler_name in scheduler_map:
             sampler_class = scheduler_map[self.sampler_name]
             msg = f'>> Setting Sampler to {self.sampler_name} ({sampler_class.__name__})'
-            self.sampler = sampler_class.from_config(
+            self.sampler = sampler_class.from_pretrained(
                 self.model_cache.model_name_or_path(self.model_name),
                 subfolder="scheduler"
             )
