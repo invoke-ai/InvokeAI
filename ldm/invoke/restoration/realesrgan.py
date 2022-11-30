@@ -5,7 +5,7 @@ import os
 
 from ldm.invoke.globals import Globals
 from PIL import Image
-
+from PIL.Image import Image as ImageType
 
 class ESRGAN():
     def __init__(self, bg_tile_size=400) -> None:
@@ -41,7 +41,7 @@ class ESRGAN():
 
         return bg_upsampler
 
-    def process(self, image, strength: float, seed: str = None, upsampler_scale: int = 2):
+    def process(self, image: ImageType, strength: float, seed: str = None, upsampler_scale: int = 2):
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=DeprecationWarning)
             warnings.filterwarnings('ignore', category=UserWarning)
@@ -62,7 +62,9 @@ class ESRGAN():
             print(
                 f'>> Real-ESRGAN Upscaling seed:{seed} : scale:{upsampler_scale}x'
             )
-            
+        # ESRGAN outputs images with partial transparency if given RGBA images; convert to RGB
+        image = image.convert("RGB")
+
         # REALSRGAN expects a BGR np array; make array and flip channels
         bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
         

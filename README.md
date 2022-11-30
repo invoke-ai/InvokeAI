@@ -172,14 +172,21 @@ problems and other issues.
 # Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
-cleanup, testing, or code reviews, is very much encouraged to do so. If you are unfamiliar with how
-to contribute to GitHub projects, here is a
-[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github).
+cleanup, testing, or code reviews, is very much encouraged to do so. To join, just raise your hand on the InvokeAI
+Discord server or discussion board. 
 
-A full set of contribution guidelines, along with templates, are in progress, but for now the most
+If you are unfamiliar with how
+to contribute to GitHub projects, here is a
+[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress, but for now the most
 important thing is to **make your pull request against the "development" branch**, and not against
 "main". This will help keep public breakage to a minimum and will allow you to propose more radical
 changes.
+
+We hope you enjoy using our software as much as we enjoy creating it,
+and we hope that some of those of you who are reading this will elect
+to become part of our community.
+
+Welcome to InvokeAI!
 
 ### Contributors
 

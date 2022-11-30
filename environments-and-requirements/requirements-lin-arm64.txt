@@ -1,6 +1,3 @@
 --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
-
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
-
 -r environments-and-requirements/requirements-base.txt
 -e .

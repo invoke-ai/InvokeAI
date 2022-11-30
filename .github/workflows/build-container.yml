@@ -6,6 +6,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'update-dockerfile'
 
 jobs:
   docker:
@@ -15,13 +16,11 @@ jobs:
         arch:
           - x86_64
           - aarch64
-        include:
-          - arch: x86_64
-            conda-env-file: environment-lin-cuda.yml
-          - arch: aarch64
-            conda-env-file: environment-lin-aarch64.yml
+        pip-requirements:
+          - requirements-lin-amd.txt
+          - requirements-lin-cuda.txt
     runs-on: ubuntu-latest
-    name: ${{ matrix.arch }}
+    name: ${{ matrix.pip-requirements }} ${{ matrix.arch }}
     steps:
       - name: prepare docker-tag
         env:
@@ -40,9 +39,5 @@ jobs:
           file: docker-build/Dockerfile
           platforms: Linux/${{ matrix.arch }}
           push: false
-          tags: ${{ env.dockertag }}:${{ matrix.arch }}
-          build-args: |
-            conda_env_file=${{ matrix.conda-env-file }}
-            conda_version=py39_4.12.0-Linux-${{ matrix.arch }}
-            invokeai_git=${{ github.repository }}
-            invokeai_branch=${{ github.ref_name }}
+          tags: ${{ env.dockertag }}:${{ matrix.pip-requirements }}-${{ matrix.arch }}
+          build-args: pip_requirements=${{ matrix.pip-requirements }}

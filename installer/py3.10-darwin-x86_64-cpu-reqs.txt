@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=installer/py3.10-darwin-x86_64-cpu-reqs.txt installer/requirements.in
 #
---extra-index-url https://download.pytorch.org/whl/cu116
+--extra-index-url https://download.pytorch.org/whl/torch_stable.html
 --trusted-host https
 
 absl-py==1.3.0 \
@@ -987,6 +987,7 @@ numpy==1.23.4 \
     #   pandas
     #   pyarrow
     #   pydeck
+    #   pypatchmatch
     #   pytorch-lightning
     #   pywavelets
     #   qudida
@@ -1159,6 +1160,7 @@ pillow==9.3.0 \
     #   imageio
     #   k-diffusion
     #   matplotlib
+    #   pypatchmatch
     #   realesrgan
     #   scikit-image
     #   streamlit
@@ -1294,6 +1296,9 @@ pyparsing==3.0.9 \
     # via
     #   matplotlib
     #   packaging
+pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/129863937a8ab37f6bbcec327c994c0f932abdbc.zip \
+    --hash=sha256:4ad6ec95379e7d122d494ff76633cc7cf9b71330d5efda147fceba81e3dc6cd2
+    # via -r installer/requirements.in
 pyreadline3==3.4.1 \
     --hash=sha256:6f3d1f7b8a31ba32b73917cefc1f28cc660562f39aea8646d30bd6eff21f7bae \
     --hash=sha256:b0efb6516fd4fb07b45949053826a62fa4cb353db5be2bbb4a7aa1fdd1e345fb
@@ -1826,27 +1831,27 @@ toolz==0.12.0 \
     --hash=sha256:2059bd4148deb1884bb0eb770a3cde70e7f954cfbbdc2285f1f2de01fd21eb6f \
     --hash=sha256:88c570861c440ee3f2f6037c4654613228ff40c93a6c25e0eba70d17282c6194
     # via altair
-torch==1.12.0 ; platform_system == "Darwin" \
-    --hash=sha256:0399746f83b4541bcb5b219a18dbe8cade760aba1c660d2748a38c6dc338ebc7 \
-    --hash=sha256:0986685f2ec8b7c4d3593e8cfe96be85d462943f1a8f54112fc48d4d9fbbe903 \
-    --hash=sha256:13c7cca6b2ea3704d775444f02af53c5f072d145247e17b8cd7813ac57869f03 \
-    --hash=sha256:201abf43a99bb4980cc827dd4b38ac28f35e4dddac7832718be3d5479cafd2c1 \
-    --hash=sha256:2143d5fe192fd908b70b494349de5b1ac02854a8a902bd5f47d13d85b410e430 \
-    --hash=sha256:2568f011dddeb5990d8698cc375d237f14568ffa8489854e3b94113b4b6b7c8b \
-    --hash=sha256:3322d33a06e440d715bb214334bd41314c94632d9a2f07d22006bf21da3a2be4 \
-    --hash=sha256:349ea3ba0c0e789e0507876c023181f13b35307aebc2e771efd0e045b8e03e84 \
-    --hash=sha256:44a3804e9bb189574f5d02ccc2dc6e32e26a81b3e095463b7067b786048c6072 \
-    --hash=sha256:5ed69d5af232c5c3287d44cef998880dadcc9721cd020e9ae02f42e56b79c2e4 \
-    --hash=sha256:60d06ee2abfa85f10582d205404d52889d69bcbb71f7e211cfc37e3957ac19ca \
-    --hash=sha256:63341f96840a223f277e498d2737b39da30d9f57c7a1ef88857b920096317739 \
-    --hash=sha256:72207b8733523388c49d43ffcc4416d1d8cd64c40f7826332e714605ace9b1d2 \
-    --hash=sha256:7ddb167827170c4e3ff6a27157414a00b9fef93dea175da04caf92a0619b7aee \
-    --hash=sha256:844f1db41173b53fe40c44b3e04fcca23a6ce00ac328b7099f2800e611766845 \
-    --hash=sha256:a1325c9c28823af497cbf443369bddac9ac59f67f1e600f8ab9b754958e55b76 \
-    --hash=sha256:abbdc5483359b9495dc76e3bd7911ccd2ddc57706c117f8316832e31590af871 \
-    --hash=sha256:c0313438bc36448ffd209f5fb4e5f325b3af158cdf61c8829b8ddaf128c57816 \
-    --hash=sha256:e3e8348edca3e3cee5a67a2b452b85c57712efe1cc3ffdb87c128b3dde54534e \
-    --hash=sha256:fb47291596677570246d723ee6abbcbac07eeba89d8f83de31e3954f21f44879
+torch==1.12.1 ; platform_system == "Darwin" \
+    --hash=sha256:03e31c37711db2cd201e02de5826de875529e45a55631d317aadce2f1ed45aa8 \
+    --hash=sha256:0b44601ec56f7dd44ad8afc00846051162ef9c26a8579dda0a02194327f2d55e \
+    --hash=sha256:42e115dab26f60c29e298559dbec88444175528b729ae994ec4c65d56fe267dd \
+    --hash=sha256:42f639501928caabb9d1d55ddd17f07cd694de146686c24489ab8c615c2871f2 \
+    --hash=sha256:4e1b9c14cf13fd2ab8d769529050629a0e68a6fc5cb8e84b4a3cc1dd8c4fe541 \
+    --hash=sha256:68104e4715a55c4bb29a85c6a8d57d820e0757da363be1ba680fa8cc5be17b52 \
+    --hash=sha256:69fe2cae7c39ccadd65a123793d30e0db881f1c1927945519c5c17323131437e \
+    --hash=sha256:6cf6f54b43c0c30335428195589bd00e764a6d27f3b9ba637aaa8c11aaf93073 \
+    --hash=sha256:743784ccea0dc8f2a3fe6a536bec8c4763bd82c1352f314937cb4008d4805de1 \
+    --hash=sha256:8a34a2fbbaa07c921e1b203f59d3d6e00ed379f2b384445773bd14e328a5b6c8 \
+    --hash=sha256:976c3f997cea38ee91a0dd3c3a42322785414748d1761ef926b789dfa97c6134 \
+    --hash=sha256:9b356aea223772cd754edb4d9ecf2a025909b8615a7668ac7d5130f86e7ec421 \
+    --hash=sha256:9c038662db894a23e49e385df13d47b2a777ffd56d9bcd5b832593fab0a7e286 \
+    --hash=sha256:a8320ba9ad87e80ca5a6a016e46ada4d1ba0c54626e135d99b2129a4541c509d \
+    --hash=sha256:b5dbcca369800ce99ba7ae6dee3466607a66958afca3b740690d88168752abcf \
+    --hash=sha256:bfec2843daa654f04fda23ba823af03e7b6f7650a873cdb726752d0e3718dada \
+    --hash=sha256:cd26d8c5640c3a28c526d41ccdca14cf1cbca0d0f2e14e8263a7ac17194ab1d2 \
+    --hash=sha256:e9c8f4a311ac29fc7e8e955cfb7733deb5dbe1bdaabf5d4af2765695824b7e0d \
+    --hash=sha256:f00c721f489089dc6364a01fd84906348fe02243d0af737f944fddb36003400d \
+    --hash=sha256:f3b52a634e62821e747e872084ab32fbcb01b7fa7dbb7471b6218279f02a178a
     # via
     #   -r installer/requirements.in
     #   accelerate
@@ -1877,26 +1882,26 @@ torchmetrics==0.10.2 \
     --hash=sha256:43757d82266969906fc74b6e80766fcb2a0d52d6c3d09e3b7c98cf3b733fd20c \
     --hash=sha256:daa29d96bff5cff04d80eec5b9f5076993d6ac9c2d2163e88b6b31f8d38f7c25
     # via pytorch-lightning
-torchvision==0.13.0 ; platform_system == "Darwin" \
-    --hash=sha256:01e9e7b2e7724e66561e8d98f900985d80191e977c5c0b3f33ed31800ba0210c \
-    --hash=sha256:0e28740bd5695076f7c449af650fc474d6566722d446461c2ceebf9c9599b37f \
-    --hash=sha256:1b703701f0b99f307ad925b1abda2b3d5bdbf30643ff02102b6aeeb8840ae278 \
-    --hash=sha256:1e2049f1207631d42d743205f663f1d2235796565be3f18b0339d479626faf30 \
-    --hash=sha256:253eb0c67bf88cef4a79ec69058c3e94f9fde28b9e3699ad1afc0b3ed50f8075 \
-    --hash=sha256:42d95ab197d090efc5669fec02fbc603d05c859e50ca2c60180d1a113aa9b3e2 \
-    --hash=sha256:5c31e9b3004142dbfdf32adc4cf2d4fd709b820833e9786f839ae3a91ff65ef0 \
-    --hash=sha256:61d5093a50b7923a4e5bf9e0271001c29e01abec2348b7dd93370a0a9d15836c \
-    --hash=sha256:667cac55afb13cda7d362466e7eba3119e529b210e55507d231bead09aca5e1f \
-    --hash=sha256:6c4c35428c758adc485ff8f239b5ed68c1b6c26efa261a52e431cab0f7f22aec \
-    --hash=sha256:83a4d9d50787d1e886c94486b63b15978391f6cf1892fce6a93132c09b14e128 \
-    --hash=sha256:a20662c11dc14fd4eff102ceb946a7ee80b9f98303bb52435cc903f2c4c1fe10 \
-    --hash=sha256:acb72a40e5dc0cd454d28514dbdd589a5057afd9bb5c785b87a54718b999bfa1 \
-    --hash=sha256:ad458146aca15f652f9b0c227bebd5403602c7341f15f68f20ec119fa8e8f4a5 \
-    --hash=sha256:ada295dbfe55017b02acfab960a997387f5addbadd28ee5e575e24f692992ce4 \
-    --hash=sha256:b620a43df4131ad09f5761c415a016a9ea95aaf8ec8c91d030fb59bad591094a \
-    --hash=sha256:b7a2c9aebc7ef265777fe7e82577364288d98cf6b8cf0a63bb2621df78a7af1a \
-    --hash=sha256:c2278a189663087bb8e65915062aa7a25b8f8e5a3cfaa5879fe277e23e4bbf40 \
-    --hash=sha256:df16abf31e7a5fce8db1f781bf1e4f20c8bc730c7c3f657e946cc5820c04e465
+torchvision==0.13.1 ; platform_system == "Darwin" \
+    --hash=sha256:0298bae3b09ac361866088434008d82b99d6458fe8888c8df90720ef4b347d44 \
+    --hash=sha256:08f592ea61836ebeceb5c97f4d7a813b9d7dc651bbf7ce4401563ccfae6a21fc \
+    --hash=sha256:099874088df104d54d8008f2a28539ca0117b512daed8bf3c2bbfa2b7ccb187a \
+    --hash=sha256:0e77706cc90462653620e336bb90daf03d7bf1b88c3a9a3037df8d111823a56e \
+    --hash=sha256:19286a733c69dcbd417b86793df807bd227db5786ed787c17297741a9b0d0fc7 \
+    --hash=sha256:3567fb3def829229ec217c1e38f08c5128ff7fb65854cac17ebac358ff7aa309 \
+    --hash=sha256:4d8bf321c4380854ef04613935fdd415dce29d1088a7ff99e06e113f0efe9203 \
+    --hash=sha256:5e631241bee3661de64f83616656224af2e3512eb2580da7c08e08b8c965a8ac \
+    --hash=sha256:7552e80fa222252b8b217a951c85e172a710ea4cad0ae0c06fbb67addece7871 \
+    --hash=sha256:7cb789ceefe6dcd0dc8eeda37bfc45efb7cf34770eac9533861d51ca508eb5b3 \
+    --hash=sha256:83e9e2457f23110fd53b0177e1bc621518d6ea2108f570e853b768ce36b7c679 \
+    --hash=sha256:87c137f343197769a51333076e66bfcd576301d2cd8614b06657187c71b06c4f \
+    --hash=sha256:899eec0b9f3b99b96d6f85b9aa58c002db41c672437677b553015b9135b3be7e \
+    --hash=sha256:8e4d02e4d8a203e0c09c10dfb478214c224d080d31efc0dbf36d9c4051f7f3c6 \
+    --hash=sha256:b167934a5943242da7b1e59318f911d2d253feeca0d13ad5d832b58eed943401 \
+    --hash=sha256:c5ed609c8bc88c575226400b2232e0309094477c82af38952e0373edef0003fd \
+    --hash=sha256:e9a563894f9fa40692e24d1aa58c3ef040450017cfed3598ff9637f404f3fe3b \
+    --hash=sha256:ef5fe3ec1848123cd0ec74c07658192b3147dcd38e507308c790d5943e87b88c \
+    --hash=sha256:f230a1a40ed70d51e463ce43df243ec520902f8725de2502e485efc5eea9d864
     # via
     #   -r installer/requirements.in
     #   basicsr

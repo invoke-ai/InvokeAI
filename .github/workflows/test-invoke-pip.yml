@@ -105,10 +105,15 @@ jobs:
         run: |
           ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
 
+      - name: cat ~/.invokeai
+        id: cat-invokeai
+        run: cat ~/.invokeai
+
       - name: Run the tests
         id: run-tests
         run: |
           time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
+            --no-patchmatch \
             --model ${{ matrix.stable-diffusion-model }} \
             --from_file ${{ env.TEST_PROMPTS }} \
             --root="${{ env.INVOKEAI_ROOT }}" \

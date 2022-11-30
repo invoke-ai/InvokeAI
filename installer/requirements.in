@@ -4,16 +4,12 @@
 accelerate~=0.14
 albumentations
 diffusers
-einops
 eventlet
-facexlib
 flask_cors
 flask_socketio
 flaskwebgui
 getpass_asterisk
 imageio-ffmpeg
-kornia
-numpy
 pyreadline3
 realesrgan
 send2trash
@@ -21,12 +17,14 @@ streamlit
 taming-transformers-rom1504
 test-tube
 torch-fidelity
-torch
-torchvision
+torch==1.12.1 ; platform_system == 'Darwin'
+torch==1.12.0+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
+torchvision==0.13.1 ; platform_system == 'Darwin'
+torchvision==0.13.0+cu116 ; platform_system == 'Linux' or platform_system == 'Windows'
 transformers
 picklescan
-clip
-clipseg
-gfpgan
-k-diffusion
-
+https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip
+https://github.com/invoke-ai/clipseg/archive/1f754751c85d7d4255fa681f4491ff5711c1c288.zip
+https://github.com/TencentARC/GFPGAN/archive/2eac2033893ca7f427f4035d80fe95b92649ac56.zip
+https://github.com/invoke-ai/k-diffusion/archive/7f16b2c33411f26b3eae78d10648d625cb0c1095.zip
+https://github.com/invoke-ai/PyPatchMatch/archive/129863937a8ab37f6bbcec327c994c0f932abdbc.zip
