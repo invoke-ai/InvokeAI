@@ -90,7 +90,7 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
-    ['f'],
+    ['shift+f'],
     () => {
       handleFillRect();
     },
@@ -194,8 +194,8 @@ const IAICanvasToolChooserOptions = () => {
         onClick={handleSelectEraserTool}
       />
       <IAIIconButton
-        aria-label="Fill Bounding Box (F)"
-        tooltip="Fill Bounding Box (F)"
+        aria-label="Fill Bounding Box (Shift+F)"
+        tooltip="Fill Bounding Box (Shift+F)"
         icon={<FaFillDrip />}
         isDisabled={isStaging}
         onClick={handleFillRect}
