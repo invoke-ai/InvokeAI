@@ -8,14 +8,15 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { undo } from 'features/canvas/store/canvasSlice';
+import { systemSelector } from 'features/system/store/systemSelectors';
 
 const canvasUndoSelector = createSelector(
-  [canvasSelector, activeTabNameSelector],
-  (canvas, activeTabName) => {
+  [canvasSelector, activeTabNameSelector, systemSelector],
+  (canvas, activeTabName, system) => {
     const { pastLayerStates } = canvas;
 
     return {
-      canUndo: pastLayerStates.length > 0,
+      canUndo: pastLayerStates.length > 0 && !system.isProcessing,
       activeTabName,
     };
   },

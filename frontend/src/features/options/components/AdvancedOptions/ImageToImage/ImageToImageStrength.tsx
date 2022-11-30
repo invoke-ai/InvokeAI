@@ -19,7 +19,7 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
   const handleChangeStrength = (v: number) => dispatch(setImg2imgStrength(v));
 
   const handleImg2ImgStrengthReset = () => {
-    dispatch(setImg2imgStrength(0.5));
+    dispatch(setImg2imgStrength(0.75));
   };
 
   return (
@@ -38,16 +38,5 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
       inputWidth={'5.5rem'}
       handleReset={handleImg2ImgStrengthReset}
     />
-    // <IAINumberInput
-    //   label={label}
-    //   step={0.01}
-    //   min={0.01}
-    //   max={0.99}
-    //   onChange={handleChangeStrength}
-    //   value={img2imgStrength}
-    //   width="100%"
-    //   isInteger={false}
-    //   styleClass={styleClass}
-    // />
   );
 }

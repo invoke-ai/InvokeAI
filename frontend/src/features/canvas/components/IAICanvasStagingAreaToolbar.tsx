@@ -10,8 +10,8 @@ import {
   FaCheck,
   FaEye,
   FaEyeSlash,
+  FaPlus,
   FaSave,
-  FaTrash,
 } from 'react-icons/fa';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
@@ -62,11 +62,11 @@ const IAICanvasStagingAreaToolbar = () => {
   } = useAppSelector(selector);
 
   const handleMouseOver = useCallback(() => {
-    dispatch(setShouldShowStagingOutline(false));
+    dispatch(setShouldShowStagingOutline(true));
   }, [dispatch]);
 
   const handleMouseOut = useCallback(() => {
-    dispatch(setShouldShowStagingOutline(true));
+    dispatch(setShouldShowStagingOutline(false));
   }, [dispatch]);
 
   useHotkeys(
@@ -167,10 +167,11 @@ const IAICanvasStagingAreaToolbar = () => {
         <IAIIconButton
           tooltip="Discard All"
           aria-label="Discard All"
-          icon={<FaTrash />}
+          icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
           onClick={() => dispatch(discardStagedImages())}
           data-selected={true}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}
+          fontSize={20}
         />
       </ButtonGroup>
     </Flex>

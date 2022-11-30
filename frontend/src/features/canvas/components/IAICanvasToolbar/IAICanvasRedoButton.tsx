@@ -8,14 +8,15 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 import _ from 'lodash';
 import { redo } from 'features/canvas/store/canvasSlice';
+import { systemSelector } from 'features/system/store/systemSelectors';
 
 const canvasRedoSelector = createSelector(
-  [canvasSelector, activeTabNameSelector],
-  (canvas, activeTabName) => {
+  [canvasSelector, activeTabNameSelector, systemSelector],
+  (canvas, activeTabName, system) => {
     const { futureLayerStates } = canvas;
 
     return {
-      canRedo: futureLayerStates.length > 0,
+      canRedo: futureLayerStates.length > 0 && !system.isProcessing,
       activeTabName,
     };
   },

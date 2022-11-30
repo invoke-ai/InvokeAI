@@ -5,7 +5,6 @@ import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
-  setBoundingBoxDimensions,
   setBoundingBoxScaleMethod,
   setScaledBoundingBoxDimensions,
 } from 'features/canvas/store/canvasSlice';
@@ -31,13 +30,11 @@ const selector = createSelector(
     const { infill_methods: availableInfillMethods } = system;
 
     const {
-      boundingBoxDimensions,
       boundingBoxScaleMethod: boundingBoxScale,
       scaledBoundingBoxDimensions,
     } = canvas;
 
     return {
-      boundingBoxDimensions,
       boundingBoxScale,
       scaledBoundingBoxDimensions,
       tileSize,
@@ -58,7 +55,6 @@ const InfillAndScalingOptions = () => {
   const {
     tileSize,
     infillMethod,
-    boundingBoxDimensions,
     availableInfillMethods,
     boundingBoxScale,
     isManual,
@@ -105,7 +101,6 @@ const InfillAndScalingOptions = () => {
     e: ChangeEvent<HTMLSelectElement>
   ) => {
     dispatch(setBoundingBoxScaleMethod(e.target.value as BoundingBoxScale));
-    dispatch(setBoundingBoxDimensions(boundingBoxDimensions));
   };
 
   return (

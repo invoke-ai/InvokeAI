@@ -4,6 +4,7 @@ import {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
+  setShouldRestrictStrokesToBox,
   setShouldShowCanvasDebugInfo,
   setShouldShowGrid,
   setShouldShowIntermediates,
@@ -32,6 +33,7 @@ export const canvasControlsSelector = createSelector(
       shouldShowGrid,
       shouldShowIntermediates,
       shouldSnapToGrid,
+      shouldRestrictStrokesToBox,
     } = canvas;
 
     return {
@@ -42,6 +44,7 @@ export const canvasControlsSelector = createSelector(
       shouldShowGrid,
       shouldShowIntermediates,
       shouldSnapToGrid,
+      shouldRestrictStrokesToBox,
     };
   },
   {
@@ -61,6 +64,7 @@ const IAICanvasSettingsButtonPopover = () => {
     shouldShowGrid,
     shouldShowIntermediates,
     shouldSnapToGrid,
+    shouldRestrictStrokesToBox,
   } = useAppSelector(canvasControlsSelector);
 
   useHotkeys(
@@ -124,6 +128,13 @@ const IAICanvasSettingsButtonPopover = () => {
           isChecked={shouldCropToBoundingBoxOnSave}
           onChange={(e) =>
             dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
+          }
+        />
+        <IAICheckbox
+          label="Limit Strokes to Box"
+          isChecked={shouldRestrictStrokesToBox}
+          onChange={(e) =>
+            dispatch(setShouldRestrictStrokesToBox(e.target.checked))
           }
         />
         <IAICheckbox

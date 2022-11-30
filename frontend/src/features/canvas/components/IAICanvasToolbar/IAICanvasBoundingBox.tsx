@@ -3,7 +3,7 @@ import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import {
@@ -26,15 +26,11 @@ const boundingBoxPreviewSelector = createSelector(
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
-      stageDimensions,
       stageScale,
       isDrawing,
       isTransformingBoundingBox,
       isMovingBoundingBox,
-      isMouseOverBoundingBox,
-      shouldDarkenOutsideBoundingBox,
       tool,
-      stageCoordinates,
       shouldSnapToGrid,
     } = canvas;
 
@@ -42,16 +38,11 @@ const boundingBoxPreviewSelector = createSelector(
       boundingBoxCoordinates,
       boundingBoxDimensions,
       isDrawing,
-      isMouseOverBoundingBox,
-      shouldDarkenOutsideBoundingBox,
       isMovingBoundingBox,
       isTransformingBoundingBox,
-      stageDimensions,
       stageScale,
       shouldSnapToGrid,
       tool,
-      stageCoordinates,
-      boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
       hitStrokeWidth: 20 / stageScale,
     };
   },
@@ -72,21 +63,19 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     boundingBoxCoordinates,
     boundingBoxDimensions,
     isDrawing,
-    isMouseOverBoundingBox,
-    shouldDarkenOutsideBoundingBox,
     isMovingBoundingBox,
     isTransformingBoundingBox,
-    stageCoordinates,
-    stageDimensions,
     stageScale,
     shouldSnapToGrid,
     tool,
-    boundingBoxStrokeWidth,
     hitStrokeWidth,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRef = useRef<Konva.Rect>(null);
+
+  const [isMouseOverBoundingBoxOutline, setIsMouseOverBoundingBoxOutline] =
+    useState(false);
 
   useEffect(() => {
     if (!transformerRef.current || !shapeRef.current) return;
@@ -205,7 +194,9 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
   const handleEndedTransforming = () => {
     dispatch(setIsTransformingBoundingBox(false));
+    dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
+    setIsMouseOverBoundingBoxOutline(false);
   };
 
   const handleStartedMoving = () => {
@@ -216,38 +207,38 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     dispatch(setIsTransformingBoundingBox(false));
     dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
+    setIsMouseOverBoundingBoxOutline(false);
   };
 
   const handleMouseOver = () => {
-    dispatch(setIsMouseOverBoundingBox(true));
+    setIsMouseOverBoundingBoxOutline(true);
   };
 
   const handleMouseOut = () => {
     !isTransformingBoundingBox &&
       !isMovingBoundingBox &&
-      dispatch(setIsMouseOverBoundingBox(false));
+      setIsMouseOverBoundingBoxOutline(false);
+  };
+
+  const handleMouseEnterBoundingBox = () => {
+    dispatch(setIsMouseOverBoundingBox(true));
+  };
+
+  const handleMouseLeaveBoundingBox = () => {
+    dispatch(setIsMouseOverBoundingBox(false));
   };
 
   return (
     <Group {...rest}>
       <Rect
-        offsetX={stageCoordinates.x / stageScale}
-        offsetY={stageCoordinates.y / stageScale}
-        height={stageDimensions.height / stageScale}
-        width={stageDimensions.width / stageScale}
-        fill={'rgba(0,0,0,0.4)'}
-        listening={false}
-        visible={shouldDarkenOutsideBoundingBox}
-      />
-      <Rect
+        height={boundingBoxDimensions.height}
+        width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
-        width={boundingBoxDimensions.width}
-        height={boundingBoxDimensions.height}
-        fill={'rgb(255,255,255)'}
-        listening={false}
-        visible={shouldDarkenOutsideBoundingBox}
-        globalCompositeOperation={'destination-out'}
+        onMouseEnter={handleMouseEnterBoundingBox}
+        onMouseOver={handleMouseEnterBoundingBox}
+        onMouseLeave={handleMouseLeaveBoundingBox}
+        onMouseOut={handleMouseLeaveBoundingBox}
       />
       <Rect
         draggable={true}
@@ -255,17 +246,21 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         height={boundingBoxDimensions.height}
         hitStrokeWidth={hitStrokeWidth}
         listening={!isDrawing && tool === 'move'}
+        onDragStart={handleStartedMoving}
         onDragEnd={handleEndedModifying}
         onDragMove={handleOnDragMove}
         onMouseDown={handleStartedMoving}
         onMouseOut={handleMouseOut}
         onMouseOver={handleMouseOver}
+        onMouseEnter={handleMouseOver}
         onMouseUp={handleEndedModifying}
         onTransform={handleOnTransform}
         onTransformEnd={handleEndedTransforming}
         ref={shapeRef}
-        stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.7)' : 'white'}
-        strokeWidth={boundingBoxStrokeWidth}
+        stroke={
+          isMouseOverBoundingBoxOutline ? 'rgba(255,255,255,0.7)' : 'white'
+        }
+        strokeWidth={(isMouseOverBoundingBoxOutline ? 8 : 1) / stageScale}
         width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
@@ -285,6 +280,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         ignoreStroke={true}
         keepRatio={false}
         listening={!isDrawing && tool === 'move'}
+        onDragStart={handleStartedMoving}
         onDragEnd={handleEndedModifying}
         onMouseDown={handleStartedTransforming}
         onMouseUp={handleEndedTransforming}

@@ -101,6 +101,8 @@ SAMPLER_CHOICES = [
     'ddim',
     'k_dpm_2_a',
     'k_dpm_2',
+    'k_dpmpp_2_a',
+    'k_dpmpp_2',
     'k_euler_a',
     'k_euler',
     'k_heun',

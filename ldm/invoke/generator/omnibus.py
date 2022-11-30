@@ -12,6 +12,8 @@ from ldm.invoke.generator.txt2img import Txt2Img
 class Omnibus(Img2Img,Txt2Img):
     def __init__(self, model, precision):
         super().__init__(model, precision)
+        self.pil_mask = None
+        self.pil_image = None
 
     def get_make_image(
             self,

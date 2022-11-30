@@ -15,13 +15,16 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAICheckbox from 'common/components/IAICheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIButton from 'common/components/IAIButton';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 
 export const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
+  [canvasSelector, isStagingSelector],
+  (canvas, isStaging) => {
     const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } =
       canvas;
 
@@ -31,6 +34,7 @@ export const selector = createSelector(
       maskColorString: rgbaColorToString(maskColor),
       isMaskEnabled,
       shouldPreserveMaskedArea,
+      isStaging,
     };
   },
   {
@@ -41,8 +45,13 @@ export const selector = createSelector(
 );
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
-  const { layer, maskColor, isMaskEnabled, shouldPreserveMaskedArea } =
-    useAppSelector(selector);
+  const {
+    layer,
+    maskColor,
+    isMaskEnabled,
+    shouldPreserveMaskedArea,
+    isStaging,
+  } = useAppSelector(selector);
 
   useHotkeys(
     ['q'],
@@ -50,7 +59,7 @@ const IAICanvasMaskOptions = () => {
       handleToggleMaskLayer();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [layer]
@@ -62,7 +71,7 @@ const IAICanvasMaskOptions = () => {
       handleClearMask();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     []
@@ -74,7 +83,7 @@ const IAICanvasMaskOptions = () => {
       handleToggleEnableMask();
     },
     {
-      enabled: () => true,
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [isMaskEnabled]
@@ -103,6 +112,7 @@ const IAICanvasMaskOptions = () => {
                 ? { backgroundColor: 'var(--accent-color)' }
                 : { backgroundColor: 'var(--btn-base-color)' }
             }
+            isDisabled={isStaging}
           />
         </ButtonGroup>
       }
