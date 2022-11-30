@@ -108,11 +108,13 @@ completely skip this step.
     completer.complete_extensions(None)  # turn off path-completion mode
     selection = None
     while selection is None:
-        choice = input('Download <r>ecommended models, <c>ustomize the list, or <s>kip this step? [r]: ')
+        choice = input('Download <r>ecommended models, <a>ll models, <c>ustomized list, or <s>kip this step? [r]: ')
         if choice.startswith(('r','R')) or len(choice)==0:
             selection = 'recommended'
         elif choice.startswith(('c','C')):
             selection = 'customized'
+        elif choice.startswith(('a','A')):
+            selection = 'all'
         elif choice.startswith(('s','S')):
             selection = 'skip'
     return selection
@@ -166,7 +168,14 @@ def recommended_datasets()->dict:
         if Datasets[ds]['recommended']:
             datasets[ds]=True
     return datasets
-    
+
+#---------------------------------------------
+def all_datasets()->dict:
+    datasets = dict()
+    for ds in Datasets.keys():
+        datasets[ds]=True
+    return datasets
+
 #-------------------------------Authenticate against Hugging Face
 def authenticate():
     print('''
@@ -526,6 +535,8 @@ def download_weights(opt:dict):
 
     if choice == 'recommended':
         models = recommended_datasets()
+    elif choice == 'all':
+        models = all_datasets()
     elif choice == 'customized':
         models = select_datasets(choice)
         if models is None and yes_or_no('Quit?',default_yes=False):
