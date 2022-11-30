@@ -21,9 +21,6 @@ from typing import Union
 
 import torch
 import transformers
-import textwrap
-import contextlib
-from typing import Union
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from picklescan.scanner import scan_file_path
@@ -99,7 +96,7 @@ class ModelCache(object):
                 assert self.current_model,'** FATAL: no current model to restore to'
                 print(f'** restoring {self.current_model}')
                 self.get_model(self.current_model)
-                return None
+                return
 
         self.current_model = model_name
         self._push_newest_model(model_name)
@@ -219,7 +216,7 @@ class ModelCache(object):
         if model_format == 'ckpt':
             weights = mconfig.weights
             print(f'>> Loading {model_name} from {weights}')
-            model, width, height, model_hash = self._load_ckpt_model(mconfig)
+            model, width, height, model_hash = self._load_ckpt_model(model_name, mconfig)
         elif model_format == 'diffusers':
             model, width, height, model_hash = self._load_diffusers_model(mconfig)
         else:
@@ -237,10 +234,10 @@ class ModelCache(object):
             )
         return model, width, height, model_hash
 
-    def _load_ckpt_model(self, mconfig):
+    def _load_ckpt_model(self, model_name, mconfig):
         config = mconfig.config
         weights = mconfig.weights
-        vae = mconfig.get('vae', None)
+        vae = mconfig.get('vae')
         width = mconfig.width
         height = mconfig.height
 
@@ -249,10 +246,22 @@ class ModelCache(object):
         if not os.path.isabs(weights):
             weights = os.path.normpath(os.path.join(Globals.root,weights))
         # scan model
-        self._scan_model(model_name, weights)
+        self.scan_model(model_name, weights)
 
-        c = OmegaConf.load(config)
-        with open(weights, 'rb') as f:
+        print(f'>> Loading {model_name} from {weights}')
+
+        # for usage statistics
+        if self._has_cuda():
+            torch.cuda.reset_peak_memory_stats()
+            torch.cuda.empty_cache()
+
+        tic = time.time()
+
+        # this does the work
+        if not os.path.isabs(config):
+            config = os.path.join(Globals.root,config)
+        omega_config = OmegaConf.load(config)
+        with open(weights,'rb') as f:
             weight_bytes = f.read()
         model_hash = self._cached_sha256(weights, weight_bytes)
         sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
@@ -289,6 +298,18 @@ class ModelCache(object):
             if isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
                 module._orig_padding_mode = module.padding_mode
 
+        # usage statistics
+        toc = time.time()
+        print(f'>> Model loaded in', '%4.2fs' % (toc - tic))
+
+        if self._has_cuda():
+            print(
+                '>> Max VRAM used to load the model:',
+                '%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9),
+                '\n>> Current VRAM usage:'
+                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
+            )
+
         return model, width, height, model_hash
 
     def _load_diffusers_model(self, mconfig):
@@ -307,6 +328,8 @@ class ModelCache(object):
             raise ValueError("Model config must specify either repo_name or path.")
 
         print(f'>> Loading diffusers model from {name_or_path}')
+
+        # TODO: scan weights maybe?
 
         if self.precision == 'float16':
             print('   | Using faster float16 precision')
@@ -342,7 +365,7 @@ class ModelCache(object):
         else:
             raise ValueError("Model config must specify either repo_name or path.")
 
-    def offload_model(self, model_name:str):
+    def offload_model(self, model_name:str) -> None:
         '''
         Offload the indicated model to CPU. Will call
         _make_cache_room() to free space if needed.

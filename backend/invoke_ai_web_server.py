@@ -1,33 +1,31 @@
-import eventlet
+import base64
 import glob
+import io
+import json
+import math
+import mimetypes
 import os
 import shutil
-import mimetypes
 import traceback
-import math
-import io
-import base64
-import os
-import json
+from threading import Event
+from uuid import uuid4
 
-from werkzeug.utils import secure_filename
+import eventlet
+from PIL import Image
+from PIL.Image import Image as ImageType
 from flask import Flask, redirect, send_from_directory, request, make_response
 from flask_socketio import SocketIO
-from PIL import Image, ImageOps
-from PIL.Image import Image as ImageType
-from uuid import uuid4
-from threading import Event
+from werkzeug.utils import secure_filename
 
-from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
-from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.prompt_parser import split_weighted_subprompts
-from ldm.invoke.generator.inpaint import infill_methods
-
-from backend.modules.parameters import parameters_to_command
 from backend.modules.get_canvas_generation_mode import (
     get_canvas_generation_mode,
 )
+from backend.modules.parameters import parameters_to_command
+from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
+from ldm.invoke.generator.inpaint import infill_methods
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
+from ldm.invoke.prompt_parser import split_weighted_subprompts
 
 # Loading Arguments
 opt = Args()
@@ -251,7 +249,7 @@ class InvokeAIWebServer:
                 return candidate
         assert "Frontend files cannot be found. Cannot continue"
 
-                                        
+
     def setup_app(self):
         self.result_url = "outputs/"
         self.init_image_url = "outputs/init-images/"
@@ -776,10 +774,10 @@ class InvokeAIWebServer:
                 ).convert("RGBA")
 
                 """
-                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
+                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass
                 to the generator should be:
                     {
-                        "x": 0, 
+                        "x": 0,
                         "y": 0,
                         "width": original_bounding_box["width"],
                         "height": original_bounding_box["height"]
@@ -799,7 +797,7 @@ class InvokeAIWebServer:
                 )
 
                 """
-                Apply the mask to the init image, creating a "mask" image with 
+                Apply the mask to the init image, creating a "mask" image with
                 transparency where inpainting should occur. This is the kind of
                 mask that prompt2image() needs.
                 """

@@ -236,7 +236,7 @@ class Generate:
             except Exception:
                 print('** An error was encountered while installing the safety checker:')
                 print(traceback.format_exc())
-                
+
     def prompt2png(self, prompt, outdir, **kwargs):
         """
         Takes a prompt and an output directory, writes out the requested number
@@ -330,7 +330,7 @@ class Generate:
             infill_method = infill_methods[0], # The infill method to use
             force_outpaint: bool = False,
             enable_image_debugging = False,
-            
+
             **args,
     ):   # eat up additional cruft
         """
@@ -373,7 +373,7 @@ class Generate:
             def process_image(image,seed):
                 image.save(f{'images/seed.png'})
 
-        The code used to save images to a directory can be found in ldm/invoke/pngwriter.py. 
+        The code used to save images to a directory can be found in ldm/invoke/pngwriter.py.
         It contains code to create the requested output directory, select a unique informative
         name for each image, and write the prompt into the PNG metadata.
         """
@@ -593,7 +593,7 @@ class Generate:
         seed = opt.seed or args.seed
         if seed is None or seed < 0:
             seed = random.randrange(0, np.iinfo(np.uint32).max)
-        
+
         prompt = opt.prompt or args.prompt or ''
         print(f'>> using seed {seed} and prompt "{prompt}" for {image_path}')
 
@@ -645,7 +645,7 @@ class Generate:
 
             opt.seed = seed
             opt.prompt = prompt
-            
+
             if len(extend_instructions) > 0:
                 restorer = Outcrop(image,self,)
                 return restorer.process (
@@ -687,7 +687,7 @@ class Generate:
                 image_callback = callback,
                 prefix         = prefix
             )
-                
+
         elif tool is None:
             print(f'* please provide at least one postprocessing option, such as -G or -U')
             return None
@@ -710,13 +710,13 @@ class Generate:
 
         if embiggen is not None:
             return self._make_embiggen()
-            
+
         if inpainting_model_in_use:
             return self._make_omnibus()
 
         if ((init_image is not None) and (mask_image is not None)) or force_outpaint:
             return self._make_inpaint()
-        
+
         if init_image is not None:
             return self._make_img2img()
 
@@ -747,7 +747,7 @@ class Generate:
         if self._has_transparency(image):
             self._transparency_check_and_warning(image, mask, force_outpaint)
             init_mask = self._create_init_mask(image, width, height, fit=fit)
-            
+
         if (image.width * image.height) > (self.width * self.height) and self.size_matters:
             print(">> This input is larger than your defaults. If you run out of memory, please use a smaller image.")
             self.size_matters = False
@@ -763,7 +763,7 @@ class Generate:
 
         if invert_mask:
             init_mask = ImageOps.invert(init_mask)
-            
+
         return init_image,init_mask
 
     # lots o' repeated code here! Turn into a make_func()
@@ -822,7 +822,7 @@ class Generate:
         self.set_model(self.model_name)
 
     def set_model(self,model_name):
-        """ 
+        """
         Given the name of a model defined in models.yaml, will load and initialize it
         and return the model object. Previously-used models will be cached.
         """
@@ -834,7 +834,7 @@ class Generate:
         if not cache.valid_model(model_name):
             print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
             return self.model
-        
+
         cache.print_vram_usage()
 
         # have to get rid of all references to model in order
@@ -843,7 +843,7 @@ class Generate:
         self.sampler = None
         self.generators = {}
         gc.collect()
-        
+
         model_data = cache.get_model(model_name)
         if model_data is None:  # restore previous
             model_data = cache.get_model(self.model_name)
@@ -856,7 +856,7 @@ class Generate:
 
         # uncache generators so they pick up new models
         self.generators = {}
-        
+
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
             self.model.embedding_manager.load(
@@ -905,7 +905,7 @@ class Generate:
                                 image_callback = None,
                                 prefix = None,
     ):
-            
+
         for r in image_list:
             image, seed = r
             try:
@@ -915,7 +915,7 @@ class Generate:
                             if self.gfpgan is None:
                                 print('>> GFPGAN not found. Face restoration is disabled.')
                             else:
-                              image = self.gfpgan.process(image, strength, seed)                              
+                              image = self.gfpgan.process(image, strength, seed)
                         if facetool == 'codeformer':
                             if self.codeformer is None:
                                 print('>> CodeFormer not found. Face restoration is disabled.')

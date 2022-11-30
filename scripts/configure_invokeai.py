@@ -34,6 +34,12 @@ warnings.filterwarnings('ignore')
 import torch
 transformers.logging.set_verbosity_error()
 
+try:
+    from ldm.invoke.model_cache import ModelCache
+except ImportError:
+    sys.path.append('.')
+    from ldm.invoke.model_cache import ModelCache
+
 #--------------------------globals-----------------------
 Model_dir = 'models'
 Weights_dir = 'ldm/stable-diffusion-v1/'
@@ -266,6 +272,19 @@ def download_weight_datasets(models:dict, access_token:str):
     keys = ', '.join(successful.keys())
     print(f'Successfully installed {keys}')
     return successful
+
+#---------------------------------------------
+def is_huggingface_authenticated():
+    # huggingface_hub 0.10 API isn't great for this, it could be OSError, ValueError,
+    # maybe other things, not all end-user-friendly.
+    # noinspection PyBroadException
+    try:
+        response = hf_whoami()
+        if response.get('id') is not None:
+            return True
+    except Exception:
+        pass
+    return False
 
 #---------------------------------------------
 def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_token:str=None)->bool:
@@ -749,6 +768,12 @@ def main():
                         action=argparse.BooleanOptionalAction,
                         default=True,
                         help='run in interactive mode (default)')
+    parser.add_argument('--full-precision',
+                        dest='full_precision',
+                        action=argparse.BooleanOptionalAction,
+                        type=bool,
+                        default=False,
+                        help='use 32-bit weights instead of faster 16-bit weights')
     parser.add_argument('--yes','-y',
                         dest='yes_to_all',
                         action='store_true',

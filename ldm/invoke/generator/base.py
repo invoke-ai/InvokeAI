@@ -9,9 +9,10 @@ import os.path as osp
 import random
 import traceback
 
+import cv2
 import numpy as np
 import torch
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageChops
 from diffusers import DiffusionPipeline
 from einops import rearrange
 from pytorch_lightning import seed_everything
@@ -169,7 +170,7 @@ class Generator:
         # Blur the mask out (into init image) by specified amount
         if mask_blur_radius > 0:
             nm = np.asarray(pil_init_mask, dtype=np.uint8)
-            nmd = cv.erode(nm, kernel=np.ones((3,3), dtype=np.uint8), iterations=int(mask_blur_radius / 2))
+            nmd = cv2.erode(nm, kernel=np.ones((3,3), dtype=np.uint8), iterations=int(mask_blur_radius / 2))
             pmd = Image.fromarray(nmd, mode='L')
             blurred_init_mask = pmd.filter(ImageFilter.BoxBlur(mask_blur_radius))
         else:
@@ -180,8 +181,6 @@ class Generator:
         # Paste original on color-corrected generation (using blurred mask)
         matched_result.paste(init_image, (0,0), mask = multiplied_blurred_init_mask)
         return matched_result
-
-
 
     def sample_to_lowres_estimated_image(self,samples):
         # origingally adapted from code by @erucipe and @keturn here:
