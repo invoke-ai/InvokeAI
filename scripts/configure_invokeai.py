@@ -604,7 +604,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
 
-    enable_safety_checker = False  # FOR TESTING CI FAILURES ONLY
+    enable_safety_checker = True
     default_sampler = 'k_heun'
     default_steps = '20'  # deliberately a string - see test below
 
