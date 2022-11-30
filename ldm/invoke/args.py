@@ -94,6 +94,7 @@ import base64
 import functools
 import warnings
 import ldm.invoke.pngwriter
+from pathlib import Path
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
@@ -174,7 +175,13 @@ class Args(object):
         try:
             sysargs = sys.argv[1:]
             if not os.path.exists(os.path.expanduser(Globals.initfile)):
-                initfile = os.path.join(get_root(), ".invokeai")
+                root_dir = get_root() or '~/invokeai'
+                Globals.root = Path(root_dir).expanduser().resolve()
+                if not Path("~/.invokeai").expanduser().exists():
+                    Globals.initfile = (Path(Globals.root) / '.invokeai').resolve()
+                else:
+                    # legacy / deprecated initfile location, supported for backwards compatibility
+                    Globals.initfile = Path('~/.invokeai').expanduser().resolve()
             else:
                 initfile = os.path.expanduser(Globals.initfile)
             if os.path.exists(initfile):
@@ -188,7 +195,7 @@ class Args(object):
             return self._arg_switches
         except Exception as e:
             # this is a one-off right now; team should discuss a global flag for setting debug verbosity level
-            if os.getenv("INVOKEAI_DEBUG") is not None:
+            if os.getenv('INVOKEAI_DEBUG') is not None:
                 raise
             else:
                 print(f'An exception has occurred: {e}.\nSet INVOKEAI_DEBUG=1 env variable for more detail')
@@ -343,7 +350,7 @@ class Args(object):
 
         if not hasattr(cmd_switches,name) and not hasattr(arg_switches,name):
             raise AttributeError
-        
+
         value_arg,value_cmd = (None,None)
         try:
             value_cmd = getattr(cmd_switches,name)
@@ -399,7 +406,7 @@ class Args(object):
             description=
             """
             Generate images using Stable Diffusion.
-            Use --web to launch the web interface. 
+            Use --web to launch the web interface.
             Use --from_file to load prompts from a file path or standard input ("-").
             Otherwise you will be dropped into an interactive command prompt (type -h for help.)
             Other command-line arguments are defaults that can usually be overridden
@@ -1042,7 +1049,7 @@ def metadata_dumps(opt,
     Given an Args object, returns a dict containing the keys and
     structure of the proposed stable diffusion metadata standard
     https://github.com/lstein/stable-diffusion/discussions/392
-    This is intended to be turned into JSON and stored in the 
+    This is intended to be turned into JSON and stored in the
     "sd
     '''
 
@@ -1125,7 +1132,7 @@ def args_from_png(png_file_path) -> list[Args]:
         meta = ldm.invoke.pngwriter.retrieve_metadata(png_file_path)
     except AttributeError:
         return [legacy_metadata_load({},png_file_path)]
-    
+
     try:
         return metadata_loads(meta)
     except:
@@ -1224,4 +1231,3 @@ def legacy_metadata_load(meta,pathname) -> Args:
             opt.prompt = ''
             opt.seed = 0
     return opt
-            
