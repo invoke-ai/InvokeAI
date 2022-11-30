@@ -49,9 +49,10 @@ const selector = createSelector(
       isMovingStage,
       shouldShowIntermediates,
       shouldShowGrid,
+      shouldRestrictStrokesToBox,
     } = canvas;
 
-    let stageCursor: string | undefined = '';
+    let stageCursor: string | undefined = 'none';
 
     if (tool === 'move' || isStaging) {
       if (isMovingStage) {
@@ -61,10 +62,8 @@ const selector = createSelector(
       }
     } else if (isTransformingBoundingBox) {
       stageCursor = undefined;
-    } else if (isMouseOverBoundingBox) {
-      stageCursor = 'move';
-    } else {
-      stageCursor = 'none';
+    } else if (shouldRestrictStrokesToBox && !isMouseOverBoundingBox) {
+      stageCursor = 'default';
     }
 
     return {
@@ -155,7 +154,6 @@ const IAICanvas = () => {
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseOut}
           onMouseMove={handleMouseMove}
-          onMouseOut={handleMouseOut}
           onMouseUp={handleMouseUp}
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
@@ -164,7 +162,6 @@ const IAICanvas = () => {
             e.evt.preventDefault()
           }
           onWheel={handleWheel}
-          listening={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
           draggable={(tool === 'move' || isStaging) && !isModifyingBoundingBox}
         >
           <Layer id={'grid'} visible={shouldShowGrid}>
@@ -182,9 +179,9 @@ const IAICanvas = () => {
           <Layer id={'mask'} visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
+            <IAICanvasBoundingBoxOverlay />
           </Layer>
           <Layer id="preview" imageSmoothingEnabled={false}>
-            <IAICanvasBoundingBoxOverlay />
             {!isStaging && (
               <IAICanvasToolPreview
                 visible={tool !== 'move'}
