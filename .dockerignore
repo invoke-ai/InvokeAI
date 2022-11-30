@@ -9,6 +9,7 @@
 !static
 !setup.py
 !docker-build
+!docs
 docker-build/Dockerfile
 
 # Guard against pulling in any models that might exist in the directory tree
