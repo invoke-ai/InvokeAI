@@ -1,7 +1,8 @@
 import { emptyTempFolder } from 'app/socketio/actions';
-import { useAppDispatch } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearCanvasHistory,
   resetCanvas,
@@ -9,6 +10,7 @@ import {
 import { FaTrash } from 'react-icons/fa';
 
 const EmptyTempFolderButtonModal = () => {
+  const isStaging = useAppSelector(isStagingSelector);
   const dispatch = useAppDispatch();
 
   const acceptCallback = () => {
@@ -23,7 +25,7 @@ const EmptyTempFolderButtonModal = () => {
       acceptCallback={acceptCallback}
       acceptButtonText={'Empty Folder'}
       triggerComponent={
-        <IAIButton leftIcon={<FaTrash />} size={'sm'}>
+        <IAIButton leftIcon={<FaTrash />} size={'sm'} isDisabled={isStaging}>
           Empty Temp Image Folder
         </IAIButton>
       }

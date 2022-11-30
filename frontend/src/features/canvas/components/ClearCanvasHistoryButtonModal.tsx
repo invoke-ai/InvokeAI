@@ -1,10 +1,12 @@
-import { useAppDispatch } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';
 import { FaTrash } from 'react-icons/fa';
+import { isStagingSelector } from '../store/canvasSelectors';
 
 const ClearCanvasHistoryButtonModal = () => {
+  const isStaging = useAppSelector(isStagingSelector);
   const dispatch = useAppDispatch();
 
   return (
@@ -13,7 +15,7 @@ const ClearCanvasHistoryButtonModal = () => {
       acceptCallback={() => dispatch(clearCanvasHistory())}
       acceptButtonText={'Clear History'}
       triggerComponent={
-        <IAIButton size={'sm'} leftIcon={<FaTrash />}>
+        <IAIButton size={'sm'} leftIcon={<FaTrash />} isDisabled={isStaging}>
           Clear Canvas History
         </IAIButton>
       }

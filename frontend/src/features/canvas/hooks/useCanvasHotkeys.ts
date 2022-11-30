@@ -9,13 +9,16 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import { useRef } from 'react';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import { CanvasTool } from '../store/canvasTypes';
 import { getCanvasStage } from '../util/konvaInstanceProvider';
 
 const selector = createSelector(
-  [canvasSelector, activeTabNameSelector],
-  (canvas, activeTabName) => {
+  [canvasSelector, activeTabNameSelector, isStagingSelector],
+  (canvas, activeTabName, isStaging) => {
     const {
       cursorPosition,
       shouldLockBoundingBox,
@@ -29,6 +32,7 @@ const selector = createSelector(
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
+      isStaging,
     };
   },
   {
@@ -40,7 +44,7 @@ const selector = createSelector(
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const { activeTabName, shouldShowBoundingBox, tool } =
+  const { activeTabName, shouldShowBoundingBox, tool, isStaging } =
     useAppSelector(selector);
 
   const previousToolRef = useRef<CanvasTool | null>(null);
@@ -64,6 +68,7 @@ const useInpaintingCanvasHotkeys = () => {
       dispatch(setShouldShowBoundingBox(!shouldShowBoundingBox));
     },
     {
+      enabled: () => !isStaging,
       preventDefault: true,
     },
     [activeTabName, shouldShowBoundingBox]
