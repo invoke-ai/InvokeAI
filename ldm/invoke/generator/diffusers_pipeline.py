@@ -83,8 +83,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
         safety_checker: Optional[StableDiffusionSafetyChecker],
         feature_extractor: Optional[CLIPFeatureExtractor],
+        requires_safety_checker: bool = False
     ):
-        super().__init__(vae, text_encoder, tokenizer, unet, scheduler, safety_checker, feature_extractor)
+        super().__init__(vae, text_encoder, tokenizer, unet, scheduler,
+                         safety_checker, feature_extractor, requires_safety_checker)
 
         self.register_modules(
             vae=vae,
