@@ -7,11 +7,13 @@
     "dev": "vite dev",
     "build": "tsc && vite build",
     "build-dev": "tsc && vite build -m development",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.0.10",
     "@chakra-ui/react": "^2.3.1",
+    "@emotion/cache": "^11.10.5",
     "@emotion/react": "^11.10.4",
     "@emotion/styled": "^11.10.4",
     "@radix-ui/react-context-menu": "^2.0.1",
@@ -29,14 +31,18 @@
     "react-colorful": "^5.6.1",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.2",
-    "react-hotkeys-hook": "^3.4.7",
+    "react-hotkeys-hook": "4.0.2",
     "react-icons": "^4.4.0",
     "react-konva": "^18.2.3",
+    "react-konva-utils": "^0.3.0",
     "react-redux": "^8.0.2",
     "react-transition-group": "^4.4.5",
+    "react-zoom-pan-pinch": "^2.1.3",
+    "redux-deep-persist": "^1.0.6",
     "redux-persist": "^6.0.0",
     "socket.io": "^4.5.2",
     "socket.io-client": "^4.5.2",
+    "use-image": "^1.1.0",
     "uuid": "^9.0.0",
     "yarn": "^1.22.19"
   },
@@ -51,10 +57,13 @@
     "eslint": "^8.23.0",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "patch-package": "^6.5.0",
+    "postinstall-postinstall": "^2.1.0",
     "sass": "^1.55.0",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.6.4",
     "vite": "^3.0.7",
-    "vite-plugin-eslint": "^1.8.1"
+    "vite-plugin-eslint": "^1.8.1",
+    "vite-tsconfig-paths": "^3.5.2"
   }
 }

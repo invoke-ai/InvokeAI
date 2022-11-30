@@ -12,7 +12,9 @@
  * 'gfpgan'.
  */
 
-import { Category as GalleryCategory } from '../features/gallery/gallerySlice';
+import { Category as GalleryCategory } from 'features/gallery/store/gallerySlice';
+import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import { IRect } from 'konva/lib/types';
 
 /**
  * TODO:
@@ -44,6 +46,8 @@ export declare type CommonGeneratedImageMetadata = {
     | 'ddim'
     | 'k_dpm_2_a'
     | 'k_dpm_2'
+    | 'k_dpmpp_2_a'
+    | 'k_dpmpp_2'
     | 'k_euler_a'
     | 'k_euler'
     | 'k_heun'
@@ -103,7 +107,7 @@ export declare type PostProcessedImageMetadata =
   | FacetoolMetadata;
 
 // Metadata includes the system config and image metadata.
-export declare type Metadata = SystemConfig & {
+export declare type Metadata = SystemGenerationMetadata & {
   image: GeneratedImageMetadata | PostProcessedImageMetadata;
 };
 
@@ -111,12 +115,14 @@ export declare type Metadata = SystemConfig & {
 export declare type Image = {
   uuid: string;
   url: string;
+  thumbnail: string;
   mtime: number;
   metadata?: Metadata;
   width: number;
   height: number;
-  category: GalleryCategory; 
-  isBase64: boolean; 
+  category: GalleryCategory;
+  isBase64?: boolean;
+  dreamPrompt?: 'string';
 };
 
 // GalleryImages is an array of Image.
@@ -140,13 +146,18 @@ export declare type SystemStatus = {
   hasError: boolean;
 };
 
-export declare type SystemConfig = {
+export declare type SystemGenerationMetadata = {
   model: string;
-  model_id: string;
+  model_weights?: string;
+  model_id?: string;
   model_hash: string;
   app_id: string;
   app_version: string;
+};
+
+export declare type SystemConfig = SystemGenerationMetadata & {
   model_list: ModelList;
+  infill_methods: string[];
 };
 
 export declare type ModelStatus = 'active' | 'cached' | 'not loaded';
@@ -171,10 +182,19 @@ export declare type SystemStatusResponse = SystemStatus;
 
 export declare type SystemConfigResponse = SystemConfig;
 
-export declare type ImageResultResponse = Omit<Image, 'uuid'>;
+export declare type ImageResultResponse = Omit<Image, 'uuid'> & {
+  boundingBox?: IRect;
+  generationMode: InvokeTabName;
+};
 
-export declare type ImageUploadResponse = Omit<Image, 'uuid' | 'metadata'> & {
-  destination: 'img2img' | 'inpainting';
+export declare type ImageUploadResponse = {
+  // image: Omit<Image, 'uuid' | 'metadata' | 'category'>;
+  url: string;
+  mtime: number;
+  width: number;
+  height: number;
+  thumbnail: string;
+  // bbox: [number, number, number, number];
 };
 
 export declare type ErrorResponse = {
@@ -198,9 +218,12 @@ export declare type ImageUrlResponse = {
   url: string;
 };
 
-export declare type ImageUploadDestination = 'img2img' | 'inpainting';
-
 export declare type UploadImagePayload = {
   file: File;
   destination?: ImageUploadDestination;
+};
+
+export declare type UploadOutpaintingMergeImagePayload = {
+  dataURL: string;
+  name: string;
 };

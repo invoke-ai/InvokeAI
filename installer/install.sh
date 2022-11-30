@@ -22,6 +22,15 @@ function _err_exit {
 
 # This enables a user to install this project without manually installing git or Python
 
+export no_cache_dir="--no-cache-dir"
+if [ $# -ge 1 ]; then
+    if [ "$1" = "use-cache" ]; then
+        export no_cache_dir=""
+    fi
+fi
+
+echo "$no_cache_dir"
+
 echo -e "\n***** Installing InvokeAI... *****\n"
 
 
@@ -29,7 +38,7 @@ OS_NAME=$(uname -s)
 case "${OS_NAME}" in
     Linux*)     OS_NAME="linux";;
     Darwin*)    OS_NAME="darwin";;
-    *)          echo -e "\n----- Unknown OS: $OS_NAME! This script runs only on Linux or MacOS -----\n" && exit
+    *)          echo -e "\n----- Unknown OS: $OS_NAME! This script runs only on Linux or macOS -----\n" && exit
 esac
 
 OS_ARCH=$(uname -m)
@@ -71,10 +80,13 @@ if [ "$OS_NAME" == "darwin" ] && [ "$OS_ARCH" == "arm64" ]; then
 fi
 
 # config
+echo "USING development BRANCH. REMEMBER TO CHANGE TO main BEFORE RELEASE"
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 MICROMAMBA_DOWNLOAD_URL="https://micro.mamba.pm/api/micromamba/${MAMBA_OS_NAME}-${MAMBA_ARCH}/latest"
 RELEASE_URL=https://github.com/invoke-ai/InvokeAI
-RELEASE_SOURCEBALL=/archive/refs/heads/main.tar.gz
+# RELEASE_SOURCEBALL=/archive/refs/heads/main.tar.gz
+# RELEASE_SOURCEBALL=/archive/refs/heads/test-installer.tar.gz
+RELEASE_SOURCEBALL=/archive/refs/heads/development.tar.gz
 PYTHON_BUILD_STANDALONE_URL=https://github.com/indygreg/python-build-standalone/releases/download
 if [ "$OS_NAME" == "darwin" ]; then
     PYTHON_BUILD_STANDALONE=20221002/cpython-3.10.7+20221002-${PY_ARCH}-apple-darwin-install_only.tar.gz
@@ -93,20 +105,20 @@ if [ "$PACKAGES_TO_INSTALL" != "" ]; then
 
     curl -L "$MICROMAMBA_DOWNLOAD_URL" | tar -xvjO bin/micromamba > micromamba
 
-    chmod u+x "micromamba"
+    chmod u+x ./micromamba
 
     # test the mamba binary
     echo -e "\n***** Micromamba version: *****\n"
-    "micromamba" --version
+    ./micromamba --version
 
     # create the installer env
     if [ ! -e "$INSTALL_ENV_DIR" ]; then
-        "micromamba" create -y --prefix "$INSTALL_ENV_DIR"
+        ./micromamba create -y --prefix "$INSTALL_ENV_DIR"
     fi
 
     echo -e "\n***** Packages to install:$PACKAGES_TO_INSTALL *****\n"
 
-    "micromamba" install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge $PACKAGES_TO_INSTALL
+    ./micromamba install -y --prefix "$INSTALL_ENV_DIR" -c conda-forge "$PACKAGES_TO_INSTALL"
 
     if [ ! -e "$INSTALL_ENV_DIR" ]; then
         echo -e "\n----- There was a problem while initializing micromamba. Cannot continue. -----\n"
@@ -154,12 +166,22 @@ echo -e "\n***** Unpacked python-build-standalone *****\n"
 
 # create venv
 _err_msg="\n----- problem creating venv -----\n"
+
+if [ "$OS_NAME" == "darwin" ]; then
+    # patch sysconfig so that extensions can build properly
+    # adapted from https://github.com/cashapp/hermit-packages/commit/fcba384663892f4d9cfb35e8639ff7a28166ee43
+    PYTHON_INSTALL_DIR="$(pwd)/python"
+    SYSCONFIG="$(echo python/lib/python*/_sysconfigdata_*.py)"
+    TMPFILE="$(mktemp)"
+    chmod +w "${SYSCONFIG}"
+    cp "${SYSCONFIG}" "${TMPFILE}"
+    sed "s,'/install,'${PYTHON_INSTALL_DIR},g" "${TMPFILE}" > "${SYSCONFIG}"
+    rm -f "${TMPFILE}"
+fi
+
 ./python/bin/python3 -E -s -m venv .venv
 _err_exit $? _err_msg
-# In reality, the following is ALL that 'activate.bat' does,
-# aside from setting the prompt, which we don't care about
-export PYTHONPATH=
-export PATH=.venv/bin:$PATH
+source .venv/bin/activate
 
 echo -e "\n***** Created Python virtual environment *****\n"
 
@@ -170,41 +192,40 @@ echo -e "We're running under"
 _err_exit $? _err_msg
 
 _err_msg="\n----- pip update failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location --upgrade pip
+.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location --upgrade pip wheel
 _err_exit $? _err_msg
 
-echo -e "\n***** Updated pip *****\n"
+echo -e "\n***** Updated pip and wheel *****\n"
 
 _err_msg="\n----- requirements file copy failed -----\n"
 cp installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt
 _err_exit $? _err_msg
 
 _err_msg="\n----- main pip install failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -r requirements.txt
-_err_exit $? _err_msg
-
-_err_msg="\n----- clipseg install failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-_err_exit $? _err_msg
-
-_err_msg="\n----- InvokeAI setup failed -----\n"
-.venv/bin/python3 -m pip install --no-cache-dir --no-warn-script-location -e .
+.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location -r requirements.txt
 _err_exit $? _err_msg
 
 echo -e "\n***** Installed Python dependencies *****\n"
 
-# preload the models
-.venv/bin/python3 scripts/preload_models.py
-_err_msg="\n----- model download clone failed -----\n"
+_err_msg="\n----- InvokeAI setup failed -----\n"
+.venv/bin/python3 -m pip install "$no_cache_dir" --no-warn-script-location -e .
 _err_exit $? _err_msg
 
-echo -e "\n***** Finished downloading models *****\n"
+echo -e "\n***** Installed InvokeAI *****\n"
 
-echo -e "\n***** Installing invoke.sh ******\n"
 cp installer/invoke.sh .
+echo -e "\n***** Installed invoke launcher script ******\n"
 
 # more cleanup
 rm -rf installer/ installer_files/
+
+# preload the models
+.venv/bin/python3 scripts/configure_invokeai.py
+_err_msg="\n----- model download clone failed -----\n"
+_err_exit $? _err_msg
+deactivate
+
+echo -e "\n***** Finished downloading models *****\n"
 
 echo "All done! Run the command './invoke.sh' to start InvokeAI."
 read -p "Press any key to exit..."

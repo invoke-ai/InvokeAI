@@ -30,6 +30,7 @@ def build_opt(post_data, seed, gfpgan_model_exists):
     # however, this code is here against that eventuality
     setattr(opt, 'embiggen', None)
     setattr(opt, 'embiggen_tiles', None)
+    setattr(opt, 'embiggen_strength', None)
 
     setattr(opt, 'facetool_strength', float(post_data['facetool_strength']) if gfpgan_model_exists else 0)
     setattr(opt, 'upscale', [int(post_data['upscale_level']), float(post_data['upscale_strength'])] if post_data['upscale_level'] != '' else None)

@@ -14,7 +14,7 @@ import torch
 
 from .prompt_parser import PromptParser, Blend, FlattenedPrompt, \
     CrossAttentionControlledFragment, CrossAttentionControlSubstitute, Fragment, log_tokenization
-from ..models.diffusion.cross_attention_control import CrossAttentionControl
+from ..models.diffusion import cross_attention_control
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
 
@@ -47,9 +47,12 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
         parsed_prompt = pp.parse_conjunction(prompt_string_cleaned).prompts[0]
 
     parsed_negative_prompt: FlattenedPrompt = pp.parse_conjunction(unconditioned_words).prompts[0]
+    if log_tokens:
+        print(f">> Parsed prompt to {parsed_prompt}")
+        print(f">> Parsed negative prompt to {parsed_negative_prompt}")
 
     conditioning = None
-    cac_args:CrossAttentionControl.Arguments = None
+    cac_args:cross_attention_control.Arguments = None
 
     if type(parsed_prompt) is Blend:
         blend: Blend = parsed_prompt
@@ -120,7 +123,7 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
             conditioning = original_embeddings
             edited_conditioning = edited_embeddings
             #print('>> got edit_opcodes', edit_opcodes, 'options', edit_options)
-            cac_args = CrossAttentionControl.Arguments(
+            cac_args = cross_attention_control.Arguments(
                 edited_conditioning = edited_conditioning,
                 edit_opcodes = edit_opcodes,
                 edit_options = edit_options

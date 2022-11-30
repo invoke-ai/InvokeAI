@@ -189,10 +189,6 @@ def get_parser(**parser_kwargs):
         help='Initialize embedding manager from a checkpoint',
     )
     parser.add_argument(
-        '--placeholder_tokens', type=str, nargs='+', default=['*'],
-        help='Placeholder token which will be used to denote the concept in future prompts')
-
-    parser.add_argument(
         '--init_word',
         type=str,
         help='Word to use as source for initial token embedding.',
@@ -722,14 +718,9 @@ if __name__ == '__main__':
         config.model.params.personalization_config.params.embedding_manager_ckpt = (
             opt.embedding_manager_ckpt
         )
-        config.model.params.personalization_config.params.placeholder_tokens = (
-            opt.placeholder_tokens
-        )
 
         if opt.init_word:
-            config.model.params.personalization_config.params.initializer_words[
-                0
-            ] = opt.init_word
+            config.model.params.personalization_config.params.initializer_words = [opt.init_word]
 
         if opt.actual_resume:
             model = load_model_from_config(config, opt.actual_resume)

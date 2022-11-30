@@ -1,24 +1,41 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-set -euo pipefail
-IFS=$'\n\t'
+set -eu
 
-PATH=.venv/scripts:$PATH
+. .venv/bin/activate
 
-if [ "$0" != "bash" ]; then
-    echo "Do you want to generate images using the"
-    echo "1. command-line"
-    echo "2. browser-based UI"
-    echo "3. open the developer console"
-    read -p "Please enter 1, 2, or 3: " yn
-    case $yn in
-        1 ) printf "\nStarting the InvokeAI command-line..\n"; .venv/bin/python scripts/invoke.py;;
-        2 ) printf "\nStarting the InvokeAI browser-based UI..\n"; .venv/bin/python scripts/invoke.py --web;;
-        3 ) printf "\nDeveloper Console:\n"; file_name=$(basename "${BASH_SOURCE[0]}"); bash --init-file "$file_name";;
-        * ) echo "Invalid selection"; exit;;
-    esac
-else # in developer console
-    python --version
-    echo "Press ^D to exit"
-    export PS1="(InvokeAI) \u@\h \w> "
-fi
+echo "Do you want to generate images using the"
+echo "1. command-line"
+echo "2. browser-based UI"
+echo "OR"
+echo "3. open the developer console"
+echo "Please enter 1, 2, or 3:"
+read choice
+
+case $choice in
+    1)
+        printf "\nStarting the InvokeAI command-line..\n";
+        .venv/bin/python scripts/invoke.py;
+    ;;
+    2)
+        printf "\nStarting the InvokeAI browser-based UI..\n";
+        .venv/bin/python scripts/invoke.py --web;
+    ;;
+    3)
+        printf "\nDeveloper Console:\n";
+        printf "Python command is:\n\t";
+        which python;
+        printf "Python version is:\n\t";
+        python --version;
+        echo "*************************"
+        echo "You are now in your user shell ($SHELL) with the local InvokeAI Python virtual environment activated,";
+        echo "so that you can troubleshoot this InvokeAI installation as necessary.";
+        printf "*************************\n"
+        echo "*** Type \`exit\` to quit this shell and deactivate the Python virtual environment *** ";
+        /usr/bin/env "$SHELL";
+    ;;
+    *)
+        echo "Invalid selection";
+        exit
+    ;;
+esac

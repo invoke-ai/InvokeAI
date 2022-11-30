@@ -13,31 +13,32 @@ on:
 jobs:
   matrix:
     strategy:
-      fail-fast: false
       matrix:
         stable-diffusion-model:
-          # - 'https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt'
-          - 'https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt'
-        os:
-          - ubuntu-latest
-          - macOS-12
+          - 'stable-diffusion-1.5'
+        environment-yaml:
+          - environment-lin-amd.yml
+          - environment-lin-cuda.yml
+          - environment-mac.yml
         include:
-          - os: ubuntu-latest
-            environment-file: environment-lin-cuda.yml
+          - environment-yaml: environment-lin-amd.yml
+            os: ubuntu-latest
             default-shell: bash -l {0}
-          - os: macOS-12
-            environment-file: environment-mac.yml
+          - environment-yaml: environment-lin-cuda.yml
+            os: ubuntu-latest
             default-shell: bash -l {0}
-          # - stable-diffusion-model: https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt
-          #   stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/sd-v1-4.ckpt
-          #   stable-diffusion-model-switch: stable-diffusion-1.4
-          - stable-diffusion-model: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-switch: stable-diffusion-1.5
-    name: ${{ matrix.os }} with ${{ matrix.stable-diffusion-model-switch }}
+          - environment-yaml: environment-mac.yml
+            os: macos-12
+            default-shell: bash -l {0}
+          - stable-diffusion-model: stable-diffusion-1.5
+            stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
+            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
+            stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
+    name: ${{ matrix.environment-yaml }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     env:
       CONDA_ENV_NAME: invokeai
+      INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
     defaults:
       run:
         shell: ${{ matrix.default-shell }}
@@ -47,17 +48,19 @@ jobs:
         uses: actions/checkout@v3
 
       - name: create models.yaml from example
-        run: cp configs/models.yaml.example configs/models.yaml
+        run: |
+          mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
+          cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
 
       - name: create environment.yml
-        run: cp environments-and-requirements/${{ matrix.environment-file }} environment.yml
+        run: cp "environments-and-requirements/${{ matrix.environment-yaml }}" environment.yml
 
       - name: Use cached conda packages
         id: use-cached-conda-packages
         uses: actions/cache@v3
         with:
           path: ~/conda_pkgs_dir
-          key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-file) }}
+          key: conda-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(matrix.environment-yaml) }}
 
       - name: Activate Conda Env
         id: activate-conda-env
@@ -83,34 +86,40 @@ jobs:
         id: cache-sd-model
         uses: actions/cache@v3
         env:
-          cache-name: cache-${{ matrix.stable-diffusion-model-switch }}
+          cache-name: cache-${{ matrix.stable-diffusion-model }}
         with:
-          path: ${{ matrix.stable-diffusion-model-dl-path }}
+          path: ${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}
           key: ${{ env.cache-name }}
 
-      - name: Download ${{ matrix.stable-diffusion-model-switch }}
+      - name: Download ${{ matrix.stable-diffusion-model }}
         id: download-stable-diffusion-model
         if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
         run: |
-          [[ -d models/ldm/stable-diffusion-v1 ]] \
-            || mkdir -p models/ldm/stable-diffusion-v1
+          mkdir -p "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}"
           curl \
             -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
-            -o ${{ matrix.stable-diffusion-model-dl-path }} \
-            -L ${{ matrix.stable-diffusion-model }}
+            -o "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" \
+            -L ${{ matrix.stable-diffusion-model-url }}
 
-      - name: run preload_models.py
+      - name: run configure_invokeai.py
         id: run-preload-models
         run: |
-          python scripts/preload_models.py \
-            --no-interactive
+          python scripts/configure_invokeai.py --no-interactive --yes
+
+      - name: cat ~/.invokeai
+        id: cat-invokeai
+        run: cat ~/.invokeai
 
       - name: Run the tests
         id: run-tests
         run: |
           time python scripts/invoke.py \
-            --model ${{ matrix.stable-diffusion-model-switch }} \
-            --from_file ${{ env.TEST_PROMPTS }}
+            --no-patchmatch \
+            --no-nsfw_checker \
+            --model ${{ matrix.stable-diffusion-model }} \
+            --from_file ${{ env.TEST_PROMPTS }} \
+            --root="${{ env.INVOKEAI_ROOT }}" \
+            --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
 
       - name: export conda env
         id: export-conda-env
@@ -122,5 +131,5 @@ jobs:
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ matrix.os }}_${{ matrix.stable-diffusion-model-switch }}
-          path: outputs/img-samples
+          name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
+          path: ${{ env.INVOKEAI_ROOT }}/outputs

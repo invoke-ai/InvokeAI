@@ -4,7 +4,6 @@
   display: flex;
   column-gap: 1rem;
   align-items: center;
-  width: max-content;
 
   .invokeai__select-label {
     color: var(--text-color-secondary);
@@ -15,6 +14,7 @@
     border: 2px solid var(--border-color);
     background-color: var(--background-color-secondary);
     font-weight: bold;
+    font-size: 0.9rem;
     height: 2rem;
     border-radius: 0.2rem;
 
@@ -27,5 +27,6 @@
 
   .invokeai__select-option {
     background-color: var(--background-color-secondary);
+    color: var(--text-color-secondary);
   }
 }

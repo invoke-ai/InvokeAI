@@ -1,13 +1,19 @@
-import { useCallback, ReactNode, useState, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../app/store';
+import {
+  useCallback,
+  ReactNode,
+  useState,
+  useEffect,
+  KeyboardEvent,
+} from 'react';
+import { useAppDispatch, useAppSelector } from 'app/store';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useToast } from '@chakra-ui/react';
-import { uploadImage } from '../../app/socketio/actions';
-import { ImageUploadDestination, UploadImagePayload } from '../../app/invokeai';
-import { ImageUploaderTriggerContext } from '../../app/contexts/ImageUploaderTriggerContext';
-import { activeTabNameSelector } from '../../features/options/optionsSelectors';
-import { tabDict } from '../../features/tabs/InvokeTabs';
+import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { tabDict } from 'features/tabs/components/InvokeTabs';
 import ImageUploadOverlay from './ImageUploadOverlay';
+import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
+import useImageUploader from 'common/hooks/useImageUploader';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -19,6 +25,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
   const activeTabName = useAppSelector(activeTabNameSelector);
   const toast = useToast({});
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
+  const { setOpenUploader } = useImageUploader();
 
   const fileRejectionCallback = useCallback(
     (rejection: FileRejection) => {
@@ -38,15 +45,10 @@ const ImageUploader = (props: ImageUploaderProps) => {
   );
 
   const fileAcceptedCallback = useCallback(
-    (file: File) => {
-      setIsHandlingUpload(true);
-      const payload: UploadImagePayload = { file };
-      if (['img2img', 'inpainting'].includes(activeTabName)) {
-        payload.destination = activeTabName as ImageUploadDestination;
-      }
-      dispatch(uploadImage(payload));
+    async (file: File) => {
+      dispatch(uploadImage({ imageFile: file }));
     },
-    [dispatch, activeTabName]
+    [dispatch]
   );
 
   const onDrop = useCallback(
@@ -76,6 +78,8 @@ const ImageUploader = (props: ImageUploaderProps) => {
     onDragOver: () => setIsHandlingUpload(true),
     maxFiles: 1,
   });
+
+  setOpenUploader(open);
 
   useEffect(() => {
     const pasteImageListener = (e: ClipboardEvent) => {
@@ -118,12 +122,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         return;
       }
 
-      const payload: UploadImagePayload = { file };
-      if (['img2img', 'inpainting'].includes(activeTabName)) {
-        payload.destination = activeTabName as ImageUploadDestination;
-      }
-
-      dispatch(uploadImage(payload));
+      dispatch(uploadImage({ imageFile: file }));
     };
     document.addEventListener('paste', pasteImageListener);
     return () => {
@@ -131,13 +130,21 @@ const ImageUploader = (props: ImageUploaderProps) => {
     };
   }, [dispatch, toast, activeTabName]);
 
-  const overlaySecondaryText = ['img2img', 'inpainting'].includes(activeTabName)
+  const overlaySecondaryText = ['img2img', 'unifiedCanvas'].includes(
+    activeTabName
+  )
     ? ` to ${tabDict[activeTabName as keyof typeof tabDict].tooltip}`
     : ``;
 
   return (
     <ImageUploaderTriggerContext.Provider value={open}>
-      <div {...getRootProps({ style: {} })}>
+      <div
+        {...getRootProps({ style: {} })}
+        onKeyDown={(e: KeyboardEvent) => {
+          // Bail out if user hits spacebar - do not open the uploader
+          if (e.key === ' ') return;
+        }}
+      >
         <input {...getInputProps()} />
         {children}
         {isDragActive && isHandlingUpload && (

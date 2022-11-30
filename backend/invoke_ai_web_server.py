@@ -7,23 +7,35 @@ import traceback
 import math
 import io
 import base64
+import os
+import json
 
-from flask import Flask, redirect, send_from_directory
+from werkzeug.utils import secure_filename
+from flask import Flask, redirect, send_from_directory, request, make_response
 from flask_socketio import SocketIO
-from PIL import Image
+from PIL import Image, ImageOps
+from PIL.Image import Image as ImageType
 from uuid import uuid4
 from threading import Event
 
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
+from ldm.invoke.generator.inpaint import infill_methods
 
 from backend.modules.parameters import parameters_to_command
-
+from backend.modules.get_canvas_generation_mode import (
+    get_canvas_generation_mode,
+)
 
 # Loading Arguments
 opt = Args()
 args = opt.parse_args()
+
+# Set the root directory for static files and relative paths
+args.root_dir = os.path.expanduser(args.root_dir or "..")
+if not os.path.isabs(args.outdir):
+    args.outdir = os.path.join(args.root_dir, args.outdir)
 
 
 class InvokeAIWebServer:
@@ -37,6 +49,13 @@ class InvokeAIWebServer:
         self.esrgan = esrgan
 
         self.canceled = Event()
+        self.ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+
+    def allowed_file(self, filename: str) -> bool:
+        return (
+            "." in filename
+            and filename.rsplit(".", 1)[1].lower() in self.ALLOWED_EXTENSIONS
+        )
 
     def run(self):
         self.setup_app()
@@ -62,8 +81,9 @@ class InvokeAIWebServer:
         if opt.cors:
             socketio_args["cors_allowed_origins"] = opt.cors
 
+        frontend_path = self.find_frontend()
         self.app = Flask(
-            __name__, static_url_path="", static_folder="../frontend/dist/"
+            __name__, static_url_path="", static_folder=frontend_path
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)
@@ -88,49 +108,156 @@ class InvokeAIWebServer:
             else:
                 return send_from_directory(self.app.static_folder, "index.html")
 
+        @self.app.route("/upload", methods=["POST"])
+        def upload():
+            try:
+                data = json.loads(request.form["data"])
+                filename = ""
+                # check if the post request has the file part
+                if "file" in request.files:
+                    file = request.files["file"]
+                    # If the user does not select a file, the browser submits an
+                    # empty file without a filename.
+                    if file.filename == "":
+                        return make_response("No file selected", 400)
+                    filename = file.filename
+                elif "dataURL" in data:
+                    file = dataURL_to_bytes(data["dataURL"])
+                    if "filename" not in data or data["filename"] == "":
+                        return make_response("No filename provided", 400)
+                    filename = data["filename"]
+                else:
+                    return make_response("No file or dataURL", 400)
+
+                kind = data["kind"]
+
+                if kind == "init":
+                    path = self.init_image_path
+                elif kind == "temp":
+                    path = self.temp_image_path
+                elif kind == "result":
+                    path = self.result_path
+                elif kind == "mask":
+                    path = self.mask_image_path
+                else:
+                    return make_response(f"Invalid upload kind: {kind}", 400)
+
+                if not self.allowed_file(filename):
+                    return make_response(
+                        f'Invalid file type, must be one of: {", ".join(self.ALLOWED_EXTENSIONS)}',
+                        400,
+                    )
+
+                secured_filename = secure_filename(filename)
+
+                uuid = uuid4().hex
+                truncated_uuid = uuid[:8]
+
+                split = os.path.splitext(secured_filename)
+                name = f"{split[0]}.{truncated_uuid}{split[1]}"
+
+                file_path = os.path.join(path, name)
+
+                if "dataURL" in data:
+                    with open(file_path, "wb") as f:
+                        f.write(file)
+                else:
+                    file.save(file_path)
+
+                mtime = os.path.getmtime(file_path)
+
+                pil_image = Image.open(file_path)
+
+                if "cropVisible" in data and data["cropVisible"] == True:
+                    visible_image_bbox = pil_image.getbbox()
+                    pil_image = pil_image.crop(visible_image_bbox)
+                    pil_image.save(file_path)
+
+                (width, height) = pil_image.size
+
+                thumbnail_path = save_thumbnail(
+                    pil_image, os.path.basename(file_path), self.thumbnail_image_path
+                )
+
+                response = {
+                    "url": self.get_url_from_image_path(file_path),
+                    "thumbnail": self.get_url_from_image_path(thumbnail_path),
+                    "mtime": mtime,
+                    "width": width,
+                    "height": height,
+                }
+
+                return make_response(response, 200)
+
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+                return make_response("Error uploading file", 500)
+
         self.load_socketio_listeners(self.socketio)
 
         if args.gui:
             print(">> Launching Invoke AI GUI")
-            close_server_on_exit = True
-            if args.web_develop:
-                close_server_on_exit = False
             try:
                 from flaskwebgui import FlaskUI
 
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
-                    start_server="flask-socketio",
-                    host=self.host,
-                    port=self.port,
+                    server="flask_socketio",
                     width=1600,
                     height=1000,
-                    idle_interval=10,
-                    close_server_on_exit=close_server_on_exit,
+                    port=self.port
                 ).run()
             except KeyboardInterrupt:
                 import sys
 
                 sys.exit(0)
         else:
+            useSSL = args.certfile or args.keyfile
             print(">> Started Invoke AI Web Server!")
             if self.host == "0.0.0.0":
                 print(
-                    f"Point your browser at http://localhost:{self.port} or use the host's DNS name or IP address."
+                    f"Point your browser at http{'s' if useSSL else ''}://localhost:{self.port} or use the host's DNS name or IP address."
                 )
             else:
                 print(
                     ">> Default host address now 127.0.0.1 (localhost). Use --host 0.0.0.0 to bind any address."
                 )
-                print(f">> Point your browser at http://{self.host}:{self.port}")
-            self.socketio.run(app=self.app, host=self.host, port=self.port)
+                print(
+                    f">> Point your browser at http{'s' if useSSL else ''}://{self.host}:{self.port}"
+                )
+            if not useSSL:
+                self.socketio.run(app=self.app, host=self.host, port=self.port)
+            else:
+                self.socketio.run(
+                    app=self.app,
+                    host=self.host,
+                    port=self.port,
+                    certfile=args.certfile,
+                    keyfile=args.keyfile,
+                )
 
+    def find_frontend(self):
+        my_dir = os.path.dirname(__file__)
+        for candidate in (os.path.join(my_dir,'..','frontend','dist'),         # pip install -e .
+                          os.path.join(my_dir,'../../../../frontend','dist')   # pip install .
+        ):
+            if os.path.exists(candidate):
+                return candidate
+        assert "Frontend files cannot be found. Cannot continue"
+
+                                        
     def setup_app(self):
         self.result_url = "outputs/"
         self.init_image_url = "outputs/init-images/"
         self.mask_image_url = "outputs/mask-images/"
         self.intermediate_url = "outputs/intermediates/"
+        self.temp_image_url = "outputs/temp-images/"
+        self.thumbnail_image_url = "outputs/thumbnails/"
         # location for "finished" images
         self.result_path = args.outdir
         # temporary path for intermediates
@@ -138,6 +265,10 @@ class InvokeAIWebServer:
         # path for user-uploaded init images and masks
         self.init_image_path = os.path.join(self.result_path, "init-images/")
         self.mask_image_path = os.path.join(self.result_path, "mask-images/")
+        # path for temp images e.g. gallery generations which are not committed
+        self.temp_image_path = os.path.join(self.result_path, "temp-images/")
+        # path for thumbnail images
+        self.thumbnail_image_path = os.path.join(self.result_path, "thumbnails/")
         # txt log
         self.log_path = os.path.join(self.result_path, "invoke_log.txt")
         # make all output paths
@@ -148,6 +279,8 @@ class InvokeAIWebServer:
                 self.intermediate_path,
                 self.init_image_path,
                 self.mask_image_path,
+                self.temp_image_path,
+                self.thumbnail_image_path,
             ]
         ]
 
@@ -156,6 +289,8 @@ class InvokeAIWebServer:
         def handle_request_capabilities():
             print(f">> System config requested")
             config = self.get_system_config()
+            config["model_list"] = self.generate.model_cache.list_models()
+            config["infill_methods"] = infill_methods
             socketio.emit("systemConfig", config)
 
         @socketio.on("requestModelChange")
@@ -181,6 +316,74 @@ class InvokeAIWebServer:
                 traceback.print_exc()
                 print("\n")
 
+        @socketio.on("requestEmptyTempFolder")
+        def empty_temp_folder():
+            try:
+                temp_files = glob.glob(os.path.join(self.temp_image_path, "*"))
+                for f in temp_files:
+                    try:
+                        os.remove(f)
+                        thumbnail_path = os.path.join(
+                            self.thumbnail_image_path,
+                            os.path.splitext(os.path.basename(f))[0] + ".webp",
+                        )
+                        os.remove(thumbnail_path)
+                    except Exception as e:
+                        socketio.emit("error", {"message": f"Unable to delete {f}: {str(e)}"})
+                        pass
+
+                socketio.emit("tempFolderEmptied")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
+        @socketio.on("requestSaveStagingAreaImageToGallery")
+        def save_temp_image_to_gallery(url):
+            try:
+                image_path = self.get_image_path_from_url(url)
+                new_path = os.path.join(self.result_path, os.path.basename(image_path))
+                shutil.copy2(image_path, new_path)
+
+                if os.path.splitext(new_path)[1] == ".png":
+                    metadata = retrieve_metadata(new_path)
+                else:
+                    metadata = {}
+
+                pil_image = Image.open(new_path)
+
+                (width, height) = pil_image.size
+
+                thumbnail_path = save_thumbnail(
+                    pil_image, os.path.basename(new_path), self.thumbnail_image_path
+                )
+
+                image_array = [
+                    {
+                        "url": self.get_url_from_image_path(new_path),
+                        "thumbnail": self.get_url_from_image_path(thumbnail_path),
+                        "mtime": os.path.getmtime(new_path),
+                        "metadata": metadata,
+                        "width": width,
+                        "height": height,
+                        "category": "result",
+                    }
+                ]
+
+                socketio.emit(
+                    "galleryImages",
+                    {"images": image_array, "category": "result"},
+                )
+
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
         @socketio.on("requestLatestImages")
         def handle_request_latest_images(category, latest_mtime):
             try:
@@ -189,6 +392,7 @@ class InvokeAIWebServer:
                 )
 
                 paths = []
+
                 for ext in ("*.png", "*.jpg", "*.jpeg"):
                     paths.extend(glob.glob(os.path.join(base_path, ext)))
 
@@ -206,24 +410,36 @@ class InvokeAIWebServer:
                 image_array = []
 
                 for path in image_paths:
-                    if os.path.splitext(path)[1] == ".png":
-                        metadata = retrieve_metadata(path)
-                        sd_metadata = metadata["sd-metadata"]
-                    else:
-                        sd_metadata = {}
+                    try:
+                        if os.path.splitext(path)[1] == ".png":
+                            metadata = retrieve_metadata(path)
+                        else:
+                            metadata = {}
 
-                    (width, height) = Image.open(path).size
+                        pil_image = Image.open(path)
+                        (width, height) = pil_image.size
 
-                    image_array.append(
-                        {
-                            "url": self.get_url_from_image_path(path),
-                            "mtime": os.path.getmtime(path),
-                            "metadata": sd_metadata,
-                            "width": width,
-                            "height": height,
-                            "category": category,
-                        }
-                    )
+                        thumbnail_path = save_thumbnail(
+                            pil_image, os.path.basename(path), self.thumbnail_image_path
+                        )
+
+                        image_array.append(
+                            {
+                                "url": self.get_url_from_image_path(path),
+                                "thumbnail": self.get_url_from_image_path(
+                                    thumbnail_path
+                                ),
+                                "mtime": os.path.getmtime(path),
+                                "metadata": metadata.get("sd-metadata"),
+                                "dreamPrompt": metadata.get("Dream"),
+                                "width": width,
+                                "height": height,
+                                "category": category,
+                            }
+                        )
+                    except Exception as e:
+                        socketio.emit("error", {"message": f"Unable to load {path}: {str(e)}"})
+                        pass
 
                 socketio.emit(
                     "galleryImages",
@@ -266,24 +482,37 @@ class InvokeAIWebServer:
 
                 image_array = []
                 for path in image_paths:
-                    if os.path.splitext(path)[1] == ".png":
-                        metadata = retrieve_metadata(path)
-                        sd_metadata = metadata["sd-metadata"]
-                    else:
-                        sd_metadata = {}
+                    try:
+                        if os.path.splitext(path)[1] == ".png":
+                            metadata = retrieve_metadata(path)
+                        else:
+                            metadata = {}
 
-                    (width, height) = Image.open(path).size
+                        pil_image = Image.open(path)
+                        (width, height) = pil_image.size
 
-                    image_array.append(
-                        {
-                            "url": self.get_url_from_image_path(path),
-                            "mtime": os.path.getmtime(path),
-                            "metadata": sd_metadata,
-                            "width": width,
-                            "height": height,
-                            "category": category,
-                        }
-                    )
+                        thumbnail_path = save_thumbnail(
+                            pil_image, os.path.basename(path), self.thumbnail_image_path
+                        )
+
+                        image_array.append(
+                            {
+                                "url": self.get_url_from_image_path(path),
+                                "thumbnail": self.get_url_from_image_path(
+                                    thumbnail_path
+                                ),
+                                "mtime": os.path.getmtime(path),
+                                "metadata": metadata.get("sd-metadata"),
+                                "dreamPrompt": metadata.get("Dream"),
+                                "width": width,
+                                "height": height,
+                                "category": category,
+                            }
+                        )
+                    except Exception as e:
+                        print(f">> Unable to load {path}")
+                        socketio.emit("error", {"message": f"Unable to load {path}: {str(e)}"})
+                        pass
 
                 socketio.emit(
                     "galleryImages",
@@ -305,19 +534,24 @@ class InvokeAIWebServer:
             generation_parameters, esrgan_parameters, facetool_parameters
         ):
             try:
-                # truncate long init_mask base64 if needed
+                # truncate long init_mask/init_img base64 if needed
+                printable_parameters = {
+                    **generation_parameters,
+                }
+
+                if "init_img" in generation_parameters:
+                    printable_parameters["init_img"] = (
+                        printable_parameters["init_img"][:64] + "..."
+                    )
+
                 if "init_mask" in generation_parameters:
-                    printable_parameters = {
-                        **generation_parameters,
-                        "init_mask": generation_parameters["init_mask"][:20] + "...",
-                    }
-                    print(
-                        f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
+                    printable_parameters["init_mask"] = (
+                        printable_parameters["init_mask"][:64] + "..."
                     )
-                else:
-                    print(
-                        f">> Image generation requested: {generation_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
-                    )
+
+                print(
+                    f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
+                )
                 self.generate_images(
                     generation_parameters,
                     esrgan_parameters,
@@ -348,12 +582,11 @@ class InvokeAIWebServer:
 
                 image = Image.open(original_image_path)
 
-                seed = (
-                    original_image["metadata"]["seed"]
-                    if "metadata" in original_image
-                    and "seed" in original_image["metadata"]
-                    else "unknown_seed"
-                )
+                try:
+                    seed = original_image["metadata"]["image"]["seed"]
+                except (KeyError) as e:
+                    seed = "unknown_seed"
+                    pass
 
                 if postprocessing_parameters["type"] == "esrgan":
                     progress.set_current_status("Upscaling (ESRGAN)")
@@ -415,6 +648,10 @@ class InvokeAIWebServer:
                     postprocessing=postprocessing_parameters["type"],
                 )
 
+                thumbnail_path = save_thumbnail(
+                    image, os.path.basename(path), self.thumbnail_image_path
+                )
+
                 self.write_log_message(
                     f'[Postprocessed] "{original_image_path}" > "{path}": {postprocessing_parameters}'
                 )
@@ -427,8 +664,10 @@ class InvokeAIWebServer:
                     "postprocessingResult",
                     {
                         "url": self.get_url_from_image_path(path),
+                        "thumbnail": self.get_url_from_image_path(thumbnail_path),
                         "mtime": os.path.getmtime(path),
                         "metadata": metadata,
+                        "dreamPrompt": command,
                         "width": width,
                         "height": height,
                     },
@@ -447,14 +686,17 @@ class InvokeAIWebServer:
 
         # TODO: I think this needs a safety mechanism.
         @socketio.on("deleteImage")
-        def handle_delete_image(url, uuid, category):
+        def handle_delete_image(url, thumbnail, uuid, category):
             try:
                 print(f'>> Delete requested "{url}"')
                 from send2trash import send2trash
 
                 path = self.get_image_path_from_url(url)
-                print(path)
+                thumbnail_path = self.get_image_path_from_url(thumbnail)
+
                 send2trash(path)
+                send2trash(thumbnail_path)
+
                 socketio.emit(
                     "imageDeleted",
                     {"url": url, "uuid": uuid, "category": category},
@@ -466,68 +708,21 @@ class InvokeAIWebServer:
                 traceback.print_exc()
                 print("\n")
 
-        # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadImage")
-        def handle_upload_image(bytes, name, destination):
-            try:
-                print(f'>> Image upload requested "{name}"')
-                file_path = self.save_file_unique_uuid_name(
-                    bytes=bytes, name=name, path=self.init_image_path
-                )
-                mtime = os.path.getmtime(file_path)
-                (width, height) = Image.open(file_path).size
-                print(file_path)
-                socketio.emit(
-                    "imageUploaded",
-                    {
-                        "url": self.get_url_from_image_path(file_path),
-                        "mtime": mtime,
-                        "width": width,
-                        "height": height,
-                        "category": "user",
-                        "destination": destination,
-                    },
-                )
-            except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
-
-        # TODO: I think this needs a safety mechanism.
-        @socketio.on("uploadMaskImage")
-        def handle_upload_mask_image(bytes, name):
-            try:
-                print(f'>> Mask image upload requested "{name}"')
-
-                file_path = self.save_file_unique_uuid_name(
-                    bytes=bytes, name=name, path=self.mask_image_path
-                )
-
-                socketio.emit(
-                    "maskImageUploaded",
-                    {
-                        "url": self.get_url_from_image_path(file_path),
-                    },
-                )
-            except Exception as e:
-                self.socketio.emit("error", {"message": (str(e))})
-                print("\n")
-
-                traceback.print_exc()
-                print("\n")
-
     # App Functions
     def get_system_config(self):
-        model_list = self.generate.model_cache.list_models()
+        model_list: dict = self.generate.model_cache.list_models()
+        active_model_name = None
+
+        for model_name, model_dict in model_list.items():
+            if model_dict["status"] == "active":
+                active_model_name = model_name
+
         return {
             "model": "stable diffusion",
-            "model_id": args.model,
+            "model_weights": active_model_name,
             "model_hash": self.generate.model_hash,
             "app_id": APP_ID,
             "app_version": APP_VERSION,
-            "model_list": model_list,
         }
 
     def generate_images(
@@ -543,64 +738,114 @@ class InvokeAIWebServer:
                 else []
             )
 
+            actual_generation_mode = generation_parameters["generation_mode"]
+            original_bounding_box = None
+
+            progress = Progress(generation_parameters=generation_parameters)
+
+            self.socketio.emit("progressUpdate", progress.to_formatted_dict())
+            eventlet.sleep(0)
+
             """
             TODO:
             If a result image is used as an init image, and then deleted, we will want to be
             able to use it as an init image in the future. Need to handle this case.
             """
 
-            # We need to give absolute paths to the generator, stash the URLs for later
-            init_img_url = None
-            mask_img_url = None
+            """
+            Prepare for generation based on generation_mode
+            """
+            if generation_parameters["generation_mode"] == "unifiedCanvas":
+                """
+                generation_parameters["init_img"] is a base64 image
+                generation_parameters["init_mask"] is a base64 image
 
-            if "init_img" in generation_parameters:
+                So we need to convert each into a PIL Image.
+                """
+
+                truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
+                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
+
+                init_img_url = generation_parameters["init_img"]
+
+                original_bounding_box = generation_parameters["bounding_box"].copy()
+
+                initial_image = dataURL_to_image(
+                    generation_parameters["init_img"]
+                ).convert("RGBA")
+
+                """
+                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
+                to the generator should be:
+                    {
+                        "x": 0, 
+                        "y": 0,
+                        "width": original_bounding_box["width"],
+                        "height": original_bounding_box["height"]
+                    }
+                """
+
+                generation_parameters["bounding_box"]["x"] = 0
+                generation_parameters["bounding_box"]["y"] = 0
+
+                # Convert mask dataURL to an image and convert to greyscale
+                mask_image = dataURL_to_image(
+                    generation_parameters["init_mask"]
+                ).convert("L")
+
+                actual_generation_mode = get_canvas_generation_mode(
+                    initial_image, mask_image
+                )
+
+                """
+                Apply the mask to the init image, creating a "mask" image with 
+                transparency where inpainting should occur. This is the kind of
+                mask that prompt2image() needs.
+                """
+                alpha_mask = initial_image.copy()
+                alpha_mask.putalpha(mask_image)
+
+                generation_parameters["init_img"] = initial_image
+                generation_parameters["init_mask"] = alpha_mask
+
+                # Remove the unneeded parameters for whichever mode we are doing
+                if actual_generation_mode == "inpainting":
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+                elif actual_generation_mode == "img2img":
+                    generation_parameters["height"] = original_bounding_box["height"]
+                    generation_parameters["width"] = original_bounding_box["width"]
+                    generation_parameters.pop("init_mask", None)
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+                    generation_parameters.pop("infill_method", None)
+                elif actual_generation_mode == "txt2img":
+                    generation_parameters["height"] = original_bounding_box["height"]
+                    generation_parameters["width"] = original_bounding_box["width"]
+                    generation_parameters.pop("strength", None)
+                    generation_parameters.pop("fit", None)
+                    generation_parameters.pop("init_img", None)
+                    generation_parameters.pop("init_mask", None)
+                    generation_parameters.pop("seam_size", None)
+                    generation_parameters.pop("seam_blur", None)
+                    generation_parameters.pop("seam_strength", None)
+                    generation_parameters.pop("seam_steps", None)
+                    generation_parameters.pop("tile_size", None)
+                    generation_parameters.pop("force_outpaint", None)
+                    generation_parameters.pop("infill_method", None)
+
+            elif generation_parameters["generation_mode"] == "img2img":
                 init_img_url = generation_parameters["init_img"]
                 init_img_path = self.get_image_path_from_url(init_img_url)
-                generation_parameters["init_img"] = init_img_path
-
-            # if 'init_mask' in generation_parameters:
-            #     mask_img_url = generation_parameters['init_mask']
-            #     generation_parameters[
-            #         'init_mask'
-            #     ] = self.get_image_path_from_url(
-            #         generation_parameters['init_mask']
-            #     )
-
-            if "init_mask" in generation_parameters:
-                # grab an Image of the init image
-                original_image = Image.open(init_img_path)
-
-                # copy a region from it which we will inpaint
-                cropped_init_image = copy_image_from_bounding_box(
-                    original_image, **generation_parameters["bounding_box"]
-                )
-                generation_parameters["init_img"] = cropped_init_image
-
-                if generation_parameters["is_mask_empty"]:
-                    generation_parameters["init_mask"] = None
-                else:
-                    # grab an Image of the mask
-                    mask_image = Image.open(
-                        io.BytesIO(
-                            base64.decodebytes(
-                                bytes(generation_parameters["init_mask"], "utf-8")
-                            )
-                        )
-                    )
-                    generation_parameters["init_mask"] = mask_image
-
-            totalSteps = self.calculate_real_steps(
-                steps=generation_parameters["steps"],
-                strength=generation_parameters["strength"]
-                if "strength" in generation_parameters
-                else None,
-                has_init_image="init_img" in generation_parameters,
-            )
-
-            progress = Progress(generation_parameters=generation_parameters)
-
-            self.socketio.emit("progressUpdate", progress.to_formatted_dict())
-            eventlet.sleep(0)
+                generation_parameters["init_img"] = Image.open(init_img_path).convert('RGB')
 
             def image_progress(sample, step):
                 if self.canceled.is_set():
@@ -610,13 +855,22 @@ class InvokeAIWebServer:
                 nonlocal generation_parameters
                 nonlocal progress
 
+                generation_messages = {
+                    "txt2img": "Text to Image",
+                    "img2img": "Image to Image",
+                    "inpainting": "Inpainting",
+                    "outpainting": "Outpainting",
+                }
+
                 progress.set_current_step(step + 1)
-                progress.set_current_status("Generating")
+                progress.set_current_status(
+                    f"Generating ({generation_messages[actual_generation_mode]})"
+                )
                 progress.set_current_status_has_steps(True)
 
                 if (
                     generation_parameters["progress_images"]
-                    and step % generation_parameters['save_intermediates'] == 0
+                    and step % generation_parameters["save_intermediates"] == 0
                     and step < generation_parameters["steps"] - 1
                 ):
                     image = self.generate.sample_to_image(sample)
@@ -645,6 +899,8 @@ class InvokeAIWebServer:
                             "metadata": metadata,
                             "width": width,
                             "height": height,
+                            "generationMode": generation_parameters["generation_mode"],
+                            "boundingBox": original_bounding_box,
                         },
                     )
 
@@ -667,6 +923,8 @@ class InvokeAIWebServer:
                             "metadata": {},
                             "width": width,
                             "height": height,
+                            "generationMode": generation_parameters["generation_mode"],
+                            "boundingBox": original_bounding_box,
                         },
                     )
 
@@ -685,8 +943,11 @@ class InvokeAIWebServer:
                 step_index = 1
                 nonlocal prior_variations
 
+                """
+                Tidy up after generation based on generation_mode
+                """
                 # paste the inpainting image back onto the original
-                if "init_mask" in generation_parameters:
+                if generation_parameters["generation_mode"] == "inpainting":
                     image = paste_image_into_bounding_box(
                         Image.open(init_img_path),
                         image,
@@ -782,11 +1043,17 @@ class InvokeAIWebServer:
                 eventlet.sleep(0)
 
                 # restore the stashed URLS and discard the paths, we are about to send the result to client
-                if "init_img" in all_parameters:
-                    all_parameters["init_img"] = init_img_url
+                all_parameters["init_img"] = (
+                    init_img_url
+                    if generation_parameters["generation_mode"] == "img2img"
+                    else ""
+                )
 
                 if "init_mask" in all_parameters:
                     all_parameters["init_mask"] = ""  # TODO: store the mask in metadata
+
+                if generation_parameters["generation_mode"] == "unifiedCanvas":
+                    all_parameters["bounding_box"] = original_bounding_box
 
                 metadata = self.parameters_to_generated_image_metadata(all_parameters)
 
@@ -794,12 +1061,23 @@ class InvokeAIWebServer:
 
                 (width, height) = image.size
 
+                generated_image_outdir = (
+                    self.result_path
+                    if generation_parameters["generation_mode"]
+                    in ["txt2img", "img2img"]
+                    else self.temp_image_path
+                )
+
                 path = self.save_result_image(
                     image,
                     command,
                     metadata,
-                    self.result_path,
+                    generated_image_outdir,
                     postprocessing=postprocessing,
+                )
+
+                thumbnail_path = save_thumbnail(
+                    image, os.path.basename(path), self.thumbnail_image_path
                 )
 
                 print(f'>> Image generated: "{path}"')
@@ -819,15 +1097,21 @@ class InvokeAIWebServer:
                     "generationResult",
                     {
                         "url": self.get_url_from_image_path(path),
+                        "thumbnail": self.get_url_from_image_path(thumbnail_path),
                         "mtime": os.path.getmtime(path),
                         "metadata": metadata,
+                        "dreamPrompt": command,
                         "width": width,
                         "height": height,
+                        "boundingBox": original_bounding_box,
+                        "generationMode": generation_parameters["generation_mode"],
                     },
                 )
                 eventlet.sleep(0)
 
                 progress.set_current_iteration(progress.current_iteration + 1)
+
+            print(generation_parameters)
 
             self.generate.prompt2image(
                 **generation_parameters,
@@ -882,6 +1166,8 @@ class InvokeAIWebServer:
 
             postprocessing = []
 
+            rfc_dict["type"] = parameters["generation_mode"]
+
             # 'postprocessing' is either null or an
             if "facetool_strength" in parameters:
                 facetool_parameters = {
@@ -930,8 +1216,9 @@ class InvokeAIWebServer:
 
             rfc_dict["variations"] = variations
 
-            if "init_img" in parameters:
-                rfc_dict["type"] = "img2img"
+            print(parameters)
+
+            if rfc_dict["type"] == "img2img":
                 rfc_dict["strength"] = parameters["strength"]
                 rfc_dict["fit"] = parameters["fit"]  # TODO: Noncompliant
                 rfc_dict["orig_hash"] = calculate_init_img_hash(
@@ -940,15 +1227,6 @@ class InvokeAIWebServer:
                 rfc_dict["init_image_path"] = parameters[
                     "init_img"
                 ]  # TODO: Noncompliant
-                # if 'init_mask' in parameters:
-                #     rfc_dict['mask_hash'] = calculate_init_img_hash(
-                #         self.get_image_path_from_url(parameters['init_mask'])
-                #     )  # TODO: Noncompliant
-                #     rfc_dict['mask_image_path'] = parameters[
-                #         'init_mask'
-                #     ]  # TODO: Noncompliant
-            else:
-                rfc_dict["type"] = "txt2img"
 
             metadata["image"] = rfc_dict
 
@@ -1110,6 +1388,14 @@ class InvokeAIWebServer:
                 return os.path.abspath(
                     os.path.join(self.intermediate_path, os.path.basename(url))
                 )
+            elif "temp-images" in url:
+                return os.path.abspath(
+                    os.path.join(self.temp_image_path, os.path.basename(url))
+                )
+            elif "thumbnails" in url:
+                return os.path.abspath(
+                    os.path.join(self.thumbnail_image_path, os.path.basename(url))
+                )
             else:
                 return os.path.abspath(
                     os.path.join(self.result_path, os.path.basename(url))
@@ -1130,6 +1416,10 @@ class InvokeAIWebServer:
                 return os.path.join(self.mask_image_url, os.path.basename(path))
             elif "intermediates" in path:
                 return os.path.join(self.intermediate_url, os.path.basename(path))
+            elif "temp-images" in path:
+                return os.path.join(self.temp_image_url, os.path.basename(path))
+            elif "thumbnails" in path:
+                return os.path.join(self.thumbnail_image_url, os.path.basename(path))
             else:
                 return os.path.join(self.result_url, os.path.basename(path))
         except Exception as e:
@@ -1241,11 +1531,13 @@ class CanceledException(Exception):
 
 
 """
-Crops an image to a bounding box.
+Returns a copy an image, cropped to a bounding box.
 """
 
 
-def copy_image_from_bounding_box(image, x, y, width, height):
+def copy_image_from_bounding_box(
+    image: ImageType, x: int, y: int, width: int, height: int
+) -> ImageType:
     with image as im:
         bounds = (x, y, x + width, y + height)
         im_cropped = im.crop(bounds)
@@ -1253,12 +1545,82 @@ def copy_image_from_bounding_box(image, x, y, width, height):
 
 
 """
+Converts a base64 image dataURL into an image.
+The dataURL is split on the first commma.
+"""
+
+
+def dataURL_to_image(dataURL: str) -> ImageType:
+    image = Image.open(
+        io.BytesIO(
+            base64.decodebytes(
+                bytes(
+                    dataURL.split(",", 1)[1],
+                    "utf-8",
+                )
+            )
+        )
+    )
+    return image
+
+
+"""
+Converts a base64 image dataURL into bytes.
+The dataURL is split on the first commma.
+"""
+
+
+def dataURL_to_bytes(dataURL: str) -> bytes:
+    return base64.decodebytes(
+        bytes(
+            dataURL.split(",", 1)[1],
+            "utf-8",
+        )
+    )
+
+
+"""
 Pastes an image onto another with a bounding box.
 """
 
 
-def paste_image_into_bounding_box(recipient_image, donor_image, x, y, width, height):
+def paste_image_into_bounding_box(
+    recipient_image: ImageType,
+    donor_image: ImageType,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+) -> ImageType:
     with recipient_image as im:
         bounds = (x, y, x + width, y + height)
         im.paste(donor_image, bounds)
         return recipient_image
+
+
+"""
+Saves a thumbnail of an image, returning its path.
+"""
+
+
+def save_thumbnail(
+    image: ImageType,
+    filename: str,
+    path: str,
+    size: int = 256,
+) -> str:
+    base_filename = os.path.splitext(filename)[0]
+    thumbnail_path = os.path.join(path, base_filename + ".webp")
+
+    if os.path.exists(thumbnail_path):
+        return thumbnail_path
+
+    thumbnail_width = size
+    thumbnail_height = round(size * (image.height / image.width))
+
+    image_copy = image.copy()
+    image_copy.thumbnail(size=(thumbnail_width, thumbnail_height))
+
+    image_copy.save(thumbnail_path, "WEBP")
+
+    return thumbnail_path

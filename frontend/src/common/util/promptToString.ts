@@ -1,4 +1,4 @@
-import * as InvokeAI from '../../app/invokeai';
+import * as InvokeAI from 'app/invokeai';
 
 const promptToString = (prompt: InvokeAI.Prompt): string => {
   if (prompt.length === 1) {

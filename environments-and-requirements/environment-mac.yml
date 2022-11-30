@@ -52,13 +52,14 @@ dependencies:
   - transformers=4.23
   - pip:
       - getpass_asterisk
+      - picklescan
       - taming-transformers-rom1504
       - test-tube==0.7.5
       - git+https://github.com/openai/CLIP.git@main#egg=clip
-      - git+https://github.com/invoke-ai/k-diffusion.git@mps#egg=k_diffusion
-      - git+https://github.com/invoke-ai/Real-ESRGAN.git#egg=realesrgan
-      - git+https://github.com/invoke-ai/GFPGAN.git#egg=gfpgan
+      - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
       - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
+      - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
+      - -e git+https://github.com/invoke-ai/PyPatchMatch@0.1.4#egg=pypatchmatch
       - -e .
 variables:
   PYTORCH_ENABLE_MPS_FALLBACK: 1

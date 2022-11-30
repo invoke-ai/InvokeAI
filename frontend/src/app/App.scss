@@ -1,5 +1,9 @@
 @use '../styles/Mixins/' as *;
 
+svg {
+  fill: var(--svg-color);
+}
+
 .App {
   display: grid;
   width: 100vw;

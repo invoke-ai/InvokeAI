@@ -5,7 +5,7 @@
 - `python scripts/dream.py --web` serves both frontend and backend at
   http://localhost:9090
 
-## Environment
+## Evironment
 
 Install [node](https://nodejs.org/en/download/) (includes npm) and optionally
 [yarn](https://yarnpkg.com/getting-started/install).
@@ -15,7 +15,7 @@ packages.
 
 ## Dev
 
-1. From `frontend/`, run `npm run dev` / `yarn dev` to start the dev server.
+1. From `frontend/`, run `npm dev` / `yarn dev` to start the dev server.
 2. Run `python scripts/dream.py --web`.
 3. Navigate to the dev server address e.g. `http://localhost:5173/`.
 

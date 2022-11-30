@@ -33,7 +33,6 @@
 }
 
 .image-uploader-button-outer {
-  min-width: 20rem;
   width: 100%;
   height: 100%;
   display: flex;
@@ -42,10 +41,10 @@
   cursor: pointer;
   border-radius: 0.5rem;
   color: var(--tab-list-text-inactive);
-  background-color: var(--btn-grey);
+  background-color: var(--background-color);
 
   &:hover {
-    background-color: var(--btn-grey-hover);
+    background-color: var(--background-color-light);
   }
 }
 
@@ -66,10 +65,10 @@
   text-align: center;
 
   svg {
-    width: 4rem !important;
-    height: 4rem !important;
+    width: 4rem;
+    height: 4rem;
   }
   h2 {
-    font-size: 1.2rem !important;
+    font-size: 1.2rem;
   }
 }
