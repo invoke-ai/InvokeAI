@@ -3,7 +3,7 @@ import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
 import _ from 'lodash';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
 import { useAppDispatch, useAppSelector } from 'app/store';
 import {
@@ -45,7 +45,6 @@ const boundingBoxPreviewSelector = createSelector(
       stageScale,
       shouldSnapToGrid,
       tool,
-      boundingBoxStrokeWidth: (isMouseOverBoundingBox ? 8 : 1) / stageScale,
       hitStrokeWidth: 20 / stageScale,
     };
   },
@@ -72,12 +71,14 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     stageScale,
     shouldSnapToGrid,
     tool,
-    boundingBoxStrokeWidth,
     hitStrokeWidth,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRef = useRef<Konva.Rect>(null);
+
+  const [isMouseOverBoundingBoxOutline, setIsMouseOverBoundingBoxOutline] =
+    useState(false);
 
   useEffect(() => {
     if (!transformerRef.current || !shapeRef.current) return;
@@ -196,7 +197,9 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
 
   const handleEndedTransforming = () => {
     dispatch(setIsTransformingBoundingBox(false));
+    dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
+    setIsMouseOverBoundingBoxOutline(false);
   };
 
   const handleStartedMoving = () => {
@@ -207,37 +210,60 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     dispatch(setIsTransformingBoundingBox(false));
     dispatch(setIsMovingBoundingBox(false));
     dispatch(setIsMouseOverBoundingBox(false));
+    setIsMouseOverBoundingBoxOutline(false);
   };
 
   const handleMouseOver = () => {
-    dispatch(setIsMouseOverBoundingBox(true));
+    setIsMouseOverBoundingBoxOutline(true);
   };
 
   const handleMouseOut = () => {
     !isTransformingBoundingBox &&
       !isMovingBoundingBox &&
-      dispatch(setIsMouseOverBoundingBox(false));
+      setIsMouseOverBoundingBoxOutline(false);
+  };
+
+  const handleMouseEnterBoundingBox = () => {
+    dispatch(setIsMouseOverBoundingBox(true));
+  };
+
+  const handleMouseLeaveBoundingBox = () => {
+    dispatch(setIsMouseOverBoundingBox(false));
   };
 
   return (
     <Group {...rest}>
+      <Rect
+        height={boundingBoxDimensions.height}
+        width={boundingBoxDimensions.width}
+        x={boundingBoxCoordinates.x}
+        y={boundingBoxCoordinates.y}
+        onMouseEnter={handleMouseEnterBoundingBox}
+        onMouseOver={handleMouseEnterBoundingBox}
+        onMouseLeave={handleMouseLeaveBoundingBox}
+        onMouseOut={handleMouseLeaveBoundingBox}
+      />
       <Rect
         draggable={true}
         fillEnabled={false}
         height={boundingBoxDimensions.height}
         hitStrokeWidth={hitStrokeWidth}
         listening={!isDrawing && tool === 'move'}
+        onDragStart={handleStartedMoving}
         onDragEnd={handleEndedModifying}
         onDragMove={handleOnDragMove}
         onMouseDown={handleStartedMoving}
         onMouseOut={handleMouseOut}
         onMouseOver={handleMouseOver}
+        onMouseEnter={handleMouseOver}
         onMouseUp={handleEndedModifying}
         onTransform={handleOnTransform}
         onTransformEnd={handleEndedTransforming}
         ref={shapeRef}
-        stroke={isMouseOverBoundingBox ? 'rgba(255,255,255,0.7)' : 'white'}
-        strokeWidth={boundingBoxStrokeWidth}
+        stroke={
+          isMouseOverBoundingBoxOutline ? 'rgba(255,255,255,0.7)' : 'white'
+        }
+        strokeWidth={(isMouseOverBoundingBoxOutline ? 8 : 1) / stageScale}
         width={boundingBoxDimensions.width}
         x={boundingBoxCoordinates.x}
         y={boundingBoxCoordinates.y}
@@ -257,6 +283,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
         ignoreStroke={true}
         keepRatio={false}
         listening={!isDrawing && tool === 'move'}
+        onDragStart={handleStartedMoving}
         onDragEnd={handleEndedModifying}
         onMouseDown={handleStartedTransforming}
         onMouseUp={handleEndedTransforming}

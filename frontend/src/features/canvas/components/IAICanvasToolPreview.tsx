@@ -15,7 +15,6 @@ const canvasBrushPreviewSelector = createSelector(
   (canvas) => {
     const {
       cursorPosition,
-      stageDimensions: { width, height },
       brushSize,
       colorPickerColor,
       maskColor,
@@ -26,12 +25,64 @@ const canvasBrushPreviewSelector = createSelector(
       isMovingBoundingBox,
       isTransformingBoundingBox,
       stageScale,
+      stageDimensions,
+      boundingBoxCoordinates,
+      boundingBoxDimensions,
+      shouldRestrictStrokesToBox,
     } = canvas;
+
+    const clip = shouldRestrictStrokesToBox
+      ? {
+          clipX: boundingBoxCoordinates.x,
+          clipY: boundingBoxCoordinates.y,
+          clipWidth: boundingBoxDimensions.width,
+          clipHeight: boundingBoxDimensions.height,
+        }
+      : {};
+
+    // // big brain time; this is the *inverse* of the clip that is needed for shouldRestrictStrokesToBox
+    // // it took some fiddling to work out, so I am leaving it here in case it is needed for something else...
+    // const clipFunc = shouldRestrictStrokesToBox
+    //   ? (ctx: SceneContext) => {
+    //       console.log(
+    //         stageCoordinates.x / stageScale,
+    //         stageCoordinates.y / stageScale,
+    //         stageDimensions.height / stageScale,
+    //         stageDimensions.width / stageScale
+    //       );
+    //       ctx.fillStyle = 'red';
+    //       ctx.rect(
+    //         -stageCoordinates.x / stageScale,
+    //         -stageCoordinates.y / stageScale,
+    //         stageDimensions.width / stageScale,
+    //         stageCoordinates.y / stageScale + boundingBoxCoordinates.y
+    //       );
+    //       ctx.rect(
+    //         -stageCoordinates.x / stageScale,
+    //         boundingBoxCoordinates.y + boundingBoxDimensions.height,
+    //         stageDimensions.width / stageScale,
+    //         stageDimensions.height / stageScale
+    //       );
+    //       ctx.rect(
+    //         -stageCoordinates.x / stageScale,
+    //         -stageCoordinates.y / stageScale,
+    //         stageCoordinates.x / stageScale + boundingBoxCoordinates.x,
+    //         stageDimensions.height / stageScale
+    //       );
+    //       ctx.rect(
+    //         boundingBoxCoordinates.x + boundingBoxDimensions.width,
+    //         -stageCoordinates.y / stageScale,
+    //         stageDimensions.width / stageScale -
+    //           (boundingBoxCoordinates.x + boundingBoxDimensions.width),
+    //         stageDimensions.height / stageScale
+    //       );
+    //     }
+    //   : undefined;
 
     return {
       cursorPosition,
-      width,
-      height,
+      brushX: cursorPosition ? cursorPosition.x : stageDimensions.width / 2,
+      brushY: cursorPosition ? cursorPosition.y : stageDimensions.height / 2,
       radius: brushSize / 2,
       colorPickerOuterRadius: COLOR_PICKER_SIZE / stageScale,
       colorPickerInnerRadius:
@@ -50,6 +101,7 @@ const canvasBrushPreviewSelector = createSelector(
         ) && shouldShowBrush,
       strokeWidth: 1.5 / stageScale,
       dotRadius: 1.5 / stageScale,
+      clip,
     };
   },
   {
@@ -65,9 +117,8 @@ const canvasBrushPreviewSelector = createSelector(
 const IAICanvasToolPreview = (props: GroupConfig) => {
   const { ...rest } = props;
   const {
-    cursorPosition,
-    width,
-    height,
+    brushX,
+    brushY,
     radius,
     maskColorString,
     tool,
@@ -79,25 +130,26 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
     colorPickerColorString,
     colorPickerInnerRadius,
     colorPickerOuterRadius,
+    clip,
   } = useAppSelector(canvasBrushPreviewSelector);
 
   if (!shouldDrawBrushPreview) return null;
 
   return (
-    <Group listening={false} {...rest}>
+    <Group listening={false} {...clip} {...rest}>
       {tool === 'colorPicker' ? (
         <>
           <Circle
-            x={cursorPosition ? cursorPosition.x : width / 2}
-            y={cursorPosition ? cursorPosition.y : height / 2}
+            x={brushX}
+            y={brushY}
             radius={colorPickerOuterRadius}
             stroke={brushColorString}
             strokeWidth={COLOR_PICKER_STROKE_RADIUS}
             strokeScaleEnabled={false}
           />
           <Circle
-            x={cursorPosition ? cursorPosition.x : width / 2}
-            y={cursorPosition ? cursorPosition.y : height / 2}
+            x={brushX}
+            y={brushY}
             radius={colorPickerInnerRadius}
             stroke={colorPickerColorString}
             strokeWidth={COLOR_PICKER_STROKE_RADIUS}
@@ -107,17 +159,17 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
       ) : (
         <>
           <Circle
-            x={cursorPosition ? cursorPosition.x : width / 2}
-            y={cursorPosition ? cursorPosition.y : height / 2}
+            x={brushX}
+            y={brushY}
             radius={radius}
             fill={layer === 'mask' ? maskColorString : brushColorString}
             globalCompositeOperation={
-              tool === 'eraser' ? 'destination-out' : 'source-over'
+              tool === 'eraser' ? 'destination-out' : 'source-out'
             }
           />
           <Circle
-            x={cursorPosition ? cursorPosition.x : width / 2}
-            y={cursorPosition ? cursorPosition.y : height / 2}
+            x={brushX}
+            y={brushY}
             radius={radius}
             stroke={'rgba(255,255,255,0.4)'}
             strokeWidth={strokeWidth * 2}
@@ -125,8 +177,8 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             listening={false}
           />
           <Circle
-            x={cursorPosition ? cursorPosition.x : width / 2}
-            y={cursorPosition ? cursorPosition.y : height / 2}
+            x={brushX}
+            y={brushY}
             radius={radius}
             stroke={'rgba(0,0,0,1)'}
             strokeWidth={strokeWidth}
@@ -136,15 +188,15 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
         </>
       )}
       <Circle
-        x={cursorPosition ? cursorPosition.x : width / 2}
-        y={cursorPosition ? cursorPosition.y : height / 2}
+        x={brushX}
+        y={brushY}
         radius={dotRadius * 2}
         fill={'rgba(255,255,255,0.4)'}
         listening={false}
       />
       <Circle
-        x={cursorPosition ? cursorPosition.x : width / 2}
-        y={cursorPosition ? cursorPosition.y : height / 2}
+        x={brushX}
+        y={brushY}
         radius={dotRadius}
         fill={'rgba(0,0,0,1)'}
         listening={false}
