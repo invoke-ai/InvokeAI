@@ -207,7 +207,7 @@ class ModelCache(object):
         if not os.path.isabs(weights):
             weights = os.path.normpath(os.path.join(Globals.root,weights))
         # scan model
-        self.scan_model(model_name, weights)
+        # self.scan_model(model_name, weights)
 
         print(f'>> Loading {model_name} from {weights}')
 
