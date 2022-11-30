@@ -179,6 +179,8 @@ const IAICanvas = () => {
           <Layer id={'mask'} visible={isMaskEnabled} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
+          </Layer>
+          <Layer>
             <IAICanvasBoundingBoxOverlay />
           </Layer>
           <Layer id="preview" imageSmoothingEnabled={false}>
