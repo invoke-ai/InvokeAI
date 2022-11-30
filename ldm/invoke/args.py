@@ -468,7 +468,7 @@ class Args(object):
             action=argparse.BooleanOptionalAction,
             dest='safety_checker',
             default=False,
-            help='Check for and blur potentially NSFW images. Use --no-nsfw_checker to disable.',
+            help='Check for and blur potentially NSFW images.',
         )
         model_group.add_argument(
             '--patchmatch',
