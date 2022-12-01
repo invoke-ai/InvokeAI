@@ -65,7 +65,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
 7. Load the big stable diffusion weights files and a couple of smaller machine-learning models:
 
     ```bash
-    python scripts/preload_models.py
+    python scripts/configure_invokeai.py
     ```
 
     !!! note

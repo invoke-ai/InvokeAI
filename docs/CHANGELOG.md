@@ -171,12 +171,12 @@ title: Changelog
 - Integrate sd-v1-5 model into test matrix (easily expandable), remove
   unecesarry caches by @mauwii in
   https://github.com/invoke-ai/InvokeAI/pull/1293
-- add --no-interactive to preload_models step by @mauwii in
+- add --no-interactive to configure_invokeai step by @mauwii in
   https://github.com/invoke-ai/InvokeAI/pull/1302
 - 1-click installer and updater. Uses micromamba to install git and conda into a
   contained environment (if necessary) before running the normal installation
   script by @cmdr2 in https://github.com/invoke-ai/InvokeAI/pull/1253
-- preload_models.py script downloads the weight files by @lstein in
+- configure_invokeai.py script downloads the weight files by @lstein in
   https://github.com/invoke-ai/InvokeAI/pull/1290
 
 ## v2.0.1 <small>(13 October 2022)</small>

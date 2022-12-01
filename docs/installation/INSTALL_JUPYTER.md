@@ -2,7 +2,7 @@
 title: Running InvokeAI on Google Colab using a Jupyter Notebook
 ---
 
-# THIS NEEDS TO BE FLESHED OUT
+# THIS DOCUMENTATION IS UNFINISHED - VOLUNTEERS GRATEFULLY ACCEPTED
 
 ## Introduction
 
@@ -21,7 +21,5 @@ start running the cells one-by-one.
 ## Updating to newer versions
 
 ### Updating the stable version
-
-### Updating to the development version
 
 ## Troubleshooting
