@@ -5,7 +5,7 @@
 @rem For users who already have git and conda, this step will be skipped.
 
 @rem Next, it'll checkout the project's git repo, if necessary.
-@rem Finally, it'll create the conda environment and preload the models.
+@rem Finally, it'll create the conda environment and configure InvokeAI.
 
 @rem This enables a user to install this project without manually installing conda and git.
 
@@ -101,11 +101,11 @@ copy source_installer\invoke.bat.in .\invoke.bat
 copy source_installer\update.bat.in .\update.bat
 
 call conda activate invokeai
-@rem preload the models
-call python scripts\preload_models.py
+@rem call configure script
+call python scripts\configure_invokeai.py
 if "%ERRORLEVEL%" NEQ "0" (
    echo ""
-   echo "The preload_models.py script crashed or was cancelled."
+   echo "The configure script crashed or was cancelled."
    echo "InvokeAI is not ready to run. To run preload_models.py again,"
    echo "run the command 'update.bat' in this directory."
    echo "Press any key to continue"
