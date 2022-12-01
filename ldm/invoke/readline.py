@@ -416,7 +416,11 @@ def get_completer(opt:Args, models=[])->Completer:
         readline.parse_and_bind('set skip-completed-text on')
         readline.parse_and_bind('set show-all-if-ambiguous on')
 
-        histfile = os.path.join(os.path.expanduser(opt.outdir), '.invoke_history')
+        outdir = os.path.expanduser(opt.outdir)
+        if os.path.isabs(outdir):
+            histfile = os.path.join(outdir,'.invoke_history')
+        else:
+            histfile = os.path.join(Globals.root, outdir, '.invoke_history')
         try:
             readline.read_history_file(histfile)
             readline.set_history_length(1000)
