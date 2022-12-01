@@ -4,6 +4,7 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=installer/py3.10-darwin-arm64-mps-reqs.txt installer/requirements.in
 #
+--extra-index-url https://download.pytorch.org/whl/torch_stable.html
 --extra-index-url https://download.pytorch.org/whl/cu116
 --trusted-host https
 
@@ -150,6 +151,10 @@ blinker==1.5 \
     --hash=sha256:1eb563df6fdbc39eeddc177d953203f99f097e9bf0e2b8f9f3cf18b6ca425e36 \
     --hash=sha256:923e5e2f69c155f2cc42dafbbd70e16e3fde24d2d4aa2ab72fbe386238892462
     # via streamlit
+boltons==21.0.0 \
+    --hash=sha256:65e70a79a731a7fe6e98592ecfb5ccf2115873d01dbc576079874629e5c90f13 \
+    --hash=sha256:b9bb7b58b2b420bbe11a6025fdef6d3e5edc9f76a42fb467afe7ca212ef9948b
+    # via torchsde
 cachetools==5.2.0 \
     --hash=sha256:6a94c6402995a99c3970cc7e4884bb60b4a8639938157eeed436098bf9831757 \
     --hash=sha256:f9f17d2aec496a9aa6b76f53e3b614c965223c061982d434d160f930c698a9db
@@ -608,8 +613,8 @@ jsonschema==4.17.0 \
     # via
     #   altair
     #   jsonmerge
-k-diffusion @ https://github.com/invoke-ai/k-diffusion/archive/7f16b2c33411f26b3eae78d10648d625cb0c1095.zip \
-    --hash=sha256:c3f2c84036aa98c3abf4552fafab04df5ca472aa639982795e05bb1db43ce5e4
+k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/363386981fee88620709cf8f6f2eea167bd6cd74.zip \
+    --hash=sha256:8eac5cdc08736e6d61908a1b2948f2b2f62691b01dc1aab978bddb3451af0d66
     # via -r installer/requirements.in
 kiwisolver==1.4.4 \
     --hash=sha256:02f79693ec433cb4b5f51694e8477ae83b3205768a6fb48ffba60549080e295b \
@@ -987,6 +992,7 @@ numpy==1.23.4 \
     #   pandas
     #   pyarrow
     #   pydeck
+    #   pypatchmatch
     #   pytorch-lightning
     #   pywavelets
     #   qudida
@@ -1002,6 +1008,7 @@ numpy==1.23.4 \
     #   tifffile
     #   torch-fidelity
     #   torchmetrics
+    #   torchsde
     #   torchvision
     #   transformers
 oauthlib==3.2.2 \
@@ -1159,6 +1166,7 @@ pillow==9.3.0 \
     #   imageio
     #   k-diffusion
     #   matplotlib
+    #   pypatchmatch
     #   realesrgan
     #   scikit-image
     #   streamlit
@@ -1294,6 +1302,9 @@ pyparsing==3.0.9 \
     # via
     #   matplotlib
     #   packaging
+pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/129863937a8ab37f6bbcec327c994c0f932abdbc.zip \
+    --hash=sha256:4ad6ec95379e7d122d494ff76633cc7cf9b71330d5efda147fceba81e3dc6cd2
+    # via -r installer/requirements.in
 pyreadline3==3.4.1 \
     --hash=sha256:6f3d1f7b8a31ba32b73917cefc1f28cc660562f39aea8646d30bd6eff21f7bae \
     --hash=sha256:b0efb6516fd4fb07b45949053826a62fa4cb353db5be2bbb4a7aa1fdd1e345fb
@@ -1649,6 +1660,7 @@ scipy==1.9.3 \
     #   scikit-learn
     #   torch-fidelity
     #   torchdiffeq
+    #   torchsde
 semver==2.13.0 \
     --hash=sha256:ced8b23dceb22134307c1b8abfa523da14198793d9787ac838e70e29e77458d4 \
     --hash=sha256:fa0fe2722ee1c3f57eac478820c3a5ae2f624af8264cbdf9000c980ff7f75e3f
@@ -1864,6 +1876,7 @@ torch==1.12.1 ; platform_system == "Darwin" \
     #   torch-fidelity
     #   torchdiffeq
     #   torchmetrics
+    #   torchsde
     #   torchvision
 torch-fidelity==0.3.0 \
     --hash=sha256:3d3e33db98919759cc4f3f24cb27e1e74bdc7c905d90a780630e4e1c18492b66 \
@@ -1877,26 +1890,30 @@ torchmetrics==0.10.2 \
     --hash=sha256:43757d82266969906fc74b6e80766fcb2a0d52d6c3d09e3b7c98cf3b733fd20c \
     --hash=sha256:daa29d96bff5cff04d80eec5b9f5076993d6ac9c2d2163e88b6b31f8d38f7c25
     # via pytorch-lightning
-torchvision==0.13.0 ; platform_system == "Darwin" \
-    --hash=sha256:01e9e7b2e7724e66561e8d98f900985d80191e977c5c0b3f33ed31800ba0210c \
-    --hash=sha256:0e28740bd5695076f7c449af650fc474d6566722d446461c2ceebf9c9599b37f \
-    --hash=sha256:1b703701f0b99f307ad925b1abda2b3d5bdbf30643ff02102b6aeeb8840ae278 \
-    --hash=sha256:1e2049f1207631d42d743205f663f1d2235796565be3f18b0339d479626faf30 \
-    --hash=sha256:253eb0c67bf88cef4a79ec69058c3e94f9fde28b9e3699ad1afc0b3ed50f8075 \
-    --hash=sha256:42d95ab197d090efc5669fec02fbc603d05c859e50ca2c60180d1a113aa9b3e2 \
-    --hash=sha256:5c31e9b3004142dbfdf32adc4cf2d4fd709b820833e9786f839ae3a91ff65ef0 \
-    --hash=sha256:61d5093a50b7923a4e5bf9e0271001c29e01abec2348b7dd93370a0a9d15836c \
-    --hash=sha256:667cac55afb13cda7d362466e7eba3119e529b210e55507d231bead09aca5e1f \
-    --hash=sha256:6c4c35428c758adc485ff8f239b5ed68c1b6c26efa261a52e431cab0f7f22aec \
-    --hash=sha256:83a4d9d50787d1e886c94486b63b15978391f6cf1892fce6a93132c09b14e128 \
-    --hash=sha256:a20662c11dc14fd4eff102ceb946a7ee80b9f98303bb52435cc903f2c4c1fe10 \
-    --hash=sha256:acb72a40e5dc0cd454d28514dbdd589a5057afd9bb5c785b87a54718b999bfa1 \
-    --hash=sha256:ad458146aca15f652f9b0c227bebd5403602c7341f15f68f20ec119fa8e8f4a5 \
-    --hash=sha256:ada295dbfe55017b02acfab960a997387f5addbadd28ee5e575e24f692992ce4 \
-    --hash=sha256:b620a43df4131ad09f5761c415a016a9ea95aaf8ec8c91d030fb59bad591094a \
-    --hash=sha256:b7a2c9aebc7ef265777fe7e82577364288d98cf6b8cf0a63bb2621df78a7af1a \
-    --hash=sha256:c2278a189663087bb8e65915062aa7a25b8f8e5a3cfaa5879fe277e23e4bbf40 \
-    --hash=sha256:df16abf31e7a5fce8db1f781bf1e4f20c8bc730c7c3f657e946cc5820c04e465
+torchsde==0.2.5 \
+    --hash=sha256:222be9e15610d37a4b5a71cfa0c442178f9fd9ca02f6522a3e11c370b3d0906b \
+    --hash=sha256:4c34373a94a357bdf60bbfee00c850f3563d634491555820b900c9a4f7eff300
+    # via k-diffusion
+torchvision==0.13.1 ; platform_system == "Darwin" \
+    --hash=sha256:0298bae3b09ac361866088434008d82b99d6458fe8888c8df90720ef4b347d44 \
+    --hash=sha256:08f592ea61836ebeceb5c97f4d7a813b9d7dc651bbf7ce4401563ccfae6a21fc \
+    --hash=sha256:099874088df104d54d8008f2a28539ca0117b512daed8bf3c2bbfa2b7ccb187a \
+    --hash=sha256:0e77706cc90462653620e336bb90daf03d7bf1b88c3a9a3037df8d111823a56e \
+    --hash=sha256:19286a733c69dcbd417b86793df807bd227db5786ed787c17297741a9b0d0fc7 \
+    --hash=sha256:3567fb3def829229ec217c1e38f08c5128ff7fb65854cac17ebac358ff7aa309 \
+    --hash=sha256:4d8bf321c4380854ef04613935fdd415dce29d1088a7ff99e06e113f0efe9203 \
+    --hash=sha256:5e631241bee3661de64f83616656224af2e3512eb2580da7c08e08b8c965a8ac \
+    --hash=sha256:7552e80fa222252b8b217a951c85e172a710ea4cad0ae0c06fbb67addece7871 \
+    --hash=sha256:7cb789ceefe6dcd0dc8eeda37bfc45efb7cf34770eac9533861d51ca508eb5b3 \
+    --hash=sha256:83e9e2457f23110fd53b0177e1bc621518d6ea2108f570e853b768ce36b7c679 \
+    --hash=sha256:87c137f343197769a51333076e66bfcd576301d2cd8614b06657187c71b06c4f \
+    --hash=sha256:899eec0b9f3b99b96d6f85b9aa58c002db41c672437677b553015b9135b3be7e \
+    --hash=sha256:8e4d02e4d8a203e0c09c10dfb478214c224d080d31efc0dbf36d9c4051f7f3c6 \
+    --hash=sha256:b167934a5943242da7b1e59318f911d2d253feeca0d13ad5d832b58eed943401 \
+    --hash=sha256:c5ed609c8bc88c575226400b2232e0309094477c82af38952e0373edef0003fd \
+    --hash=sha256:e9a563894f9fa40692e24d1aa58c3ef040450017cfed3598ff9637f404f3fe3b \
+    --hash=sha256:ef5fe3ec1848123cd0ec74c07658192b3147dcd38e507308c790d5943e87b88c \
+    --hash=sha256:f230a1a40ed70d51e463ce43df243ec520902f8725de2502e485efc5eea9d864
     # via
     #   -r installer/requirements.in
     #   basicsr
@@ -1937,6 +1954,9 @@ tqdm==4.64.1 \
     #   taming-transformers-rom1504
     #   torch-fidelity
     #   transformers
+trampoline==0.1.2 \
+    --hash=sha256:36cc9a4ff9811843d177fc0e0740efbd7da39eadfe6e50c9e2937cbc06d899d9
+    # via torchsde
 transformers==4.24.0 \
     --hash=sha256:486f353a8e594002e48be0e2aba723d96eda839e63bfe274702a4b5eda85559b \
     --hash=sha256:b7ab50039ef9bf817eff14ab974f306fd20a72350bdc9df3a858fd009419322e
