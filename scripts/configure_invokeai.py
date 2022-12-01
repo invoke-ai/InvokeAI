@@ -536,6 +536,8 @@ def download_weights(opt:dict) -> Union[str, None]:
     if not (access_token := HfFolder.get_token()):
         # If unable to find an existing token or expected environment, try the non-canonical environment variable (widely used in the community and supported as per docs)
         if (access_token := os.getenv("HUGGINGFACE_TOKEN")):
+            # set the environment variable here instead of simply calling huggingface_hub.login(token), to maintain consistent behaviour.
+            # when calling the .login() method, the token is cached in the user's home directory. When the env var is used, the token is NOT cached.
             os.environ['HUGGING_FACE_HUB_TOKEN'] = access_token
 
     if opt.yes_to_all:
