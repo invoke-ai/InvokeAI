@@ -102,6 +102,7 @@ class Completer(object):
         self.auto_history_active = True
         self.extensions = None
         self.concepts = None
+        self.embedding_terms = set()
         return
 
     def complete(self, text, state):
@@ -270,17 +271,21 @@ class Completer(object):
         return matches
 
     def add_embedding_terms(self, terms:list[str]):
-        self.concepts = Concepts().list_concepts()
+        self.embedding_terms = set(terms)
         if self.concepts:
-            self.concepts.extend(terms)
+            self.embedding_terms.update(self.concepts)
 
     def _concept_completions(self, text, state):
+        if self.concepts is None:
+            self.concepts = set(Concepts().list_concepts())
+            self.embedding_terms.update(self.concepts)
+
         partial = text[1:]  # this removes the leading '<'
         if len(partial) == 0:
-            return self.concepts  # whole dump - think if user wants this!
+            return list(self.embedding_terms)  # whole dump - think if user wants this!
 
         matches = list()
-        for concept in self.concepts:
+        for concept in self.embedding_terms:
             if concept.startswith(partial):
                 matches.append(f'<{concept}>')
         matches.sort()
