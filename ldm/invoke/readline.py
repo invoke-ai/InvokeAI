@@ -101,7 +101,7 @@ class Completer(object):
         self.linebuffer  = None
         self.auto_history_active = True
         self.extensions = None
-        self.concepts = Concepts().list_concepts()
+        self.concepts = None
         return
 
     def complete(self, text, state):
@@ -271,7 +271,8 @@ class Completer(object):
 
     def add_embedding_terms(self, terms:list[str]):
         self.concepts = Concepts().list_concepts()
-        self.concepts.extend(terms)
+        if self.concepts:
+            self.concepts.extend(terms)
 
     def _concept_completions(self, text, state):
         partial = text[1:]  # this removes the leading '<'

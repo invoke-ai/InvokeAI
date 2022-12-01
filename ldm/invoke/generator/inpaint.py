@@ -27,7 +27,7 @@ if Globals.try_patchmatch:
         print('>> Patchmatch initialized')
         infill_methods.append('patchmatch')
     else:
-        print('>> Patchmatch not loaded, please see https://github.com/invoke-ai/InvokeAI/blob/patchmatch-install-docs/docs/installation/INSTALL_PATCHMATCH.md')
+        print('>> Patchmatch not loaded (nonfatal)')
 else:
     print('>> Patchmatch loading disabled')
 
