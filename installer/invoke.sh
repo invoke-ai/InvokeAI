@@ -1,8 +1,18 @@
 #!/usr/bin/env sh
 
+# ensure we're in the correct folder in case user's CWD is somewhere else
+scriptdir=$(dirname "$0")
+cd "$scriptdir"
+
 set -eu
 
 . .venv/bin/activate
+
+# set required env var for torch on mac MPS
+if [ "$(uname -s)" == "Darwin" ]; then
+    export PYTORCH_ENABLE_MPS_FALLBACK=1
+fi
+
 
 echo "Do you want to generate images using the"
 echo "1. command-line"
@@ -15,11 +25,11 @@ read choice
 case $choice in
     1)
         printf "\nStarting the InvokeAI command-line..\n";
-        .venv/bin/python scripts/invoke.py;
+        .venv/bin/python scripts/invoke.py $*;
     ;;
     2)
         printf "\nStarting the InvokeAI browser-based UI..\n";
-        .venv/bin/python scripts/invoke.py --web;
+        .venv/bin/python scripts/invoke.py --web $*;
     ;;
     3)
         printf "\nDeveloper Console:\n";
