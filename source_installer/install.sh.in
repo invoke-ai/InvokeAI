@@ -5,7 +5,7 @@
 # For users who already have git and conda, this step will be skipped.
 
 # Next, it'll checkout the project's git repo, if necessary.
-# Finally, it'll create the conda environment and preload the models.
+# Finally, it'll create the conda environment and configure InvokeAI.
 
 # This enables a user to install this project without manually installing conda and git.
 
@@ -125,8 +125,8 @@ else
     ln -sf ./source_installer/update.sh.in ./update.sh
 
     conda activate invokeai
-    # preload the models
-    echo "Calling the preload_models.py script"
+    # configure
+    echo "Calling the configure_invokeai script"
     python scripts/configure_invokeai.py
     status=$?
     if test $status -ne 0
