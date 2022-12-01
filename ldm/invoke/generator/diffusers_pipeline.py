@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from typing import List, Optional, Union, Callable
 
 import PIL.Image
+import einops
 import torch
+import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import preprocess, \
-    StableDiffusionImg2ImgPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import StableDiffusionImg2ImgPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
@@ -38,6 +39,25 @@ _default_personalization_config_params = dict(
     num_vectors_per_token=8,
     progressive_words=False
 )
+
+
+def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool=True, multiple_of=8) -> torch.FloatTensor:
+    """
+
+    :param image: input image
+    :param normalize: scale the range to [-1, 1] instead of [0, 1]
+    :param multiple_of: resize the input so both dimensions are a multiple of this
+    """
+    w, h = image.size
+    w, h = map(lambda x: x - x % 8, (w, h))  # resize to integer multiple of 8
+    transformation = T.Compose([
+        T.Resize((h, w), T.InterpolationMode.LANCZOS),
+        T.ToTensor(),
+    ])
+    tensor = transformation(image)
+    if normalize:
+        tensor = tensor * 2.0 - 1.0
+    return tensor
 
 
 class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
@@ -270,12 +290,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 noise_func=None,
                                 **extra_step_kwargs) -> StableDiffusionPipelineOutput:
         device = self.unet.device
-        latents_dtype = text_embeddings.dtype
+        latents_dtype = self.unet.dtype
         batch_size = 1
         num_images_per_prompt = 1
 
         if isinstance(init_image, PIL.Image.Image):
-            init_image = preprocess(init_image.convert('RGB'))
+            init_image = image_resized_to_grid_as_tensor(init_image.convert('RGB'))
+
+        if init_image.dim() == 3:
+            init_image = einops.rearrange(init_image, 'c h w -> 1 c h w')
 
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
@@ -296,6 +319,51 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if result is None:
             raise AssertionError("why was that an empty generator?")
         return result
+
+    def inpaint_from_embeddings(
+            self,
+            init_image: torch.FloatTensor,
+            mask_image: torch.FloatTensor,
+            strength: float,
+            num_inference_steps: int,
+            text_embeddings: torch.Tensor, unconditioned_embeddings: torch.Tensor,
+            guidance_scale: float,
+            *, callback: Callable[[PipelineIntermediateState], None] = None,
+            extra_conditioning_info: InvokeAIDiffuserComponent.ExtraConditioningInfo = None,
+            run_id=None,
+            noise_func=None,
+            **extra_step_kwargs) -> StableDiffusionPipelineOutput:
+        device = self.unet.device
+        latents_dtype = self.unet.dtype
+        batch_size = 1
+        num_images_per_prompt = 1
+
+        if isinstance(init_image, PIL.Image.Image):
+            init_image = image_resized_to_grid_as_tensor(init_image.convert('RGB'))
+
+        if init_image.dim() == 3:
+            init_image = einops.rearrange(init_image, 'c h w -> 1 c h w')
+
+        img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
+        img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
+        timesteps = img2img_pipeline.get_timesteps(num_inference_steps, strength, device=device)
+
+        # 6. Prepare latent variables
+        latent_timestep = timesteps[:1].repeat(batch_size * num_images_per_prompt)
+        latents = self.prepare_latents_from_image(init_image, latent_timestep, latents_dtype, device, noise_func)
+
+        result = None
+        for result in self.generate_from_embeddings(
+                latents, text_embeddings, unconditioned_embeddings, guidance_scale,
+                extra_conditioning_info=extra_conditioning_info,
+                timesteps=timesteps,
+                run_id=run_id, **extra_step_kwargs):
+            if callback is not None and isinstance(result, PipelineIntermediateState):
+                callback(result)
+        if result is None:
+            raise AssertionError("why was that an empty generator?")
+        return result
+
 
     def prepare_latents_from_image(self, init_image, timestep, dtype, device, noise_func) -> torch.FloatTensor:
         # can't quite use upstream StableDiffusionImg2ImgPipeline.prepare_latents
