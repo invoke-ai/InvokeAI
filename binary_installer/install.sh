@@ -198,7 +198,7 @@ _err_exit $? _err_msg
 echo -e "\n***** Updated pip and wheel *****\n"
 
 _err_msg="\n----- requirements file copy failed -----\n"
-cp installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt
+cp binary_installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt
 _err_exit $? _err_msg
 
 _err_msg="\n----- main pip install failed -----\n"
@@ -213,11 +213,11 @@ _err_exit $? _err_msg
 
 echo -e "\n***** Installed InvokeAI *****\n"
 
-cp installer/invoke.sh .
+cp binary_installer/invoke.sh .
 echo -e "\n***** Installed invoke launcher script ******\n"
 
 # more cleanup
-rm -rf installer/ installer_files/
+rm -rf binary_installer/ installer_files/
 
 # preload the models
 .venv/bin/python3 scripts/configure_invokeai.py

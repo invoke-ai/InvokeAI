@@ -127,7 +127,7 @@ if %errorlevel% neq 0 goto err_exit
 echo ***** Updated pip and wheel *****
 
 set err_msg=----- requirements file copy failed -----
-copy installer\py3.10-windows-x86_64-cuda-reqs.txt requirements.txt
+copy binary_installer\py3.10-windows-x86_64-cuda-reqs.txt requirements.txt
 if %errorlevel% neq 0 goto err_exit
 
 set err_msg=----- main pip install failed -----
@@ -140,11 +140,11 @@ set err_msg=----- InvokeAI setup failed -----
 .venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location -e .
 if %errorlevel% neq 0 goto err_exit
 
-copy installer\invoke.bat .\invoke.bat
+copy binary_installer\invoke.bat .\invoke.bat
 echo ***** Installed invoke launcher script ******
 
 @rem more cleanup
-rd /s /q installer installer_files
+rd /s /q binary_installer installer_files
 
 @rem preload the models
 call .venv\Scripts\python scripts\configure_invokeai.py
