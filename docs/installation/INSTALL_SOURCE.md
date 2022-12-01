@@ -67,7 +67,7 @@ off the process.
     InvokeAI code and install it along with its dependencies.
 
 6.  After installation completes, the installer will launch a script called
-    `preload_models.py`, which will guide you through the first-time process of
+    `configure_invokeai.py`, which will guide you through the first-time process of
     selecting one or more Stable Diffusion model weights files, downloading and
     configuring them.
 
@@ -119,31 +119,15 @@ This section describes how to update InvokeAI to new versions of the software.
 This distribution is changing rapidly, and we add new features on a daily basis.
 To update to the latest released version (recommended), run the `update.sh`
 (Linux/Mac) or `update.bat` (Windows) scripts. This will fetch the latest
-release and re-run the `preload_models` script to download any updated models
+release and re-run the `configure_invokeai` script to download any updated models
 files that may be needed. You can also use this to add additional models that
 you did not select at installation time.
 
-### Updating to the development version
-
-There may be times that there is a feature in the `development` branch of
-InvokeAI that you'd like to take advantage of. Or perhaps there is a branch that
-corrects an annoying bug. To do this, you will use the developer's console.
-
-From within the invokeAI directory, run the command `invoke.sh` (Linux/Mac) or
-`invoke.bat` (Windows) and selection option (3) to open the developers console.
-Then run the following command to get the `development branch`:
-
-```bash
-git checkout development
-git pull
-conda env update
-```
-
 You can now close the developer console and run `invoke` as before. If you get
 complaints about missing models, then you may need to do the additional step of
-running `preload_models.py`. This happens relatively infrequently. To do this,
+running `configure_invokeai.py`. This happens relatively infrequently. To do this,
 simply open up the developer's console again and type
-`python scripts/preload_models.py`.
+`python scripts/configure_invokeai.py`.
 
 ## Troubleshooting
 

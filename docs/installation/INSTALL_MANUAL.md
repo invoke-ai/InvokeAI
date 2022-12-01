@@ -155,10 +155,10 @@ command-line completion.
         process for this is described in [here](INSTALLING_MODELS.md).
 
     ```bash
-    python scripts/preload_models.py
+    python scripts/configure_invokeai.py
     ```
 
-    The script `preload_models.py` will interactively guide you through the
+    The script `configure_invokeai.py` will interactively guide you through the
     process of downloading and installing the weights files needed for InvokeAI.
     Note that the main Stable Diffusion weights file is protected by a license
     agreement that you have to agree to. The script will list the steps you need
@@ -220,7 +220,7 @@ greatest version, launch the Anaconda window, enter `InvokeAI` and type:
 ```bash
 git pull
 conda env update
-python scripts/preload_models.py --no-interactive  #optional
+python scripts/configure_invokeai.py --no-interactive  #optional
 ```
 
 This will bring your local copy into sync with the remote one. The last step may
@@ -359,7 +359,7 @@ brew install llvm
 
 If brew config has Clang installed, update to the latest llvm and try creating the environment again.
 
-#### `preload_models.py` or `invoke.py` crashes at an early stage
+#### `configure_invokeai.py` or `invoke.py` crashes at an early stage
 
 This is usually due to an incomplete or corrupted Conda install. Make sure you
 have linked to the correct environment file and run `conda update` again.
