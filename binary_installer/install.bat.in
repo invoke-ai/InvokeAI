@@ -140,11 +140,7 @@ set err_msg=----- InvokeAI setup failed -----
 .venv\Scripts\python -m pip install %no_cache_dir% --no-warn-script-location -e .
 if %errorlevel% neq 0 goto err_exit
 
-<<<<<<< HEAD:binary_installer/install.bat
-copy binary_installer\invoke.bat .\invoke.bat
-=======
-copy installer\invoke.bat.in .\invoke.bat
->>>>>>> main:binary_installer/install.bat.in
+copy binary_installer\invoke.bat.in .\invoke.bat
 echo ***** Installed invoke launcher script ******
 
 @rem more cleanup

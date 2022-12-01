@@ -213,12 +213,8 @@ _err_exit $? _err_msg
 
 echo -e "\n***** Installed InvokeAI *****\n"
 
-<<<<<<< HEAD:binary_installer/install.sh
-cp binary_installer/invoke.sh .
-=======
-cp installer/invoke.sh.in ./invoke.sh
+cp binary_installer/invoke.sh.in ./invoke.sh
 chmod a+x ./invoke.sh
->>>>>>> main:binary_installer/install.sh.in
 echo -e "\n***** Installed invoke launcher script ******\n"
 
 # more cleanup
