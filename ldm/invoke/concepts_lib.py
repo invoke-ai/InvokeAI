@@ -36,7 +36,7 @@ class Concepts(object):
             models = self.hf_api.list_models(filter=ModelFilter(model_name='sd-concepts-library/'))
             self.concept_list = [a.id.split('/')[1] for a in models]
         except Exception as e:
-            print(' ** WARNING: Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}.')
+            print(f' ** WARNING: Hugging Face textual inversion concepts libraries could not be loaded. The error was {str(e)}.')
             print(' ** You may load .bin and .pt file(s) manually using the --embedding_directory argument.')
         return self.concept_list
 
