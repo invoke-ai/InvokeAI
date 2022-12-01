@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script will install git and conda (if not found on the PATH variable)
 #  using micromamba (an 8mb static-linked single-file binary, conda replacement).
@@ -11,7 +11,11 @@
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-echo "Installing InvokeAI.."
+echo "InvokeAI source installer..."
+echo ""
+echo "Some of the installation steps take a long time to run. Please be patient."
+echo "If the script appears to hang for more than 10 minutes, please interrupt with control-C and retry."
+read -n 1 -s -r -p "<Press any key to start the install>"
 echo ""
 
 OS_NAME=$(uname -s)
@@ -112,21 +116,22 @@ status=$?
 
 if test $status -ne 0
 then
-   echo "Something went wrong while installing Python libraries and cannot continue."
-   echo "Please visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
-   echo "installation methods"
+    echo "Something went wrong while installing Python libraries and cannot continue."
+    echo "See https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#troubleshooting for troubleshooting"
+    echo "tips, or visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
+    echo "installation methods"
 else
-    ln -sf ./source_installer/invoke.sh .
-    ln -sf ./source_installer/update.sh .
+    ln -sf ./source_installer/invoke.sh.in ./invoke.sh
+    ln -sf ./source_installer/update.sh.in ./update.sh
 
     conda activate invokeai
     # preload the models
     echo "Calling the preload_models.py script"
-    python scripts/preload_models.py
+    python scripts/configure_invokeai.py
     status=$?
     if test $status -ne 0
        then
-	   echo "The preload_models.py script crashed or was cancelled."
+	   echo "The configure_invoke.py script crashed or was cancelled."
            echo "InvokeAI is not ready to run. Try again by running"
            echo "update.sh in this directory."
        else

@@ -9,8 +9,13 @@
 
 @rem This enables a user to install this project without manually installing conda and git.
 
-echo "Installing InvokeAI.."
-echo.
+echo "InvokeAI source installer..."
+echo ""
+echo "Some of the installation steps take a long time to run. Please be patient."
+echo "If the script appears to hang for more than 10 minutes, please interrupt with control-C and retry."
+echo "<Press any key to start the install process>"
+pause
+echo ""
 
 @rem config
 set MAMBA_ROOT_PREFIX=%cd%\installer_files\mamba
@@ -84,16 +89,16 @@ copy environments-and-requirements\environment-win-cuda.yml environment.yml
 call conda env create
 if "%ERRORLEVEL%" NEQ "0" (
    echo ""
-   echo "Something went wrong while installing Python libraries and cannot continue.
-   echo "Please visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
-   echo "installation methods."
-   echo "Press any key to continue"
+   echo "Something went wrong while installing Python libraries and cannot continue."
+   echo "See https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#troubleshooting for troubleshooting"
+   echo "tips, or visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
+   echo "installation methods"
    pause
    exit /b
 )
 
-copy source_installer\invoke.bat invoke.bat
-copy source_installer\update.bat update.bat
+copy source_installer\invoke.bat.in .\invoke.bat
+copy source_installer\update.bat.in .\update.bat
 
 call conda activate invokeai
 @rem preload the models
@@ -114,5 +119,6 @@ echo "* InvokeAI installed successfully *"
 echo "You can now start generating images by double-clicking the 'invoke.bat' file (inside this folder)
 echo "Press any key to continue"
 pause
-exit 0
+exit /b
+
 
