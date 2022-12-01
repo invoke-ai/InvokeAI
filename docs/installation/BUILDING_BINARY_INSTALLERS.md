@@ -1,6 +1,6 @@
 # How to build "binary" installers (InvokeAI-mac/windows/linux_on_*.zip)
 
-## 1. Ensure `installers/requirements.in` is correct 
+## 1. Ensure `installers/requirements.in` is correct
 
 and up to date on the branch to be installed.
 
@@ -21,10 +21,10 @@ py3.10-darwin-x86_64-reqs.txt
 py3.10-linux-x86_64-cuda-reqs.txt
 py3.10-windows-x86_64-cuda-reqs.txt
 ```
-matches the current OS and architecture. 
+matches the current OS and architecture.
 > There is no way to cross-compile these. They must be done on a system matching the target OS and arch.
 
-## <a name="step-3"></a> 3. Set github repository and branch 
+## <a name="step-3"></a> 3. Set github repository and branch
 
 Once all reqs files have been collected and committed **to the branch
 to be installed**, edit `installer/install.sh` so that `RELEASE_URL`
@@ -56,10 +56,9 @@ process.
 
 cd into the `installers/` folder and run
 `./create_installers.sh`. This will create
-`InvokeAI-mac_on_<branch>_<gitcommit>.zip`,
-`InvokeAI-windowson_<branch>_<gitcommit>.zip` and
-`InvokeAI-linuxon_<branch>_<gitcommit>.zip`. These files can be
-distributed to end users.
+`InvokeAI-mac_on_<branch>.zip`,
+`InvokeAI-windows_on_<branch>.zip` and
+`InvokeAI-linux_on_<branch>.zip`. These files can be distributed to end users.
 
 These zips will continue to function as installers for all future
 pushes to those branches, as long as necessary changes to
