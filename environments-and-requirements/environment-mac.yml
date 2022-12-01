@@ -51,6 +51,12 @@ dependencies:
   - tensorboard=2.10
   - transformers=4.23
   - pip:
+      - graphlib-backport
+      - fastapi
+      - uvicorn[standard]
+      - fastapi-events
+      - fastapi-socketio
+      - python-multipart
       - getpass_asterisk
       - picklescan
       - taming-transformers-rom1504

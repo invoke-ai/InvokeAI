@@ -38,6 +38,12 @@ dependencies:
     - torch-fidelity==0.3.0
     - torchmetrics==0.7.0
     - transformers==4.21.3
+    - graphlib-backport
+    - fastapi
+    - uvicorn[standard]
+    - fastapi-events
+    - fastapi-socketio
+    - python-multipart
     - git+https://github.com/openai/CLIP.git@main#egg=clip
     - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
     - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
