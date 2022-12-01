@@ -86,6 +86,10 @@ AMD card (using the ROCm driver). For full installation and upgrade
 instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
+Linux users who wish to make use of the PyPatchMatch inpainting
+functions will need to perform a bit of extra work to enable this
+module. Instructions can be found at [Installing PyPatchMatch](installation/INSTALL_PATCHMATCH.md).
+
 ## :fontawesome-solid-computer: Hardware Requirements
 
 ### :octicons-cpu-24: System
