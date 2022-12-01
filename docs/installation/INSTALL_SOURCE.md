@@ -55,7 +55,7 @@ off the process.
     named `install.bat` on Windows systems and `install.sh` on Linux and
     Macintosh systems.
 
-4.  Alternatively, form the command line, run the shell script or .bat file:
+4.  Alternatively, from the command line, run the shell script or .bat file:
 
     ```cmd
     C:\Documents\Linco> cd invokeAI
@@ -65,6 +65,15 @@ off the process.
 5.  Sit back and let the install script work. It will install various binary
     requirements including Conda, Git and Python, then download the current
     InvokeAI code and install it along with its dependencies.
+
+    Be aware that some of the library download and install steps take a long time.
+    In particular, the `pytorch` package is quite large and often appears to get
+    "stuck" at 99.9%. Similarly, the `pip installing requirements` step may
+    appear to hang. Have patience and the installation step will eventually
+    resume. However, there are occasions when the library install does
+    legitimately get stuck. If you have been waiting for more than ten minutes
+    and nothing is happening, you can interrupt the script with ^C. You may restart
+    it and it will pick up where it left off.
 
 6.  After installation completes, the installer will launch a script called
     `configure_invokeai.py`, which will guide you through the first-time process of
@@ -109,6 +118,71 @@ python scripts/invoke.py --web --max_load_models=3 \
 
 These options are described in detail in the
 [Command-Line Interface](../features/CLI.md) documentation.
+
+## Troubleshooting
+
+_Package dependency conflicts_ If you have previously installed
+InvokeAI or another Stable Diffusion package, the installer may
+occasionally pick up outdated libraries and either the installer or
+`invoke` will fail with complaints out library conflicts. There are
+two steps you can take to clear this problem. Both of these are done
+from within the "developer's console", which you can get to by
+launching `invoke.sh` (or `invoke.bat`) and selecting launch option
+#3:
+
+1. Remove the previous `invokeai` environment completely. From within
+   the developer's console, give the command `conda env remove -n
+   invokeai`. This will delete previous files installed by `invoke`.
+
+   Then exit from the developer's console and launch the script
+   `update.sh` (or `update.bat`). This will download the most recent
+   InvokeAI (including bug fixes) and reinstall the environment.
+   You should then be able to run `invoke.sh`/`invoke.bat`.
+
+2. If this doesn't work, you can try cleaning your system's conda
+   cache. This is slightly more extreme, but won't interfere with
+   any other python-based programs installed on your computer.
+   From the developer's console, run the command `conda clean -a`
+   and answer "yes" to all prompts.
+
+   After this is done, run `update.sh` and try again as before.
+
+_"Corrupted configuration file."__ Everything seems to install ok, but
+`invoke` complains of a corrupted configuration file and goes calls
+`configure_invokeai.py` to fix, but this doesn't fix the problem.
+
+This issue is often caused by a misconfigured configuration directive
+in the `.invokeai` initialization file that contains startup settings.
+This can be corrected by fixing the offending line.
+
+First find `.invokeai`. It is a small text file located in your home
+directory, `~/.invokeai` on Mac and Linux systems, and `C:\Users\*your
+name*\.invokeai` on Windows systems. Open it with a text editor
+(e.g. Notepad on Windows, TextEdit on Macs, or `nano` on Linux)
+and look for the lines starting with `--root` and `--outdir`.
+
+An example is here:
+
+```cmd
+--root="/home/lstein/invokeai"
+--outdir="/home/lstein/invokeai/outputs"
+```
+
+There should not be whitespace before or after the directory paths,
+and the paths should not end with slashes:
+
+```cmd
+--root="/home/lstein/invokeai "     # wrong! no whitespace here
+--root="/home\lstein\invokeai\"     # wrong! shouldn't end in a slash
+```
+
+Fix the problem with your text editor and save as a **plain text**
+file. This should clear the issue.
+
+_If none of these maneuvers fixes the problem_ then please report the
+problem to the [InvokeAI
+Issues](https://github.com/invoke-ai/InvokeAI/issues) section, or
+visit our [Discord Server](https://discord.gg/ZmtBAhwWhy) for interactive assistance.
 
 ## Updating to newer versions
 

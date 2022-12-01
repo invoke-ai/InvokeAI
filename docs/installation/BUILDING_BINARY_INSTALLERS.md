@@ -12,7 +12,7 @@ inside the InvokeAI git root folder, run the following commands:
 ```commandline
 conda activate invokeai # or however you activate python
 pip install pip-tools
-pip-compile --allow-unsafe --generate-hashes --output-file=installer/<reqsfile>.txt installer/requirements.in
+pip-compile --allow-unsafe --generate-hashes --output-file=binary_installer/<reqsfile>.txt binary_installer/requirements.in
 ```
 where `<reqsfile>.txt` is whichever of
 ```commandline
@@ -27,7 +27,7 @@ matches the current OS and architecture.
 ## <a name="step-3"></a> 3. Set github repository and branch
 
 Once all reqs files have been collected and committed **to the branch
-to be installed**, edit `installer/install.sh.in` and `installer/install.bat.in` so that `RELEASE_URL`
+to be installed**, edit `binary_installer/install.sh.in` and `binary_installer/install.bat.in` so that `RELEASE_URL`
 and `RELEASE_SOURCEBALL` point to the github repo and branch that is
 to be installed.
 
