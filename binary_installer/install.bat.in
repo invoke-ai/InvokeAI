@@ -10,6 +10,8 @@
 
 @rem This enables a user to install this project without manually installing git or Python
 
+PUSHD %~dp0
+
 set "no_cache_dir=--no-cache-dir"
 if "%1" == "use-cache" (
     set "no_cache_dir="
