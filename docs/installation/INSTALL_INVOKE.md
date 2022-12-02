@@ -1,8 +1,8 @@
 ---
-title: InvokeAI Installer
+title: InvokeAI Binary Installer
 ---
 
-The InvokeAI installer is a shell script that will install InvokeAI onto a stock
+The InvokeAI binary installer is a shell script that will install InvokeAI onto a stock
 computer running recent versions of Linux, MacOSX or Windows. It will leave you
 with a version that runs a stable version of InvokeAI. When a new version of
 InvokeAI is released, you will download and reinstall the new version.
@@ -36,7 +36,7 @@ recommended model weights files.
 
 1. Download the
    [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest) of
-   InvokeAI's installer for your platform
+   InvokeAI's installer for your platform. Look for a file named InvokeAI-binary-<your platform>.zip
 
 2. Place the downloaded package someplace where you have plenty of HDD space,
    and have full permissions (i.e. `~/` on Lin/Mac; your home folder on Windows)
