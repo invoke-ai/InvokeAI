@@ -207,9 +207,10 @@ class InvokeAIWebServer:
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
-                    server="flask_socketio",
+                    start_server="flask-socketio",
                     width=1600,
                     height=1000,
+                    idle_interval=10,
                     port=self.port
                 ).run()
             except KeyboardInterrupt:
@@ -250,7 +251,7 @@ class InvokeAIWebServer:
                 return candidate
         assert "Frontend files cannot be found. Cannot continue"
 
-                                        
+
     def setup_app(self):
         self.result_url = "outputs/"
         self.init_image_url = "outputs/init-images/"
@@ -775,10 +776,10 @@ class InvokeAIWebServer:
                 ).convert("RGBA")
 
                 """
-                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass 
+                The outpaint image and mask are pre-cropped by the UI, so the bounding box we pass
                 to the generator should be:
                     {
-                        "x": 0, 
+                        "x": 0,
                         "y": 0,
                         "width": original_bounding_box["width"],
                         "height": original_bounding_box["height"]
@@ -798,7 +799,7 @@ class InvokeAIWebServer:
                 )
 
                 """
-                Apply the mask to the init image, creating a "mask" image with 
+                Apply the mask to the init image, creating a "mask" image with
                 transparency where inpainting should occur. This is the kind of
                 mask that prompt2image() needs.
                 """
