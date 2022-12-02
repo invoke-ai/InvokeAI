@@ -130,20 +130,34 @@ file should contain the startup options as you would type them on the
 command line (`--steps=10 --grid`), one argument per line, or a
 mixture of both using any of the accepted command switch formats:
 
-!!! example ""
+!!! example "my unmodified initialization file"
 
-    ```bash
-    --web
-    --steps=28
-    --grid
-    -f 0.6 -C 11.0 -A k_euler_a
+    ```bash title="~/.invokeai" linenums="1"
+    # InvokeAI initialization file
+    # This is the InvokeAI initialization file, which contains command-line default values.
+    # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
+    # or renaming it and then running configure_invokeai.py again.
+
+    # The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
+    --root="/Users/mauwii/invokeai"
+
+    # the --outdir option controls the default location of image files.
+    --outdir="/Users/mauwii/invokeai/outputs"
+
+    # You may place other  frequently-used startup commands here, one or more per line.
+    # Examples:
+    # --web --host=0.0.0.0
+    # --steps=20
+    # -Ak_euler_a -C10.0
     ```
 
-Note that the initialization file only accepts the command line arguments.
-There are additional arguments that you can provide on the `invoke>` command
-line (such as `-n` or `--iterations`) that cannot be entered into this file.
-Also be alert for empty blank lines at the end of the file, which will cause
-an arguments error at startup time.
+!!! note
+
+    The  initialization file only accepts the command line arguments.
+    There are additional arguments that you can provide on the `invoke>` command
+    line (such as `-n` or `--iterations`) that cannot be entered into this file.
+    Also be alert for empty blank lines at the end of the file, which will cause
+    an arguments error at startup time.
 
 ## List of prompt arguments
 
@@ -195,15 +209,17 @@ Here are the invoke> command that apply to txt2img:
 | `--with_variations <pattern>`             |                                           | `None`                                   | Combine two or more variations. See [Variations](./VARIATIONS.md) for now to use this.                                                                                                                                                           |
 | `--save_intermediates <n>`                |                                           | `None`                                   | Save the image from every nth step into an "intermediates" folder inside the output directory                                                                                                                                                    |
 
-Note that the width and height of the image must be multiples of 64. You can
-provide different values, but they will be rounded down to the nearest multiple
-of 64.
+!!! note
 
-### This is an example of img2img:
+    the width and height of the image must be multiples of 64. You can
+    provide different values, but they will be rounded down to the nearest multiple
+    of 64.
 
-```
-invoke> waterfall and rainbow -I./vacation-photo.png -W640 -H480 --fit
-```
+!!! example "This is a example of img2img"
+
+    ```bash
+    invoke> waterfall and rainbow -I./vacation-photo.png -W640 -H480 --fit
+    ```
 
 This will modify the indicated vacation photograph by making it more like the
 prompt. Results will vary greatly depending on what is in the image. We also ask
@@ -253,7 +269,7 @@ description of the part of the image to replace. For example, if you have an
 image of a breakfast plate with a bagel, toast and scrambled eggs, you can
 selectively mask the bagel and replace it with a piece of cake this way:
 
-```
+```bash
 invoke> a piece of cake -I /path/to/breakfast.png -tm bagel
 ```
 
@@ -265,7 +281,7 @@ are getting too much or too little masking you can adjust the threshold down (to
 get more mask), or up (to get less). In this example, by passing `-tm` a higher
 value, we are insisting on a more stringent classification.
 
-```
+```bash
 invoke> a piece of cake -I /path/to/breakfast.png -tm bagel 0.6
 ```
 
@@ -275,16 +291,16 @@ You can load and use hundreds of community-contributed Textual
 Inversion models just by typing the appropriate trigger phrase. Please
 see [Concepts Library](CONCEPTS.md) for more details.
 
-# Other Commands
+## Other Commands
 
 The CLI offers a number of commands that begin with "!".
 
-## Postprocessing images
+### Postprocessing images
 
 To postprocess a file using face restoration or upscaling, use the `!fix`
 command.
 
-### `!fix`
+#### `!fix`
 
 This command runs a post-processor on a previously-generated image. It takes a
 PNG filename or path and applies your choice of the `-U`, `-G`, or `--embiggen`
@@ -311,19 +327,19 @@ Some examples:
     [1] outputs/img-samples/000017.4829112.gfpgan-00.png: !fix "outputs/img-samples/0000045.4829112.png" -s 50 -S  -W 512 -H 512 -C 7.5 -A k_lms -G 0.8
     ```
 
-### !mask
+#### `!mask`
 
 This command takes an image, a text prompt, and uses the `clipseg` algorithm to
 automatically generate a mask of the area that matches the text prompt. It is
 useful for debugging the text masking process prior to inpainting with the
 `--text_mask` argument. See [INPAINTING.md] for details.
 
-## Model selection and importation
+### Model selection and importation
 
 The CLI allows you to add new models on the fly, as well as to switch among them
 rapidly without leaving the script.
 
-### !models
+#### `!models`
 
 This prints out a list of the models defined in `config/models.yaml'. The active
 model is bold-faced
@@ -336,7 +352,7 @@ laion400m                 not loaded  <no description>
 waifu-diffusion           not loaded  Waifu Diffusion v1.3
 </pre>
 
-### !switch <model>
+#### `!switch <model>`
 
 This quickly switches from one model to another without leaving the CLI script.
 `invoke.py` uses a memory caching system; once a model has been loaded,
@@ -361,7 +377,7 @@ invoke> !switch waifu-diffusion
    | Making attention of type 'vanilla' with 512 in_channels
    | Using faster float16 precision
 >> Model loaded in 18.24s
->> Max VRAM used to load the model: 2.17G 
+>> Max VRAM used to load the model: 2.17G
 >> Current VRAM usage:2.17G
 >> Setting Sampler to k_lms
 
@@ -381,7 +397,7 @@ laion400m                 not loaded  <no description>
 waifu-diffusion               cached  Waifu Diffusion v1.3
 </pre>
 
-### !import_model <path/to/model/weights>
+#### `!import_model <path/to/model/weights>`
 
 This command imports a new model weights file into InvokeAI, makes it available
 for image generation within the script, and writes out the configuration for the
@@ -428,10 +444,10 @@ OK to import [n]? <b>y</b>
    | Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
    | Making attention of type 'vanilla' with 512 in_channels
    | Using faster float16 precision
-invoke> 
+invoke>
 </pre>
 
-###!edit_model <name_of_model>
+#### `!edit_model <name_of_model>`
 
 The `!edit_model` command can be used to modify a model that is already defined
 in `config/models.yaml`. Call it with the short name of the model you wish to
@@ -468,12 +484,12 @@ text... Outputs: [2] outputs/img-samples/000018.2273800735.embiggen-00.png: !fix
 "outputs/img-samples/000017.243781548.gfpgan-00.png" -s 50 -S 2273800735 -W 512
 -H 512 -C 7.5 -A k_lms --embiggen 3.0 0.75 0.25 ```
 
-## History processing
+### History processing
 
 The CLI provides a series of convenient commands for reviewing previous actions,
 retrieving them, modifying them, and re-running them.
 
-### !history
+#### `!history`
 
 The invoke script keeps track of all the commands you issue during a session,
 allowing you to re-run them. On Mac and Linux systems, it also writes the
@@ -485,20 +501,22 @@ during the session (Windows), or the most recent 1000 commands (Mac|Linux). You
 can then repeat a command by using the command `!NNN`, where "NNN" is the
 history line number. For example:
 
-```bash
-invoke> !history
-...
-[14] happy woman sitting under tree wearing broad hat and flowing garment
-[15] beautiful woman sitting under tree wearing broad hat and flowing garment
-[18] beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6
-[20] watercolor of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
-[21] surrealist painting of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
-...
-invoke> !20
-invoke> watercolor of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
-```
+!!! example ""
 
-### !fetch
+    ```bash
+    invoke> !history
+    ...
+    [14] happy woman sitting under tree wearing broad hat and flowing garment
+    [15] beautiful woman sitting under tree wearing broad hat and flowing garment
+    [18] beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6
+    [20] watercolor of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
+    [21] surrealist painting of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
+    ...
+    invoke> !20
+    invoke> watercolor of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
+    ```
+
+####`!fetch`
 
 This command retrieves the generation parameters from a previously generated
 image and either loads them into the command line (Linux|Mac), or prints them
@@ -508,33 +526,36 @@ a folder with image png files, and wildcard \*.png to retrieve the dream command
 used to generate the images, and save them to a file commands.txt for further
 processing.
 
-This example loads the generation command for a single png file:
+!!! example "load the generation command for a single png file"
 
-```bash
-invoke> !fetch 0000015.8929913.png
-# the script returns the next line, ready for editing and running:
-invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
-```
+    ```bash
+    invoke> !fetch 0000015.8929913.png
+    # the script returns the next line, ready for editing and running:
+    invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
+    ```
 
-This one fetches the generation commands from a batch of files and stores them
-into `selected.txt`:
+!!! example "fetch the generation commands from a batch of files and store them into `selected.txt`"
 
-```bash
-invoke> !fetch outputs\selected-imgs\*.png selected.txt
-```
+    ```bash
+    invoke> !fetch outputs\selected-imgs\*.png selected.txt
+    ```
 
-### !replay
+#### `!replay`
 
 This command replays a text file generated by !fetch or created manually
 
-```
-invoke> !replay outputs\selected-imgs\selected.txt
-```
+!!! example
 
-Note that these commands may behave unexpectedly if given a PNG file that was
-not generated by InvokeAI.
+    ```bash
+    invoke> !replay outputs\selected-imgs\selected.txt
+    ```
 
-### !search <search string>
+!!! note
+
+    These commands may behave unexpectedly if given a PNG file that was
+    not generated by InvokeAI.
+
+#### `!search <search string>`
 
 This is similar to !history but it only returns lines that contain
 `search string`. For example:
@@ -544,7 +565,7 @@ invoke> !search surreal
 [21] surrealist painting of beautiful woman sitting under tree wearing broad hat and flowing garment -v0.2 -n6 -S2878767194
 ```
 
-### `!clear`
+#### `!clear`
 
 This clears the search history from memory and disk. Be advised that this
 operation is irreversible and does not issue any warnings!
