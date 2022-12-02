@@ -5,31 +5,7 @@ title: Overview
 We offer several ways to install InvokeAI, each one suited to your
 experience and preferences.
 
-1. [InvokeAI binary installer](INSTALL_INVOKE.md)
-
-    This is a installer script that installs InvokeAI and all the
-    third party libraries it depends on. It includes access to a
-    "developer console" which will help us debug problems with you and
-    give you to access experimental features.
-
-    When a new InvokeAI release is available, you will run an `update`
-    script to download and install the new version. Intermediate versions
-    that contain experimental and possibly unstable features will not be
-    available.
-
-    This installer is designed for people who want the system to "just
-    work", don't have an interest in tinkering with it, and do not
-    care about upgrading to unreleased experimental features.
-
-    **Important Caveats**
-    - This script does not support AMD GPUs. For Linux AMD support,
-    please use the manual or source code installer methods.
-    - The tab autocomplete feature of the command-line client,
-    which completes commonly used filenames and commands, will
-    not work in this version. All Web UI functions are fully
-    operational, however.
-
-2. [InvokeAI source code installer](INSTALL_SOURCE.md)
+1. [InvokeAI source code installer](INSTALL_SOURCE.md)
 
     This is a script that will install Python, the Anaconda ("conda")
     package manager, all of InvokeAI's its essential third party
@@ -46,8 +22,7 @@ experience and preferences.
     **Important Caveats**
     - This script is a bit cranky and occasionally hangs or times out,
     forcing you to cancel and restart the script (it will pick up where
-    it left off). It also takes noticeably longer to run than the
-    binary installer.
+    it left off).
 
 2. [Manual Installation](INSTALL_MANUAL.md)
 
