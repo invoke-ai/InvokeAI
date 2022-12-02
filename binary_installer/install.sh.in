@@ -198,7 +198,7 @@ _err_exit $? _err_msg
 echo -e "\n***** Updated pip *****\n"
 
 _err_msg="\n----- requirements file copy failed -----\n"
-cp binary_installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt
+cp installer/py3.10-${OS_NAME}-"${OS_ARCH}"-${CD}-reqs.txt requirements.txt
 _err_exit $? _err_msg
 
 _err_msg="\n----- main pip install failed -----\n"
@@ -213,12 +213,11 @@ _err_exit $? _err_msg
 
 echo -e "\n***** Installed InvokeAI *****\n"
 
-cp binary_installer/invoke.sh.in ./invoke.sh
-chmod a+x ./invoke.sh
+cp installer/invoke.sh .
 echo -e "\n***** Installed invoke launcher script ******\n"
 
 # more cleanup
-rm -rf binary_installer/ installer_files/
+rm -rf installer/ installer_files/
 
 # preload the models
 .venv/bin/python3 scripts/configure_invokeai.py
@@ -229,7 +228,7 @@ deactivate
 echo -e "\n***** Finished downloading models *****\n"
 
 echo "All done! Run the command"
-echo "  \"$scriptdir/invoke.sh\""
+echo "  $scriptdir/invoke.sh"
 echo "to start InvokeAI."
 read -p "Press any key to exit..."
 exit
