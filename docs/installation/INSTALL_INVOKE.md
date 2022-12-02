@@ -35,8 +35,8 @@ recommended model weights files.
 ## Steps to Install
 
 1. Download the
-   [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest) of
-   InvokeAI's installer for your platform. Look for a file named InvokeAI-binary-<your platform>.zip
+   [latest release](https://github.com/invoke-ai/InvokeAI/releases/tag/2.2.0-rc4) of
+   InvokeAI's installer for your platform. Look for a file named `InvokeAI-binary-<your platform>.zip`
 
 2. Place the downloaded package someplace where you have plenty of HDD space,
    and have full permissions (i.e. `~/` on Lin/Mac; your home folder on Windows)
