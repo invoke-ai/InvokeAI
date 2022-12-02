@@ -27,7 +27,7 @@ Though there are multiple steps, there really is only one click involved to kick
 off the process.
 
 1.  The source installer is distributed in ZIP files. Go to the
-    [latest release](https://github.com/invoke-ai/InvokeAI/releases/tag/2.2.0-rc4), and
+    [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
     - invokeAI-src-installer-mac.zip
