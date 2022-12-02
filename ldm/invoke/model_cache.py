@@ -310,6 +310,23 @@ class ModelCache(object):
         else:
             print('>> Model Scanned. OK!!')
 
+    def search_models(self, search_folder):
+        models_folder = os.path.abspath(search_folder)
+        found_models = []
+        
+        if os.path.isdir(models_folder):
+            for root, dirs, files in os.walk(models_folder):
+                for filename in files:
+                    if filename.endswith('.ckpt'):
+                        checkpoint_name = filename.split('.ckpt')[0]
+                        checkpoint_path = os.path.join(root, filename)
+                        found_models.append({
+                            'name': checkpoint_name,
+                            'location': checkpoint_path
+                        })
+
+        return found_models
+
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
         if num_loaded_models >= self.max_loaded_models:

@@ -45,6 +45,7 @@ export const socketioMiddleware = () => {
       onImageDeleted,
       onSystemConfig,
       onModelChanged,
+      onFoundModels,
       onNewModelAdded,
       onModelDeleted,
       onModelChangeFailed,
@@ -60,6 +61,7 @@ export const socketioMiddleware = () => {
       emitRequestNewImages,
       emitCancelProcessing,
       emitRequestSystemConfig,
+      emitSearchForModels,
       emitAddNewModel,
       emitDeleteModel,
       emitRequestModelChange,
@@ -113,6 +115,10 @@ export const socketioMiddleware = () => {
 
       socketio.on('modelChanged', (data: InvokeAI.ModelChangeResponse) => {
         onModelChanged(data);
+      });
+
+      socketio.on('foundModels', (data: any) => {
+        onFoundModels(data);
       });
 
       socketio.on('newModelAdded', (data: InvokeAI.ModelAddedResponse) => {
@@ -179,6 +185,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/requestSystemConfig': {
         emitRequestSystemConfig();
+        break;
+      }
+
+      case 'socketio/searchForModels': {
+        emitSearchForModels(action.payload);
         break;
       }
 
