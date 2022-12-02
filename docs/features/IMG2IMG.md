@@ -12,21 +12,19 @@ stable diffusion to build the prompt on top of the image you provide, preserving
 the original's basic shape and layout. To use it, provide the `--init_img`
 option as shown here:
 
-```commandline
-tree on a hill with a river, nature photograph, national geographic -I./test-pictures/tree-and-river-sketch.png -f 0.85
-```
+!!! example ""
 
-This will take the original image shown here:
+    ```commandline
+    tree on a hill with a river, nature photograph, national geographic -I./test-pictures/tree-and-river-sketch.png -f 0.85
+    ```
 
-<figure markdown>
-![original-image](https://user-images.githubusercontent.com/50542132/193946000-c42a96d8-5a74-4f8a-b4c3-5213e6cadcce.png){ width=320 }
-</figure>
+    <figure markdown>
 
-and generate a new image based on it as shown here:
+    | original image | generated image |
+    | :------------: | :-------------: |
+    | ![original-image](https://user-images.githubusercontent.com/50542132/193946000-c42a96d8-5a74-4f8a-b4c3-5213e6cadcce.png){ width=320 } | ![generated-image](https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png){ width=320 } |
 
-<figure markdown>
-![generated-image](https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png){ width=320 }
-</figure>
+    </figure>
 
 The `--init_img` (`-I`) option gives the path to the seed picture. `--strength`
 (`-f`) controls how much the original will be modified, ranging from `0.0` (keep
@@ -88,13 +86,15 @@ from a prompt. If the step count is 10, then the "latent space" (Stable
 Diffusion's internal representation of the image) for the prompt "fire" with
 seed `1592514025` develops something like this:
 
-```bash
-invoke> "fire" -s10 -W384 -H384 -S1592514025
-```
+!!! example ""
 
-<figure markdown>
-![latent steps](../assets/img2img/000019.steps.png)
-</figure>
+    ```bash
+    invoke> "fire" -s10 -W384 -H384 -S1592514025
+    ```
+
+    <figure markdown>
+    ![latent steps](../assets/img2img/000019.steps.png){ width=720 }
+    </figure>
 
 Put simply: starting from a frame of fuzz/static, SD finds details in each frame
 that it thinks look like "fire" and brings them a little bit more into focus,
@@ -109,25 +109,23 @@ into the sequence at the appropriate point, with just the right amount of noise.
 
 ### A concrete example
 
-I want SD to draw a fire based on this hand-drawn image:
+!!! example "I want SD to draw a fire based on this hand-drawn image"
 
-<figure markdown>
-![drawing of a fireplace](../assets/img2img/fire-drawing.png)
-</figure>
+    ![drawing of a fireplace](../assets/img2img/fire-drawing.png){ align=left }
 
-Let's only do 10 steps, to make it easier to see what's happening. If strength
-is `0.7`, this is what the internal steps the algorithm has to take will look
-like:
+    Let's only do 10 steps, to make it easier to see what's happening. If strength
+    is `0.7`, this is what the internal steps the algorithm has to take will look
+    like:
 
-<figure markdown>
-![gravity32](../assets/img2img/000032.steps.gravity.png)
-</figure>
+    <figure markdown>
+    ![gravity32](../assets/img2img/000032.steps.gravity.png)
+    </figure>
 
-With strength `0.4`, the steps look more like this:
+    With strength `0.4`, the steps look more like this:
 
-<figure markdown>
-![gravity30](../assets/img2img/000030.steps.gravity.png)
-</figure>
+    <figure markdown>
+    ![gravity30](../assets/img2img/000030.steps.gravity.png)
+    </figure>
 
 Notice how much more fuzzy the starting image is for strength `0.7` compared to
 `0.4`, and notice also how much longer the sequence is with `0.7`:
