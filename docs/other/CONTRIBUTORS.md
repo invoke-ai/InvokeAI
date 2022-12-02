@@ -15,16 +15,16 @@ We thank them for all of their time and hard work.
 
 ## **Current core team**
 
-* lstein (Lincoln Stein) - Co-maintainer
-* blessedcoolant - Co-maintainer
-* hipsterusername (Kent Keirsey) - Product Manager
-* psychedelicious - Web Team Leader
-* Kyle0654 (Kyle Schouviller) - Node Architect and General Backend Wizard
-* damian0815 - Attention Systems and Gameplay Engineer
-* mauwii (Matthias Wild) - Continuous integration and product maintenance engineer
-* Netsvetaev (Artur Netsvetaev) - UI/UX Developer
-* tildebyte - general gadfly and resident (self-appointed) know-it-all
-* keturn - Lead for Diffusers port
+* @lstein (Lincoln Stein) - Co-maintainer
+* @blessedcoolant - Co-maintainer
+* @hipsterusername (Kent Keirsey) - Product Manager
+* @psychedelicious - Web Team Leader
+* @Kyle0654 (Kyle Schouviller) - Node Architect and General Backend Wizard
+* @damian0815 - Attention Systems and Gameplay Engineer
+* @mauwii (Matthias Wild) - Continuous integration and product maintenance engineer
+* @Netsvetaev (Artur Netsvetaev) - UI/UX Developer
+* @tildebyte - general gadfly and resident (self-appointed) know-it-all
+* @keturn - Lead for Diffusers port
 
 ## **Contributions by**
 
