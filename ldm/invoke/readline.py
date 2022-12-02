@@ -101,7 +101,8 @@ class Completer(object):
         self.linebuffer  = None
         self.auto_history_active = True
         self.extensions = None
-        self.concepts = Concepts().list_concepts()
+        self.concepts = None
+        self.embedding_terms = set()
         return
 
     def complete(self, text, state):
@@ -270,16 +271,21 @@ class Completer(object):
         return matches
 
     def add_embedding_terms(self, terms:list[str]):
-        self.concepts = Concepts().list_concepts()
-        self.concepts.extend(terms)
+        self.embedding_terms = set(terms)
+        if self.concepts:
+            self.embedding_terms.update(self.concepts)
 
     def _concept_completions(self, text, state):
+        if self.concepts is None:
+            self.concepts = set(Concepts().list_concepts())
+            self.embedding_terms.update(self.concepts)
+
         partial = text[1:]  # this removes the leading '<'
         if len(partial) == 0:
-            return self.concepts  # whole dump - think if user wants this!
+            return list(self.embedding_terms)  # whole dump - think if user wants this!
 
         matches = list()
-        for concept in self.concepts:
+        for concept in self.embedding_terms:
             if concept.startswith(partial):
                 matches.append(f'<{concept}>')
         matches.sort()
@@ -416,7 +422,11 @@ def get_completer(opt:Args, models=[])->Completer:
         readline.parse_and_bind('set skip-completed-text on')
         readline.parse_and_bind('set show-all-if-ambiguous on')
 
-        histfile = os.path.join(os.path.expanduser(opt.outdir), '.invoke_history')
+        outdir = os.path.expanduser(opt.outdir)
+        if os.path.isabs(outdir):
+            histfile = os.path.join(outdir,'.invoke_history')
+        else:
+            histfile = os.path.join(Globals.root, outdir, '.invoke_history')
         try:
             readline.read_history_file(histfile)
             readline.set_history_length(1000)

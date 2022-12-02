@@ -9,20 +9,21 @@ read -p "Press any key to continue, or CTRL-C to exit..."
 # make the installer zip for linux and mac
 rm -rf InvokeAI
 mkdir -p InvokeAI
-cp install.sh InvokeAI
+cp install.sh.in InvokeAI/install.sh
+chmod a+x InvokeAI/install.sh
 cp readme.txt InvokeAI
 
-zip -r InvokeAI-linux.zip InvokeAI
-zip -r InvokeAI-mac.zip InvokeAI
+zip -r InvokeAI-binary-linux.zip InvokeAI
+zip -r InvokeAI-binary-mac.zip InvokeAI
 
 # make the installer zip for windows
 rm -rf InvokeAI
 mkdir -p InvokeAI
-cp install.bat InvokeAI
+cp install.bat.in InvokeAI/install.bat
 cp readme.txt InvokeAI
 cp WinLongPathsEnabled.reg InvokeAI
 
-zip -r InvokeAI-windows.zip InvokeAI
+zip -r InvokeAI-binary-windows.zip InvokeAI
 
 rm -rf InvokeAI
 

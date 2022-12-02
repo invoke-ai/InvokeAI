@@ -86,6 +86,10 @@ AMD card (using the ROCm driver). For full installation and upgrade
 instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
+Linux users who wish to make use of the PyPatchMatch inpainting
+functions will need to perform a bit of extra work to enable this
+module. Instructions can be found at [Installing PyPatchMatch](installation/INSTALL_PATCHMATCH.md).
+
 ## :fontawesome-solid-computer: Hardware Requirements
 
 ### :octicons-cpu-24: System
@@ -123,7 +127,8 @@ You wil need one of the following:
 
 - [The InvokeAI Web Interface](features/WEB.md)
     - [WebGUI hotkey reference guide](features/WEBUIHOTKEYS.md)
-<!-- this link does not exist    - [WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md) -->
+    - [WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
+<!-- seperator -->
 - [The Command Line Interace](features/CLI.md)
     - [Image2Image](features/IMG2IMG.md)
     - [Inpainting](features/INPAINTING.md)
@@ -136,6 +141,7 @@ You wil need one of the following:
 - [Prompt Engineering](features/PROMPTS.md)
 <!-- seperator -->
 - Miscellaneous
+    - [NSFW Checker](features/NSFW.md)
     - [Embiggen upscaling](features/EMBIGGEN.md)
     - [Other](features/OTHER.md)
 
@@ -160,7 +166,7 @@ You wil need one of the following:
 - You can now load
   [multiple models and switch among them quickly](https://docs.google.com/presentation/d/1WywGA1rny7bpFh7CLSdTr4nNpVKdlUeT0Bj0jCsILyU/edit?usp=sharing)
   without leaving the CLI.
-- The installation process (via `scripts/preload_models.py`) now lets you select
+- The installation process (via `scripts/configure_invokeai.py`) now lets you select
   among several popular
   [Stable Diffusion models](https://invoke-ai.github.io/InvokeAI/installation/INSTALLING_MODELS/)
   and downloads and installs them on your behalf. Among other models, this

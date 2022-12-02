@@ -27,7 +27,7 @@ Though there are multiple steps, there really is only one click involved to kick
 off the process.
 
 1.  The source installer is distributed in ZIP files. Go to the
-    [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
+    [latest release](https://github.com/invoke-ai/InvokeAI/releases/tag/2.2.0-rc4), and
     look for a series of files named:
 
     - invokeAI-src-installer-mac.zip
@@ -55,7 +55,7 @@ off the process.
     named `install.bat` on Windows systems and `install.sh` on Linux and
     Macintosh systems.
 
-4.  Alternatively, form the command line, run the shell script or .bat file:
+4.  Alternatively, from the command line, run the shell script or .bat file:
 
     ```cmd
     C:\Documents\Linco> cd invokeAI
@@ -66,8 +66,17 @@ off the process.
     requirements including Conda, Git and Python, then download the current
     InvokeAI code and install it along with its dependencies.
 
+    Be aware that some of the library download and install steps take a long time.
+    In particular, the `pytorch` package is quite large and often appears to get
+    "stuck" at 99.9%. Similarly, the `pip installing requirements` step may
+    appear to hang. Have patience and the installation step will eventually
+    resume. However, there are occasions when the library install does
+    legitimately get stuck. If you have been waiting for more than ten minutes
+    and nothing is happening, you can interrupt the script with ^C. You may restart
+    it and it will pick up where it left off.
+
 6.  After installation completes, the installer will launch a script called
-    `preload_models.py`, which will guide you through the first-time process of
+    `configure_invokeai.py`, which will guide you through the first-time process of
     selecting one or more Stable Diffusion model weights files, downloading and
     configuring them.
 
@@ -110,6 +119,71 @@ python scripts/invoke.py --web --max_load_models=3 \
 These options are described in detail in the
 [Command-Line Interface](../features/CLI.md) documentation.
 
+## Troubleshooting
+
+_Package dependency conflicts_ If you have previously installed
+InvokeAI or another Stable Diffusion package, the installer may
+occasionally pick up outdated libraries and either the installer or
+`invoke` will fail with complaints out library conflicts. There are
+two steps you can take to clear this problem. Both of these are done
+from within the "developer's console", which you can get to by
+launching `invoke.sh` (or `invoke.bat`) and selecting launch option
+#3:
+
+1. Remove the previous `invokeai` environment completely. From within
+   the developer's console, give the command `conda env remove -n
+   invokeai`. This will delete previous files installed by `invoke`.
+
+   Then exit from the developer's console and launch the script
+   `update.sh` (or `update.bat`). This will download the most recent
+   InvokeAI (including bug fixes) and reinstall the environment.
+   You should then be able to run `invoke.sh`/`invoke.bat`.
+
+2. If this doesn't work, you can try cleaning your system's conda
+   cache. This is slightly more extreme, but won't interfere with
+   any other python-based programs installed on your computer.
+   From the developer's console, run the command `conda clean -a`
+   and answer "yes" to all prompts.
+
+   After this is done, run `update.sh` and try again as before.
+
+_"Corrupted configuration file."__ Everything seems to install ok, but
+`invoke` complains of a corrupted configuration file and goes calls
+`configure_invokeai.py` to fix, but this doesn't fix the problem.
+
+This issue is often caused by a misconfigured configuration directive
+in the `.invokeai` initialization file that contains startup settings.
+This can be corrected by fixing the offending line.
+
+First find `.invokeai`. It is a small text file located in your home
+directory, `~/.invokeai` on Mac and Linux systems, and `C:\Users\*your
+name*\.invokeai` on Windows systems. Open it with a text editor
+(e.g. Notepad on Windows, TextEdit on Macs, or `nano` on Linux)
+and look for the lines starting with `--root` and `--outdir`.
+
+An example is here:
+
+```cmd
+--root="/home/lstein/invokeai"
+--outdir="/home/lstein/invokeai/outputs"
+```
+
+There should not be whitespace before or after the directory paths,
+and the paths should not end with slashes:
+
+```cmd
+--root="/home/lstein/invokeai "     # wrong! no whitespace here
+--root="/home\lstein\invokeai\"     # wrong! shouldn't end in a slash
+```
+
+Fix the problem with your text editor and save as a **plain text**
+file. This should clear the issue.
+
+_If none of these maneuvers fixes the problem_ then please report the
+problem to the [InvokeAI
+Issues](https://github.com/invoke-ai/InvokeAI/issues) section, or
+visit our [Discord Server](https://discord.gg/ZmtBAhwWhy) for interactive assistance.
+
 ## Updating to newer versions
 
 This section describes how to update InvokeAI to new versions of the software.
@@ -119,31 +193,15 @@ This section describes how to update InvokeAI to new versions of the software.
 This distribution is changing rapidly, and we add new features on a daily basis.
 To update to the latest released version (recommended), run the `update.sh`
 (Linux/Mac) or `update.bat` (Windows) scripts. This will fetch the latest
-release and re-run the `preload_models` script to download any updated models
+release and re-run the `configure_invokeai` script to download any updated models
 files that may be needed. You can also use this to add additional models that
 you did not select at installation time.
 
-### Updating to the development version
-
-There may be times that there is a feature in the `development` branch of
-InvokeAI that you'd like to take advantage of. Or perhaps there is a branch that
-corrects an annoying bug. To do this, you will use the developer's console.
-
-From within the invokeAI directory, run the command `invoke.sh` (Linux/Mac) or
-`invoke.bat` (Windows) and selection option (3) to open the developers console.
-Then run the following command to get the `development branch`:
-
-```bash
-git checkout development
-git pull
-conda env update
-```
-
 You can now close the developer console and run `invoke` as before. If you get
 complaints about missing models, then you may need to do the additional step of
-running `preload_models.py`. This happens relatively infrequently. To do this,
+running `configure_invokeai.py`. This happens relatively infrequently. To do this,
 simply open up the developer's console again and type
-`python scripts/preload_models.py`.
+`python scripts/configure_invokeai.py`.
 
 ## Troubleshooting
 

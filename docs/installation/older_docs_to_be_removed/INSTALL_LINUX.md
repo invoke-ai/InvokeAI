@@ -69,7 +69,7 @@ title: Manual Installation, Linux
     machine-learning models:
 
     ```bash
-    (invokeai) ~/InvokeAI$ python3 scripts/preload_models.py
+    (invokeai) ~/InvokeAI$ python3 scripts/configure_invokeai.py
     ```
 
     !!! note

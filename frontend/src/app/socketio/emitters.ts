@@ -42,7 +42,6 @@ const makeSocketIOEmitters = (
         options: optionsState,
         system: systemState,
         canvas: canvasState,
-        gallery: galleryState,
       } = state;
 
       const frontendToBackendParametersConfig: FrontendToBackendParametersConfig =
@@ -54,13 +53,6 @@ const makeSocketIOEmitters = (
         };
 
       dispatch(generationRequested());
-
-      if (!['txt2img', 'img2img'].includes(generationMode)) {
-        if (!galleryState.currentImage?.url) return;
-
-        frontendToBackendParametersConfig.imageToProcessUrl =
-          galleryState.currentImage.url;
-      }
 
       const { generationParameters, esrganParameters, facetoolParameters } =
         frontendToBackendParameters(frontendToBackendParametersConfig);

@@ -116,11 +116,13 @@ completely skip this step.
     completer.complete_extensions(None)  # turn off path-completion mode
     selection = None
     while selection is None:
-        choice = input('Download <r>ecommended models, <c>ustomize the list, or <s>kip this step? [r]: ')
+        choice = input('Download <r>ecommended models, <a>ll models, <c>ustomized list, or <s>kip this step? [r]: ')
         if choice.startswith(('r','R')) or len(choice)==0:
             selection = 'recommended'
         elif choice.startswith(('c','C')):
             selection = 'customized'
+        elif choice.startswith(('a','A')):
+            selection = 'all'
         elif choice.startswith(('s','S')):
             selection = 'skip'
     return selection
@@ -175,6 +177,13 @@ def recommended_datasets()->dict:
             datasets[ds]=True
     return datasets
 
+#---------------------------------------------
+def all_datasets()->dict:
+    datasets = dict()
+    for ds in Datasets.keys():
+        datasets[ds]=True
+    return datasets
+
 #-------------------------------Authenticate against Hugging Face
 def authenticate():
     print('''
@@ -225,7 +234,9 @@ This involves a few easy steps.
    (You can enter anything you like in the token creation field marked "Name".
    "Role" should be "read").
 
-   Now copy the token to your clipboard and paste it here: '''
+   Now copy the token to your clipboard and paste it at the prompt. Windows
+   users can paste with right-click.
+   Token: '''
         )
         access_token = getpass_asterisk.getpass_asterisk()
     return access_token
@@ -599,6 +610,8 @@ def download_weights(opt:dict):
 
     if choice == 'recommended':
         models = recommended_datasets()
+    elif choice == 'all':
+        models = all_datasets()
     elif choice == 'customized':
         models = select_datasets(choice)
         if models is None and yes_or_no('Quit?',default_yes=False):
@@ -644,7 +657,8 @@ def select_root(root:str, yes_to_all:bool=False):
     completer.set_default_dir(default)
     completer.complete_extensions(())
     completer.set_line(default)
-    return input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ") or default
+    directory = input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ").strip(' \\')
+    return directory or default
 
 #-------------------------------------
 def select_outputs(root:str,yes_to_all:bool=False):
@@ -654,7 +668,8 @@ def select_outputs(root:str,yes_to_all:bool=False):
     completer.set_default_dir(os.path.expanduser('~'))
     completer.complete_extensions(())
     completer.set_line(default)
-    return input(f'Select the default directory for image outputs [{default}]: ') or default
+    directory = input(f'Select the default directory for image outputs [{default}]: ').strip(' \\')
+    return directory or default
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
