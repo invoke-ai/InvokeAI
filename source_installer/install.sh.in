@@ -123,6 +123,8 @@ then
 else
     ln -sf ./source_installer/invoke.sh.in ./invoke.sh
     ln -sf ./source_installer/update.sh.in ./update.sh
+    chmod a+rx ./source_installer/invoke.sh.in
+    chmod a+rx ./source_installer/update.sh.in
 
     conda activate invokeai
     # configure
