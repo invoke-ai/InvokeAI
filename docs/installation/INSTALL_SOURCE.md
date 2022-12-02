@@ -10,7 +10,6 @@ The source installer is a shell script that attempts to automate every step
 needed to install and run InvokeAI on a stock computer running recent versions
 of Linux, MacOS or Windows. It will leave you with a version that runs a stable
 version of InvokeAI with the option to upgrade to experimental versions later.
-It is not as foolproof as the [InvokeAI installer](INSTALL_INVOKE.md)
 
 Before you begin, make sure that you meet the
 [hardware requirements](index.md#Hardware_Requirements) and has the appropriate
