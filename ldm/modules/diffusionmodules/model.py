@@ -9,6 +9,7 @@ from einops import rearrange
 
 from ldm.util import instantiate_from_config
 from ldm.modules.attention import LinearAttention
+from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 
 import psutil
 
@@ -220,7 +221,7 @@ class AttnBlock(nn.Module):
 
             if mem_required > mem_free_total:
                 steps = 2**(math.ceil(math.log(mem_required / mem_free_total, 2)))
-            
+
             slice_size = q.shape[1] // steps if (q.shape[1] % steps) == 0 else q.shape[1]
 
         else:
@@ -228,7 +229,7 @@ class AttnBlock(nn.Module):
                 slice_size = 1
             else:
                 slice_size = min(q.shape[1], math.floor(2**30 / (q.shape[0] * q.shape[1])))
-        
+
         for i in range(0, q.shape[1], slice_size):
             end = i + slice_size
 
