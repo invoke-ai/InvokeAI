@@ -7,7 +7,7 @@ title: Running InvokeAI on Google Colab using a Jupyter Notebook
 ## Introduction
 
 We have a [Jupyter
-notebook](https://github.com/invoke-ai/InvokeAI/blob/main/notebooks/Stable-Diffusion-local-Windows.ipynb)
+notebook](https://github.com/invoke-ai/InvokeAI/blob/main/notebooks/Stable_Diffusion_AI_Notebook.ipynb)
 with cell-by-cell installation steps. It will download the code in
 this repo as one of the steps, so instead of cloning this repo, simply
 download the notebook from the link above and load it up in VSCode
