@@ -162,6 +162,12 @@ the command-line client's `!import_model` command.
          Type a bit of the path name and hit ++tab++ in order to get a choice of
          possible completions.
 
+    !!! tip "on Windows, you can drag model files onto the command-line"
+
+         Once you have typed in `!import_model `, you can drag the model `.ckpt` file
+         onto the command-line to insert the model path. This way, you don't need to
+         type it or copy/paste.
+
 4.  Follow the wizard's instructions to complete installation as shown in the
     example here:
 
