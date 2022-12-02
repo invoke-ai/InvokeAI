@@ -30,13 +30,7 @@ export const frontendToBackendParameters = (
 ): { [key: string]: any } => {
   const canvasBaseLayer = getCanvasBaseLayer();
 
-  const {
-    generationMode,
-    optionsState,
-    canvasState,
-    systemState,
-    imageToProcessUrl,
-  } = config;
+  const { generationMode, optionsState, canvasState, systemState } = config;
 
   const {
     cfgScale,
@@ -164,7 +158,6 @@ export const frontendToBackendParameters = (
 
     generationParameters.fit = false;
 
-    generationParameters.init_img = imageToProcessUrl;
     generationParameters.strength = img2imgStrength;
 
     generationParameters.invert_mask = shouldPreserveMaskedArea;
