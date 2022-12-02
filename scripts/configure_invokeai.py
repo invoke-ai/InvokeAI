@@ -226,7 +226,9 @@ This involves a few easy steps.
    (You can enter anything you like in the token creation field marked "Name". 
    "Role" should be "read").
 
-   Now copy the token to your clipboard and paste it here: '''
+   Now copy the token to your clipboard and paste it at the prompt. Windows
+   users can paste with right-click.
+   Token: '''
         )
         access_token = getpass_asterisk.getpass_asterisk()
     return access_token
@@ -582,7 +584,8 @@ def select_root(root:str, yes_to_all:bool=False):
     completer.set_default_dir(default)
     completer.complete_extensions(())
     completer.set_line(default)
-    return input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ") or default
+    directory = input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ").strip(' \\')
+    return directory or default
 
 #-------------------------------------
 def select_outputs(root:str,yes_to_all:bool=False):
@@ -592,7 +595,8 @@ def select_outputs(root:str,yes_to_all:bool=False):
     completer.set_default_dir(os.path.expanduser('~'))
     completer.complete_extensions(())
     completer.set_line(default)
-    return input(f'Select the default directory for image outputs [{default}]: ') or default
+    directory = input(f'Select the default directory for image outputs [{default}]: ').strip(' \\')
+    return directory or default
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
