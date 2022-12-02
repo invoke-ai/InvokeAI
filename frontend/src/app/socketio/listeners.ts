@@ -346,6 +346,12 @@ const makeSocketIOListeners = (
         dispatch(setInfillMethod(data.infill_methods[0]));
       }
     },
+    onFoundModels: (data: any) => {
+      const { found_models } = data;
+      found_models.forEach((model: any) => {
+        console.log(model.name);
+      });
+    },
     onNewModelAdded: (data: InvokeAI.ModelAddedResponse) => {
       const { new_model_name, model_list, update } = data;
       dispatch(setModelList(model_list));
