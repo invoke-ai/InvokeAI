@@ -214,6 +214,7 @@ _err_exit $? _err_msg
 echo -e "\n***** Installed InvokeAI *****\n"
 
 cp binary_installer/invoke.sh.in ./invoke.sh
+chmod a+rx ./invoke.sh
 echo -e "\n***** Installed invoke launcher script ******\n"
 
 # more cleanup
