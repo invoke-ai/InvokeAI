@@ -1,5 +1,5 @@
 import { Box, Flex, VStack } from '@chakra-ui/react';
-import { searchForModels } from 'app/socketio/actions';
+import { addNewModel, searchForModels } from 'app/socketio/actions';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAICheckbox from 'common/components/IAICheckbox';
 import React, { ReactNode, ChangeEvent } from 'react';
@@ -57,6 +57,25 @@ export default function SearchModels() {
 
   const removeAllFromSelected = () => {
     setModelsToAdd([]);
+  };
+
+  const addSelectedModels = () => {
+    const modelsToBeAdded = foundModels?.filter((foundModel) =>
+      modelsToAdd.includes(foundModel.name)
+    );
+    modelsToBeAdded?.forEach((model) => {
+      const modelFormat = {
+        name: model.name,
+        description: '',
+        config: 'configs/stable-diffusion/v1-inference.yaml',
+        weights: model.location,
+        vae: '',
+        width: 512,
+        height: 512,
+        default: false,
+      };
+      dispatch(addNewModel(modelFormat));
+    });
   };
 
   const renderFoundModels = () => {
@@ -156,14 +175,17 @@ export default function SearchModels() {
               </IAIButton>
             </Flex>
 
-            <IAIButton isDisabled={modelsToAdd.length === 0}>
+            <IAIButton
+              isDisabled={modelsToAdd.length === 0}
+              onClick={addSelectedModels}
+            >
               Add Selected
             </IAIButton>
           </Flex>
           <Flex
             rowGap={'1rem'}
             flexDirection="column"
-            maxHeight={'20rem'}
+            maxHeight={'18rem'}
             overflowY="scroll"
             paddingRight={'1rem'}
             paddingLeft={'0.2rem'}
