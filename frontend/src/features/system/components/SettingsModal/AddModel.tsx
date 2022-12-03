@@ -30,10 +30,6 @@ import { addNewModel } from 'app/socketio/actions';
 import { InvokeModelConfigProps } from 'app/invokeai';
 import IAICheckbox from 'common/components/IAICheckbox';
 import SearchModels from './SearchModels';
-import {
-  setFoundModels,
-  setSearchFolder,
-} from 'features/system/store/systemSlice';
 
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;
@@ -73,8 +69,6 @@ export default function AddModel() {
   };
 
   const addModelModalClose = () => {
-    dispatch(setSearchFolder(null));
-    dispatch(setFoundModels(null));
     onClose();
   };
 
