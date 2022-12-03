@@ -5,7 +5,7 @@ title: Overview
 We offer several ways to install InvokeAI, each one suited to your
 experience and preferences.
 
-1. InvokeAI source code installer
+1.  [InvokeAI source code installer](INSTALL_SOURCE.md)
     This is a script that will install Python, the Anaconda ("conda")
     package manager, all of InvokeAI's its essential third party
     libraries and InvokeAI itself. It includes access to a "developer
@@ -18,7 +18,8 @@ experience and preferences.
     stay on the cutting edge of InvokeAI development and are not
     afraid of occasional breakage.
     
-    To get started go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
+    To get started go to the bottom of the
+    [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
     and download the .zip file for your platform. Unzip the file.
     If you are on a Windows system, double-click on the `install.bat`
     script. On a Mac or Linux system, navigate to the file `install.sh`
