@@ -69,7 +69,7 @@ This fork is supported across Linux, Windows and Macintosh. Linux
 users can use either an Nvidia-based card (with CUDA support) or an
 AMD card (using the ROCm driver). For full installation and upgrade
 instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_SOURCE/)
 
 ### Hardware Requirements
 
