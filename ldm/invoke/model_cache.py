@@ -145,10 +145,14 @@ class ModelCache(object):
             else:
                 status = 'not loaded'
 
-            models[name]={
-                'status' : status,
-                'description' : description
-            }
+            models.update(
+                {
+                    name: {
+                        'status' : status,
+                        'description' : description
+                    }
+                }
+            )
         return models
 
     def print_models(self) -> None:
