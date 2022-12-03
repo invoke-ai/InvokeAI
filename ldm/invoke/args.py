@@ -119,7 +119,7 @@ PRECISION_CHOICES = [
 
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
-APP_VERSION = 'v2.2.0'
+APP_VERSION = 'v2.2.3'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
