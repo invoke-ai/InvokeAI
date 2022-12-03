@@ -303,14 +303,12 @@ class InvokeAIWebServer:
             socketio.emit("systemConfig", config)
 
         @socketio.on('searchForModels')
-        def handle_search_models(models_folder: str):
+        def handle_search_models():
             try:
-                print(f'>> Finding Models In: {models_folder}')
-                found_models = self.generate.model_cache.search_models(
-                    models_folder)
+                search_folder, found_models = self.generate.model_cache.search_models()
                 socketio.emit(
                     "foundModels",
-                    {'found_models': found_models},
+                    {'search_folder': search_folder, 'found_models': found_models},
                 )
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})

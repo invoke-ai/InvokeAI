@@ -249,3 +249,13 @@ export declare type InvokeModelConfigProps = {
   height: number;
   default: boolean;
 };
+
+export declare type OnFoundModelResponse = {
+  search_folder: string;
+  found_models: FoundModel[];
+};
+
+export declare type FoundModel = {
+  name: string;
+  location: string;
+};

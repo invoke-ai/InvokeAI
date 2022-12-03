@@ -1,7 +1,8 @@
+import { ReactNode } from 'react';
 import { Checkbox, CheckboxProps } from '@chakra-ui/react';
 
 type IAICheckboxProps = CheckboxProps & {
-  label: string;
+  label: string | ReactNode;
   styleClass?: string;
 };
 
