@@ -29,9 +29,9 @@ off the process.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - invokeAI-src-installer-mac.zip
-    - invokeAI-src-installer-windows.zip
-    - invokeAI-src-installer-linux.zip
+    - [invokeAI-src-installer-2.2.3-mac.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/invokeAI-src-installer-2.2.3-mac.zip)
+    - [invokeAI-src-installer-2.2.3-windows.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/invokeAI-src-installer-2.2.3-windows.zip)
+    - [invokeAI-src-installer-2.2.3-linux.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/invokeAI-src-installer-2.2.3-windows.zip)
 
     Download the one that is appropriate for your operating system.
 
