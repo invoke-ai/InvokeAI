@@ -17,6 +17,7 @@ import {
   setIsCancelable,
   addToast,
   setFoundModels,
+  setSearchFolder,
 } from 'features/system/store/systemSlice';
 
 import {
@@ -347,8 +348,9 @@ const makeSocketIOListeners = (
         dispatch(setInfillMethod(data.infill_methods[0]));
       }
     },
-    onFoundModels: (data: any) => {
-      const { found_models } = data;
+    onFoundModels: (data: InvokeAI.OnFoundModelResponse) => {
+      const { search_folder, found_models } = data;
+      dispatch(setSearchFolder(search_folder));
       dispatch(setFoundModels(found_models));
     },
     onNewModelAdded: (data: InvokeAI.ModelAddedResponse) => {

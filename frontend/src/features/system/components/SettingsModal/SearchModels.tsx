@@ -1,35 +1,42 @@
-import {
-  Box,
-  Flex,
-  FormControl,
-  FormLabel,
-  HStack,
-  Input,
-  VStack,
-} from '@chakra-ui/react';
+import { Box, Flex, VStack } from '@chakra-ui/react';
 import { searchForModels } from 'app/socketio/actions';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import IAICheckbox from 'common/components/IAICheckbox';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { Field, Formik } from 'formik';
-import React from 'react';
+import React, { ReactNode, ChangeEvent } from 'react';
 import { MdFindInPage } from 'react-icons/md';
 import _ from 'lodash';
 import IAIButton from 'common/components/IAIButton';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { FaPlus } from 'react-icons/fa';
+import {
+  setFoundModels,
+  setSearchFolder,
+} from 'features/system/store/systemSlice';
 
 export default function SearchModels() {
   const dispatch = useAppDispatch();
+
+  const searchFolder = useAppSelector(
+    (state: RootState) => state.system.searchFolder
+  );
+
   const foundModels = useAppSelector(
     (state: RootState) => state.system.foundModels
   );
 
-  const [modelsToAdd, setModelsToAdd] = React.useState([]);
+  const [modelsToAdd, setModelsToAdd] = React.useState<string[]>([]);
 
-  const findModelsHandler = (values: any) => {
-    dispatch(searchForModels(values.search_folder));
+  const resetSearchModelHandler = () => {
+    dispatch(setSearchFolder(null));
+    dispatch(setFoundModels(null));
+    setModelsToAdd([]);
   };
 
-  const foundModelsChangeHandler = (e) => {
+  const findModelsHandler = () => {
+    dispatch(searchForModels());
+  };
+
+  const foundModelsChangeHandler = (e: ChangeEvent<HTMLInputElement>) => {
     if (!modelsToAdd.includes(e.target.value)) {
       setModelsToAdd([...modelsToAdd, e.target.value]);
     } else {
@@ -39,11 +46,13 @@ export default function SearchModels() {
 
   const addAllToSelected = () => {
     setModelsToAdd([]);
-    foundModels.forEach((model) => {
-      setModelsToAdd((currentModels) => {
-        return [...currentModels, model.name];
+    if (foundModels) {
+      foundModels.forEach((model) => {
+        setModelsToAdd((currentModels) => {
+          return [...currentModels, model.name];
+        });
       });
-    });
+    }
   };
 
   const removeAllFromSelected = () => {
@@ -51,7 +60,7 @@ export default function SearchModels() {
   };
 
   const renderFoundModels = () => {
-    const foundModelsToRender = [];
+    const foundModelsToRender: ReactNode[] = [];
 
     if (foundModels) {
       foundModels.forEach((model, index) => {
@@ -87,35 +96,44 @@ export default function SearchModels() {
 
   return (
     <>
-      <Formik
-        initialValues={{ search_folder: '' }}
-        onSubmit={findModelsHandler}
-      >
-        {({ handleSubmit }) => (
-          <form onSubmit={handleSubmit}>
-            <HStack alignItems={'center'} columnGap="0.5rem">
-              {/* Search Folder */}
-              <FormControl isRequired>
-                <FormLabel htmlFor="search_folder">Search Folder</FormLabel>
-                <Field
-                  as={Input}
-                  id="search_folder"
-                  name="search_folder"
-                  type="text"
-                />
-              </FormControl>
-              <Box paddingTop={'2rem'}>
-                <IAIIconButton
-                  aria-label="Find Models"
-                  tooltip="Find Models"
-                  icon={<MdFindInPage />}
-                  type="submit"
-                />
-              </Box>
-            </HStack>
-          </form>
-        )}
-      </Formik>
+      {searchFolder ? (
+        <Flex
+          flexDirection={'column'}
+          padding={'1rem'}
+          backgroundColor={'var(--background-color)'}
+          borderRadius="0.5rem"
+          rowGap={'0.5rem'}
+          position={'relative'}
+        >
+          <p
+            style={{
+              fontWeight: 'bold',
+              fontSize: '0.8rem',
+              backgroundColor: 'var(--background-color-secondary)',
+              padding: '0.2rem 1rem',
+              width: 'max-content',
+              borderRadius: '0.2rem',
+            }}
+          >
+            Checkpoint Folder
+          </p>
+          <p style={{ fontWeight: 'bold' }}>{searchFolder}</p>
+          <IAIIconButton
+            aria-label="Clear Checkpoint Folder"
+            icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
+            position={'absolute'}
+            right={5}
+            onClick={resetSearchModelHandler}
+          />
+        </Flex>
+      ) : (
+        <IAIButton aria-label="Find Models" onClick={findModelsHandler}>
+          <Flex columnGap={'0.5rem'}>
+            <MdFindInPage fontSize={20} />
+            Select Folder
+          </Flex>
+        </IAIButton>
+      )}
       {foundModels && (
         <Flex flexDirection={'column'} rowGap={'1rem'}>
           <Flex justifyContent={'space-between'} alignItems="center">
@@ -145,7 +163,7 @@ export default function SearchModels() {
           <Flex
             rowGap={'1rem'}
             flexDirection="column"
-            maxHeight={'24rem'}
+            maxHeight={'20rem'}
             overflowY="scroll"
             paddingRight={'1rem'}
             paddingLeft={'0.2rem'}

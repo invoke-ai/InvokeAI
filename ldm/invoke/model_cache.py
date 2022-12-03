@@ -17,12 +17,15 @@ import transformers
 import traceback
 import textwrap
 import contextlib
+import tkinter as tk
 from typing import Union
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config, ask_user
 from ldm.invoke.globals import Globals
 from picklescan.scanner import scan_file_path
+from pathlib import Path
+from tkinter import filedialog
 
 DEFAULT_MAX_MODELS=2
 
@@ -310,22 +313,31 @@ class ModelCache(object):
         else:
             print('>> Model Scanned. OK!!')
 
-    def search_models(self, search_folder):
-        models_folder = os.path.abspath(search_folder)
-        found_models = []
+    def search_models(self):
+        # Using tkinter to get the filepath because JS doesn't allow
+        root = tk.Tk()
+        root.withdraw()
+        root.wm_attributes('-topmost', 1)
+        root.focus_force()
+        search_folder = filedialog.askdirectory(parent=root, title='Select Checkpoint Folder')
+        root.destroy()
         
-        if os.path.isdir(models_folder):
-            for root, dirs, files in os.walk(models_folder):
-                for filename in files:
-                    if filename.endswith('.ckpt'):
-                        checkpoint_name = filename.split('.ckpt')[0]
-                        checkpoint_path = os.path.join(root, filename)
-                        found_models.append({
-                            'name': checkpoint_name,
-                            'location': checkpoint_path
-                        })
+        if not search_folder:
+            return None, None
+        
+        print(f'>> Finding Models In: {search_folder}')
+        models_folder = Path(search_folder).glob('**/*.ckpt')
 
-        return found_models
+        files = [x for x in models_folder if x.is_file()]
+
+        found_models = []
+        for file in files:
+            found_models.append({
+                'name': file.stem,
+                'location': str(file.resolve())
+            })
+
+        return search_folder, found_models
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)

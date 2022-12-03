@@ -117,7 +117,7 @@ export const socketioMiddleware = () => {
         onModelChanged(data);
       });
 
-      socketio.on('foundModels', (data: any) => {
+      socketio.on('foundModels', (data: InvokeAI.OnFoundModelResponse) => {
         onFoundModels(data);
       });
 
@@ -189,7 +189,7 @@ export const socketioMiddleware = () => {
       }
 
       case 'socketio/searchForModels': {
-        emitSearchForModels(action.payload);
+        emitSearchForModels();
         break;
       }
 
