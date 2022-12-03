@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   FormControl,
   FormErrorMessage,
@@ -27,10 +26,11 @@ import React from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { Field, FieldInputProps, Formik, FormikProps } from 'formik';
 import { RootState, useAppDispatch, useAppSelector } from 'app/store';
-import { addNewModel, searchForModels } from 'app/socketio/actions';
+import { addNewModel } from 'app/socketio/actions';
 import { InvokeModelConfigProps } from 'app/invokeai';
-import { MdFindInPage } from 'react-icons/md';
 import IAICheckbox from 'common/components/IAICheckbox';
+import SearchModels from './SearchModels';
+import { setFoundModels } from 'features/system/store/systemSlice';
 
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;
@@ -69,9 +69,9 @@ export default function AddModel() {
     onClose();
   };
 
-  const findModelsHandler = (values: any) => {
-    console.log(values.search_folder);
-    dispatch(searchForModels(values.search_folder));
+  const addModelModalClose = () => {
+    dispatch(setFoundModels(null));
+    onClose();
   };
 
   const [addManually, setAddmanually] = React.useState<boolean>(false);
@@ -89,7 +89,7 @@ export default function AddModel() {
 
       <Modal
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={addModelModalClose}
         size="xl"
         closeOnOverlayClick={false}
       >
@@ -98,38 +98,7 @@ export default function AddModel() {
           <ModalHeader>Add New Model</ModalHeader>
           <ModalCloseButton />
           <ModalBody className="add-model-modal-body">
-            <Formik
-              initialValues={{ search_folder: '' }}
-              onSubmit={findModelsHandler}
-            >
-              {({ handleSubmit }) => (
-                <form onSubmit={handleSubmit}>
-                  <HStack alignItems={'center'} columnGap="0.5rem">
-                    {/* Search Folder */}
-                    <FormControl isRequired>
-                      <FormLabel htmlFor="search_folder">
-                        Search Folder
-                      </FormLabel>
-                      <Field
-                        as={Input}
-                        id="search_folder"
-                        name="search_folder"
-                        type="text"
-                      />
-                    </FormControl>
-                    <Box paddingTop={'2rem'}>
-                      <IAIIconButton
-                        aria-label="Find Models"
-                        tooltip="Find Models"
-                        icon={<MdFindInPage />}
-                        type="submit"
-                      />
-                    </Box>
-                  </HStack>
-                </form>
-              )}
-            </Formik>
-
+            <SearchModels />
             <IAICheckbox
               label="Add Manually"
               isChecked={addManually}

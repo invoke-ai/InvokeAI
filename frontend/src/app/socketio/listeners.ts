@@ -16,6 +16,7 @@ import {
   setModelList,
   setIsCancelable,
   addToast,
+  setFoundModels,
 } from 'features/system/store/systemSlice';
 
 import {
@@ -348,9 +349,7 @@ const makeSocketIOListeners = (
     },
     onFoundModels: (data: any) => {
       const { found_models } = data;
-      found_models.forEach((model: any) => {
-        console.log(model.name);
-      });
+      dispatch(setFoundModels(found_models));
     },
     onNewModelAdded: (data: InvokeAI.ModelAddedResponse) => {
       const { new_model_name, model_list, update } = data;
