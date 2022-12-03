@@ -116,10 +116,17 @@ status=$?
 
 if test $status -ne 0
 then
-    echo "Something went wrong while installing Python libraries and cannot continue."
-    echo "See https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#troubleshooting for troubleshooting"
-    echo "tips, or visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
-    echo "installation methods"
+    if [ "$OS_NAME" == "osx" ]; then
+	echo "Python failed to install the environment. You may need to install"
+	echo "the Xcode command line tools to proceed. See step number 3 of"
+	echo "https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#walk_through for"
+	echo "installation instructions and then run this script again."
+    else
+	echo "Something went wrong while installing Python libraries and cannot continue."
+	echo "See https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#troubleshooting for troubleshooting"
+	echo "tips, or visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
+	echo "installation methods"
+    fi
 else
     ln -sf ./source_installer/invoke.sh.in ./invoke.sh
     ln -sf ./source_installer/update.sh.in ./update.sh

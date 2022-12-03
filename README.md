@@ -77,6 +77,14 @@ For full installation and upgrade instructions, please see:
 8. [Support](#support)
 9. [Further Reading](#further-reading)
 
+### Installation
+
+This fork is supported across Linux, Windows and Macintosh. Linux
+users can use either an Nvidia-based card (with CUDA support) or an
+AMD card (using the ROCm driver). For full installation and upgrade
+instructions, please see:
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_SOURCE/)
+
 ### Hardware Requirements
 
 InvokeAI is supported across Linux, Windows and macOS. Linux
@@ -88,6 +96,10 @@ You wil need one of the following:
 
 - An NVIDIA-based graphics card with 4 GB or more VRAM memory.
 - An Apple computer with an M1 chip.
+
+We do not recommend the GTX 1650 or 1660 series video cards. They are
+unable to run in half-precision mode and do not have sufficient VRAM
+to render 512x512 images.
 
 #### Memory
 
