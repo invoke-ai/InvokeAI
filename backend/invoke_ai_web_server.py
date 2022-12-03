@@ -9,6 +9,7 @@ import io
 import base64
 import os
 import json
+import tkinter as tk
 
 from werkzeug.utils import secure_filename
 from flask import Flask, redirect, send_from_directory, request, make_response
@@ -17,6 +18,7 @@ from PIL import Image, ImageOps
 from PIL.Image import Image as ImageType
 from uuid import uuid4
 from threading import Event
+from tkinter import filedialog
 
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
@@ -305,11 +307,25 @@ class InvokeAIWebServer:
         @socketio.on('searchForModels')
         def handle_search_models():
             try:
-                search_folder, found_models = self.generate.model_cache.search_models()
-                socketio.emit(
+                # Using tkinter to get the filepath because JS doesn't allow
+                root = tk.Tk()
+                root.withdraw()
+                root.wm_attributes('-topmost', 1)
+                root.focus_force()
+                search_folder = filedialog.askdirectory(parent=root, title='Select Checkpoint Folder')
+                root.destroy()
+                
+                if not search_folder:
+                    socketio.emit(
                     "foundModels",
-                    {'search_folder': search_folder, 'found_models': found_models},
+                    {'search_folder': None, 'found_models': None},
                 )
+                else:
+                    search_folder, found_models = self.generate.model_cache.search_models(search_folder)
+                    socketio.emit(
+                        "foundModels",
+                        {'search_folder': search_folder, 'found_models': found_models},
+                    )            
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
                 print("\n")
