@@ -80,6 +80,10 @@ You wil need one of the following:
 - An NVIDIA-based graphics card with 4 GB or more VRAM memory.
 - An Apple computer with an M1 chip.
 
+We do not recommend the GTX 1650 or 1660 series video cards. They are
+unable to run in half-precision mode and do not have sufficient VRAM
+to render 512x512 images.
+
 #### Memory
 
 - At least 12 GB Main Memory RAM.
