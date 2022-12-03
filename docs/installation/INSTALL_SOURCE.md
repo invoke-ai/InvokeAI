@@ -29,9 +29,9 @@ off the process.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - invokeAI-src-installer-mac.zip
-    - invokeAI-src-installer-windows.zip
-    - invokeAI-src-installer-linux.zip
+    - invokeAI-src-installer-<VERSION>-mac.zip
+    - invokeAI-src-installer-<VERSION>-windows.zip
+    - invokeAI-src-installer-<VERSION>-linux.zip
 
     Download the one that is appropriate for your operating system.
 
@@ -50,18 +50,26 @@ off the process.
     inflating: invokeAI\readme.txt
     ```
 
-3.  If you are using a desktop GUI, double-click the installer file. It will be
+3. If you are a Macintosh user, you may need to authorize the InvokeAI
+   installer by opening a terminal window and typing `xcode-select
+   --install`. Alternatively, you may install Xcode thorugh a graphical
+   user interface. Information is available at https://www.freecodecamp.org/news/how-to-download-and-install-xcode/
+
+   If installation fails with an `EnvironmentNameNotFound` error, then
+   you will need to install Xcode!!
+
+4.  If you are using a desktop GUI, double-click the installer file. It will be
     named `install.bat` on Windows systems and `install.sh` on Linux and
     Macintosh systems.
 
-4.  Alternatively, from the command line, run the shell script or .bat file:
+5.  Alternatively, from the command line, run the shell script or .bat file:
 
     ```cmd
     C:\Documents\Linco> cd invokeAI
     C:\Documents\Linco\invokeAI> install.bat
     ```
 
-5.  Sit back and let the install script work. It will install various binary
+6.  Sit back and let the install script work. It will install various binary
     requirements including Conda, Git and Python, then download the current
     InvokeAI code and install it along with its dependencies.
 
@@ -74,7 +82,7 @@ off the process.
     and nothing is happening, you can interrupt the script with ^C. You may restart
     it and it will pick up where it left off.
 
-6.  After installation completes, the installer will launch a script called
+7.  After installation completes, the installer will launch a script called
     `configure_invokeai.py`, which will guide you through the first-time process of
     selecting one or more Stable Diffusion model weights files, downloading and
     configuring them.
@@ -90,7 +98,7 @@ off the process.
     prompted) and configure InvokeAI to use the previously-downloaded files. The
     process for this is described in [Installing Models](INSTALLING_MODELS.md).
 
-7.  The script will now exit and you'll be ready to generate some images. The
+8.  The script will now exit and you'll be ready to generate some images. The
     invokeAI directory will contain numerous files. Look for a shell script
     named `invoke.sh` (Linux/Mac) or `invoke.bat` (Windows). Launch the script
     by double-clicking it or typing its name at the command-line:
