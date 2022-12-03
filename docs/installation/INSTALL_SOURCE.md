@@ -50,13 +50,17 @@ off the process.
     inflating: invokeAI\readme.txt
     ```
 
-3. If you are a Macintosh user, you may need to authorize the InvokeAI
-   installer by opening a terminal window and typing `xcode-select
-   --install`. Alternatively, you may install Xcode thorugh a graphical
-   user interface. Information is available at https://www.freecodecamp.org/news/how-to-download-and-install-xcode/
-
-   If installation fails with an `EnvironmentNameNotFound` error, then
-   you will need to install Xcode!!
+3. If you are a macOS user, you may need to install the Xcode command line tools. 
+   These are a set of tools that are needed to run certain applications in a Terminal, 
+   including InvokeAI. This package is provided directly by Apple.
+   
+   To install, open a terminal window and run `xcode-select --install`. You will get
+   a macOS system popup guiding you through the install. If you already have them
+   installed, you will instead see some output in the Terminal advising you that the 
+   tools are already installed.
+   
+   More information can be found here:
+   https://www.freecodecamp.org/news/install-xcode-command-line-tools/
 
 4.  If you are using a desktop GUI, double-click the installer file. It will be
     named `install.bat` on Windows systems and `install.sh` on Linux and
