@@ -986,6 +986,8 @@ class Generate:
             self.sampler = KSampler(self.model, 'heun', device=self.device)
         elif self.sampler_name == 'k_lms':
             self.sampler = KSampler(self.model, 'lms', device=self.device)
+        elif self.sampler_name[:2] == 'k_': # and f'sample_{self.sampler_name[2:]}' in K.sampling.__dict__:
+            self.sampler = KSampler(self.model, self.sampler_name[2:], device=self.device)
         else:
             msg = f'>> Unsupported Sampler: {self.sampler_name}, Defaulting to plms'
             self.sampler = PLMSSampler(self.model, device=self.device)
