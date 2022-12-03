@@ -38,18 +38,32 @@ This is a fork of
 [CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion),
 the open source text-to-image generator. It provides a streamlined
 process with various new features and options to aid the image
-generation process. It runs on Windows, Mac and Linux machines, with
+generation process. It runs on Windows, macOS and Linux machines, with
 GPU cards with as little as 4 GB of RAM. It provides both a polished
 Web interface (see below), and an easy-to-use command-line interface.
 
-**Quick links**: [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
+**Quick links**: [[How to Install](#installation)] [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
+
+_Note: InvokeAI is rapidly evolving. Please use the
+[Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to report bugs and make feature
+requests. Be sure to use the provided templates. They will help us diagnose issues faster._
+
+## Installation Quick-Start
+
+1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/tag/v2.2.3)
+2. Download the .zip file for your OS (Windows/macOS/Linux).
+3. Unzip the file. 
+4. If you are on Windows, double-click on the `install.bat` script. On macOS, open a Terminal window, drag the file `install.sh` from Finder into the Terminal, and press return. On Linux, run `install.sh`.
+5. Wait a while, until it is done. 
+6. The folder where you ran the installer from will now be filled with lots of files. If you are on Windows, double-click on the `invoke.bat` file. On macOS, open a Terminal window, drag `invoke.sh` from the folder into the Terminal, and press return. On Linux, run `invoke.sh`
+7. Press 2 to open the "browser-based UI", press enter/return, wait a minute or two for Stable Diffusion to start up, then open your browser and go to http://localhost:9090. 
+8. Type `banana sushi` in the box on the top left and click `Invoke`:
 
 <div align="center"><img src="docs/assets/invoke-web-server-1.png" width=640></div>
 
 
-_Note: This fork is rapidly evolving. Please use the
-[Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to report bugs and make feature
-requests. Be sure to use the provided templates. They will help aid diagnose issues faster._
+For full installation and upgrade instructions, please see:
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
 ## Table of Contents
 
@@ -63,16 +77,11 @@ requests. Be sure to use the provided templates. They will help aid diagnose iss
 8. [Support](#support)
 9. [Further Reading](#further-reading)
 
-### Installation
-
-This fork is supported across Linux, Windows and Macintosh. Linux
-users can use either an Nvidia-based card (with CUDA support) or an
-AMD card (using the ROCm driver). For full installation and upgrade
-instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
-
 ### Hardware Requirements
 
+InvokeAI is supported across Linux, Windows and macOS. Linux
+users can use either an Nvidia-based card (with CUDA support) or an
+AMD card (using the ROCm driver).
 #### System
 
 You wil need one of the following:
@@ -144,7 +153,7 @@ you can try starting `invoke.py` with the `--precision=float32` flag:
   - img2img runs on all k* samplers
   - Support for <a href="https://invoke-ai.github.io/InvokeAI/features/PROMPTS/#negative-and-unconditioned-prompts">negative prompts</a>
   - Support for CodeFormer face reconstruction
-  - Support for Textual Inversion on Macintoshes
+  - Support for Textual Inversion on macOS
   - Support in both WebGUI and CLI for <a href="https://invoke-ai.github.io/InvokeAI/features/POSTPROCESS/">post-processing of previously-generated images</a>
     using facial reconstruction, ESRGAN upscaling, outcropping (similar to DALL-E infinite canvas),
     and "embiggen" upscaling. See the `!fix` command.
@@ -153,7 +162,7 @@ you can try starting `invoke.py` with the `--precision=float32` flag:
     during image generation (see <a href="https://github.com/invoke-ai/InvokeAI/blob/main/docs/features/OTHER.md#thresholding-and-perlin-noise-initialization-options">Thresholding and Perlin Noise Initialization</a>
   - Extensive metadata now written into PNG files, allowing reliable regeneration of images
     and tweaking of previous settings.
-  - Command-line completion in `invoke.py` now works on Windows, Linux and Mac platforms.
+  - Command-line completion in `invoke.py` now works on Windows, Linux and macOS platforms.
   - Improved <a href="https://invoke-ai.github.io/InvokeAI/features/CLI/">command-line completion behavior</a>.
     New commands added:
     - List command-line history with `!history`
