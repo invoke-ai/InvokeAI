@@ -46,6 +46,7 @@ export interface SystemState
   saveIntermediatesInterval: number;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
+  foundModels: [] | null;
 }
 
 const initialSystemState: SystemState = {
@@ -79,6 +80,7 @@ const initialSystemState: SystemState = {
   saveIntermediatesInterval: 5,
   enableImageDebugging: false,
   toastQueue: [],
+  foundModels: null,
 };
 
 export const systemSlice = createSlice({
@@ -220,6 +222,9 @@ export const systemSlice = createSlice({
       state.currentStatus = action.payload;
       state.currentStatusHasSteps = false;
     },
+    setFoundModels: (state, action: any) => {
+      state.foundModels = action.payload;
+    },
   },
 });
 
@@ -248,6 +253,7 @@ export const {
   addToast,
   clearToastQueue,
   setProcessingIndeterminateTask,
+  setFoundModels,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
