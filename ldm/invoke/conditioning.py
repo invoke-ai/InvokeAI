@@ -77,8 +77,13 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
             # for name, a0, a1, b0, b1 in edit_opcodes: only name == 'equal' is currently parsed
             original_token_count = 0
             edited_token_count = 0
-            edit_opcodes = []
             edit_options = []
+            edit_opcodes = []
+            # beginning of sequence
+            edit_opcodes.append(('equal', original_token_count, original_token_count+1, edited_token_count, edited_token_count+1))
+            edit_options.append(None)
+            original_token_count += 1
+            edited_token_count += 1
             for fragment in flattened_prompt.children:
                 if type(fragment) is CrossAttentionControlSubstitute:
                     original_prompt.append(fragment.original)
@@ -105,6 +110,12 @@ def get_uc_and_c_and_ec(prompt_string_uncleaned, model, log_tokens=False, skip_n
                     edit_options.append(None)
                     original_token_count += count
                     edited_token_count += count
+            # end of sequence
+            edit_opcodes.append(('equal', original_token_count, original_token_count+1, edited_token_count, edited_token_count+1))
+            edit_options.append(None)
+            original_token_count += 1
+            edited_token_count += 1
+
             original_embeddings, original_tokens = build_embeddings_and_tokens_for_flattened_prompt(model,
                                                                                                     original_prompt,
                                                                                                     log_tokens=log_tokens,
