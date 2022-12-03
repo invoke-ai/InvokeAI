@@ -17,7 +17,6 @@ import transformers
 import traceback
 import textwrap
 import contextlib
-import tkinter as tk
 from typing import Union
 from omegaconf import OmegaConf
 from omegaconf.errors import ConfigAttributeError
@@ -25,7 +24,7 @@ from ldm.util import instantiate_from_config, ask_user
 from ldm.invoke.globals import Globals
 from picklescan.scanner import scan_file_path
 from pathlib import Path
-from tkinter import filedialog
+
 
 DEFAULT_MAX_MODELS=2
 
@@ -313,17 +312,7 @@ class ModelCache(object):
         else:
             print('>> Model Scanned. OK!!')
 
-    def search_models(self):
-        # Using tkinter to get the filepath because JS doesn't allow
-        root = tk.Tk()
-        root.withdraw()
-        root.wm_attributes('-topmost', 1)
-        root.focus_force()
-        search_folder = filedialog.askdirectory(parent=root, title='Select Checkpoint Folder')
-        root.destroy()
-        
-        if not search_folder:
-            return None, None
+    def search_models(self, search_folder):
         
         print(f'>> Finding Models In: {search_folder}')
         models_folder = Path(search_folder).glob('**/*.ckpt')
