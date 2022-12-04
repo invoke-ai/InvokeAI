@@ -64,7 +64,7 @@ steps:
    It should look like the follwing:
 
    ```
-   Python 3.9.5 (default, Nov 23 2021, 15:27:38) 
+   Python 3.9.5 (default, Nov 23 2021, 15:27:38)
    [GCC 9.3.0] on linux
    Type "help", "copyright", "credits" or "license" for more information.
    >>> from patchmatch import patch_match

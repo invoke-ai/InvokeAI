@@ -21,7 +21,7 @@ This model card focuses on the model associated with the Stable Diffusion model,
 
 # Uses
 
-## Direct Use 
+## Direct Use
 The model is intended for research purposes only. Possible research areas and
 tasks include
 
@@ -68,11 +68,11 @@ Using the model to generate content that is cruel to individuals is a misuse of 
   considerations.
 
 ### Bias
-While the capabilities of image generation models are impressive, they can also reinforce or exacerbate social biases. 
-Stable Diffusion v1 was trained on subsets of [LAION-2B(en)](https://laion.ai/blog/laion-5b/), 
-which consists of images that are primarily limited to English descriptions. 
-Texts and images from communities and cultures that use other languages are likely to be insufficiently accounted for. 
-This affects the overall output of the model, as white and western cultures are often set as the default. Further, the 
+While the capabilities of image generation models are impressive, they can also reinforce or exacerbate social biases.
+Stable Diffusion v1 was trained on subsets of [LAION-2B(en)](https://laion.ai/blog/laion-5b/),
+which consists of images that are primarily limited to English descriptions.
+Texts and images from communities and cultures that use other languages are likely to be insufficiently accounted for.
+This affects the overall output of the model, as white and western cultures are often set as the default. Further, the
 ability of the model to generate content with non-English prompts is significantly worse than with English-language prompts.
 
 
@@ -84,7 +84,7 @@ The model developers used the following dataset for training the model:
 - LAION-2B (en) and subsets thereof (see next section)
 
 **Training Procedure**
-Stable Diffusion v1 is a latent diffusion model which combines an autoencoder with a diffusion model that is trained in the latent space of the autoencoder. During training, 
+Stable Diffusion v1 is a latent diffusion model which combines an autoencoder with a diffusion model that is trained in the latent space of the autoencoder. During training,
 
 - Images are encoded through an encoder, which turns images into latent representations. The autoencoder uses a relative downsampling factor of 8 and maps images of shape H x W x 3 to latents of shape H/f x W/f x 4
 - Text prompts are encoded through a ViT-L/14 text-encoder.
@@ -108,12 +108,12 @@ filtered to images with an original size `>= 512x512`, estimated aesthetics scor
 - **Batch:** 32 x 8 x 2 x 4 = 2048
 - **Learning rate:** warmup to 0.0001 for 10,000 steps and then kept constant
 
-## Evaluation Results 
+## Evaluation Results
 Evaluations with different classifier-free guidance scales (1.5, 2.0, 3.0, 4.0,
 5.0, 6.0, 7.0, 8.0) and 50 PLMS sampling
 steps show the relative improvements of the checkpoints:
 
-![pareto](assets/v1-variants-scores.jpg) 
+![pareto](assets/v1-variants-scores.jpg)
 
 Evaluated using 50 PLMS steps and 10000 random prompts from the COCO2017 validation set, evaluated at 512x512 resolution.  Not optimized for FID scores.
 ## Environmental Impact

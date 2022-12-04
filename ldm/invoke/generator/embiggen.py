@@ -21,7 +21,7 @@ class Embiggen(Generator):
     def generate(self,prompt,iterations=1,seed=None,
                  image_callback=None, step_callback=None,
                  **kwargs):
-        
+
         scope      = choose_autocast(self.precision)
         make_image = self.get_make_image(
             prompt,
@@ -39,7 +39,7 @@ class Embiggen(Generator):
                 results.append([image, seed])
                 if image_callback is not None:
                     image_callback(image, seed, prompt_in=prompt)
-                seed = self.new_seed() 
+                seed = self.new_seed()
         return results
 
     @torch.no_grad()
@@ -179,9 +179,9 @@ class Embiggen(Generator):
                 # Clamp values to max 255
                 if distanceToLR > 255:
                     distanceToLR = 255
-                #Place the pixel as invert of distance     
+                #Place the pixel as invert of distance
                 agradientC.putpixel((x, y), round(255 - distanceToLR))
-        
+
         # Create alternative asymmetric diagonal corner to use on "tailing" intersections to prevent hard edges
         # Fits for a left-fading gradient on the bottom side and full opacity on the right side.
         agradientAsymC = Image.new('L', (256, 256))

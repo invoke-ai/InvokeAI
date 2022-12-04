@@ -24,12 +24,12 @@ class ApiJobs(MethodView):
     job_queue_service.push(jobRequest)
 
     return { 'jobId': jobRequest.id }
-  
+
 
 class WebIndex(MethodView):
   init_every_request = False
   __file: str = None
-  
+
   def __init__(self, file):
     self.__file = file
 
@@ -52,7 +52,7 @@ class WebConfig(MethodView):
 
 class ApiCancel(MethodView):
   init_every_request = False
-  
+
   @inject
   def get(self, generator_service: GeneratorService = Provide[Container.generator_service]):
     generator_service.cancel()
@@ -74,7 +74,7 @@ class ApiImages(MethodView):
     name = self.__storage.path(dreamId)
     fullpath=os.path.join(self.__pathRoot, name)
     return send_from_directory(os.path.dirname(fullpath), os.path.basename(fullpath))
-  
+
   def delete(self, dreamId):
     result = self.__storage.delete(dreamId)
     return Response(status=204) if result else Response(status=404)
@@ -115,7 +115,7 @@ class ApiIntermediates(MethodView):
     result = self.__storage.delete(dreamId)
     return Response(status=204) if result else Response(status=404)
 
-    
+
 class ApiImagesList(MethodView):
   init_every_request = False
   __storage: ImageStorageService

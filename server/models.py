@@ -227,7 +227,7 @@ class Signal():
     return Signal('job_started', {
       'jobId': jobId
     }, room=jobId, broadcast=True)
-    
+
   @staticmethod
   def job_done(jobId: str):
     return Signal('job_done', {

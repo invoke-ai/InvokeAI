@@ -121,8 +121,8 @@ command-line completion.
             dir
             ```
 
-    !!! warning "Do not try to run conda on directly on the subdirectory environments file. This won't work. Instead, copy or link it to the top-level directory as shown."    
-    
+    !!! warning "Do not try to run conda on directly on the subdirectory environments file. This won't work. Instead, copy or link it to the top-level directory as shown."
+
 6.  Create the conda environment:
 
     ```bash

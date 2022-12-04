@@ -16,7 +16,7 @@ class Outpaint(object):
         def wrapped_callback(img,seed,**kwargs):
             image_callback(img,seed,use_prefix=prefix,**kwargs)
 
-        
+
         return self.generate.prompt2image(
             prompt,
             seed           = seed,

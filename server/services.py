@@ -52,7 +52,7 @@ class SignalService:
       room = data['room']
       join_room(room)
       self.__socketio.emit("test", "something", room=room)
-      
+
     def on_leave(data):
       room = data['room']
       leave_room(room)
@@ -121,7 +121,7 @@ class ImageStorageService:
     name = self.__getName(dreamId, postfix)
     path = os.path.join(self.__location, name)
     return path
-  
+
   # Returns true if found, false if not found or error
   def delete(self, dreamId: str, postfix: str = '') -> bool:
     path = self.path(dreamId, postfix)
@@ -130,7 +130,7 @@ class ImageStorageService:
       return True
     else:
       return False
-  
+
   def getMetadata(self, dreamId: str, postfix: str = '') -> DreamResult:
     path = self.path(dreamId, postfix)
     image = Image.open(path)
@@ -266,7 +266,7 @@ class GeneratorService:
     # TODO: Separate status of GFPGAN?
 
     self.__imageStorage.save(image, dreamResult)
-    
+
     # TODO: handle upscaling logic better (this is appending data to log, but only on first generation)
     if not upscaled:
       self.__log.log(dreamResult)
@@ -275,7 +275,7 @@ class GeneratorService:
     self.__signal_service.emit(Signal.image_result(jobRequest.id, dreamResult.id, dreamResult))
 
     upscaling_requested = dreamResult.enable_upscale or dreamResult.enable_gfpgan
-    
+
     # Report upscaling status
     # TODO: this is very coupled to logic inside the generator. Fix that.
     if upscaling_requested and any(result.has_upscaled for result in jobRequest.results):

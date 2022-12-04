@@ -43,7 +43,7 @@ def get_canvas_generation_mode(
         )
 
     """
-    Mask images are white in areas where no change should be made, black where changes 
+    Mask images are white in areas where no change should be made, black where changes
     should be made.
     """
 

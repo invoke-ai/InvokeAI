@@ -22,7 +22,7 @@ def initialize_app(
   socketio: SocketIO = Provide[Container.socketio]
 ) -> SocketIO:
   socketio.init_app(app)
-  
+
   return socketio
 
 # The signal and generator services are injected to warm up the processing queues
@@ -43,7 +43,7 @@ def run_app(config, host, port) -> Flask:
   container.config.from_dict(config)
   container.wire(modules=[__name__])
   app.container = container
-  
+
   # Set up CORS
   CORS(app, resources={r'/api/*': {'origins': '*'}})
 
@@ -63,7 +63,7 @@ def run_app(config, host, port) -> Flask:
   app.add_url_rule('/api/images', view_func=views.ApiImagesList.as_view('api_images_list'))
   app.add_url_rule('/api/intermediates/<string:dreamId>/<string:step>', view_func=views.ApiIntermediates.as_view('api_intermediates', '../'))
 
-  app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../static/dream_web/')) 
+  app.static_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '../static/dream_web/'))
 
   # Initialize
   socketio = initialize_app(app)
@@ -91,7 +91,7 @@ def main():
   if opt.weights:
       print('--weights argument has been deprecated. Please edit ./configs/models.yaml, and select the weights using --model instead.')
       sys.exit(-1)
-      
+
   # try:
   #   models  = OmegaConf.load(opt.config)
   #   width   = models[opt.model].width
