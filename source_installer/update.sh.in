@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# ensure we're in the correct folder in case user's CWD is somewhere else
+scriptdir=$(dirname "$0")
+cd "$scriptdir"
 
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
@@ -21,6 +24,6 @@ case "${OS_NAME}" in
     *)          echo "Unknown OS: $OS_NAME! This script runs only on Linux or Mac" && exit
 esac
 
-python scripts/preload_models.py
+python scripts/configure_invokeai.py --create_launchers
 
 

@@ -92,7 +92,7 @@ if [ ! -e ".git" ]; then
     git fetch
     echo "CHANGE BRANCH BACK TO MAIN"
     #    git checkout origin/main -ft
-    get checkout origin/lstein-config-launch
+    git checkout origin/lstein-config-launch
 fi
 
 # create the environment
