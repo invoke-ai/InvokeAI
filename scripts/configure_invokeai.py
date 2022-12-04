@@ -15,7 +15,7 @@ import sys
 import traceback
 import warnings
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 from urllib import request
 
 import requests
@@ -70,9 +70,9 @@ this program and resume later.\n'''
     )
 
 #--------------------------------------------
-def postscript():
-    print(
-        '''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
+def postscript(errors: None):
+    if not any(errors):
+        message='''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
 Web version:
     python scripts/invoke.py --web  (connect to http://localhost:9090)
 Command-line version:
@@ -85,7 +85,14 @@ automated installation script, execute "invoke.sh" (Linux/Mac) or
 
 Have fun!
 '''
-)
+
+    else:
+        message=f"\n** There were errors during installation. It is possible some of the models were not fully downloaded.\n"
+        for err in errors:
+            message += f"\t - {err}\n"
+        message += "Please check the logs above and correct any issues."
+
+    print(message)
 
 #---------------------------------------------
 def yes_or_no(prompt:str, default_yes=True):
@@ -220,8 +227,7 @@ This involves a few easy steps.
     access_token = HfFolder.get_token()
     if access_token is not None:
         print('found')
-
-    if access_token is None:
+    else:
         print('not found')
         print('''
 4. Thank you! The last step is to enter your HuggingFace access token so that
@@ -239,6 +245,7 @@ This involves a few easy steps.
    Token: '''
         )
         access_token = getpass_asterisk.getpass_asterisk()
+        HfFolder.save_token(access_token)
     return access_token
 
 #---------------------------------------------
@@ -594,17 +601,27 @@ def download_safety_checker():
     print('...success',file=sys.stderr)
 
 #-------------------------------------
-def download_weights(opt:dict):
+def download_weights(opt:dict) -> Union[str, None]:
+    # Authenticate to Huggingface using environment variables.
+    # If successful, authentication will persist for either interactive or non-interactive use.
+    # Default env var expected by HuggingFace is HUGGING_FACE_HUB_TOKEN.
+    if not (access_token := HfFolder.get_token()):
+        # If unable to find an existing token or expected environment, try the non-canonical environment variable (widely used in the community and supported as per docs)
+        if (access_token := os.getenv("HUGGINGFACE_TOKEN")):
+            # set the environment variable here instead of simply calling huggingface_hub.login(token), to maintain consistent behaviour.
+            # when calling the .login() method, the token is cached in the user's home directory. When the env var is used, the token is NOT cached.
+            os.environ['HUGGING_FACE_HUB_TOKEN'] = access_token
+
     if opt.yes_to_all:
         models = recommended_datasets()
-        access_token = HfFolder.get_token()
         if len(models)>0 and access_token is not None:
             successfully_downloaded = download_weight_datasets(models, access_token)
             update_config_file(successfully_downloaded,opt)
             return
         else:
             print('** Cannot download models because no Hugging Face access token could be found. Please re-run without --yes')
-            return
+            return "could not download model weights from Huggingface due to missing or invalid access token"
+
     else:
         choice = user_wants_to_download_weights()
 
@@ -620,10 +637,13 @@ def download_weights(opt:dict):
         return
 
     print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+    # We are either already authenticated, or will be asked to provide the token interactively
     access_token = authenticate()
     print('\n** DOWNLOADING WEIGHTS **')
     successfully_downloaded = download_weight_datasets(models, access_token)
     update_config_file(successfully_downloaded,opt)
+    if len(successfully_downloaded) < len(models):
+        return "some of the model weights downloads were not successful"
 
 #-------------------------------------
 def get_root(root:str=None)->str:
@@ -818,9 +838,12 @@ def main():
            or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
             initialize_rootdir(Globals.root,opt.yes_to_all)
 
+        # Optimistically try to download all required assets. If any errors occur, add them and proceed anyway.
+        errors=set()
+
         if opt.interactive:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
-            download_weights(opt)
+            errors.add(download_weights(opt))
         else:
             config_path = Path(Globals.root, opt.config_file or Default_config_file)
             if config_path.exists():
@@ -835,7 +858,7 @@ def main():
         download_codeformer()
         download_clipseg()
         download_safety_checker()
-        postscript()
+        postscript(errors=errors)
     except KeyboardInterrupt:
         print('\nGoodbye! Come back soon.')
     except Exception as e:

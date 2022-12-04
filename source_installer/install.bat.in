@@ -9,6 +9,9 @@
 
 @rem This enables a user to install this project without manually installing conda and git.
 
+@rem change to the script's directory
+PUSHD "%~dp0"
+
 echo "InvokeAI source installer..."
 echo ""
 echo "Some of the installation steps take a long time to run. Please be patient."

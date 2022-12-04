@@ -10,13 +10,15 @@
 
 @rem This enables a user to install this project without manually installing git or Python
 
+@rem change to the script's directory
+PUSHD "%~dp0"
+
 set "no_cache_dir=--no-cache-dir"
 if "%1" == "use-cache" (
     set "no_cache_dir="
 )
 
 echo ***** Installing InvokeAI.. *****
-echo "USING development BRANCH. REMEMBER TO CHANGE TO main BEFORE RELEASE"
 @rem Config
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 @rem https://mamba.readthedocs.io/en/latest/installation.html

@@ -39,10 +39,6 @@ If you do not run this script in advance, the GFPGAN module will attempt to
 download the models files the first time you try to perform facial
 reconstruction.
 
-## Usage
-
-You will now have access to two new prompt arguments.
-
 ### Upscaling
 
 `-U : <upscaling_factor> <upscaling_strength>`
@@ -119,7 +115,7 @@ You can use `-ft` prompt argument to swap between CodeFormer and the default
 GFPGAN. The above mentioned `-G` prompt argument will allow you to control the
 strength of the restoration effect.
 
-### Usage
+### CodeFormer Usage
 
 The following command will perform face restoration with CodeFormer instead of
 the default gfpgan.
@@ -160,7 +156,7 @@ A new file named `000044.2945021133.fixed.png` will be created in the output
 directory. Note that the `!fix` command does not replace the original file,
 unlike the behavior at generate time.
 
-### Disabling
+## How to disable
 
 If, for some reason, you do not wish to load the GFPGAN and/or ESRGAN libraries,
 you can disable them on the invoke.py command line with the `--no_restore` and

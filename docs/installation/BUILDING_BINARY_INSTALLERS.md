@@ -1,4 +1,8 @@
-# How to build "binary" installers (InvokeAI-mac/windows/linux_on_*.zip)
+---
+title: build binary installers
+---
+
+# :simple-buildkite: How to build "binary" installers (InvokeAI-mac/windows/linux_on_*.zip)
 
 ## 1. Ensure `installers/requirements.in` is correct
 

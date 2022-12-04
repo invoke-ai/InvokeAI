@@ -10,7 +10,6 @@ The source installer is a shell script that attempts to automate every step
 needed to install and run InvokeAI on a stock computer running recent versions
 of Linux, MacOS or Windows. It will leave you with a version that runs a stable
 version of InvokeAI with the option to upgrade to experimental versions later.
-It is not as foolproof as the [InvokeAI installer](INSTALL_INVOKE.md)
 
 Before you begin, make sure that you meet the
 [hardware requirements](index.md#Hardware_Requirements) and has the appropriate
@@ -27,12 +26,12 @@ Though there are multiple steps, there really is only one click involved to kick
 off the process.
 
 1.  The source installer is distributed in ZIP files. Go to the
-    [latest release](https://github.com/invoke-ai/InvokeAI/releases/tag/2.2.0-rc4), and
+    [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - invokeAI-src-installer-mac.zip
-    - invokeAI-src-installer-windows.zip
-    - invokeAI-src-installer-linux.zip
+    - [invokeAI-src-installer-2.2.3-mac.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/invokeAI-src-installer-2.2.3-mac.zip)
+    - [invokeAI-src-installer-2.2.3-windows.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/invokeAI-src-installer-2.2.3-windows.zip)
+    - [invokeAI-src-installer-2.2.3-linux.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/invokeAI-src-installer-2.2.3-linux.zip)
 
     Download the one that is appropriate for your operating system.
 
@@ -51,18 +50,30 @@ off the process.
     inflating: invokeAI\readme.txt
     ```
 
-3.  If you are using a desktop GUI, double-click the installer file. It will be
+3. If you are a macOS user, you may need to install the Xcode command line tools. 
+   These are a set of tools that are needed to run certain applications in a Terminal, 
+   including InvokeAI. This package is provided directly by Apple.
+   
+   To install, open a terminal window and run `xcode-select --install`. You will get
+   a macOS system popup guiding you through the install. If you already have them
+   installed, you will instead see some output in the Terminal advising you that the 
+   tools are already installed.
+   
+   More information can be found here:
+   https://www.freecodecamp.org/news/install-xcode-command-line-tools/
+
+4.  If you are using a desktop GUI, double-click the installer file. It will be
     named `install.bat` on Windows systems and `install.sh` on Linux and
     Macintosh systems.
 
-4.  Alternatively, from the command line, run the shell script or .bat file:
+5.  Alternatively, from the command line, run the shell script or .bat file:
 
     ```cmd
     C:\Documents\Linco> cd invokeAI
     C:\Documents\Linco\invokeAI> install.bat
     ```
 
-5.  Sit back and let the install script work. It will install various binary
+6.  Sit back and let the install script work. It will install various binary
     requirements including Conda, Git and Python, then download the current
     InvokeAI code and install it along with its dependencies.
 
@@ -75,7 +86,7 @@ off the process.
     and nothing is happening, you can interrupt the script with ^C. You may restart
     it and it will pick up where it left off.
 
-6.  After installation completes, the installer will launch a script called
+7.  After installation completes, the installer will launch a script called
     `configure_invokeai.py`, which will guide you through the first-time process of
     selecting one or more Stable Diffusion model weights files, downloading and
     configuring them.
@@ -91,7 +102,7 @@ off the process.
     prompted) and configure InvokeAI to use the previously-downloaded files. The
     process for this is described in [Installing Models](INSTALLING_MODELS.md).
 
-7.  The script will now exit and you'll be ready to generate some images. The
+8.  The script will now exit and you'll be ready to generate some images. The
     invokeAI directory will contain numerous files. Look for a shell script
     named `invoke.sh` (Linux/Mac) or `invoke.bat` (Windows). Launch the script
     by double-clicking it or typing its name at the command-line:

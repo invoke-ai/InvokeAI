@@ -206,9 +206,10 @@ class InvokeAIWebServer:
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
-                    server="flask_socketio",
+                    start_server="flask-socketio",
                     width=1600,
                     height=1000,
+                    idle_interval=10,
                     port=self.port
                 ).run()
             except KeyboardInterrupt:

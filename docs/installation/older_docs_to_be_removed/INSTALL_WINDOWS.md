@@ -7,7 +7,7 @@ title: Manual Installation, Windows
 ## **Notebook install (semi-automated)**
 
 We have a
-[Jupyter notebook](https://github.com/invoke-ai/InvokeAI/blob/main/notebooks/Stable-Diffusion-local-Windows.ipynb)
+[Jupyter notebook](https://github.com/invoke-ai/InvokeAI/blob/main/notebooks/Stable_Diffusion_AI_Notebook.ipynb)
 with cell-by-cell installation steps. It will download the code in this repo as
 one of the steps, so instead of cloning this repo, simply download the notebook
 from the link above and load it up in VSCode (with the appropriate extensions
@@ -75,7 +75,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
           obtaining an access token for downloading. It will then download and install the
           weights files for you.
 
-          Please look [here](INSTALLING_MODELS.md) for a manual process for doing the
+          Please look [here](../INSTALL_MANUAL.md) for a manual process for doing the
           same thing.
 
 8. Start generating images!
@@ -108,7 +108,7 @@ Note that you will need NVIDIA drivers, Python 3.10, and Git installed beforehan
         To use an alternative model you may invoke the `!switch` command in
         the CLI, or pass `--model <model_name>` during `invoke.py` launch for
         either the CLI or the Web UI. See [Command Line
-        Client](../features/CLI.md#model-selection-and-importation). The
+        Client](../../features/CLI.md#model-selection-and-importation). The
         model names are defined in `configs/models.yaml`.
 
 9. Subsequently, to relaunch the script, first activate the Anaconda
