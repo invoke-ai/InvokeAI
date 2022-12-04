@@ -574,30 +574,6 @@ def download_weights(opt:dict) -> Union[str, None]:
         return "some of the model weights downloads were not successful"
 
 #-------------------------------------
-def get_root(root:str=None)->str:
-    if root:
-        return root
-    elif os.environ.get('INVOKEAI_ROOT'):
-        return os.environ.get('INVOKEAI_ROOT')
-    else:
-        init_file = os.path.expanduser(Globals.initfile)
-        if not os.path.exists(init_file):
-            return None
-
-    # if we get here, then we read from initfile
-    root = None
-    with open(init_file, 'r') as infile:
-        lines = infile.readlines()
-        for l in lines:
-            if re.search('\s*#',l): # ignore comments
-                continue
-            match = re.search('--root\s*=?\s*"?([^"]+)"?',l)
-            if match:
-                root = match.groups()[0]
-                root = root.strip()
-    return root
-
-#-------------------------------------
 def select_root(root:str, yes_to_all:bool=False):
     default = root or os.path.expanduser('~/invokeai')
     if (yes_to_all):
