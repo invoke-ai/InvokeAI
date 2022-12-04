@@ -718,9 +718,8 @@ def create_launchers(root:str):
         outfile = os.path.join(root,os.path.basename(outbase))
         with open(infile,'r') as input, open(outfile,'w') as output:
             for line in input:
-                if line.startswith('#!'):
-                    output.write(line)
-                    output.write(f'cd "{repodir}"')
+                if line.startswith('scriptdir'):
+                    output.write(f'scriptdir="{repodir}"\n')
                 elif line.startswith('PUSHD'):
                     output.write(f'PUSHD "{repodir}"\n')
                 else:
