@@ -146,7 +146,7 @@ copy binary_installer\invoke.bat.in .\invoke.bat
 echo ***** Installed invoke launcher script ******
 
 @rem preload the models
-call .venv\Scripts\python scripts\configure_invokeai.py --create_launchers
+call .venv\Scripts\python scripts\configure_invokeai.py --create_launchers binary
 set err_msg=----- model download clone failed -----
 if %errorlevel% neq 0 goto err_exit
 deactivate

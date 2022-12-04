@@ -107,7 +107,7 @@ copy source_installer\update.bat.in .\update.bat
 
 call conda activate invokeai
 @rem call configure script
-call python scripts\configure_invokeai.py  --create_launchers
+call python scripts\configure_invokeai.py  --create_launchers source
 if "%ERRORLEVEL%" NEQ "0" (
    echo ""
    echo "The configure script crashed or was cancelled."
