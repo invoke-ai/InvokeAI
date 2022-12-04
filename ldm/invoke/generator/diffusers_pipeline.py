@@ -9,6 +9,14 @@ import PIL.Image
 import einops
 import torch
 import torchvision.transforms as T
+
+from ldm.models.diffusion.cross_attention_control import InvokeAICrossAttention
+
+from diffusers.models import attention
+# monkeypatch diffusers CrossAttention 🙈
+# this is to make prompt2prompt and (future) attention maps work
+attention.CrossAttention = InvokeAICrossAttention
+
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
