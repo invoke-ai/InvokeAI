@@ -10,17 +10,18 @@ the attributes:
   - try_patchmatch - option to globally disable loading of 'patchmatch' module
 '''
 
-import os
 from argparse import Namespace
+from pathlib import Path
 
 Globals = Namespace()
 
 # This is usually overwritten by the command line and/or environment variables
-Globals.root = '.'
+Globals.root = '~/invokeai'
 
-# Where to look for the initialization file
-Globals.initfile = os.path.expanduser('~/.invokeai')
+Globals.initfile = "invokeai.init"
 
 # Awkward workaround to disable attempted loading of pypatchmatch
 # which is causing CI tests to error out.
 Globals.try_patchmatch = True
+
+Globals.debug = False
