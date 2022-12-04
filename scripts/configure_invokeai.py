@@ -709,10 +709,10 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 ''')
 
 #-------------------------------------
-def create_launchers(root:str):
+def create_launchers(root:str,launcher_type:str):
     repodir = os.path.normpath(os.path.join(os.path.dirname(__file__),'..'))
     for template in ('invoke.sh.in','invoke.bat.in'):
-        infile = os.path.join(repodir,'binary_installer',template)
+        infile = os.path.join(repodir,f'{launcher_type}_installer',template)
         assert os.path.exists(infile),f'the file {infile} does not exist'
         outbase,_ = os.path.splitext(infile)
         outfile = os.path.join(root,os.path.basename(outbase))
@@ -756,7 +756,8 @@ def main():
                         help='answer "yes" to all prompts')
     parser.add_argument('--create_launchers',
                         dest='create_launchers',
-                        action='store_true',
+                        type=str,
+                        choices=['binary','source'],
                         help='create invoke.bat and invoke.sh launchers in rootdir')
     parser.add_argument('--config_file',
                         '-c',
@@ -804,7 +805,7 @@ def main():
         print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
         print(traceback.format_exc())
     if opt.create_launchers:
-        create_launchers(Globals.root)
+        create_launchers(Globals.root,opt.create_launchers)
 
 #-------------------------------------
 if __name__ == '__main__':

@@ -1,6 +1,8 @@
 #!/bin/bash
 
-cd "$(dirname "${BASH_SOURCE[0]}")"
+# ensure we're in the correct folder in case user's CWD is somewhere else
+scriptdir=$(dirname "$0")
+cd "$scriptdir"
 
 INSTALL_ENV_DIR="$(pwd)/installer_files/env"
 if [ -e "$INSTALL_ENV_DIR" ]; then export PATH="$INSTALL_ENV_DIR/bin:$PATH"; fi
