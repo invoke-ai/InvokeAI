@@ -221,7 +221,7 @@ echo -e "\n***** Installed invoke launcher script ******\n"
 rm -rf binary_installer/ installer_files/
 
 # preload the models
-.venv/bin/python3 scripts/configure_invokeai.py
+.venv/bin/python3 scripts/configure_invokeai.py  --create_launchers
 _err_msg="\n----- model download clone failed -----\n"
 _err_exit $? _err_msg
 deactivate

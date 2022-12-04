@@ -13,6 +13,7 @@ import os
 import re
 import warnings
 import shutil
+import stat
 from urllib import request
 from tqdm import tqdm
 from omegaconf import OmegaConf
@@ -708,6 +709,25 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 ''')
 
 #-------------------------------------
+def create_launchers(root:str):
+    repodir = os.path.normpath(os.path.join(os.path.dirname(__file__),'..'))
+    for template in ('invoke.sh.in','invoke.bat.in'):
+        infile = os.path.join(repodir,'binary_installer',template)
+        assert os.path.exists(infile),f'the file {infile} does not exist'
+        outbase,_ = os.path.splitext(infile)
+        outfile = os.path.join(root,os.path.basename(outbase))
+        with open(infile,'r') as input, open(outfile,'w') as output:
+            for line in input:
+                if line.startswith('#!'):
+                    output.write(line)
+                    output.write(f'cd "{repodir}"')
+                elif line.startswith('PUSHD'):
+                    output.write(f'PUSHD "{repodir}"\n')
+                else:
+                    output.write(line)
+        os.chmod(outfile, stat.S_IRWXU|stat.S_IRGRP|stat.S_IXGRP|stat.S_IROTH|stat.S_IXOTH)
+
+#-------------------------------------
 class ProgressBar():
     def __init__(self,model_name='file'):
         self.pbar = None
@@ -735,6 +755,10 @@ def main():
                         dest='yes_to_all',
                         action='store_true',
                         help='answer "yes" to all prompts')
+    parser.add_argument('--create_launchers',
+                        dest='create_launchers',
+                        action='store_true',
+                        help='create invoke.bat and invoke.sh launchers in rootdir')
     parser.add_argument('--config_file',
                         '-c',
                         dest='config_file',
@@ -780,6 +804,8 @@ def main():
     except Exception as e:
         print(f'\nA problem occurred during initialization.\nThe error was: "{str(e)}"')
         print(traceback.format_exc())
+    if opt.create_launchers:
+        create_launchers(Globals.root)
 
 #-------------------------------------
 if __name__ == '__main__':

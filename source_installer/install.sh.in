@@ -136,7 +136,7 @@ else
     conda activate invokeai
     # configure
     echo "Calling the configure_invokeai script"
-    python scripts/configure_invokeai.py
+    python scripts/configure_invokeai.py --create_launchers
     status=$?
     if test $status -ne 0
        then
