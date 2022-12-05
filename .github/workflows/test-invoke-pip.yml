@@ -20,7 +20,7 @@ jobs:
           - requirements-lin-amd.txt
           - requirements-mac-mps-cpu.txt
         python-version:
-          - '3.9'
+          # - '3.9'
           - '3.10'
         include:
           - requirements-file: requirements-lin-cuda.txt
