@@ -56,17 +56,17 @@ jobs:
 
       - name: install pip-tools
         id: install-pip-tools
-        run: pip install pip-tools
+        run: pip3 install pip-tools
 
       - name: install requirements
         id: install-requirements
-        run: pip install -r '${{ matrix.requirements-file }}'
+        run: pip3 install -r '${{ matrix.requirements-file }}'
 
       - name: debug output
         run: |
-          pip -V
-          python -V
-          pip list
+          pip3 -V
+          python3 -V
+          pip3 list
 
       - name: run pip-compile
         id: pip-compile
