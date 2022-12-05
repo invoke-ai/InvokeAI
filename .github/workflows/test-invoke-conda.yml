@@ -27,18 +27,22 @@ jobs:
             os: ubuntu-latest
             curl-command: curl
             github-env: $GITHUB_ENV
+            default-shell: bash -l {0}
           - environment-yaml: environment-lin-cuda.yml
             os: ubuntu-latest
             curl-command: curl
             github-env: $GITHUB_ENV
+            default-shell: bash -l {0}
           - environment-yaml: environment-mac.yml
             os: macos-12
             curl-command: curl
             github-env: $GITHUB_ENV
+            default-shell: bash -l {0}
           - environment-yaml: environment-win-cuda.yml
             os: windows-2022
             curl-command: curl.exe
             github-env: $env:GITHUB_ENV
+            default-shell: pwsh
           - stable-diffusion-model: stable-diffusion-1.5
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
@@ -48,6 +52,9 @@ jobs:
     env:
       CONDA_ENV_NAME: invokeai
       INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
+    defaults:
+      run:
+        shell: ${{ matrix.default-shell }}
     steps:
       - name: Checkout sources
         id: checkout-sources
@@ -115,7 +122,7 @@ jobs:
 
       - name: Run the tests
         id: run-tests
-        if: ${{ matrix.os }} != windows-2022
+        if: ${{ matrix.os != windows-2022 }}
         run: |
           time python scripts/invoke.py \
             --no-patchmatch \
@@ -127,7 +134,7 @@ jobs:
 
       - name: export conda env
         id: export-conda-env
-        if: ${{ matrix.os }} != windows-2022
+        if: ${{ matrix.os != windows-2022 }}
         run: |
           mkdir -p outputs/img-samples
           conda env export --name ${{ env.CONDA_ENV_NAME }} > ${{ env.INVOKEAI_ROOT }}/outputs/environment-${{ runner.os }}-${{ runner.arch }}.yml
