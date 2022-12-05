@@ -6,7 +6,8 @@ import torch
 
 from ldm.models.diffusion.cross_attention_control import Arguments, \
     remove_cross_attention_control, setup_cross_attention_control, Context
-from ldm.modules.attention import get_mem_free_total
+from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver, setup_attention_map_saving, \
+    remove_attention_map_saving
 
 
 class InvokeAIDiffuserComponent:
@@ -52,6 +53,11 @@ class InvokeAIDiffuserComponent:
         self.cross_attention_control_context = None
         remove_cross_attention_control(self.model)
 
+    def setup_attention_map_saving(self, saver: AttentionMapSaver):
+        setup_attention_map_saving(self.model, saver)
+
+    def remove_attention_map_saving(self):
+        remove_attention_map_saving(self.model)
 
 
     def do_diffusion_step(self, x: torch.Tensor, sigma: torch.Tensor,
