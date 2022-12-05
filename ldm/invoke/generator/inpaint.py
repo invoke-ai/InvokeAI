@@ -10,9 +10,7 @@ import cv2
 import numpy as np
 import torch
 from PIL import Image, ImageFilter, ImageOps, ImageChops
-from einops import repeat
 
-from ldm.invoke.generator.base import downsampling
 from ldm.invoke.generator.diffusers_pipeline import image_resized_to_grid_as_tensor, StableDiffusionGeneratorPipeline
 from ldm.invoke.generator.img2img import Img2Img
 from ldm.invoke.globals import Globals
@@ -154,7 +152,7 @@ class Inpaint(Img2Img):
             ddim_eta,
             conditioning,
             init_image = im.copy().convert('RGBA'),
-            mask_image = mask.convert('RGB'), # Code currently requires an RGB mask
+            mask_image = mask,
             strength = strength,
             mask_blur_radius = 0,
             seam_size = 0,
@@ -228,7 +226,11 @@ class Inpaint(Img2Img):
             self.pil_mask = mask_image.copy()
             debug_image(mask_image, "mask_image BEFORE multiply with pil_image", debug_status=self.enable_image_debugging)
 
-            mask_image = ImageChops.multiply(mask_image, self.pil_image.split()[-1].convert('RGB'))
+            init_alpha = self.pil_image.getchannel("A")
+            if mask_image.mode != "L":
+                # FIXME: why do we get passed an RGB image here? We can only use single-channel.
+                mask_image = mask_image.convert("L")
+            mask_image = ImageChops.multiply(mask_image, init_alpha)
             self.pil_mask = mask_image
 
             # Resize if requested for inpainting
@@ -236,32 +238,14 @@ class Inpaint(Img2Img):
                 mask_image = mask_image.resize((inpaint_width, inpaint_height))
 
             debug_image(mask_image, "mask_image AFTER multiply with pil_image", debug_status=self.enable_image_debugging)
-            mask_image = mask_image.resize(
-                (
-                    mask_image.width // downsampling,
-                    mask_image.height // downsampling
-                ),
-                resample=Image.Resampling.NEAREST
-            )
-            mask_image = image_resized_to_grid_as_tensor(mask_image, normalize=False)
+            mask: torch.FloatTensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
+        else:
+            mask: torch.FloatTensor = mask_image
 
         self.mask_blur_radius = mask_blur_radius
 
-        # klms samplers not supported yet, so ignore previous sampler
-        # if isinstance(sampler,KSampler):
-        #     print(
-        #         ">> Using recommended DDIM sampler for inpainting."
-        #     )
-        #     sampler = DDIMSampler(self.model, device=self.model.device)
-
-        mask_image = mask_image[0][0].unsqueeze(0).repeat(4,1,1).unsqueeze(0)
-        mask_image = repeat(mask_image, '1 ... -> b ...', b=1)
-
-        t_enc   = int(strength * steps)
         # todo: support cross-attention control
         uc, c, _ = conditioning
-
-        print(f">> target t_enc is {t_enc} steps")
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
@@ -269,24 +253,17 @@ class Inpaint(Img2Img):
 
         def make_image(x_T):
             # FIXME: some of this z_enc and inpaint_replace stuff was probably important
-            # encode (scaled latent)
-            # z_enc = sampler.stochastic_encode(
-            #     self.init_latent,
-            #     torch.tensor([t_enc]).to(self.model.device),
-            #     noise=x_T
-            # )
-            #
             # # to replace masked area with latent noise, weighted by inpaint_replace strength
             # if inpaint_replace > 0.0:
             #     print(f'>> inpaint will replace what was under the mask with a strength of {inpaint_replace}')
             #     l_noise = self.get_noise(kwargs['width'],kwargs['height'])
-            #     inverted_mask = 1.0-mask_image  # there will be 1s where the mask is
+            #     inverted_mask = 1.0-mask  # there will be 1s where the mask is
             #     masked_region = (1.0-inpaint_replace) * inverted_mask * z_enc + inpaint_replace * inverted_mask * l_noise
-            #     z_enc   = z_enc * mask_image + masked_region
+            #     z_enc   = z_enc * mask + masked_region
 
             pipeline_output = pipeline.inpaint_from_embeddings(
                 init_image=init_image,
-                mask_image=mask_image,
+                mask=1 - mask,  # expects white means "paint here."
                 strength=strength,
                 num_inference_steps=steps,
                 text_embeddings=c,
