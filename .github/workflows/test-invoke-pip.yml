@@ -26,11 +26,11 @@ jobs:
           - '3.10'
         include:
           - requirements-file: requirements-lin-cuda.txt
-            os: ubuntu-latest
+            os: ubuntu-22.04
             curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-lin-amd.txt
-            os: ubuntu-latest
+            os: ubuntu-22.04
             curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-mac-mps-cpu.txt
@@ -38,7 +38,7 @@ jobs:
             curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-win-colab-cuda.txt
-            os: windows-latest
+            os: windows-2022
             curl-command: curl.exe
             github-env: $env:GITHUB_ENV
           - stable-diffusion-model: stable-diffusion-1.5
@@ -109,7 +109,7 @@ jobs:
 
       - name: Run the tests
         id: run-tests
-        if: ${{ matrix.os }} != windows-latest
+        if: matrix.os != 'windows-2022'
         run: |
           time python3 scripts/invoke.py \
             --no-patchmatch \
@@ -121,7 +121,7 @@ jobs:
 
       - name: Archive results
         id: archive-results
-        if: ${{ matrix.os }} != windows-latest
+        if: matrix.os != 'windows-2022'
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}

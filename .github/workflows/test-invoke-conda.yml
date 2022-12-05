@@ -23,12 +23,12 @@ jobs:
           - environment-win-cuda.yml
         include:
           - environment-yaml: environment-lin-amd.yml
-            os: ubuntu-latest
+            os: ubuntu-22.04
             curl-command: curl
             github-env: $GITHUB_ENV
             default-shell: bash -l {0}
           - environment-yaml: environment-lin-cuda.yml
-            os: ubuntu-latest
+            os: ubuntu-22.04
             curl-command: curl
             github-env: $GITHUB_ENV
             default-shell: bash -l {0}
@@ -121,7 +121,7 @@ jobs:
 
       - name: Run the tests
         id: run-tests
-        if: ${{ matrix.os != windows-2022 }}
+        if: matrix.os != 'windows-2022'
         run: |
           time python scripts/invoke.py \
             --no-patchmatch \
@@ -133,13 +133,13 @@ jobs:
 
       - name: export conda env
         id: export-conda-env
-        if: ${{ matrix.os != windows-2022 }}
+        if: matrix.os != 'windows-2022'
         run: |
           mkdir -p outputs/img-samples
           conda env export --name ${{ env.CONDA_ENV_NAME }} > ${{ env.INVOKEAI_ROOT }}/outputs/environment-${{ runner.os }}-${{ runner.arch }}.yml
 
       - name: Archive results
-        if: ${{ matrix.os }} != windows-2022
+        if: matrix.os != 'windows-2022'
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
