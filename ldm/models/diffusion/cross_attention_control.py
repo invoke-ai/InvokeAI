@@ -212,7 +212,7 @@ def setup_cross_attention_control(model, context: Context):
 
 def get_attention_modules(model, which: CrossAttentionType):
     # cross_attention_class: type = ldm.modules.attention.CrossAttention
-    cross_attention_class: type = InvokeAICrossAttention
+    cross_attention_class: type = InvokeAIDiffusersCrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [(name,module) for name, module in model.named_modules() if
                 isinstance(module, cross_attention_class) and which_attn in name]
@@ -315,12 +315,16 @@ def get_mem_free_total(device):
     mem_free_total = mem_free_cuda + mem_free_torch
     return mem_free_total
 
-class InvokeAICrossAttention(diffusers.models.attention.CrossAttention):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+
+class InvokeAICrossAttentionMixin:
+    """
+    Enable InvokeAI-flavoured CrossAttention calculation, which does aggressive low-memory slicing and calls
+    through both to an attention_slice_wrangler and a slicing_strategy_getter for custom attention map wrangling
+    and dymamic slicing strategy selection.
+    """
+    def __init__(self):
         self.mem_total_gb = psutil.virtual_memory().total // (1 << 30)
-
         self.attention_slice_wrangler = None
         self.slicing_strategy_getter = None
 
@@ -342,16 +346,9 @@ class InvokeAICrossAttention(diffusers.models.attention.CrossAttention):
     def set_slicing_strategy_getter(self, getter: Optional[Callable[[nn.Module], tuple[int,int]]]):
         self.slicing_strategy_getter = getter
 
-    def _attention(self, query, key, value):
-        #default_result = super()._attention(query,  key, value)
-        damian_result = self.get_attention_mem_efficient(query, key, value)
-
-        hidden_states = self.reshape_batch_dim_to_heads(damian_result)
-        return hidden_states
-
     def einsum_lowest_level(self, query, key, value, dim, offset, slice_size):
         # calculate attention scores
-        #attention_scores = torch.einsum('b i d, b j d -> b i j', q, k) * self.scale
+        #attention_scores = torch.einsum('b i d, b j d -> b i j', q, k)
         if dim is not None:
             print(f"sliced dim {dim}, offset {offset}, slice_size {slice_size}")
         attention_scores = torch.baddbmm(
@@ -370,10 +367,8 @@ class InvokeAICrossAttention(diffusers.models.attention.CrossAttention):
         else:
             attention_slice = default_attention_slice
 
-        #return torch.einsum('b i j, b j d -> b i d', attention_slice, v)
         hidden_states = torch.bmm(attention_slice, value)
         return hidden_states
-
 
     def einsum_op_slice_dim0(self, q, k, v, slice_size):
         r = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
@@ -424,12 +419,12 @@ class InvokeAICrossAttention(diffusers.models.attention.CrossAttention):
                     return self.einsum_op_slice_dim1(q, k, v, slice_size)
 
         # fallback for when there is no saved strategy, or saved strategy does not slice
-        mem_free_total = get_mem_free_total(q.device)
+        mem_free_total = self.cached_mem_free_total or get_mem_free_total(q.device)
         # Divide factor of safety as there's copying and fragmentation
         return self.einsum_op_tensor_mem(q, k, v, mem_free_total / 3.3 / (1 << 20))
 
 
-    def get_attention_mem_efficient(self, q, k, v):
+    def get_invokeai_attention_mem_efficient(self, q, k, v):
         if q.device.type == 'cuda':
             #print("in get_attention_mem_efficient with q shape", q.shape, ", k shape", k.shape, ", free memory is", get_mem_free_total(q.device))
             return self.einsum_op_cuda(q, k, v)
@@ -442,3 +437,19 @@ class InvokeAICrossAttention(diffusers.models.attention.CrossAttention):
         # Smaller slices are faster due to L2/L3/SLC caches.
         # Tested on i7 with 8MB L3 cache.
         return self.einsum_op_tensor_mem(q, k, v, 32)
+
+
+class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        InvokeAICrossAttentionMixin.__init__(self)
+
+    def _attention(self, query, key, value):
+        #default_result = super()._attention(query,  key, value)
+        damian_result = self.get_invokeai_attention_mem_efficient(query, key, value)
+
+        hidden_states = self.reshape_batch_dim_to_heads(damian_result)
+        return hidden_states
+
+
