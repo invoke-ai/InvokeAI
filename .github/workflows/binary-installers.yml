@@ -27,7 +27,7 @@ jobs:
           - output-file: py3.10-linux-x86_64-cuda-reqs
             os: ubuntu-22.04
             default-shell: bash -l {0}
-            requirements-file: requirements-lin-cuda
+            requirements-file: requirements-lin-cuda.txt
           - output-file: py3.10-windows-x86_64-cuda-reqs
             os: windows-2022
             default-shell: pwsh
