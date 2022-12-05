@@ -119,7 +119,7 @@ PRECISION_CHOICES = [
 
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
-APP_VERSION = 'v2.2.3'
+APP_VERSION = 'v2.2.4'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -411,7 +411,7 @@ class Args(object):
         model_group.add_argument(
             '--root_dir',
             default=None,
-            help='Path to directory containing "models", "outputs" and "configs". If not present will try to read from ~/.invokeai and then from environment variable INVOKEAI_ROOT. Defaults to the current directory as a last resort.',
+            help='Path to directory containing "models", "outputs" and "configs". If not present will read from environment variable INVOKEAI_ROOT. Defaults to ~/invokeai.',
         )
         model_group.add_argument(
             '--config',

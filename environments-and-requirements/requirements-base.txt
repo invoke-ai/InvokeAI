@@ -33,9 +33,8 @@ torch-fidelity
 torchmetrics
 transformers==4.21.*
 picklescan
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan ; platform_system == 'Windows'
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan ; platform_system != 'Windows'
-git+https://github.com/openai/CLIP.git@main#egg=clip
-git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
-git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-git+https://github.com/invoke-ai/PyPatchMatch@0.1.4#egg=pypatchmatch
+https://github.com/TencentARC/GFPGAN/archive/master.zip#egg=gfpgan
+https://github.com/openai/CLIP/archive/main.zip#egg=clip
+https://github.com/Birch-san/k-diffusion/archive/mps.zip#egg=k-diffusion
+https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip#egg=clipseg
+https://github.com/invoke-ai/PyPatchMatch/archive/master.zip#egg=pypatchmatch

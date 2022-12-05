@@ -16,10 +16,10 @@ from argparse import Namespace
 Globals = Namespace()
 
 # This is usually overwritten by the command line and/or environment variables
-Globals.root = '.'
+Globals.root = '~/invokeai'
 
 # Where to look for the initialization file
-Globals.initfile = os.path.expanduser('~/.invokeai')
+Globals.initfile = os.path.expanduser(os.path.join(Globals.root,'invokeai.init'))
 
 # Awkward workaround to disable attempted loading of pypatchmatch
 # which is causing CI tests to error out.

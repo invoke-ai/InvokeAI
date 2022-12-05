@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+
+# ensure we're in the correct folder in case user's CWD is somewhere else
+scriptdir=$(dirname "$0")
+cd "$scriptdir"
+
+# this should be changed to the tagged release!
+INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
+INSTRUCTIONS='<insert URL here>'
+TROUBLESHOOTING='<insert URL here>'
+MINIMUM_PYTHON_VERSION=3.9.0
+
+set -euo pipefail
+IFS=$'\n\t'
+
+function _err_exit {
+    if test "$1" -ne 0
+    then
+        echo -e "Error code $1; Error caught was '$2'"
+        read -p "Press any key to exit..."
+        exit
+    fi
+}
+
+
+function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+
+echo "InvokeAI simple installer..."
+echo ""
+echo "Some of the installation steps take a long time to run. Please be patient."
+echo "If the script appears to hang for more than 10 minutes, please interrupt with control-C and retry."
+read -n 1 -s -r -p "<Press any key to start the install>"
+echo ""
+
+OS_NAME=$(uname -s)
+case "${OS_NAME}" in
+    Linux*)     OS_NAME="linux";;
+    Darwin*)    OS_NAME="osx";;
+    *)          echo "Unknown OS: $OS_NAME! This script runs only on Linux or Mac" && exit
+esac
+
+OS_ARCH=$(uname -m)
+case "${OS_ARCH}" in
+    x86_64*)    OS_ARCH="64";;
+    arm64*)     OS_ARCH="arm64";;
+    *)          echo "Unknown system architecture: $OS_ARCH! This script runs only on x86_64 or arm64" && exit
+esac
+
+echo "Installing for $OS_NAME-$OS_ARCH"
+# confirm that python is installed and is up to date
+if ! which python &>/dev/null; then
+   echo "Please install Python 3.9 or higher before running this script. See instructions at $INSTRUCTIONS for help."
+   exit -1
+fi
+
+python_version=$(python -V | awk '{ print $2 }')
+if [ $(version $python_version) -lt $(version "$MINIMUM_PYTHON_VERSION") ]; then
+   echo "Installed Python version $python_version is less than the required version $MINIMUM_PYTHON_VERSION. See instructions at $INSTRUCTIONS for help."
+   exit -1
+fi
+
+echo "Python version $python_version detected. Looking good!"
+# install virtualenv support
+if ! which virtualenv &>/dev/null; then
+   echo "Installing virtualenv support."
+   pip install virtualenv
+   _err_exit $? "The pip program failed to install virtualenv support. Please see $TROUBLESHOOTING for help."
+fi
+
+ROOTDIR=""
+while [ "$ROOTDIR" == "" ]
+do
+    echo
+    read -e -p "Select the directory to install InvokeAI into [~/invokeai]: " -i ~/invokeai input
+    ROOTDIR=${input:=~/invokeai}
+    read -e -p "InvokeAI will be installed into $ROOTDIR. OK? [y]: " input
+    RESPONSE=${input:='y'}
+    if [ "$RESPONSE" == 'y' ]; then
+	if [ -e $ROOTDIR ]; then
+	    echo
+	    read -e -p "Directory $ROOTDIR already exists. Do you want to resume an interrupted install? [y]: " input
+            RESPONSE=${input:='y'}
+	    if [ "$RESPONSE" != 'y' ]; then
+	        ROOTDIR=""
+	    fi	       
+	else
+	    mkdir -p $ROOTDIR
+	    if [ $? -ne 0 ]; then
+		echo "Could not create $ROOTDIR. Try again with a different install location."
+		ROOTDIR=""
+	    fi
+	fi
+    else
+	ROOTDIR=""
+    fi
+done
+
+#--------------------------------------------------------------------------------
+echo
+echo "** Creating Virtual Environment for InvokeAI **"
+
+python -mvirtualenv $ROOTDIR/.venv
+_err_exit $? "Python failed to create virtual environment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
+
+#--------------------------------------------------------------------------------
+echo
+echo "** Activating Virtual Environment for InvokeAI **"
+
+source $ROOTDIR/.venv/bin/activate
+_err_exit $? "Failed to activate virtual evironment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
+
+#--------------------------------------------------------------------------------
+echo
+echo "*** Installing InvokeAI Dependencies ***"
+
+if [ "$OS_NAME" == "osx" ]; then
+    echo "macOS detected. Installing MPS and CPU support."
+    egrep -v '^-e .' ../environments-and-requirements/requirements-mac-mps-cpu.txt >requirements.txt
+else
+    if (lsmod | grep amdgpu) &>/dev/null ; then
+	echo "Linux system with AMD GPU driver detected. Installing ROCm and CPU support"
+	egrep -v '^-e .' environments-and-requirements/requirements-lin-arm64.txt >requirements.txt
+    else
+	echo "Linux system detected. Installing CUDA and CPU support."
+	egrep -v '^-e .' environments-and-requirements/requirements-lin-cuda.txt >requirements.txt
+    fi
+fi
+
+pip install -r requirements.txt
+_err_exit $? "Installation of requirements failed. Please see above error messages and $TROUBLESHOOTING for help."
+
+
+#--------------------------------------------------------------------------------
+echo
+echo "*** Installing InvokeAI Modules and Executables ***"
+pip install $INVOKE_AI_SRC
+_err_exit $? "Installation of InvokeAI failed. Please see above error messages and $TROUBLESHOOTING for help."
+
+
+#--------------------------------------------------------------------------------
+echo " *** Setting Up Root Directory $ROOTDIR *** "
+cp -pr templates/rootdir/* $ROOTDIR/
+cp templates/invoke.sh.in $ROOTDIR/invoke.sh
+chmod a+rx $ROOTDIR/invoke.sh
+
+echo " *** NOT CONFIGURING YET *** "
+exit 0
+
+#--------------------------------------------------------------------------------
+echo
+echo "*** Confguring InvokeAI ***"
+cp -pr templates/rootdir/* $ROOTDIR/
+$ROOTDIR/.env/bin/configure_invokeai.py --root=$ROOTDIR
+_err_exit $? "Initial configuration failed. Please see above error messages and $TROUBLESHOOTING for help."
+
+#--------------------------------------------------------------------------------
+cp templates/invoke.sh.in $ROOTDIR/invoke.sh
+chmod a+rx $ROOTDIR/invoke.sh
+echo "all done"
+
+exit 0
+
+
+status=$?
+
+if test $status -ne 0
+then
+    if [ "$OS_NAME" == "osx" ]; then
+	echo "Python failed to install the environment. You may need to install"
+	echo "the Xcode command line tools to proceed. See step number 3 of"
+	echo "https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#walk_through for"
+	echo "installation instructions and then run this script again."
+    else
+	echo "Something went wrong while installing Python libraries and cannot continue."
+	echo "See https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#troubleshooting for troubleshooting"
+	echo "tips, or visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
+	echo "installation methods"
+    fi
+else
+    cp ./source_installer/invoke.sh.in ./invoke.sh
+    cp ./source_installer/update.sh.in ./update.sh
+    chmod a+rx ./source_installer/invoke.sh.in
+    chmod a+rx ./source_installer/update.sh.in
+
+    conda activate invokeai
+    # configure
+    echo "Calling the configure_invokeai script"
+    python scripts/configure_invokeai.py
+    status=$?
+    if test $status -ne 0
+       then
+	   echo "The configure_invoke.py script crashed or was cancelled."
+           echo "InvokeAI is not ready to run. Try again by running"
+           echo "update.sh in this directory."
+       else
+           # tell the user their next steps
+	   echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"
+       fi
+fi
+
+conda activate invokeai
