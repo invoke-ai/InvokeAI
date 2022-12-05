@@ -11,6 +11,7 @@ on:
 jobs:
   pip-compile:
     strategy:
+      fail-fast: false
       matrix:
         output-file:
           - py3.10-darwin-x86_64-reqs
