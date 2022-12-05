@@ -43,21 +43,21 @@ jobs:
         id: checkout-sources
         uses: actions/checkout@v3
 
-      - name: create requirements.txt
-        id: create-requirements
-        run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
+      # - name: create requirements.txt
+      #   id: create-requirements
+      #   run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
 
       - name: setup python
         id: setup-python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-          cache-dependency-path: ${{ matrix.requirements-file }}
+          # cache: 'pip'
+          # cache-dependency-path: ${{ matrix.requirements-file }}
 
-      - name: install requirements
-        id: install-requirements
-        run: pip3 install -r '${{ matrix.requirements-file }}'
+      # - name: install requirements
+      #   id: install-requirements
+      #   run: pip3 install -r '${{ matrix.requirements-file }}'
 
       - name: install pip-tools
         id: install-pip-tools
