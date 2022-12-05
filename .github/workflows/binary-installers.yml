@@ -23,21 +23,21 @@ jobs:
         include:
           - output-file: py3.10-darwin-x86_64-reqs
             os: macos-12
-            default-shell: bash -l {0}
+            # default-shell: bash -l {0}
             requirements-file: requirements-mac-mps-cpu.txt
           - output-file: py3.10-linux-x86_64-cuda-reqs
             os: ubuntu-22.04
-            default-shell: bash -l {0}
+            # default-shell: bash -l {0}
             requirements-file: requirements-lin-cuda.txt
           - output-file: py3.10-windows-x86_64-cuda-reqs
             os: windows-2022
-            default-shell: pwsh
+            # default-shell: pwsh
             requirements-file: requirements-win-colab-cuda.txt
     name: ${{ matrix.output-file }} on Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: ${{ matrix.default-shell }}
+    # defaults:
+    #   run:
+    #     shell: ${{ matrix.default-shell }}
     steps:
       - name: Checkout sources
         id: checkout-sources
