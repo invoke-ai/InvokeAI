@@ -55,13 +55,13 @@ jobs:
           cache: 'pip'
           cache-dependency-path: ${{ matrix.requirements-file }}
 
-      - name: install pip-tools
-        id: install-pip-tools
-        run: pip3 install pip-tools
-
       - name: install requirements
         id: install-requirements
         run: pip3 install -r '${{ matrix.requirements-file }}'
+
+      - name: install pip-tools
+        id: install-pip-tools
+        run: pip3 install pip-tools
 
       - name: debug output
         run: |
