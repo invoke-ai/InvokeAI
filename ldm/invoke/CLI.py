@@ -68,6 +68,8 @@ def main():
     if opt.embeddings:
         if not os.path.isabs(opt.embedding_path):
             embedding_path = os.path.normpath(os.path.join(Globals.root,opt.embedding_path))
+        else:
+            embedding_path = opt.embedding_path
     else:
         embedding_path = None
 
