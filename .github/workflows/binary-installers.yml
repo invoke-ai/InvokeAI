@@ -18,7 +18,7 @@ jobs:
           - py3.10-linux-x86_64-cuda-reqs
           - py3.10-windows-x86_64-cuda-reqs
         python-version:
-          # - '3.9'
+          - '3.9'
           - '3.10'
         include:
           - output-file: py3.10-darwin-x86_64-reqs
