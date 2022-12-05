@@ -60,7 +60,7 @@ jobs:
 
       - name: install requirements
         id: install-requirements
-        run: ${{ env.pythonLocation }}/bin/pip install -r '${{ matrix.requirements-file }}'
+        run: pip install -r '${{ matrix.requirements-file }}'
 
       - name: debug output
         run: |
