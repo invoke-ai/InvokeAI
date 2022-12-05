@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 def list_files(directory):
     return [os.path.join(directory,x) for x in os.listdir(directory) if os.path.isfile(os.path.join(directory,x))]
 
-VERSION = '2.2.0'
+VERSION = '2.2.3'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
 LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, an'

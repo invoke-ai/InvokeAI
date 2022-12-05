@@ -39,47 +39,46 @@ class RuntimeDir:
         self.config = Config()
         self.paths = Paths()
 
-        # these properties are exposed from the paths class for convenience
+        # for convenience
         self.root = self.paths.root.location
         self.outputs = self.paths.outputs.location
 
     def set_root(self, root_path: str = None) -> Path:
-        """
-        Determine the path to the runtime directory in an order of precedence
-        """
 
-        if os.getenv("INVOKEAI_OUTPUTS") is not None:
-            print(f"INVOKEAI_ROOT={root_path} environment variable is set")
+        if root_path is None:
+            if (root_path := os.getenv("INVOKEAI_ROOT")) is not None:
+                print(f"INVOKEAI_ROOT={root_path} environment variable is set")
 
         self.paths.set_root(root_path)
         self.root = self.paths.root.location
-        print(f"Using {Path(root_path).expanduser().resolve()} as the InvokeAI runtime directory")
-        return root_path
+
+        print(f"Using {Path(self.root).expanduser().resolve()} as the InvokeAI runtime directory")
+        return self.root
 
     def set_outputs(self, output_path: str = None) -> Path:
-        # Check CLI flag
+
         if output_path is None:
             # Check env var
-            ### NOT YET DOCUMENTED
+            ### TODO NOT YET DOCUMENTED
             if (output_path := os.getenv("INVOKEAI_OUTPUTS")) is not None:
                 print(f"Found INVOKEAI_OUTPUTS={output_path} environment variable")
-            else:
-                output_path = self.paths.outputs["location"]
-        else:
-            output_path = Path(output_path).expanduser().resolve()
 
-        print(f"Generated images will be found under {output_path}")
 
-        self.paths.set_root(output_path)
-        self.output_path = Path(output_path)
-        return output_path
+        ### TODO THIS DOES NOT TAKE EFFECT FOR SOME REASON
+        ### location remains unchanged
+        self.paths.outputs.location = Path(output_path)
+        self.outputs = self.paths.root.location / output_path
+
+        print(f"Generated images will be placed under {Path(self.outputs).expanduser().resolve()}")
+        return self.outputs
 
     def validate(self) -> bool:
         """
         Validate that the runtime dir is correctly configured
         """
 
-        print(f"Validating the runtime directory at {self.root.expanduser().resolve()}")
+        console.rule(f"Validating the runtime directory at {self.root.expanduser().resolve()}")
+        console.line()
 
         missing = False
         for this in self.paths.get():
@@ -89,7 +88,7 @@ class RuntimeDir:
             else:
                 msg_prefix = ":x:"
                 missing = True
-            print(f"{msg_prefix} {this.description} {this.kind} at {abspath}")
+            print(f"{msg_prefix} {this.description} {this.kind}: {abspath}")
 
         return not missing
 

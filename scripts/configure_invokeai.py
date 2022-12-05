@@ -15,15 +15,18 @@ import warnings
 import shutil
 from urllib import request
 from tqdm import tqdm
-from omegaconf import OmegaConf
 from huggingface_hub import HfFolder, hf_hub_url
-from pathlib import Path
 from typing import Union
 from getpass_asterisk import getpass_asterisk
 from transformers import CLIPTokenizer, CLIPTextModel
-from ldm.invoke.globals import Globals
 from ldm.invoke.readline import generic_completer
-
+from pathlib import Path
+from omegaconf import OmegaConf
+from ldm.invoke.config import RuntimeDir, Config
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt, Confirm
+from ldm.invoke.paths import Paths
 import traceback
 import requests
 import clip
@@ -33,18 +36,17 @@ warnings.filterwarnings('ignore')
 import torch
 transformers.logging.set_verbosity_error()
 
-#--------------------------globals-----------------------
-Model_dir = 'models'
-Weights_dir = 'ldm/stable-diffusion-v1/'
-Dataset_path = './configs/INITIAL_MODELS.yaml'
-Default_config_file = './configs/models.yaml'
-SD_Configs = './configs/stable-diffusion'
 
-assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the InvokeAI distribution directory, or from within the invokeai runtime directory."
+#--------------------------globals-----------------------
+
+console = Console()
+RD = RuntimeDir()
 
 Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(['yes','no'])
 
+
+## TODO move this to the configfile manager
 Config_preamble = '''# This file describes the alternative machine learning models
 # available to InvokeAI script.
 #
@@ -56,11 +58,8 @@ Config_preamble = '''# This file describes the alternative machine learning mode
 
 #---------------------------------------------
 def introduction():
-    print(
-        '''Welcome to InvokeAI. This script will help download the Stable Diffusion weight files
-and other large models that are needed for text to image generation. At any point you may interrupt
-this program and resume later.\n'''
-    )
+    console.print(Panel("Welcome to InvokeAI. This script will help download the Stable Diffusion weight files and other large models that are needed for text to image generation. At any point you may interrupt this program and resume later."))
+    console.line()
 
 #--------------------------------------------
 def postscript(errors: None):
@@ -85,7 +84,7 @@ Have fun!
             message += f"\t - {err}\n"
         message += "Please check the logs above and correct any issues."
 
-    print(message)
+    console.print(message)
 
 #---------------------------------------------
 def yes_or_no(prompt:str, default_yes=True):
@@ -574,46 +573,49 @@ def download_weights(opt:dict) -> Union[str, None]:
         return "some of the model weights downloads were not successful"
 
 #-------------------------------------
-def select_root(root:str, yes_to_all:bool=False):
-    default = root or os.path.expanduser('~/invokeai')
-    if (yes_to_all):
-        return default
+def select_runtime_dir():
+
+    default = str(RD.paths.root.location.expanduser().resolve())
+
     completer.set_default_dir(default)
     completer.complete_extensions(())
     completer.set_line(default)
     directory = input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ").strip(' \\')
-    return directory or default
+
+    RD.set_root(root_path=directory)
+    return directory
 
 #-------------------------------------
-def select_outputs(root:str,yes_to_all:bool=False):
-    default = os.path.normpath(os.path.join(root,'outputs'))
-    if (yes_to_all):
-        return default
-    completer.set_default_dir(os.path.expanduser('~'))
+def select_outputs():
+    default = str(RD.paths.outputs.location.expanduser().resolve())
+
+    completer.set_default_dir(default)
     completer.complete_extensions(())
     completer.set_line(default)
     directory = input(f'Select the default directory for image outputs [{default}]: ').strip(' \\')
-    return directory or default
+
+    RD.set_outputs(output_path=Path(directory))
+    return directory
 
 #-------------------------------------
-def initialize_rootdir(root:str,yes_to_all:bool=False):
-    assert os.path.exists('./configs'),'Run this script from within the InvokeAI source code directory, "InvokeAI" or the runtime directory "invokeai".'
+def initialize_runtime_dir(yes_to_all:bool=False):
 
-    print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
-    root_selected = False
-    while not root_selected:
-        root = select_root(root,yes_to_all)
-        outputs = select_outputs(root,yes_to_all)
-        Globals.root = os.path.abspath(root)
-        outputs = outputs if os.path.isabs(outputs) else os.path.abspath(os.path.join(Globals.root,outputs))
+    if not yes_to_all:
+        accepted = False
+        while not accepted:
+            console.print(f'InvokeAI models and configuration files will be placed into {RD.root} and image outputs will be placed into {RD.outputs}.')
+            accepted = Confirm.ask("Accept these locations?", default="y")
+            if accepted:
+                break
+            console.line()
+            select_runtime_dir()
+            console.line()
+            select_outputs()
 
-        print(f'\nInvokeAI models and configuration files will be placed into "{root}" and image outputs will be placed into "{outputs}".')
-        if not yes_to_all:
-            root_selected = yes_or_no('Accept these locations?')
-        else:
-            root_selected = True
 
-    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
+    console.print(f'InvokeAI models and configuration files will be placed into {RD.root} and image outputs will be placed into {RD.outputs}.')
+
+    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{RD.paths.initfile.location}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
 
     enable_safety_checker = True
@@ -626,7 +628,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
         print('The NSFW (not safe for work) checker blurs out images that potentially contain sexual imagery.')
         print('It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker.')
         print('The following option will set whether the checker is enabled by default. Like other options, you can')
-        print(f'change this setting later by editing the file {Globals.initfile}.')
+        print(f'change this setting later by editing the file {RD.paths.initfile.location}.')
         enable_safety_checker = yes_or_no('Enable the NSFW checker by default?',enable_safety_checker)
 
         print('\nThe next choice selects the sampler to use by default. Samplers have different speed/performance')
@@ -647,15 +649,17 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
-    for name in ('models','configs','embeddings'):
-        os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in (['configs']):
-        dest = os.path.join(root,src)
-        if not os.path.samefile(src,dest):
-            shutil.copytree(src,dest,dirs_exist_ok=True)
-        os.makedirs(outputs, exist_ok=True)
+    for location in [path.location for path in RD.paths.get() if path.kind == "directory"]:
+        Path(location).expanduser().absolute().mkdir(exist_ok=True, parents=True)
 
-    init_file = os.path.expanduser(Globals.initfile)
+    ### TODO confirm how this is supposed to work
+    # for src in [Path(RD.paths.configs)]:
+    #     dest = Path(RD.root / src)
+    #     if not os.path.samefile(src,dest):
+    #         shutil.copytree(src,dest,dirs_exist_ok=True)
+    Path.mkdir(RD.outputs, exist_ok=True)
+
+    init_file = RD.paths.initfile.location
 
     print(f'Creating the initialization file at "{init_file}".\n')
     with open(init_file,'w') as f:
@@ -665,10 +669,10 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 # or renaming it and then running configure_invokeai.py again.
 
 # The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
---root="{Globals.root}"
+--root="{RD.root}"
 
 # the --outdir option controls the default location of image files.
---outdir="{outputs}"
+--outdir="{RD.outputs}"
 
 # generation arguments
 {safety_checker}
@@ -711,12 +715,6 @@ def main():
                         dest='yes_to_all',
                         action='store_true',
                         help='answer "yes" to all prompts')
-    parser.add_argument('--config_file',
-                        '-c',
-                        dest='config_file',
-                        type=str,
-                        default='./configs/models.yaml',
-                        help='path to configuration file to create')
     parser.add_argument('--root',
                         dest='root',
                         type=str,
@@ -724,17 +722,21 @@ def main():
                         help='path to root of install directory')
     opt = parser.parse_args()
 
-
-    # setting a global here
-    Globals.root = os.path.expanduser(get_root(opt.root) or '')
-
     try:
         introduction()
 
-        # We check for to see if the runtime directory is correctly initialized.
-        if Globals.root == '' \
-           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
-            initialize_rootdir(Globals.root,opt.yes_to_all)
+        if (opt.interactive
+            and not opt.yes_to_all
+            and opt.root is None
+            and os.getenv("INVOKEAI_ROOT") is None
+        ):
+            select_runtime_dir()
+            # select_outputs()
+
+        if not RD.validate():
+            console.line()
+            console.rule(f"Configuring InvokeAI at {RD.root}")
+            initialize_runtime_dir(yes_to_all=opt.yes_to_all)
 
         # Optimistically try to download all required assets. If any errors occur, add them and proceed anyway.
         errors=set()
