@@ -100,6 +100,10 @@ You wil need one of the following:
 - :simple-amd: An AMD-based graphics card with 4 GB or more VRAM memory (Linux only)
 - :fontawesome-brands-apple: An Apple computer with an M1 chip.
 
+We do not recommend the GTX 1650 or 1660 series video cards. They are
+unable to run in half-precision mode and do not come with sufficient VRAM
+to render 512x512 images.
+
 ### :fontawesome-solid-memory: Memory
 
 - At least 12 GB Main Memory RAM.
