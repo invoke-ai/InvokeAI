@@ -14,7 +14,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: invoke-ai/invokeai # shouldn't use ${{ github.repository }} due to capitalization
 
 jobs:
   docker:
@@ -45,7 +45,7 @@ jobs:
       name: Docker login
       uses: docker/login-action@v2
       with:
-        registry: ${{env.REGISTRY}}
+        registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
