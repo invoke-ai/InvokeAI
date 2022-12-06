@@ -29,7 +29,9 @@ jobs:
           - output-file: windows-x86_64-cuda-reqs
             os: windows-2022
             requirements-file: requirements-win-colab-cuda.txt
-    name: py${{ matrix.python-version }}-${{ matrix.output-file }}.txt
+    name: py${{ matrix.python-version }}-${{ matrix.output-file }}
+    env:
+      output-file-name: py${{ matrix.python-version }}-${{ matrix.output-file }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -54,11 +56,11 @@ jobs:
 
       - name: run pip-compile
         id: pip-compile
-        run: pip-compile --allow-unsafe --generate-hashes --output-file=binary_installer/py${{ matrix.python-version }}-${{ matrix.output-file }}.txt binary_installer/requirements.in
+        run: pip-compile --allow-unsafe --generate-hashes --output-file=binary_installer/${{ env.output-file-name }}.txt binary_installer/requirements.in
 
       - name: Archive results
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
-          name: results_py${{ matrix.python-version }}-${{ matrix.output-file }}_${{ matrix.python-version }}
+          name: results_${{ env.output-file-name }}
           path: binary_installer
