@@ -74,7 +74,13 @@ const ModelList = () => {
 
       <IAIInput onChange={handleSearchFilter} label="Search" />
 
-      <Flex flexDirection={'column'} gap={4}>
+      <Flex
+        flexDirection={'column'}
+        gap={2}
+        maxHeight={window.innerHeight - 360}
+        overflow={'scroll'}
+        paddingRight="1rem"
+      >
         {renderModelListItems()}
       </Flex>
     </Flex>

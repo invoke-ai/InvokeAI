@@ -33,13 +33,13 @@ export default function ModelManagerModal({
       <Modal
         isOpen={isModelManagerModalOpen}
         onClose={onModelManagerModalClose}
-        size={'full'}
+        size="6xl"
       >
         <ModalOverlay />
         <ModalContent className=" modal">
           <ModalCloseButton className="modal-close-btn" />
           <ModalHeader>Model Manager</ModalHeader>
-          <Flex padding={'0 2rem 1rem 2rem'} width="100%" columnGap={'2rem'}>
+          <Flex padding={'0 2rem 2rem 2rem'} width="100%" columnGap={'2rem'}>
             <ModelList />
             <ModelEdit />
           </Flex>
