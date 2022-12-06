@@ -1,5 +1,8 @@
 @echo off
 
+REM  isolate changes to environment variables so that this can be run again with restarting a cmd session
+setlocal
+
 PUSHD "%~dp0"
 set INSTALL_ENV_DIR=%cd%\installer_files\env
 set PATH=%INSTALL_ENV_DIR%;%INSTALL_ENV_DIR%\Library\bin;%INSTALL_ENV_DIR%\Scripts;%INSTALL_ENV_DIR%\Library\usr\bin;%PATH%
@@ -28,3 +31,4 @@ IF /I "%restore%" == "1" (
     pause
     exit /b
 )
+endlocal
