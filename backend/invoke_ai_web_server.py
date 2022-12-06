@@ -905,16 +905,13 @@ class InvokeAIWebServer:
                         },
                     )
 
+
                 if generation_parameters["progress_latents"]:
                     image = self.generate.sample_to_lowres_estimated_image(sample)
                     (width, height) = image.size
                     width *= 8
                     height *= 8
-                    buffered = io.BytesIO()
-                    image.save(buffered, format="PNG")
-                    img_base64 = "data:image/png;base64," + base64.b64encode(
-                        buffered.getvalue()
-                    ).decode("UTF-8")
+                    img_base64 = image_to_dataURL(image)
                     self.socketio.emit(
                         "intermediateResult",
                         {
@@ -932,7 +929,7 @@ class InvokeAIWebServer:
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
-            def image_done(image, seed, first_seed):
+            def image_done(image, seed, first_seed, attention_maps_image=None):
                 if self.canceled.is_set():
                     raise CanceledException
 
@@ -1094,6 +1091,8 @@ class InvokeAIWebServer:
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
+                attention_maps_image_base64_url = None if attention_maps_image is None else image_to_dataURL(attention_maps_image)
+
                 self.socketio.emit(
                     "generationResult",
                     {
@@ -1106,6 +1105,7 @@ class InvokeAIWebServer:
                         "height": height,
                         "boundingBox": original_bounding_box,
                         "generationMode": generation_parameters["generation_mode"],
+                        "attentionMaps": attention_maps_image_base64_url
                     },
                 )
                 eventlet.sleep(0)
@@ -1117,7 +1117,7 @@ class InvokeAIWebServer:
             self.generate.prompt2image(
                 **generation_parameters,
                 step_callback=image_progress,
-                image_callback=image_done,
+                image_callback=image_done
             )
 
         except KeyboardInterrupt:
@@ -1563,6 +1563,19 @@ def dataURL_to_image(dataURL: str) -> ImageType:
         )
     )
     return image
+
+"""
+Converts an image into a base64 image dataURL.
+"""
+
+def image_to_dataURL(image):
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    image_base64 = "data:image/png;base64," + base64.b64encode(
+        buffered.getvalue()
+    ).decode("UTF-8")
+    return image_base64
+
 
 
 """
