@@ -18,6 +18,7 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { SystemState } from 'features/system/store/systemSlice';
 import AddModel from './AddModel';
 import { DeleteIcon } from '@chakra-ui/icons';
+import IAIAlertDialog from 'common/components/IAIAlertDialog';
 
 type ModelListItemProps = {
   name: string;
@@ -59,14 +60,30 @@ const ModelListItem = (props: ModelListItemProps) => {
         >
           Load
         </Button>
-        <IconButton
-          icon={<DeleteIcon />}
-          size={'sm'}
-          aria-label="Delete Config"
-          onClick={handleModelDelete}
-          isDisabled={status === 'active' || isProcessing || !isConnected}
-          className="model-list-item-load-btn"
-        />
+        <IAIAlertDialog
+          title={'Delete Model?'}
+          acceptCallback={() => dispatch(deleteModel(name))}
+          acceptButtonText={'Delete'}
+          triggerComponent={
+            <IconButton
+              icon={<DeleteIcon />}
+              size={'sm'}
+              aria-label="Delete Config"
+              isDisabled={status === 'active' || isProcessing || !isConnected}
+              className="model-list-item-load-btn"
+            />
+          }
+        >
+          <Flex rowGap={'1rem'} flexDirection="column">
+            <p style={{ fontWeight: 'bold' }}>
+              Are you sure you want to delete this model entry from InvokeAI?
+            </p>
+            <p style={{ color: 'var(--text-color-secondary' }}>
+              This will <strong>not</strong> delete the model checkpoint file
+              from your disk. You can readd them if you wish to.
+            </p>
+          </Flex>
+        </IAIAlertDialog>
       </Flex>
     </div>
   );

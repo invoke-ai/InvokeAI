@@ -118,7 +118,11 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         onClick: onSettingsModalOpen,
       })}
 
-      <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
+      <Modal
+        isOpen={isSettingsModalOpen}
+        onClose={onSettingsModalClose}
+        size="xl"
+      >
         <ModalOverlay />
         <ModalContent className="modal settings-modal">
           <ModalHeader className="settings-modal-header">Settings</ModalHeader>
