@@ -53,6 +53,8 @@ class RuntimeDir:
         self.root = self.paths.root.location
 
         print(f"Using {Path(self.root).expanduser().resolve()} as the InvokeAI runtime directory")
+        console.line()
+
         return self.root
 
     def set_outputs(self, output_path: str = None) -> Path:
@@ -77,7 +79,7 @@ class RuntimeDir:
         Validate that the runtime dir is correctly configured
         """
 
-        console.rule(f"Validating the runtime directory at {self.root.expanduser().resolve()}")
+        console.rule(f"Validating directory structure at {self.root.expanduser().resolve()}")
         console.line()
 
         missing = False
@@ -90,6 +92,7 @@ class RuntimeDir:
                 missing = True
             print(f"{msg_prefix} {this.description} {this.kind}: {abspath}")
 
+        console.line()
         return not missing
 
     def initialize(self, yes_to_all=False):

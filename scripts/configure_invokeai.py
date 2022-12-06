@@ -20,13 +20,14 @@ from typing import Union
 from getpass_asterisk import getpass_asterisk
 from transformers import CLIPTokenizer, CLIPTextModel
 from ldm.invoke.readline import generic_completer
+from ldm.invoke.globals import Globals as G
 from pathlib import Path
 from omegaconf import OmegaConf
-from ldm.invoke.config import RuntimeDir, Config
+from ldm.invoke.config import RuntimeDir
 from rich.console import Console
 from rich.panel import Panel
+from rich.style import Style
 from rich.prompt import Prompt, Confirm
-from ldm.invoke.paths import Paths
 import traceback
 import requests
 import clip
@@ -38,13 +39,12 @@ transformers.logging.set_verbosity_error()
 
 
 #--------------------------globals-----------------------
+runtime_dir = RuntimeDir()
+
+#--------------------------------------------------------
 
 console = Console()
-RD = RuntimeDir()
-
-Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(['yes','no'])
-
 
 ## TODO move this to the configfile manager
 Config_preamble = '''# This file describes the alternative machine learning models
@@ -58,13 +58,14 @@ Config_preamble = '''# This file describes the alternative machine learning mode
 
 #---------------------------------------------
 def introduction():
-    console.print(Panel("Welcome to InvokeAI. This script will help download the Stable Diffusion weight files and other large models that are needed for text to image generation. At any point you may interrupt this program and resume later."))
+    console.print(Panel(title="Welcome to InvokeAI", renderable="[bold]This script will help download the Stable Diffusion weight files and other large models that are needed for text to image generation. At any point you may interrupt this program and resume later.", style="grey23 on grey78"))
     console.line()
 
 #--------------------------------------------
 def postscript(errors: None):
     if not any(errors):
-        message='''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
+        message_title = "Model Installation Successful"
+        message = '''You're all set! You may now launch InvokeAI using one of these two commands:
 Web version:
     python scripts/invoke.py --web  (connect to http://localhost:9090)
 Command-line version:
@@ -79,12 +80,13 @@ Have fun!
 '''
 
     else:
-        message=f"\n** There were errors during installation. It is possible some of the models were not fully downloaded.\n"
+        message_title = "There were errors during installation"
+        message="It is possible some of the models were not fully downloaded."
         for err in errors:
             message += f"\t - {err}\n"
         message += "Please check the logs above and correct any issues."
 
-    console.print(message)
+    console.print(Panel(title=message_title, renderable=message))
 
 #---------------------------------------------
 def yes_or_no(prompt:str, default_yes=True):
@@ -102,14 +104,14 @@ def user_wants_to_download_weights()->str:
     '''
     Returns one of "skip", "recommended" or "customized"
     '''
-    print('''You can download and configure the weights files manually or let this
+    console.print(Panel('''You can download and configure the weights files manually or let this
 script do it for you. Manual installation is described at:
 
-https://github.com/invoke-ai/InvokeAI/blob/main/docs/installation/INSTALLING_MODELS.md
+https://github.com/invoke-ai/InvokeAI/blob/main/docs/installation/INSTALLING_runtime_dir.paths.models.location.md
 
 You may download the recommended models (about 10GB total), select a customized set, or
 completely skip this step.
-'''
+''')
     )
     completer.set_options(['recommended','customized','skip'])
     completer.complete_extensions(None)  # turn off path-completion mode
@@ -185,7 +187,7 @@ def all_datasets()->dict:
 
 #-------------------------------Authenticate against Hugging Face
 def authenticate():
-    print('''
+    console.print(Panel('''
 To download the Stable Diffusion weight files from the official Hugging Face
 repository, you need to read and accept the CreativeML Responsible AI license.
 
@@ -213,7 +215,7 @@ This involves a few easy steps.
 
     (Yes, you have to accept two slightly different license agreements)
 '''
-    )
+    ))
     input('Press <enter> when you are ready to continue:')
     print('(Fetching Hugging Face token from cache...',end='')
     access_token = HfFolder.get_token()
@@ -221,7 +223,7 @@ This involves a few easy steps.
         print('found')
     else:
         print('not found')
-        print('''
+        console.print(Panel('''
 4. Thank you! The last step is to enter your HuggingFace access token so that
    this script is authorized to initiate the download. Go to the access tokens
    page of your Hugging Face account and create a token by clicking the
@@ -235,7 +237,7 @@ This involves a few easy steps.
    Now copy the token to your clipboard and paste it at the prompt. Windows
    users can paste with right-click.
    Token: '''
-        )
+        ))
         access_token = getpass_asterisk.getpass_asterisk()
         HfFolder.save_token(access_token)
     return access_token
@@ -244,15 +246,21 @@ This involves a few easy steps.
 # look for legacy model.ckpt in models directory and offer to
 # normalize its name
 def migrate_models_ckpt():
-    model_path = os.path.join(Globals.root,Model_dir,Weights_dir)
-    if not os.path.exists(os.path.join(model_path,'model.ckpt')):
+    model = runtime_dir.paths.default_weights.location / 'model.ckpt'
+    if not model.is_file():
         return
     new_name = Datasets['stable-diffusion-1.4']['file']
     print('You seem to have the Stable Diffusion v4.1 "model.ckpt" already installed.')
     rename = yes_or_no(f'Ok to rename it to "{new_name}" for future reference?')
     if rename:
         print(f'model.ckpt => {new_name}')
-        os.replace(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
+        os.replace(model, runtime_dir.paths.default_weights.location / new_name)
+
+
+#---------------------------------------------
+#  migrate user's existing `~/.invokeai` init file to the new path
+def migrate_initfile():
+    pass
 
 #---------------------------------------------
 def download_weight_datasets(models:dict, access_token:str):
@@ -261,7 +269,7 @@ def download_weight_datasets(models:dict, access_token:str):
     for mod in models.keys():
         repo_id = Datasets[mod]['repo_id']
         filename = Datasets[mod]['file']
-        dest = os.path.join(Globals.root,Model_dir,Weights_dir)
+        dest = runtime_dir.paths.default_weights.location
         success = hf_download_with_resume(
             repo_id=repo_id,
             model_dir=dest,
@@ -352,8 +360,7 @@ def download_with_progress_bar(model_url:str, model_dest:str, label:str='the'):
 
 #---------------------------------------------
 def update_config_file(successfully_downloaded:dict,opt:dict):
-    config_file = opt.config_file or Default_config_file
-    config_file = os.path.normpath(os.path.join(Globals.root,config_file))
+    config_file = runtime_dir.paths.models_config.location
 
     yaml = new_config_file_contents(successfully_downloaded,config_file)
 
@@ -398,17 +405,17 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
         stanza = conf[model] if model in conf else { }
 
         stanza['description'] = Datasets[model]['description']
-        stanza['weights'] = os.path.join(Model_dir,Weights_dir,Datasets[model]['file'])
-        stanza['config'] = os.path.normpath(os.path.join(SD_Configs, Datasets[model]['config']))
+        stanza['weights'] = runtime_dir.paths.default_weights.location / Datasets[model]['file']
+        stanza['config'] = runtime_dir.paths.sd_configs.location / Datasets[model]['config']
         stanza['width'] = Datasets[model]['width']
         stanza['height'] = Datasets[model]['height']
         stanza.pop('default',None)  # this will be set later
         if vaes:
             for target in vaes:
                 if re.search(target, model, flags=re.IGNORECASE):
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes[target]))
+                    stanza['vae'] = runtime_dir.paths.default_weights.location / vaes[target]
                 else:
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes['default']))
+                    stanza['vae'] = runtime_dir.paths.default_weights.location / vaes['default']
         # BUG - the first stanza is always the default. User should select.
         if not default_selected:
             stanza['default'] = True
@@ -430,7 +437,7 @@ def download_bert():
 def download_from_hf(model_class:object, model_name:str):
     print('',file=sys.stderr)  # to prevent tqdm from overwriting
     return model_class.from_pretrained(model_name,
-                                       cache_dir=os.path.join(Globals.root,Model_dir,model_name),
+                                       cache_dir=runtime_dir.paths.models.location / model_name,
                                        resume_download=True
     )
 
@@ -448,7 +455,7 @@ def download_clip():
 def download_realesrgan():
     print('Installing models from RealESRGAN...',file=sys.stderr)
     model_url = 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth'
-    model_dest = os.path.join(Globals.root,'models/realesrgan/realesr-general-x4v3.pth')
+    model_dest = runtime_dir.paths.models.location / 'realesrgan/realesr-general-x4v3.pth'
     download_with_progress_bar(model_url, model_dest, 'RealESRGAN')
 
 def download_gfpgan():
@@ -456,25 +463,25 @@ def download_gfpgan():
     for model in (
             [
                 'https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth',
-                './models/gfpgan/GFPGANv1.4.pth'
+                'gfpgan/GFPGANv1.4.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth',
-                './models/gfpgan/weights/detection_Resnet50_Final.pth'
+                'gfpgan/weights/detection_Resnet50_Final.pth'
             ],
             [
                 'https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth',
-                './models/gfpgan/weights/parsing_parsenet.pth'
+                'gfpgan/weights/parsing_parsenet.pth'
             ],
     ):
-        model_url,model_dest  = model[0],os.path.join(Globals.root,model[1])
+        model_url, model_dest  = model[0], runtime_dir.paths.models.location / model[1]
         download_with_progress_bar(model_url, model_dest, 'GFPGAN weights')
 
 #---------------------------------------------
 def download_codeformer():
     print('Installing CodeFormer model file...',file=sys.stderr)
     model_url  = 'https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'
-    model_dest = os.path.join(Globals.root,'models/codeformer/codeformer.pth')
+    model_dest = runtime_dir.paths.models.location / 'codeformer/codeformer.pth'
     download_with_progress_bar(model_url, model_dest, 'CodeFormer')
 
 #---------------------------------------------
@@ -483,24 +490,24 @@ def download_clipseg():
     import zipfile
     try:
         model_url = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
-        model_dest = os.path.join(Globals.root,'models/clipseg/clipseg_weights')
-        weights_zip = 'models/clipseg/weights.zip'
+        model_dest = runtime_dir.paths.models.location / 'clipseg/clipseg_weights'
+        weights_zip = 'clipseg/weights.zip'
 
-        if not os.path.exists(model_dest):
-            os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-        if not os.path.exists(f'{model_dest}/rd64-uni-refined.pth'):
-            dest = os.path.join(Globals.root,weights_zip)
-            request.urlretrieve(model_url,dest)
-            with zipfile.ZipFile(dest,'r') as zip:
-                zip.extractall(os.path.join(Globals.root,'models/clipseg'))
-            os.remove(dest)
+        if not model_dest.is_dir():
+            model_dest.mkdir(exist_ok=True, parents=True)
+        if not (model_dest / "rd64-uni-refined.pth").is_file():
+            dest = runtime_dir.paths.models.location / weights_zip
+            request.urlretrieve(model_url, dest)
+            with zipfile.ZipFile(dest, 'r') as zip:
+                zip.extractall(runtime_dir.paths.models.location / 'clipseg')
+            os.remove(str(dest.expanduser().absolute()))
 
             from clipseg.clipseg import CLIPDensePredT
             model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
             model.eval()
             model.load_state_dict(
                 torch.load(
-                    os.path.join(Globals.root,'models/clipseg/clipseg_weights/rd64-uni-refined.pth'),
+                    runtime_dir.paths.models.location / 'clipseg/clipseg_weights/rd64-uni-refined.pth',
                     map_location=torch.device('cpu')
                     ),
                 strict=False,
@@ -508,11 +515,11 @@ def download_clipseg():
     except Exception:
         print('Error installing clipseg model:')
         print(traceback.format_exc())
-    print('...success',file=sys.stderr)
+    print('...success', file=sys.stderr)
 
 #-------------------------------------
 def download_safety_checker():
-    print('Installing model for NSFW content detection...',file=sys.stderr)
+    print('Installing model for NSFW content detection...', file=sys.stderr)
     try:
         from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
         from transformers import AutoFeatureExtractor
@@ -563,59 +570,61 @@ def download_weights(opt:dict) -> Union[str, None]:
     else:  # 'skip'
         return
 
-    print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+    console.rule("LICENSE AGREEMENT FOR WEIGHT FILES")
     # We are either already authenticated, or will be asked to provide the token interactively
     access_token = authenticate()
-    print('\n** DOWNLOADING WEIGHTS **')
+    console.rule("DOWNLOADING WEIGHTS")
     successfully_downloaded = download_weight_datasets(models, access_token)
     update_config_file(successfully_downloaded,opt)
     if len(successfully_downloaded) < len(models):
         return "some of the model weights downloads were not successful"
 
 #-------------------------------------
-def select_runtime_dir():
+def select_runtime_dir(root):
+    runtime_dir.set_root(root_path=root)
 
-    default = str(RD.paths.root.location.expanduser().resolve())
+    default = str(runtime_dir.paths.root.location.expanduser().resolve())
 
     completer.set_default_dir(default)
     completer.complete_extensions(())
     completer.set_line(default)
     directory = input(f"Select a directory in which to install InvokeAI's models and configuration files [{default}]: ").strip(' \\')
 
-    RD.set_root(root_path=directory)
+    runtime_dir.set_root(root_path=directory)
+
     return directory
 
 #-------------------------------------
 def select_outputs():
-    default = str(RD.paths.outputs.location.expanduser().resolve())
+    default = str(runtime_dir.paths.outputs.location.expanduser().resolve())
 
     completer.set_default_dir(default)
     completer.complete_extensions(())
     completer.set_line(default)
     directory = input(f'Select the default directory for image outputs [{default}]: ').strip(' \\')
 
-    RD.set_outputs(output_path=Path(directory))
+    runtime_dir.set_outputs(output_path=Path(directory))
     return directory
 
 #-------------------------------------
-def initialize_runtime_dir(yes_to_all:bool=False):
+def initialize_runtime_dir(root, yes_to_all:bool=False):
 
     if not yes_to_all:
         accepted = False
         while not accepted:
-            console.print(f'InvokeAI models and configuration files will be placed into {RD.root} and image outputs will be placed into {RD.outputs}.')
+            console.print(f'InvokeAI models and configuration files will be placed into {runtime_dir.root} and image outputs will be placed into {runtime_dir.outputs}.')
             accepted = Confirm.ask("Accept these locations?", default="y")
             if accepted:
                 break
             console.line()
-            select_runtime_dir()
+            select_runtime_dir(root)
             console.line()
             select_outputs()
 
 
-    console.print(f'InvokeAI models and configuration files will be placed into {RD.root} and image outputs will be placed into {RD.outputs}.')
+    console.print(f'InvokeAI models and configuration files will be placed into {runtime_dir.root} and image outputs will be placed into {runtime_dir.outputs}.')
 
-    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{RD.paths.initfile.location}",')
+    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{runtime_dir.paths.initfile.location}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
 
     enable_safety_checker = True
@@ -628,7 +637,7 @@ def initialize_runtime_dir(yes_to_all:bool=False):
         print('The NSFW (not safe for work) checker blurs out images that potentially contain sexual imagery.')
         print('It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker.')
         print('The following option will set whether the checker is enabled by default. Like other options, you can')
-        print(f'change this setting later by editing the file {RD.paths.initfile.location}.')
+        print(f'change this setting later by editing the file {runtime_dir.paths.initfile.location}.')
         enable_safety_checker = yes_or_no('Enable the NSFW checker by default?',enable_safety_checker)
 
         print('\nThe next choice selects the sampler to use by default. Samplers have different speed/performance')
@@ -649,17 +658,17 @@ def initialize_runtime_dir(yes_to_all:bool=False):
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
-    for location in [path.location for path in RD.paths.get() if path.kind == "directory"]:
+    for location in [path.location for path in runtime_dir.paths.get() if path.kind == "directory"]:
         Path(location).expanduser().absolute().mkdir(exist_ok=True, parents=True)
 
-    ### TODO confirm how this is supposed to work
-    # for src in [Path(RD.paths.configs)]:
-    #     dest = Path(RD.root / src)
-    #     if not os.path.samefile(src,dest):
-    #         shutil.copytree(src,dest,dirs_exist_ok=True)
-    Path.mkdir(RD.outputs, exist_ok=True)
+    # copy source directories (configs) to the runtime dir
+    for src in ['configs']:
+        dest = Path(runtime_dir.root / src)
+        if not Path.samefile(Path(src), dest):
+            shutil.copytree(src, dest, dirs_exist_ok=True)
+    Path.mkdir(runtime_dir.outputs, exist_ok=True)
 
-    init_file = RD.paths.initfile.location
+    init_file = runtime_dir.paths.initfile.location
 
     print(f'Creating the initialization file at "{init_file}".\n')
     with open(init_file,'w') as f:
@@ -669,10 +678,10 @@ def initialize_runtime_dir(yes_to_all:bool=False):
 # or renaming it and then running configure_invokeai.py again.
 
 # The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
---root="{RD.root}"
+--root="{runtime_dir.root}"
 
 # the --outdir option controls the default location of image files.
---outdir="{RD.outputs}"
+--outdir="{runtime_dir.outputs}"
 
 # generation arguments
 {safety_checker}
@@ -725,26 +734,27 @@ def main():
     try:
         introduction()
 
-        if (opt.interactive
-            and not opt.yes_to_all
-            and opt.root is None
-            and os.getenv("INVOKEAI_ROOT") is None
-        ):
-            select_runtime_dir()
-            # select_outputs()
+        if opt.root is not None:
+            runtime_dir.set_root(root_path=opt.root)
 
-        if not RD.validate():
+        if opt.interactive and not opt.yes_to_all:
+            select_outputs()
+
+        if not runtime_dir.validate():
             console.line()
-            console.rule(f"Configuring InvokeAI at {RD.root}")
-            initialize_runtime_dir(yes_to_all=opt.yes_to_all)
+            console.rule(f"Configuring InvokeAI at {runtime_dir.root}")
+            initialize_runtime_dir(root=opt.root, yes_to_all=opt.yes_to_all)
+
+        global Datasets
+        Datasets = OmegaConf.load(runtime_dir.paths.core_models.location)
 
         # Optimistically try to download all required assets. If any errors occur, add them and proceed anyway.
         errors=set()
 
         if opt.interactive:
-            print('** DOWNLOADING DIFFUSION WEIGHTS **')
+            console.rule("DOWNLOADING DIFFUSION WEIGHTS")
             errors.add(download_weights(opt))
-        print('\n** DOWNLOADING SUPPORT MODELS **')
+        console.rule("DOWNLOADING SUPPORT MODELS")
         download_bert()
         download_clip()
         download_realesrgan()
