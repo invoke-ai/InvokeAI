@@ -4,12 +4,10 @@ from typing import Optional, Callable
 
 import psutil
 import torch
-import diffusers
 from torch import nn
 
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
-
 
 class Arguments:
     def __init__(self, edited_conditioning: torch.Tensor, edit_opcodes: list[tuple], edit_options: dict):
@@ -67,11 +65,11 @@ class Context:
         self.clear_requests(cleanup=True)
 
     def register_cross_attention_modules(self, model):
-        for name,module in get_attention_modules(model, CrossAttentionType.SELF):
+        for name,module in get_cross_attention_modules(model, CrossAttentionType.SELF):
             if name in self.self_cross_attention_module_identifiers:
                 assert False, f"name {name} cannot appear more than once"
             self.self_cross_attention_module_identifiers.append(name)
-        for name,module in get_attention_modules(model, CrossAttentionType.TOKENS):
+        for name,module in get_cross_attention_modules(model, CrossAttentionType.TOKENS):
             if name in self.tokens_cross_attention_module_identifiers:
                 assert False, f"name {name} cannot appear more than once"
             self.tokens_cross_attention_module_identifiers.append(name)
@@ -172,147 +170,6 @@ class Context:
         for key, map_dict in self.saved_cross_attention_maps.items():
             for offset, slice in map_dict['slices'].items():
                 map_dict[offset] = slice.to('cpu')
-
-
-def remove_cross_attention_control(model):
-    remove_attention_function(model)
-
-
-def setup_cross_attention_control(model, context: Context):
-    """
-    Inject attention parameters and functions into the passed in model to enable cross attention editing.
-
-    :param model: The unet model to inject into.
-    :param cross_attention_control_args: Arugments passeed to the CrossAttentionControl implementations
-    :return: None
-    """
-
-    # adapted from init_attention_edit
-    device = context.arguments.edited_conditioning.device
-
-    # urgh. should this be hardcoded?
-    max_length = 77
-    # mask=1 means use base prompt attention, mask=0 means use edited prompt attention
-    mask = torch.zeros(max_length)
-    indices_target = torch.arange(max_length, dtype=torch.long)
-    indices = torch.arange(max_length, dtype=torch.long)
-    for name, a0, a1, b0, b1 in context.arguments.edit_opcodes:
-        if b0 < max_length:
-            if name == "equal":# or (name == "replace" and a1 - a0 == b1 - b0):
-                # these tokens have not been edited
-                indices[b0:b1] = indices_target[a0:a1]
-                mask[b0:b1] = 1
-
-    context.register_cross_attention_modules(model)
-    context.cross_attention_mask = mask.to(device)
-    context.cross_attention_index_map = indices.to(device)
-    inject_attention_function(model, context)
-
-
-def get_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, 'InvokeAICrossAttentionMixin']]:
-    # cross_attention_class: type = ldm.modules.attention.CrossAttention
-    cross_attention_class: type = InvokeAIDiffusersCrossAttention
-    which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
-    attention_module_tuples = [(name,module) for name, module in model.named_modules() if
-                isinstance(module, cross_attention_class) and which_attn in name]
-    cross_attention_modules_in_model_count = len(attention_module_tuples)
-    expected_count = 16
-    if cross_attention_modules_in_model_count != expected_count:
-        # non-fatal error but .swap() won't work.
-        print(f"Error! CrossAttentionControl found an unexpected number of InvokeAICrossAttention modules in the model " +
-              f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching failed " +
-              f"or some assumption has changed about the structure of the model itself. Please fix the monkey-patching, " +
-              f"and/or update the {expected_count} above to an appropriate number, and/or find and inform someone who knows " +
-              f"what it means. This error is non-fatal, but it is likely that .swap() and attention map display will not " +
-              f"work properly until it is fixed.")
-    return attention_module_tuples
-
-
-def inject_attention_function(unet, context: Context):
-    # ORIGINAL SOURCE CODE: https://github.com/huggingface/diffusers/blob/91ddd2a25b848df0fa1262d4f1cd98c7ccb87750/src/diffusers/models/attention.py#L276
-
-    def attention_slice_wrangler(module, suggested_attention_slice:torch.Tensor, dim, offset, slice_size):
-
-        #memory_usage = suggested_attention_slice.element_size() * suggested_attention_slice.nelement()
-
-        attention_slice = suggested_attention_slice
-
-        if context.get_should_save_maps(module.identifier):
-            #print(module.identifier, "saving suggested_attention_slice of shape",
-            #      suggested_attention_slice.shape, "dim", dim, "offset", offset)
-            slice_to_save = attention_slice.to('cpu') if dim is not None else attention_slice
-            context.save_slice(module.identifier, slice_to_save, dim=dim, offset=offset, slice_size=slice_size)
-        elif context.get_should_apply_saved_maps(module.identifier):
-            #print(module.identifier, "applying saved attention slice for dim", dim, "offset", offset)
-            saved_attention_slice = context.get_slice(module.identifier, dim, offset, slice_size)
-
-            # slice may have been offloaded to CPU
-            saved_attention_slice = saved_attention_slice.to(suggested_attention_slice.device)
-
-            if context.is_tokens_cross_attention(module.identifier):
-                index_map = context.cross_attention_index_map
-                remapped_saved_attention_slice = torch.index_select(saved_attention_slice, -1, index_map)
-                this_attention_slice = suggested_attention_slice
-
-                mask = context.cross_attention_mask
-                saved_mask = mask
-                this_mask = 1 - mask
-                attention_slice = remapped_saved_attention_slice * saved_mask + \
-                                  this_attention_slice * this_mask
-            else:
-                # just use everything
-                attention_slice = saved_attention_slice
-
-        return attention_slice
-
-    cross_attention_modules = get_attention_modules(unet, CrossAttentionType.TOKENS) + get_attention_modules(unet, CrossAttentionType.SELF)
-    for identifier, module in cross_attention_modules:
-        module.identifier = identifier
-        try:
-            module.set_attention_slice_wrangler(attention_slice_wrangler)
-            module.set_slicing_strategy_getter(
-                lambda module: context.get_slicing_strategy(identifier)
-            )
-        except AttributeError as e:
-            if is_attribute_error_about(e, 'set_attention_slice_wrangler'):
-                print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")  # TODO
-            else:
-                raise
-
-
-def remove_attention_function(unet):
-    cross_attention_modules = get_attention_modules(unet, CrossAttentionType.TOKENS) + get_attention_modules(unet, CrossAttentionType.SELF)
-    for identifier, module in cross_attention_modules:
-        try:
-            # clear wrangler callback
-            module.set_attention_slice_wrangler(None)
-            module.set_slicing_strategy_getter(None)
-        except AttributeError as e:
-            if is_attribute_error_about(e, 'set_attention_slice_wrangler'):
-                print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")
-            else:
-                raise
-
-
-def is_attribute_error_about(error: AttributeError, attribute: str):
-    if hasattr(error, 'name'):  # Python 3.10
-        return error.name == attribute
-    else:  # Python 3.9
-        return attribute in str(error)
-
-
-
-def get_mem_free_total(device):
-    #only on cuda
-    if not torch.cuda.is_available():
-        return None
-    stats = torch.cuda.memory_stats(device)
-    mem_active = stats['active_bytes.all.current']
-    mem_reserved = stats['reserved_bytes.all.current']
-    mem_free_cuda, _ = torch.cuda.mem_get_info(device)
-    mem_free_torch = mem_reserved - mem_active
-    mem_free_total = mem_free_cuda + mem_free_torch
-    return mem_free_total
 
 
 
@@ -445,15 +302,144 @@ class InvokeAICrossAttentionMixin:
         return self.einsum_op_tensor_mem(q, k, v, 32)
 
 
-class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        InvokeAICrossAttentionMixin.__init__(self)
+def remove_cross_attention_control(model):
+    remove_attention_function(model)
 
-    def _attention(self, query, key, value):
-        result = self.get_invokeai_attention_mem_efficient(query, key, value)
-        hidden_states = self.reshape_batch_dim_to_heads(result)
-        return hidden_states
 
+def setup_cross_attention_control(model, context: Context):
+    """
+    Inject attention parameters and functions into the passed in model to enable cross attention editing.
+
+    :param model: The unet model to inject into.
+    :param cross_attention_control_args: Arugments passeed to the CrossAttentionControl implementations
+    :return: None
+    """
+
+    # adapted from init_attention_edit
+    device = context.arguments.edited_conditioning.device
+
+    # urgh. should this be hardcoded?
+    max_length = 77
+    # mask=1 means use base prompt attention, mask=0 means use edited prompt attention
+    mask = torch.zeros(max_length)
+    indices_target = torch.arange(max_length, dtype=torch.long)
+    indices = torch.arange(max_length, dtype=torch.long)
+    for name, a0, a1, b0, b1 in context.arguments.edit_opcodes:
+        if b0 < max_length:
+            if name == "equal":# or (name == "replace" and a1 - a0 == b1 - b0):
+                # these tokens have not been edited
+                indices[b0:b1] = indices_target[a0:a1]
+                mask[b0:b1] = 1
+
+    context.register_cross_attention_modules(model)
+    context.cross_attention_mask = mask.to(device)
+    context.cross_attention_index_map = indices.to(device)
+    inject_attention_function(model, context)
+
+
+def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
+    cross_attention_class: type = InvokeAICrossAttentionMixin
+    # cross_attention_class: type = InvokeAIDiffusersCrossAttention
+    which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
+    attention_module_tuples = [(name,module) for name, module in model.named_modules() if
+                isinstance(module, cross_attention_class) and which_attn in name]
+    cross_attention_modules_in_model_count = len(attention_module_tuples)
+    expected_count = 16
+    if cross_attention_modules_in_model_count != expected_count:
+        # non-fatal error but .swap() won't work.
+        print(f"Error! CrossAttentionControl found an unexpected number of {cross_attention_class} modules in the model " +
+              f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching failed " +
+              f"or some assumption has changed about the structure of the model itself. Please fix the monkey-patching, " +
+              f"and/or update the {expected_count} above to an appropriate number, and/or find and inform someone who knows " +
+              f"what it means. This error is non-fatal, but it is likely that .swap() and attention map display will not " +
+              f"work properly until it is fixed.")
+    return attention_module_tuples
+
+
+def inject_attention_function(unet, context: Context):
+    # ORIGINAL SOURCE CODE: https://github.com/huggingface/diffusers/blob/91ddd2a25b848df0fa1262d4f1cd98c7ccb87750/src/diffusers/models/attention.py#L276
+
+    def attention_slice_wrangler(module, suggested_attention_slice:torch.Tensor, dim, offset, slice_size):
+
+        #memory_usage = suggested_attention_slice.element_size() * suggested_attention_slice.nelement()
+
+        attention_slice = suggested_attention_slice
+
+        if context.get_should_save_maps(module.identifier):
+            #print(module.identifier, "saving suggested_attention_slice of shape",
+            #      suggested_attention_slice.shape, "dim", dim, "offset", offset)
+            slice_to_save = attention_slice.to('cpu') if dim is not None else attention_slice
+            context.save_slice(module.identifier, slice_to_save, dim=dim, offset=offset, slice_size=slice_size)
+        elif context.get_should_apply_saved_maps(module.identifier):
+            #print(module.identifier, "applying saved attention slice for dim", dim, "offset", offset)
+            saved_attention_slice = context.get_slice(module.identifier, dim, offset, slice_size)
+
+            # slice may have been offloaded to CPU
+            saved_attention_slice = saved_attention_slice.to(suggested_attention_slice.device)
+
+            if context.is_tokens_cross_attention(module.identifier):
+                index_map = context.cross_attention_index_map
+                remapped_saved_attention_slice = torch.index_select(saved_attention_slice, -1, index_map)
+                this_attention_slice = suggested_attention_slice
+
+                mask = context.cross_attention_mask
+                saved_mask = mask
+                this_mask = 1 - mask
+                attention_slice = remapped_saved_attention_slice * saved_mask + \
+                                  this_attention_slice * this_mask
+            else:
+                # just use everything
+                attention_slice = saved_attention_slice
+
+        return attention_slice
+
+    cross_attention_modules = get_cross_attention_modules(unet, CrossAttentionType.TOKENS) + get_cross_attention_modules(unet, CrossAttentionType.SELF)
+    for identifier, module in cross_attention_modules:
+        module.identifier = identifier
+        try:
+            module.set_attention_slice_wrangler(attention_slice_wrangler)
+            module.set_slicing_strategy_getter(
+                lambda module: context.get_slicing_strategy(identifier)
+            )
+        except AttributeError as e:
+            if is_attribute_error_about(e, 'set_attention_slice_wrangler'):
+                print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")  # TODO
+            else:
+                raise
+
+
+def remove_attention_function(unet):
+    cross_attention_modules = get_cross_attention_modules(unet, CrossAttentionType.TOKENS) + get_cross_attention_modules(unet, CrossAttentionType.SELF)
+    for identifier, module in cross_attention_modules:
+        try:
+            # clear wrangler callback
+            module.set_attention_slice_wrangler(None)
+            module.set_slicing_strategy_getter(None)
+        except AttributeError as e:
+            if is_attribute_error_about(e, 'set_attention_slice_wrangler'):
+                print(f"TODO: implement set_attention_slice_wrangler for {type(module)}")
+            else:
+                raise
+
+
+def is_attribute_error_about(error: AttributeError, attribute: str):
+    if hasattr(error, 'name'):  # Python 3.10
+        return error.name == attribute
+    else:  # Python 3.9
+        return attribute in str(error)
+
+
+
+def get_mem_free_total(device):
+    #only on cuda
+    if not torch.cuda.is_available():
+        return None
+    stats = torch.cuda.memory_stats(device)
+    mem_active = stats['active_bytes.all.current']
+    mem_reserved = stats['reserved_bytes.all.current']
+    mem_free_cuda, _ = torch.cuda.mem_get_info(device)
+    mem_free_torch = mem_reserved - mem_active
+    mem_free_total = mem_free_cuda + mem_free_torch
+    return mem_free_total
 

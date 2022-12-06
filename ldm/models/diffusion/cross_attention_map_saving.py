@@ -4,7 +4,7 @@ import PIL
 import torch
 from torchvision.transforms.functional import resize as tv_resize, InterpolationMode
 
-from ldm.models.diffusion.cross_attention_control import get_attention_modules, CrossAttentionType
+from ldm.models.diffusion.cross_attention_control import get_cross_attention_modules, CrossAttentionType
 
 
 class AttentionMapSaver():
@@ -47,7 +47,6 @@ class AttentionMapSaver():
         Scale all collected attention maps to the same size, blend them together and return as an image.
         :return: An image containing a vertical stack of blended attention maps, one for each requested token.
         """
-
         num_tokens = len(self.token_ids)
         latents_height = self.latents_shape[0]
         latents_width = self.latents_shape[1]
@@ -88,22 +87,3 @@ class AttentionMapSaver():
 
         merged_bytes = merged.mul(0xff).byte()
         return PIL.Image.fromarray(merged_bytes.numpy(), mode='L')
-
-def setup_attention_map_saving(unet, saver: AttentionMapSaver):
-    def callback(slice, dim, offset, slice_size, key):
-        if dim is not None:
-            print("sliced tokens attention map saving is not implemented")
-            return
-        saver.add_attention_maps(slice, key)
-
-    tokens_cross_attention_modules = get_attention_modules(unet, CrossAttentionType.TOKENS)
-    for identifier, module in tokens_cross_attention_modules:
-        key = ('down' if identifier.startswith('down') else
-                'up' if identifier.startswith('up') else
-                'mid')
-        module.set_attention_slice_calculated_callback(lambda slice, dim, offset, slice_size, key=key: callback(slice, dim, offset, slice_size, key))
-
-def remove_attention_map_saving(unet):
-    tokens_cross_attention_modules = get_attention_modules(unet, CrossAttentionType.TOKENS)
-    for _, module in tokens_cross_attention_modules:
-        module.set_attention_slice_calculated_callback(None)
