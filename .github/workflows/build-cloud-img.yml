@@ -53,8 +53,7 @@ jobs:
       uses: docker/build-push-action@v3
       with:
         context: .
-        file: docker-build/Dockerfile.fake ### so we don't wait too long
-        # file: docker-build/Dockerfile.cloud
+        file: docker-build/Dockerfile.cloud
         platforms: Linux/${{ matrix.arch }}
         push: ${{ github.event_name != 'pull_request' }}
         # push: false
