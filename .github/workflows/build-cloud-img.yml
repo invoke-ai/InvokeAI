@@ -3,10 +3,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-    - main
-    - development
-    tags:
-      - v*
+    # - main
+    - ebr-test-docker-push ### This is a "fake main"
+    # tags:
+    #   - v*
 
 permissions:
   contents: read
@@ -34,31 +34,29 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-ebr-test-delete-this
         tags: |
           type=ref,event=branch
-          type=ref,event=tag
-          type=ref,event=pr
-          type=sha
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
-    # - if: github.event_name != 'pull_request'
-    #   name: Docker login
-    #   uses: docker/login-action@v2
-    #   with:
-    #     registry: ghcr.io
-    #     username: ${{ github.actor }}
-    #     password: ${{ secrets.GITHUB_TOKEN }}
+    - if: github.event_name != 'pull_request'
+      name: Docker login
+      uses: docker/login-action@v2
+      with:
+        registry: ${{env.REGISTRY}}
+        # username: ${{ github.actor }}
+        # password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build and push cloud image
       uses: docker/build-push-action@v3
       with:
         context: .
-        file: docker-build/Dockerfile.cloud
+        file: docker-build/Dockerfile.fake ### so we don't wait too long
+        # file: docker-build/Dockerfile.cloud
         platforms: Linux/${{ matrix.arch }}
-        # push: ${{ github.event_name != 'pull_request' }}
-        push: false
+        push: ${{ github.event_name != 'pull_request' }}
+        # push: false
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
