@@ -1,7 +1,7 @@
 *
 !backend
 !frontend
-!installer
+!binary_installer
 !ldm
 !main.py
 !scripts

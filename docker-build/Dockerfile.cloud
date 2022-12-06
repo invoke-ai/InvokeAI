@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    cp installer/py3.10-linux-x86_64-cuda-reqs.txt requirements.txt && \
+    cp binary_installer/py3.10-linux-x86_64-cuda-reqs.txt requirements.txt && \
     pip install -r requirements.txt &&\
     pip install -e .
 
