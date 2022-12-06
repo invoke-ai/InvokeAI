@@ -17,18 +17,15 @@ jobs:
           - linux-x86_64-cuda-reqs
           - windows-x86_64-cuda-reqs
         python-version:
-          - '3.9'
+          # - '3.9'
           - '3.10'
         include:
           - output-file: darwin-x86_64-reqs
             os: macos-12
-            requirements-file: requirements-mac-mps-cpu.txt
           - output-file: linux-x86_64-cuda-reqs
             os: ubuntu-22.04
-            requirements-file: requirements-lin-cuda.txt
           - output-file: windows-x86_64-cuda-reqs
             os: windows-2022
-            requirements-file: requirements-win-colab-cuda.txt
     name: py${{ matrix.python-version }}-${{ matrix.output-file }}
     env:
       output-file-name: py${{ matrix.python-version }}-${{ matrix.output-file }}
@@ -56,7 +53,7 @@ jobs:
 
       - name: run pip-compile
         id: pip-compile
-        run: pip-compile --allow-unsafe --generate-hashes --output-file=binary_installer/${{ env.output-file-name }}.txt binary_installer/requirements.in
+        run: pip-compile -r --annotate --annotation-style split --generate-hashes --emit-index-url --allow-unsafe --resolver=backtracking --reuse-hashes --output-file=binary_installer/${{ env.output-file-name }}.txt binary_installer/requirements.in
 
       - name: Archive results
         id: archive-results
