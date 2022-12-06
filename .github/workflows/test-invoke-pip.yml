@@ -107,7 +107,7 @@ jobs:
 
       - name: cat invokeai.init
         id: cat-invokeai
-        run: cat cat ${{ env.INVOKEAI_ROOT }}/invokeai.init
+        run: cat ${{ env.INVOKEAI_ROOT }}/invokeai.init
 
       - name: Run the tests
         id: run-tests
