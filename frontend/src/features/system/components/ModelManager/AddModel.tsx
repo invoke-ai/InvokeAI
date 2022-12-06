@@ -1,5 +1,6 @@
 import {
   Button,
+  Flex,
   FormControl,
   FormErrorMessage,
   FormHelperText,
@@ -21,7 +22,7 @@ import {
   useDisclosure,
   VStack,
 } from '@chakra-ui/react';
-import IAIIconButton from 'common/components/IAIIconButton';
+
 import React from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { Field, FieldInputProps, Formik, FormikProps } from 'formik';
@@ -29,6 +30,7 @@ import { RootState, useAppDispatch, useAppSelector } from 'app/store';
 import { addNewModel } from 'app/socketio/actions';
 import { InvokeModelConfigProps } from 'app/invokeai';
 import IAICheckbox from 'common/components/IAICheckbox';
+import IAIButton from 'common/components/IAIButton';
 import SearchModels from './SearchModels';
 
 const MIN_MODEL_SIZE = 64;
@@ -76,14 +78,18 @@ export default function AddModel() {
 
   return (
     <>
-      <IAIIconButton
-        icon={<FaPlus />}
+      <IAIButton
         aria-label="Add New Model"
         tooltip="Add New Model"
         onClick={onOpen}
         className="modal-close-btn"
         size={'sm'}
-      />
+      >
+        <Flex columnGap={'0.5rem'} alignItems="center">
+          <FaPlus />
+          Add New
+        </Flex>
+      </IAIButton>
 
       <Modal
         isOpen={isOpen}

@@ -6,6 +6,7 @@ import {
   FaBug,
   FaKeyboard,
   FaWrench,
+  FaCube,
 } from 'react-icons/fa';
 
 import InvokeAILogo from 'assets/images/logo.png';
@@ -17,6 +18,7 @@ import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 import ThemeChanger from './ThemeChanger';
 import ModelSelect from './ModelSelect';
+import ModelManagerModal from './ModelManager/ModelManagerModal';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
@@ -35,6 +37,18 @@ const SiteHeader = () => {
         <StatusIndicator />
 
         <ModelSelect />
+
+        <ModelManagerModal>
+          <IAIIconButton
+            aria-label="Model Manager"
+            tooltip="Model Manager"
+            size={'sm'}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            icon={<FaCube />}
+          />
+        </ModelManagerModal>
 
         <HotkeysModal>
           <IAIIconButton

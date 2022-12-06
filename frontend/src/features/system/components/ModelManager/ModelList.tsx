@@ -2,13 +2,9 @@ import {
   Button,
   Tooltip,
   Spacer,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
   IconButton,
   Flex,
+  Text,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
@@ -42,27 +38,38 @@ const ModelListItem = (props: ModelListItemProps) => {
     dispatch(deleteModel(name));
   };
 
+  const statusTextColor = () => {
+    switch (status) {
+      case 'active':
+        return 'var(--status-good-color)';
+      case 'cached':
+        return 'var(--status-working-color)';
+      case 'not loaded':
+        return 'var(--text-color-secondary)';
+    }
+  };
+
   return (
-    <div className="model-list-item">
+    <Flex alignItems={'center'}>
       <Tooltip label={description} hasArrow placement="bottom">
-        <div className="model-list-item-name">{name}</div>
+        <Text>{name}</Text>
       </Tooltip>
       <Spacer />
-      <div className={`model-list-item-status ${status.split(' ').join('-')}`}>
-        {status}
-      </div>
-      <Flex gap={2}>
+
+      <Flex gap={4}>
+        <Text color={statusTextColor()}>{status}</Text>
+
         <Button
           size={'sm'}
           onClick={handleChangeModel}
           isDisabled={status === 'active' || isProcessing || !isConnected}
-          className="model-list-item-load-btn"
+          className="modal-close-btn"
         >
           Load
         </Button>
         <IAIAlertDialog
           title={'Delete Model?'}
-          acceptCallback={() => dispatch(deleteModel(name))}
+          acceptCallback={handleModelDelete}
           acceptButtonText={'Delete'}
           triggerComponent={
             <IconButton
@@ -70,7 +77,7 @@ const ModelListItem = (props: ModelListItemProps) => {
               size={'sm'}
               aria-label="Delete Config"
               isDisabled={status === 'active' || isProcessing || !isConnected}
-              className="model-list-item-load-btn"
+              className=" modal-close-btn"
             />
           }
         >
@@ -85,7 +92,7 @@ const ModelListItem = (props: ModelListItemProps) => {
           </Flex>
         </IAIAlertDialog>
       </Flex>
-    </div>
+    </Flex>
   );
 };
 
@@ -109,38 +116,25 @@ const ModelList = () => {
   const { models } = useAppSelector(modelListSelector);
 
   return (
-    <Accordion
-      allowToggle
-      className="model-list-accordion"
-      variant={'unstyled'}
-    >
-      <div className="model-list-header">
-        <h2>Models</h2>
+    <Flex flexDirection={'column'} rowGap="1rem">
+      <Flex justifyContent={'space-between'}>
+        <Text fontSize={'1.4rem'} fontWeight="bold">
+          Available Models
+        </Text>
         <AddModel />
-      </div>
+      </Flex>
 
-      <AccordionItem>
-        <AccordionButton>
-          <div className="model-list-button">
-            <h2>Available Models</h2>
-            <AccordionIcon />
-          </div>
-        </AccordionButton>
-
-        <AccordionPanel>
-          <div className="model-list-list">
-            {models.map((model, i) => (
-              <ModelListItem
-                key={i}
-                name={model.name}
-                status={model.status}
-                description={model.description}
-              />
-            ))}
-          </div>
-        </AccordionPanel>
-      </AccordionItem>
-    </Accordion>
+      <Flex flexDirection={'column'} rowGap={2}>
+        {models.map((model, i) => (
+          <ModelListItem
+            key={i}
+            name={model.name}
+            status={model.status}
+            description={model.description}
+          />
+        ))}
+      </Flex>
+    </Flex>
   );
 };
 
