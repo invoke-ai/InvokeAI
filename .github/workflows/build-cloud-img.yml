@@ -24,14 +24,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # only x86_64 for now. aarch64+cuda isn't really a thing yet
         arch:
         - x86_64
+        - aarch64
     runs-on: ubuntu-latest
     name: ${{ matrix.arch }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      if: matrix.arch == 'aarch64'
 
     - name: Docker meta
       id: meta
@@ -39,9 +43,9 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         # see https://github.com/docker/metadata-action
-        # will push the following tags (suffixed wit the arch):
+        # will push the following tags:
         # :edge
-        # :main (+ any other branches enabled in the workflow
+        # :main (+ any other branches enabled in the workflow)
         # :<tag>
         # :1.2.3 (for semver tags)
         # :1.2 (for semver tags)
@@ -53,10 +57,8 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=sha
-        # will su
         flavor: |
-          latest=false
-          suffix=-${{ matrix.arch }}
+          latest=auto
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
