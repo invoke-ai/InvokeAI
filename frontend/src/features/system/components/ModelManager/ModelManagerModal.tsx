@@ -9,6 +9,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import React, { cloneElement, ReactElement } from 'react';
+import ModelEdit from './ModelEdit';
 import ModelList from './ModelList';
 
 type ModelManagerModalProps = {
@@ -38,9 +39,10 @@ export default function ModelManagerModal({
         <ModalContent className=" modal">
           <ModalCloseButton className="modal-close-btn" />
           <ModalHeader>Model Manager</ModalHeader>
-          <Box padding={'0 2rem 1rem 2rem'} width="100%">
+          <Flex padding={'0 2rem 1rem 2rem'} width="100%" columnGap={'2rem'}>
             <ModelList />
-          </Box>
+            <ModelEdit />
+          </Flex>
         </ModalContent>
       </Modal>
     </>

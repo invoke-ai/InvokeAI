@@ -5,13 +5,13 @@ interface IAIInputProps extends InputProps {
   styleClass?: string;
   label?: string;
   width?: string | number;
-  value: string;
+  value?: string;
   onChange: (e: ChangeEvent<HTMLInputElement>) => void;
 }
 
 export default function IAIInput(props: IAIInputProps) {
   const {
-    label,
+    label = '',
     styleClass,
     isDisabled = false,
     fontSize = '1rem',
