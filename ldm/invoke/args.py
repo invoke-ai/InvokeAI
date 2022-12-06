@@ -172,14 +172,20 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             sysargs = sys.argv[1:]
+            # pre-parse to get the root directory; ignore the rest
+            switches = self._arg_parser.parse_args(sysargs)
+            Globals.root = switches.root_dir or Globals.root
+
+            # now use root directory to find the init file
             initfile = os.path.expanduser(os.path.join(Globals.root,Globals.initfile))
+            legacyinit = os.path.expanduser('~/.invokeai')
             if os.path.exists(initfile):
                 print(f'>> Initialization file {initfile} found. Loading...')
                 sysargs.insert(0,f'@{initfile}')
-            else:
-                from ldm.invoke.CLI import emergency_model_reconfigure
-                emergency_model_reconfigure()
-                sys.exit(-1)
+            elif os.path.exists(legacyinit):
+                print(f'>> WARNING: Old initialization file found at {legacyinit}. This location is deprecated. Please move it to {Globals.root}/invokeai.init.')
+                sysargs.insert(0,f'@{legacyinit}')
+
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
