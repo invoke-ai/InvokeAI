@@ -25,7 +25,6 @@ import {
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
 } from 'features/system/store/systemSlice';
-import ModelList from './ModelList';
 import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
 import IAISwitch from 'common/components/IAISwitch';
 import IAISelect from 'common/components/IAISelect';
@@ -121,7 +120,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
       <Modal
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
-        size="xl"
+        size="lg"
       >
         <ModalOverlay />
         <ModalContent className="modal settings-modal">
@@ -129,9 +128,6 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalCloseButton className="modal-close-btn" />
           <ModalBody className="settings-modal-content">
             <div className="settings-modal-items">
-              <div className="settings-modal-item">
-                <ModelList />
-              </div>
               <div
                 className="settings-modal-item"
                 style={{ gridAutoFlow: 'row', rowGap: '0.5rem' }}
