@@ -47,7 +47,7 @@ _default_personalization_config_params = dict(
     placeholder_strings=["*"],
     initializer_wods=["sculpture"],
     per_image_tokens=False,
-    num_vectors_per_token=8,
+    num_vectors_per_token=1,
     progressive_words=False
 )
 
