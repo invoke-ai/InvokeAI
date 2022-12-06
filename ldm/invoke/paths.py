@@ -33,7 +33,7 @@ class Paths:
     def root(self) -> PathSpec:
         return PathSpec(
             kind = "directory",
-            description = "InvokeAI runtime (root)",
+            description = "InvokeAI application",
             location = self.root_dir
         )
 
@@ -91,6 +91,14 @@ class Paths:
             kind = "file",
             description = "Application init",
             location = self.root.location / "invokeai.init"
+        )
+
+    @property
+    def core_models(self) -> PathSpec:
+        return PathSpec(
+            kind = "file",
+            description = "Core supported models config",
+            location = self.configs.location / "INITIAL_MODELS.yaml"
         )
 
     ## not yet in use
