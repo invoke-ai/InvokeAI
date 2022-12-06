@@ -19,7 +19,7 @@ Globals = Namespace()
 Globals.root = '~/invokeai'
 
 # Where to look for the initialization file
-Globals.initfile = os.path.expanduser(os.path.join(Globals.root,'invokeai.init'))
+Globals.initfile = 'invokeai.init'
 
 # Awkward workaround to disable attempted loading of pypatchmatch
 # which is causing CI tests to error out.

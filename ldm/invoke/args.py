@@ -172,7 +172,7 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             sysargs = sys.argv[1:]
-            initfile = os.path.expanduser(Globals.initfile)
+            initfile = os.path.expanduser(os.path.join(Globals.root,Globals.initfile))
             if os.path.exists(initfile):
                 print(f'>> Initialization file {initfile} found. Loading...')
                 sysargs.insert(0,f'@{initfile}')

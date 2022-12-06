@@ -134,7 +134,7 @@ if [ "$OS_NAME" == "osx" ]; then
 else
     if (lsmod | grep amdgpu) &>/dev/null ; then
 	echo "Linux system with AMD GPU driver detected. Installing ROCm and CPU support"
-	egrep -v '^-e .' environments-and-requirements/requirements-lin-arm64.txt >requirements.txt
+	egrep -v '^-e .' environments-and-requirements/requirements-lin-amd.txt >requirements.txt
     else
 	echo "Linux system detected. Installing CUDA and CPU support."
 	egrep -v '^-e .' environments-and-requirements/requirements-lin-cuda.txt >requirements.txt

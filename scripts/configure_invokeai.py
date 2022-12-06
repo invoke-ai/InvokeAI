@@ -580,22 +580,7 @@ def get_root(root:str=None)->str:
     elif os.environ.get('INVOKEAI_ROOT'):
         return os.environ.get('INVOKEAI_ROOT')
     else:
-        init_file = os.path.expanduser(Globals.initfile)
-        if not os.path.exists(init_file):
-            return None
-
-    # if we get here, then we read from initfile
-    root = None
-    with open(init_file, 'r') as infile:
-        lines = infile.readlines()
-        for l in lines:
-            if re.search('\s*#',l): # ignore comments
-                continue
-            match = re.search('--root\s*=?\s*"?([^"]+)"?',l)
-            if match:
-                root = match.groups()[0]
-                root = root.strip()
-    return root
+        return Globals.root
 
 #-------------------------------------
 def select_root(root:str, yes_to_all:bool=False):
@@ -678,7 +663,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
             shutil.copytree(src,dest,dirs_exist_ok=True)
         os.makedirs(outputs, exist_ok=True)
 
-    init_file = os.path.expanduser(Globals.initfile)
+    init_file = os.path.join(Globals.root,Globals.initfile)
 
     print(f'Creating the initialization file at "{init_file}".\n')
     with open(init_file,'w') as f:
