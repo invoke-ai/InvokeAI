@@ -1,0 +1,63 @@
+name: Build and push cloud image
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    - development
+    tags:
+      - v*
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        # only x86_64 for now. aarch64+cuda isn't really a thing yet
+        arch:
+        - x86_64
+    runs-on: ubuntu-latest
+    name: ${{ matrix.arch }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=tag
+          type=ref,event=pr
+          type=sha
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - if: github.event_name != 'pull_request'
+      name: Docker login
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push cloud image
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        file: docker-build/Dockerfile.cloud
+        platforms: Linux/${{ matrix.arch }}
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
