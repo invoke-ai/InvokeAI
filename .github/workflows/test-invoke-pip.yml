@@ -118,12 +118,12 @@ jobs:
 
       - name: Run the tests
         id: run-tests
-        # if: matrix.os != 'windows-2022'
+        if: matrix.os != 'windows-2022'
         run: python3 scripts/invoke.py --no-patchmatch --no-nsfw_checker --model ${{ matrix.stable-diffusion-model }} --from_file ${{ env.TEST_PROMPTS }} --root="${{ env.INVOKEAI_ROOT }}" --outdir="${{ env.INVOKEAI_OUTDIR }}"
 
       - name: Archive results
         id: archive-results
-        # if: matrix.os != 'windows-2022'
+        if: matrix.os != 'windows-2022'
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
