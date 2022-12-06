@@ -165,6 +165,7 @@ export declare type ModelStatus = 'active' | 'cached' | 'not loaded';
 export declare type Model = {
   status: ModelStatus;
   description: string;
+  weights: string;
 };
 
 export declare type ModelList = Record<string, Model>;

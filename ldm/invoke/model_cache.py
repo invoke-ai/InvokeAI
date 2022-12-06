@@ -137,8 +137,10 @@ class ModelCache(object):
         for name in self.config:
             try:
                 description = self.config[name].description
+                weights = self.config[name].weights
             except ConfigAttributeError:
                 description = '<no description>'
+                weights = '<not found>'
 
             if self.current_model == name:
                 status = 'active'
@@ -149,7 +151,8 @@ class ModelCache(object):
 
             models[name]={
                 'status' : status,
-                'description' : description
+                'description' : description,
+                'weights': weights
             }
         return models
 
@@ -188,6 +191,8 @@ class ModelCache(object):
 
         config = omega[model_name] if model_name in omega else {}
         for field in model_attributes:
+            if field == 'weights':
+                field.replace('\\', '/')
             config[field] = model_attributes[field]
 
         omega[model_name] = config
@@ -323,7 +328,7 @@ class ModelCache(object):
         for file in files:
             found_models.append({
                 'name': file.stem,
-                'location': str(file.resolve())
+                'location': str(file.resolve()).replace('\\', '/')
             })
 
         return search_folder, found_models
