@@ -57,8 +57,10 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=sha
+        # suffix image tags with architecture
         flavor: |
           latest=auto
+          suffix=-${{ matrix.arch }},latest=true
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
