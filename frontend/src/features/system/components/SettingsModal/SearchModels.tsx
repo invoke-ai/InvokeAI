@@ -12,6 +12,93 @@ import {
   setFoundModels,
   setSearchFolder,
 } from 'features/system/store/systemSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { setShouldShowExistingModelsInSearch } from 'features/options/store/optionsSlice';
+import { FoundModel } from 'app/invokeai';
+
+const existingModelsSelector = createSelector([systemSelector], (system) => {
+  const { model_list } = system;
+
+  const existingModels: string[] = [];
+
+  _.forEach(model_list, (value) => {
+    existingModels.push(value.weights);
+  });
+
+  return existingModels;
+});
+
+function ModelExistsTag() {
+  return (
+    <Box
+      position={'absolute'}
+      zIndex={2}
+      right={4}
+      top={4}
+      fontSize="0.7rem"
+      fontWeight={'bold'}
+      backgroundColor={'var(--accent-color)'}
+      padding={'0.2rem 0.5rem'}
+      borderRadius="0.2rem"
+      alignItems={'center'}
+    >
+      Model Exists
+    </Box>
+  );
+}
+
+interface SearchModelEntry {
+  model: FoundModel;
+  modelsToAdd: string[];
+  setModelsToAdd: React.Dispatch<React.SetStateAction<string[]>>;
+}
+
+function SearchModelEntry({
+  model,
+  modelsToAdd,
+  setModelsToAdd,
+}: SearchModelEntry) {
+  const existingModels = useAppSelector(existingModelsSelector);
+
+  const foundModelsChangeHandler = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!modelsToAdd.includes(e.target.value)) {
+      setModelsToAdd([...modelsToAdd, e.target.value]);
+    } else {
+      setModelsToAdd(_.remove(modelsToAdd, (v) => v !== e.target.value));
+    }
+  };
+
+  return (
+    <Box position="relative">
+      {existingModels.includes(model.location) ? <ModelExistsTag /> : null}
+      <IAICheckbox
+        value={model.name}
+        label={
+          <>
+            <VStack alignItems={'start'}>
+              <p style={{ fontWeight: 'bold' }}>{model.name}</p>
+              <p style={{ fontStyle: 'italic' }}>{model.location}</p>
+            </VStack>
+          </>
+        }
+        isChecked={modelsToAdd.includes(model.name)}
+        isDisabled={existingModels.includes(model.location)}
+        onChange={foundModelsChangeHandler}
+        padding={'1rem'}
+        backgroundColor={'var(--background-color)'}
+        borderRadius={'0.5rem'}
+        _checked={{
+          backgroundColor: 'var(--accent-color)',
+          color: 'var(--text-color)',
+        }}
+        _disabled={{
+          backgroundColor: 'var(--background-color-secondary)',
+        }}
+      ></IAICheckbox>
+    </Box>
+  );
+}
 
 export default function SearchModels() {
   const dispatch = useAppDispatch();
@@ -22,6 +109,12 @@ export default function SearchModels() {
 
   const foundModels = useAppSelector(
     (state: RootState) => state.system.foundModels
+  );
+
+  const existingModels = useAppSelector(existingModelsSelector);
+
+  const shouldShowExistingModelsInSearch = useAppSelector(
+    (state: RootState) => state.options.shouldShowExistingModelsInSearch
   );
 
   const [modelsToAdd, setModelsToAdd] = React.useState<string[]>([]);
@@ -36,21 +129,15 @@ export default function SearchModels() {
     dispatch(searchForModels());
   };
 
-  const foundModelsChangeHandler = (e: ChangeEvent<HTMLInputElement>) => {
-    if (!modelsToAdd.includes(e.target.value)) {
-      setModelsToAdd([...modelsToAdd, e.target.value]);
-    } else {
-      setModelsToAdd(_.remove(modelsToAdd, (v) => v !== e.target.value));
-    }
-  };
-
   const addAllToSelected = () => {
     setModelsToAdd([]);
     if (foundModels) {
       foundModels.forEach((model) => {
-        setModelsToAdd((currentModels) => {
-          return [...currentModels, model.name];
-        });
+        if (!existingModels.includes(model.location)) {
+          setModelsToAdd((currentModels) => {
+            return [...currentModels, model.name];
+          });
+        }
       });
     }
   };
@@ -76,41 +163,43 @@ export default function SearchModels() {
       };
       dispatch(addNewModel(modelFormat));
     });
+    setModelsToAdd([]);
   };
 
   const renderFoundModels = () => {
-    const foundModelsToRender: ReactNode[] = [];
+    const newFoundModels: ReactNode[] = [];
+    const existingFoundModels: ReactNode[] = [];
 
     if (foundModels) {
       foundModels.forEach((model, index) => {
-        foundModelsToRender.push(
-          <Box key={index}>
-            <IAICheckbox
-              value={model.name}
-              label={
-                <>
-                  <VStack alignItems={'start'}>
-                    <p style={{ fontWeight: 'bold' }}>{model.name}</p>
-                    <p style={{ fontStyle: 'italic' }}>{model.location}</p>
-                  </VStack>
-                </>
-              }
-              isChecked={modelsToAdd.includes(model.name)}
-              onChange={foundModelsChangeHandler}
-              padding={'1rem'}
-              backgroundColor={'var(--background-color)'}
-              borderRadius={'0.5rem'}
-              _checked={{
-                backgroundColor: 'var(--accent-color)',
-                color: 'var(--text-color)',
-              }}
-            ></IAICheckbox>
-          </Box>
-        );
+        if (existingModels.includes(model.location)) {
+          existingFoundModels.push(
+            <SearchModelEntry
+              key={index}
+              model={model}
+              modelsToAdd={modelsToAdd}
+              setModelsToAdd={setModelsToAdd}
+            />
+          );
+        } else {
+          newFoundModels.push(
+            <SearchModelEntry
+              key={index}
+              model={model}
+              modelsToAdd={modelsToAdd}
+              setModelsToAdd={setModelsToAdd}
+            />
+          );
+        }
       });
     }
 
-    return foundModelsToRender;
+    return (
+      <>
+        {newFoundModels}
+        {shouldShowExistingModelsInSearch && existingFoundModels}
+      </>
+    );
   };
 
   return (
@@ -136,7 +225,11 @@ export default function SearchModels() {
           >
             Checkpoint Folder
           </p>
-          <p style={{ fontWeight: 'bold' }}>{searchFolder}</p>
+          <p
+            style={{ fontWeight: 'bold', fontSize: '0.8rem', maxWidth: '80%' }}
+          >
+            {searchFolder}
+          </p>
           <IAIIconButton
             aria-label="Clear Checkpoint Folder"
             icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
@@ -173,6 +266,17 @@ export default function SearchModels() {
               >
                 Deselect All
               </IAIButton>
+              <IAICheckbox
+                label="Show Existing"
+                isChecked={shouldShowExistingModelsInSearch}
+                onChange={() =>
+                  dispatch(
+                    setShouldShowExistingModelsInSearch(
+                      !shouldShowExistingModelsInSearch
+                    )
+                  )
+                }
+              />
             </Flex>
 
             <IAIButton

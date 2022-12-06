@@ -55,6 +55,7 @@ export interface OptionsState {
   upscalingStrength: number;
   variationAmount: number;
   width: number;
+  shouldShowExistingModelsInSearch: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -101,6 +102,7 @@ const initialOptionsState: OptionsState = {
   upscalingStrength: 0.75,
   variationAmount: 0.1,
   width: 512,
+  shouldShowExistingModelsInSearch: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -396,6 +398,12 @@ export const optionsSlice = createSlice({
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
     },
+    setShouldShowExistingModelsInSearch: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldShowExistingModelsInSearch = action.payload;
+    },
   },
 });
 
@@ -451,6 +459,7 @@ export const {
   setUpscalingStrength,
   setVariationAmount,
   setWidth,
+  setShouldShowExistingModelsInSearch,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
