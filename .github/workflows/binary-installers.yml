@@ -13,23 +13,23 @@ jobs:
       fail-fast: false
       matrix:
         output-file:
-          - py3.10-darwin-x86_64-reqs
-          - py3.10-linux-x86_64-cuda-reqs
-          - py3.10-windows-x86_64-cuda-reqs
+          - darwin-x86_64-reqs
+          - linux-x86_64-cuda-reqs
+          - windows-x86_64-cuda-reqs
         python-version:
           - '3.9'
           - '3.10'
         include:
-          - output-file: py3.10-darwin-x86_64-reqs
+          - output-file: darwin-x86_64-reqs
             os: macos-12
             requirements-file: requirements-mac-mps-cpu.txt
-          - output-file: py3.10-linux-x86_64-cuda-reqs
+          - output-file: linux-x86_64-cuda-reqs
             os: ubuntu-22.04
             requirements-file: requirements-lin-cuda.txt
-          - output-file: py3.10-windows-x86_64-cuda-reqs
+          - output-file: windows-x86_64-cuda-reqs
             os: windows-2022
             requirements-file: requirements-win-colab-cuda.txt
-    name: ${{ matrix.output-file }} on Python ${{ matrix.python-version }}
+    name: py${{ matrix.python-version }}-${{ matrix.output-file }}.txt
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -54,11 +54,11 @@ jobs:
 
       - name: run pip-compile
         id: pip-compile
-        run: pip-compile --allow-unsafe --generate-hashes --output-file=binary_installer/${{ matrix.output-file }}.txt binary_installer/requirements.in
+        run: pip-compile --allow-unsafe --generate-hashes --output-file=binary_installer/py${{ matrix.python-version }}-${{ matrix.output-file }}.txt binary_installer/requirements.in
 
       - name: Archive results
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ matrix.output-file }}_${{ matrix.python-version }}
+          name: results_py${{ matrix.python-version }}-${{ matrix.output-file }}_${{ matrix.python-version }}
           path: binary_installer
