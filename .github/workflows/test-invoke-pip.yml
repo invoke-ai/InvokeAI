@@ -46,12 +46,22 @@ jobs:
             stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
     name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
-    env:
-      INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
     steps:
       - name: Checkout sources
         id: checkout-sources
         uses: actions/checkout@v3
+
+      - name: set INVOKEAI_ROOT Windows
+        if: matrix.os == 'windows-2022'
+        run: |
+          echo "INVOKEAI_ROOT=${{ github.workspace }}\invokeai" >> ${{ matrix.github-env }}
+          echo "INVOKEAI_OUTDIR=${{ github.workspace }}\invokeai\outputs" >> ${{ matrix.github-env }}
+
+      - name: set INVOKEAI_ROOT others
+        if: matrix.os != 'windows-2022'
+        run: |
+          echo "INVOKEAI_ROOT=${{ github.workspace }}/invokeai" >> ${{ matrix.github-env }}
+          echo "INVOKEAI_OUTDIR=${{ github.workspace }}/invokeai/outputs" >> ${{ matrix.github-env }}
 
       - name: create models.yaml from example
         run: |
@@ -109,7 +119,7 @@ jobs:
       - name: Run the tests
         id: run-tests
         # if: matrix.os != 'windows-2022'
-        run: python3 scripts/invoke.py --no-patchmatch --no-nsfw_checker --model ${{ matrix.stable-diffusion-model }} --from_file ${{ env.TEST_PROMPTS }} --root="${{ env.INVOKEAI_ROOT }}" --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
+        run: python3 scripts/invoke.py --no-patchmatch --no-nsfw_checker --model ${{ matrix.stable-diffusion-model }} --from_file ${{ env.TEST_PROMPTS }} --root="${{ env.INVOKEAI_ROOT }}" --outdir="${{ env.INVOKEAI_OUTDIR }}"
 
       - name: Archive results
         id: archive-results
