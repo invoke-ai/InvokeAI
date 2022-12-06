@@ -60,15 +60,15 @@ jobs:
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
-        run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_ENV
+        run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> ${{ matrix.github-env }}
 
       - name: set test prompt to development branch validation
         if: ${{ github.ref == 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_ENV
+        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> ${{ matrix.github-env }}
 
       - name: set test prompt to Pull Request validation
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
+        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: create requirements.txt
         run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
