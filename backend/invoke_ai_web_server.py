@@ -305,6 +305,7 @@ class InvokeAIWebServer:
             try:
                 # Using tkinter to get the filepath because JS doesn't allow
                 root = tk.Tk()
+                root.iconify() # for macos
                 root.withdraw()
                 root.wm_attributes('-topmost', 1)
                 root.focus_force()
