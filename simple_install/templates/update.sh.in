@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -eu
+
+INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
+
+# ensure we're in the correct folder in case user's CWD is somewhere else
+scriptdir=$(dirname "$0")
+cd "$scriptdir"
+
+. .venv/bin/activate
+
+pip install $INVOKE_AI_SRC
+
+
+
+

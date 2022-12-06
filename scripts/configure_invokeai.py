@@ -234,7 +234,7 @@ This involves a few easy steps.
    "Role" should be "read").
 
    Now copy the token to your clipboard and paste it at the prompt. Windows
-   users can paste with right-click.
+   users can paste with right-click or Ctrl-Shift-V.
    Token: '''
         )
         access_token = getpass_asterisk.getpass_asterisk()
@@ -626,18 +626,16 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root_selected = False
     while not root_selected:
-        root = select_root(root,yes_to_all)
         outputs = select_outputs(root,yes_to_all)
-        Globals.root = os.path.abspath(root)
         outputs = outputs if os.path.isabs(outputs) else os.path.abspath(os.path.join(Globals.root,outputs))
 
-        print(f'\nInvokeAI models and configuration files will be placed into "{root}" and image outputs will be placed into "{outputs}".')
+        print(f'\nInvokeAI image outputs will be placed into "{outputs}".')
         if not yes_to_all:
-            root_selected = yes_or_no('Accept these locations?')
+            root_selected = yes_or_no('Accept this location?')
         else:
             root_selected = True
 
-    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
+    print(f'\nYou may change the chosen output directory at any time by editing the --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
 
     enable_safety_checker = True
@@ -651,6 +649,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
         print('It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker.')
         print('The following option will set whether the checker is enabled by default. Like other options, you can')
         print(f'change this setting later by editing the file {Globals.initfile}.')
+        print(f'The NSFW checker is a memory hog. If you have less than 6 GB of VRAM answer NO to this option.')
         enable_safety_checker = yes_or_no('Enable the NSFW checker by default?',enable_safety_checker)
 
         print('\nThe next choice selects the sampler to use by default. Samplers have different speed/performance')
@@ -687,9 +686,6 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 # This is the InvokeAI initialization file, which contains command-line default values.
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
 # or renaming it and then running configure_invokeai.py again.
-
-# The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
---root="{Globals.root}"
 
 # the --outdir option controls the default location of image files.
 --outdir="{outputs}"
@@ -757,7 +753,7 @@ def main():
 
         # We check for to see if the runtime directory is correctly initialized.
         if Globals.root == '' \
-           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
+           or not os.path.exists(os.path.join(Globals.root,'invokeai.init')):
             initialize_rootdir(Globals.root,opt.yes_to_all)
 
         # Optimistically try to download all required assets. If any errors occur, add them and proceed anyway.

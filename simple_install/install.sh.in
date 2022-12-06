@@ -4,8 +4,12 @@
 scriptdir=$(dirname "$0")
 cd "$scriptdir"
 
+# make sure we are not already in a venv
+deactivate
+
 # this should be changed to the tagged release!
-INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
+# INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
+INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/lstein-simple-install.zip
 INSTRUCTIONS='<insert URL here>'
 TROUBLESHOOTING='<insert URL here>'
 MINIMUM_PYTHON_VERSION=3.9.0
@@ -17,6 +21,17 @@ function _err_exit {
     if test "$1" -ne 0
     then
         echo -e "Error code $1; Error caught was '$2'"
+	if [ "$OS_NAME" == "osx" ]; then
+	    echo "Something went wrong while installing InvokeAI and/or its requirements."
+	    echo "You may need to the Xcode command line tools to proceed. See step number 3 of"
+	    echo "https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#walk_through for"
+	    echo "installation instructions and then run this script again."
+	else
+	    echo "Something went wrong while installing InvokeAI and/or its requirements."
+	    echo "See https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#troubleshooting for troubleshooting"
+	    echo "tips, or visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
+	    echo "installation methods"
+	fi
         read -p "Press any key to exit..."
         exit
     fi
@@ -127,75 +142,36 @@ else
 fi
 
 pip install -r requirements.txt
-_err_exit $? "Installation of requirements failed. Please see above error messages and $TROUBLESHOOTING for help."
-
+_err_exit $? "Failed to install InvokeAI's dependencies."
 
 #--------------------------------------------------------------------------------
 echo
 echo "*** Installing InvokeAI Modules and Executables ***"
 pip install $INVOKE_AI_SRC
-_err_exit $? "Installation of InvokeAI failed. Please see above error messages and $TROUBLESHOOTING for help."
-
+_err_exit $? "Installation of InvokeAI failed."
 
 #--------------------------------------------------------------------------------
 echo " *** Setting Up Root Directory $ROOTDIR *** "
 cp -pr templates/rootdir/* $ROOTDIR/
 cp templates/invoke.sh.in $ROOTDIR/invoke.sh
 chmod a+rx $ROOTDIR/invoke.sh
-
-echo " *** NOT CONFIGURING YET *** "
-exit 0
+cp templates/update.sh.in $ROOTDIR/update.sh
+chmod a+rx $ROOTDIR/update.sh
 
 #--------------------------------------------------------------------------------
 echo
 echo "*** Confguring InvokeAI ***"
 cp -pr templates/rootdir/* $ROOTDIR/
-$ROOTDIR/.env/bin/configure_invokeai.py --root=$ROOTDIR
+pushd $ROOTDIR
+./.venv/bin/configure_invokeai.py --root=$ROOTDIR
 _err_exit $? "Initial configuration failed. Please see above error messages and $TROUBLESHOOTING for help."
 
 #--------------------------------------------------------------------------------
+popd
 cp templates/invoke.sh.in $ROOTDIR/invoke.sh
 chmod a+rx $ROOTDIR/invoke.sh
-echo "all done"
 
-exit 0
+cp templates/update.sh.in $ROOTDIR/update.sh
+chmod a+rx $ROOTDIR/update.sh
 
-
-status=$?
-
-if test $status -ne 0
-then
-    if [ "$OS_NAME" == "osx" ]; then
-	echo "Python failed to install the environment. You may need to install"
-	echo "the Xcode command line tools to proceed. See step number 3 of"
-	echo "https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#walk_through for"
-	echo "installation instructions and then run this script again."
-    else
-	echo "Something went wrong while installing Python libraries and cannot continue."
-	echo "See https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#troubleshooting for troubleshooting"
-	echo "tips, or visit https://invoke-ai.github.io/InvokeAI/#installation for alternative"
-	echo "installation methods"
-    fi
-else
-    cp ./source_installer/invoke.sh.in ./invoke.sh
-    cp ./source_installer/update.sh.in ./update.sh
-    chmod a+rx ./source_installer/invoke.sh.in
-    chmod a+rx ./source_installer/update.sh.in
-
-    conda activate invokeai
-    # configure
-    echo "Calling the configure_invokeai script"
-    python scripts/configure_invokeai.py
-    status=$?
-    if test $status -ne 0
-       then
-	   echo "The configure_invoke.py script crashed or was cancelled."
-           echo "InvokeAI is not ready to run. Try again by running"
-           echo "update.sh in this directory."
-       else
-           # tell the user their next steps
-	   echo "You can now start generating images by running invoke.sh (inside this folder), using ./invoke.sh"
-       fi
-fi
-
-conda activate invokeai
+echo "You may now run InvokeAI by entering the directory $ROOTDIR and running invoke.sh"
