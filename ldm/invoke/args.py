@@ -94,10 +94,10 @@ import base64
 import functools
 import warnings
 import ldm.invoke.pngwriter
-from pathlib import Path
-from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
+from ldm.invoke.config import RuntimeDir, Config
 
+## TODO import these from Config?
 SAMPLER_CHOICES = [
     'ddim',
     'k_dpm_2_a',
@@ -369,6 +369,10 @@ class Args(object):
         This defines all the arguments used on the command line when you launch
         the CLI or web backend.
         '''
+
+        runtime_dir = RuntimeDir()
+        runtime_dir.set_root()
+
         parser = PagingArgumentParser(
             description=
             """
@@ -392,20 +396,21 @@ class Args(object):
         deprecated_group.add_argument('--weights') # deprecated
         model_group.add_argument(
             '--root_dir',
-            default=None,
-            help=f'Path to directory containing "models", "outputs" and "configs". If not present will look in environment variable INVOKEAI_ROOT and default to {Globals.root}',
+            '--root',
+            default = runtime_dir.root,
+            help=f'Path to directory containing "models", "outputs" and "configs". If not present will look in environment variable INVOKEAI_ROOT and default to "{runtime_dir.root}"',
         )
         model_group.add_argument(
             '--config',
             '-c',
             '-config',
             dest='conf',
-            default='./configs/models.yaml',
-            help='Path to configuration file for alternate models.',
+            default = runtime_dir.paths.configs.location / 'models.yaml',
+            help=f'Path to configuration file for alternate models. [{runtime_dir.paths.configs.location / "models.yaml"}]',
         )
         model_group.add_argument(
             '--model',
-            help='Indicates which diffusion model to load (defaults to "default" stanza in configs/models.yaml)',
+            help=f'Indicates which diffusion model to load (defaults to "default" stanza in {runtime_dir.paths.configs.location / "models.yaml"})',
         )
         model_group.add_argument(
             '--png_compression','-z',
@@ -468,8 +473,8 @@ class Args(object):
             '--outdir',
             '-o',
             type=str,
-            help='Directory to save generated images and a log of prompts and seeds. Default: outputs/img-samples',
-            default='outputs/img-samples',
+            default=runtime_dir.paths.outputs.location / "img-samples",
+            help=f'Directory to save generated images and a log of prompts and seeds. [{runtime_dir.paths.outputs.location / "img-samples"}]',
         )
         file_group.add_argument(
             '--prompt_as_dir',

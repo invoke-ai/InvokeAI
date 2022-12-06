@@ -8,7 +8,7 @@ import time
 import traceback
 import yaml
 
-from ldm.invoke.globals import Globals
+from ldm.invoke.config import RuntimeDir
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.invoke.readline import get_completer, Completer
 from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
@@ -20,16 +20,17 @@ from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
 
-# global used in multiple functions (fix)
-infile = None
-
 def main():
-    """Initialize command-line parsers and the diffusion model"""
-    global infile
+    """
+    Initialize command-line parsers and the diffusion model
+    """
+
     print('* Initializing, be patient...')
-    
+
     opt  = Args()
     args = opt.parse_args()
+    runtime_dir = RuntimeDir(root_path=args.root_dir)
+
     if not args:
         sys.exit(-1)
 
@@ -45,10 +46,9 @@ def main():
             args.max_loaded_models = 1
 
     # alert - setting globals here
-    Globals.root = os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or os.path.abspath('.'))
-    Globals.try_patchmatch = args.patchmatch
-    
-    print(f'>> InvokeAI runtime directory is "{Globals.root}"')
+    # Globals.try_patchmatch = args.patchmatch
+
+    print(f'>> InvokeAI runtime directory is "{runtime_dir.root}"')
 
     # loading here to avoid long delays on startup
     from ldm.generate import Generate
@@ -62,18 +62,19 @@ def main():
     gfpgan,codeformer,esrgan = load_face_restoration(opt)
 
     # normalize the config directory relative to root
-    if not os.path.isabs(opt.conf):
-        opt.conf = os.path.normpath(os.path.join(Globals.root,opt.conf))
+    if not Path.is_absolute(opt.conf):
+        opt.conf = str((runtime_dir.root / opt.conf).expanduser().resolve())
 
     if opt.embeddings:
-        if not os.path.isabs(opt.embedding_path):
-            embedding_path = os.path.normpath(os.path.join(Globals.root,opt.embedding_path))
+        if not Path(opt.embedding_path).is_absolute():
+            embedding_path = str((runtime_dir.root / opt.embedding_path).expanduser().resolve())
         else:
-            embedding_path = opt.embedding_path
+            embedding_path = Path(opt.embedding_path).resolve()
     else:
         embedding_path = None
 
     # load the infile as a list of lines
+    # TODO: deprecate this? or delete?
     if opt.infile:
         try:
             if os.path.isfile(opt.infile):
@@ -341,8 +342,8 @@ def main_loop(gen, opt):
                             filename,
                             tool,
                             formatted_dream_prompt,
-                        )                           
-                        
+                        )
+
                     if (not postprocessed) or opt.save_original:
                         # only append to results if we didn't overwrite an earlier output
                         results.append([path, formatted_dream_prompt])
@@ -432,7 +433,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         add_embedding_terms(gen, completer)
         completer.add_history(command)
         operation = None
-        
+
     elif command.startswith('!models'):
         gen.model_cache.print_models()
         completer.add_history(command)
@@ -533,7 +534,7 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
 
     completer.complete_extensions(('.yaml','.yml'))
     completer.linebuffer = 'configs/stable-diffusion/v1-inference.yaml'
-    
+
     done = False
     while not done:
         new_config['config'] = input('Configuration file for this model: ')
@@ -564,7 +565,7 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
                 print('** Please enter a valid integer between 64 and 2048')
 
     make_default = input('Make this the default model? [n] ') in ('y','Y')
-    
+
     if write_config_file(opt.conf, gen, model_name, new_config, make_default=make_default):
         completer.add_model(model_name)
 
@@ -577,14 +578,14 @@ def del_config(model_name:str, gen, opt, completer):
     gen.model_cache.commit(opt.conf)
     print(f'** {model_name} deleted')
     completer.del_model(model_name)
-    
+
 def edit_config(model_name:str, gen, opt, completer):
     config = gen.model_cache.config
-    
+
     if model_name not in config:
         print(f'** Unknown model {model_name}')
         return
-    
+
     print(f'\n>> Editing model {model_name} from configuration file {opt.conf}')
 
     conf = config[model_name]
@@ -597,10 +598,10 @@ def edit_config(model_name:str, gen, opt, completer):
     make_default = input('Make this the default model? [n] ') in ('y','Y')
     completer.complete_extensions(None)
     write_config_file(opt.conf, gen, model_name, new_config, clobber=True, make_default=make_default)
-    
+
 def write_config_file(conf_path, gen, model_name, new_config, clobber=False, make_default=False):
     current_model = gen.model_name
-    
+
     op = 'modify' if clobber else 'import'
     print('\n>> New configuration:')
     if make_default:
@@ -623,7 +624,7 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
         gen.model_cache.set_default_model(model_name)
 
     gen.model_cache.commit(conf_path)
-    
+
     do_switch = input(f'Keep model loaded? [y]')
     if len(do_switch)==0 or do_switch[0] in ('y','Y'):
         pass
@@ -653,7 +654,7 @@ def do_postprocess (gen, opt, callback):
         opt.prompt = opt.new_prompt
     else:
         opt.prompt = None
-        
+
     if os.path.dirname(file_path) == '': #basename given
         file_path = os.path.join(opt.outdir,file_path)
 
@@ -718,7 +719,7 @@ def add_postprocessing_to_metadata(opt,original_file,new_file,tool,command):
     )
     meta['image']['postprocessing'] = pp
     write_metadata(new_file,meta)
-    
+
 def prepare_image_metadata(
         opt,
         prefix,
@@ -796,21 +797,21 @@ def invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan):
     os.chdir(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     )
-    
+
     invoke_ai_web_server = InvokeAIWebServer(generate=gen, gfpgan=gfpgan, codeformer=codeformer, esrgan=esrgan)
 
     try:
         invoke_ai_web_server.run()
     except KeyboardInterrupt:
         pass
-    
+
 def add_embedding_terms(gen,completer):
     '''
     Called after setting the model, updates the autocompleter with
     any terms loaded by the embedding manager.
     '''
     completer.add_embedding_terms(gen.model.embedding_manager.list_terms())
-    
+
 def split_variations(variations_string) -> list:
     # shotgun parsing, woo
     parts = []
@@ -867,7 +868,7 @@ def make_step_callback(gen, opt, prefix):
             image = gen.sample_to_image(img)
             image.save(filename,'PNG')
     return callback
-    
+
 def retrieve_dream_command(opt,command,completer):
     '''
     Given a full or partial path to a previously-generated image file,
@@ -875,7 +876,7 @@ def retrieve_dream_command(opt,command,completer):
     and pop it into the readline buffer (linux, Mac), or print out a comment
     for cut-and-paste (windows)
 
-    Given a wildcard path to a folder with image png files, 
+    Given a wildcard path to a folder with image png files,
     will retrieve and format the dream command used to generate the images,
     and save them to a file commands.txt for further processing
     '''
@@ -911,7 +912,7 @@ def write_commands(opt, file_path:str, outfilepath:str):
     except ValueError:
         print(f'## "{basename}": unacceptable pattern')
         return
- 
+
     commands = []
     cmd = None
     for path in paths:
@@ -940,8 +941,7 @@ def emergency_model_reconfigure():
     print('   After reconfiguration is done, please relaunch invoke.py.                      ')
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('configure_invokeai is launching....\n')
-    
+
     sys.argv = ['configure_invokeai','--interactive']
     import configure_invokeai
     configure_invokeai.main()
-
