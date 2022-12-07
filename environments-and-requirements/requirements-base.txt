@@ -17,6 +17,7 @@ kornia
 numpy
 omegaconf
 opencv-python
+picklescan
 pillow
 pip>=22
 pudb
@@ -32,9 +33,8 @@ test-tube>=0.7.5
 torch-fidelity
 torchmetrics
 transformers==4.21.*
-picklescan
-https://github.com/TencentARC/GFPGAN/archive/master.zip#egg=gfpgan
-https://github.com/openai/CLIP/archive/main.zip#egg=clip
-https://github.com/Birch-san/k-diffusion/archive/mps.zip#egg=k-diffusion
-https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip#egg=clipseg
-https://github.com/invoke-ai/PyPatchMatch/archive/master.zip#egg=pypatchmatch
+https://github.com/TencentARC/GFPGAN/archive/refs/tags/v1.3.8.zip#egg=gfpgan
+https://github.com/Birch-san/k-diffusion/archive/refs/tags/v0.0.10.zip#egg=k-diffusion
+https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.4.zip#egg=pypatchmatch
+https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip#egg=clip
+https://github.com/timojl/clipseg/archive/a5dc13f3649ce67d58505401ce7a7dd25601ffba.zip#egg=clipseg
