@@ -26,6 +26,9 @@ it.
 Prior to installing PyPatchMatch, you need to take the following
 steps:
 
+### Debian Based Distros
+
+
 1. Install the `build-essential` tools:
 
    ```
@@ -44,6 +47,7 @@ steps:
    ```
    cd /usr/lib/x86_64-linux-gnu/pkgconfig/
    ln -sf opencv4.pc opencv.pc
+   ```
 
 4. Activate the environment you use for invokeai, either with
 `conda` or with a virtual environment.
@@ -51,7 +55,7 @@ steps:
 5. Do a "develop" install of pypatchmatch:
 
    ```
-   pip install -e git+https://github.com/invoke-ai/PyPatchMatch@0.1.3#egg=pypatchmatch
+   pip install -e "git+https://github.com/invoke-ai/PyPatchMatch@0.1.3#egg=pypatchmatch"
    ```
 
 6. Confirm that pypatchmatch is installed.
@@ -79,8 +83,33 @@ steps:
    [link] libpatchmatch.so ...
    ```
 
+
+### Arch Based Distros
+
+1. Install the `base-devel` package:
+   ```
+   sudo pacman -Syu
+   sudo pacman -S --needed base-devel
+   ```
+
+2. Install `opencv`:
+   ```
+   sudo pacman -S opencv
+   ```
+   or for CUDA support
+   ```
+   sudo pacman -S opencv-cuda
+   ```
+
+3. Fix the naming of the `opencv` package configuration file:
+   ```
+   cd /usr/lib/pkgconfig/
+   ln -sf opencv4.pc opencv.pc
+   ```
+
+**Next, Follow Steps 4-6 from the Debian Section above**
+
+
 If you see no errors, then you're ready to go!
-
-
 
 
