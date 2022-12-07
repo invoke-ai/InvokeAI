@@ -10,8 +10,8 @@ deactivate
 # this should be changed to the tagged release!
 # INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
 INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/lstein-simple-install.zip
-INSTRUCTIONS='<insert URL here>'
-TROUBLESHOOTING='<insert URL here>'
+INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
+TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 MINIMUM_PYTHON_VERSION=3.9.0
 
 set -euo pipefail
@@ -157,6 +157,9 @@ cp templates/invoke.sh.in $ROOTDIR/invoke.sh
 chmod a+rx $ROOTDIR/invoke.sh
 cp templates/update.sh.in $ROOTDIR/update.sh
 chmod a+rx $ROOTDIR/update.sh
+
+# This allows the updater to work!
+cp -pr environments-and-requirements requirements.txt $ROOTDIR/
 
 #--------------------------------------------------------------------------------
 echo

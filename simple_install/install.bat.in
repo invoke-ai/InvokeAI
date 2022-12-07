@@ -16,8 +16,8 @@ if "%1" == "use-cache" (
 @rem this should be changed to the tagged release!
 @rem set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
 set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/lstein-simple-install.zip
-set INSTRUCTIONS=insert URL here
-set TROUBLESHOOTING=insert URL here
+set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
+set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 set MINIMUM_PYTHON_VERSION=3.9.0
 
 
@@ -127,6 +127,11 @@ if %errorlevel% neq 0 (
 POPD
 copy .\templates\invoke.bat.in %rootdir%\invoke.bat
 copy .\templates\update.bat.in %rootdir%\update.bat
+
+@rem so that update.bat works
+xcopy /I /Y .\environments-and-requirements %rootdir%
+copy .\requirements.txt %rootdir%\requirements.txt
+
 
 echo.
 echo ***** Finished configuration *****
