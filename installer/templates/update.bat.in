@@ -1,4 +1,5 @@
 @echo off
+setlocal
 
 PUSHD "%~dp0"
 call .venv\Scripts\activate.bat
@@ -29,5 +30,5 @@ if %errorlevel% neq 0 (
 
 echo "Press any key to continue"
 pause
-exit 0
+endlocal
 

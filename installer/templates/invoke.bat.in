@@ -1,6 +1,8 @@
 @echo off
 
 PUSHD "%~dp0"
+setlocal
+
 call .venv\Scripts\activate.bat
 set INVOKEAI_ROOT=.
 
@@ -32,3 +34,4 @@ IF /I "%restore%" == "1" (
     pause
     exit /b
 )
+endlocal
