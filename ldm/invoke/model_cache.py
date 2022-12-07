@@ -266,7 +266,9 @@ class ModelCache(object):
         model_hash = self._cached_sha256(weights, weight_bytes)
         sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
         del weight_bytes
-        sd = sd['state_dict']
+        # merged models from auto11 merge board are flat for some reason
+        if 'state_dict' in sd:
+            sd = sd['state_dict']
         model = instantiate_from_config(omega_config.model)
         model.load_state_dict(sd, strict=False)
 
