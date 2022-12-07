@@ -55,7 +55,7 @@ steps:
 5. Do a "develop" install of pypatchmatch:
 
    ```
-   pip install -e "git+https://github.com/invoke-ai/PyPatchMatch@0.1.3#egg=pypatchmatch"
+   pip install "git+https://github.com/invoke-ai/PyPatchMatch@0.1.3#egg=pypatchmatch"
    ```
 
 6. Confirm that pypatchmatch is installed.
