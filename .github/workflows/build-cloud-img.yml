@@ -26,7 +26,8 @@ jobs:
       matrix:
         arch:
         - x86_64
-        - aarch64
+        # requires resolving a patchmatch issue
+        # - aarch64
     runs-on: ubuntu-latest
     name: ${{ matrix.arch }}
     steps:
