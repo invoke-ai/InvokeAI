@@ -1,10 +1,8 @@
 <div align="center">
 
+![project logo](docs/assets/invoke_ai_banner.png)
+
 # InvokeAI: A Stable Diffusion Toolkit
-
-_Formerly known as lstein/stable-diffusion_
-
-![project logo](docs/assets/logo.png)
 
 [![discord badge]][discord link]
 
@@ -48,7 +46,10 @@ _Note: InvokeAI is rapidly evolving. Please use the
 [Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to report bugs and make feature
 requests. Be sure to use the provided templates. They will help us diagnose issues faster._
 
-## Installation Quick-Start
+# Getting Started with InvokeAI
+
+For full installation and upgrade instructions, please see:
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
 1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/tag/v2.2.3)
 2. Download the .zip file for your OS (Windows/macOS/Linux).
@@ -62,8 +63,6 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 <div align="center"><img src="docs/assets/invoke-web-server-1.png" width=640></div>
 
 
-For full installation and upgrade instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
 ## Table of Contents
 
@@ -118,11 +117,12 @@ Similarly, specify full-precision mode on Apple M1 hardware.
 
 Precision is auto configured based on the device. If however you encounter
 errors like 'expected type Float but found Half' or 'not implemented for Half'
-you can try starting `invoke.py` with the `--precision=float32` flag:
+you can try starting `invoke.py` with the `--precision=float32` flag to your initialization command
 
 ```bash
 (invokeai) ~/InvokeAI$ python scripts/invoke.py --precision=float32
 ```
+Or by updating your InvokeAI configuration file with this argument.
 
 ### Features
 
@@ -151,39 +151,7 @@ you can try starting `invoke.py` with the `--precision=float32` flag:
 
 ### Latest Changes
 
-- v2.0.1 (13 November 2022)
-  - fix noisy images at high step count when using k* samplers
-  - dream.py script now calls invoke.py module directly rather than
-    via a new python process (which could break the environment)
-
-- v2.0.0 (9 November 2022)
-
-  - `dream.py` script renamed `invoke.py`. A `dream.py` script wrapper remains
-    for backward compatibility.
-  - Completely new WebGUI - launch with `python3 scripts/invoke.py --web`
-  - Support for <a href="https://invoke-ai.github.io/InvokeAI/features/INPAINTING/">inpainting</a> and <a href="https://invoke-ai.github.io/InvokeAI/features/OUTPAINTING/">outpainting</a>
-  - img2img runs on all k* samplers
-  - Support for <a href="https://invoke-ai.github.io/InvokeAI/features/PROMPTS/#negative-and-unconditioned-prompts">negative prompts</a>
-  - Support for CodeFormer face reconstruction
-  - Support for Textual Inversion on macOS
-  - Support in both WebGUI and CLI for <a href="https://invoke-ai.github.io/InvokeAI/features/POSTPROCESS/">post-processing of previously-generated images</a>
-    using facial reconstruction, ESRGAN upscaling, outcropping (similar to DALL-E infinite canvas),
-    and "embiggen" upscaling. See the `!fix` command.
-  - New `--hires` option on `invoke>` line allows <a href="https://invoke-ai.github.io/InvokeAI/features/CLI/#txt2img">larger images to be created without duplicating elements</a>, at the cost of some performance.
-  - New `--perlin` and `--threshold` options allow you to add and control variation
-    during image generation (see <a href="https://github.com/invoke-ai/InvokeAI/blob/main/docs/features/OTHER.md#thresholding-and-perlin-noise-initialization-options">Thresholding and Perlin Noise Initialization</a>
-  - Extensive metadata now written into PNG files, allowing reliable regeneration of images
-    and tweaking of previous settings.
-  - Command-line completion in `invoke.py` now works on Windows, Linux and macOS platforms.
-  - Improved <a href="https://invoke-ai.github.io/InvokeAI/features/CLI/">command-line completion behavior</a>.
-    New commands added:
-    - List command-line history with `!history`
-    - Search command-line history with `!search`
-    - Clear history with `!clear`
-  - Deprecated `--full_precision` / `-F`. Simply omit it and `invoke.py` will auto
-    configure. To switch away from auto use the new flag like `--precision=float32`.
-
-For older changelogs, please visit the **[CHANGELOG](https://invoke-ai.github.io/InvokeAI/CHANGELOG#v114-11-september-2022)**.
+For our latest changes, view our [Release Notes](https://github.com/invoke-ai/InvokeAI/releases)
 
 ### Troubleshooting
 
@@ -193,8 +161,9 @@ problems and other issues.
 # Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
-cleanup, testing, or code reviews, is very much encouraged to do so. To join, just raise your hand on the InvokeAI
-Discord server or discussion board. 
+cleanup, testing, or code reviews, is very much encouraged to do so. 
+
+To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board. 
 
 If you are unfamiliar with how
 to contribute to GitHub projects, here is a

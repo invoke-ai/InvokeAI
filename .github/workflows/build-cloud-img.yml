@@ -1,0 +1,87 @@
+name: Build and push cloud image
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    tags:
+      - v*
+  # we will NOT push the image on pull requests, only test buildability.
+  pull_request:
+    branches:
+    - main
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - x86_64
+        # requires resolving a patchmatch issue
+        # - aarch64
+    runs-on: ubuntu-latest
+    name: ${{ matrix.arch }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      if: matrix.arch == 'aarch64'
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        # see https://github.com/docker/metadata-action
+        # will push the following tags:
+        # :edge
+        # :main (+ any other branches enabled in the workflow)
+        # :<tag>
+        # :1.2.3 (for semver tags)
+        # :1.2 (for semver tags)
+        # :<sha>
+        tags: |
+          type=edge,branch=main
+          type=ref,event=branch
+          type=ref,event=tag
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+        # suffix image tags with architecture
+        flavor: |
+          latest=auto
+          suffix=-${{ matrix.arch }},latest=true
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    # do not login to container registry on PRs
+    - if: github.event_name != 'pull_request'
+      name: Docker login
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push cloud image
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        file: docker-build/Dockerfile.cloud
+        platforms: Linux/${{ matrix.arch }}
+        # do not push the image on PRs
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
