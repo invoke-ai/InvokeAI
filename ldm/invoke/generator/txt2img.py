@@ -29,10 +29,6 @@ class Txt2Img(Generator):
         pipeline.scheduler = sampler
 
         def make_image(x_T) -> PIL.Image.Image:
-            # FIXME: restore free_gpu_mem functionality
-            # if self.free_gpu_mem and self.model.model.device != self.model.device:
-            #     self.model.model.to(self.model.device)
-
             pipeline_output = pipeline.image_from_embeddings(
                 latents=x_T,
                 num_inference_steps=steps,
@@ -44,10 +40,6 @@ class Txt2Img(Generator):
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
             )
-
-            # FIXME: restore free_gpu_mem functionality
-            # if self.free_gpu_mem:
-            #     self.model.model.to("cpu")
 
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
 

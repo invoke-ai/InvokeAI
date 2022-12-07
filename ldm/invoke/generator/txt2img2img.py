@@ -3,13 +3,12 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 '''
 
 import math
+from typing import Callable, Optional
 
 import torch
-from PIL import Image
 
 from ldm.invoke.generator.base import Generator
-from ldm.invoke.generator.omnibus import Omnibus
-from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.invoke.generator.diffusers_pipeline import trim_to_multiple_of, StableDiffusionGeneratorPipeline
 
 
 class Txt2Img2Img(Generator):
@@ -17,9 +16,9 @@ class Txt2Img2Img(Generator):
         super().__init__(model, precision)
         self.init_latent = None    # for get_noise()
 
-    @torch.no_grad()
-    def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
-                       conditioning,width,height,strength,step_callback=None,**kwargs):
+    def get_make_image(self, prompt:str, sampler, steps:int, cfg_scale:float, ddim_eta,
+                       conditioning, width:int, height:int, strength:float,
+                       step_callback:Optional[Callable]=None, **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
@@ -29,125 +28,72 @@ class Txt2Img2Img(Generator):
         scale_dim = min(width, height)
         scale = 512 / scale_dim
 
-        init_width = math.ceil(scale * width / 64) * 64
-        init_height = math.ceil(scale * height / 64) * 64
+        init_width, init_height = trim_to_multiple_of(scale * width, scale * height)
 
-        @torch.no_grad()
+        # noinspection PyTypeChecker
+        pipeline: StableDiffusionGeneratorPipeline = self.model
+        pipeline.scheduler = sampler
+
         def make_image(x_T):
 
-            shape = [
-                self.latent_channels,
-                init_height // self.downsampling_factor,
-                init_width // self.downsampling_factor,
-            ]
-
-            sampler.make_schedule(
-                    ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
+            pipeline_output = pipeline.latents_from_embeddings(
+                latents=x_T,
+                num_inference_steps=steps,
+                text_embeddings=c,
+                unconditioned_embeddings=uc,
+                guidance_scale=cfg_scale,
+                callback=step_callback,
+                extra_conditioning_info=extra_conditioning_info,
+                # TODO: eta = ddim_eta,
+                # TODO: threshold = threshold,
             )
 
-            #x = self.get_noise(init_width, init_height)
-            x = x_T
-
-            if self.free_gpu_mem and self.model.model.device != self.model.device:
-                self.model.model.to(self.model.device)
-
-            samples, _ = sampler.sample(
-                batch_size                   = 1,
-                S                            = steps,
-                x_T                          = x,
-                conditioning                 = c,
-                shape                        = shape,
-                verbose                      = False,
-                unconditional_guidance_scale = cfg_scale,
-                unconditional_conditioning   = uc,
-                eta                          = ddim_eta,
-                img_callback                 = step_callback,
-                extra_conditioning_info      = extra_conditioning_info
-            )
+            first_pass_latent_output = pipeline_output.latents
 
             print(
                   f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
                  )
 
             # resizing
-            samples = torch.nn.functional.interpolate(
-                samples,
+            resized_latents = torch.nn.functional.interpolate(
+                first_pass_latent_output,
                 size=(height // self.downsampling_factor, width // self.downsampling_factor),
                 mode="bilinear"
             )
 
-            t_enc = int(strength * steps)
-            ddim_sampler = DDIMSampler(self.model, device=self.model.device)
-            ddim_sampler.make_schedule(
-                    ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
-            )
-
-            z_enc = ddim_sampler.stochastic_encode(
-                samples,
-                torch.tensor([t_enc]).to(self.model.device),
-                noise=self.get_noise(width,height,False)
-            )
-
-            # decode it
-            samples = ddim_sampler.decode(
-                z_enc,
-                c,
-                t_enc,
-                img_callback = step_callback,
-                unconditional_guidance_scale=cfg_scale,
-                unconditional_conditioning=uc,
+            pipeline_output = pipeline.img2img_from_latents_and_embeddings(
+                resized_latents,
+                num_inference_steps=steps,
+                text_embeddings=c,
+                unconditioned_embeddings=uc,
+                guidance_scale=cfg_scale, strength=strength,
                 extra_conditioning_info=extra_conditioning_info,
-                all_timesteps_count=steps
-            )
+                noise_func=self.get_noise_like,
+                callback=step_callback)
 
-            if self.free_gpu_mem:
-                self.model.model.to("cpu")
+            return pipeline.numpy_to_pil(pipeline_output.images)[0]
 
-            return self.sample_to_image(samples)
+
+        # FIXME: do we really need something entirely different for the inpainting model?
 
         # in the case of the inpainting model being loaded, the trick of
         # providing an interpolated latent doesn't work, so we transiently
         # create a 512x512 PIL image, upscale it, and run the inpainting
         # over it in img2img mode. Because the inpaing model is so conservative
         # it doesn't change the image (much)
-        def inpaint_make_image(x_T):
-            omnibus = Omnibus(self.model,self.precision)
-            result = omnibus.generate(
-                prompt,
-                sampler=sampler,
-                width=init_width,
-                height=init_height,
-                step_callback=step_callback,
-                steps = steps,
-                cfg_scale = cfg_scale,
-                ddim_eta = ddim_eta,
-                conditioning = conditioning,
-                **kwargs
-            )
-            assert result is not None and len(result)>0,'** txt2img failed **'
-            image = result[0][0]
-            interpolated_image = image.resize((width,height),resample=Image.Resampling.LANCZOS)
-            print(kwargs.pop('init_image',None))
-            result = omnibus.generate(
-                prompt,
-                sampler=sampler,
-                init_image=interpolated_image,
-                width=width,
-                height=height,
-                seed=result[0][1],
-                step_callback=step_callback,
-                steps = steps,
-                cfg_scale = cfg_scale,
-                ddim_eta = ddim_eta,
-                conditioning = conditioning,
-                **kwargs
-                )
-            return result[0][0]
-            
-        if sampler.uses_inpainting_model():
-            return inpaint_make_image
+
+        return make_image
+
+    def get_noise_like(self, like: torch.Tensor):
+        device = like.device
+        if device.type == 'mps':
+            x = torch.randn_like(like, device='cpu').to(device)
         else:
-            return make_image
+            x = torch.randn_like(like, device=device)
+        if self.perlin > 0.0:
+            shape = like.shape
+            x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(shape[3], shape[2])
+        return x
 
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height,scale = True):
@@ -175,4 +121,3 @@ class Txt2Img2Img(Generator):
                                 scaled_height // self.downsampling_factor,
                                 scaled_width  // self.downsampling_factor],
                                 device=device)
-
