@@ -77,12 +77,11 @@ goto :pick_rootdir
 @rem ---------------------- Initialize the runtime directory ---------------------
 echo.
 echo *** Creating Runtime Directory %rootdir% ***
+if not exist %rootdir% mkdir %rootdir%
+@rem for unknown reasons the mkdir works but returns an error code
 if not exist %rootdir% (
-   mkdir %rootdir%
-   if %errorlevel% neq 0 (
-       echo Could not create the directory %rootdir%. Please check the directory's permissions and try again.
-       exit /b
-    )
+	echo Could not create the directory %rootdir%. Please check the directory's permissions and try again.
+	exit /b
 )
 echo Successful.
 
@@ -129,7 +128,8 @@ copy .\templates\invoke.bat.in %rootdir%\invoke.bat
 copy .\templates\update.bat.in %rootdir%\update.bat
 
 @rem so that update.bat works
-xcopy /I /Y .\environments-and-requirements %rootdir%
+mkdir %rootdir%\environments-and-requirements
+xcopy /I /Y .\environments-and-requirements %rootdir%\environments-and-requirements
 copy .\requirements.txt %rootdir%\requirements.txt
 
 
