@@ -86,8 +86,8 @@ ROOTDIR=""
 while [ "$ROOTDIR" == "" ]
 do
     echo
-    read -e -p "Select the directory to install InvokeAI into [~/invokeai]: " -i ~/invokeai input
-    ROOTDIR=${input:=~/invokeai}
+    read -e -p "Select your preferred location for the 'invokeai' directory [$HOME]: " -i $HOME input
+    ROOTDIR=${input:=$HOME}/invokeai
     read -e -p "InvokeAI will be installed into $ROOTDIR. OK? [y]: " input
     RESPONSE=${input:='y'}
     if [ "$RESPONSE" == 'y' ]; then
@@ -161,7 +161,6 @@ chmod a+rx $ROOTDIR/update.sh
 #--------------------------------------------------------------------------------
 echo
 echo "*** Confguring InvokeAI ***"
-cp -pr templates/rootdir/* $ROOTDIR/
 pushd $ROOTDIR
 ./.venv/bin/configure_invokeai.py --root=$ROOTDIR
 _err_exit $? "Initial configuration failed. Please see above error messages and $TROUBLESHOOTING for help."

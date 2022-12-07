@@ -25,8 +25,20 @@ chmod a+rx InvokeAI-Installer/install.sh
 zip -r InvokeAI-simple-installer-$VERSION-linux.zip InvokeAI-Installer
 zip -r InvokeAI-simple-installer-$VERSION-mac.zip InvokeAI-Installer
 
+# now do the windows installer
+rm InvokeAI-Installer/install.sh
+cp install.bat.in InvokeAI-Installer/install.bat
+
+# this gets rid of the "-e ." at the end of the windows requirements file
+# because it is easier to do it now than in the .bat install script
+egrep -v '^-e .' InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt >requirements.txt
+mv requirements.txt InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt
+zip -r InvokeAI-simple-installer-$VERSION-windows.zip InvokeAI-Installer
+
 # clean up
 rm -rf InvokeAI-Installer
+
+
 exit 0
 
 
