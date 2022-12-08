@@ -19,6 +19,7 @@ from uuid import uuid4
 from threading import Event
 
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.conditioning import get_tokens_for_prompt
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 from ldm.invoke.generator.inpaint import infill_methods
@@ -1091,7 +1092,8 @@ class InvokeAIWebServer:
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
-                attention_maps_image_base64_url = None if attention_maps_image is None else image_to_dataURL(attention_maps_image)
+                attention_maps_image_base64_url, tokens = (None, None) if attention_maps_image is None \
+                    else image_to_dataURL(attention_maps_image), get_tokens_for_prompt(generation_parameters["prompt"])
 
                 self.socketio.emit(
                     "generationResult",
@@ -1105,7 +1107,8 @@ class InvokeAIWebServer:
                         "height": height,
                         "boundingBox": original_bounding_box,
                         "generationMode": generation_parameters["generation_mode"],
-                        "attentionMaps": attention_maps_image_base64_url
+                        "attentionMaps": attention_maps_image_base64_url,
+                        "tokens": tokens
                     },
                 )
                 eventlet.sleep(0)

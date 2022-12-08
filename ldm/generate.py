@@ -20,6 +20,8 @@ import cv2
 import skimage
 
 from omegaconf import OmegaConf
+
+import ldm.invoke.conditioning
 from ldm.invoke.generator.base import downsampling
 from PIL import Image, ImageOps
 from torch import nn
@@ -455,7 +457,7 @@ class Generate:
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
                 prompt, model =self.model,
-                skip_normalize=skip_normalize,
+                skip_normalize_legacy_blend=skip_normalize,
                 log_tokens    =self.log_tokenization
             )
 
@@ -483,7 +485,7 @@ class Generate:
                 'extractor':self.safety_feature_extractor
             } if self.safety_checker else None
 
-            results = generator.generate(
+            results, attention_maps_images = generator.generate(
                 prompt,
                 iterations=iterations,
                 seed=self.seed,
@@ -607,8 +609,8 @@ class Generate:
         # todo: cross-attention control
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
             prompt, model =self.model,
-            skip_normalize=opt.skip_normalize,
-            log_tokens    =opt.log_tokenization
+            skip_normalize_legacy_blend=opt.skip_normalize,
+            log_tokens    =ldm.invoke.conditioning.log_tokenization
         )
 
         if tool in ('gfpgan','codeformer','upscale'):

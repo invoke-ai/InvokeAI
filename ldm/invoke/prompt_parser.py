@@ -3,7 +3,7 @@ from typing import Union, Optional
 import re
 import pyparsing as pp
 '''
-This module parses prompt strings and produces tree-like structures that can be used generate and control the conditioning tensors. 
+This module parses prompt strings and produces tree-like structures that can be used generate and control the conditioning tensors.
 weighted subprompts.
 
 Useful class exports:
@@ -68,6 +68,12 @@ class FlattenedPrompt():
     def is_empty(self):
         return len(self.children) == 0 or \
                (len(self.children) == 1 and len(self.children[0].text) == 0)
+
+    @property
+    def wants_cross_attention_control(self):
+        return any(
+            [issubclass(type(x), CrossAttentionControlledFragment) for x in self.children]
+        )
 
     def __repr__(self):
         return f"FlattenedPrompt:{self.children}"
@@ -240,6 +246,12 @@ class Blend():
         self.weights = weights
         self.normalize_weights = normalize_weights
 
+    @property
+    def wants_cross_attention_control(self):
+        # blends cannot cross-attention control
+        return False
+
+
     def __repr__(self):
         return f"Blend:{self.prompts} | weights {' ' if self.normalize_weights else '(non-normalized) '}{self.weights}"
     def __eq__(self, other):
@@ -277,8 +289,8 @@ class PromptParser():
 
         return self.flatten(root[0])
 
-    def parse_legacy_blend(self, text: str) -> Optional[Blend]:
-        weighted_subprompts = split_weighted_subprompts(text, skip_normalize=False)
+    def parse_legacy_blend(self, text: str, skip_normalize: bool) -> Optional[Blend]:
+        weighted_subprompts = split_weighted_subprompts(text, skip_normalize=skip_normalize)
         if len(weighted_subprompts) <= 1:
             return None
         strings = [x[0] for x in weighted_subprompts]
@@ -287,7 +299,7 @@ class PromptParser():
         parsed_conjunctions = [self.parse_conjunction(x) for x in strings]
         flattened_prompts = [x.prompts[0] for x in parsed_conjunctions]
 
-        return Blend(prompts=flattened_prompts, weights=weights, normalize_weights=True)
+        return Blend(prompts=flattened_prompts, weights=weights, normalize_weights=not skip_normalize)
 
 
     def flatten(self, root: Conjunction, verbose = False) -> Conjunction:
@@ -641,27 +653,3 @@ def split_weighted_subprompts(text, skip_normalize=False)->list:
         return [(x[0], equal_weight) for x in parsed_prompts]
     return [(x[0], x[1] / weight_sum) for x in parsed_prompts]
 
-
-# shows how the prompt is tokenized
-# usually tokens have '</w>' to indicate end-of-word,
-# but for readability it has been replaced with ' '
-def log_tokenization(text, model, display_label=None):
-    tokens    = model.cond_stage_model.tokenizer.tokenize(text)
-    tokenized = ""
-    discarded = ""
-    usedTokens = 0
-    totalTokens = len(tokens)
-    for i in range(0, totalTokens):
-        token = tokens[i].replace('</w>', ' ')
-        # alternate color
-        s = (usedTokens % 6) + 1
-        if i < model.cond_stage_model.max_length:
-            tokenized = tokenized + f"\x1b[0;3{s};40m{token}"
-            usedTokens += 1
-        else:  # over max token length
-            discarded = discarded + f"\x1b[0;3{s};40m{token}"
-    print(f"\n>> Tokens {display_label or ''} ({usedTokens}):\n{tokenized}\x1b[0m")
-    if discarded != "":
-        print(
-            f">> Tokens Discarded ({totalTokens-usedTokens}):\n{discarded}\x1b[0m"
-        )

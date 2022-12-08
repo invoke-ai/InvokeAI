@@ -56,8 +56,8 @@ class Generator():
                  **kwargs):
         scope = choose_autocast(self.precision)
         self.safety_checker = safety_checker
-        attention_maps_image = []
-        attention_maps_callback = lambda saver: attention_maps_image.append(saver.get_stacked_maps_image())
+        attention_maps_images = []
+        attention_maps_callback = lambda saver: attention_maps_images.append(saver.get_stacked_maps_image())
         make_image = self.get_make_image(
             prompt,
             sampler = sampler,
@@ -103,11 +103,11 @@ class Generator():
                 results.append([image, seed])
 
                 if image_callback is not None:
-                    image_callback(image, seed, first_seed=first_seed, attention_maps_image=attention_maps_image[0])
+                    image_callback(image, seed, first_seed=first_seed)
 
                 seed = self.new_seed()
 
-        return results
+        return results, attention_maps_images
 
     def sample_to_image(self,samples)->Image.Image:
         """
