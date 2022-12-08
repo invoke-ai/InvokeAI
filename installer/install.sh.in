@@ -140,8 +140,9 @@ done
 echo
 echo "** Creating Virtual Environment for InvokeAI **"
 
-$PYTHON -mpip install --update pip
-$PYTHON -mvenv $ROOTDIR/.venv
+$PYTHON -mpip install --upgrade pip
+$PYTHON -mpip install virtualenv
+$PYTHON -mvirtualenv $ROOTDIR/.venv
 _err_exit $? "Python failed to create virtual environment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
 
 #--------------------------------------------------------------------------------
@@ -150,6 +151,8 @@ echo "** Activating Virtual Environment for InvokeAI **"
 
 source $ROOTDIR/.venv/bin/activate
 _err_exit $? "Failed to activate virtual evironment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
+
+PYTHON=$ROOTDIR/.venv/bin/python
 
 #--------------------------------------------------------------------------------
 echo
