@@ -23,7 +23,7 @@ function _err_exit {
         echo -e "Error code $1; Error caught was '$2'"
 	if [ "$OS_NAME" == "osx" ]; then
 	    echo "Something went wrong while installing InvokeAI and/or its requirements."
-	    echo "You may need to the Xcode command line tools to proceed. See step number 3 of"
+	    echo "You may need to use the Xcode command line tools to proceed. See step number 3 of"
 	    echo "https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#walk_through for"
 	    echo "installation instructions and then run this script again."
 	else
@@ -140,6 +140,7 @@ done
 echo
 echo "** Creating Virtual Environment for InvokeAI **"
 
+$PYTHON -mpip install --update pip
 $PYTHON -mvenv $ROOTDIR/.venv
 _err_exit $? "Python failed to create virtual environment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
 
