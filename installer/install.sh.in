@@ -90,22 +90,23 @@ esac
 echo "Installing for $OS_NAME-$OS_ARCH"
 # confirm that python is installed and is up to date
 
-if PYTHON=`which python3`; then
-    echo "Found python at $PYTHON"
-elif PYTHON=`which python`; then
-    echo "Found python at $PYTHON"
-else
-   echo "Please install Python 3.9 or higher before running this script. See instructions at $INSTRUCTIONS for help."
-   exit -1
-fi
+unset PYTHON
+for candidate in python python3 python3.9 python3.10; do
+    if ppath=`which $candidate`; then
+	python_version=$($ppath -V | awk '{ print $2 }')    
+	if [ $(version $python_version) -ge $(version "$MINIMUM_PYTHON_VERSION") ]; then
+	    PYTHON=$ppath
+	    echo Python $python_version found at $PYTHON
+	    break
+	fi
+    fi
+done
 
-python_version=$($PYTHON -V | awk '{ print $2 }')
-if [ $(version $python_version) -lt $(version "$MINIMUM_PYTHON_VERSION") ]; then
-   echo "$PYTHON version $python_version is less than the required version $MINIMUM_PYTHON_VERSION. See instructions at $INSTRUCTIONS for help."
-   exit -1
+if [ -z "$PYTHON" ]; then
+    echo "A suitable Python interpreter could not be found"
+    echo "Please install Python 3.9 or higher before running this script. See instructions at $INSTRUCTIONS for help."
+    exit -1
 fi
-
-echo "Python version $python_version detected. Looking good!"
 
 ROOTDIR=""
 while [ "$ROOTDIR" == "" ]
