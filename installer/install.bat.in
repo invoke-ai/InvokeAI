@@ -43,7 +43,6 @@ del /q .tmp1 .tmp2
 
 echo Updating PIP...
 call python -m pip install --no-warn-script-location -q --upgrade pip
-call pip install --no-warn-script-location -q virtualenv
 
 @rem --------------------- Get the requirements file ------------
 echo.
@@ -88,7 +87,7 @@ echo Successful.
 @rem --------------------------- Create and populate .venv ---------------------------
 echo.
 echo ** Creating Virtual Environment for InvokeAI **
-python -mvirtualenv %rootdir%\.venv
+call python -mvenv %rootdir%\.venv
 if %errorlevel% neq 0 (
    set err_msg=Could not create virtual environment %rootdir%\.venv. Please check the directory's permissions and try again.
    goto :err_exit
@@ -99,7 +98,7 @@ echo.
 echo *** Installing InvokeAI Requirements ***
 call %rootdir%\.venv\Scripts\activate.bat
 copy environments-and-requirements\requirements-win-colab-cuda.txt .\requirements.txt
-call pip install -r requirements.txt
+call python -mpip install -r requirements.txt
 if %errorlevel% neq 0 (
    set err_msg=Installation of requirements failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
    goto :err_exit
@@ -108,7 +107,7 @@ echo Installation successful.
 
 echo.
 echo *** Installing InvokeAI Modules and Executables ***
-pip install %INVOKE_AI_SRC%
+call python -mpip install %INVOKE_AI_SRC%
 if %errorlevel% neq 0 (
    set err_msg=Installation of InvokeAI failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
    goto :err_exit
