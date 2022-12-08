@@ -37,6 +37,9 @@ number. If it is version `3.9.1` or higher, you meet requirements.
    3.10.9](https://www.python.org/downloads/release/python-3109/),
    which has been extensively tested with InvokeAI.
 
+   - See [Installing Python in Ubuntu](#installing-python-in-ubuntu) for some
+   platform-specific tips.
+
 3.  The source installer is distributed in ZIP files. Go to the
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
@@ -180,7 +183,7 @@ address this by entering the `invokeai` directory and running
 `update.sh`, which will bring InvokeAI up to date with the latest
 libraries.
 
-!!! warning "Some users have tried to correct dependency problems by installing the `ldm` package from PyPi.org. This is an unfortunate name clash with  the 'latent diffusion model (ldm)' libraries that InvokeAI uses, and installing it will make matters worse."
+!!! warning "Some users have tried to correct dependency problems by installing the `ldm` package from PyPi.org. Unfortunately this is an unrelated package that has nothing to do with the 'latent diffusion model' used by InvokeAI. Installing ldm will make matters worse. If you've installed ldm, uninstall it with `pip uninstall ldm`."
 
 _"Corrupted configuration file."__ Everything seems to install ok, but
 `invoke` complains of a corrupted configuration file and goes back
@@ -220,6 +223,24 @@ running `configure_invokeai.py`. This happens relatively infrequently. To do thi
 simply open up the developer's console again and type
 `python scripts/configure_invokeai.py`.
 
+You may also use the `update` script to install any selected version
+of InvokeAI. From https://github.com/invoke-ai/InvokeAI, navigate to
+the zip file link of the version you wish to install. You can find the
+zip links by going to the one of the release pages and looking for the
+**Assets** section at the bottom. Alternatively, you can browse
+"branches" and "tags" at the top of the big code directory on the
+InvokeAI welcome page. When you find the version you want to install,
+go to the green "&lt;&gt; Code" button at the top, and copy the
+"Download ZIP" link.
+
+Now run `update.sh` (or `update.bat`) with the URL of the desired
+InvokeAI version as its argument. For example, this will install the
+2.2.0 release.
+
+```cmd
+update.sh https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.0.zip
+```
+
 ## Troubleshooting
 
 If you run into problems during or after installation, the InvokeAI team is
@@ -229,3 +250,28 @@ make a request for help on the "bugs-and-support" channel of our
 [Discord server](https://discord.gg/ZmtBAhwWhy). We are a 100% volunteer
 organization, but typically somebody will be available to help you within 24
 hours, and often much sooner.
+
+## Installing Python in Ubuntu
+
+For reasons that are not entirely clear, installing the correct
+version of Python is a bit of a challenge on Ubuntu, Linux Mint, and
+other Ubuntu-derived distributions.
+
+In particular, Ubuntu version 20.04 LTS comes with an old version of
+Python, does not come with the PIP package manager installed, and to
+make matters worse, the `python` command points to Python2, not
+Python3.
+
+Here is the quick recipe for bringing your system up to date:
+
+```
+sudo apt update
+sudo apt install python3.9
+sudo apt install python3-pip
+cd /usr/bin
+sudo ln -sf python3.9 python
+```
+
+You can still access older versions of Python by calling `python2`,
+`python3.8`, etc.
+
