@@ -55,11 +55,11 @@ dependencies:
       - picklescan
       - taming-transformers-rom1504
       - test-tube==0.7.5
-      - https://github.com/TencentARC/GFPGAN/archive/refs/tags/v1.3.8.zip#egg=gfpgan
-      - https://github.com/Birch-san/k-diffusion/archive/refs/tags/v0.0.10.zip#egg=k-diffusion
-      - https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.4.zip#egg=pypatchmatch
-      - https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip#egg=clip
-      - https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip#egg=clipseg
+      - git+https://github.com/openai/CLIP.git@main#egg=clip
+      - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
+      - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
+      - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
+      - git+https://github.com/invoke-ai/PyPatchMatch@0.1.4#egg=pypatchmatch
       - -e .
 variables:
   PYTORCH_ENABLE_MPS_FALLBACK: 1
