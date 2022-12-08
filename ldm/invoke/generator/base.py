@@ -103,11 +103,11 @@ class Generator():
                 results.append([image, seed])
 
                 if image_callback is not None:
-                    image_callback(image, seed, first_seed=first_seed)
+                    image_callback(image, seed, first_seed=first_seed, attention_maps_image=attention_maps_images[-1])
 
                 seed = self.new_seed()
 
-        return results, attention_maps_images
+        return results
 
     def sample_to_image(self,samples)->Image.Image:
         """

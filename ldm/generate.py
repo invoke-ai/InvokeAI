@@ -485,7 +485,7 @@ class Generate:
                 'extractor':self.safety_feature_extractor
             } if self.safety_checker else None
 
-            results, attention_maps_images = generator.generate(
+            results = generator.generate(
                 prompt,
                 iterations=iterations,
                 seed=self.seed,
