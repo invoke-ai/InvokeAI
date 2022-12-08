@@ -36,7 +36,7 @@ class Txt2Img2Img(Generator):
 
         def make_image(x_T):
 
-            pipeline_output = pipeline.latents_from_embeddings(
+            first_pass_latent_output = pipeline.latents_from_embeddings(
                 latents=x_T,
                 num_inference_steps=steps,
                 text_embeddings=c,
@@ -47,8 +47,6 @@ class Txt2Img2Img(Generator):
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
             )
-
-            first_pass_latent_output = pipeline_output.latents
 
             print(
                   f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
