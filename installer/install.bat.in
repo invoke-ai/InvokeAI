@@ -21,6 +21,17 @@ set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AU
 set MINIMUM_PYTHON_VERSION=3.9.0
 set err_msg=An error has occurred and the script could not continue.
 
+@rem --------------------------- Intro -------------------------------
+echo This script will install InvokeAI and its dependencies. Before you start,
+echo please make sure to do the following:
+echo 1. Install python 3.9 or higher.
+echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
+echo    enable long path support on your system.
+echo
+echo See $INSTRUCTIONS for more details.
+echo 
+pause
+
 @rem ---------------------------- check Python version ---------------
 echo ***** Checking and Updating Python *****
 
