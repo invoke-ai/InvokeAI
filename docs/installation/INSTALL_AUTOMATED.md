@@ -35,7 +35,8 @@ number. If it is version `3.9.1` or higher, you meet requirements.
    appropriate installer package for your platform. We recommend
    [Version
    3.10.9](https://www.python.org/downloads/release/python-3109/),
-   which has been extensively tested with InvokeAI.
+   which has been extensively tested with InvokeAI. _Please be
+   sure to click the checkbox to add Python to your PATH._
 
    - See [Installing Python in Ubuntu](#installing-python-in-ubuntu) for some
    platform-specific tips.

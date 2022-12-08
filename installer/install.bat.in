@@ -18,7 +18,11 @@ if "%1" == "use-cache" (
 set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/lstein-simple-install.zip
 set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
+set PYTHON_URL=https://www.python.org/downloads/windows/
 set MINIMUM_PYTHON_VERSION=3.9.0
+set PYTHON_URL=https://www.python.org/downloads/release/python-3109/
+
+
 set err_msg=An error has occurred and the script could not continue.
 
 @rem --------------------------- Intro -------------------------------
@@ -27,9 +31,9 @@ echo please make sure to do the following:
 echo 1. Install python 3.9 or higher.
 echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
 echo    enable long path support on your system.
-echo
-echo See $INSTRUCTIONS for more details.
-echo 
+echo.
+echo See %INSTRUCTIONS% for more details.
+echo. 
 pause
 
 @rem ---------------------------- check Python version ---------------
@@ -38,15 +42,19 @@ echo ***** Checking and Updating Python *****
 call python --version >.tmp1 2>.tmp2
 if %errorlevel% == 1 (
    set err_msg=Please install Python 3.9 or higher. See %INSTRUCTIONS% for details.
-   goto :err_exit
+   goto err_exit
 )
 
 for /f "tokens=2" %%i in (.tmp1) do set python_version=%%i
+if "%python_version%" == "" (
+   set err_msg=No python was detected on your system. Please install Python version %MINIMUM_PYTHON_VERSION% or higher. We recommend Python 3.10.9 from %PYTHON_URL%
+   goto err_exit
+)
 
 call :compareVersions %MINIMUM_PYTHON_VERSION% %python_version%
 if %errorlevel% == 1 (
-   set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%
-   goto :err_exit
+   set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%. We recommend Python 3.10.9 from %PYTHON_URL%
+   goto err_exit
 )
 
 @rem Cleanup
@@ -195,6 +203,8 @@ for %%C in (a b c d e f g h i j k l m n o p q r s t u v w x y z) do set "%~1=!%~
 exit /b
 
 :err_exit
-    echo %err_msg%
-    pause
-    exit
+echo %err_msg%
+echo The installer will exit now.
+pause
+exit /b
+
