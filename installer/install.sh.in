@@ -91,7 +91,7 @@ echo "Installing for $OS_NAME-$OS_ARCH"
 # confirm that python is installed and is up to date
 
 unset PYTHON
-for candidate in python python3 python3.9 python3.10; do
+for candidate in python3.10 python3 python3.9 python; do
     if ppath=`which $candidate`; then
 	python_version=$($ppath -V | awk '{ print $2 }')    
 	if [ $(version $python_version) -ge $(version "$MINIMUM_PYTHON_VERSION") ]; then
