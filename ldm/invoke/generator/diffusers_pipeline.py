@@ -407,7 +407,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         batch_size = initial_latents.size(0)
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
-        timesteps = img2img_pipeline.get_timesteps(num_inference_steps, strength, device=device)
+        timesteps, _ = img2img_pipeline.get_timesteps(num_inference_steps, strength, device=device)
         latent_timestep = timesteps[:1].repeat(batch_size)
         latents = self.noise_latents_for_time(initial_latents, latent_timestep, noise_func=noise_func)
 
@@ -454,7 +454,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
-        timesteps = img2img_pipeline.get_timesteps(num_inference_steps, strength, device=device)
+        timesteps, _ = img2img_pipeline.get_timesteps(num_inference_steps, strength, device=device)
 
         assert img2img_pipeline.scheduler is self.scheduler
 

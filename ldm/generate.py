@@ -17,6 +17,7 @@ import skimage
 import torch
 import transformers
 from PIL import Image, ImageOps
+from diffusers import HeunDiscreteScheduler
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.schedulers.scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
@@ -1008,12 +1009,17 @@ class Generate:
 
         scheduler_map = dict(
             ddim=DDIMScheduler,
+            dpmpp_2=DPMSolverMultistepScheduler,
             ipndm=IPNDMScheduler,
+            # DPMSolverMultistepScheduler is technically not `k_` anything, as it is neither
+            # the k-diffusers implementation nor included in EDM (Karras 2022), but we can
+            # provide an alias for compatibility.
+            k_dpmpp_2=DPMSolverMultistepScheduler,
             k_euler=EulerDiscreteScheduler,
             k_euler_a=EulerAncestralDiscreteScheduler,
+            k_heun=HeunDiscreteScheduler,
             k_lms=LMSDiscreteScheduler,
             plms=PNDMScheduler,
-            k_dpmpp_2=DPMSolverMultistepScheduler,
         )
 
         if self.sampler_name in scheduler_map:
