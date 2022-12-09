@@ -4,6 +4,7 @@ on:
     branches:
       - 'main'
       - 'development'
+      - 'fix-gh-actions-fork'
   pull_request:
     branches:
       - 'main'
@@ -19,28 +20,16 @@ jobs:
           - environment-lin-amd.yml
           - environment-lin-cuda.yml
           - environment-mac.yml
-          - environment-win-cuda.yml
         include:
           - environment-yaml: environment-lin-amd.yml
-            os: ubuntu-22.04
-            curl-command: curl
-            github-env: $GITHUB_ENV
+            os: ubuntu-latest
             default-shell: bash -l {0}
           - environment-yaml: environment-lin-cuda.yml
-            os: ubuntu-22.04
-            curl-command: curl
-            github-env: $GITHUB_ENV
+            os: ubuntu-latest
             default-shell: bash -l {0}
           - environment-yaml: environment-mac.yml
             os: macos-12
-            curl-command: curl
-            github-env: $GITHUB_ENV
             default-shell: bash -l {0}
-          - environment-yaml: environment-win-cuda.yml
-            os: windows-2022
-            curl-command: curl.exe
-            github-env: $env:GITHUB_ENV
-            default-shell: pwsh
           - stable-diffusion-model: stable-diffusion-1.5
             stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
             stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
@@ -83,15 +72,15 @@ jobs:
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
-        run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> ${{ matrix.github-env }}
+        run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_ENV
 
       - name: set test prompt to development branch validation
         if: ${{ github.ref == 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> ${{ matrix.github-env }}
+        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_ENV
 
       - name: set test prompt to Pull Request validation
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
+        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
 
       - name: Use Cached Stable Diffusion Model
         id: cache-sd-model
@@ -107,20 +96,22 @@ jobs:
         if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
         run: |
           mkdir -p "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}"
-          ${{ matrix.curl-command }} -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" -o "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" -L ${{ matrix.stable-diffusion-model-url }}
+          curl \
+            -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" \
+            -o "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" \
+            -L ${{ matrix.stable-diffusion-model-url }}
 
       - name: run configure_invokeai.py
         id: run-preload-models
         run: |
           python scripts/configure_invokeai.py --no-interactive --yes
 
-      - name: cat ~/.invokeai
+      - name: cat invokeai.init
         id: cat-invokeai
-        run: cat ~/.invokeai
+        run: cat ${{ env.INVOKEAI_ROOT }}/invokeai.init
 
       - name: Run the tests
         id: run-tests
-        if: matrix.os != 'windows-2022'
         run: |
           time python scripts/invoke.py \
             --no-patchmatch \
@@ -132,13 +123,11 @@ jobs:
 
       - name: export conda env
         id: export-conda-env
-        if: matrix.os != 'windows-2022'
         run: |
           mkdir -p outputs/img-samples
-          conda env export --name ${{ env.CONDA_ENV_NAME }} > ${{ env.INVOKEAI_ROOT }}/outputs/environment-${{ runner.os }}-${{ runner.arch }}.yml
+          conda env export --name ${{ env.CONDA_ENV_NAME }} > outputs/img-samples/environment-${{ runner.os }}-${{ runner.arch }}.yml
 
       - name: Archive results
-        if: matrix.os != 'windows-2022'
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
