@@ -40,7 +40,7 @@ from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
 from ldm.invoke.concepts_lib import Concepts
-    
+
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         def new_func(*args, **kw):
@@ -128,7 +128,6 @@ gr = Generate(
           )
 
 """
-
 
 class Generate:
     """Generate class
