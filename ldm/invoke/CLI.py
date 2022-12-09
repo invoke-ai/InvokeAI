@@ -282,7 +282,7 @@ def main_loop(gen, opt):
             prefix = file_writer.unique_prefix()
             step_callback = make_step_callback(gen, opt, prefix) if opt.save_intermediates > 0 else None
 
-            def image_writer(image, seed, upscaled=False, first_seed=None, use_prefix=None):
+            def image_writer(image, seed, upscaled=False, first_seed=None, use_prefix=None, prompt_in=None):
                 # note the seed is the seed of the current image
                 # the first_seed is the original seed that noise is added to
                 # when the -v switch is used to generate variations
@@ -311,7 +311,7 @@ def main_loop(gen, opt):
                     if use_prefix is not None:
                         prefix = use_prefix
                     postprocessed = upscaled if upscaled else operation=='postprocess'
-                    opt.prompt = gen.concept_lib().replace_triggers_with_concepts(opt.prompt)  # to avoid the problem of non-unique concept triggers
+                    opt.prompt = gen.concept_lib().replace_triggers_with_concepts(opt.prompt or prompt_in)  # to avoid the problem of non-unique concept triggers
                     filename, formatted_dream_prompt = prepare_image_metadata(
                         opt,
                         prefix,

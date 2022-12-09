@@ -62,7 +62,7 @@ const PromptInput = () => {
         <Textarea
           id="prompt"
           name="prompt"
-          placeholder="I'm dreaming of..."
+          placeholder="Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)"
           size={'lg'}
           value={prompt}
           onChange={handleChangePrompt}

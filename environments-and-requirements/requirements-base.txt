@@ -33,7 +33,7 @@ torch-fidelity
 torchmetrics
 transformers~=4.24
 picklescan
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan ; platform_system == 'Windows'
+# git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan ; platform_system == 'Windows'
 git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan ; platform_system != 'Windows'
 git+https://github.com/openai/CLIP.git@main#egg=clip
 git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion

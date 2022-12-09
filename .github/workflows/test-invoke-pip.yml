@@ -16,24 +16,25 @@ jobs:
           - requirements-lin-cuda.txt
           - requirements-lin-amd.txt
           - requirements-mac-mps-cpu.txt
+          - requirements-win-colab-cuda.txt
         python-version:
           # - '3.9'
           - '3.10'
         include:
           - requirements-file: requirements-lin-cuda.txt
-            os: ubuntu-latest
-            default-shell: bash -l {0}
+            os: ubuntu-22.04
+            github-env: $GITHUB_ENV
           - requirements-file: requirements-lin-amd.txt
-            os: ubuntu-latest
-            default-shell: bash -l {0}
+            os: ubuntu-22.04
+            github-env: $GITHUB_ENV
           - requirements-file: requirements-mac-mps-cpu.txt
             os: macOS-12
-            default-shell: bash -l {0}
+            github-env: $GITHUB_ENV
+          - requirements-file: requirements-win-colab-cuda.txt
+            os: windows-2022
+            github-env: $env:GITHUB_ENV
     name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: ${{ matrix.default-shell }}
     env:
       INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
       PYTHONUNBUFFERED: 1
@@ -42,6 +43,18 @@ jobs:
       - name: Checkout sources
         id: checkout-sources
         uses: actions/checkout@v3
+
+      - name: set INVOKEAI_ROOT Windows
+        if: matrix.os == 'windows-2022'
+        run: |
+          echo "INVOKEAI_ROOT=${{ github.workspace }}\invokeai" >> ${{ matrix.github-env }}
+          echo "INVOKEAI_OUTDIR=${{ github.workspace }}\invokeai\outputs" >> ${{ matrix.github-env }}
+
+      - name: set INVOKEAI_ROOT others
+        if: matrix.os != 'windows-2022'
+        run: |
+          echo "INVOKEAI_ROOT=${{ github.workspace }}/invokeai" >> ${{ matrix.github-env }}
+          echo "INVOKEAI_OUTDIR=${{ github.workspace }}/invokeai/outputs" >> ${{ matrix.github-env }}
 
       - name: create models.yaml from example
         run: |
@@ -59,15 +72,15 @@ jobs:
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
-        run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> $GITHUB_ENV
+        run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> ${{ matrix.github-env }}
 
       - name: set test prompt to development branch validation
         if: ${{ github.ref == 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> $GITHUB_ENV
+        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> ${{ matrix.github-env }}
 
       - name: set test prompt to Pull Request validation
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> $GITHUB_ENV
+        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: create requirements.txt
         run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
@@ -76,14 +89,14 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-          cache-dependency-path: ${{ matrix.requirements-file }}
+          # cache: 'pip'
+          # cache-dependency-path: ${{ matrix.requirements-file }}
 
       # - name: install dependencies
       #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
 
       - name: install requirements
-        run: ${{ env.pythonLocation }}/bin/pip install -r '${{ matrix.requirements-file }}'
+        run: pip3 install -r '${{ matrix.requirements-file }}'
 
       - name: run configure_invokeai.py
         id: run-preload-models
@@ -92,7 +105,7 @@ jobs:
             mkdir -p ~/.huggingface
             echo -n '${{ secrets.HUGGINGFACE_TOKEN }}' > ~/.huggingface/token
           fi
-          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py \
+          python3 scripts/configure_invokeai.py \
               --no-interactive --yes \
               --full-precision  # can't use fp16 weights without a GPU
 
@@ -102,22 +115,24 @@ jobs:
 
       - name: Run the tests
         id: run-tests
+        if: matrix.os != 'windows-2022'
         env:
           # Set offline mode to make sure configure preloaded successfully.
           HF_HUB_OFFLINE: 1
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
         run: |
-          time ${{ env.pythonLocation }}/bin/python scripts/invoke.py \
+          time python3 scripts/invoke.py \
             --no-patchmatch \
             --no-nsfw_checker \
             --model ${{ matrix.stable-diffusion-model }} \
             --from_file ${{ env.TEST_PROMPTS }} \
             --root="${{ env.INVOKEAI_ROOT }}" \
-            --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
+            --outdir="${{ env.INVOKEAI_OUTDIR }}"
 
       - name: Archive results
         id: archive-results
+        if: matrix.os != 'windows-2022'
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
