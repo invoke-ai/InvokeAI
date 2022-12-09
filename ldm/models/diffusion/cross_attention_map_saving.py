@@ -48,6 +48,9 @@ class AttentionMapSaver():
         :return: An image containing a vertical stack of blended attention maps, one for each requested token.
         """
         num_tokens = len(self.token_ids)
+        if num_tokens == 0:
+            return None
+
         latents_height = self.latents_shape[0]
         latents_width = self.latents_shape[1]
 
@@ -84,6 +87,9 @@ class AttentionMapSaver():
             else:
                 # screen blend
                 merged = 1 - (1 - maps_stacked)*(1 - merged)
+
+        if merged is None:
+            return None
 
         merged_bytes = merged.mul(0xff).byte()
         return PIL.Image.fromarray(merged_bytes.numpy(), mode='L')

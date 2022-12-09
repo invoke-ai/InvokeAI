@@ -21,7 +21,8 @@ class InvokeAIDiffuserComponent:
 
 
     class ExtraConditioningInfo:
-        def __init__(self, cross_attention_control_args: Optional[Arguments]):
+        def __init__(self, tokens_count_including_eos_bos:int, cross_attention_control_args: Optional[Arguments]):
+            self.tokens_count_including_eos_bos = tokens_count_including_eos_bos
             self.cross_attention_control_args = cross_attention_control_args
 
         @property
@@ -55,7 +56,7 @@ class InvokeAIDiffuserComponent:
     def setup_attention_map_saving(self, saver: AttentionMapSaver):
         def callback(slice, dim, offset, slice_size, key):
             if dim is not None:
-                print("sliced tokens attention map saving is not implemented")
+                # sliced tokens attention map saving is not implemented
                 return
             saver.add_attention_maps(slice, key)
 

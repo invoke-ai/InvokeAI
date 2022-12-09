@@ -209,8 +209,6 @@ class InvokeAICrossAttentionMixin:
     def einsum_lowest_level(self, query, key, value, dim, offset, slice_size):
         # calculate attention scores
         #attention_scores = torch.einsum('b i d, b j d -> b i j', q, k)
-        if dim is not None:
-            print(f"sliced dim {dim}, offset {offset}, slice_size {slice_size}")
         attention_scores = torch.baddbmm(
             torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
             query,

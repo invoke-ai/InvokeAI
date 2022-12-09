@@ -22,7 +22,7 @@ from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.prompt_parser import split_weighted_subprompts
+from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 from ldm.invoke.generator.inpaint import infill_methods
 
 from backend.modules.parameters import parameters_to_command
@@ -1094,7 +1094,8 @@ class InvokeAIWebServer:
                 eventlet.sleep(0)
 
                 parsed_prompt, _ = get_prompt_structure(generation_parameters["prompt"])
-                tokens = get_tokens_for_prompt(self.generate.model, parsed_prompt)
+                tokens = None if type(parsed_prompt) is Blend else \
+                    get_tokens_for_prompt(self.generate.model, parsed_prompt)
                 attention_maps_image_base64_url = None if attention_maps_image is None \
                     else image_to_dataURL(attention_maps_image)
 

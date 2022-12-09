@@ -174,7 +174,7 @@ class KSampler(Sampler):
         log_every_t=100,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
-        extra_conditioning_info=None,
+        extra_conditioning_info: InvokeAIDiffuserComponent.ExtraConditioningInfo=None,
         threshold = 0,
         perlin = 0,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
@@ -207,9 +207,12 @@ class KSampler(Sampler):
 
         model_wrap_cfg = CFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
         model_wrap_cfg.prepare_to_sample(S, extra_conditioning_info=extra_conditioning_info)
-        attention_maps_saver = None if attention_maps_callback is None else AttentionMapSaver(token_ids = range(1, 77), latents_shape=x.shape[-2:])
+
+        attention_map_token_ids = range(1, extra_conditioning_info.tokens_count_including_eos_bos - 1)
+        attention_maps_saver = None if attention_maps_callback is None else AttentionMapSaver(token_ids = attention_map_token_ids, latents_shape=x.shape[-2:])
         if attention_maps_callback is not None:
             model_wrap_cfg.invokeai_diffuser.setup_attention_map_saving(attention_maps_saver)
+
         extra_args = {
             'cond': conditioning,
             'uncond': unconditional_conditioning,

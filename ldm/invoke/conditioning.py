@@ -95,6 +95,7 @@ def _get_conditioning_for_prompt(parsed_prompt: Union[Blend, FlattenedPrompt], p
     elif type(parsed_prompt) is FlattenedPrompt:
         if parsed_prompt.wants_cross_attention_control:
             conditioning, cac_args = _get_conditioning_for_cross_attention_control(model, parsed_prompt, log_tokens)
+
         else:
             conditioning, _ = _get_embeddings_and_tokens_for_prompt(model,
                                                                     parsed_prompt,
@@ -115,8 +116,13 @@ def _get_conditioning_for_prompt(parsed_prompt: Union[Blend, FlattenedPrompt], p
                 ">> Hybrid conditioning cannot currently be combined with cross attention control. Cross attention control will be ignored.")
             cac_args = None
 
+    eos_token_index = 1
+    if type(parsed_prompt) is not Blend:
+        tokens = get_tokens_for_prompt(model, parsed_prompt)
+        eos_token_index = len(tokens)+1
     return (
         unconditioning, conditioning, InvokeAIDiffuserComponent.ExtraConditioningInfo(
+            tokens_count_including_eos_bos=eos_token_index + 1,
             cross_attention_control_args=cac_args
         )
     )
