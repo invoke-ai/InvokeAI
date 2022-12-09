@@ -1,7 +1,7 @@
 # pip will resolve the version which matches torch
 albumentations
 dependency_injector==4.40.0
-diffusers
+diffusers==0.9.0
 einops
 eventlet
 facexlib
@@ -33,7 +33,7 @@ torch-fidelity
 torchmetrics
 transformers==4.21.*
 picklescan
-git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan ; platform_system == 'Windows'
+# git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan ; platform_system == 'Windows'
 git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan ; platform_system != 'Windows'
 git+https://github.com/openai/CLIP.git@main#egg=clip
 git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
