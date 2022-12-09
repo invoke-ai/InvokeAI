@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         stable-diffusion-model:
-          - diffusers-1.4
+          - diffusers-1.5
         requirements-file:
           - requirements-lin-cuda.txt
           - requirements-lin-amd.txt

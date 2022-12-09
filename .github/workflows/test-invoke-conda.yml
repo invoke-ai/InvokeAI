@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         stable-diffusion-model:
-          - diffusers-1.4
+          - diffusers-1.5
         environment-yaml:
           - environment-lin-amd.yml
           - environment-lin-cuda.yml
