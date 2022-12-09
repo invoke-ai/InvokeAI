@@ -114,12 +114,7 @@ jobs:
 
       - name: run configure_invokeai.py
         id: run-preload-models
-        run: |
-          ${{ env.pythonLocation }}/bin/python scripts/configure_invokeai.py --no-interactive --yes
-
-      - name: cat invokeai.init
-        id: cat-invokeai
-        run: cat ${{ env.INVOKEAI_ROOT }}/invokeai.init
+        run: python3 scripts/configure_invokeai.py --no-interactive --yes
 
       - name: Run the tests
         id: run-tests
