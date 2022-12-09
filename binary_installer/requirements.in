@@ -2,7 +2,7 @@
 --extra-index-url https://download.pytorch.org/whl/torch_stable.html
 --extra-index-url https://download.pytorch.org/whl/cu116
 --trusted-host https://download.pytorch.org
-accelerate~=0.14
+accelerate~=0.15
 albumentations
 diffusers[torch]~=0.10
 einops

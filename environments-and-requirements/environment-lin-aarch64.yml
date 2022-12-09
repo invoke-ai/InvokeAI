@@ -28,7 +28,7 @@ dependencies:
   - torch-fidelity=0.3.0
   - torchmetrics=0.7.0
   - torchvision
-  - transformers=4.21.3
+  - transformers~=4.25
   - pip:
       - dependency_injector==4.40.0
       - getpass_asterisk
