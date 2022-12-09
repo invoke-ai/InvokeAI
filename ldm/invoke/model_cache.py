@@ -464,9 +464,12 @@ class ModelCache(object):
     def _model_from_cpu(self,model):
         if self.device != 'cpu':
             model.to(self.device)
-            model.first_stage_model.to(self.device)
-            model.cond_stage_model.to(self.device)
-            model.cond_stage_model.device = self.device
+            try:
+                model.first_stage_model.to(self.device)
+                model.cond_stage_model.to(self.device)
+                model.cond_stage_model.device = self.device
+            except AttributeError as e:
+                warnings.warn(f"TODO: clean up legacy model-management: {e}")
         return model
 
     def _pop_oldest_model(self):
