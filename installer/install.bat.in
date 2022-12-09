@@ -18,8 +18,23 @@ if "%1" == "use-cache" (
 set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/lstein-simple-install.zip
 set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
+set PYTHON_URL=https://www.python.org/downloads/windows/
 set MINIMUM_PYTHON_VERSION=3.9.0
+set PYTHON_URL=https://www.python.org/downloads/release/python-3109/
+
+
 set err_msg=An error has occurred and the script could not continue.
+
+@rem --------------------------- Intro -------------------------------
+echo This script will install InvokeAI and its dependencies. Before you start,
+echo please make sure to do the following:
+echo 1. Install python 3.9 or higher.
+echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
+echo    enable long path support on your system.
+echo.
+echo See %INSTRUCTIONS% for more details.
+echo. 
+pause
 
 @rem ---------------------------- check Python version ---------------
 echo ***** Checking and Updating Python *****
@@ -27,15 +42,19 @@ echo ***** Checking and Updating Python *****
 call python --version >.tmp1 2>.tmp2
 if %errorlevel% == 1 (
    set err_msg=Please install Python 3.9 or higher. See %INSTRUCTIONS% for details.
-   goto :err_exit
+   goto err_exit
 )
 
 for /f "tokens=2" %%i in (.tmp1) do set python_version=%%i
+if "%python_version%" == "" (
+   set err_msg=No python was detected on your system. Please install Python version %MINIMUM_PYTHON_VERSION% or higher. We recommend Python 3.10.9 from %PYTHON_URL%
+   goto err_exit
+)
 
 call :compareVersions %MINIMUM_PYTHON_VERSION% %python_version%
 if %errorlevel% == 1 (
-   set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%
-   goto :err_exit
+   set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%. We recommend Python 3.10.9 from %PYTHON_URL%
+   goto err_exit
 )
 
 @rem Cleanup
@@ -43,7 +62,6 @@ del /q .tmp1 .tmp2
 
 echo Updating PIP...
 call python -m pip install --no-warn-script-location -q --upgrade pip
-call pip install --no-warn-script-location -q virtualenv
 
 @rem --------------------- Get the requirements file ------------
 echo.
@@ -88,7 +106,7 @@ echo Successful.
 @rem --------------------------- Create and populate .venv ---------------------------
 echo.
 echo ** Creating Virtual Environment for InvokeAI **
-python -mvirtualenv %rootdir%\.venv
+call python -mvenv %rootdir%\.venv
 if %errorlevel% neq 0 (
    set err_msg=Could not create virtual environment %rootdir%\.venv. Please check the directory's permissions and try again.
    goto :err_exit
@@ -99,7 +117,7 @@ echo.
 echo *** Installing InvokeAI Requirements ***
 call %rootdir%\.venv\Scripts\activate.bat
 copy environments-and-requirements\requirements-win-colab-cuda.txt .\requirements.txt
-call pip install -r requirements.txt
+call python -mpip install -r requirements.txt
 if %errorlevel% neq 0 (
    set err_msg=Installation of requirements failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
    goto :err_exit
@@ -108,7 +126,7 @@ echo Installation successful.
 
 echo.
 echo *** Installing InvokeAI Modules and Executables ***
-pip install %INVOKE_AI_SRC%
+call python -mpip install %INVOKE_AI_SRC%
 if %errorlevel% neq 0 (
    set err_msg=Installation of InvokeAI failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
    goto :err_exit
@@ -185,6 +203,8 @@ for %%C in (a b c d e f g h i j k l m n o p q r s t u v w x y z) do set "%~1=!%~
 exit /b
 
 :err_exit
-    echo %err_msg%
-    pause
-    exit
+echo %err_msg%
+echo The installer will exit now.
+pause
+exit /b
+

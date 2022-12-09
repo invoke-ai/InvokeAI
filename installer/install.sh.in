@@ -23,7 +23,7 @@ function _err_exit {
         echo -e "Error code $1; Error caught was '$2'"
 	if [ "$OS_NAME" == "osx" ]; then
 	    echo "Something went wrong while installing InvokeAI and/or its requirements."
-	    echo "You may need to the Xcode command line tools to proceed. See step number 3 of"
+	    echo "You may need to use the Xcode command line tools to proceed. See step number 3 of"
 	    echo "https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE#walk_through for"
 	    echo "installation instructions and then run this script again."
 	else
@@ -35,6 +35,32 @@ function _err_exit {
         read -p "Press any key to exit..."
         exit
     fi
+}
+
+function readinput() {
+  local CLEAN_ARGS=""
+  while [[ $# -gt 0 ]]; do
+    local i="$1"
+    case "$i" in
+      "-i")
+        if read -i "default" 2>/dev/null <<< "test"; then 
+          CLEAN_ARGS="$CLEAN_ARGS -i \"$2\""
+        fi
+        shift
+        shift
+        ;;
+      "-p")
+        CLEAN_ARGS="$CLEAN_ARGS -p \"$2\""
+        shift
+        shift
+        ;;
+      *)
+        CLEAN_ARGS="$CLEAN_ARGS $1"
+        shift
+        ;;
+    esac
+  done
+  eval read $CLEAN_ARGS
 }
 
 
@@ -63,30 +89,30 @@ esac
 
 echo "Installing for $OS_NAME-$OS_ARCH"
 # confirm that python is installed and is up to date
-if ! which python &>/dev/null; then
-   echo "Please install Python 3.9 or higher before running this script. See instructions at $INSTRUCTIONS for help."
-   exit -1
-fi
 
-python_version=$(python -V | awk '{ print $2 }')
-if [ $(version $python_version) -lt $(version "$MINIMUM_PYTHON_VERSION") ]; then
-   echo "Installed Python version $python_version is less than the required version $MINIMUM_PYTHON_VERSION. See instructions at $INSTRUCTIONS for help."
-   exit -1
-fi
+unset PYTHON
+for candidate in python3.10 python3 python3.9 python; do
+    if ppath=`which $candidate`; then
+	python_version=$($ppath -V | awk '{ print $2 }')    
+	if [ $(version $python_version) -ge $(version "$MINIMUM_PYTHON_VERSION") ]; then
+	    PYTHON=$ppath
+	    echo Python $python_version found at $PYTHON
+	    break
+	fi
+    fi
+done
 
-echo "Python version $python_version detected. Looking good!"
-# install virtualenv support
-if ! which virtualenv &>/dev/null; then
-   echo "Installing virtualenv support."
-   pip install virtualenv
-   _err_exit $? "The pip program failed to install virtualenv support. Please see $TROUBLESHOOTING for help."
+if [ -z "$PYTHON" ]; then
+    echo "A suitable Python interpreter could not be found"
+    echo "Please install Python 3.9 or higher before running this script. See instructions at $INSTRUCTIONS for help."
+    exit -1
 fi
 
 ROOTDIR=""
 while [ "$ROOTDIR" == "" ]
 do
     echo
-    read -e -p "Select your preferred location for the 'invokeai' directory [$HOME]: " -i $HOME input
+    readinput -e -p "Select your preferred location for the 'invokeai' directory [$HOME]: " -i $HOME input
     ROOTDIR=${input:=$HOME}/invokeai
     read -e -p "InvokeAI will be installed into $ROOTDIR. OK? [y]: " input
     RESPONSE=${input:='y'}
@@ -114,7 +140,9 @@ done
 echo
 echo "** Creating Virtual Environment for InvokeAI **"
 
-python -mvirtualenv $ROOTDIR/.venv
+$PYTHON -mpip install --upgrade pip
+$PYTHON -mpip install virtualenv
+$PYTHON -mvirtualenv $ROOTDIR/.venv
 _err_exit $? "Python failed to create virtual environment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
 
 #--------------------------------------------------------------------------------
@@ -124,13 +152,15 @@ echo "** Activating Virtual Environment for InvokeAI **"
 source $ROOTDIR/.venv/bin/activate
 _err_exit $? "Failed to activate virtual evironment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
 
+PYTHON=$ROOTDIR/.venv/bin/python
+
 #--------------------------------------------------------------------------------
 echo
 echo "*** Installing InvokeAI Dependencies ***"
 
 if [ "$OS_NAME" == "osx" ]; then
     echo "macOS detected. Installing MPS and CPU support."
-    egrep -v '^-e .' ../environments-and-requirements/requirements-mac-mps-cpu.txt >requirements.txt
+    egrep -v '^-e .' environments-and-requirements/requirements-mac-mps-cpu.txt >requirements.txt
 else
     if (lsmod | grep amdgpu) &>/dev/null ; then
 	echo "Linux system with AMD GPU driver detected. Installing ROCm and CPU support"
@@ -141,13 +171,13 @@ else
     fi
 fi
 
-pip install -r requirements.txt
+$PYTHON -mpip install -r requirements.txt
 _err_exit $? "Failed to install InvokeAI's dependencies."
 
 #--------------------------------------------------------------------------------
 echo
 echo "*** Installing InvokeAI Modules and Executables ***"
-pip install $INVOKE_AI_SRC
+$PYTHON -mpip install $INVOKE_AI_SRC
 _err_exit $? "Installation of InvokeAI failed."
 
 #--------------------------------------------------------------------------------

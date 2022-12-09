@@ -31,6 +31,7 @@ zip -r InvokeAI-installer-$VERSION-mac.zip InvokeAI-Installer
 # now do the windows installer
 rm InvokeAI-Installer/install.sh
 cp install.bat.in InvokeAI-Installer/install.bat
+cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
 # this gets rid of the "-e ." at the end of the windows requirements file
 # because it is easier to do it now than in the .bat install script

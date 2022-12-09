@@ -26,7 +26,7 @@ Preparations:
 
 Long Paths on Windows:
 
-  If you are on Windows, you may need to enable Windows Long Paths to
+  If you are on Windows, you will need to enable Windows Long Paths to
   run InvokeAI successfully. If you're not sure what this is, you
   almost certainly need to do this.
 
