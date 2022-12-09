@@ -756,7 +756,7 @@ class Generate:
         elif text_mask:
             init_mask = self._txt2mask(image, text_mask, width, height, fit=fit)
 
-        if invert_mask:
+        if init_mask and invert_mask:
             init_mask = ImageOps.invert(init_mask)
             
         return init_image,init_mask
