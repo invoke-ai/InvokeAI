@@ -38,7 +38,7 @@ class Embiggen(Generator):
                 image = make_image()
                 results.append([image, seed])
                 if image_callback is not None:
-                    image_callback(image, seed)
+                    image_callback(image, seed, prompt_in=prompt)
                 seed = self.new_seed() 
         return results
 
