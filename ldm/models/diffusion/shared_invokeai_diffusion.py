@@ -5,8 +5,8 @@ from typing import Callable, Optional, Union
 import torch
 
 from ldm.models.diffusion.cross_attention_control import Arguments, \
-    remove_cross_attention_control, setup_cross_attention_control, Context
-from ldm.modules.attention import get_mem_free_total
+    remove_cross_attention_control, setup_cross_attention_control, Context, get_cross_attention_modules, CrossAttentionType
+from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 
 
 class InvokeAIDiffuserComponent:
@@ -21,7 +21,8 @@ class InvokeAIDiffuserComponent:
 
 
     class ExtraConditioningInfo:
-        def __init__(self, cross_attention_control_args: Optional[Arguments]):
+        def __init__(self, tokens_count_including_eos_bos:int, cross_attention_control_args: Optional[Arguments]):
+            self.tokens_count_including_eos_bos = tokens_count_including_eos_bos
             self.cross_attention_control_args = cross_attention_control_args
 
         @property
@@ -52,7 +53,25 @@ class InvokeAIDiffuserComponent:
         self.cross_attention_control_context = None
         remove_cross_attention_control(self.model)
 
+    def setup_attention_map_saving(self, saver: AttentionMapSaver):
+        def callback(slice, dim, offset, slice_size, key):
+            if dim is not None:
+                # sliced tokens attention map saving is not implemented
+                return
+            saver.add_attention_maps(slice, key)
 
+        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
+        for identifier, module in tokens_cross_attention_modules:
+            key = ('down' if identifier.startswith('down') else
+                   'up' if identifier.startswith('up') else
+                   'mid')
+            module.set_attention_slice_calculated_callback(
+                lambda slice, dim, offset, slice_size, key=key: callback(slice, dim, offset, slice_size, key))
+
+    def remove_attention_map_saving(self):
+        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
+        for _, module in tokens_cross_attention_modules:
+            module.set_attention_slice_calculated_callback(None)
 
     def do_diffusion_step(self, x: torch.Tensor, sigma: torch.Tensor,
                                 unconditioning: Union[torch.Tensor,dict],

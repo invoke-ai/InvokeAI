@@ -53,7 +53,6 @@ COMMANDS = (
     '--codeformer_fidelity','-cf',
     '--upscale','-U',
     '-save_orig','--save_original',
-    '--skip_normalize','-x',
     '--log_tokenization','-t',
     '--hires_fix',
     '--inpaint_replace','-r',
@@ -117,19 +116,19 @@ class Completer(object):
             # extensions defined, so go directly into path completion mode
             if self.extensions is not None:
                 self.matches = self._path_completions(text, state, self.extensions)
-                
+
             # looking for an image file
             elif re.search(path_regexp,buffer):
                 do_shortcut = re.search('^'+'|'.join(IMG_FILE_COMMANDS),buffer)
                 self.matches = self._path_completions(text, state, IMG_EXTENSIONS,shortcut_ok=do_shortcut)
 
             # looking for a seed
-            elif re.search('(-S\s*|--seed[=\s])\d*$',buffer): 
+            elif re.search('(-S\s*|--seed[=\s])\d*$',buffer):
                 self.matches= self._seed_completions(text,state)
 
-            elif re.search('<[\w-]*$',buffer): 
+            elif re.search('<[\w-]*$',buffer):
                 self.matches= self._concept_completions(text,state)
-            
+
             # looking for a model
             elif re.match('^'+'|'.join(MODEL_COMMANDS),buffer):
                 self.matches= self._model_completions(text, state)
@@ -227,7 +226,7 @@ class Completer(object):
         if h_len < 1:
             print('<empty history>')
             return
-        
+
         for i in range(0,h_len):
             line = self.get_history_item(i+1)
             if match and match not in line:
@@ -367,7 +366,7 @@ class DummyCompleter(Completer):
     def __init__(self,options):
         super().__init__(options)
         self.history = list()
-        
+
     def add_history(self,line):
         self.history.append(line)
 

@@ -14,7 +14,9 @@ class Txt2Img(Generator):
 
     @torch.no_grad()
     def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
-                       conditioning,width,height,step_callback=None,threshold=0.0,perlin=0.0,**kwargs):
+                       conditioning,width,height,step_callback=None,threshold=0.0,perlin=0.0,
+                       attention_maps_callback=None,
+                       **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
@@ -33,7 +35,7 @@ class Txt2Img(Generator):
 
             if self.free_gpu_mem and self.model.model.device != self.model.device:
                 self.model.model.to(self.model.device)
-                                
+
             sampler.make_schedule(ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False)
 
             samples, _ = sampler.sample(
@@ -49,6 +51,7 @@ class Txt2Img(Generator):
                 eta                          = ddim_eta,
                 img_callback                 = step_callback,
                 threshold                    = threshold,
+                attention_maps_callback      = attention_maps_callback,
             )
 
             if self.free_gpu_mem:
