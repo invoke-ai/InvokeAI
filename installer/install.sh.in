@@ -91,7 +91,7 @@ echo "Installing for $OS_NAME-$OS_ARCH"
 # confirm that python is installed and is up to date
 
 unset PYTHON
-for candidate in python 3.11 python3.10 python3 python3.9 python; do
+for candidate in python 3.11 python3.10 python3.9 python3 python; do
     if ppath=`which $candidate`; then
 	python_version=$($ppath -V | awk '{ print $2 }')    
 	if [ $(version $python_version) -ge $(version "$MINIMUM_PYTHON_VERSION") ]; then
@@ -106,6 +106,13 @@ if [ -z "$PYTHON" ]; then
     echo "A suitable Python interpreter could not be found"
     echo "Please install Python 3.9 or higher before running this script. See instructions at $INSTRUCTIONS for help."
     exit -1
+fi
+
+if [ "$OS_NAME" == "osx" ]; then
+    xcode_path=$(xcode-select --print-path)
+    _err_exit $? "xcode_path command not found"
+    export CPPFLAGS="-I $xcode_path/Library/Frameworks/Python3.framework/Versions/Current/Headers"
+    echo "Will compile wheels with CPPFLAGS=$CPPFLAGS"
 fi
 
 ROOTDIR=""
