@@ -8,6 +8,7 @@ import time
 import traceback
 import yaml
 
+from ldm.generate import Generate
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.invoke.readline import get_completer, Completer
@@ -282,7 +283,7 @@ def main_loop(gen, opt):
             prefix = file_writer.unique_prefix()
             step_callback = make_step_callback(gen, opt, prefix) if opt.save_intermediates > 0 else None
 
-            def image_writer(image, seed, upscaled=False, first_seed=None, use_prefix=None, prompt_in=None):
+            def image_writer(image, seed, upscaled=False, first_seed=None, use_prefix=None, prompt_in=None, attention_maps_image=None):
                 # note the seed is the seed of the current image
                 # the first_seed is the original seed that noise is added to
                 # when the -v switch is used to generate variations
@@ -790,7 +791,7 @@ def get_next_command(infile=None) -> str:  # command string
             print(f'#{command}')
     return command
 
-def invoke_ai_web_server_loop(gen, gfpgan, codeformer, esrgan):
+def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     print('\n* --web was specified, starting web server...')
     from backend.invoke_ai_web_server import InvokeAIWebServer
     # Change working directory to the stable-diffusion directory

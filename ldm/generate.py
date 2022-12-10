@@ -16,7 +16,6 @@ import numpy as np
 import skimage
 import torch
 import transformers
-from PIL import Image, ImageOps
 from diffusers import HeunDiscreteScheduler
 from diffusers.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
@@ -27,6 +26,7 @@ from diffusers.schedulers.scheduling_ipndm import IPNDMScheduler
 from diffusers.schedulers.scheduling_lms_discrete import LMSDiscreteScheduler
 from diffusers.schedulers.scheduling_pndm import PNDMScheduler
 from omegaconf import OmegaConf
+from PIL import Image, ImageOps
 from pytorch_lightning import seed_everything, logging
 
 from ldm.invoke.args import metadata_from_png
@@ -461,7 +461,7 @@ class Generate:
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
                 prompt, model =self.model,
-                skip_normalize=skip_normalize,
+                skip_normalize_legacy_blend=skip_normalize,
                 log_tokens    =self.log_tokenization
             )
 
@@ -613,8 +613,8 @@ class Generate:
         # todo: cross-attention control
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
             prompt, model =self.model,
-            skip_normalize=opt.skip_normalize,
-            log_tokens    =opt.log_tokenization
+            skip_normalize_legacy_blend=opt.skip_normalize,
+            log_tokens    =ldm.invoke.conditioning.log_tokenization
         )
 
         if tool in ('gfpgan','codeformer','upscale'):

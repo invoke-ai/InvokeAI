@@ -10,8 +10,6 @@ from einops import rearrange, repeat
 from ldm.models.diffusion.cross_attention_control import InvokeAICrossAttentionMixin
 from ldm.modules.diffusionmodules.util import checkpoint
 
-import psutil
-
 def exists(val):
     return val is not None
 
@@ -165,10 +163,10 @@ def get_mem_free_total(device):
     return mem_free_total
 
 class CrossAttention(nn.Module, InvokeAICrossAttentionMixin):
-
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
         print(f"Warning! ldm.modules.attention.CrossAttention is no longer being maintained. Please use InvokeAICrossAttention instead.")
         super().__init__()
+        InvokeAICrossAttentionMixin.__init__(self)
         inner_dim = dim_head * heads
         context_dim = default(context_dim, query_dim)
 
@@ -184,7 +182,6 @@ class CrossAttention(nn.Module, InvokeAICrossAttentionMixin):
             nn.Dropout(dropout)
         )
 
-
     def forward(self, x, context=None, mask=None):
         h = self.heads
 
@@ -196,7 +193,7 @@ class CrossAttention(nn.Module, InvokeAICrossAttentionMixin):
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
 
-        # prevent scale being applied twice
+        # don't apply scale twice
         cached_scale = self.scale
         self.scale = 1
         r = self.get_invokeai_attention_mem_efficient(q, k, v)

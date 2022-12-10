@@ -7,10 +7,8 @@ import torch
 import diffusers
 from torch import nn
 
-
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
-
 
 class Arguments:
     def __init__(self, edited_conditioning: torch.Tensor, edit_opcodes: list[tuple], edit_options: dict):
@@ -68,11 +66,11 @@ class Context:
         self.clear_requests(cleanup=True)
 
     def register_cross_attention_modules(self, model):
-        for name,module in get_attention_modules(model, CrossAttentionType.SELF):
+        for name,module in get_cross_attention_modules(model, CrossAttentionType.SELF):
             if name in self.self_cross_attention_module_identifiers:
                 assert False, f"name {name} cannot appear more than once"
             self.self_cross_attention_module_identifiers.append(name)
-        for name,module in get_attention_modules(model, CrossAttentionType.TOKENS):
+        for name,module in get_cross_attention_modules(model, CrossAttentionType.TOKENS):
             if name in self.tokens_cross_attention_module_identifiers:
                 assert False, f"name {name} cannot appear more than once"
             self.tokens_cross_attention_module_identifiers.append(name)
@@ -175,6 +173,135 @@ class Context:
                 map_dict[offset] = slice.to('cpu')
 
 
+
+class InvokeAICrossAttentionMixin:
+    """
+    Enable InvokeAI-flavoured CrossAttention calculation, which does aggressive low-memory slicing and calls
+    through both to an attention_slice_wrangler and a slicing_strategy_getter for custom attention map wrangling
+    and dymamic slicing strategy selection.
+    """
+    def __init__(self):
+        self.mem_total_gb = psutil.virtual_memory().total // (1 << 30)
+        self.attention_slice_wrangler = None
+        self.slicing_strategy_getter = None
+        self.attention_slice_calculated_callback = None
+
+    def set_attention_slice_wrangler(self, wrangler: Optional[Callable[[nn.Module, torch.Tensor, int, int, int], torch.Tensor]]):
+        '''
+        Set custom attention calculator to be called when attention is calculated
+        :param wrangler: Callback, with args (module, suggested_attention_slice, dim, offset, slice_size),
+        which returns either the suggested_attention_slice or an adjusted equivalent.
+            `module` is the current CrossAttention module for which the callback is being invoked.
+            `suggested_attention_slice` is the default-calculated attention slice
+            `dim` is -1 if the attenion map has not been sliced, or 0 or 1 for dimension-0 or dimension-1 slicing.
+                If `dim` is >= 0, `offset` and `slice_size` specify the slice start and length.
+
+        Pass None to use the default attention calculation.
+        :return:
+        '''
+        self.attention_slice_wrangler = wrangler
+
+    def set_slicing_strategy_getter(self, getter: Optional[Callable[[nn.Module], tuple[int,int]]]):
+        self.slicing_strategy_getter = getter
+
+    def set_attention_slice_calculated_callback(self, callback: Optional[Callable[[torch.Tensor], None]]):
+        self.attention_slice_calculated_callback = callback
+
+    def einsum_lowest_level(self, query, key, value, dim, offset, slice_size):
+        # calculate attention scores
+        #attention_scores = torch.einsum('b i d, b j d -> b i j', q, k)
+        attention_scores = torch.baddbmm(
+            torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
+            query,
+            key.transpose(-1, -2),
+            beta=0,
+            alpha=self.scale,
+        )
+
+        # calculate attention slice by taking the best scores for each latent pixel
+        default_attention_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
+        attention_slice_wrangler = self.attention_slice_wrangler
+        if attention_slice_wrangler is not None:
+            attention_slice = attention_slice_wrangler(self, default_attention_slice, dim, offset, slice_size)
+        else:
+            attention_slice = default_attention_slice
+
+        if self.attention_slice_calculated_callback is not None:
+            self.attention_slice_calculated_callback(attention_slice, dim, offset, slice_size)
+
+        hidden_states = torch.bmm(attention_slice, value)
+        return hidden_states
+
+    def einsum_op_slice_dim0(self, q, k, v, slice_size):
+        r = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
+        for i in range(0, q.shape[0], slice_size):
+            end = i + slice_size
+            r[i:end] = self.einsum_lowest_level(q[i:end], k[i:end], v[i:end], dim=0, offset=i, slice_size=slice_size)
+        return r
+
+    def einsum_op_slice_dim1(self, q, k, v, slice_size):
+        r = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
+        for i in range(0, q.shape[1], slice_size):
+            end = i + slice_size
+            r[:, i:end] = self.einsum_lowest_level(q[:, i:end], k, v, dim=1, offset=i, slice_size=slice_size)
+        return r
+
+    def einsum_op_mps_v1(self, q, k, v):
+        if q.shape[1] <= 4096: # (512x512) max q.shape[1]: 4096
+            return self.einsum_lowest_level(q, k, v, None, None, None)
+        else:
+            slice_size = math.floor(2**30 / (q.shape[0] * q.shape[1]))
+            return self.einsum_op_slice_dim1(q, k, v, slice_size)
+
+    def einsum_op_mps_v2(self, q, k, v):
+        if self.mem_total_gb > 8 and q.shape[1] <= 4096:
+            return self.einsum_lowest_level(q, k, v, None, None, None)
+        else:
+            return self.einsum_op_slice_dim0(q, k, v, 1)
+
+    def einsum_op_tensor_mem(self, q, k, v, max_tensor_mb):
+        size_mb = q.shape[0] * q.shape[1] * k.shape[1] * q.element_size() // (1 << 20)
+        if size_mb <= max_tensor_mb:
+            return self.einsum_lowest_level(q, k, v, None, None, None)
+        div = 1 << int((size_mb - 1) / max_tensor_mb).bit_length()
+        if div <= q.shape[0]:
+            return self.einsum_op_slice_dim0(q, k, v, q.shape[0] // div)
+        return self.einsum_op_slice_dim1(q, k, v, max(q.shape[1] // div, 1))
+
+    def einsum_op_cuda(self, q, k, v):
+        # check if we already have a slicing strategy (this should only happen during cross-attention controlled generation)
+        slicing_strategy_getter = self.slicing_strategy_getter
+        if slicing_strategy_getter is not None:
+            (dim, slice_size) = slicing_strategy_getter(self)
+            if dim is not None:
+                # print("using saved slicing strategy with dim", dim, "slice size", slice_size)
+                if dim == 0:
+                    return self.einsum_op_slice_dim0(q, k, v, slice_size)
+                elif dim == 1:
+                    return self.einsum_op_slice_dim1(q, k, v, slice_size)
+
+        # fallback for when there is no saved strategy, or saved strategy does not slice
+        mem_free_total = self.cached_mem_free_total or get_mem_free_total(q.device)
+        # Divide factor of safety as there's copying and fragmentation
+        return self.einsum_op_tensor_mem(q, k, v, mem_free_total / 3.3 / (1 << 20))
+
+
+    def get_invokeai_attention_mem_efficient(self, q, k, v):
+        if q.device.type == 'cuda':
+            #print("in get_attention_mem_efficient with q shape", q.shape, ", k shape", k.shape, ", free memory is", get_mem_free_total(q.device))
+            return self.einsum_op_cuda(q, k, v)
+
+        if q.device.type == 'mps' or q.device.type == 'cpu':
+            if self.mem_total_gb >= 32:
+                return self.einsum_op_mps_v1(q, k, v)
+            return self.einsum_op_mps_v2(q, k, v)
+
+        # Smaller slices are faster due to L2/L3/SLC caches.
+        # Tested on i7 with 8MB L3 cache.
+        return self.einsum_op_tensor_mem(q, k, v, 32)
+
+
+
 def remove_cross_attention_control(model):
     remove_attention_function(model)
 
@@ -210,8 +337,7 @@ def setup_cross_attention_control(model, context: Context):
     inject_attention_function(model, context)
 
 
-def get_attention_modules(model, which: CrossAttentionType):
-    # cross_attention_class: type = ldm.modules.attention.CrossAttention
+def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
     cross_attention_class: type = InvokeAIDiffusersCrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [(name,module) for name, module in model.named_modules() if
@@ -220,7 +346,7 @@ def get_attention_modules(model, which: CrossAttentionType):
     expected_count = 16
     if cross_attention_modules_in_model_count != expected_count:
         # non-fatal error but .swap() won't work.
-        print(f"Error! CrossAttentionControl found an unexpected number of InvokeAICrossAttention modules in the model " +
+        print(f"Error! CrossAttentionControl found an unexpected number of {cross_attention_class} modules in the model " +
               f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching failed " +
               f"or some assumption has changed about the structure of the model itself. Please fix the monkey-patching, " +
               f"and/or update the {expected_count} above to an appropriate number, and/or find and inform someone who knows " +
@@ -266,7 +392,7 @@ def inject_attention_function(unet, context: Context):
 
         return attention_slice
 
-    cross_attention_modules = get_attention_modules(unet, CrossAttentionType.TOKENS) + get_attention_modules(unet, CrossAttentionType.SELF)
+    cross_attention_modules = get_cross_attention_modules(unet, CrossAttentionType.TOKENS) + get_cross_attention_modules(unet, CrossAttentionType.SELF)
     for identifier, module in cross_attention_modules:
         module.identifier = identifier
         try:
@@ -282,7 +408,7 @@ def inject_attention_function(unet, context: Context):
 
 
 def remove_attention_function(unet):
-    cross_attention_modules = get_attention_modules(unet, CrossAttentionType.TOKENS) + get_attention_modules(unet, CrossAttentionType.SELF)
+    cross_attention_modules = get_cross_attention_modules(unet, CrossAttentionType.TOKENS) + get_cross_attention_modules(unet, CrossAttentionType.SELF)
     for identifier, module in cross_attention_modules:
         try:
             # clear wrangler callback
@@ -314,7 +440,6 @@ def get_mem_free_total(device):
     mem_free_torch = mem_reserved - mem_active
     mem_free_total = mem_free_cuda + mem_free_torch
     return mem_free_total
-
 
 
 class InvokeAICrossAttentionMixin:
@@ -451,5 +576,4 @@ class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention,
 
         hidden_states = self.reshape_batch_dim_to_heads(damian_result)
         return hidden_states
-
 

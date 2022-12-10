@@ -19,6 +19,7 @@ from pytorch_lightning import seed_everything
 from tqdm import trange
 
 from ldm.invoke.devices import choose_autocast
+from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ldm.models.diffusion.ddpm import DiffusionWrapper
 from ldm.util import rand_perlin_2d
 
@@ -62,9 +63,12 @@ class Generator:
     def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  safety_checker:dict=None,
+                 attention_maps_callback = None,
                  **kwargs):
         scope = choose_autocast(self.precision)
         self.safety_checker = safety_checker
+        attention_maps_images = []
+        attention_maps_callback = lambda saver: attention_maps_images.append(saver.get_stacked_maps_image())
         make_image = self.get_make_image(
             prompt,
             sampler = sampler,
@@ -74,6 +78,7 @@ class Generator:
             step_callback = step_callback,
             threshold     = threshold,
             perlin        = perlin,
+            attention_maps_callback = attention_maps_callback,
             **kwargs
         )
         results             = []
@@ -109,7 +114,7 @@ class Generator:
                 results.append([image, seed])
 
                 if image_callback is not None:
-                    image_callback(image, seed, first_seed=first_seed)
+                    image_callback(image, seed, first_seed=first_seed, attention_maps_image=attention_maps_images[-1])
 
                 seed = self.new_seed()
 

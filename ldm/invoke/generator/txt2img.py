@@ -15,6 +15,7 @@ class Txt2Img(Generator):
     @torch.no_grad()
     def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
                        conditioning,width,height,step_callback=None,threshold=0.0,perlin=0.0,
+                       attention_maps_callback=None,
                        **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
@@ -39,6 +40,7 @@ class Txt2Img(Generator):
                 extra_conditioning_info=extra_conditioning_info,
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
+                attention_maps_callback      = attention_maps_callback,
             )
 
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
