@@ -641,33 +641,13 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
 
     enable_safety_checker = True
-    default_sampler = 'k_heun'
-    default_steps = '20'  # deliberately a string - see test below
-
-    sampler_choices =['ddim','k_dpm_2_a','k_dpm_2','k_euler_a','k_euler','k_heun','k_lms','plms']
-
     if not yes_to_all:
         print('The NSFW (not safe for work) checker blurs out images that potentially contain sexual imagery.')
         print('It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker.')
         print('The following option will set whether the checker is enabled by default. Like other options, you can')
         print(f'change this setting later by editing the file {Globals.initfile}.')
+        print(f"This is NOT recommended for systems with less than 6G VRAM because of the checker's memory requirements.")
         enable_safety_checker = yes_or_no('Enable the NSFW checker by default?',enable_safety_checker)
-
-        print('\nThe next choice selects the sampler to use by default. Samplers have different speed/performance')
-        print('tradeoffs. If you are not sure what to select, accept the default.')
-        sampler = None
-        while sampler not in sampler_choices:
-            sampler = input(f'Default sampler to use? ({", ".join(sampler_choices)}) [{default_sampler}]:') or default_sampler
-
-        print('\nThe number of denoising steps affects both the speed and quality of the images generated.')
-        print('Higher steps often (but not always) increases the quality of the image, but increases image')
-        print('generation time. This can be changed at run time. Accept the default if you are unsure.')
-        steps = ''
-        while not steps.isnumeric():
-            steps = input(f'Default number of steps to use during generation? [{default_steps}]:') or default_steps
-    else:
-        sampler = default_sampler
-        steps = default_steps
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
@@ -696,8 +676,6 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
 # generation arguments
 {safety_checker}
---sampler={sampler}
---steps={steps}
 
 # You may place other  frequently-used startup commands here, one or more per line.
 # Examples:
