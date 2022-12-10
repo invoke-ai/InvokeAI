@@ -1,3 +1,0 @@
-banana sushi -Ak_lms -S42 -s5
-banana sushi -Ak_heun -S42 -s5
-banana sushi -Addim -S42 -s5
