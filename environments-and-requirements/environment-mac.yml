@@ -22,7 +22,7 @@ dependencies:
 
   - albumentations=1.2
   - coloredlogs=15.0
-  - diffusers=0.6
+  - diffusers=0.10.0
   - einops=0.3
   - eventlet
   - grpcio=1.46
@@ -49,16 +49,16 @@ dependencies:
   - sympy=1.10
   - send2trash=1.8
   - tensorboard=2.10
-  - transformers=4.23
+  - transformers=4.25.*
   - pip:
       - getpass_asterisk
       - picklescan
+      - gfpgan==1.4.2
       - taming-transformers-rom1504
       - test-tube==0.7.5
       - git+https://github.com/openai/CLIP.git@main#egg=clip
       - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k-diffusion
       - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-      - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
       - git+https://github.com/invoke-ai/PyPatchMatch@0.1.4#egg=pypatchmatch
       - -e .
 variables:

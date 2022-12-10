@@ -1,7 +1,7 @@
 # pip will resolve the version which matches torch
 albumentations
 dependency_injector==4.40.0
-diffusers
+diffusers==0.10.0
 einops
 eventlet
 facexlib
@@ -10,7 +10,7 @@ flask_cors==3.0.10
 flask_socketio==5.3.0
 flaskwebgui==0.3.7
 getpass_asterisk
-gfpgan
+gfpgan==1.4.2
 huggingface-hub
 imageio
 imageio-ffmpeg
