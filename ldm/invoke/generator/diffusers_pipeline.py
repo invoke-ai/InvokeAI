@@ -10,6 +10,7 @@ import einops
 import torch
 import torchvision.transforms as T
 from diffusers.models import attention
+from diffusers.utils.import_utils import is_xformers_available
 
 from ...models.diffusion import cross_attention_control
 
@@ -238,6 +239,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
         self.embedding_manager = EmbeddingManager(self.clip_embedder, **_default_personalization_config_params)
+
+        if is_xformers_available():
+            self.enable_xformers_memory_efficient_attention()
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               text_embeddings: torch.Tensor, unconditioned_embeddings: torch.Tensor,
