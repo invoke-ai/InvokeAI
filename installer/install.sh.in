@@ -5,7 +5,8 @@ scriptdir=$(dirname "$0")
 cd "$scriptdir"
 
 # make sure we are not already in a venv
-deactivate
+# (don't need to check status)
+deactivate >/dev/null 2>&1
 
 # this should be changed to the tagged release!
 # INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
@@ -111,7 +112,7 @@ fi
 if [ "$OS_NAME" == "osx" ]; then
     xcode_path=$(xcode-select --print-path)
     _err_exit $? "xcode_path command not found"
-    export CPPFLAGS="-I $xcode_path/Library/Frameworks/Python3.framework/Versions/Current/Headers"
+    export CPPFLAGS="-I$xcode_path/Library/Frameworks/Python3.framework/Versions/Current/Headers"
     echo "Will compile wheels with CPPFLAGS=$CPPFLAGS"
 fi
 
@@ -148,8 +149,7 @@ echo
 echo "** Creating Virtual Environment for InvokeAI **"
 
 $PYTHON -mpip install --upgrade pip
-$PYTHON -mpip install virtualenv
-$PYTHON -mvirtualenv $ROOTDIR/.venv
+$PYTHON -mvenv $ROOTDIR/.venv
 _err_exit $? "Python failed to create virtual environment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
 
 #--------------------------------------------------------------------------------
