@@ -1575,7 +1575,7 @@ def dataURL_to_image(dataURL: str) -> ImageType:
 Converts an image into a base64 image dataURL.
 """
 
-def image_to_dataURL(image):
+def image_to_dataURL(image: ImageType) -> str:
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     image_base64 = "data:image/png;base64," + base64.b64encode(
