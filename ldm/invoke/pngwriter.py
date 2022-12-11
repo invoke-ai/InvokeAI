@@ -57,8 +57,13 @@ def retrieve_metadata(img_path):
     metadata stored there, as a dict
     '''
     im = Image.open(img_path)
-    md = im.text.get('sd-metadata', '{}')
-    dream_prompt = im.text.get('Dream', '')
+    if hasattr(im, 'text'):
+        md = im.text.get('sd-metadata', '{}')
+        dream_prompt = im.text.get('Dream', '')
+    else:
+        # When trying to retrieve metadata from images without a 'text' payload, such as JPG images.
+        md = '{}'
+        dream_prompt = ''
     return {'sd-metadata': json.loads(md), 'Dream': dream_prompt}
 
 def write_metadata(img_path:str, meta:dict):
