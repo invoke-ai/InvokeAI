@@ -114,7 +114,8 @@ class Generator:
                 results.append([image, seed])
 
                 if image_callback is not None:
-                    image_callback(image, seed, first_seed=first_seed, attention_maps_image=attention_maps_images[-1])
+                    attention_maps_image = None if len(attention_maps_images)==0 else attention_maps_images[-1]
+                    image_callback(image, seed, first_seed=first_seed, attention_maps_image=attention_maps_image)
 
                 seed = self.new_seed()
 
