@@ -9,7 +9,7 @@ cd "$scriptdir"
 deactivate >/dev/null 2>&1
 
 # this should be changed to the tagged release!
-INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/refs/tags/2.2.4-rc1.zip
+INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/2.2.4-rc1.zip
 INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 MINIMUM_PYTHON_VERSION=3.9.0
