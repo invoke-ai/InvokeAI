@@ -28,8 +28,9 @@ this, open up a command-line window ("Terminal" on Linux and
 Macintosh, "Command" or "Powershell" on Windows) and type `python
 --version`. If Python is installed, it will print out the version
 number. If it is version `3.9.1` or higher, you meet requirements.
+At this time we do not recommend Python 3.11.
 
-   - If you see an older version, or you get a command not found
+       - If you see an older version, or you get a command not found
    error, then go to [Python
    Downloads](https://www.python.org/downloads/) and download the
    appropriate installer package for your platform. We recommend
@@ -37,24 +38,21 @@ number. If it is version `3.9.1` or higher, you meet requirements.
    3.10.9](https://www.python.org/downloads/release/python-3109/),
    which has been extensively tested with InvokeAI.
 
-   -**Windows users**: During the Python configuration process,
+       - **Windows users**: During the Python configuration process,
    Please look out for a checkbox to add Python to your PATH
    and select it. If the install script complains that it can't
    find python, then open the Python installer again and choose
    "Modify" existing installation.
 
-   - **Mac users**: After installing Python, you may need to run the
+       - **Mac users**: After installing Python, you may need to run the
    following command from the Terminal in order to install the Web
    certificates needed to download model data from https sites. If
    you see lots of CERTIFICATE ERRORS during the last part of the
-   install, this is the problem:
+   install, this is the problem, and you can fix it with this command:
 
-   `/Applications/Python\ 3.10/Install\ Certificates.command` 
+      `/Applications/Python\ 3.10/Install\ Certificates.command` 
 
-   Do not use Python 3.11 at this time due to poor performance
-   of the underlying pytorch machine learning library.
-
-   - **Linux users**: See [Installing Python in Ubuntu](#installing-python-in-ubuntu) for some
+       - **Linux users**: See [Installing Python in Ubuntu](#installing-python-in-ubuntu) for some
    platform-specific tips.
 
 3.  The source installer is distributed in ZIP files. Go to the
@@ -67,7 +65,7 @@ number. If it is version `3.9.1` or higher, you meet requirements.
 
     Download the one that is appropriate for your operating system.
 
-4. If you are a macOS user, you may need to install the Xcode command line tools. 
+4. **MacOS only** You may need to install the Xcode command line tools. 
    These are a set of tools that are needed to run certain applications in a Terminal, 
    including InvokeAI. This package is provided directly by Apple.
    
@@ -80,7 +78,7 @@ number. If it is version `3.9.1` or higher, you meet requirements.
 	- More information can be found here:
    https://www.freecodecamp.org/news/install-xcode-command-line-tools/
 
-5.  If you are a Windows users, there is a slight possibility that you
+5.  **Windows only**: there is a slight possibility that you
     will encountered DLL load errors at the very end of the installation
     process. This is caused by not having up to date Visual C++
     redistributable libraries. If this happens to you, you can install
@@ -104,7 +102,7 @@ number. If it is version `3.9.1` or higher, you meet requirements.
     After successful installation, you can delete the
     `InvokeAI-Installer` directory.
 
-7. Windows users should now double-click on the file WinLongPathsEnabled.reg
+7. **Windows only** Please double-click on the file WinLongPathsEnabled.reg
    and accept the dialog box that asks you if you wish to modify your
    registry. This activates long filename support on your system and will
    prevent mysterious errors during installation.
