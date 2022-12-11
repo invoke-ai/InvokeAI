@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - 'main'
-      - 'development'
-      - 'update-dockerfile-2.2.4'
 
 jobs:
   docker:
