@@ -6,6 +6,7 @@ models/ldm/stable-diffusion-v1/model.ckpt
 # ignore user models config
 configs/models.user.yaml
 config/models.user.yml
+invokeai.init
 
 # ignore the Anaconda/Miniconda installer used while building Docker image
 anaconda.sh
