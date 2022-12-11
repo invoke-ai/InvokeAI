@@ -29,16 +29,32 @@ Macintosh, "Command" or "Powershell" on Windows) and type `python
 --version`. If Python is installed, it will print out the version
 number. If it is version `3.9.1` or higher, you meet requirements.
 
-	- If you see an older version, or you get a command not found
+   - If you see an older version, or you get a command not found
    error, then go to [Python
    Downloads](https://www.python.org/downloads/) and download the
    appropriate installer package for your platform. We recommend
    [Version
    3.10.9](https://www.python.org/downloads/release/python-3109/),
-   which has been extensively tested with InvokeAI. _Please be
-   sure to click the checkbox to add Python to your PATH._
+   which has been extensively tested with InvokeAI.
 
-   - See [Installing Python in Ubuntu](#installing-python-in-ubuntu) for some
+   -**Windows users**: During the Python configuration process,
+   Please look out for a checkbox to add Python to your PATH
+   and select it. If the install script complains that it can't
+   find python, then open the Python installer again and choose
+   "Modify" existing installation.
+
+   - **Mac users**: After installing Python, you may need to run the
+   following command from the Terminal in order to install the Web
+   certificates needed to download model data from https sites. If
+   you see lots of CERTIFICATE ERRORS during the last part of the
+   install, this is the problem:
+
+   `/Applications/Python\ 3.10/Install\ Certificates.command` 
+
+   Do not use Python 3.11 at this time due to poor performance
+   of the underlying pytorch machine learning library.
+
+   - **Linux users**: See [Installing Python in Ubuntu](#installing-python-in-ubuntu) for some
    platform-specific tips.
 
 3.  The source installer is distributed in ZIP files. Go to the
@@ -64,7 +80,14 @@ number. If it is version `3.9.1` or higher, you meet requirements.
 	- More information can be found here:
    https://www.freecodecamp.org/news/install-xcode-command-line-tools/
 
-5.  Unpack the zip file into a convenient directory.  This will create
+5.  If you are a Windows users, there is a slight possibility that you
+    will encountered DLL load errors at the very end of the installation
+    process. This is caused by not having up to date Visual C++
+    redistributable libraries. If this happens to you, you can install
+    the C++ libraries from this site:
+    https://learn.microsoft.com/en-us/cpp/windows/deploying-native-desktop-applications-visual-cpp?view=msvc-170
+
+6.  Unpack the zip file into a convenient directory.  This will create
     a new directory named "InvokeAI-Installer". This example shows how
     this would look using the `unzip` command-line tool, but you may
     use any graphical or command-line Zip extractor:
@@ -81,18 +104,26 @@ number. If it is version `3.9.1` or higher, you meet requirements.
     After successful installation, you can delete the
     `InvokeAI-Installer` directory.
 
-4.  If you are using a desktop GUI, double-click the installer file. It will be
+7. Windows users should now double-click on the file WinLongPathsEnabled.reg
+   and accept the dialog box that asks you if you wish to modify your
+   registry. This activates long filename support on your system and will
+   prevent mysterious errors during installation.
+
+8.  If you are using a desktop GUI, double-click the installer file. It will be
     named `install.bat` on Windows systems and `install.sh` on Linux and
     Macintosh systems.
 
-5.  Alternatively, from the command line, run the shell script or .bat file:
+    On Windows systems you will probably get an "Untrusted Publisher" warning.
+    Click on "More Info" and select "Run Anyway."  You trust us, right?
+
+9.  Alternatively, from the command line, run the shell script or .bat file:
 
     ```cmd
     C:\Documents\Linco> cd InvokeAI-Installer
     C:\Documents\Linco\invokeAI> install.bat
     ```
 
-6. The script will ask you to choose where to install InvokeAI. Select
+10. The script will ask you to choose where to install InvokeAI. Select
    a directory with at least 18G of free space for a full
    install. InvokeAI and all its support files will be installed into
    a new directory named `invokeai` located at the location you specify.
@@ -107,7 +138,7 @@ number. If it is version `3.9.1` or higher, you meet requirements.
    completions. Type part of the path (e.g. "C:\Users") and press
    &lt;tab&gt; repeatedly to suggest completions.
 
-7.  Sit back and let the install script work. It will install the
+11. Sit back and let the install script work. It will install the
     third-party libraries needed by InvokeAI, then download the
     current InvokeAI release and install it.
 
@@ -120,7 +151,7 @@ number. If it is version `3.9.1` or higher, you meet requirements.
     happening, you can interrupt the script with ^C. You may restart
     it and it will pick up where it left off.
 
-8.  After installation completes, the installer will launch a script
+12.  After installation completes, the installer will launch a script
     called `configure_invokeai.py`, which will guide you through the
     first-time process of selecting one or more Stable Diffusion model
     weights files, downloading and configuring them. We provide a list
@@ -139,7 +170,7 @@ number. If it is version `3.9.1` or higher, you meet requirements.
     prompted) and configure InvokeAI to use the previously-downloaded files. The
     process for this is described in [Installing Models](INSTALLING_MODELS.md).
 
-9.  The script will now exit and you'll be ready to generate some
+13.  The script will now exit and you'll be ready to generate some
     images. Look for the directory `invokeai` installed in the
     location you chose at the beginning of the install session. Look
     for a shell script named `invoke.sh` (Linux/Mac) or `invoke.bat`
@@ -160,7 +191,7 @@ number. If it is version `3.9.1` or higher, you meet requirements.
     command-line interface in which you can run python commands directly,
     access developer tools, and launch InvokeAI with customized options.
 
-9. You can launch InvokeAI with several different command-line arguments
+14. You can launch InvokeAI with several different command-line arguments
 that customize its behavior. For example, you can change the location
 of the inage output directory, or select your favorite sampler. See
 the [Command-Line Interface](../features/CLI.md) for a full list of
@@ -236,7 +267,7 @@ go to the green "&lt;&gt; Code" button at the top, and copy the
 
 Now run `update.sh` (or `update.bat`) with the URL of the desired
 InvokeAI version as its argument. For example, this will install the
-2.2.0 release.
+old 2.2.0 release.
 
 ```cmd
 update.sh https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.0.zip
@@ -255,7 +286,7 @@ hours, and often much sooner.
 ## Installing Python in Ubuntu
 
 For reasons that are not entirely clear, installing the correct
-version of Python is a bit of a challenge on Ubuntu, Linux Mint, and
+version of Python can be a bit of a challenge on Ubuntu, Linux Mint, and
 other Ubuntu-derived distributions.
 
 In particular, Ubuntu version 20.04 LTS comes with an old version of
@@ -270,7 +301,8 @@ sudo apt update
 sudo apt install python3.9
 sudo apt install python3-pip
 cd /usr/bin
-sudo ln -sf python3.9 python
+sudo ln -sf python3.9 python3
+sudo ln -sf python3 python
 ```
 
 You can still access older versions of Python by calling `python2`,
