@@ -8,7 +8,7 @@ diffusers
 eventlet
 flask_cors
 flask_socketio
-flaskwebgui
+flaskwebgui==1.0.3
 getpass_asterisk
 imageio-ffmpeg
 pyreadline3
