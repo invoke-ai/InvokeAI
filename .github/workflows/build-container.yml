@@ -6,16 +6,13 @@ on:
     branches:
       - 'main'
       - 'development'
-      - 'update-dockerfile'
+      - 'update-dockerfile-2.2.4'
 
 jobs:
   docker:
     strategy:
       fail-fast: false
       matrix:
-        arch:
-          - x86_64
-          - aarch64
         pip-requirements:
           - requirements-lin-amd.txt
           - requirements-lin-cuda.txt
@@ -37,7 +34,7 @@ jobs:
         with:
           context: .
           file: docker-build/Dockerfile
-          platforms: Linux/${{ matrix.arch }}
+          platforms: linux/amd64,linux/arm64
           push: false
-          tags: ${{ env.dockertag }}:${{ matrix.pip-requirements }}-${{ matrix.arch }}
+          tags: ${{ env.dockertag }}:${{ matrix.pip-requirements }}
           build-args: pip_requirements=${{ matrix.pip-requirements }}
