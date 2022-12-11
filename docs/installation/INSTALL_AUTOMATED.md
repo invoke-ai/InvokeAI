@@ -30,8 +30,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     installed, it will print out the version number. If it is version `3.9.1` or
     higher, you meet requirements.
 
-    !!! warning "If you see an older version, or you get a command not found
-    error"
+    !!! warning "If you see an older version, or get a command not found error"
 
         Go to [Python Downloads](https://www.python.org/downloads/) and
         download the appropriate installer package for your platform. We recommend
@@ -137,9 +136,9 @@ version of InvokeAI with the option to upgrade to experimental versions later.
       `/home/YourName/invokeai` on Linux systems, and `/Users/YourName/invokeai`
       on Macintoshes, where "YourName" is your login name.
 
-    - The script uses tab autocompletion to suggest directory path completions. Type
-      part of the path (e.g. "C:\Users") and press &lt;tab&gt; repeatedly to suggest
-      completions.
+    - The script uses tab autocompletion to suggest directory path completions.
+      Type part of the path (e.g. "C:\Users") and press ++tab++ repeatedly
+      to suggest completions.
 
 9.  Sit back and let the install script work. It will install the third-party
     libraries needed by InvokeAI, then download the current InvokeAI release and
