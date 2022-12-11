@@ -33,3 +33,5 @@ inpainting-1.5:
   config: configs/stable-diffusion/v1-inpainting-inference.yaml
   vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
   description: RunwayML SD 1.5 model optimized for inpainting
+  width: 512
+  height: 512
