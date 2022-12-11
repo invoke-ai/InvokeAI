@@ -16,7 +16,7 @@ from argparse import Namespace
 Globals = Namespace()
 
 # This is usually overwritten by the command line and/or environment variables
-Globals.root = os.environ.get('INVOKEAI_ROOT') or os.path.expanduser('~/invokeai')
+Globals.root = os.path.abspath(os.environ.get('INVOKEAI_ROOT') or os.path.expanduser('~/invokeai'))
 
 # Where to look for the initialization file
 Globals.initfile = 'invokeai.init'
