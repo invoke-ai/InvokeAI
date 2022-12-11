@@ -31,6 +31,11 @@ echo please make sure to do the following:
 echo 1. Install python 3.9 or higher.
 echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
 echo    enable long path support on your system.
+echo 3. Some users have found they need to install the Visual C++ core
+echo    libraries or else they experience DLL loading problems at the end of the install.
+echo    Visual C++ is very likely already installed on your system, but if you get DLL
+echo    issues, please download and install the libraries by going to:
+echo    https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
 echo.
 echo See %INSTRUCTIONS% for more details.
 echo. 
