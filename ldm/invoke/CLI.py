@@ -46,7 +46,6 @@ def main():
             args.max_loaded_models = 1
 
     # alert - setting globals here
-    Globals.root = os.path.expanduser(args.root_dir or os.environ.get('INVOKEAI_ROOT') or os.path.abspath('.'))
     Globals.try_patchmatch = args.patchmatch
 
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')

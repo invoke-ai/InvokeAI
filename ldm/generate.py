@@ -131,7 +131,6 @@ gr = Generate(
 
 """
 
-
 class Generate:
     """Generate class
     Stores default values for multiple configuration items

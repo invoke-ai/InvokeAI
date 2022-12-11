@@ -1,0 +1,215 @@
+@echo off
+setlocal EnableExtensions EnableDelayedExpansion
+
+@rem This script requires the user to install Python 3.9 or higher. All other
+@rem requirements are downloaded as needed.
+
+@rem change to the script's directory
+PUSHD "%~dp0"
+
+set "no_cache_dir=--no-cache-dir"
+if "%1" == "use-cache" (
+    set "no_cache_dir="
+)
+
+@rem Config
+@rem this should be changed to the tagged release!
+@rem set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
+set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/refs/tags/2.2.4-rc1.zip
+set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
+set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
+set PYTHON_URL=https://www.python.org/downloads/windows/
+set MINIMUM_PYTHON_VERSION=3.9.0
+set PYTHON_URL=https://www.python.org/downloads/release/python-3109/
+
+
+set err_msg=An error has occurred and the script could not continue.
+
+@rem --------------------------- Intro -------------------------------
+echo This script will install InvokeAI and its dependencies. Before you start,
+echo please make sure to do the following:
+echo 1. Install python 3.9 or higher.
+echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
+echo    enable long path support on your system.
+echo 3. Some users have found they need to install the Visual C++ core
+echo    libraries or else they experience DLL loading problems at the end of the install.
+echo    Visual C++ is very likely already installed on your system, but if you get DLL
+echo    issues, please download and install the libraries by going to:
+echo    https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
+echo.
+echo See %INSTRUCTIONS% for more details.
+echo. 
+pause
+
+@rem ---------------------------- check Python version ---------------
+echo ***** Checking and Updating Python *****
+
+call python --version >.tmp1 2>.tmp2
+if %errorlevel% == 1 (
+   set err_msg=Please install Python 3.9 or higher. See %INSTRUCTIONS% for details.
+   goto err_exit
+)
+
+for /f "tokens=2" %%i in (.tmp1) do set python_version=%%i
+if "%python_version%" == "" (
+   set err_msg=No python was detected on your system. Please install Python version %MINIMUM_PYTHON_VERSION% or higher. We recommend Python 3.10.9 from %PYTHON_URL%
+   goto err_exit
+)
+
+call :compareVersions %MINIMUM_PYTHON_VERSION% %python_version%
+if %errorlevel% == 1 (
+   set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%. We recommend Python 3.10.9 from %PYTHON_URL%
+   goto err_exit
+)
+
+@rem Cleanup
+del /q .tmp1 .tmp2
+
+echo Updating PIP...
+call python -m pip install --no-warn-script-location -q --upgrade pip
+
+@rem --------------------- Get the requirements file ------------
+echo.
+echo Setting up requirements file for your system.
+copy /y environments-and-requirements\requirements-win-colab-cuda.txt .\requirements.txt
+
+@rem --------------------- Get the root directory for installation ------------
+set rootdir=""
+set response=""
+set selection=""
+:pick_rootdir
+	if %rootdir% neq "" goto :done
+	set /p selection=Select the path to install InvokeAI's directory into [%UserProfile%]: 
+	if %selection% == "" set selection=%UserProfile%
+	set dest=%selection%\invokeai
+	if exist %dest% (
+	   set response=y
+	   set /p response=The directory %dest% exists. Do you wish to resume install from a previous attempt? [Y/n]: 
+	   if !response! == "" set response=y
+	   if /I !response! == y (set rootdir=%dest%) else (goto :pick_rootdir)
+	) else (
+	   set rootdir=!dest!
+	)
+	set response=y
+	set /p response="You have chosen to install InvokeAI into %rootdir%. OK? [Y/n]: "
+	if !response! == "" set response=y
+	if /I !response! neq y set rootdir=""
+goto :pick_rootdir
+:done
+
+@rem ---------------------- Initialize the runtime directory ---------------------
+echo.
+echo *** Creating Runtime Directory %rootdir% ***
+if not exist %rootdir% mkdir %rootdir%
+@rem for unknown reasons the mkdir works but returns an error code
+if not exist %rootdir% (
+	set err_msg=Could not create the directory %rootdir%. Please check the directory's permissions and try again.
+	goto :err_exit
+)
+echo Successful.
+
+@rem --------------------------- Create and populate .venv ---------------------------
+echo.
+echo ** Creating Virtual Environment for InvokeAI **
+call python -mvenv %rootdir%\.venv
+if %errorlevel% neq 0 (
+   set err_msg=Could not create virtual environment %rootdir%\.venv. Please check the directory's permissions and try again.
+   goto :err_exit
+)
+echo Successful.
+
+echo.
+echo *** Installing InvokeAI Requirements ***
+call %rootdir%\.venv\Scripts\activate.bat
+copy environments-and-requirements\requirements-win-colab-cuda.txt .\requirements.txt
+call python -mpip install -r requirements.txt
+if %errorlevel% neq 0 (
+   set err_msg=Installation of requirements failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
+   goto :err_exit
+)
+echo Installation successful.
+
+echo.
+echo *** Installing InvokeAI Modules and Executables ***
+call python -mpip install %INVOKE_AI_SRC%
+if %errorlevel% neq 0 (
+   set err_msg=Installation of InvokeAI failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
+   goto :err_exit
+)
+echo Installation successful.
+
+@rem --------------------------- Set up the root directory ---------------------------
+xcopy /E /Y .\templates\rootdir %rootdir%
+PUSHD "%rootdir%"
+call .venv\Scripts\python .venv\Scripts\configure_invokeai.py --root="%rootdir%"
+if %errorlevel% neq 0 (
+   set err_msg=Configuration failed. See above for error messages and check %TROUBLESHOOTING% for potential solutions.
+   goto :err_exit
+)
+POPD
+copy .\templates\invoke.bat.in %rootdir%\invoke.bat
+copy .\templates\update.bat.in %rootdir%\update.bat
+
+@rem so that update.bat works
+mkdir %rootdir%\environments-and-requirements
+xcopy /I /Y .\environments-and-requirements %rootdir%\environments-and-requirements
+copy .\requirements.txt %rootdir%\requirements.txt
+
+
+echo.
+echo ***** Finished configuration *****
+echo All done. Execute the file %rootdir%\invoke.bat to start InvokeAI.
+pause
+deactivate
+exit
+
+@rem ------------------------ Subroutines ---------------
+@rem routine to do comparison of semantic version numbers
+@rem found at https://stackoverflow.com/questions/15807762/compare-version-numbers-in-batch-file
+:compareVersions
+::
+:: Compares two version numbers and returns the result in the ERRORLEVEL
+::
+:: Returns 1 if version1 > version2
+::         0 if version1 = version2
+::        -1 if version1 < version2
+::
+:: The nodes must be delimited by . or , or -
+::
+:: Nodes are normally strictly numeric, without a 0 prefix. A letter suffix
+:: is treated as a separate node
+::
+setlocal enableDelayedExpansion
+set "v1=%~1"
+set "v2=%~2"
+call :divideLetters v1
+call :divideLetters v2
+:loop
+call :parseNode "%v1%" n1 v1
+call :parseNode "%v2%" n2 v2
+if %n1% gtr %n2% exit /b 1
+if %n1% lss %n2% exit /b -1
+if not defined v1 if not defined v2 exit /b 0
+if not defined v1 exit /b -1
+if not defined v2 exit /b 1
+goto :loop
+
+
+:parseNode  version  nodeVar  remainderVar
+for /f "tokens=1* delims=.,-" %%A in ("%~1") do (
+  set "%~2=%%A"
+  set "%~3=%%B"
+)
+exit /b
+
+
+:divideLetters  versionVar
+for %%C in (a b c d e f g h i j k l m n o p q r s t u v w x y z) do set "%~1=!%~1:%%C=.%%C!"
+exit /b
+
+:err_exit
+echo %err_msg%
+echo The installer will exit now.
+pause
+exit /b
+

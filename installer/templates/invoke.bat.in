@@ -1,0 +1,37 @@
+@echo off
+
+PUSHD "%~dp0"
+setlocal
+
+call .venv\Scripts\activate.bat
+set INVOKEAI_ROOT=.
+
+echo Do you want to generate images using the
+echo 1. command-line
+echo 2. browser-based UI
+echo 3. open the developer console
+set /P restore="Please enter 1, 2 or 3: "
+IF /I "%restore%" == "1" (
+    echo Starting the InvokeAI command-line..
+    python .venv\Scripts\invoke.py %*
+) ELSE IF /I "%restore%" == "2" (
+    echo Starting the InvokeAI browser-based UI..
+    python .venv\Scripts\invoke.py --web %*
+) ELSE IF /I "%restore%" == "3" (
+    echo Developer Console
+    echo Python command is:
+    where python
+    echo Python version is:
+    python --version
+    echo *************************
+    echo You are now in the system shell, with the local InvokeAI Python virtual environment activated,
+    echo so that you can troubleshoot this InvokeAI installation as necessary.
+    echo *************************
+    echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
+    call cmd /k
+) ELSE (
+    echo Invalid selection
+    pause
+    exit /b
+)
+endlocal

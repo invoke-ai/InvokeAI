@@ -8,7 +8,7 @@ title: Manual Installation
 
 !!! warning "This is for advanced Users"
 
-    who are already expirienced with using conda or pip
+    who are already experienced with using conda or pip
 
 ## Introduction
 

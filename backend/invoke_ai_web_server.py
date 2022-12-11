@@ -209,10 +209,9 @@ class InvokeAIWebServer:
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
-                    start_server="flask-socketio",
+                    server="flask_socketio",
                     width=1600,
                     height=1000,
-                    idle_interval=10,
                     port=self.port
                 ).run()
             except KeyboardInterrupt:
@@ -246,13 +245,15 @@ class InvokeAIWebServer:
 
     def find_frontend(self):
         my_dir = os.path.dirname(__file__)
-        for candidate in (os.path.join(my_dir,'..','frontend','dist'),         # pip install -e .
-                          os.path.join(my_dir,'../../../../frontend','dist')   # pip install .
+        # LS: setup.py seems to put the frontend in different places on different systems, so
+        # this is fragile and needs to be replaced with a better way of finding the front end.
+        for candidate in (os.path.join(my_dir,'..','frontend','dist'),          # pip install -e .
+                          os.path.join(my_dir,'../../../../frontend','dist'),   # pip install . (Linux, Mac)
+                          os.path.join(my_dir,'../../../frontend','dist'),      # pip install . (Windows)
         ):
             if os.path.exists(candidate):
                 return candidate
         assert "Frontend files cannot be found. Cannot continue"
-
 
     def setup_app(self):
         self.result_url = "outputs/"
