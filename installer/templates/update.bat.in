@@ -1,0 +1,52 @@
+@echo off
+setlocal EnableExtensions EnableDelayedExpansion
+
+PUSHD "%~dp0"
+
+set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
+set arg=%1
+if "%arg%" neq "" (
+   if "%arg:~0,4%" neq "http" (
+       echo Usage: update.bat ^<release URL^>.zip
+       echo Updates InvokeAI to use the indicated version of the code base.
+       echo Find the zip file for the release you want, and pass it as the argument.
+       echo For example update.sh https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.4.zip
+    echo.
+    echo If no argument provided then will install the most recent development version, equivalent to
+    echo update.bat https://github.com/invoke-ai/InvokeAI/archive/main.zip
+    exit /b
+   ) else (
+     set INVOKE_AI_SRC=%arg%
+   )
+)
+
+
+call .venv\Scripts\activate.bat
+
+echo This script will update InvokeAI and all its dependencies to !INVOKE_AI_SRC!.
+echo If you do not want to do this, press control-C now!
+pause
+
+call pip install -r requirements.txt
+if %errorlevel% neq 0 (
+   echo Installation of requirements failed. See https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting for suggestions.
+   exit /b
+)
+
+call pip install !INVOKE_AI_SRC!
+if %errorlevel% neq 0 (
+   echo Installation of InvokeAI failed. See https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting for suggestions.
+   exit /b
+)
+
+call .venv\Scripts\python .venv\Scripts\configure_invokeai.py --root="%rootdir%"
+
+if %errorlevel% neq 0 (
+   echo Configuration InvokeAI failed. See https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting for suggestions.
+   exit /b
+)
+
+echo "Press any key to continue"
+pause
+endlocal
+

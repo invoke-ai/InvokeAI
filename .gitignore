@@ -222,12 +222,11 @@ environment.yml
 requirements.txt
 
 # source installer files
-source_installer/*zip
-source_installer/invokeAI
-install.bat
-install.sh
-update.bat
-update.sh
+installer/*zip
+installer/install.bat
+installer/install.sh
+installer/update.bat
+installer/update.sh
 
 # this may be present if the user created a venv
 invokeai
