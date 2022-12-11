@@ -12,13 +12,13 @@ pip_requirements=${PIP_REQUIREMENTS:-requirements-lin-cuda.txt}
 dockerfile=${INVOKE_DOCKERFILE:-docker-build/Dockerfile}
 
 # print the settings
-echo "You are using these values:"
-echo -e "Dockerfile:\t\t ${dockerfile}"
-echo -e "requirements:\t\t ${pip_requirements}"
-echo -e "volumename:\t\t ${volumename}"
-echo -e "arch:\t\t\t ${arch}"
-echo -e "platform:\t\t ${platform}"
-echo -e "invokeai_tag:\t\t ${invokeai_tag}\n"
+echo -e "You are using these values:\n"
+echo -e "Dockerfile:\t ${dockerfile}"
+echo -e "requirements:\t ${pip_requirements}"
+echo -e "volumename:\t ${volumename}"
+echo -e "arch:\t\t ${arch}"
+echo -e "platform:\t ${platform}"
+echo -e "invokeai_tag:\t ${invokeai_tag}\n"
 
 if [[ -n "$(docker volume ls -f name="${volumename}" -q)" ]]; then
   echo "Volume already exists"
