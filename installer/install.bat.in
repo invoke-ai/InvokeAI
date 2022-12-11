@@ -15,7 +15,7 @@ if "%1" == "use-cache" (
 @rem Config
 @rem this should be changed to the tagged release!
 @rem set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
-set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/refs/tags/2.2.4-rc1.zip
+set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/2.2.4-rc1.zip
 set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 set PYTHON_URL=https://www.python.org/downloads/windows/
