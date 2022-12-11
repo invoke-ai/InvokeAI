@@ -6,6 +6,7 @@ import torch
 import numpy as  np
 from ldm.invoke.generator.base import Generator
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+import gc
 
 
 class Txt2Img(Generator):
@@ -55,7 +56,11 @@ class Txt2Img(Generator):
             )
 
             if self.free_gpu_mem:
-                self.model.model.to("cpu")
+                self.model.model.to('cpu')
+                self.model.cond_stage_model.device = 'cpu'
+                self.model.cond_stage_model.to('cpu')
+                gc.collect()
+                torch.cuda.empty_cache()
 
             return self.sample_to_image(samples)
 
