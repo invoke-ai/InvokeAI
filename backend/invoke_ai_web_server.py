@@ -23,10 +23,11 @@ from backend.modules.get_canvas_generation_mode import (
 from backend.modules.parameters import parameters_to_command
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
 from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.prompt_parser import split_weighted_subprompts
+from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 
 # Loading Arguments
 opt = Args()
