@@ -40,7 +40,9 @@ class Txt2Img(Generator):
                 extra_conditioning_info=extra_conditioning_info,
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
-                attention_maps_callback      = attention_maps_callback,
+                # FIXME: Attention Maps Callback merged from main, but not hooked up
+                #     in diffusers branch yet. - keturn
+                # attention_maps_callback      = attention_maps_callback,
             )
 
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
