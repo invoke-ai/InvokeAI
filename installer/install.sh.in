@@ -9,8 +9,7 @@ cd "$scriptdir"
 deactivate >/dev/null 2>&1
 
 # this should be changed to the tagged release!
-# INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
-INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/lstein-simple-install.zip
+INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/refs/tags/2.2.4-rc1.zip
 INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 MINIMUM_PYTHON_VERSION=3.9.0
@@ -91,8 +90,8 @@ esac
 echo "Installing for $OS_NAME-$OS_ARCH"
 # confirm that python is installed and is up to date
 
-unset PYTHON
-for candidate in python 3.11 python3.10 python3.9 python3 python; do
+PYTHON=""
+for candidate in python3.10 python3.9 python3 python python3.11 ; do
     if ppath=`which $candidate`; then
 	python_version=$($ppath -V | awk '{ print $2 }')    
 	if [ $(version $python_version) -ge $(version "$MINIMUM_PYTHON_VERSION") ]; then
@@ -106,6 +105,7 @@ done
 if [ -z "$PYTHON" ]; then
     echo "A suitable Python interpreter could not be found"
     echo "Please install Python 3.9 or higher before running this script. See instructions at $INSTRUCTIONS for help."
+    read -p "Press any key to exit"
     exit -1
 fi
 
