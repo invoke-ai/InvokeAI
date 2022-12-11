@@ -174,7 +174,7 @@ class Args(object):
             sysargs = sys.argv[1:]
             # pre-parse to get the root directory; ignore the rest
             switches = self._arg_parser.parse_args(sysargs)
-            Globals.root = switches.root_dir or Globals.root
+            Globals.root = os.path.abspath(switches.root_dir or Globals.root)
 
             # now use root directory to find the init file
             initfile = os.path.expanduser(os.path.join(Globals.root,Globals.initfile))
