@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -eu
+
+if [ $# -ge 1 ] && [ "${1:0:4}" != "http" ]; then
+    echo "Usage: update.sh <release URL>.zip"
+    echo "Updates InvokeAI to use the indicated version of the code base."
+    echo "Find the zip file for the release you want, and pass it as the argument."
+    echo "For example update.sh https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.3.zip"
+    echo ""
+    echo "If no argument provided then will install the most recent development version, equivalent to"
+    echo "update.sh https://github.com/invoke-ai/InvokeAI/archive/main.zip"
+    exit -1
+fi
+    
+INVOKE_AI_SRC=${1:-https://github.com/invoke-ai/InvokeAI/archive/main.zip}
+
+# ensure we're in the correct folder in case user's CWD is somewhere else
+scriptdir=$(dirname "$0")
+cd "$scriptdir"
+
+function _err_exit {
+    if test "$1" -ne 0
+    then
+	echo "Something went wrong while installing InvokeAI and/or its requirements."
+	echo "Update cannot continue. Please report this error to https://github.com/invoke-ai/InvokeAI/issues"
+        echo -e "Error code $1; Error caught was '$2'"
+        read -p "Press any key to exit..."
+        exit
+    fi
+}
+
+echo This script will update InvokeAI and all its dependencies from $INVOKE_AI_SRC.
+echo If you do not want to do this, press control-C now!
+read -p "Press any key to continue, or CTRL-C to exit..."
+
+. .venv/bin/activate
+
+pip install -r requirements.txt
+_err_exit $? "The pip program failed to install InvokeAI's requirements."
+
+pip install $INVOKE_AI_SRC
+_err_exit $? "The pip program failed to install InvokeAI."
+
+python .venv/bin/configure_invoke.py
+_err_exit $? "The configure script failed to run successfully."
+
+
+
+
+
+

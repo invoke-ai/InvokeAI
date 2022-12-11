@@ -1,4 +1,4 @@
-FROM ubuntu:22.10
+FROM python:3.10-slim AS builder
 
 # use bash
 SHELL [ "/bin/bash", "-c" ]
@@ -7,28 +7,42 @@ SHELL [ "/bin/bash", "-c" ]
 RUN apt-get update \
   && apt-get install -y \
     --no-install-recommends \
-    build-essential \
-    gcc \
-    git \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    pip \
-    python3 \
-    python3-dev \
+    gcc=4:10.2.* \
+    libgl1-mesa-glx=20.3.* \
+    libglib2.0-0=2.66.* \
+    python3-dev=3.9.* \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# set workdir and copy sources
-WORKDIR /invokeai
+# set workdir, PATH and copy sources
+WORKDIR /usr/src/app
+ENV PATH /usr/src/app/.venv/bin:$PATH
 ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
 COPY . ./environments-and-requirements/${PIP_REQUIREMENTS} ./
 
-# install requirements and link outputs folder
-RUN pip install \
-  --no-cache-dir \
-  -r ${PIP_REQUIREMENTS}
+# install requirements
+RUN python3 -m venv .venv \
+  && pip install \
+    --no-cache-dir \
+    -r ${PIP_REQUIREMENTS}
+
+FROM python:3.10-slim AS runtime
+
+# Install necesarry packages
+RUN apt-get update \
+  && apt-get install -y \
+    --no-install-recommends \
+    libgl1-mesa-glx=20.3.* \
+    libglib2.0-0=2.66.* \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+COPY --from=builder /usr/src/app .
 
 # set Environment, Entrypoint and default CMD
 ENV INVOKEAI_ROOT /data
-ENTRYPOINT [ "python3", "scripts/invoke.py", "--outdir=/data/outputs" ]
+ENV PATH=/usr/src/app/.venv/bin:$PATH
+
+ENTRYPOINT [ "python3", "scripts/invoke.py" ]
 CMD [ "--web", "--host=0.0.0.0" ]

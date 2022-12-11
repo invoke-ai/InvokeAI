@@ -132,7 +132,6 @@ gr = Generate(
 
 """
 
-
 class Generate:
     """Generate class
     Stores default values for multiple configuration items
@@ -457,6 +456,11 @@ class Generate:
         results = list()
         init_image = None
         mask_image = None
+
+
+        if self.free_gpu_mem and self.model.cond_stage_model.device != self.model.device:
+            self.model.cond_stage_model.device = self.model.device
+            self.model.cond_stage_model.to(self.model.device)
 
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(

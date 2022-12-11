@@ -208,9 +208,12 @@ class KSampler(Sampler):
         model_wrap_cfg = CFGDenoiser(self.model, threshold=threshold, warmup=max(0.8*S,S-10))
         model_wrap_cfg.prepare_to_sample(S, extra_conditioning_info=extra_conditioning_info)
 
-        attention_map_token_ids = range(1, extra_conditioning_info.tokens_count_including_eos_bos - 1)
-        attention_maps_saver = None if attention_maps_callback is None else AttentionMapSaver(token_ids = attention_map_token_ids, latents_shape=x.shape[-2:])
-        if attention_maps_callback is not None:
+        # setup attention maps saving. checks for None are because there are multiple code paths to get here.
+        attention_maps_saver = None
+        if attention_maps_callback is not None and extra_conditioning_info is not None:
+            eos_token_index = extra_conditioning_info.tokens_count_including_eos_bos - 1
+            attention_map_token_ids = range(1, eos_token_index)
+            attention_maps_saver = AttentionMapSaver(token_ids = attention_map_token_ids, latents_shape=x.shape[-2:])
             model_wrap_cfg.invokeai_diffuser.setup_attention_map_saving(attention_maps_saver)
 
         extra_args = {
@@ -226,7 +229,7 @@ class KSampler(Sampler):
             ),
             None,
         )
-        if attention_maps_callback is not None:
+        if attention_maps_saver is not None:
             attention_maps_callback(attention_maps_saver)
         return sampling_result
 

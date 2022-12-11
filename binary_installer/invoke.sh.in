@@ -2,10 +2,6 @@
 
 set -eu
 
-# ensure we're in the correct folder in case user's CWD is somewhere else
-scriptdir=$(dirname "$0")
-cd "$scriptdir"
-￼
 . .venv/bin/activate
 
 # set required env var for torch on mac MPS

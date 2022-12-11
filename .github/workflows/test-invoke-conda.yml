@@ -104,9 +104,9 @@ jobs:
             --no-interactive --yes \
             --full-precision  # can't use fp16 weights without a GPU
 
-      - name: cat ~/.invokeai
+      - name: cat invokeai.init
         id: cat-invokeai
-        run: cat ~/.invokeai
+        run: cat ${{ env.INVOKEAI_ROOT }}/invokeai.init
 
       - name: Run the tests
         id: run-tests

@@ -3,6 +3,10 @@ set -e
 
 source ./docker-build/env.sh || echo "please run from repository root" || exit 1
 
+echo -e "You are using these values:\n"
+echo -e "volumename:\t ${volumename}"
+echo -e "invokeai_tag:\t ${invokeai_tag}\n"
+
 docker run \
   --interactive \
   --tty \
