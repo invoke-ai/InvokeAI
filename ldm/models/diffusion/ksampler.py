@@ -209,6 +209,7 @@ class KSampler(Sampler):
         model_wrap_cfg.prepare_to_sample(S, extra_conditioning_info=extra_conditioning_info)
 
         # setup attention maps saving. checks for None are because there are multiple code paths to get here.
+        attention_maps_saver = None
         if attention_maps_callback is not None and extra_conditioning_info is not None:
             eos_token_index = extra_conditioning_info.tokens_count_including_eos_bos - 1
             attention_map_token_ids = range(1, eos_token_index)
@@ -228,7 +229,7 @@ class KSampler(Sampler):
             ),
             None,
         )
-        if attention_maps_callback is not None:
+        if attention_maps_saver is not None:
             attention_maps_callback(attention_maps_saver)
         return sampling_result
 
