@@ -84,6 +84,8 @@ class Concepts(object):
         better to store the concept name (unique) than the concept trigger
         (not necessarily unique!)
         '''
+        if not prompt:
+            return prompt
         triggers = self.match_trigger.findall(prompt)
         if not triggers:
             return prompt
