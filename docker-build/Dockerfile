@@ -30,6 +30,7 @@ RUN python3 -m venv .venv \
     'wheel>=0.38.4' \
   && pip install \
     --no-cache-dir \
+    wheel \
     -r ${PIP_REQUIREMENTS}
 
 FROM python:3.10-slim AS runtime
