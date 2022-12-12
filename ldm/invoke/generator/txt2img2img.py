@@ -83,7 +83,7 @@ class Txt2Img2Img(Generator):
 
             z_enc = ddim_sampler.stochastic_encode(
                 samples,
-                torch.tensor([t_enc]).to(self.model.device),
+                torch.tensor([t_enc-1]).to(self.model.device),
                 noise=self.get_noise(width,height,False)
             )
 
