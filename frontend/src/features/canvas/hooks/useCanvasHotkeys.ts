@@ -3,7 +3,9 @@ import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import {
+  clearMask,
   resetCanvasInteractionState,
+  setIsMaskEnabled,
   setShouldShowBoundingBox,
   setTool,
 } from 'features/canvas/store/canvasSlice';
@@ -24,6 +26,7 @@ const selector = createSelector(
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
+      isMaskEnabled,
     } = canvas;
 
     return {
@@ -33,6 +36,7 @@ const selector = createSelector(
       shouldShowBoundingBox,
       tool,
       isStaging,
+      isMaskEnabled,
     };
   },
   {
@@ -44,12 +48,48 @@ const selector = createSelector(
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const { activeTabName, shouldShowBoundingBox, tool, isStaging } =
-    useAppSelector(selector);
+  const {
+    activeTabName,
+    shouldShowBoundingBox,
+    tool,
+    isStaging,
+    isMaskEnabled,
+  } = useAppSelector(selector);
 
   const previousToolRef = useRef<CanvasTool | null>(null);
 
   const canvasStage = getCanvasStage();
+
+  // Beta Keys
+  const handleClearMask = () => dispatch(clearMask());
+
+  useHotkeys(
+    ['shift+c'],
+    () => {
+      handleClearMask();
+    },
+    {
+      enabled: () => !isStaging,
+      preventDefault: true,
+    },
+    []
+  );
+
+  const handleToggleEnableMask = () =>
+    dispatch(setIsMaskEnabled(!isMaskEnabled));
+
+  useHotkeys(
+    ['h'],
+    () => {
+      handleToggleEnableMask();
+    },
+    {
+      enabled: () => !isStaging,
+      preventDefault: true,
+    },
+    [isMaskEnabled]
+  );
+  //
 
   useHotkeys(
     'esc',
