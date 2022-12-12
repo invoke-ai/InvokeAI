@@ -180,7 +180,7 @@ else
     fi
 fi
 
-$PYTHON -mpip install -r requirements.txt
+$PYTHON -mpip install --prefer-binary -r requirements.txt
 _err_exit $? "Failed to install InvokeAI's dependencies."
 
 #--------------------------------------------------------------------------------
