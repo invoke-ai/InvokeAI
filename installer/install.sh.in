@@ -126,17 +126,17 @@ do
     read -e -p "InvokeAI will be installed into $ROOTDIR. OK? [y]: " input
     RESPONSE=${input:='y'}
     if [ "$RESPONSE" == 'y' ]; then
-	if [ -e $ROOTDIR ]; then
+	if [ -e "$ROOTDIR" ]; then
 	    echo
-	    read -e -p "Directory $ROOTDIR already exists. Do you want to resume an interrupted install? [y]: " input
+	    read -e -p "Directory "$ROOTDIR" already exists. Do you want to resume an interrupted install? [y]: " input
             RESPONSE=${input:='y'}
 	    if [ "$RESPONSE" != 'y' ]; then
 	        ROOTDIR=""
 	    fi	       
 	else
-	    mkdir -p $ROOTDIR
+	    mkdir -p "$ROOTDIR"
 	    if [ $? -ne 0 ]; then
-		echo "Could not create $ROOTDIR. Try again with a different install location."
+		echo "Could not create "$ROOTDIR". Try again with a different install location."
 		ROOTDIR=""
 	    fi
 	fi
@@ -149,18 +149,19 @@ done
 echo
 echo "** Creating Virtual Environment for InvokeAI **"
 
-$PYTHON -mpip install --upgrade pip
-$PYTHON -mvenv $ROOTDIR/.venv
-_err_exit $? "Python failed to create virtual environment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
+$PYTHON -mvenv "$ROOTDIR"/.venv
+_err_exit $? "Python failed to create virtual environment "$ROOTDIR"/.venv. Please see $TROUBLESHOOTING for help."
 
 #--------------------------------------------------------------------------------
 echo
 echo "** Activating Virtual Environment for InvokeAI **"
 
-source $ROOTDIR/.venv/bin/activate
-_err_exit $? "Failed to activate virtual evironment $ROOTDIR/.venv. Please see $TROUBLESHOOTING for help."
+source "$ROOTDIR"/.venv/bin/activate
+_err_exit $? "Failed to activate virtual evironment "$ROOTDIR"/.venv. Please see $TROUBLESHOOTING for help."
 
-PYTHON=$ROOTDIR/.venv/bin/python
+PYTHON="$ROOTDIR"/.venv/bin/python
+$PYTHON -mensurepip --upgrade
+$PYTHON -mpip install --upgrade pip
 
 #--------------------------------------------------------------------------------
 echo
@@ -189,29 +190,29 @@ $PYTHON -mpip install $INVOKE_AI_SRC
 _err_exit $? "Installation of InvokeAI failed."
 
 #--------------------------------------------------------------------------------
-echo " *** Setting Up Root Directory $ROOTDIR *** "
-cp -pr templates/rootdir/* $ROOTDIR/
-cp templates/invoke.sh.in $ROOTDIR/invoke.sh
-chmod a+rx $ROOTDIR/invoke.sh
-cp templates/update.sh.in $ROOTDIR/update.sh
-chmod a+rx $ROOTDIR/update.sh
+echo " *** Setting Up Root Directory "$ROOTDIR" *** "
+cp -pr templates/rootdir/* "$ROOTDIR"/
+cp templates/invoke.sh.in "$ROOTDIR"/invoke.sh
+chmod a+rx "$ROOTDIR"/invoke.sh
+cp templates/update.sh.in "$ROOTDIR"/update.sh
+chmod a+rx "$ROOTDIR"/update.sh
 
 # This allows the updater to work!
-cp -pr environments-and-requirements requirements.txt $ROOTDIR/
+cp -pr environments-and-requirements requirements.txt "$ROOTDIR/"
 
 #--------------------------------------------------------------------------------
 echo
 echo "*** Confguring InvokeAI ***"
-pushd $ROOTDIR
-./.venv/bin/configure_invokeai.py --root=$ROOTDIR
+pushd "$ROOTDIR" >/dev/null
+$PYTHON ./.venv/bin/configure_invokeai.py --root="$ROOTDIR"
 _err_exit $? "Initial configuration failed. Please see above error messages and $TROUBLESHOOTING for help."
 
 #--------------------------------------------------------------------------------
 popd
-cp templates/invoke.sh.in $ROOTDIR/invoke.sh
-chmod a+rx $ROOTDIR/invoke.sh
+cp templates/invoke.sh.in "$ROOTDIR"/invoke.sh
+chmod a+rx "$ROOTDIR"/invoke.sh
 
-cp templates/update.sh.in $ROOTDIR/update.sh
-chmod a+rx $ROOTDIR/update.sh
+cp templates/update.sh.in "$ROOTDIR"/update.sh
+chmod a+rx "$ROOTDIR"/update.sh
 
 echo "You may now run InvokeAI by entering the directory $ROOTDIR and running invoke.sh"
