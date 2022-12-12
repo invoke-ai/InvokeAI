@@ -22,7 +22,6 @@ set PYTHON_URL=https://www.python.org/downloads/windows/
 set MINIMUM_PYTHON_VERSION=3.9.0
 set PYTHON_URL=https://www.python.org/downloads/release/python-3109/
 
-
 set err_msg=An error has occurred and the script could not continue.
 
 @rem --------------------------- Intro -------------------------------
@@ -77,7 +76,7 @@ set "selection="
 :pick_rootdir
 	if defined rootdir goto :done
 	set /p selection=Select the path to install InvokeAI's directory into [%UserProfile%]: 
-	if %selection% == "" set selection=%UserProfile%
+	if not defined selection set selection=%UserProfile%
 	set selection=%selection:"=%
 	set dest="%selection%\invokeai"
 	if exist %dest% (
