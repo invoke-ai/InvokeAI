@@ -218,3 +218,4 @@ echo The installer will exit now.
 pause
 exit /b
 
+pause
