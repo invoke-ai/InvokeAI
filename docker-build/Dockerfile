@@ -24,6 +24,7 @@ COPY . ./environments-and-requirements/${PIP_REQUIREMENTS} ./
 RUN python3 -m venv .venv \
   && pip install \
     --no-cache-dir \
+    wheel \
     -r ${PIP_REQUIREMENTS}
 
 FROM python:3.10-slim AS runtime
@@ -42,6 +43,7 @@ COPY --from=builder /usr/src/app .
 
 # set Environment, Entrypoint and default CMD
 ENV INVOKEAI_ROOT /data
+ENV INVOKE_MODEL_RECONFIGURE --yes
 ENV PATH=/usr/src/app/.venv/bin:$PATH
 
 ENTRYPOINT [ "python3", "scripts/invoke.py" ]
