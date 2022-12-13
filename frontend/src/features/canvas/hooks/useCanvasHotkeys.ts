@@ -3,8 +3,11 @@ import _ from 'lodash';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import {
+  clearMask,
   resetCanvasInteractionState,
+  setIsMaskEnabled,
   setShouldShowBoundingBox,
+  setShouldSnapToGrid,
   setTool,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/store';
@@ -24,6 +27,8 @@ const selector = createSelector(
       shouldLockBoundingBox,
       shouldShowBoundingBox,
       tool,
+      isMaskEnabled,
+      shouldSnapToGrid,
     } = canvas;
 
     return {
@@ -33,6 +38,8 @@ const selector = createSelector(
       shouldShowBoundingBox,
       tool,
       isStaging,
+      isMaskEnabled,
+      shouldSnapToGrid,
     };
   },
   {
@@ -44,12 +51,61 @@ const selector = createSelector(
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const { activeTabName, shouldShowBoundingBox, tool, isStaging } =
-    useAppSelector(selector);
+  const {
+    activeTabName,
+    shouldShowBoundingBox,
+    tool,
+    isStaging,
+    isMaskEnabled,
+    shouldSnapToGrid,
+  } = useAppSelector(selector);
 
   const previousToolRef = useRef<CanvasTool | null>(null);
 
   const canvasStage = getCanvasStage();
+
+  // Beta Keys
+  const handleClearMask = () => dispatch(clearMask());
+
+  useHotkeys(
+    ['shift+c'],
+    () => {
+      handleClearMask();
+    },
+    {
+      enabled: () => !isStaging,
+      preventDefault: true,
+    },
+    []
+  );
+
+  const handleToggleEnableMask = () =>
+    dispatch(setIsMaskEnabled(!isMaskEnabled));
+
+  useHotkeys(
+    ['h'],
+    () => {
+      handleToggleEnableMask();
+    },
+    {
+      enabled: () => !isStaging,
+      preventDefault: true,
+    },
+    [isMaskEnabled]
+  );
+
+  useHotkeys(
+    ['n'],
+    () => {
+      dispatch(setShouldSnapToGrid(!shouldSnapToGrid));
+    },
+    {
+      enabled: true,
+      preventDefault: true,
+    },
+    [shouldSnapToGrid]
+  );
+  //
 
   useHotkeys(
     'esc',
