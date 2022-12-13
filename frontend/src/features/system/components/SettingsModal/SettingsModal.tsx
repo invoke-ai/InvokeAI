@@ -32,10 +32,11 @@ import IAISelect from 'common/components/IAISelect';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { optionsSelector } from 'features/options/store/optionsSelectors';
+import { setShouldUseCanvasBetaLayout } from 'features/options/store/optionsSlice';
 
 const selector = createSelector(
   [systemSelector, optionsSelector],
-  (system) => {
+  (system, options) => {
     const {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
@@ -45,6 +46,8 @@ const selector = createSelector(
       enableImageDebugging,
     } = system;
 
+    const { shouldUseCanvasBetaLayout } = options;
+
     return {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
@@ -52,6 +55,7 @@ const selector = createSelector(
       models: _.map(model_list, (_model, key) => key),
       saveIntermediatesInterval,
       enableImageDebugging,
+      shouldUseCanvasBetaLayout,
     };
   },
   {
@@ -93,6 +97,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
     shouldDisplayGuides,
     saveIntermediatesInterval,
     enableImageDebugging,
+    shouldUseCanvasBetaLayout,
   } = useAppSelector(selector);
 
   /**
@@ -171,6 +176,14 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 isChecked={shouldDisplayGuides}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldDisplayGuides(e.target.checked))
+                }
+              />
+              <IAISwitch
+                styleClass="settings-modal-item"
+                label={'Use Canvas Beta Layout'}
+                isChecked={shouldUseCanvasBetaLayout}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
                 }
               />
             </div>

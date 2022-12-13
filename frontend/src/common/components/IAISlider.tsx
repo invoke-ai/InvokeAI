@@ -40,6 +40,7 @@ export type IAIFullSliderProps = {
   sliderMarkRightOffset?: number;
   withInput?: boolean;
   isInteger?: boolean;
+  width?: string | number;
   inputWidth?: string | number;
   inputReadOnly?: boolean;
   withReset?: boolean;
@@ -71,6 +72,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
     max = 100,
     step = 1,
     onChange,
+    width = '100%',
     tooltipSuffix = '',
     withSliderMarks = false,
     sliderMarkLeftOffset = 0,
@@ -161,6 +163,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
           onMouseLeave={() => setShowTooltip(false)}
           focusThumbOnChange={false}
           isDisabled={isSliderDisabled}
+          width={width}
           {...rest}
         >
           {withSliderMarks && (

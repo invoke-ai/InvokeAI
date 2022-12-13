@@ -941,7 +941,11 @@ def emergency_model_reconfigure():
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('configure_invokeai is launching....\n')
 
-    sys.argv = ['configure_invokeai','--interactive']
+    sys.argv = [
+        'configure_invokeai',
+        os.environ.get(
+            'INVOKE_MODEL_RECONFIGURE',
+            '--interactive')]
     import configure_invokeai
     configure_invokeai.main()
 

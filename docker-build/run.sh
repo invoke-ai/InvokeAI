@@ -16,4 +16,5 @@ docker run \
   --hostname="$project_name" \
   --mount="source=$volumename,target=/data" \
   --publish=9090:9090 \
+  --cap-add=sys_nice \
   "$invokeai_tag" ${1:+$@}
