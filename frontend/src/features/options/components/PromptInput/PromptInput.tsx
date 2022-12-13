@@ -70,6 +70,9 @@ const PromptInput = () => {
           resize="vertical"
           height={30}
           ref={promptRef}
+          _placeholder={{
+            color: 'var(--text-color-secondary)',
+          }}
         />
       </FormControl>
     </div>
