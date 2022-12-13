@@ -5,6 +5,7 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 import torch
 import numpy as  np
 import math
+import gc
 from ldm.invoke.generator.base import Generator
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.invoke.generator.omnibus import Omnibus

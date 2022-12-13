@@ -806,6 +806,7 @@ class Generate:
         if not self.generators.get('inpaint'):
             from ldm.invoke.generator.inpaint import Inpaint
             self.generators['inpaint'] = Inpaint(self.model, self.precision)
+            self.generators['inpaint'].free_gpu_mem = self.free_gpu_mem
         return self.generators['inpaint']
 
     # "omnibus" supports the runwayML custom inpainting model, which does

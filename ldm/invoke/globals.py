@@ -11,12 +11,18 @@ the attributes:
 '''
 
 import os
+import os.path as osp
 from argparse import Namespace
 
 Globals = Namespace()
 
 # This is usually overwritten by the command line and/or environment variables
-Globals.root = os.path.abspath(os.environ.get('INVOKEAI_ROOT') or os.path.expanduser('~/invokeai'))
+if os.environ.get('INVOKEAI_ROOT'):
+    Globals.root = osp.abspath(os.environ.get('INVOKEAI_ROOT'))
+elif os.environ.get('VIRTUAL_ENV'):
+    Globals.root = osp.abspath(osp.join(os.environ.get('VIRTUAL_ENV'), '..'))
+else:
+    Globals.root = osp.abspath(osp.expanduser('~/invokeai'))
 
 # Where to look for the initialization file
 Globals.initfile = 'invokeai.init'
