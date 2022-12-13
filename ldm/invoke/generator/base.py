@@ -306,6 +306,7 @@ class Generator():
         return blurry
 
     def get_caution_img(self):
+        path = None
         if self.caution_img:
             return self.caution_img
         # Find the caution image. If we are installed in the package directory it will
