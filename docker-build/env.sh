@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
-project_name=${PROJECT_NAME:-invokeai}
-volumename=${VOLUMENAME:-${project_name}_data}
-arch=${ARCH:-x86_64}
+repository_name=$(basename "$(git rev-parse --show-toplevel)")
+repository_name_lc=${repository_name,,}
+volumename=${VOLUMENAME:-${repository_name_lc}_data}
+arch=${ARCH:-$(arch)}
 platform=${PLATFORM:-Linux/${arch}}
-invokeai_tag=${INVOKEAI_TAG:-${project_name}:${arch}}
+container_flavor=${CONTAINER_FLAVOR:-cuda}
+invokeai_tag=${repository_name_lc}-${container_flavor}:${INVOKEAI_TAG:-latest}
 
-export project_name
+export repository_name
 export volumename
 export arch
 export platform
