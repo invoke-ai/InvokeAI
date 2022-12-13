@@ -194,7 +194,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
 
 12. You can launch InvokeAI with several different command-line arguments that
     customize its behavior. For example, you can change the location of the
-    inage output directory, or select your favorite sampler. See the
+    image output directory, or select your favorite sampler. See the
     [Command-Line Interface](../features/CLI.md) for a full list of the options.
 
         - To set defaults that will take effect every time you launch InvokeAI,
