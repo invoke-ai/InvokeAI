@@ -55,6 +55,7 @@ export interface OptionsState {
   upscalingStrength: number;
   variationAmount: number;
   width: number;
+  shouldUseCanvasBetaLayout: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -101,6 +102,7 @@ const initialOptionsState: OptionsState = {
   upscalingStrength: 0.75,
   variationAmount: 0.1,
   width: 512,
+  shouldUseCanvasBetaLayout: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -396,6 +398,9 @@ export const optionsSlice = createSlice({
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
     },
+    setShouldUseCanvasBetaLayout: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseCanvasBetaLayout = action.payload;
+    },
   },
 });
 
@@ -451,6 +456,7 @@ export const {
   setUpscalingStrength,
   setVariationAmount,
   setWidth,
+  setShouldUseCanvasBetaLayout,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
