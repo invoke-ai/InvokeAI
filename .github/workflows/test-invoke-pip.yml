@@ -94,8 +94,8 @@ jobs:
           # cache: 'pip'
           # cache-dependency-path: ${{ matrix.requirements-file }}
 
-      # - name: install dependencies
-      #   run: ${{ env.pythonLocation }}/bin/pip install --upgrade pip setuptools wheel
+      - name: install dependencies
+        run: pip3 install --upgrade pip setuptools wheel
 
       - name: install requirements
         run: pip3 install -r '${{ matrix.requirements-file }}'
