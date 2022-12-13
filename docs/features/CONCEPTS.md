@@ -77,8 +77,8 @@ the file for malicious code. Should any errors occur, you will be warned and the
 concept will fail to load. Generation will then continue treating the trigger
 term as a normal string of characters (e.g. as literal "&lt;ghibli-face&gt;").
 
-Currently auto-installation of concepts is a feature only available on the
-command-line client. Support for the WebUI is a work in progress.
+You can also use <concept-names> in the WebGUI's prompt textbox. There
+is no autocompletion at this time.
 
 ## Installing your Own TI Files
 
