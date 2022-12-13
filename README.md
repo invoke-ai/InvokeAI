@@ -4,6 +4,10 @@
 
 # InvokeAI: A Stable Diffusion Toolkit
 
+_Formerly known as lstein/stable-diffusion_
+
+![project logo](docs/assets/logo.png)
+
 [![discord badge]][discord link]
 
 [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link]
