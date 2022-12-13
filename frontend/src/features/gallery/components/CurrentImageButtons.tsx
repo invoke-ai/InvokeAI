@@ -256,7 +256,7 @@ const CurrentImageButtons = () => {
   };
 
   useHotkeys(
-    'u',
+    'Shift+U',
     () => {
       if (
         isESRGANAvailable &&
@@ -290,7 +290,7 @@ const CurrentImageButtons = () => {
   };
 
   useHotkeys(
-    'r',
+    'Shift+R',
     () => {
       if (
         isGFPGANAvailable &&

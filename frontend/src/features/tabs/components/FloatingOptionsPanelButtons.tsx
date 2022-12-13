@@ -28,25 +28,34 @@ export const floatingSelector = createSelector(
       shouldPinOptionsPanel,
       shouldShowOptionsPanel,
       shouldHoldOptionsPanelOpen,
+      shouldUseCanvasBetaLayout,
     } = options;
 
     const { shouldShowGallery, shouldPinGallery, shouldHoldGalleryOpen } =
       gallery;
 
+    const canvasBetaLayoutCheck =
+      shouldUseCanvasBetaLayout && activeTabName === 'unifiedCanvas';
+
     const shouldShowOptionsPanelButton =
+      !canvasBetaLayoutCheck &&
       !(
         shouldShowOptionsPanel ||
         (shouldHoldOptionsPanelOpen && !shouldPinOptionsPanel)
-      ) && ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
+      ) &&
+      ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
     const shouldShowGalleryButton =
       !(shouldShowGallery || (shouldHoldGalleryOpen && !shouldPinGallery)) &&
       ['txt2img', 'img2img', 'unifiedCanvas'].includes(activeTabName);
 
+    const shouldShowProcessButtons =
+      !canvasBetaLayoutCheck &&
+      (!shouldPinOptionsPanel || !shouldShowOptionsPanel);
+
     return {
       shouldPinOptionsPanel,
-      shouldShowProcessButtons:
-        !shouldPinOptionsPanel || !shouldShowOptionsPanel,
+      shouldShowProcessButtons,
       shouldShowOptionsPanelButton,
       shouldShowOptionsPanel,
       shouldShowGallery,
