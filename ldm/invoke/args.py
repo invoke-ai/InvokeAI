@@ -583,6 +583,12 @@ class Args(object):
             action='store_true',
             help='Generates debugging image to display'
         )
+        render_group.add_argument(
+            '--karras_max',
+            type=int,
+            default=None,
+            help="control the point at which the K* samplers will shift from using the Karras noise schedule (good for low step counts) to the LatentDiffusion noise schedule (good for high step counts). Set to 0 to use LatentDiffusion for all step values, and to a high value (e.g. 1000) to use Karras for all step values. [29]."
+        )
         # Restoration related args
         postprocessing_group.add_argument(
             '--no_restore',
