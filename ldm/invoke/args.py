@@ -81,18 +81,18 @@ with metadata_from_png():
 """
 
 import argparse
-from argparse import Namespace, RawTextHelpFormatter
-import pydoc
-import json
-import hashlib
-import os
-import re
-import sys
-import shlex
-import copy
 import base64
+import copy
 import functools
-import warnings
+import hashlib
+import json
+import os
+import pydoc
+import re
+import shlex
+import sys
+from argparse import Namespace
+
 import ldm.invoke.pngwriter
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
@@ -477,7 +477,7 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
-            '--nsfw_checker'
+            '--nsfw_checker',
             '--safety_checker',
             action=argparse.BooleanOptionalAction,
             dest='safety_checker',

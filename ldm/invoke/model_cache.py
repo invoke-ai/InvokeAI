@@ -356,7 +356,12 @@ class ModelCache(object):
 
         pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
             name_or_path,
-            safety_checker=None,  # TODO
+            # TODO: Safety checker is currently handled at a different stage in the code:
+            #     ldm.invoke.generator.base.Generator.safety_check
+            #     We might want to move that here for consistency with diffusers API, or we might
+            #     want to leave it as a separate processing node. It ends up using the same diffusers
+            #     code either way, so we can table it for now.
+            safety_checker=None,
             # TODO: alternate VAE
             # TODO: local_files_only=True
             **pipeline_args
