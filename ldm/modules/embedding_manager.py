@@ -256,32 +256,22 @@ class EmbeddingManager(nn.Module):
         return [x for x in expanded_paths if os.path.splitext(x)[1] in ('.pt','.bin')]
 
     def _load(self, ckpt_path, full=True):
-
-        scan_result = scan_file_path(ckpt_path)
-        if scan_result.infected_files == 1:
-            print(f'\n### Security Issues Found in Model: {scan_result.issues_count}')
-            print('### For your safety, InvokeAI will not load this embed.')
+        try:
+            scan_result = scan_file_path(ckpt_path)
+            if scan_result.infected_files == 1:
+                print(f'\n### Security Issues Found in Model: {scan_result.issues_count}')
+                print('### For your safety, InvokeAI will not load this embed.')
+                return
+        except Exception:
+            print(f"### WARNING::: Invalid or corrupt embeddings found. Ignoring: {ckpt_path}")
             return
-        
-        ckpt = torch.load(ckpt_path, map_location='cpu')
-
-        # Handle .pt textual inversion files
-        if 'string_to_token' in ckpt and 'string_to_param' in ckpt:
-            filename = os.path.basename(ckpt_path)
-            token_str = '.'.join(filename.split('.')[:-1]) # filename excluding extension
-            if len(ckpt["string_to_token"]) > 1:
-                print(f">> {ckpt_path} has >1 embedding, only the first will be used")
-
-            string_to_param_dict = ckpt['string_to_param']
-            embedding = list(string_to_param_dict.values())[0]
-            self.add_embedding(token_str, embedding, full)
-
-        # Handle .bin textual inversion files from Huggingface Concepts
-        # https://huggingface.co/sd-concepts-library
+            
+        embedding_info = self.parse_embedding(ckpt_path)
+        if embedding_info:
+            self.max_vectors_per_token = embedding_info['num_vectors_per_token']
+            self.add_embedding(embedding_info['name'], embedding_info['embedding'], full)
         else:
-            for token_str in list(ckpt.keys()):
-                embedding = ckpt[token_str]
-                self.add_embedding(token_str, embedding, full)
+            print(f'>> Failed to load embedding located at {ckpt_path}. Unsupported file.')
 
     def add_embedding(self, token_str, embedding, full):
         if token_str in self.string_to_param_dict:
@@ -301,6 +291,60 @@ class EmbeddingManager(nn.Module):
         token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
         self.string_to_token_dict[token_str] = token
         self.string_to_param_dict[token_str] = torch.nn.Parameter(embedding)
+
+    def parse_embedding(self, embedding_file: str):
+        file_type = embedding_file.split('.')[-1]
+        if file_type == 'pt':
+            return self.parse_embedding_pt(embedding_file)
+        elif file_type == 'bin':
+            return self.parse_embedding_bin(embedding_file)
+        else:
+            print(f'>> Not a recognized embedding file: {embedding_file}')
+
+    def parse_embedding_pt(self, embedding_file):
+        embedding_ckpt = torch.load(embedding_file, map_location='cpu')
+        embedding_info = {}
+
+        # Check if valid embedding file
+        if 'string_to_token' and 'string_to_param' in embedding_ckpt:
+            embedding_info['name'] = embedding_ckpt['name'] or '.'.join(embedding_file.split('.')[:-1])
+
+            # Check num of embeddings and warn user only the first will be used
+            embedding_info['num_of_embeddings'] = len(embedding_ckpt["string_to_token"])
+            if embedding_info['num_of_embeddings'] > 1:
+                print('>> More than 1 embedding found. Will use the first one')
+
+            # Get the embedding
+            embedding = list(embedding_ckpt['string_to_param'].values())[0]
+            embedding_info['embedding'] = embedding
+            embedding_info['num_vectors_per_token'] = embedding.size()[0]
+
+            try:
+                embedding_info['trained_steps'] = embedding_ckpt['step']
+                embedding_info['trained_model_name'] = embedding_ckpt['sd_checkpoint_name']
+                embedding_info['trained_model_checksum'] = embedding_ckpt['sd_checkpoint']
+            except AttributeError:
+                print(">> No Training Details Found. Passing ...")
+        else:
+            print('>> Invalid embedding format')
+            embedding_info = None
+
+        return embedding_info
+
+    def parse_embedding_bin(self, embedding_file):
+        embedding_ckpt = torch.load(embedding_file, map_location='cpu')
+        embedding_info = {}
+
+        if list(embedding_ckpt.keys()) == 0:
+            print(">> Invalid concepts file")
+            embedding_info = None
+        else:
+            for token in list(embedding_ckpt.keys()):
+                embedding_info['name'] = token or '.'.join(embedding_file.split('.')[:-1])
+                embedding_info['embedding'] = embedding_ckpt[token]
+                embedding_info['num_vectors_per_token'] = 1 # All Concepts seem to default to 1
+
+        return embedding_info
 
     def has_embedding_for_token(self, token_str):
         return token_str in self.string_to_token_dict
