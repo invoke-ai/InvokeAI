@@ -432,6 +432,12 @@ class Args(object):
             help='Indicates which diffusion model to load (defaults to "default" stanza in configs/models.yaml)',
         )
         model_group.add_argument(
+            '--weight_folders',
+            nargs='+',
+            type=str,
+            help='List of folders that will be scanned for new model weights to import',
+        )
+        model_group.add_argument(
             '--png_compression','-z',
             type=int,
             default=6,
