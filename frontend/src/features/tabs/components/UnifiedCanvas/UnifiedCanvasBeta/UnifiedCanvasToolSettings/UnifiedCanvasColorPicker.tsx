@@ -1,6 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIPopover from 'common/components/IAIPopover';
 import {

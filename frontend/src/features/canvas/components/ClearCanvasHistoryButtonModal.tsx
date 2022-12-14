@@ -1,4 +1,4 @@
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';

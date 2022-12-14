@@ -2,7 +2,7 @@
 
 import { useColorMode } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import _ from 'lodash';
 import { ReactNode, useCallback, useLayoutEffect, useState } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';

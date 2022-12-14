@@ -1,5 +1,5 @@
 import { IconButton, Tooltip } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import { errorSeen, setShouldShowLogViewer, SystemState } from 'features/system/store/systemSlice';
 import { useLayoutEffect, useRef, useState } from 'react';

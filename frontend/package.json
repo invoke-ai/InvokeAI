@@ -8,6 +8,8 @@
     "build": "tsc && vite build",
     "build-dev": "tsc && vite build -m development",
     "preview": "vite preview",
+    "madge": "madge --circular src/main.tsx",
+    "lint": "eslint src/",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -58,6 +60,7 @@
     "eslint": "^8.23.0",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "madge": "^5.0.1",
     "patch-package": "^6.5.0",
     "postinstall-postinstall": "^2.1.0",
     "sass": "^1.55.0",
@@ -67,5 +70,15 @@
     "vite": "^3.0.7",
     "vite-plugin-eslint": "^1.8.1",
     "vite-tsconfig-paths": "^3.5.2"
+  },
+  "madge": {
+    "detectiveOptions": {
+      "ts": {
+        "skipTypeImports": true
+      },
+      "tsx": {
+        "skipTypeImports": true
+      }
+    }
   }
 }

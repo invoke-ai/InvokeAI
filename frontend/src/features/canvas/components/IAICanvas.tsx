@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import Konva from 'konva';
 import { Layer, Stage } from 'react-konva';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import {
   canvasSelector,
   isStagingSelector,

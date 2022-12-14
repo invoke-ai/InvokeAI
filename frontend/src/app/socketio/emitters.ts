@@ -17,9 +17,9 @@ import {
   modelChangeRequested,
   setIsProcessing,
 } from 'features/system/store/systemSlice';
-import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName } from 'features/tabs/tabMap';
 import * as InvokeAI from 'app/invokeai';
-import { RootState } from 'app/store';
+import type { RootState } from 'app/store';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.

@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/store';
+import { useAppDispatch } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 
 import { clearMask } from 'features/canvas/store/canvasSlice';
