@@ -20,4 +20,5 @@ docker run \
   --env="INVOKE_MODEL_RECONFIGURE=--yes" \
   --publish=9090:9090 \
   --cap-add=sys_nice \
+  $gpus \
   "$invokeai_tag" ${1:+$@}
