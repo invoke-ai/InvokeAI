@@ -110,12 +110,6 @@ if [ -z "$PYTHON" ]; then
     exit -1
 fi
 
-if [ "$OS_NAME" == "osx" ]; then
-    xcode_path=$(xcode-select --print-path)
-    _err_exit $? "xcode_path command not found"
-    export CPPFLAGS="-I$xcode_path/Library/Frameworks/Python3.framework/Versions/Current/Headers"
-    echo "Will compile wheels with CPPFLAGS=$CPPFLAGS"
-fi
 
 ROOTDIR=""
 while [ "$ROOTDIR" == "" ]
