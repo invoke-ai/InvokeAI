@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { RectConfig } from 'konva/lib/shapes/Rect';
 import { Rect } from 'react-konva';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';

@@ -1,5 +1,6 @@
 import { IconButton } from '@chakra-ui/react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import CurrentImageButtons from 'features/gallery/components/CurrentImageButtons';
 import { imagesSelector } from 'features/gallery/components/CurrentImagePreview';

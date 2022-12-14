@@ -1,6 +1,7 @@
 import { FormControl, Textarea } from '@chakra-ui/react';
 import { ChangeEvent, KeyboardEvent, useRef } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { generateImage } from 'app/socketio/actions';
 
 import { OptionsState, setPrompt } from 'features/options/store/optionsSlice';

@@ -1,5 +1,5 @@
 import { MdPhotoLibrary } from 'react-icons/md';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';

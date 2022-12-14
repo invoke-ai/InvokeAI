@@ -4,11 +4,8 @@ import { SystemState } from 'features/system/store/systemSlice';
 
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
-import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
-import {
-  CanvasState,
-  isCanvasMaskLine,
-} from 'features/canvas/store/canvasTypes';
+import { InvokeTabName } from 'features/tabs/tabMap';
+import { CanvasState, isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
 import generateMask from 'features/canvas/util/generateMask';
 import openBase64ImageInTab from './openBase64ImageInTab';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';

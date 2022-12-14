@@ -1,5 +1,6 @@
 import { useColorMode, VStack } from '@chakra-ui/react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { setCurrentTheme } from 'features/options/store/optionsSlice';
 import IAIPopover from 'common/components/IAIPopover';
 import IAIIconButton from 'common/components/IAIIconButton';

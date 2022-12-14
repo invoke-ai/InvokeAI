@@ -39,7 +39,7 @@ import {
   requestSystemConfig,
 } from './actions';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { tabMap } from 'features/tabs/components/InvokeTabs';
+import { tabMap } from 'features/tabs/tabMap';
 
 /**
  * Returns an object containing listener callbacks for socketio events.

@@ -6,7 +6,7 @@ import {
   setBrushColor,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import _ from 'lodash';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {

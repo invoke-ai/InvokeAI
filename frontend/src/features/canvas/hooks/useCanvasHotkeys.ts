@@ -10,7 +10,7 @@ import {
   setShouldSnapToGrid,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { useRef } from 'react';
 import {
   canvasSelector,

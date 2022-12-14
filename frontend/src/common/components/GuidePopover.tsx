@@ -6,7 +6,7 @@ import {
   Box,
 } from '@chakra-ui/react';
 import { SystemState } from 'features/system/store/systemSlice';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import { createSelector } from '@reduxjs/toolkit';
 import { ReactElement } from 'react';
