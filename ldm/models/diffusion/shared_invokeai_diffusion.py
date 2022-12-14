@@ -55,10 +55,12 @@ class InvokeAIDiffuserComponent:
 
     def setup_attention_map_saving(self, saver: AttentionMapSaver):
         def callback(slice, dim, offset, slice_size, key):
-            if dim is not None:
+            #if dim is not None:
                 # sliced tokens attention map saving is not implemented
-                return
-            saver.add_attention_maps(slice, key)
+                #return
+            #saver.add_attention_maps(slice, key)
+            # NOTE: Commented out above and added a return to fix regression in Unified Canvas  
+            return
 
         tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
         for identifier, module in tokens_cross_attention_modules:
