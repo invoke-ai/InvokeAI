@@ -101,10 +101,10 @@ jobs:
         id: run-preload-models
         env:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
-        run: |
-          python scripts/configure_invokeai.py \
-            --no-interactive --yes \
-            --full-precision  # can't use fp16 weights without a GPU
+        run: >
+          python scripts/configure_invokeai.py
+          --no-interactive --yes
+          --full-precision  # can't use fp16 weights without a GPU
 
       - name: cat invokeai.init
         id: cat-invokeai
@@ -118,14 +118,14 @@ jobs:
           HF_HUB_OFFLINE: 1
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
-        run: |
-          time python scripts/invoke.py \
-            --no-patchmatch \
-            --no-nsfw_checker \
-            --model ${{ matrix.stable-diffusion-model }} \
-            --from_file ${{ env.TEST_PROMPTS }} \
-            --root="${{ env.INVOKEAI_ROOT }}" \
-            --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
+        run: >
+          python scripts/invoke.py
+          --no-patchmatch
+          --no-nsfw_checker
+          --model ${{ matrix.stable-diffusion-model }}
+          --from_file ${{ env.TEST_PROMPTS }}
+          --root="${{ env.INVOKEAI_ROOT }}"
+          --outdir="${{ env.INVOKEAI_ROOT }}/outputs"
 
       - name: export conda env
         id: export-conda-env

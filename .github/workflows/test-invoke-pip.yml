@@ -106,10 +106,10 @@ jobs:
         id: run-preload-models
         env:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
-        run: |
-          python3 scripts/configure_invokeai.py \
-              --no-interactive --yes \
-              --full-precision  # can't use fp16 weights without a GPU
+        run: >
+          python3 scripts/configure_invokeai.py
+          --no-interactive --yes
+          --full-precision  # can't use fp16 weights without a GPU
 
       - name: Run the tests
         id: run-tests
@@ -119,14 +119,14 @@ jobs:
           HF_HUB_OFFLINE: 1
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
-        run: |
-          time python3 scripts/invoke.py \
-            --no-patchmatch \
-            --no-nsfw_checker \
-            --model ${{ matrix.stable-diffusion-model }} \
-            --from_file ${{ env.TEST_PROMPTS }} \
-            --root="${{ env.INVOKEAI_ROOT }}" \
-            --outdir="${{ env.INVOKEAI_OUTDIR }}"
+        run: >
+          python3 scripts/invoke.py
+          --no-patchmatch
+          --no-nsfw_checker
+          --model ${{ matrix.stable-diffusion-model }}
+          --from_file ${{ env.TEST_PROMPTS }}
+          --root="${{ env.INVOKEAI_ROOT }}"
+          --outdir="${{ env.INVOKEAI_OUTDIR }}"
 
       - name: Archive results
         id: archive-results
