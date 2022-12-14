@@ -63,7 +63,6 @@ class Generator:
     def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  safety_checker:dict=None,
-                 attention_maps_callback = None,
                  **kwargs):
         scope = choose_autocast(self.precision)
         self.safety_checker = safety_checker

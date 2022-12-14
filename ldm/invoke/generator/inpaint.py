@@ -273,6 +273,8 @@ class Inpaint(Img2Img):
                 callback=step_callback,
             )
 
+            if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
+                attention_maps_callback(pipeline_output.attention_map_saver)
             result = pipeline.numpy_to_pil(pipeline_output.images)[0]
 
             # Seam paint if this is our first pass (seam_size set to 0 during seam painting)

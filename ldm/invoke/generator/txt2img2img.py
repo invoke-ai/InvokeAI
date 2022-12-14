@@ -36,7 +36,7 @@ class Txt2Img2Img(Generator):
 
         def make_image(x_T):
 
-            first_pass_latent_output = pipeline.latents_from_embeddings(
+            first_pass_latent_output, _ = pipeline.latents_from_embeddings(
                 latents=x_T,
                 num_inference_steps=steps,
                 text_embeddings=c,

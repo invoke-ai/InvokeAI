@@ -14,7 +14,9 @@ class Img2Img(Generator):
         self.init_latent = None    # by get_noise()
 
     def get_make_image(self,prompt,sampler,steps,cfg_scale,ddim_eta,
-                       conditioning,init_image,strength,step_callback=None,threshold=0.0,perlin=0.0,**kwargs):
+                       conditioning,init_image,strength,step_callback=None,threshold=0.0,perlin=0.0,
+                       attention_maps_callback=None,
+                       **kwargs):
         """
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it.
@@ -35,7 +37,8 @@ class Img2Img(Generator):
                 noise_func=self.get_noise_like,
                 callback=step_callback
             )
-
+            if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
+                attention_maps_callback(pipeline_output.attention_map_saver)
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
 
         return make_image
