@@ -17,5 +17,5 @@ docker run \
   --mount="source=$volumename,target=/data" \
   --publish=9090:9090 \
   --cap-add=sys_nice \
-  $GPU_FLAGS \
+  $gpus \
   "$invokeai_tag" ${1:+$@}
