@@ -1,0 +1,24 @@
+name: Lint frontend
+
+on:
+  push:
+    paths:
+      - 'frontend/**'
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  lint-frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Setup Node 18
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+      - uses: actions/checkout@v2
+      - run: 'yarn install'
+      - run: 'yarn tsc'
+      - run: 'yarn run madge'
+      - run: 'yarn run lint --max-warnings=22'
