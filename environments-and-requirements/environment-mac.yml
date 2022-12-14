@@ -4,7 +4,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.10
+  - python=3.9
   - pip>=22.2
   - pytorch=1.12
   - pytorch-lightning=1.7

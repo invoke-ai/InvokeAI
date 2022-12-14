@@ -24,23 +24,24 @@ jobs:
           - requirements-lin-amd.txt
           - requirements-mac-mps-cpu.txt
           - requirements-win-colab-cuda.txt
-        python-version:
-          # - '3.9'
-          - '3.10'
         include:
           - requirements-file: requirements-lin-cuda.txt
+            python-version: '3.10'
             os: ubuntu-22.04
             curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-lin-amd.txt
+            python-version: '3.10'
             os: ubuntu-22.04
             curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-mac-mps-cpu.txt
+            python-version: '3.9'
             os: macOS-12
             curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-win-colab-cuda.txt
+            python-version: '3.10'
             os: windows-2022
             curl-command: curl.exe
             github-env: $env:GITHUB_ENV
