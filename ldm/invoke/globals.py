@@ -22,7 +22,7 @@ if os.environ.get('INVOKEAI_ROOT'):
 elif os.environ.get('VIRTUAL_ENV'):
     Globals.root = osp.abspath(osp.join(os.environ.get('VIRTUAL_ENV'), '..'))
 else:
-    Globals.root = osp.abspath(osp.expanduser('~/invokeai'))
+    Globals.root = osp.abspath(osp.join(__file__, '../../..'))
 
 # Where to look for the initialization file
 Globals.initfile = 'invokeai.init'
