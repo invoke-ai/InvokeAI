@@ -14,6 +14,7 @@ docker run \
   --platform="$platform" \
   --name="$project_name" \
   --hostname="$project_name" \
+  --gpus all \
   --mount="source=$volumename,target=/data" \
   --publish=9090:9090 \
   --cap-add=sys_nice \
