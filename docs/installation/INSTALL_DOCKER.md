@@ -133,7 +133,7 @@ If you have an Nvidia GPU, you can enable InvokeAI to run on the GPU by running 
 environment variable to enable GPU usage and have the process run much faster:
 
 ```bash
-GPUS=all ./docker-build/run.sh
+GPU_FLAGS=all ./docker-build/run.sh
 ```
 
 This passes the `--gpus all` to docker and uses the GPU.
@@ -146,7 +146,7 @@ You can use the full set of GPU combinations documented here:
 
 https://docs.docker.com/config/containers/resource_constraints/#gpu
 
-For example, use `GPUS=device=GPU-3a23c669-1f69-c64e-cf85-44e9b07e7a2a` to choose a specific device identified by a UUID.
+For example, use `GPU_FLAGS=device=GPU-3a23c669-1f69-c64e-cf85-44e9b07e7a2a` to choose a specific device identified by a UUID.
 
 ## Running InvokeAI in the cloud with Docker
 
