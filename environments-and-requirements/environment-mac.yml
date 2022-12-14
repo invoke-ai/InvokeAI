@@ -49,7 +49,7 @@ dependencies:
   - sympy=1.10
   - send2trash=1.8
   - tensorboard=2.10
-  - transformers=~4.25
+  - transformers~=4.25
   - pip:
       - getpass_asterisk
       - picklescan
