@@ -8,9 +8,6 @@ source ./docker-build/env.sh \
   || echo "please execute docker-build/build.sh from repository root" \
   || exit 1
 
-# check if HUGGINGFACE_TOKEN is available
-huggingface_token=${HUGGINGFACE_TOKEN:?Please set your token for Huggingface as HUGGINGFACE_TOKEN}
-
 pip_requirements=${PIP_REQUIREMENTS:-requirements-lin-cuda.txt}
 dockerfile=${INVOKE_DOCKERFILE:-docker-build/Dockerfile}
 
@@ -38,15 +35,3 @@ docker build \
   --build-arg="PIP_REQUIREMENTS=${pip_requirements}" \
   --file="${dockerfile}" \
   .
-
-# download required models non-interactive
-docker run \
-  --rm \
-  --platform="$platform" \
-  --name="$project_name" \
-  --hostname="$project_name" \
-  --mount="source=$volumename,target=/data" \
-  --env="HUGGINGFACE_TOKEN=${huggingface_token}" \
-  --entrypoint="python3" \
-  "${invokeai_tag}" \
-  scripts/configure_invokeai.py --yes
