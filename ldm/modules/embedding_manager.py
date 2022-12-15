@@ -305,17 +305,21 @@ class EmbeddingManager(nn.Module):
         embedding_ckpt = torch.load(embedding_file, map_location='cpu')
         embedding_info = {}
 
-        # Check if valid embedding file
         if 'string_to_token' and 'string_to_param' in embedding_ckpt:
-            embedding_info['name'] = embedding_ckpt['name'] or '.'.join(embedding_file.split('.')[:-1])
+            embedding_info['name'] = embedding_ckpt.get('name',None) or os.path.basename(os.path.splitext(embedding_file)[0])
 
             # Check num of embeddings and warn user only the first will be used
             embedding_info['num_of_embeddings'] = len(embedding_ckpt["string_to_token"])
             if embedding_info['num_of_embeddings'] > 1:
                 print('>> More than 1 embedding found. Will use the first one')
 
-            # Get the embedding
-            embedding = list(embedding_ckpt['string_to_param'].values())[0]
+            # Get the embedding; if we get an AttributeError at this point, we search
+            # for known broken variants.
+            try:           
+                embedding = list(embedding_ckpt['string_to_param'].values())[0]
+            except AttributeError: 
+                return self.handle_broken_pt_variants(embedding_ckpt, embedding_file)
+                
             embedding_info['embedding'] = embedding
             embedding_info['num_vectors_per_token'] = embedding.size()[0]
 
@@ -325,6 +329,13 @@ class EmbeddingManager(nn.Module):
                 embedding_info['trained_model_checksum'] = embedding_ckpt['sd_checkpoint']
             except AttributeError:
                 print(">> No Training Details Found. Passing ...")
+
+        # .pt files found at https://cyberes.github.io/stable-diffusion-textual-inversion-models/
+        # They are actually .bin files
+        elif len(embedding_ckpt.keys())==1:
+            print('>> Detected .bin file masquerading as .pt file')
+            embedding_info = self.parse_embedding_bin(embedding_file)
+ 
         else:
             print('>> Invalid embedding format')
             embedding_info = None
@@ -340,12 +351,29 @@ class EmbeddingManager(nn.Module):
             embedding_info = None
         else:
             for token in list(embedding_ckpt.keys()):
-                embedding_info['name'] = token or '.'.join(embedding_file.split('.')[:-1])
+                embedding_info['name'] = token or os.path.basename(os.path.splitext(embedding_file)[0])
                 embedding_info['embedding'] = embedding_ckpt[token]
                 embedding_info['num_vectors_per_token'] = 1 # All Concepts seem to default to 1
 
         return embedding_info
 
+    def handle_broken_pt_variants(self, embedding_ckpt:dict, embedding_file:str)->dict:
+        '''
+        This handles the broken .pt file variants. We only know of one at present.
+        '''
+        embedding_info = {}
+        if isinstance(list(embedding_ckpt['string_to_token'].values())[0],torch.Tensor):
+            print('>> Detected .pt file variant 1') # example at https://github.com/invoke-ai/InvokeAI/issues/1829
+            for token in list(embedding_ckpt['string_to_token'].keys()):
+                embedding_info['name'] = token if token != '*' else os.path.basename(os.path.splitext(embedding_file)[0])
+                embedding_info['embedding'] = embedding_ckpt['string_to_param'].state_dict()[token]
+                embedding_info['num_vectors_per_token'] = embedding_info['embedding'].shape[0]
+        else:
+            print('>> Invalid embedding format')
+            embedding_info = None
+
+        return embedding_info
+        
     def has_embedding_for_token(self, token_str):
         return token_str in self.string_to_token_dict
 
