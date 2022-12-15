@@ -265,7 +265,7 @@ class EmbeddingManager(nn.Module):
         except Exception:
             print(f"### WARNING::: Invalid or corrupt embeddings found. Ignoring: {ckpt_path}")
             return
-            
+
         embedding_info = self.parse_embedding(ckpt_path)
         if embedding_info:
             self.max_vectors_per_token = embedding_info['num_vectors_per_token']
@@ -309,7 +309,7 @@ class EmbeddingManager(nn.Module):
         if 'string_to_token' and 'string_to_param' in embedding_ckpt:
 
             # Catch variants that do not have the expected keys or values.
-            try:           
+            try:
                 embedding_info['name'] = embedding_ckpt['name'] or os.path.basename(os.path.splitext(embedding_file)[0])
 
                 # Check num of embeddings and warn user only the first will be used
@@ -320,7 +320,7 @@ class EmbeddingManager(nn.Module):
                 embedding = list(embedding_ckpt['string_to_param'].values())[0]
             except (AttributeError,KeyError): 
                 return self.handle_broken_pt_variants(embedding_ckpt, embedding_file)
-                
+
             embedding_info['embedding'] = embedding
             embedding_info['num_vectors_per_token'] = embedding.size()[0]
             embedding_info['token_dim'] = embedding.size()[1]
@@ -337,7 +337,7 @@ class EmbeddingManager(nn.Module):
         elif len(embedding_ckpt.keys())==1:
             print('>> Detected .bin file masquerading as .pt file')
             embedding_info = self.parse_embedding_bin(embedding_file)
- 
+
         else:
             print('>> Invalid embedding format')
             embedding_info = None
@@ -357,7 +357,7 @@ class EmbeddingManager(nn.Module):
                 embedding_info['embedding'] = embedding_ckpt[token]
                 embedding_info['num_vectors_per_token'] = 1 # All Concepts seem to default to 1
                 embedding_info['token_dim'] = embedding_info['embedding'].size()[0]
-                
+
         return embedding_info
 
     def handle_broken_pt_variants(self, embedding_ckpt:dict, embedding_file:str)->dict:
@@ -377,7 +377,7 @@ class EmbeddingManager(nn.Module):
             embedding_info = None
 
         return embedding_info
-        
+
     def has_embedding_for_token(self, token_str):
         return token_str in self.string_to_token_dict
 
