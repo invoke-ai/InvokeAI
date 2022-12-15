@@ -23,7 +23,7 @@ export default function ThemeChanger() {
     if (colorMode !== currentTheme) {
       setColorMode(currentTheme);
     }
-  }, [colorMode, currentTheme]);
+  }, [setColorMode, colorMode, currentTheme]);
 
   const handleChangeTheme = (theme: string) => {
     dispatch(setCurrentTheme(theme));
