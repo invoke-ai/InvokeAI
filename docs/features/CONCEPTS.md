@@ -37,8 +37,9 @@ generated using the command-line client and the Stable Diffusion 1.5 model:
 You can also combine styles and concepts:
 
 <figure markdown>
-  ![](../assets/concepts/image5.png)
-  <figcaption>A portrait of &lt;alf&gt; in &lt;cartoona-animal&gt; style</figcaption>
+  | A portrait of &lt;alf&gt; in &lt;cartoona-animal&gt; style |
+  | :--------------------------------------------------------: |
+  | ![](../assets/concepts/image5.png)                         |
 </figure>
 ## Using a Hugging Face Concept
 
@@ -49,24 +50,26 @@ find out what each concept is for, you can browse the
 look at examples of what each concept produces.
 
 When you have an idea of a concept you wish to try, go to the command-line
-client (CLI) and type a "&lt;" character and the beginning of the Hugging Face
-concept name you wish to load. Press the Tab key, and the CLI will show you all
-matching concepts. You can also type "&lt;" and Tab to get a listing of all ~800
-concepts, but be prepared to scroll up to see them all! If there is more than
-one match you can continue to type and Tab until the concept is completed.
+client (CLI) and type a `<` character and the beginning of the Hugging Face
+concept name you wish to load. Press ++tab++, and the CLI will show you all
+matching concepts. You can also type `<` and hit ++tab++ to get a listing of all
+~800 concepts, but be prepared to scroll up to see them all! If there is more
+than one match you can continue to type and ++tab++ until the concept is
+completed.
 
-For example if you type "&lt;x" and Tab, you'll be prompted with the
-completions:
+!!! example
 
-```
-<xatu2>        <xatu>         <xbh>          <xi>           <xidiversity>  <xioboma>      <xuna>         <xyz>
-```
+    if you type in `<x` and hit ++tab++, you'll be prompted with the completions:
 
-Now type "id" and press Tab. It will be autocompleted to "&lt;xidiversity&gt;"
-because this is a unique match.
+    ```py
+    <xatu2>        <xatu>         <xbh>          <xi>           <xidiversity>  <xioboma>      <xuna>         <xyz>
+    ```
 
-Finish your prompt and generate as usual. You may include multiple concept terms
-in the prompt.
+    Now type `id` and press ++tab++. It will be autocompleted to `<xidiversity>`
+    because this is a unique match.
+
+    Finish your prompt and generate as usual. You may include multiple concept terms
+    in the prompt.
 
 If you have never used this concept before, you will see a message that the TI
 model is being downloaded and installed. After this, the concept will be saved
@@ -75,10 +78,10 @@ locally (in the `models/sd-concepts-library` directory) for future use.
 Several steps happen during downloading and installation, including a scan of
 the file for malicious code. Should any errors occur, you will be warned and the
 concept will fail to load. Generation will then continue treating the trigger
-term as a normal string of characters (e.g. as literal "&lt;ghibli-face&gt;").
+term as a normal string of characters (e.g. as literal `<ghibli-face>`).
 
-Currently auto-installation of concepts is a feature only available on the
-command-line client. Support for the WebUI is a work in progress.
+You can also use `<concept-names>` in the WebGUI's prompt textbox. There is no
+autocompletion at this time.
 
 ## Installing your Own TI Files
 
