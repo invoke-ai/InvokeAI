@@ -318,6 +318,7 @@ class EmbeddingManager(nn.Module):
             embedding = list(embedding_ckpt['string_to_param'].values())[0]
             embedding_info['embedding'] = embedding
             embedding_info['num_vectors_per_token'] = embedding.size()[0]
+            embedding_info['token_dim'] = embedding.size()[1]
 
             try:
                 embedding_info['trained_steps'] = embedding_ckpt['step']
@@ -343,6 +344,7 @@ class EmbeddingManager(nn.Module):
                 embedding_info['name'] = token or '.'.join(embedding_file.split('.')[:-1])
                 embedding_info['embedding'] = embedding_ckpt[token]
                 embedding_info['num_vectors_per_token'] = 1 # All Concepts seem to default to 1
+                embedding_info['token_dim'] = embedding_info['embedding'].size()[0]
 
         return embedding_info
 
