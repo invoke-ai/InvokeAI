@@ -167,10 +167,7 @@ To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the 
 
 If you are unfamiliar with how
 to contribute to GitHub projects, here is a
-[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress, but for now the most
-important thing is to **make your pull request against the "development" branch**, and not against
-"main". This will help keep public breakage to a minimum and will allow you to propose more radical
-changes.
+[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress. You can **make your pull request against the "main" branch**. 
 
 We hope you enjoy using our software as much as we enjoy creating it,
 and we hope that some of those of you who are reading this will elect
