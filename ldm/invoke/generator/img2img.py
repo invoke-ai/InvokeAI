@@ -45,7 +45,7 @@ class Img2Img(Generator):
             # encode (scaled latent)
             z_enc = sampler.stochastic_encode(
                 self.init_latent,
-                torch.tensor([t_enc]).to(self.model.device),
+                torch.tensor([t_enc - 1]).to(self.model.device),
                 noise=x_T
             )
 
