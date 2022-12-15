@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Setup Node 18
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '18'
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: 'yarn install --frozen-lockfile'
       - run: 'yarn tsc'
       - run: 'yarn run madge'
