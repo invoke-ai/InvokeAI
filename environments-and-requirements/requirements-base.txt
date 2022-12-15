@@ -35,6 +35,6 @@ torch-fidelity
 torchmetrics
 transformers==4.25.*
 https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip#egg=k-diffusion
-https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.4.zip#egg=pypatchmatch
+https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip#egg=pypatchmatch
 https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip#egg=clip
 https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip#egg=clipseg

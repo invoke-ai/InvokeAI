@@ -305,23 +305,25 @@ class EmbeddingManager(nn.Module):
         embedding_ckpt = torch.load(embedding_file, map_location='cpu')
         embedding_info = {}
 
+        # Check if valid embedding file
         if 'string_to_token' and 'string_to_param' in embedding_ckpt:
-            embedding_info['name'] = embedding_ckpt.get('name',None) or os.path.basename(os.path.splitext(embedding_file)[0])
 
-            # Check num of embeddings and warn user only the first will be used
-            embedding_info['num_of_embeddings'] = len(embedding_ckpt["string_to_token"])
-            if embedding_info['num_of_embeddings'] > 1:
-                print('>> More than 1 embedding found. Will use the first one')
-
-            # Get the embedding; if we get an AttributeError at this point, we search
-            # for known broken variants.
+            # Catch variants that do not have the expected keys or values.
             try:           
+                embedding_info['name'] = embedding_ckpt['name'] or os.path.basename(os.path.splitext(embedding_file)[0])
+
+                # Check num of embeddings and warn user only the first will be used
+                embedding_info['num_of_embeddings'] = len(embedding_ckpt["string_to_token"])
+                if embedding_info['num_of_embeddings'] > 1:
+                    print('>> More than 1 embedding found. Will use the first one')
+
                 embedding = list(embedding_ckpt['string_to_param'].values())[0]
-            except AttributeError: 
+            except (AttributeError,KeyError): 
                 return self.handle_broken_pt_variants(embedding_ckpt, embedding_file)
                 
             embedding_info['embedding'] = embedding
             embedding_info['num_vectors_per_token'] = embedding.size()[0]
+            embedding_info['token_dim'] = embedding.size()[1]
 
             try:
                 embedding_info['trained_steps'] = embedding_ckpt['step']
@@ -354,7 +356,8 @@ class EmbeddingManager(nn.Module):
                 embedding_info['name'] = token or os.path.basename(os.path.splitext(embedding_file)[0])
                 embedding_info['embedding'] = embedding_ckpt[token]
                 embedding_info['num_vectors_per_token'] = 1 # All Concepts seem to default to 1
-
+                embedding_info['token_dim'] = embedding_info['embedding'].size()[0]
+                
         return embedding_info
 
     def handle_broken_pt_variants(self, embedding_ckpt:dict, embedding_file:str)->dict:
@@ -368,6 +371,7 @@ class EmbeddingManager(nn.Module):
                 embedding_info['name'] = token if token != '*' else os.path.basename(os.path.splitext(embedding_file)[0])
                 embedding_info['embedding'] = embedding_ckpt['string_to_param'].state_dict()[token]
                 embedding_info['num_vectors_per_token'] = embedding_info['embedding'].shape[0]
+                embedding_info['token_dim'] = embedding_info['embedding'].size()[0]
         else:
             print('>> Invalid embedding format')
             embedding_info = None
