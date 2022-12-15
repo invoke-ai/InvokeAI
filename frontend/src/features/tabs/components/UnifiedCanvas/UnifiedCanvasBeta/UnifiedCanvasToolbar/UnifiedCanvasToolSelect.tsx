@@ -3,7 +3,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import {
   addEraseRect,
   addFillRect,
-  setBrushColor,
   setTool,
 } from 'features/canvas/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';

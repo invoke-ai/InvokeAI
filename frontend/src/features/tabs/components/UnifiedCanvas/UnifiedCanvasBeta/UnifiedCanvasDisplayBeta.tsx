@@ -6,7 +6,6 @@ import { useLayoutEffect } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import IAICanvas from 'features/canvas/components/IAICanvas';
-import IAICanvasOutpaintingControls from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { Flex } from '@chakra-ui/react';
 import UnifiedCanvasToolbarBeta from './UnifiedCanvasToolbarBeta';
