@@ -14,7 +14,8 @@ import UnifiedCanvasDownloadImage from './UnifiedCanvasToolbar/UnifiedCanvasDown
 import UnifiedCanvasFileUploader from './UnifiedCanvasToolbar/UnifiedCanvasFileUploader';
 import UnifiedCanvasResetCanvas from './UnifiedCanvasToolbar/UnifiedCanvasResetCanvas';
 import UnifiedCanvasProcessingButtons from './UnifiedCanvasToolbar/UnifiedCanvasProcessingButtons';
-import { RootState, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 
 const UnifiedCanvasToolbarBeta = () => {
   const shouldShowOptionsPanel = useAppSelector(

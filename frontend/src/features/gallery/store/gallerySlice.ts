@@ -3,7 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import _, { clamp } from 'lodash';
 import * as InvokeAI from 'app/invokeai';
 import { IRect } from 'konva/lib/types';
-import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName } from 'features/tabs/tabMap';
 
 export type GalleryCategory = 'user' | 'result';
 

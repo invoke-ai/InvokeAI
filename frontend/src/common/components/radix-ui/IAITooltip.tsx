@@ -20,7 +20,7 @@ const IAITooltip = (props: IAITooltipProps) => {
         <Tooltip.Portal>
           <Tooltip.Content
             {...contentProps}
-            onPointerDownOutside={(e: any) => {e.preventDefault()}}
+            onPointerDownOutside={(e) => {e.preventDefault()}}
             className="invokeai__tooltip-content"
           >
             <Tooltip.Arrow {...arrowProps} className="invokeai__tooltip-arrow" />

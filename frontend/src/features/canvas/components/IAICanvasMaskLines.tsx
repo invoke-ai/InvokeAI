@@ -1,6 +1,6 @@
 import { GroupConfig } from 'konva/lib/Group';
 import { Group, Line } from 'react-konva';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { createSelector } from '@reduxjs/toolkit';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { isCanvasMaskLine } from '../store/canvasTypes';

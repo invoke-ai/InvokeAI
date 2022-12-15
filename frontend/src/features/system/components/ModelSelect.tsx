@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { requestModelChange } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import _ from 'lodash';
 import { ChangeEvent } from 'react';

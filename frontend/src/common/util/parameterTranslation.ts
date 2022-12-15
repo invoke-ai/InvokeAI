@@ -1,10 +1,12 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { OptionsState } from 'features/options/store/optionsSlice';
 import { SystemState } from 'features/system/store/systemSlice';
+import { Vector2d } from 'konva/lib/types';
+import { Dimensions } from 'features/canvas/store/canvasTypes';
 
 import { stringToSeedWeightsArray } from './seedWeightPairs';
 import randomInt from './randomInt';
-import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName } from 'features/tabs/tabMap';
 import {
   CanvasState,
   isCanvasMaskLine,
@@ -12,6 +14,10 @@ import {
 import generateMask from 'features/canvas/util/generateMask';
 import openBase64ImageInTab from './openBase64ImageInTab';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
+import type {
+  UpscalingLevel,
+  FacetoolType,
+} from 'features/options/store/optionsSlice';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;
@@ -21,13 +27,68 @@ export type FrontendToBackendParametersConfig = {
   imageToProcessUrl?: string;
 };
 
+export type BackendGenerationParameters = {
+  prompt: string;
+  iterations: number;
+  steps: number;
+  cfg_scale: number;
+  threshold: number;
+  perlin: number;
+  height: number;
+  width: number;
+  sampler_name: string;
+  seed: number;
+  progress_images: boolean;
+  progress_latents: boolean;
+  save_intermediates: number;
+  generation_mode: InvokeTabName;
+  init_mask: string;
+  init_img?: string;
+  fit?: boolean;
+  seam_size?: number;
+  seam_blur?: number;
+  seam_strength?: number;
+  seam_steps?: number;
+  tile_size?: number;
+  infill_method?: string;
+  force_outpaint?: boolean;
+  seamless?: boolean;
+  hires_fix?: boolean;
+  strength?: number;
+  invert_mask?: boolean;
+  inpaint_replace?: number;
+  bounding_box?: Vector2d & Dimensions;
+  inpaint_width?: number;
+  inpaint_height?: number;
+  with_variations?: Array<Array<number>>;
+  variation_amount?: number;
+  enable_image_debugging?: boolean;
+};
+
+export type BackendEsrGanParameters = {
+  level: UpscalingLevel;
+  strength: number;
+};
+
+export type BackendFacetoolParameters = {
+  type: FacetoolType;
+  strength: number;
+  codeformer_fidelity?: number;
+};
+
+export type BackendParameters = {
+  generationParameters: BackendGenerationParameters;
+  esrganParameters: false | BackendEsrGanParameters;
+  facetoolParameters: false | BackendFacetoolParameters;
+};
+
 /**
  * Translates/formats frontend state into parameters suitable
  * for consumption by the API.
  */
 export const frontendToBackendParameters = (
   config: FrontendToBackendParametersConfig
-): { [key: string]: any } => {
+): BackendParameters => {
   const canvasBaseLayer = getCanvasBaseLayer();
 
   const { generationMode, optionsState, canvasState, systemState } = config;
@@ -73,7 +134,7 @@ export const frontendToBackendParameters = (
     enableImageDebugging,
   } = systemState;
 
-  const generationParameters: { [k: string]: any } = {
+  const generationParameters: BackendGenerationParameters = {
     prompt,
     iterations,
     steps,
@@ -91,8 +152,8 @@ export const frontendToBackendParameters = (
     init_mask: '',
   };
 
-  let esrganParameters: false | { [k: string]: any } = false;
-  let facetoolParameters: false | { [k: string]: any } = false;
+  let esrganParameters: false | BackendEsrGanParameters = false;
+  let facetoolParameters: false | BackendFacetoolParameters = false;
 
   generationParameters.seed = shouldRandomizeSeed
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)

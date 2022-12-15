@@ -15,8 +15,9 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import _, { isEqual } from 'lodash';
 import { ChangeEvent, cloneElement, ReactElement } from 'react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
-import { persistor } from 'main';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { persistor } from 'persistor';
 import {
   InProgressImageType,
   setEnableImageDebugging,
