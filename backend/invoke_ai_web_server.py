@@ -1099,6 +1099,8 @@ class InvokeAIWebServer:
                     get_tokens_for_prompt(self.generate.model, parsed_prompt)
                 attention_maps_image_base64_url = None if attention_maps_image is None \
                     else image_to_dataURL(attention_maps_image)
+                if attention_maps_image is not None:
+                    attention_maps_image.save(path + '.attention.png', 'PNG')
 
                 self.socketio.emit(
                     "generationResult",

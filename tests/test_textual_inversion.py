@@ -269,7 +269,9 @@ class TextualInversionManagerTestCase(unittest.TestCase):
 
         overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
         self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:4], default_prompt_embeddings[0:4]))
         self.assertTrue(torch.equal(overwritten_prompt_embeddings[4], test_embedding_1v[0]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[5:77], default_prompt_embeddings[5:77]))
 
         # at the start
         prompt_token_ids = [test_embedding_1v_token_id] + KNOWN_WORDS_TOKEN_IDS
@@ -280,7 +282,9 @@ class TextualInversionManagerTestCase(unittest.TestCase):
 
         overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
         self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:1], default_prompt_embeddings[0:1]))
         self.assertTrue(torch.equal(overwritten_prompt_embeddings[1], test_embedding_1v[0]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[2:77], default_prompt_embeddings[2:77]))
 
         # in the middle
         prompt_token_ids = KNOWN_WORDS_TOKEN_IDS[0:1] + [test_embedding_1v_token_id] + KNOWN_WORDS_TOKEN_IDS[1:3]
@@ -291,7 +295,9 @@ class TextualInversionManagerTestCase(unittest.TestCase):
 
         overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
         self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:2], default_prompt_embeddings[0:2]))
         self.assertTrue(torch.equal(overwritten_prompt_embeddings[2], test_embedding_1v[0]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[3:77], default_prompt_embeddings[3:77]))
 
 
 
@@ -367,4 +373,167 @@ class TextualInversionManagerTestCase(unittest.TestCase):
         self.assertTrue(torch.equal(overwritten_prompt_embeddings[4], test_embedding_1v_2[0]))
         self.assertTrue(torch.equal(overwritten_prompt_embeddings[5:77], default_prompt_embeddings[5:77]))
 
+    def test_overwrite_textual_inversion_4v_single(self):
+        tim = TextualInversionManager(DummyClipEmbedder())
+        default_prompt_embeddings = torch.randn([77, 768])
 
+        # add embedding
+        test_embedding_4v = torch.randn([4, 768])
+        test_embedding_4v_token = "<inversion-trigger-vector-length-4>"
+        test_embedding_4v_token_id = tim.add_textual_inversion(test_embedding_4v_token, test_embedding_4v)
+        self.assertEqual(test_embedding_4v_token_id, len(KNOWN_WORDS))
+
+        # at the end
+        prompt_token_ids = KNOWN_WORDS_TOKEN_IDS + [test_embedding_4v_token_id]
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:4], default_prompt_embeddings[0:4]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[4:8], test_embedding_4v))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[8:77], default_prompt_embeddings[8:77]))
+
+        # at the start
+        prompt_token_ids = [test_embedding_4v_token_id] + KNOWN_WORDS_TOKEN_IDS
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:1], default_prompt_embeddings[0:1]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[1:5], test_embedding_4v))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[5:77], default_prompt_embeddings[5:77]))
+
+        # in the middle
+        prompt_token_ids = KNOWN_WORDS_TOKEN_IDS[0:1] + [test_embedding_4v_token_id] + KNOWN_WORDS_TOKEN_IDS[1:3]
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:2], default_prompt_embeddings[0:2]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[2:6], test_embedding_4v))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[6:77], default_prompt_embeddings[6:77]))
+
+    def test_overwrite_textual_inversion_4v_overflow(self):
+        tim = TextualInversionManager(DummyClipEmbedder())
+        default_prompt_embeddings = torch.randn([77, 768])
+
+        # add embedding
+        test_embedding_4v = torch.randn([4, 768])
+        test_embedding_4v_token = "<inversion-trigger-vector-length-4>"
+        test_embedding_4v_token_id = tim.add_textual_inversion(test_embedding_4v_token, test_embedding_4v)
+        self.assertEqual(test_embedding_4v_token_id, len(KNOWN_WORDS))
+
+        base_prompt = KNOWN_WORDS_TOKEN_IDS * 24
+
+        # at the end
+        prompt_token_ids = base_prompt + [test_embedding_4v_token_id]
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        base_prompt_length = len(base_prompt)
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:base_prompt_length+1], default_prompt_embeddings[0:base_prompt_length+1]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[base_prompt_length+1:base_prompt_length+1+3], test_embedding_4v[0:3]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[base_prompt_length+1+3:77], default_prompt_embeddings[base_prompt_length+1+3:77]))
+
+        # at the start
+        prompt_token_ids = [test_embedding_4v_token_id] + base_prompt
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        expanded_prompt_token_ids = expanded_prompt_token_ids[0:75]
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:1], default_prompt_embeddings[0:1]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[1:5], test_embedding_4v))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[5:77], default_prompt_embeddings[5:77]))
+
+        # in the middle
+        prompt_token_ids = base_prompt[0:20] + [test_embedding_4v_token_id] + base_prompt[20:-1]
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:21], default_prompt_embeddings[0:21]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[21:25], test_embedding_4v))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[25:77], default_prompt_embeddings[25:77]))
+
+
+    def test_overwrite_textual_inversion_4v_multiple(self):
+        tim = TextualInversionManager(DummyClipEmbedder())
+        default_prompt_embeddings = torch.randn([77, 768])
+
+        # add embedding
+        test_embedding_4v_1 = torch.randn([4, 768])
+        test_embedding_4v_1_token = "<inversion-trigger-vector-length-4-a>"
+        test_embedding_4v_1_token_id = tim.add_textual_inversion(test_embedding_4v_1_token, test_embedding_4v_1)
+        self.assertEqual(test_embedding_4v_1_token_id, len(KNOWN_WORDS))
+
+        test_embedding_4v_2 = torch.randn([4, 768])
+        test_embedding_4v_2_token = "<inversion-trigger-vector-length-4-b>"
+        test_embedding_4v_2_token_id = tim.add_textual_inversion(test_embedding_4v_2_token, test_embedding_4v_2)
+        self.assertEqual(test_embedding_4v_2_token_id, len(KNOWN_WORDS)+1)
+
+        base_prompt = KNOWN_WORDS_TOKEN_IDS * 20
+
+        # at the end
+        prompt_token_ids = base_prompt + [test_embedding_4v_1_token_id] + [test_embedding_4v_2_token_id]
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        base_prompt_length = len(base_prompt)
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:base_prompt_length+1], default_prompt_embeddings[0:base_prompt_length+1]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[base_prompt_length+1:base_prompt_length+1+4], test_embedding_4v_1))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[base_prompt_length+1+4:base_prompt_length+1+4+4], test_embedding_4v_2))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[base_prompt_length+1+4+4:77], default_prompt_embeddings[base_prompt_length+1+4+4:77]))
+
+        # at the start
+        prompt_token_ids = [test_embedding_4v_1_token_id] + [test_embedding_4v_2_token_id] + base_prompt
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        expanded_prompt_token_ids = expanded_prompt_token_ids[0:75]
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:1], default_prompt_embeddings[0:1]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[1:5], test_embedding_4v_1))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[5:9], test_embedding_4v_2))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[9:77], default_prompt_embeddings[9:77]))
+
+        # in the middle
+        prompt_token_ids = base_prompt[0:10] + [test_embedding_4v_1_token_id] + base_prompt[10:20] + [test_embedding_4v_2_token_id] + base_prompt[20:-1]
+        expanded_prompt_token_ids = tim.expand_textual_inversion_token_ids(prompt_token_ids)
+        padded_prompt_token_ids = [tim.clip_embedder.tokenizer.bos_token_id] + \
+                           expanded_prompt_token_ids + \
+                           (76 - len(expanded_prompt_token_ids)) * [tim.clip_embedder.tokenizer.eos_token_id]
+
+        overwritten_prompt_embeddings = tim.overwrite_textual_inversion_embeddings(padded_prompt_token_ids, default_prompt_embeddings)
+        self.assertFalse(torch.equal(default_prompt_embeddings, overwritten_prompt_embeddings))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[0:11], default_prompt_embeddings[0:11]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[11:15], test_embedding_4v_1))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[15:25], default_prompt_embeddings[15:25]))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[25:29], test_embedding_4v_2))
+        self.assertTrue(torch.equal(overwritten_prompt_embeddings[29:77], default_prompt_embeddings[29:77]))

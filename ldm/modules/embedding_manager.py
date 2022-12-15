@@ -150,12 +150,18 @@ class TextualInversionManager():
         subsequent rows in `prompt_embeddings` as well.
 
         :param `prompt_token_ids`: Prompt token ids, already expanded to account for any textual inversions with vector lenght
-            >1 (call `expand_textual_inversion_token_ids()` to do this)
+            >1 (call `expand_textual_inversion_token_ids()` to do this) and including bos and eos markers.
         :param `prompt_embeddings`: Prompt embeddings tensor of shape with indices aligning to token ids in
             `prompt_token_ids` (i.e., also already expanded).
         :return: `The prompt_embeddings` tensor overwritten as appropriate with the textual inversion embeddings.
         """
-        assert prompt_embeddings.shape[0] == self.clip_embedder.max_length, f"prompt_embeddings must have 77 entries (has: {prompt_embeddings.shape[0]})"
+        if prompt_embeddings.shape[0] != self.clip_embedder.max_length: # typically 77
+            raise ValueError(f"prompt_embeddings must have {self.clip_embedder.max_length} entries (has: {prompt_embeddings.shape[0]})")
+        if len(prompt_token_ids) != self.clip_embedder.max_length:
+            raise ValueError(f"prompt_token_ids must be fully padded out to {self.clip_embedder.max_length} entries (has: {prompt_embeddings.shape[0]})")
+        if prompt_token_ids[0] != self.clip_embedder.tokenizer.bos_token_id or prompt_token_ids[-1] != self.clip_embedder.tokenizer.eos_token_id:
+            raise ValueError("prompt_token_ids must start with with bos token id and end with the eos token id")
+
         textual_inversion_token_ids = [ti.token_id for ti in self.textual_inversions]
         pad_token_id = self.clip_embedder.tokenizer.pad_token_id
         overwritten_prompt_embeddings = prompt_embeddings.clone()
@@ -164,7 +170,9 @@ class TextualInversionManager():
                 continue
             if token_id in textual_inversion_token_ids:
                 textual_inversion = next(ti for ti in self.textual_inversions if ti.token_id == token_id)
-                for j in range(0, textual_inversion.embedding_vector_length):
+                end_index = min(i + textual_inversion.embedding_vector_length, self.clip_embedder.max_length-1)
+                count_to_overwrite = end_index - i
+                for j in range(0, count_to_overwrite):
                     # only overwrite the textual inversion token id or the padding token id
                     if prompt_token_ids[i+j] != pad_token_id and prompt_token_ids[i+j] != token_id:
                         break
