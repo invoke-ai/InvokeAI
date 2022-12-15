@@ -1,6 +1,9 @@
 name: Lint frontend
 
 on:
+  pull_request:
+    paths:
+      - 'frontend/**'
   push:
     paths:
       - 'frontend/**'
