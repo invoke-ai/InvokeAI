@@ -81,6 +81,7 @@ class InvokeAIWebServer:
         }
 
         if opt.cors:
+            print(f">> CORS: {opt.cors}")            
             socketio_args["cors_allowed_origins"] = opt.cors
 
         frontend_path = self.find_frontend()
