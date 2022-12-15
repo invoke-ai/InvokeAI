@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# IMPORTANT: You need to have a token on huggingface.co to be able to download the checkpoints!!!
-# configure values by using env when executing build.sh f.e. `env ARCH=aARCH64 ./build.sh`
+# How to use: https://invoke-ai.github.io/InvokeAI/installation/INSTALL_DOCKER/#setup
 
 source ./docker-build/env.sh \
   || echo "please execute docker-build/build.sh from repository root" \
@@ -21,8 +20,7 @@ echo -e "Platform:\t ${PLATFORM}"
 echo -e "Invokeai_tag:\t ${INVOKEAI_TAG}\n"
 
 if [[ -n "$(docker volume ls -f name="${VOLUMENAME}" -q)" ]]; then
-  echo "Volume already exists"
-  echo
+  echo -e "Volume already exists\n"
 else
   echo -n "createing docker volume "
   docker volume create "${VOLUMENAME}"
