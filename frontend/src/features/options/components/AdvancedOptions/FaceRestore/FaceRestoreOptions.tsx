@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 
 import { RootState } from 'app/store';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 
 import {
   FacetoolType,

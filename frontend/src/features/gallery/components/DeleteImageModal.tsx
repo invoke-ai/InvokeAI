@@ -14,15 +14,9 @@ import {
   Flex,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import {
-  ChangeEvent,
-  cloneElement,
-  forwardRef,
-  ReactElement,
-  SyntheticEvent,
-  useRef,
-} from 'react';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { ChangeEvent, ReactElement, SyntheticEvent } from 'react';
+import { cloneElement, forwardRef, useRef } from 'react';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { deleteImage } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import {

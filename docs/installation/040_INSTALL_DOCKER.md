@@ -1,5 +1,5 @@
 ---
-title: Docker
+title: Installing with Docker
 ---
 
 # :fontawesome-brands-docker: Docker

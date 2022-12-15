@@ -12,7 +12,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { ModelStatus } from 'app/invokeai';
 import { requestModelChange } from 'app/socketio/actions';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { SystemState } from 'features/system/store/systemSlice';
 
 type ModelListItemProps = {

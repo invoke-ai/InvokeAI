@@ -1,5 +1,5 @@
 import React, { ChangeEvent } from 'react';
-import { useAppDispatch, useAppSelector } from '../../../../../app/store';
+import { useAppDispatch, useAppSelector } from '../../../../../app/storeHooks';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
 import IAISwitch from '../../../../../common/components/IAISwitch';

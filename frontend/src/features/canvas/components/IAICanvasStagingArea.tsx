@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { Group, Rect } from 'react-konva';

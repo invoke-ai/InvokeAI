@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/store';
+import { useAppDispatch } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { resetCanvasView } from 'features/canvas/store/canvasSlice';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';

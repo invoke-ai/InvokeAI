@@ -1,5 +1,6 @@
 import { Accordion, ExpandedIndex } from '@chakra-ui/react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { setOpenAccordions } from 'features/system/store/systemSlice';
 import InvokeAccordionItem, {
   InvokeAccordionItemProps,

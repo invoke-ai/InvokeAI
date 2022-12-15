@@ -1,7 +1,8 @@
 import { IconButton, Image } from '@chakra-ui/react';
 import { useState } from 'react';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
   GalleryCategory,
   GalleryState,

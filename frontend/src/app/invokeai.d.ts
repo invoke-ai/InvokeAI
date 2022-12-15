@@ -12,8 +12,7 @@
  * 'gfpgan'.
  */
 
-import { Category as GalleryCategory } from 'features/gallery/store/gallerySlice';
-import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName } from 'features/tabs/tabMap';
 import { IRect } from 'konva/lib/types';
 
 /**

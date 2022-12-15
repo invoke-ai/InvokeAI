@@ -39,14 +39,15 @@ import {
   requestSystemConfig,
 } from './actions';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { tabMap } from 'features/tabs/components/InvokeTabs';
+import { tabMap } from 'features/tabs/tabMap';
+import type { RootState } from 'app/store';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
  * TODO: This file is large, but simple. Should it be split up further?
  */
 const makeSocketIOListeners = (
-  store: MiddlewareAPI<Dispatch<AnyAction>, any>
+  store: MiddlewareAPI<Dispatch<AnyAction>, RootState>
 ) => {
   const { dispatch, getState } = store;
 
@@ -100,7 +101,7 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const state = getState();
+        const state: RootState = getState();
         const { shouldLoopback, activeTab } = state.options;
         const { boundingBox: _, generationMode, ...rest } = data;
 
@@ -325,7 +326,10 @@ const makeSocketIOListeners = (
       // remove references to image in options
       const { initialImage, maskPath } = getState().options;
 
-      if (initialImage?.url === url || initialImage === url) {
+      if (
+        initialImage === url ||
+        (initialImage as InvokeAI.Image)?.url === url
+      ) {
         dispatch(clearInitialImage());
       }
 

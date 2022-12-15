@@ -1,6 +1,7 @@
 import { MdCancel } from 'react-icons/md';
 import { cancelProcessing } from 'app/socketio/actions';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
