@@ -23,5 +23,5 @@ docker run \
   --env="HUGGINGFACE_TOKEN=${huggingface_token}" \
   --publish=9090:9090 \
   --cap-add=sys_nice \
-  $gpus \
+  ${GPU_FLAGS:+--gpus=${GPU_FLAGS}} \
   "$invokeai_tag" ${1:+$@}
