@@ -39,11 +39,11 @@ FROM python:3.10-slim AS runtime
 RUN apt-get update \
   && apt-get install -y \
     --no-install-recommends \
-    build-essential \
+    build-essential=12.9 \
     libgl1-mesa-glx=20.3.* \
     libglib2.0-0=2.66.* \
-    libopencv-dev \
-    python3-opencv \
+    libopencv-dev=4.5.* \
+    python3-opencv=4.5.* \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
