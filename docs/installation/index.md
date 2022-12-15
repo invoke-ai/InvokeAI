@@ -5,7 +5,7 @@ title: Overview
 We offer several ways to install InvokeAI, each one suited to your
 experience and preferences.
 
-1.  [Automated Installer](010_INSTALL_AUTOMATED.md)
+1. [Automated Installer](010_INSTALL_AUTOMATED.md)
 
     This is a script that will install all of InvokeAI's essential
     third party libraries and InvokeAI itself. It includes access to a
@@ -31,4 +31,3 @@ experience and preferences.
     InvokeAI and its dependencies. This method is recommended for
     individuals with experience with Docker containers and understand
     the pluses and minuses of a container-based install.
-

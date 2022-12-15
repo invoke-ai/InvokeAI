@@ -30,8 +30,6 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     installed, it will print out the version number. If it is version `3.9.1` or
     higher, you meet requirements.
 
-    
-
     !!! warning "If you see an older version, or get a command not found error"
 
         Go to [Python Downloads](https://www.python.org/downloads/) and
@@ -53,7 +51,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         "Modify" existing installation.
 
         - Installation requires an up to date version of the Microsoft Visual C libraries. Please install the 2015-2022 libraries available here: https://learn.microsoft.com/en-us/cpp/windows/deploying-native-desktop-applications-visual-cpp?view=msvc-170
-	
+
     === "Mac users"
 
         - After installing Python, you may need to run the
@@ -83,7 +81,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
 	In particular, Ubuntu version 20.04 LTS comes with an old version of Python, does not come with the PIP package manager installed, and to make matters worse, the `python` command points to Python2, not Python3.
 
 	Here is the quick recipe for bringing your system up to date:
-	
+
 	```
 	sudo apt update
 	sudo apt install python3.9
@@ -174,7 +172,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     and configuring them. We provide a list of popular models that InvokeAI
     performs well with. However, you can add more weight files later on using
     the command-line client or the Web UI. See
-    [Installing Models](INSTALLING_MODELS.md) for details.
+    [Installing Models](050_INSTALLING_MODELS.md) for details.
 
     Note that the main Stable Diffusion weights file is protected by a license
     agreement that you must agree to in order to use. The script will list the
@@ -185,7 +183,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     If you have already downloaded the weights file(s) for another Stable
     Diffusion distribution, you may skip this step (by selecting "skip" when
     prompted) and configure InvokeAI to use the previously-downloaded files. The
-    process for this is described in [Installing Models](INSTALLING_MODELS.md).
+    process for this is described in [Installing Models](050_INSTALLING_MODELS.md).
 
 11. The script will now exit and you'll be ready to generate some images. Look
     for the directory `invokeai` installed in the location you chose at the
