@@ -18,7 +18,8 @@ jobs:
         with:
           node-version: '18'
       - uses: actions/checkout@v2
-      - run: 'yarn install'
+      - run: 'yarn install --frozen-lockfile'
       - run: 'yarn tsc'
       - run: 'yarn run madge'
       - run: 'yarn run lint --max-warnings=0'
+      - run: 'yarn run prettier --check'
