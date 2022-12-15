@@ -157,7 +157,8 @@ class TextualInversionManager():
         """
         assert prompt_embeddings.shape[0] == self.clip_embedder.max_length, f"prompt_embeddings must have 77 entries (has: {prompt_embeddings.shape[0]})"
         textual_inversion_token_ids = [ti.token_id for ti in self.textual_inversions]
-        pad_token_id = self.clip_embedder.pad_token_id
+        pad_token_id = self.clip_embedder.tokenizer.pad_token_id
+        overwritten_prompt_embeddings = prompt_embeddings.clone()
         for i, token_id in enumerate(prompt_token_ids):
             if token_id == pad_token_id:
                 continue
@@ -167,9 +168,9 @@ class TextualInversionManager():
                     # only overwrite the textual inversion token id or the padding token id
                     if prompt_token_ids[i+j] != pad_token_id and prompt_token_ids[i+j] != token_id:
                         break
-                    prompt_embeddings[i+j] = textual_inversion.embedding[j]
+                    overwritten_prompt_embeddings[i+j] = textual_inversion.embedding[j]
 
-        return prompt_embeddings
+        return overwritten_prompt_embeddings
 
 
 
