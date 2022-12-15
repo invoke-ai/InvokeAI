@@ -51,7 +51,7 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 For full installation and upgrade instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
-1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/tag/v2.2.3)
+1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
 2. Download the .zip file for your OS (Windows/macOS/Linux).
 3. Unzip the file. 
 4. If you are on Windows, double-click on the `install.bat` script. On macOS, open a Terminal window, drag the file `install.sh` from Finder into the Terminal, and press return. On Linux, run `install.sh`.
