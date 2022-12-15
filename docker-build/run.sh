@@ -17,8 +17,8 @@ docker run \
   --tty \
   --rm \
   --platform="$platform" \
-  --name="$repository_name_lc" \
-  --hostname="$repository_name_lc" \
+  --name="${repository_name,,}" \
+  --hostname="${repository_name,,}" \
   --mount="source=$volumename,target=/data" \
   --env="HUGGINGFACE_TOKEN=${huggingface_token}" \
   --publish=9090:9090 \
