@@ -9,7 +9,8 @@ import _ from 'lodash';
 const selector = createSelector(
   canvasSelector,
   (canvas) => {
-    const { boundingBoxDimensions, boundingBoxScaleMethod: boundingBoxScale } = canvas;
+    const { boundingBoxDimensions, boundingBoxScaleMethod: boundingBoxScale } =
+      canvas;
     return {
       boundingBoxDimensions,
       boundingBoxScale,

@@ -4,7 +4,10 @@ import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import Konva from 'konva';
 import _ from 'lodash';
 import { MutableRefObject, useCallback } from 'react';
-import { canvasSelector, isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import {
   // addPointToCurrentEraserLine,
   addPointToCurrentLine,

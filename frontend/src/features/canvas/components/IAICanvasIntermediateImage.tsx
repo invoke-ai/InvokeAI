@@ -43,7 +43,7 @@ const IAICanvasIntermediateImage = (props: Props) => {
   const {
     boundingBox: { x, y, width, height },
   } = intermediateImage;
-  
+
   return loadedImageElement ? (
     <KonvaImage
       x={x}
