@@ -42,6 +42,7 @@ from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
 from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.generator.inpaint import Infill
 
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -265,8 +266,6 @@ class Generate:
         ), 'call to img2img() must include the init_img argument'
         return self.prompt2png(prompt, outdir, **kwargs)
 
-    from ldm.invoke.generator.inpaint import infill_methods
-
     def prompt2image(
             self,
             # these are common
@@ -327,7 +326,7 @@ class Generate:
             seam_strength: float = 0.7,
             seam_steps: int  = 10,
             tile_size: int   = 32,
-            infill_method = infill_methods[0], # The infill method to use
+            infill_method = None,
             force_outpaint: bool = False,
             enable_image_debugging = False,
 
@@ -393,6 +392,7 @@ class Generate:
         self.log_tokenization = log_tokenization
         self.step_callback = step_callback
         self.karras_max = karras_max
+        self.infill_method = Infill().infill_methods()[0], # The infill method to use
         with_variations = [] if with_variations is None else with_variations
 
         # will instantiate the model or return it from cache
