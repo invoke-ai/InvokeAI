@@ -1,6 +1,5 @@
 # pip will resolve the version which matches torch
 albumentations
-dependency_injector==4.40.0
 diffusers==0.10.*
 einops
 eventlet
