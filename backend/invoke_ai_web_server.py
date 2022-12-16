@@ -81,7 +81,13 @@ class InvokeAIWebServer:
         }
 
         if opt.cors:
-            socketio_args["cors_allowed_origins"] = opt.cors
+            _cors = opt.cors
+            if hasattr(_cors, "__len__"):
+                _cors = "".join(_cors)
+            if "," in _cors:
+                _cors = _cors.split(",")
+            print(f"CORS is {_cors}")
+            socketio_args["cors_allowed_origins"] = _cors
 
         frontend_path = self.find_frontend()
         self.app = Flask(
