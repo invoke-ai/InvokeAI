@@ -231,7 +231,7 @@ def _get_embeddings_and_tokens_for_prompt(model, flattened_prompt: FlattenedProm
 
 def _get_tokens_length(model, fragments: list[Fragment]):
     fragment_texts = [x.text for x in fragments]
-    tokens = model.cond_stage_model.get_tokens(fragment_texts, include_start_and_end_markers=False)
+    tokens = model.cond_stage_model.get_token_ids(fragment_texts, include_start_and_end_markers=False)
     return sum([len(x) for x in tokens])
 
 

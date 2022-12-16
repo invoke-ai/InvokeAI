@@ -9,6 +9,7 @@ from transformers import CLIPTokenizer, CLIPTextModel
 import kornia
 from ldm.invoke.devices import choose_torch_device
 from ldm.invoke.globals import Globals
+#from ldm.modules.textual_inversion_manager import TextualInversionManager
 
 from ldm.modules.x_transformer import (
     Encoder,
@@ -465,7 +466,12 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
     fragment_weights_key = "fragment_weights"
     return_tokens_key = "return_tokens"
 
+    def set_textual_inversion_manager(self, manager): #TextualInversionManager):
+        # TODO all of the weighting and expanding stuff needs be moved out of this class
+        self.textual_inversion_manager = manager
+
     def forward(self, text: list, **kwargs):
+        # TODO all of the weighting and expanding stuff needs be moved out of this class
         '''
 
         :param text: A batch of prompt strings, or, a batch of lists of fragments of prompt strings to which different
@@ -560,19 +566,42 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         else:
             return batch_z
 
-    def get_tokens(self, fragments: list[str], include_start_and_end_markers: bool = True) -> list[list[int]]:
-        tokens = self.tokenizer(
+    def get_token_ids(self, fragments: list[str], include_start_and_end_markers: bool = True) -> list[list[int]]:
+        """
+        Convert a list of strings like `["a cat", "sitting", "on a mat"]` into a list of lists of token ids like
+        `[[bos, 0, 1, eos], [bos, 2, eos], [bos, 3, 0, 4, eos]]`. bos/eos markers are skipped if
+        `include_start_and_end_markers` is `False`. Each list will be restricted to the maximum permitted length
+        (typically 75 tokens + eos/bos markers).
+
+        :param fragments: The strings to convert.
+        :param include_start_and_end_markers:
+        :return:
+        """
+        # for args documentation see ENCODE_KWARGS_DOCSTRING in tokenization_utils_base.py (in `transformers` lib)
+        token_ids_list = self.tokenizer(
             fragments,
             truncation=True,
             max_length=self.max_length,
             return_overflowing_tokens=False,
             padding='do_not_pad',
-            return_tensors=None,  # just give me a list of ints
+            return_tensors=None,  # just give me lists of ints
         )['input_ids']
-        if include_start_and_end_markers:
-            return tokens
-        else:
-            return [x[1:-1] for x in tokens]
+
+        result = []
+        for token_ids in token_ids_list:
+            # trim eos/bos
+            token_ids = token_ids[1:-1]
+            # pad for textual inversions with vector length >1
+            token_ids = self.textual_inversion_manager.expand_textual_inversion_token_ids(token_ids)
+            # restrict length to max_length-2 (leaving room for bos/eos)
+            token_ids = token_ids[0:self.max_length - 2]
+            # add back eos/bos if requested
+            if include_start_and_end_markers:
+                token_ids = [self.tokenizer.bos_token_id] + token_ids + [self.tokenizer.eos_token_id]
+
+            result.append(token_ids)
+
+        return result
 
 
     @classmethod
@@ -597,56 +626,60 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         if len(fragments) == 0 and len(weights) == 0:
             fragments = ['']
             weights = [1]
-        item_encodings = self.tokenizer(
-            fragments,
-            truncation=True,
-            max_length=self.max_length,
-            return_overflowing_tokens=True,
-            padding='do_not_pad',
-            return_tensors=None,  # just give me a list of ints
-        )['input_ids']
-        all_tokens = []
+        per_fragment_token_ids = self.get_token_ids(fragments, include_start_and_end_markers=False)
+        all_token_ids = []
         per_token_weights = []
         #print("all fragments:", fragments, weights)
-        for index, fragment in enumerate(item_encodings):
-            weight = weights[index]
+        for index, fragment in enumerate(per_fragment_token_ids):
+            weight = float(weights[index])
             #print("processing fragment", fragment, weight)
-            fragment_tokens = item_encodings[index]
-            #print("fragment", fragment, "processed to", fragment_tokens)
-            # trim bos and eos markers before appending
-            all_tokens.extend(fragment_tokens[1:-1])
-            per_token_weights.extend([weight] * (len(fragment_tokens) - 2))
+            this_fragment_token_ids = per_fragment_token_ids[index]
+            #print("fragment", fragment, "processed to", this_fragment_token_ids)
+            # append
+            all_token_ids += this_fragment_token_ids
+            # fill out weights tensor with one float per token
+            per_token_weights += [weight] * len(this_fragment_token_ids)
 
-        if (len(all_tokens) + 2) > self.max_length:
-            excess_token_count = (len(all_tokens) + 2) - self.max_length
+        # leave room for bos/eos
+        if len(all_token_ids) > self.max_length - 2:
+            excess_token_count = len(all_token_ids) - self.max_length - 2
+            # TODO build nice description string of how the truncation was applied
+            # this should be done by calling self.tokenizer.convert_ids_to_tokens() then passing the result to
+            # self.tokenizer.convert_tokens_to_string() for the token_ids on each side of the truncation limit.
             print(f">> Prompt is {excess_token_count} token(s) too long and has been truncated")
-            all_tokens = all_tokens[:self.max_length - 2]
-            per_token_weights = per_token_weights[:self.max_length - 2]
+            all_token_ids = all_token_ids[0:self.max_length]
+            per_token_weights = per_token_weights[0:self.max_length]
 
         # pad out to a 77-entry array: [eos_token, <prompt tokens>, eos_token, ..., eos_token]
         # (77 = self.max_length)
-        pad_length = self.max_length - 1 - len(all_tokens)
-        all_tokens.insert(0, self.tokenizer.bos_token_id)
-        all_tokens.extend([self.tokenizer.eos_token_id] * pad_length)
-        per_token_weights.insert(0, 1)
-        per_token_weights.extend([1] * pad_length)
+        all_token_ids = [self.tokenizer.bos_token_id] + all_token_ids + [self.tokenizer.eos_token_id]
+        per_token_weights = [1.0] + per_token_weights + [1.0]
+        pad_length = self.max_length - len(all_token_ids)
+        all_token_ids += [self.tokenizer.eos_token_id] * pad_length
+        per_token_weights += [1.0] * pad_length
 
-        all_tokens_tensor = torch.tensor(all_tokens, dtype=torch.long).to(self.device)
+        all_token_ids_tensor = torch.tensor(all_token_ids, dtype=torch.long).to(self.device)
         per_token_weights_tensor = torch.tensor(per_token_weights, dtype=torch.float32).to(self.device)
-        #print(f"assembled all_tokens_tensor with shape {all_tokens_tensor.shape}")
-        return all_tokens_tensor, per_token_weights_tensor
+        #print(f"assembled all_token_ids_tensor with shape {all_token_ids_tensor.shape}")
+        return all_token_ids_tensor, per_token_weights_tensor
 
-    def build_weighted_embedding_tensor(self, tokens: torch.Tensor, per_token_weights: torch.Tensor, weight_delta_from_empty=True, **kwargs) -> torch.Tensor:
+    def build_weighted_embedding_tensor(self, token_ids: torch.Tensor, per_token_weights: torch.Tensor, weight_delta_from_empty=True, **kwargs) -> torch.Tensor:
         '''
         Build a tensor representing the passed-in tokens, each of which has a weight.
-        :param tokens: A tensor of shape (77) containing token ids (integers)
+        :param token_ids: A tensor of shape (77) containing token ids (integers)
         :param per_token_weights: A tensor of shape (77) containing weights (floats)
         :param method: Whether to multiply the whole feature vector for each token or just its distance from an "empty" feature vector
         :param kwargs: passed on to self.transformer()
         :return: A tensor of shape (1, 77, 768) representing the requested weighted embeddings.
         '''
         #print(f"building weighted embedding tensor for {tokens} with weights {per_token_weights}")
-        z = self.transformer(input_ids=tokens.unsqueeze(0), **kwargs)
+        if token_ids.shape[0] != self.max_length:
+            raise ValueError(f"token_ids has shape {token_ids.shape} - expected [{self.max_length}]")
+        z = self.transformer(input_ids=token_ids.unsqueeze(0), **kwargs)
+        assert(z.shape[0] == 1)
+        new_z0 = self.textual_inversion_manager.overwrite_textual_inversion_embeddings(token_ids, z[0])
+        z[0] = new_z0
+
         batch_weights_expanded = per_token_weights.reshape(per_token_weights.shape + (1,)).expand(z.shape)
 
         if weight_delta_from_empty:
@@ -660,7 +693,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
             z_delta_from_empty = z - empty_z
             weighted_z = empty_z + (z_delta_from_empty * batch_weights_expanded)
 
-            weighted_z_delta_from_empty = (weighted_z-empty_z)
+            #weighted_z_delta_from_empty = (weighted_z-empty_z)
             #print("weighted z has delta from empty with sum", weighted_z_delta_from_empty.sum().item(), "mean", weighted_z_delta_from_empty.mean().item() )
 
             #print("using empty-delta method, first 5 rows:")

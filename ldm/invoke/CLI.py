@@ -16,7 +16,7 @@ from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_f
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
-from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
@@ -133,6 +133,10 @@ def main():
         main_loop(gen, opt)
     except KeyboardInterrupt:
         print("\ngoodbye!")
+    except Exception:
+        print(">> An error occurred:")
+        traceback.print_exc()
+
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt):
@@ -310,7 +314,7 @@ def main_loop(gen, opt):
                     if use_prefix is not None:
                         prefix = use_prefix
                     postprocessed = upscaled if upscaled else operation=='postprocess'
-                    opt.prompt = gen.concept_lib().replace_triggers_with_concepts(opt.prompt or prompt_in)  # to avoid the problem of non-unique concept triggers
+                    opt.prompt = gen.huggingface_concepts_library.replace_triggers_with_concepts(opt.prompt or prompt_in)  # to avoid the problem of non-unique concept triggers
                     filename, formatted_dream_prompt = prepare_image_metadata(
                         opt,
                         prefix,
@@ -809,7 +813,8 @@ def add_embedding_terms(gen,completer):
     Called after setting the model, updates the autocompleter with
     any terms loaded by the embedding manager.
     '''
-    completer.add_embedding_terms(gen.model.embedding_manager.list_terms())
+    trigger_strings = gen.model.textual_inversion_manager.get_all_trigger_strings()
+    completer.add_embedding_terms(trigger_strings)
 
 def split_variations(variations_string) -> list:
     # shotgun parsing, woo

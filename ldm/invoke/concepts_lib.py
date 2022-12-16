@@ -12,7 +12,7 @@ from urllib import request, error as ul_error
 from huggingface_hub import HfFolder, hf_hub_url, ModelSearchArguments, ModelFilter, HfApi
 from ldm.invoke.globals import Globals
 
-class Concepts(object):
+class HuggingFaceConceptsLibrary(object):
     def __init__(self, root=None):
         '''
         Initialize the Concepts object. May optionally pass a root directory.
@@ -116,11 +116,11 @@ class Concepts(object):
             self.download_concept(concept_name)
         path = os.path.join(self._concept_path(concept_name), file_name)
         return path if os.path.exists(path) else None
-        
+
     def concept_is_downloaded(self, concept_name)->bool:
         concept_directory = self._concept_path(concept_name)
         return os.path.exists(concept_directory)
-        
+
     def download_concept(self,concept_name)->bool:
         repo_id = self._concept_id(concept_name)
         dest = self._concept_path(concept_name)
@@ -133,7 +133,7 @@ class Concepts(object):
 
         os.makedirs(dest, exist_ok=True)
         succeeded = True
-        
+
         bytes = 0
         def tally_download_size(chunk, size, total):
             nonlocal bytes
