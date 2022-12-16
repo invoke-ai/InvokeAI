@@ -1,15 +1,15 @@
 name: Build and push cloud image
 on:
   workflow_dispatch:
-  push:
-    branches:
-    - main
-    tags:
-      - v*
-  # we will NOT push the image on pull requests, only test buildability.
-  pull_request:
-    branches:
-    - main
+  # push:
+  #   branches:
+  #   - main
+  #   tags:
+  #     - v*
+  # # we will NOT push the image on pull requests, only test buildability.
+  # pull_request:
+  #   branches:
+  #   - main
 
 permissions:
   contents: read
@@ -82,6 +82,6 @@ jobs:
         file: docker-build/Dockerfile.cloud
         platforms: Linux/${{ matrix.arch }}
         # do not push the image on PRs
-        push: ${{ github.event_name != 'pull_request' }}
+        push: false
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
