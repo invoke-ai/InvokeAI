@@ -562,7 +562,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
         """
-        return self.clip_embedder.encode(c, return_tokens=return_tokens, fragment_weights=fragment_weights)
+        return self.clip_embedder.encode(c, return_tokens=return_tokens, fragment_weights=fragment_weights, embedding_manager=self.embedding_manager)
 
     @property
     def cond_stage_model(self):
