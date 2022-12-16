@@ -98,6 +98,10 @@ import ldm.invoke.pngwriter
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 
+APP_ID = ldm.invoke.__app_id__
+APP_NAME = ldm.invoke.__app_name__
+APP_VERSION = ldm.invoke.__version__
+
 SAMPLER_CHOICES = [
     'ddim',
     'k_dpm_2_a',
