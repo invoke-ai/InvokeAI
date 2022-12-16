@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { useColorMode, VStack } from '@chakra-ui/react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { setCurrentTheme } from 'features/options/store/optionsSlice';
 import IAIPopover from 'common/components/IAIPopover';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -9,14 +11,21 @@ import IAIButton from 'common/components/IAIButton';
 const THEMES = ['dark', 'light', 'green'];
 
 export default function ThemeChanger() {
-  const { setColorMode } = useColorMode();
+  const { setColorMode, colorMode } = useColorMode();
   const dispatch = useAppDispatch();
   const currentTheme = useAppSelector(
     (state: RootState) => state.options.currentTheme
   );
 
+  useEffect(() => {
+    // syncs the redux store theme to the chakra's theme on startup and when
+    // setCurrentTheme is dispatched
+    if (colorMode !== currentTheme) {
+      setColorMode(currentTheme);
+    }
+  }, [setColorMode, colorMode, currentTheme]);
+
   const handleChangeTheme = (theme: string) => {
-    setColorMode(theme);
     dispatch(setCurrentTheme(theme));
   };
 

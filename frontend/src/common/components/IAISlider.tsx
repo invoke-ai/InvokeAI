@@ -124,8 +124,8 @@ export default function IAISlider(props: IAIFullSliderProps) {
     onChange(clamped);
   };
 
-  const handleInputChange = (v: any) => {
-    setLocalInputValue(v);
+  const handleInputChange = (v: number | string) => {
+    setLocalInputValue(String(v));
     onChange(Number(v));
   };
 

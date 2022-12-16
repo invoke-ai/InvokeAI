@@ -10,7 +10,7 @@ InvokeAI is released, you will download and reinstall the new version.
 If you wish to tinker with unreleased versions of InvokeAI that introduce
 potentially unstable new features, you should consider using the
 [source installer](INSTALL_SOURCE.md) or one of the
-[manual install](INSTALL_MANUAL.md) methods.
+[manual install](../020_INSTALL_MANUAL.md) methods.
 
 **Important Caveats**
   - This script does not support AMD GPUs. For Linux AMD support,

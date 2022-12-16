@@ -17,16 +17,16 @@ import {
   modelChangeRequested,
   setIsProcessing,
 } from 'features/system/store/systemSlice';
-import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName } from 'features/tabs/tabMap';
 import * as InvokeAI from 'app/invokeai';
-import { RootState } from 'app/store';
+import type { RootState } from 'app/store';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
  * i.e. those which make server requests.
  */
 const makeSocketIOEmitters = (
-  store: MiddlewareAPI<Dispatch<AnyAction>, any>,
+  store: MiddlewareAPI<Dispatch<AnyAction>, RootState>,
   socketio: Socket
 ) => {
   // We need to dispatch actions to redux and get pieces of state from the store.
@@ -114,7 +114,7 @@ const makeSocketIOEmitters = (
       const options: OptionsState = getState().options;
       const { facetoolType, facetoolStrength, codeformerFidelity } = options;
 
-      const facetoolParameters: Record<string, any> = {
+      const facetoolParameters: Record<string, unknown> = {
         facetool_strength: facetoolStrength,
       };
 

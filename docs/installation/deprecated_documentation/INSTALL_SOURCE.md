@@ -12,7 +12,7 @@ of Linux, MacOS or Windows. It will leave you with a version that runs a stable
 version of InvokeAI with the option to upgrade to experimental versions later.
 
 Before you begin, make sure that you meet the
-[hardware requirements](index.md#Hardware_Requirements) and has the appropriate
+[hardware requirements](../../index.md#hardware-requirements) and has the appropriate
 GPU drivers installed. In particular, if you are a Linux user with an AMD GPU
 installed, you may need to install the
 [ROCm driver](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html).
@@ -50,15 +50,15 @@ off the process.
     inflating: invokeAI\readme.txt
     ```
 
-3. If you are a macOS user, you may need to install the Xcode command line tools. 
-   These are a set of tools that are needed to run certain applications in a Terminal, 
+3. If you are a macOS user, you may need to install the Xcode command line tools.
+   These are a set of tools that are needed to run certain applications in a Terminal,
    including InvokeAI. This package is provided directly by Apple.
-   
+
    To install, open a terminal window and run `xcode-select --install`. You will get
    a macOS system popup guiding you through the install. If you already have them
-   installed, you will instead see some output in the Terminal advising you that the 
+   installed, you will instead see some output in the Terminal advising you that the
    tools are already installed.
-   
+
    More information can be found here:
    https://www.freecodecamp.org/news/install-xcode-command-line-tools/
 
@@ -100,7 +100,7 @@ off the process.
     If you have already downloaded the weights file(s) for another Stable
     Diffusion distribution, you may skip this step (by selecting "skip" when
     prompted) and configure InvokeAI to use the previously-downloaded files. The
-    process for this is described in [Installing Models](INSTALLING_MODELS.md).
+    process for this is described in [Installing Models](../050_INSTALLING_MODELS.md).
 
 8.  The script will now exit and you'll be ready to generate some images. The
     invokeAI directory will contain numerous files. Look for a shell script
@@ -128,7 +128,7 @@ python scripts/invoke.py --web --max_load_models=3 \
 ```
 
 These options are described in detail in the
-[Command-Line Interface](../features/CLI.md) documentation.
+[Command-Line Interface](../../features/CLI.md) documentation.
 
 ## Troubleshooting
 

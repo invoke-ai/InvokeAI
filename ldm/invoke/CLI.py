@@ -45,9 +45,16 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
-    # alert - setting globals here
+    # alert - setting a global here
     Globals.try_patchmatch = args.patchmatch
     Globals.always_use_cpu = args.always_use_cpu
+
+    if not args.conf:
+        if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
+            print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
+            print(f'** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
+            print(f'** This script will now exit.')
+            sys.exit(-1)
 
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 

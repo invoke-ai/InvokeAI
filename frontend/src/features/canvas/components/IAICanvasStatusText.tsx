@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import _ from 'lodash';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';

@@ -78,7 +78,7 @@ def postscript(errors: None):
 You're all set!
 
 If you installed using one of the automated installation scripts,
-execute 'invoke.sh' (Linux/macOS) or 'invoke.bat' (Windows) to 
+execute 'invoke.sh' (Linux/macOS) or 'invoke.bat' (Windows) to
 start InvokeAI.
 
 If you installed manually, activate the 'invokeai' environment
@@ -120,7 +120,7 @@ def user_wants_to_download_weights()->str:
     print('''You can download and configure the weights files manually or let this
 script do it for you. Manual installation is described at:
 
-https://github.com/invoke-ai/InvokeAI/blob/main/docs/installation/INSTALLING_MODELS.md
+https://invoke-ai.github.io/InvokeAI/installation/020_INSTALL_MANUAL/
 
 You may download the recommended models (about 10GB total), select a customized set, or
 completely skip this step.

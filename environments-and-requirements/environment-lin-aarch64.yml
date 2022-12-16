@@ -30,7 +30,6 @@ dependencies:
   - torchvision
   - transformers~=4.25
   - pip:
-      - dependency_injector==4.40.0
       - getpass_asterisk
       - omegaconf==2.1.1
       - picklescan
@@ -42,5 +41,5 @@ dependencies:
       - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
       - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
       - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.2#egg=gfpgan
-      - git+https://github.com/invoke-ai/PyPatchMatch@0.1.4#egg=pypatchmatch
+      - git+https://github.com/invoke-ai/PyPatchMatch@0.1.5#egg=pypatchmatch
       - -e .

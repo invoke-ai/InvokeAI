@@ -1,7 +1,7 @@
 import { Progress } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import { SystemState } from 'features/system/store/systemSlice';
 

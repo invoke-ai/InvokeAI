@@ -25,15 +25,14 @@ set PYTHON_URL=https://www.python.org/downloads/release/python-3109/
 set err_msg=An error has occurred and the script could not continue.
 
 @rem --------------------------- Intro -------------------------------
-echo This script will install InvokeAI and its dependencies. Before you start,
-echo please make sure to do the following:
+echo This script will install InvokeAI and its dependencies.
+echo.
+echo BEFORE YOU START PLEASE MAKE SURE TO DO THE FOLLOWING
 echo 1. Install python 3.9 or higher.
 echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
 echo    enable long path support on your system.
-echo 3. Some users have found they need to install the Visual C++ core
-echo    libraries or else they experience DLL loading problems at the end of the install.
-echo    Visual C++ is very likely already installed on your system, but if you get DLL
-echo    issues, please download and install the libraries by going to:
+echo 3. Install the Visual C++ core libraries.
+echo    Pleaase download and install the libraries from:
 echo    https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
 echo.
 echo See %INSTRUCTIONS% for more details.

@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import IAISlider from 'common/components/IAISlider';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';

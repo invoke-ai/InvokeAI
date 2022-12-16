@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaRedo } from 'react-icons/fa';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';

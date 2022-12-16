@@ -1,7 +1,7 @@
 import InvokeButton from './InvokeButton';
 import CancelButton from './CancelButton';
 import LoopbackButton from './Loopback';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 
 /**

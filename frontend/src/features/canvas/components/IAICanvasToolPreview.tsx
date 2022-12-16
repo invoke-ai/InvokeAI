@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { GroupConfig } from 'konva/lib/Group';
 import _ from 'lodash';
 import { Circle, Group } from 'react-konva';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import {

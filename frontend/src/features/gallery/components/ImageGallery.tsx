@@ -12,7 +12,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { requestImages } from 'app/socketio/actions';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   selectNextImage,
@@ -41,7 +41,7 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
 import IAIButton from 'common/components/IAIButton';
-import { InvokeTabName } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName } from 'features/tabs/tabMap';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 const GALLERY_IMAGE_WIDTH_OFFSET = 40;
@@ -55,6 +55,7 @@ const GALLERY_TAB_WIDTHS: Record<
   unifiedCanvas: { galleryMinWidth: 200, galleryMaxWidth: 200 },
   nodes: { galleryMinWidth: 200, galleryMaxWidth: 500 },
   postprocess: { galleryMinWidth: 200, galleryMaxWidth: 500 },
+  training: { galleryMinWidth: 200, galleryMaxWidth: 500 },
 };
 
 const LIGHTBOX_GALLERY_WIDTH = 400;

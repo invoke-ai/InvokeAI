@@ -6,9 +6,7 @@ import createCache from '@emotion/cache';
 import { store } from './app/store';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { persistStore } from 'redux-persist';
-
-export const persistor = persistStore(store);
+import { persistor } from './persistor';
 
 import Loading from './Loading';
 import App from './app/App';

@@ -4,7 +4,7 @@ import * as InvokeAI from 'app/invokeai';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { FACETOOL_TYPES } from 'app/constants';
-import { InvokeTabName, tabMap } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName, tabMap } from 'features/tabs/tabMap';
 
 export type UpscalingLevel = 2 | 4;
 

@@ -1,7 +1,8 @@
 import { Button } from '@chakra-ui/react';
 import React from 'react';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import randomInt from 'common/util/randomInt';
 import { setSeed } from 'features/options/store/optionsSlice';
 

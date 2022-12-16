@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { ImageConfig } from 'konva/lib/shapes/Image';
 import _ from 'lodash';
@@ -42,7 +43,7 @@ const IAICanvasIntermediateImage = (props: Props) => {
   const {
     boundingBox: { x, y, width, height },
   } = intermediateImage;
-  
+
   return loadedImageElement ? (
     <KonvaImage
       x={x}

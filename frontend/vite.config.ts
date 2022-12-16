@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => {
        * We need to polyfill for Array.prototype.findLast(); the polyfill plugin above
        * overrides any target specified here.
        */
-      // target: 'esnext', 
+      // target: 'esnext',
       chunkSizeWarningLimit: 1500, // we don't really care about chunk size
     },
   };
