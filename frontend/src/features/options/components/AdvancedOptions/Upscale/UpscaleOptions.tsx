@@ -60,7 +60,7 @@ const UpscaleOptions = () => {
   const handleChangeStrength = (v: number) => dispatch(setUpscalingStrength(v));
 
   return (
-    <div className='upscale-options'>
+    <div className="upscale-options">
       <IAISelect
         isDisabled={!isESRGANAvailable}
         label="Scale"
