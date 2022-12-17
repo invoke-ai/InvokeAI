@@ -290,7 +290,7 @@ You may re-run the configuration script again in the future if you do not wish t
 
     elif access_token is None:
         print()
-        print("HuggingFace login did not succeed. Some functionality may be limited; see https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/ for more information")
+        print("HuggingFace login did not succeed. Some functionality may be limited; see https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept for more information")
         print()
         print(f"Re-run the configuration script without '--yes' to set the HuggingFace token interactively, or use one of the environment variables: {', '.join(hf_envvars)}")
 
