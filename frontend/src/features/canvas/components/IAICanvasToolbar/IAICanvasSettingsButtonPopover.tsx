@@ -21,6 +21,7 @@ import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFold
 import ClearCanvasHistoryButtonModal from '../ClearCanvasHistoryButtonModal';
 import { ChangeEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],
@@ -56,6 +57,8 @@ export const canvasControlsSelector = createSelector(
 
 const IAICanvasSettingsButtonPopover = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
   const {
     shouldAutoSave,
     shouldCropToBoundingBoxOnSave,
@@ -87,58 +90,58 @@ const IAICanvasSettingsButtonPopover = () => {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          tooltip="Canvas Settings"
-          aria-label="Canvas Settings"
+          tooltip={t('unifiedcanvas:canvasSettings')}
+          aria-label={t('unifiedcanvas:canvasSettings')}
           icon={<FaWrench />}
         />
       }
     >
       <Flex direction={'column'} gap={'0.5rem'}>
         <IAICheckbox
-          label="Show Intermediates"
+          label={t('unifiedcanvas:showIntermediates')}
           isChecked={shouldShowIntermediates}
           onChange={(e) =>
             dispatch(setShouldShowIntermediates(e.target.checked))
           }
         />
         <IAICheckbox
-          label="Show Grid"
+          label={t('unifiedcanvas:showGrid')}
           isChecked={shouldShowGrid}
           onChange={(e) => dispatch(setShouldShowGrid(e.target.checked))}
         />
         <IAICheckbox
-          label="Snap to Grid"
+          label={t('unifiedcanvas:snapToGrid')}
           isChecked={shouldSnapToGrid}
           onChange={handleChangeShouldSnapToGrid}
         />
         <IAICheckbox
-          label="Darken Outside Selection"
+          label={t('unifiedcanvas:darkenOutsideSelection')}
           isChecked={shouldDarkenOutsideBoundingBox}
           onChange={(e) =>
             dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked))
           }
         />
         <IAICheckbox
-          label="Auto Save to Gallery"
+          label={t('unifiedcanvas:autoSaveToGallery')}
           isChecked={shouldAutoSave}
           onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
         />
         <IAICheckbox
-          label="Save Box Region Only"
+          label={t('unifiedcanvas:saveBoxRegionOnly')}
           isChecked={shouldCropToBoundingBoxOnSave}
           onChange={(e) =>
             dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
           }
         />
         <IAICheckbox
-          label="Limit Strokes to Box"
+          label={t('unifiedcanvas:limitStrokesToBox')}
           isChecked={shouldRestrictStrokesToBox}
           onChange={(e) =>
             dispatch(setShouldRestrictStrokesToBox(e.target.checked))
           }
         />
         <IAICheckbox
-          label="Show Canvas Debug Info"
+          label={t('unifiedcanvas:showCanvasDebugInfo')}
           isChecked={shouldShowCanvasDebugInfo}
           onChange={(e) =>
             dispatch(setShouldShowCanvasDebugInfo(e.target.checked))
