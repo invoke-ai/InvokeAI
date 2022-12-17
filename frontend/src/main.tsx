@@ -28,7 +28,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       <PersistGate loading={<Loading />} persistor={persistor}>
         <CacheProvider value={emotionCache}>
           <ChakraProvider>
-            <React.Suspense fallback={'Loading...'}>
+            <React.Suspense fallback={<Loading />}>
               <App />
             </React.Suspense>
           </ChakraProvider>
