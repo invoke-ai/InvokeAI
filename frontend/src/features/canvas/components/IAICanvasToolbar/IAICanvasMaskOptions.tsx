@@ -120,7 +120,7 @@ const IAICanvasMaskOptions = () => {
         </ButtonGroup>
       }
     >
-      <Flex direction={'column'} gap={'0.5rem'}>
+      <Flex direction="column" gap="0.5rem">
         <IAICheckbox
           label={`${t('unifiedcanvas:enableMask')} (H)`}
           isChecked={isMaskEnabled}
@@ -138,7 +138,7 @@ const IAICanvasMaskOptions = () => {
           color={maskColor}
           onChange={(newColor) => dispatch(setMaskColor(newColor))}
         />
-        <IAIButton size={'sm'} leftIcon={<FaTrash />} onClick={handleClearMask}>
+        <IAIButton size="sm" leftIcon={<FaTrash />} onClick={handleClearMask}>
           {t('unifiedcanvas:clearMask')} (Shift+C)
         </IAIButton>
       </Flex>

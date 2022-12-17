@@ -20,10 +20,10 @@ const HiresOptions = () => {
     dispatch(setHiresFix(e.target.checked));
 
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <IAISwitch
         label={t('options:hiresOptim')}
-        fontSize={'md'}
+        fontSize="md"
         isChecked={hiresFix}
         onChange={handleChangeHiresFix}
       />

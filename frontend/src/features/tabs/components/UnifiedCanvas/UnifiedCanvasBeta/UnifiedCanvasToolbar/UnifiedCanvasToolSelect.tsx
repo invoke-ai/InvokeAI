@@ -112,7 +112,7 @@ const UnifiedCanvasToolSelect = () => {
   const handleEraseBoundingBox = () => dispatch(addEraseRect());
 
   return (
-    <Flex flexDirection={'column'} gap={'0.5rem'}>
+    <Flex flexDirection="column" gap="0.5rem">
       <ButtonGroup>
         <IAIIconButton
           aria-label={`${t('unifiedcanvas:brush')} (B)`}
@@ -154,7 +154,7 @@ const UnifiedCanvasToolSelect = () => {
         data-selected={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectColorPickerTool}
-        width={'max-content'}
+        width="max-content"
       />
     </Flex>
   );

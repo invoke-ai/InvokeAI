@@ -28,6 +28,7 @@ export default function IAIInput(props: IAIInputProps) {
       isInvalid={isInvalid}
       isDisabled={isDisabled}
     >
+<<<<<<< HEAD
       {label !== '' && (
         <FormLabel
           fontSize={fontSize}
@@ -42,6 +43,20 @@ export default function IAIInput(props: IAIInputProps) {
         </FormLabel>
       )}
       <Input {...rest} className="input-entry" size={size} width={width} />
+=======
+      <FormLabel
+        fontSize={fontSize}
+        fontWeight="bold"
+        alignItems="center"
+        whiteSpace="nowrap"
+        marginBottom={0}
+        marginRight={0}
+        className="input-label"
+      >
+        {label}
+      </FormLabel>
+      <Input {...rest} className="input-entry" size="sm" width={width} />
+>>>>>>> 524e7e6 ([WebUI] Even off JSX string props)
     </FormControl>
   );
 }

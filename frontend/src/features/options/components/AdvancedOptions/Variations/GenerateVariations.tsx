@@ -18,7 +18,7 @@ export default function GenerateVariationsToggle() {
   return (
     <IAISwitch
       isChecked={shouldGenerateVariations}
-      width={'auto'}
+      width="auto"
       onChange={handleChangeShouldGenerateVariations}
     />
   );

@@ -92,7 +92,7 @@ export default function UnifiedCanvasColorPicker() {
         />
       }
     >
-      <Flex minWidth={'15rem'} direction={'column'} gap={'1rem'} width={'100%'}>
+      <Flex minWidth="15rem" direction="column" gap="1rem" width="100%">
         {layer === 'base' && (
           <IAIColorPicker
             style={{

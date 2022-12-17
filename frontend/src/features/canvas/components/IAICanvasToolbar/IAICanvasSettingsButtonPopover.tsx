@@ -96,7 +96,7 @@ const IAICanvasSettingsButtonPopover = () => {
         />
       }
     >
-      <Flex direction={'column'} gap={'0.5rem'}>
+      <Flex direction="column" gap="0.5rem">
         <IAICheckbox
           label={t('unifiedcanvas:showIntermediates')}
           isChecked={shouldShowIntermediates}

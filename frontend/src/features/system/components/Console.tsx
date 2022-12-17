@@ -109,7 +109,7 @@ const Console = () => {
             bottom: 0,
             zIndex: 9999,
           }}
-          maxHeight={'90vh'}
+          maxHeight="90vh"
         >
           <div className="console" ref={viewerRef} onScroll={handleOnScroll}>
             {log.map((entry, i) => {
@@ -130,11 +130,11 @@ const Console = () => {
           label={shouldAutoscroll ? 'Autoscroll On' : 'Autoscroll Off'}
         >
           <IconButton
-            className={'console-autoscroll-icon-button'}
+            className="console-autoscroll-icon-button"
             data-autoscroll-enabled={shouldAutoscroll}
             size="sm"
             aria-label="Toggle autoscroll"
-            variant={'solid'}
+            variant="solid"
             icon={<FaAngleDoubleDown />}
             onClick={() => setShouldAutoscroll(!shouldAutoscroll)}
           />
@@ -145,11 +145,11 @@ const Console = () => {
         label={shouldShowLogViewer ? 'Hide Console' : 'Show Console'}
       >
         <IconButton
-          className={'console-toggle-icon-button'}
+          className="console-toggle-icon-button"
           data-error-seen={hasError || !wasErrorSeen}
           size="sm"
-          position={'fixed'}
-          variant={'solid'}
+          position="fixed"
+          variant="solid"
           aria-label="Toggle Log Viewer"
           icon={shouldShowLogViewer ? <FaMinus /> : <FaCode />}
           onClick={handleClickLogViewerToggle}

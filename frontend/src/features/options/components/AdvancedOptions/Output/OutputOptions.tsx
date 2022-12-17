@@ -4,7 +4,7 @@ import SeamlessOptions from './SeamlessOptions';
 
 const OutputOptions = () => {
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <SeamlessOptions />
       <HiresOptions />
     </Flex>

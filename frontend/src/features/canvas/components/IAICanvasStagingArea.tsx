@@ -66,7 +66,7 @@ const IAICanvasStagingArea = (props: Props) => {
             width={width}
             height={height}
             strokeWidth={1}
-            stroke={'white'}
+            stroke="white"
             strokeScaleEnabled={false}
           />
           <Rect
@@ -76,7 +76,7 @@ const IAICanvasStagingArea = (props: Props) => {
             height={height}
             dash={[4, 4]}
             strokeWidth={1}
-            stroke={'black'}
+            stroke="black"
             strokeScaleEnabled={false}
           />
         </Group>
