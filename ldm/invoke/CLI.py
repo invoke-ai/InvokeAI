@@ -110,7 +110,7 @@ def main():
             max_loaded_models=opt.max_loaded_models,
             )
     except (FileNotFoundError, TypeError, AssertionError):
-        emergency_model_reconfigure()
+        emergency_model_reconfigure(opt)
         sys.exit(-1)
     except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
@@ -123,7 +123,7 @@ def main():
     try:
         gen.load_model()
     except AssertionError:
-        emergency_model_reconfigure()
+        emergency_model_reconfigure(opt)
         sys.exit(-1)
 
     # web server loops forever
@@ -939,7 +939,7 @@ def write_commands(opt, file_path:str, outfilepath:str):
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
 
-def emergency_model_reconfigure():
+def emergency_model_reconfigure(opt):
     print()
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('   You appear to have a missing or misconfigured model file(s).                   ')
@@ -948,11 +948,12 @@ def emergency_model_reconfigure():
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('configure_invokeai is launching....\n')
 
-    sys.argv = [
-        'configure_invokeai',
-        os.environ.get(
-            'INVOKE_MODEL_RECONFIGURE',
-            '--interactive')]
+    # try to match what the user has set on the CLI
+    root_dir = f"--root_dir {opt.root_dir}" if opt.root_dir is not None else None
+    config = f"--config {opt.config}" if opt.config is not None else None
+    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
+
+    sys.argv = [ 'configure_invokeai', root_dir, config, yes_to_all ]
+
     import configure_invokeai
     configure_invokeai.main()
-

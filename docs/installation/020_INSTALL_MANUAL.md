@@ -459,12 +459,12 @@ greatest version, launch the Anaconda window, enter `InvokeAI` and type:
 ```bash
 git pull
 conda env update
-python scripts/configure_invokeai.py --no-interactive  #optional
+python scripts/configure_invokeai.py --skip-sd-weights #optional
 ```
 
 This will bring your local copy into sync with the remote one. The last step may
 be needed to take advantage of new features or released models. The
-`--no-interactive` flag will prevent the script from prompting you to download
+`--skip-sd-weights` flag will prevent the script from prompting you to download
 the big Stable Diffusion weights files.
 
 ## Troubleshooting

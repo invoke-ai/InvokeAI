@@ -735,7 +735,12 @@ def main():
                         dest='interactive',
                         action=argparse.BooleanOptionalAction,
                         default=True,
-                        help='run in interactive mode (default)')
+                        help='run in interactive mode (default) - DEPRECATED')
+    parser.add_argument('--skip-sd-weights',
+                        dest='skip_sd_weights',
+                        action=argparse.BooleanOptionalAction,
+                        default=False,
+                        help='skip downloading the large Stable Diffusion weight files')
     parser.add_argument('--yes','-y',
                         dest='yes_to_all',
                         action='store_true',
@@ -768,7 +773,12 @@ def main():
         # Optimistically try to download all required assets. If any errors occur, add them and proceed anyway.
         errors=set()
 
-        if opt.interactive:
+        if not opt.interactive:
+            print("WARNING: The --(no)-interactive argument is deprecated and will be removed. Use --skip-sd-weights.")
+            opt.skip_sd_weights=True
+        if opt.skip_sd_weights:
+            print('** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **')
+        else:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
             errors.add(download_weights(opt))
         print('\n** DOWNLOADING SUPPORT MODELS **')
