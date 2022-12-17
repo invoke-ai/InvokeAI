@@ -1,0 +1,16 @@
+{
+  "generations": "Generations",
+  "showGenerations": "Show Generations",
+  "uploads": "Uploads",
+  "showUploads": "Show Uploads",
+  "galleryImageSize": "Image Size",
+  "galleryImageResetSize": "Reset Size",
+  "gallerySettings": "Gallery Settings",
+  "maintainAspectRatio": "Maintain Aspect Ratio",
+  "autoSwitchNewImages": "Auto-Switch to New Images",
+  "singleColumnLayout": "Single Column Layout",
+  "pinGallery": "Pin Gallery",
+  "allImagesLoaded": "All Images Loaded",
+  "loadMore": "Load More",
+  "noImagesInGallery": "No Images In Gallery"
+}
