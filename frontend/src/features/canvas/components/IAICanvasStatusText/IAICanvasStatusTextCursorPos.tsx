@@ -4,6 +4,7 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import React from 'react';
 import _ from 'lodash';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
+import { useTranslation } from 'react-i18next';
 
 const cursorPositionSelector = createSelector(
   [canvasSelector],
@@ -29,6 +30,11 @@ const cursorPositionSelector = createSelector(
 
 export default function IAICanvasStatusTextCursorPos() {
   const { cursorCoordinatesString } = useAppSelector(cursorPositionSelector);
+  const { t } = useTranslation();
 
-  return <div>{`Cursor Position: ${cursorCoordinatesString}`}</div>;
+  return (
+    <div>{`${t(
+      'unifiedcanvas:cursorPosition'
+    )}: ${cursorCoordinatesString}`}</div>
+  );
 }
