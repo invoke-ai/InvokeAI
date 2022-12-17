@@ -14,34 +14,37 @@ import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
+import { useTranslation } from 'react-i18next';
 
 export default function ImageToImagePanel() {
+  const { t } = useTranslation();
+
   const imageToImageAccordions = {
     seed: {
-      header: 'Seed',
+      header: `${t('options:seed')}`,
       feature: Feature.SEED,
       content: <SeedOptions />,
     },
     variations: {
-      header: 'Variations',
+      header: `${t('options:variations')}`,
       feature: Feature.VARIATIONS,
       content: <VariationsOptions />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
     },
     face_restore: {
-      header: 'Face Restoration',
+      header: `${t('options:faceRestoration')}`,
       feature: Feature.FACE_CORRECTION,
       content: <FaceRestoreOptions />,
       additionalHeaderComponents: <FaceRestoreToggle />,
     },
     upscale: {
-      header: 'Upscaling',
+      header: `${t('options:upscaling')}`,
       feature: Feature.UPSCALE,
       content: <UpscaleOptions />,
       additionalHeaderComponents: <UpscaleToggle />,
     },
     other: {
-      header: 'Other Options',
+      header: `${t('options:otherOptions')}`,
       feature: Feature.OTHER,
       content: <OutputOptions />,
     },
@@ -53,7 +56,7 @@ export default function ImageToImagePanel() {
       <ProcessButtons />
       <MainOptions />
       <ImageToImageStrength
-        label="Image To Image Strength"
+        label={t('options:img2imgStrength')}
         styleClass="main-option-block image-to-image-strength-main-option"
       />
       <ImageFit />

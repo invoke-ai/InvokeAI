@@ -18,10 +18,15 @@ import StatusIndicator from './StatusIndicator';
 import ThemeChanger from './ThemeChanger';
 import ModelSelect from './ModelSelect';
 
+import { useTranslation } from 'react-i18next';
+import IAISelect from 'common/components/IAISelect';
+
 /**
  * Header, includes color mode toggle, settings button, status message.
  */
 const SiteHeader = () => {
+  const { t, i18n } = useTranslation();
+
   return (
     <div className="site-header">
       <div className="site-header-left-side">
@@ -36,10 +41,16 @@ const SiteHeader = () => {
 
         <ModelSelect />
 
+        <IAISelect
+          validValues={['en', 'ru']}
+          value={localStorage.getItem('i18nextLng') || 'en'}
+          onChange={(e) => i18n.changeLanguage(e.target.value)}
+        />
+
         <HotkeysModal>
           <IAIIconButton
-            aria-label="Hotkeys"
-            tooltip="Hotkeys"
+            aria-label={t('common:hotkeysLabel')}
+            tooltip={t('common:hotkeysLabel')}
             size={'sm'}
             variant="link"
             data-variant="link"
@@ -51,8 +62,8 @@ const SiteHeader = () => {
         <ThemeChanger />
 
         <IAIIconButton
-          aria-label="Report Bug"
-          tooltip="Report Bug"
+          aria-label={t('common:reportBugLabel')}
+          tooltip={t('common:reportBugLabel')}
           variant="link"
           data-variant="link"
           fontSize={20}
@@ -65,8 +76,8 @@ const SiteHeader = () => {
         />
 
         <IAIIconButton
-          aria-label="Link to Github Repo"
-          tooltip="Github"
+          aria-label={t('common:githubLabel')}
+          tooltip={t('common:githubLabel')}
           variant="link"
           data-variant="link"
           fontSize={20}
@@ -79,8 +90,8 @@ const SiteHeader = () => {
         />
 
         <IAIIconButton
-          aria-label="Link to Discord Server"
-          tooltip="Discord"
+          aria-label={t('common:discordLabel')}
+          tooltip={t('common:discordLabel')}
           variant="link"
           data-variant="link"
           fontSize={20}
@@ -94,8 +105,8 @@ const SiteHeader = () => {
 
         <SettingsModal>
           <IAIIconButton
-            aria-label="Settings"
-            tooltip="Settings"
+            aria-label={t('common:settingsLabel')}
+            tooltip={t('common:settingsLabel')}
             variant="link"
             data-variant="link"
             fontSize={20}

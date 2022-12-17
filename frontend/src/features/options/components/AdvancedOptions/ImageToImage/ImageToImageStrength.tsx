@@ -3,6 +3,7 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setImg2imgStrength } from 'features/options/store/optionsSlice';
+import { useTranslation } from 'react-i18next';
 
 interface ImageToImageStrengthProps {
   label?: string;
@@ -10,7 +11,8 @@ interface ImageToImageStrengthProps {
 }
 
 export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
-  const { label = 'Strength', styleClass } = props;
+  const { t } = useTranslation();
+  const { label = `${t('options:strength')}`, styleClass } = props;
   const img2imgStrength = useAppSelector(
     (state: RootState) => state.options.img2imgStrength
   );
