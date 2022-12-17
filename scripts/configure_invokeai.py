@@ -10,13 +10,14 @@ print('Loading Python libraries...\n')
 import argparse
 import sys
 import os
+import io
 import re
 import warnings
 import shutil
 from urllib import request
 from tqdm import tqdm
 from omegaconf import OmegaConf
-from huggingface_hub import HfFolder, hf_hub_url
+from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login
 from pathlib import Path
 from typing import Union
 from getpass_asterisk import getpass_asterisk
@@ -191,61 +192,110 @@ def all_datasets()->dict:
         datasets[ds]=True
     return datasets
 
+#---------------------------------------------
+def HfLogin(access_token) -> str:
+    """
+    Helper for logging in to Huggingface
+    The stdout capture is needed to hide the irrelevant "git credential helper" warning
+    """
+
+    capture = io.StringIO()
+    sys.stdout = capture
+    try:
+        hf_hub_login(token = access_token, add_to_git_credential=False)
+        sys.stdout = sys.__stdout__
+    except Exception as exc:
+        sys.stdout = sys.__stdout__
+        print(exc)
+        raise exc
+
 #-------------------------------Authenticate against Hugging Face
-def authenticate():
+def authenticate(yes_to_all=False):
+    print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
+    print("═" * os.get_terminal_size()[0])
     print('''
-To download the Stable Diffusion weight files from the official Hugging Face
-repository, you need to read and accept the CreativeML Responsible AI license.
+By downloading the Stable Diffusion weight files from the official Hugging Face
+repository, you agree to have read and accepted the CreativeML Responsible AI License.
+The license terms are located here:
 
-This involves a few easy steps.
+   https://huggingface.co/spaces/CompVis/stable-diffusion-license
 
-1. If you have not already done so, create an account on Hugging Face's web site
-   using the "Sign Up" button:
+''')
+    print("═" * os.get_terminal_size()[0])
 
-   https://huggingface.co/join
-
-   You will need to verify your email address as part of the HuggingFace
-   registration process.
-
-2. Log into your Hugging Face account:
-
-    https://huggingface.co/login
-
-3. Accept the license terms located here:
-
-   https://huggingface.co/runwayml/stable-diffusion-v1-5
-
-   and here:
-
-   https://huggingface.co/runwayml/stable-diffusion-inpainting
-
-    (Yes, you have to accept two slightly different license agreements)
-'''
-    )
-    input('Press <enter> when you are ready to continue:')
-    print('(Fetching Hugging Face token from cache...',end='')
-    access_token = HfFolder.get_token()
-    if access_token is not None:
-        print('found')
+    if not yes_to_all:
+        accepted = False
+        while not accepted:
+            accepted = yes_or_no('Accept the above License terms?')
+            if not accepted:
+                print('Please accept the License or Ctrl+C to exit.')
+            else:
+                print('Thank you!')
     else:
-        print('not found')
+        print("The program was started with a '--yes' flag, which indicates user's acceptance of the above License terms.")
+
+    # Authenticate to Huggingface using environment variables.
+    # If successful, authentication will persist for either interactive or non-interactive use.
+    # Default env var expected by HuggingFace is HUGGING_FACE_HUB_TOKEN.
+    print("═" * os.get_terminal_size()[0])
+    print('Authenticating to Huggingface')
+    hf_envvars = [ "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN" ]
+    if not (access_token := HfFolder.get_token()):
+        print(f"Huggingface token not found in cache.")
+
+        for ev in hf_envvars:
+            if (access_token := os.getenv(ev)):
+                print(f"Token was found in the {ev} environment variable.... Logging in.")
+                try:
+                    HfLogin(access_token)
+                    continue
+                except ValueError:
+                    print(f"Login failed due to invalid token found in {ev}")
+            else:
+                print(f"Token was not found in the environment variable {ev}.")
+    else:
+        print(f"Huggingface token found in cache.")
+        try:
+            HfLogin(access_token)
+        except ValueError:
+            print(f"Login failed due to invalid token found in cache")
+
+    if not yes_to_all:
         print('''
-4. Thank you! The last step is to enter your HuggingFace access token so that
-   this script is authorized to initiate the download. Go to the access tokens
-   page of your Hugging Face account and create a token by clicking the
-   "New token" button:
+You may optionally enter your Huggingface token now. InvokeAI *will* work without it, but some functionality may be limited.
+See https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept for more information.
 
-   https://huggingface.co/settings/tokens
+Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
 
-   (You can enter anything you like in the token creation field marked "Name".
-   "Role" should be "read").
+Paste the token below using Ctrl-Shift-V (macOS/Linux) or right-click (Windows), and/or 'Enter' to continue.
+You may re-run the configuration script again in the future if you do not wish to set the token right now.
+        ''')
+        again = True
+        while again:
+            try:
+                access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ⮞ ")
+                HfLogin(access_token)
+                access_token = HfFolder.get_token()
+                again = False
+            except ValueError:
+                again = yes_or_no('Failed to log in to Huggingface. Would you like to try again?')
+                if not again:
+                    print('\nRe-run the configuration script whenever you wish to set the token.')
+                    print('...Continuing...')
+            except EOFError:
+                # this happens if the user pressed Enter on the prompt without any input; assume this means they don't want to input a token
+                # safety net needed against accidental "Enter"?
+                print("None provided - continuing")
+                again = False
 
-   Now copy the token to your clipboard and paste it at the prompt. Windows
-   users can paste with right-click or Ctrl-Shift-V.
-   Token: '''
-        )
-        access_token = getpass_asterisk.getpass_asterisk()
-        HfFolder.save_token(access_token)
+    elif access_token is None:
+        print()
+        print("HuggingFace login did not succeed. Some functionality may be limited; see https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/ for more information")
+        print()
+        print(f"Re-run the configuration script without '--yes' to set the HuggingFace token interactively, or use one of the environment variables: {', '.join(hf_envvars)}")
+
+    print("═" * os.get_terminal_size()[0])
+
     return access_token
 
 #---------------------------------------------
@@ -537,25 +587,14 @@ def download_safety_checker():
 
 #-------------------------------------
 def download_weights(opt:dict) -> Union[str, None]:
-    # Authenticate to Huggingface using environment variables.
-    # If successful, authentication will persist for either interactive or non-interactive use.
-    # Default env var expected by HuggingFace is HUGGING_FACE_HUB_TOKEN.
-    if not (access_token := HfFolder.get_token()):
-        # If unable to find an existing token or expected environment, try the non-canonical environment variable (widely used in the community and supported as per docs)
-        if (access_token := os.getenv("HUGGINGFACE_TOKEN")):
-            # set the environment variable here instead of simply calling huggingface_hub.login(token), to maintain consistent behaviour.
-            # when calling the .login() method, the token is cached in the user's home directory. When the env var is used, the token is NOT cached.
-            os.environ['HUGGING_FACE_HUB_TOKEN'] = access_token
 
     if opt.yes_to_all:
         models = recommended_datasets()
-        if len(models)>0 and access_token is not None:
+        access_token = authenticate(opt.yes_to_all)
+        if len(models)>0:
             successfully_downloaded = download_weight_datasets(models, access_token)
             update_config_file(successfully_downloaded,opt)
             return
-        else:
-            print('** Cannot download models because no Hugging Face access token could be found. Please re-run without --yes')
-            return "could not download model weights from Huggingface due to missing or invalid access token"
 
     else:
         choice = user_wants_to_download_weights()
@@ -571,11 +610,12 @@ def download_weights(opt:dict) -> Union[str, None]:
     else:  # 'skip'
         return
 
-    print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
-    # We are either already authenticated, or will be asked to provide the token interactively
+
     access_token = authenticate()
+
     print('\n** DOWNLOADING WEIGHTS **')
     successfully_downloaded = download_weight_datasets(models, access_token)
+
     update_config_file(successfully_downloaded,opt)
     if len(successfully_downloaded) < len(models):
         return "some of the model weights downloads were not successful"
