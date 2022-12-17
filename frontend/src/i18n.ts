@@ -10,10 +10,10 @@ i18n
   .init({
     fallbackLng: 'en',
     debug: true,
-    backend: {
-      loadPath: 'src/locales/{{ns}}/{{lng}}.json',
-    },
     ns: ['common', 'options', 'unifiedcanvas', 'gallery'],
+    backend: {
+      loadPath: '/locales/{{ns}}/{{lng}}.json',
+    },
     returnNull: false,
   });
 

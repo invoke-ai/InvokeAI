@@ -1,10 +1,10 @@
 import 'i18next';
 
 // Import All Namespaces (for the default language only)
-import common from './locales/common/en.json';
-import unifiedcanvas from './locales/unifiedcanvas/en.json';
-import options from './locales/options/en.json';
-import gallery from './locales/gallery/en.json';
+import common from '../public/locales/common/en.json';
+import unifiedcanvas from '../public/locales/unifiedcanvas/en.json';
+import options from '../public/locales/options/en.json';
+import gallery from '../public/locales/gallery/en.json';
 
 declare module 'i18next' {
   // Extend CustomTypeOptions
