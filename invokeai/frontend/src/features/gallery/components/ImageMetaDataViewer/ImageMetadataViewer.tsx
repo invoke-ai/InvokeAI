@@ -71,8 +71,8 @@ const MetadataItem = ({
           <IconButton
             aria-label="Use this parameter"
             icon={<IoArrowUndoCircleOutline />}
-            size={'xs'}
-            variant={'ghost'}
+            size="xs"
+            variant="ghost"
             fontSize={20}
             onClick={onClick}
           />
@@ -83,23 +83,23 @@ const MetadataItem = ({
           <IconButton
             aria-label={`Copy ${label}`}
             icon={<FaCopy />}
-            size={'xs'}
-            variant={'ghost'}
+            size="xs"
+            variant="ghost"
             fontSize={14}
             onClick={() => navigator.clipboard.writeText(value.toString())}
           />
         </Tooltip>
       )}
       <Flex direction={labelPosition ? 'column' : 'row'}>
-        <Text fontWeight={'semibold'} whiteSpace={'pre-wrap'} pr={2}>
+        <Text fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
           {label}:
         </Text>
         {isLink ? (
-          <Link href={value.toString()} isExternal wordBreak={'break-all'}>
+          <Link href={value.toString()} isExternal wordBreak="break-all">
             {value.toString()} <ExternalLinkIcon mx="2px" />
           </Link>
         ) : (
-          <Text overflowY={'scroll'} wordBreak={'break-all'}>
+          <Text overflowY="scroll" wordBreak="break-all">
             {value.toString()}
           </Text>
         )}
@@ -163,10 +163,10 @@ const ImageMetadataViewer = memo(
 
     return (
       <div className={`image-metadata-viewer ${styleClass}`}>
-        <Flex gap={1} direction={'column'} width={'100%'}>
+        <Flex gap={1} direction="column" width="100%">
           <Flex gap={2}>
-            <Text fontWeight={'semibold'}>File:</Text>
-            <Link href={image.url} isExternal maxW={'calc(100% - 3rem)'}>
+            <Text fontWeight="semibold">File:</Text>
+            <Link href={image.url} isExternal maxW="calc(100% - 3rem)">
               {image.url.length > 64
                 ? image.url.substring(0, 64).concat('...')
                 : image.url}
@@ -304,7 +304,7 @@ const ImageMetadataViewer = memo(
               )}
               {postprocessing && postprocessing.length > 0 && (
                 <>
-                  <Heading size={'sm'}>Postprocessing</Heading>
+                  <Heading size="sm">Postprocessing</Heading>
                   {postprocessing.map(
                     (
                       postprocess: InvokeAI.PostProcessedImageMetadata,
@@ -313,13 +313,8 @@ const ImageMetadataViewer = memo(
                       if (postprocess.type === 'esrgan') {
                         const { scale, strength, denoise_str } = postprocess;
                         return (
-                          <Flex
-                            key={i}
-                            pl={'2rem'}
-                            gap={1}
-                            direction={'column'}
-                          >
-                            <Text size={'md'}>{`${
+                          <Flex key={i} pl="2rem" gap={1} direction="column">
+                            <Text size="md">{`${
                               i + 1
                             }: Upscale (ESRGAN)`}</Text>
                             <MetadataItem
@@ -348,13 +343,8 @@ const ImageMetadataViewer = memo(
                       } else if (postprocess.type === 'gfpgan') {
                         const { strength } = postprocess;
                         return (
-                          <Flex
-                            key={i}
-                            pl={'2rem'}
-                            gap={1}
-                            direction={'column'}
-                          >
-                            <Text size={'md'}>{`${
+                          <Flex key={i} pl="2rem" gap={1} direction="column">
+                            <Text size="md">{`${
                               i + 1
                             }: Face restoration (GFPGAN)`}</Text>
 
@@ -371,13 +361,8 @@ const ImageMetadataViewer = memo(
                       } else if (postprocess.type === 'codeformer') {
                         const { strength, fidelity } = postprocess;
                         return (
-                          <Flex
-                            key={i}
-                            pl={'2rem'}
-                            gap={1}
-                            direction={'column'}
-                          >
-                            <Text size={'md'}>{`${
+                          <Flex key={i} pl="2rem" gap={1} direction="column">
+                            <Text size="md">{`${
                               i + 1
                             }: Face restoration (Codeformer)`}</Text>
 
@@ -413,30 +398,30 @@ const ImageMetadataViewer = memo(
                   value={dreamPrompt}
                 />
               )}
-              <Flex gap={2} direction={'column'}>
+              <Flex gap={2} direction="column">
                 <Flex gap={2}>
-                  <Tooltip label={`Copy metadata JSON`}>
+                  <Tooltip label="Copy metadata JSON">
                     <IconButton
                       aria-label="Copy metadata JSON"
                       icon={<FaCopy />}
-                      size={'xs'}
-                      variant={'ghost'}
+                      size="xs"
+                      variant="ghost"
                       fontSize={14}
                       onClick={() =>
                         navigator.clipboard.writeText(metadataJSON)
                       }
                     />
                   </Tooltip>
-                  <Text fontWeight={'semibold'}>Metadata JSON:</Text>
+                  <Text fontWeight="semibold">Metadata JSON:</Text>
                 </Flex>
-                <div className={'image-json-viewer'}>
+                <div className="image-json-viewer">
                   <pre>{metadataJSON}</pre>
                 </div>
               </Flex>
             </>
           ) : (
-            <Center width={'100%'} pt={10}>
-              <Text fontSize={'lg'} fontWeight="semibold">
+            <Center width="100%" pt={10}>
+              <Text fontSize="lg" fontWeight="semibold">
                 No metadata available
               </Text>
             </Center>

@@ -72,9 +72,9 @@ export default function AddModel() {
         tooltip={t('modelmanager:addNewModel')}
         onClick={onOpen}
         className="modal-close-btn"
-        size={'sm'}
+        size="sm"
       >
-        <Flex columnGap={'0.5rem'} alignItems="center">
+        <Flex columnGap="0.5rem" alignItems="center">
           <FaPlus />
           {t('modelmanager:addNew')}
         </Flex>

@@ -45,21 +45,16 @@ const UnifiedCanvasDisplayBeta = () => {
   }, [dispatch]);
 
   return (
-    <div className={'workarea-single-view'}>
+    <div className="workarea-single-view">
       <Flex
-        flexDirection={'row'}
+        flexDirection="row"
         width="100%"
         height="100%"
-        columnGap={'1rem'}
+        columnGap="1rem"
         padding="1rem"
       >
         <UnifiedCanvasToolbarBeta />
-        <Flex
-          width="100%"
-          height="100%"
-          flexDirection={'column'}
-          rowGap={'1rem'}
-        >
+        <Flex width="100%" height="100%" flexDirection="column" rowGap="1rem">
           <UnifiedCanvasToolSettingsBeta />
           {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
         </Flex>

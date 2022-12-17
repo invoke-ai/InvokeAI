@@ -56,7 +56,7 @@ export default function ModelListItem(props: ModelListItemProps) {
 
   return (
     <Flex
-      alignItems={'center'}
+      alignItems="center"
       padding="0.5rem 0.5rem"
       borderRadius="0.2rem"
       backgroundColor={name === openModel ? 'var(--accent-color)' : ''}
@@ -69,14 +69,14 @@ export default function ModelListItem(props: ModelListItemProps) {
     >
       <Box onClick={openModelHandler} cursor="pointer">
         <Tooltip label={description} hasArrow placement="bottom">
-          <Text fontWeight={'bold'}>{name}</Text>
+          <Text fontWeight="bold">{name}</Text>
         </Tooltip>
       </Box>
       <Spacer onClick={openModelHandler} cursor="pointer" />
       <Flex gap={2} alignItems="center">
         <Text color={statusTextColor()}>{status}</Text>
         <Button
-          size={'sm'}
+          size="sm"
           onClick={handleChangeModel}
           isDisabled={status === 'active' || isProcessing || !isConnected}
           className="modal-close-btn"
@@ -85,7 +85,7 @@ export default function ModelListItem(props: ModelListItemProps) {
         </Button>
         <IAIIconButton
           icon={<EditIcon />}
-          size={'sm'}
+          size="sm"
           onClick={openModelHandler}
           aria-label="Modify Config"
           isDisabled={status === 'active' || isProcessing || !isConnected}
@@ -98,7 +98,7 @@ export default function ModelListItem(props: ModelListItemProps) {
           triggerComponent={
             <IAIIconButton
               icon={<DeleteIcon />}
-              size={'sm'}
+              size="sm"
               aria-label={t('modelmanager:deleteConfig')}
               isDisabled={status === 'active' || isProcessing || !isConnected}
               className=" modal-close-btn"
@@ -106,7 +106,7 @@ export default function ModelListItem(props: ModelListItemProps) {
             />
           }
         >
-          <Flex rowGap={'1rem'} flexDirection="column">
+          <Flex rowGap="1rem" flexDirection="column">
             <p style={{ fontWeight: 'bold' }}>{t('modelmanager:deleteMsg1')}</p>
             <p style={{ color: 'var(--text-color-secondary' }}>
               {t('modelmanager:deleteMsg2')}
