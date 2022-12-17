@@ -43,6 +43,7 @@ import {
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import IAIPopover from 'common/components/IAIPopover';
+import { useTranslation } from 'react-i18next';
 
 const systemSelector = createSelector(
   [
@@ -111,6 +112,7 @@ const CurrentImageButtons = () => {
   } = useAppSelector(systemSelector);
 
   const toast = useToast();
+  const { t } = useTranslation();
 
   const handleClickUseAsInitialImage = () => {
     if (!currentImage) return;
@@ -368,7 +370,10 @@ const CurrentImageButtons = () => {
         <IAIPopover
           trigger="hover"
           triggerComponent={
-            <IAIIconButton aria-label="Send to..." icon={<FaShareAlt />} />
+            <IAIIconButton
+              aria-label={`${t('options:sendTo')}...`}
+              icon={<FaShareAlt />}
+            />
           }
         >
           <div className="current-image-send-to-popover">
@@ -377,35 +382,41 @@ const CurrentImageButtons = () => {
               onClick={handleClickUseAsInitialImage}
               leftIcon={<FaShare />}
             >
-              Send to Image to Image
+              {t('options:sendToImg2Img')}
             </IAIButton>
             <IAIButton
               size={'sm'}
               onClick={handleSendToCanvas}
               leftIcon={<FaShare />}
             >
-              Send to Unified Canvas
+              {t('options:sendToUnifiedCanvas')}
             </IAIButton>
             <IAIButton
               size={'sm'}
               onClick={handleCopyImageLink}
               leftIcon={<FaCopy />}
             >
-              Copy Link to Image
+              {t('options:copyImageToLink')}
             </IAIButton>
 
             <IAIButton leftIcon={<FaDownload />} size={'sm'}>
               <Link download={true} href={currentImage?.url}>
-                Download Image
+                {t('options:downloadImage')}
               </Link>
             </IAIButton>
           </div>
         </IAIPopover>
         <IAIIconButton
           icon={<FaExpand />}
-          tooltip={!isLightBoxOpen ? 'Open In Viewer (Z)' : 'Close Viewer (Z)'}
+          tooltip={
+            !isLightBoxOpen
+              ? `${t('options:openInViewer')} (Z)`
+              : `${t('options:closeViewer')} (Z)`
+          }
           aria-label={
-            !isLightBoxOpen ? 'Open In Viewer (Z)' : 'Close Viewer (Z)'
+            !isLightBoxOpen
+              ? `${t('options:openInViewer')} (Z)`
+              : `${t('options:closeViewer')} (Z)`
           }
           data-selected={isLightBoxOpen}
           onClick={handleLightBox}
@@ -415,24 +426,24 @@ const CurrentImageButtons = () => {
       <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaQuoteRight />}
-          tooltip="Use Prompt (P)"
-          aria-label="Use Prompt (P)"
+          tooltip={`${t('options:usePrompt')} (P)`}
+          aria-label={`${t('options:usePrompt')} (P)`}
           isDisabled={!currentImage?.metadata?.image?.prompt}
           onClick={handleClickUsePrompt}
         />
 
         <IAIIconButton
           icon={<FaSeedling />}
-          tooltip="Use Seed (S)"
-          aria-label="Use Seed (S)"
+          tooltip={`${t('options:useSeed')} (S)`}
+          aria-label={`${t('options:useSeed')} (S)`}
           isDisabled={!currentImage?.metadata?.image?.seed}
           onClick={handleClickUseSeed}
         />
 
         <IAIIconButton
           icon={<FaAsterisk />}
-          tooltip="Use All (A)"
-          aria-label="Use All (A)"
+          tooltip={`${t('options:useAll')} (A)`}
+          aria-label={`${t('options:useAll')} (A)`}
           isDisabled={
             !['txt2img', 'img2img'].includes(
               currentImage?.metadata?.image?.type
@@ -446,7 +457,10 @@ const CurrentImageButtons = () => {
         <IAIPopover
           trigger="hover"
           triggerComponent={
-            <IAIIconButton icon={<FaGrinStars />} aria-label="Restore Faces" />
+            <IAIIconButton
+              icon={<FaGrinStars />}
+              aria-label={t('options:restoreFaces')}
+            />
           }
         >
           <div className="current-image-postprocessing-popover">
@@ -460,7 +474,7 @@ const CurrentImageButtons = () => {
               }
               onClick={handleClickFixFaces}
             >
-              Restore Faces
+              {t('options:restoreFaces')}
             </IAIButton>
           </div>
         </IAIPopover>
@@ -468,7 +482,10 @@ const CurrentImageButtons = () => {
         <IAIPopover
           trigger="hover"
           triggerComponent={
-            <IAIIconButton icon={<FaExpandArrowsAlt />} aria-label="Upscale" />
+            <IAIIconButton
+              icon={<FaExpandArrowsAlt />}
+              aria-label={t('options:upscale')}
+            />
           }
         >
           <div className="current-image-postprocessing-popover">
@@ -482,7 +499,7 @@ const CurrentImageButtons = () => {
               }
               onClick={handleClickUpscale}
             >
-              Upscale Image
+              {t('options:upscaleImage')}
             </IAIButton>
           </div>
         </IAIPopover>
@@ -491,8 +508,8 @@ const CurrentImageButtons = () => {
       <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaCode />}
-          tooltip="Info (I)"
-          aria-label="Info (I)"
+          tooltip={`${t('options:info')} (I)`}
+          aria-label={`${t('options:info')} (I)`}
           data-selected={shouldShowImageDetails}
           onClick={handleClickShowImageDetails}
         />
@@ -501,8 +518,8 @@ const CurrentImageButtons = () => {
       <DeleteImageModal image={currentImage}>
         <IAIIconButton
           icon={<FaTrash />}
-          tooltip="Delete Image"
-          aria-label="Delete Image"
+          tooltip={`${t('options:deleteImage')} (Del)`}
+          aria-label={`${t('options:deleteImage')} (Del)`}
           isDisabled={!currentImage || !isConnected || isProcessing}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}
         />
