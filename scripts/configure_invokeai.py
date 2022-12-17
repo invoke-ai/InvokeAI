@@ -707,7 +707,6 @@ def main():
                         default='./configs/models.yaml',
                         help='path to configuration file to create')
     parser.add_argument('--root_dir',
-                        '--root',
                         dest='root',
                         type=str,
                         default=None,
