@@ -948,12 +948,17 @@ def emergency_model_reconfigure(opt):
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('configure_invokeai is launching....\n')
 
-    # try to match what the user has set on the CLI
-    root_dir = f"--root_dir {opt.root_dir}" if opt.root_dir is not None else None
-    config = f"--config {opt.config}" if opt.config is not None else None
+    # Match arguments that were set on the CLI
+    # only the arguments accepted by the configuration script are parsed
+    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
+    config = ["--config", opt.conf] if opt.conf is not None else []
     yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
 
-    sys.argv = [ 'configure_invokeai', root_dir, config, yes_to_all ]
+    sys.argv = [ 'configure_invokeai' ]
+    sys.argv.extend(root_dir)
+    sys.argv.extend(config)
+    if yes_to_all is not None:
+        sys.argv.append(yes_to_all)
 
     import configure_invokeai
     configure_invokeai.main()
