@@ -10,5 +10,11 @@
   "lightTheme": "Светлый",
   "greenTheme": "Зеленый",
   "langEnglish": "English",
-  "langRussian": "Русский"
+  "langRussian": "Русский",
+  "text2img": "Text To ImageRU",
+  "img2img": "Image To Image",
+  "unifiedCanvas": "Unified Canvas",
+  "nodes": "Nodes",
+  "postProcessing": "Post Processing",
+  "training": "Training"
 }
