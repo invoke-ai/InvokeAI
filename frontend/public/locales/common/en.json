@@ -23,5 +23,7 @@
   "training": "Training",
   "trainingDesc1": "A dedicated workflow for training your own embeddings and checkpoints using Textual Inversion and Dreambooth from the web interface.",
   "trainingDesc2": "InvokeAI already supports training custom embeddings using Textual Inversion using the main script.",
-  "upload": "Upload"
+  "upload": "Upload",
+  "close": "Close",
+  "load": "Load"
 }

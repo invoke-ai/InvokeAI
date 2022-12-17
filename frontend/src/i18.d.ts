@@ -7,6 +7,7 @@ import options from '../public/locales/options/en.json';
 import gallery from '../public/locales/gallery/en.json';
 import toast from '../public/locales/toast/en.json';
 import hotkeys from '../public/locales/hotkeys/en.json';
+import settings from '../public/locales/settings/en.json';
 
 declare module 'i18next' {
   // Extend CustomTypeOptions
@@ -21,6 +22,7 @@ declare module 'i18next' {
       gallery: typeof gallery;
       toast: typeof toast;
       hotkeys: typeof hotkeys;
+      settings: typeof settings;
     };
     // Never Return Null
     returnNull: false;
