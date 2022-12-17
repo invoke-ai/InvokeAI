@@ -17,15 +17,15 @@ import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 import ThemeChanger from './ThemeChanger';
 import ModelSelect from './ModelSelect';
+import LanguagePicker from './LanguagePicker';
 
 import { useTranslation } from 'react-i18next';
-import IAISelect from 'common/components/IAISelect';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
  */
 const SiteHeader = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   return (
     <div className="site-header">
@@ -41,12 +41,6 @@ const SiteHeader = () => {
 
         <ModelSelect />
 
-        <IAISelect
-          validValues={['en', 'ru']}
-          value={localStorage.getItem('i18nextLng') || 'en'}
-          onChange={(e) => i18n.changeLanguage(e.target.value)}
-        />
-
         <HotkeysModal>
           <IAIIconButton
             aria-label={t('common:hotkeysLabel')}
@@ -60,6 +54,8 @@ const SiteHeader = () => {
         </HotkeysModal>
 
         <ThemeChanger />
+
+        <LanguagePicker />
 
         <IAIIconButton
           aria-label={t('common:reportBugLabel')}
