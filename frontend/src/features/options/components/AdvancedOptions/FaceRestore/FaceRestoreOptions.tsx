@@ -18,6 +18,7 @@ import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
 import { FACETOOL_TYPES } from 'app/constants';
 import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const optionsSelector = createSelector(
   (state: RootState) => state.options,
@@ -66,17 +67,19 @@ const FaceRestoreOptions = () => {
   const handleChangeFacetoolType = (e: ChangeEvent<HTMLSelectElement>) =>
     dispatch(setFacetoolType(e.target.value as FacetoolType));
 
+  const { t } = useTranslation();
+
   return (
     <Flex direction={'column'} gap={2}>
       <IAISelect
-        label="Type"
+        label={t('options:type')}
         validValues={FACETOOL_TYPES.concat()}
         value={facetoolType}
         onChange={handleChangeFacetoolType}
       />
       <IAINumberInput
         isDisabled={!isGFPGANAvailable}
-        label="Strength"
+        label={t('options:strength')}
         step={0.05}
         min={0}
         max={1}
@@ -88,7 +91,7 @@ const FaceRestoreOptions = () => {
       {facetoolType === 'codeformer' && (
         <IAINumberInput
           isDisabled={!isGFPGANAvailable}
-          label="Fidelity"
+          label={t('options:codeformerFidelity')}
           step={0.05}
           min={0}
           max={1}

@@ -10,6 +10,7 @@ import {
   setShouldUseInpaintReplace,
 } from 'features/canvas/store/canvasSlice';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   canvasSelector,
@@ -32,10 +33,12 @@ export default function InpaintReplace() {
 
   const dispatch = useAppDispatch();
 
+  const { t } = useTranslation();
+
   return (
     <Flex alignItems={'center'} columnGap={'1rem'}>
       <IAISlider
-        label="Inpaint Replace"
+        label={t('options:inpaintReplace')}
         value={inpaintReplace}
         onChange={(v: number) => {
           dispatch(setInpaintReplace(v));
