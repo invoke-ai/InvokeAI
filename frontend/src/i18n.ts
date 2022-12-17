@@ -13,7 +13,7 @@ i18n
     backend: {
       loadPath: 'src/locales/{{ns}}/{{lng}}.json',
     },
-    ns: ['common', 'options', 'unifiedcanvas'],
+    ns: ['common', 'options', 'unifiedcanvas', 'gallery'],
     returnNull: false,
   });
 

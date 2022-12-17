@@ -54,6 +54,7 @@
   "usePrompt": "Use Prompt",
   "useSeed": "Use Seed",
   "useAll": "Use All",
+  "useInitImg": "Use Initial Image",
   "info": "Info",
   "deleteImage": "Delete Image"
 }

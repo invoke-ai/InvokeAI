@@ -1,11 +1,4 @@
-import {
-  Box,
-  Icon,
-  IconButton,
-  Image,
-  Tooltip,
-  useToast,
-} from '@chakra-ui/react';
+import { Box, Icon, IconButton, Image, useToast } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
   setCurrentImage,
@@ -30,6 +23,7 @@ import {
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
 import { hoverableImageSelector } from 'features/gallery/store/gallerySliceSelectors';
+import { useTranslation } from 'react-i18next';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -60,6 +54,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   const toast = useToast();
+
+  const { t } = useTranslation();
 
   const handleMouseOver = () => setIsHovered(true);
 
@@ -202,18 +198,16 @@ const HoverableImage = memo((props: HoverableImageProps) => {
           </div>
           {isHovered && galleryImageMinimumWidth >= 64 && (
             <div className="hoverable-image-delete-button">
-              <Tooltip label={'Delete image'} hasArrow>
-                <DeleteImageModal image={image}>
-                  <IconButton
-                    aria-label="Delete image"
-                    icon={<FaTrashAlt />}
-                    size="xs"
-                    variant={'imageHoverIconButton'}
-                    fontSize={14}
-                    isDisabled={!mayDeleteImage}
-                  />
-                </DeleteImageModal>
-              </Tooltip>
+              <DeleteImageModal image={image}>
+                <IconButton
+                  aria-label={t('options:deleteImage')}
+                  icon={<FaTrashAlt />}
+                  size="xs"
+                  variant={'imageHoverIconButton'}
+                  fontSize={14}
+                  isDisabled={!mayDeleteImage}
+                />
+              </DeleteImageModal>
             </div>
           )}
         </Box>
@@ -226,20 +220,20 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         }}
       >
         <ContextMenu.Item onClickCapture={handleLightBox}>
-          Open In Viewer
+          {t('options:openInViewer')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUsePrompt}
           disabled={image?.metadata?.image?.prompt === undefined}
         >
-          Use Prompt
+          {t('options:usePrompt')}
         </ContextMenu.Item>
 
         <ContextMenu.Item
           onClickCapture={handleUseSeed}
           disabled={image?.metadata?.image?.seed === undefined}
         >
-          Use Seed
+          {t('options:useSeed')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUseAllParameters}
@@ -247,25 +241,25 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
           }
         >
-          Use All Parameters
+          {t('options:useAll')}
         </ContextMenu.Item>
-        <Tooltip label="Load initial image used for this generation">
-          <ContextMenu.Item
-            onClickCapture={handleUseInitialImage}
-            disabled={image?.metadata?.image?.type !== 'img2img'}
-          >
-            Use Initial Image
-          </ContextMenu.Item>
-        </Tooltip>
+        <ContextMenu.Item
+          onClickCapture={handleUseInitialImage}
+          disabled={image?.metadata?.image?.type !== 'img2img'}
+        >
+          {t('options:useInitImg')}
+        </ContextMenu.Item>
         <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
-          Send to Image To Image
+          {t('options:sendToImg2Img')}
         </ContextMenu.Item>
         <ContextMenu.Item onClickCapture={handleSendToCanvas}>
-          Send to Unified Canvas
+          {t('options:sendToUnifiedCanvas')}
         </ContextMenu.Item>
-        <DeleteImageModal image={image}>
-          <ContextMenu.Item data-warning>Delete Image</ContextMenu.Item>
-        </DeleteImageModal>
+        <ContextMenu.Item data-warning>
+          <DeleteImageModal image={image}>
+            <p>{t('options:deleteImage')}</p>
+          </DeleteImageModal>
+        </ContextMenu.Item>
       </ContextMenu.Content>
     </ContextMenu.Root>
   );
