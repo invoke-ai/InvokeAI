@@ -56,5 +56,6 @@
   "useAll": "Use All",
   "useInitImg": "Use Initial Image",
   "info": "Info",
-  "deleteImage": "Delete Image"
+  "deleteImage": "Delete Image",
+  "initialImage": "Inital Image"
 }
