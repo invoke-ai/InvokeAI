@@ -10,7 +10,7 @@ i18n
   .init({
     fallbackLng: 'en',
     debug: true,
-    ns: ['common', 'options', 'unifiedcanvas', 'gallery'],
+    ns: ['common', 'options', 'unifiedcanvas', 'gallery', 'toast'],
     backend: {
       loadPath: '/locales/{{ns}}/{{lng}}.json',
     },

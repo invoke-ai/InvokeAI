@@ -3,20 +3,18 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
 import { clearInitialImage } from 'features/options/store/optionsSlice';
+import { useTranslation } from 'react-i18next';
 
 export default function InitImagePreview() {
   const initialImage = useAppSelector(
     (state: RootState) => state.options.initialImage
   );
 
+  const { t } = useTranslation();
+
   const dispatch = useAppDispatch();
 
   const toast = useToast();
-
-  // const handleClickResetInitialImage = (e: SyntheticEvent) => {
-  //   e.stopPropagation();
-  //   dispatch(clearInitialImage());
-  // };
 
   const alertMissingInitImage = () => {
     toast({
@@ -31,14 +29,7 @@ export default function InitImagePreview() {
   return (
     <>
       <div className="init-image-preview-header">
-        {/* <div className="init-image-preview-header"> */}
-        <h2>Initial Image</h2>
-        {/* <IconButton
-          isDisabled={!initialImage}
-          aria-label={'Reset Initial Image'}
-          onClick={handleClickResetInitialImage}
-          icon={<MdClear />}
-        /> */}
+        <h2>{t('options:initialImage')}</h2>
         <ImageUploaderIconButton />
       </div>
       {initialImage && (
