@@ -1,10 +1,14 @@
 {
   "hotkeysLabel": "Hotkeys",
+  "themeLabel": "Theme",
+  "languagePickerLabel": "Language Picker",
   "reportBugLabel": "Report Bug",
   "githubLabel": "Github",
   "discordLabel": "Discord",
   "settingsLabel": "Settings",
   "darkTheme": "dark",
   "lightTheme": "light",
-  "greenTheme": "green"
+  "greenTheme": "green",
+  "langEnglish": "English",
+  "langRussian": "Russian"
 }

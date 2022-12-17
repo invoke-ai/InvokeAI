@@ -10,14 +10,18 @@ import IAIButton from 'common/components/IAIButton';
 import { useTranslation } from 'react-i18next';
 
 export default function ThemeChanger() {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation();
   const { setColorMode, colorMode } = useColorMode();
   const dispatch = useAppDispatch();
   const currentTheme = useAppSelector(
     (state: RootState) => state.options.currentTheme
   );
 
-  const THEMES = [t('darkTheme'), t('lightTheme'), t('greenTheme')];
+  const THEMES = [
+    t('common:darkTheme'),
+    t('common:lightTheme'),
+    t('common:greenTheme'),
+  ];
 
   useEffect(() => {
     // syncs the redux store theme to the chakra's theme on startup and when
@@ -36,7 +40,7 @@ export default function ThemeChanger() {
       trigger="hover"
       triggerComponent={
         <IAIIconButton
-          aria-label="Theme"
+          aria-label={t('common:themeLabel')}
           size={'sm'}
           variant="link"
           data-variant="link"
