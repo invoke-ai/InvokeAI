@@ -10,7 +10,15 @@ i18n
   .init({
     fallbackLng: 'en',
     debug: true,
-    ns: ['common', 'options', 'unifiedcanvas', 'gallery', 'toast', 'hotkeys'],
+    ns: [
+      'common',
+      'options',
+      'unifiedcanvas',
+      'gallery',
+      'toast',
+      'hotkeys',
+      'settings',
+    ],
     backend: {
       loadPath: '/locales/{{ns}}/{{lng}}.json',
     },

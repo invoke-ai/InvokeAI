@@ -15,6 +15,7 @@ import { requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { SystemState } from 'features/system/store/systemSlice';
+import { useTranslation } from 'react-i18next';
 
 type ModelListItemProps = {
   name: string;
@@ -32,6 +33,7 @@ const ModelListItem = (props: ModelListItemProps) => {
   const handleChangeModel = () => {
     dispatch(requestModelChange(name));
   };
+  const { t } = useTranslation();
   return (
     <div className="model-list-item">
       <Tooltip label={description} hasArrow placement="bottom">
@@ -47,7 +49,7 @@ const ModelListItem = (props: ModelListItemProps) => {
           onClick={handleChangeModel}
           isDisabled={status === 'active' || isProcessing || !isConnected}
         >
-          Load
+          {t('common:load')}
         </Button>
       </div>
     </div>
@@ -72,6 +74,7 @@ const modelListSelector = createSelector(
 
 const ModelList = () => {
   const { models } = useAppSelector(modelListSelector);
+  const { t } = useTranslation();
 
   return (
     <Accordion
@@ -82,7 +85,7 @@ const ModelList = () => {
       <AccordionItem>
         <AccordionButton>
           <div className="model-list-button">
-            <h2>Models</h2>
+            <h2>{t('settings:models')}</h2>
             <AccordionIcon />
           </div>
         </AccordionButton>
