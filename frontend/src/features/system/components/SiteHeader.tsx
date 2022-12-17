@@ -42,7 +42,7 @@ const SiteHeader = () => {
           <IAIIconButton
             aria-label={t('modelmanager:modelManager')}
             tooltip={t('modelmanager:modelManager')}
-            size={'sm'}
+            size="sm"
             variant="link"
             data-variant="link"
             fontSize={20}
