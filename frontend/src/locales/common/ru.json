@@ -1,10 +1,14 @@
 {
   "hotkeysLabel": "Горячие клавиши",
+  "themeLabel": "Тема",
+  "languagePickerLabel": "Язык",
   "reportBugLabel": "Сообщить об ошибке",
   "githubLabel": "Github",
   "discordLabel": "Discord",
-  "settingsLabel": "Настройки",
-  "darkTheme": "Dark",
-  "lightTheme": "Light",
-  "greenTheme": "Green"
+  "settingsLabel": "Настройка",
+  "darkTheme": "Темный",
+  "lightTheme": "Светлый",
+  "greenTheme": "Зеленый",
+  "langEnglish": "English",
+  "langRussian": "Русский"
 }
