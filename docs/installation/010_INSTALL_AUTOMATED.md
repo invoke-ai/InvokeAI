@@ -303,4 +303,3 @@ version as its argument. For example, this will install the old 2.2.0 release.
 ```cmd
 update.sh https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.0.zip
 ```
-
