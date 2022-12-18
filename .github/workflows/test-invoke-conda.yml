@@ -3,11 +3,10 @@ on:
   push:
     branches:
       - 'main'
-      - 'development'
   pull_request:
-    branches:
-      - 'main'
-      - 'development'
+    types:
+      - review_requested
+      - ready_for_review
 
 concurrency:
    group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
