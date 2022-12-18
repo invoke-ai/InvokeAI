@@ -64,7 +64,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleUsePrompt = () => {
     image.metadata && dispatch(setPrompt(image.metadata.image.prompt));
     toast({
-      title: 'Prompt Set',
+      title: t('toast:promptSet'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -74,7 +74,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleUseSeed = () => {
     image.metadata && dispatch(setSeed(image.metadata.image.seed));
     toast({
-      title: 'Seed Set',
+      title: t('toast:seedSet'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -88,7 +88,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       dispatch(setActiveTab('img2img'));
     }
     toast({
-      title: 'Sent to Image To Image',
+      title: t('toast:sentToImageToImage'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -107,7 +107,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     }
 
     toast({
-      title: 'Sent to Unified Canvas',
+      title: t('toast:sentToUnifiedCanvas'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -117,7 +117,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleUseAllParameters = () => {
     metadata && dispatch(setAllTextToImageParameters(metadata));
     toast({
-      title: 'Parameters Set',
+      title: t('toast:parametersSet'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -131,7 +131,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         dispatch(setActiveTab('img2img'));
         dispatch(setAllImageToImageParameters(metadata));
         toast({
-          title: 'Initial Image Set',
+          title: t('toast:initialImageSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -140,8 +140,8 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       }
     }
     toast({
-      title: 'Initial Image Not Set',
-      description: 'Could not load initial image.',
+      title: t('toast:initialImageNotSet'),
+      description: t('toast:initialImageNotSetDesc'),
       status: 'error',
       duration: 2500,
       isClosable: true,

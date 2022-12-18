@@ -18,8 +18,8 @@ export default function InitImagePreview() {
 
   const alertMissingInitImage = () => {
     toast({
-      title: 'Problem loading parameters',
-      description: 'Unable to load init image.',
+      title: t('toast:parametersFailed'),
+      description: t('toast:parametersFailedDesc'),
       status: 'error',
       isClosable: true,
     });

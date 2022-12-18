@@ -128,7 +128,7 @@ const CurrentImageButtons = () => {
       )
       .then(() => {
         toast({
-          title: 'Image Link Copied',
+          title: t('toast:imageLinkCopied'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -142,15 +142,15 @@ const CurrentImageButtons = () => {
       if (currentImage) {
         handleClickUseAsInitialImage();
         toast({
-          title: 'Sent To Image To Image',
+          title: t('toast:sentToImageToImage'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: 'No Image Loaded',
-          description: 'No image found to send to image to image module.',
+          title: t('toast:imageNotLoaded'),
+          description: t('toast:imageNotLoadedDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -178,15 +178,15 @@ const CurrentImageButtons = () => {
       ) {
         handleClickUseAllParameters();
         toast({
-          title: 'Parameters Set',
+          title: t('toast:parametersSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: 'Parameters Not Set',
-          description: 'No metadata found for this image.',
+          title: t('toast:parametersNotSet'),
+          description: t('toast:parametersNotSetDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -207,15 +207,15 @@ const CurrentImageButtons = () => {
       if (currentImage?.metadata?.image?.seed) {
         handleClickUseSeed();
         toast({
-          title: 'Seed Set',
+          title: t('toast:seedSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: 'Seed Not Set',
-          description: 'Could not find seed for this image.',
+          title: t('toast:seedNotSet'),
+          description: t('toast:seedNotSetDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -235,15 +235,15 @@ const CurrentImageButtons = () => {
       if (currentImage?.metadata?.image?.prompt) {
         handleClickUsePrompt();
         toast({
-          title: 'Prompt Set',
+          title: t('toast:promptSet'),
           status: 'success',
           duration: 2500,
           isClosable: true,
         });
       } else {
         toast({
-          title: 'Prompt Not Set',
-          description: 'Could not find prompt for this image.',
+          title: t('toast:promptNotSet'),
+          description: t('toast:promptNotSetDesc'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -270,7 +270,7 @@ const CurrentImageButtons = () => {
         handleClickUpscale();
       } else {
         toast({
-          title: 'Upscaling Failed',
+          title: t('toast:upscalingFailed'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -304,7 +304,7 @@ const CurrentImageButtons = () => {
         handleClickFixFaces();
       } else {
         toast({
-          title: 'Face Restoration Failed',
+          title: t('toast:faceRestoreFailed'),
           status: 'error',
           duration: 2500,
           isClosable: true,
@@ -336,7 +336,7 @@ const CurrentImageButtons = () => {
     }
 
     toast({
-      title: 'Sent to Unified Canvas',
+      title: t('toast:sentToUnifiedCanvas'),
       status: 'success',
       duration: 2500,
       isClosable: true,
@@ -350,7 +350,7 @@ const CurrentImageButtons = () => {
         handleClickShowImageDetails();
       } else {
         toast({
-          title: 'Failed to load metadata',
+          title: t('toast:metadataLoadFailed'),
           status: 'error',
           duration: 2500,
           isClosable: true,

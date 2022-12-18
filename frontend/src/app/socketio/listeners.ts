@@ -1,6 +1,7 @@
 import { AnyAction, MiddlewareAPI, Dispatch } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 import dateFormat from 'dateformat';
+import i18n from 'i18n';
 
 import * as InvokeAI from 'app/invokeai';
 
@@ -381,7 +382,7 @@ const makeSocketIOListeners = (
     onTempFolderEmptied: () => {
       dispatch(
         addToast({
-          title: 'Temp Folder Emptied',
+          title: i18n.t('toast:tempFoldersEmptied'),
           status: 'success',
           duration: 2500,
           isClosable: true,
