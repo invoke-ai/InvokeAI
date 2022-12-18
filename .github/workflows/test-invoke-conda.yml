@@ -25,7 +25,6 @@ jobs:
       run: exit 1
 
   matrix:
-    if: github.event.pull_request.draft == false
     strategy:
       matrix:
         stable-diffusion-model:
