@@ -42,7 +42,7 @@ from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
 from ldm.invoke.concepts_lib import Concepts
-from ldm.invoke.generator.inpaint import Infill
+from ldm.invoke.generator.inpaint import infill_methods
 
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -392,7 +392,7 @@ class Generate:
         self.log_tokenization = log_tokenization
         self.step_callback = step_callback
         self.karras_max = karras_max
-        self.infill_method = Infill().infill_methods()[0], # The infill method to use
+        self.infill_method = infill_methods()[0], # The infill method to use
         with_variations = [] if with_variations is None else with_variations
 
         # will instantiate the model or return it from cache

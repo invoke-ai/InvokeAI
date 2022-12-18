@@ -23,7 +23,7 @@ from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
-from ldm.invoke.generator.inpaint import Infill
+from ldm.invoke.generator.inpaint import infill_methods
 
 from backend.modules.parameters import parameters_to_command
 from backend.modules.get_canvas_generation_mode import (
@@ -294,7 +294,7 @@ class InvokeAIWebServer:
             print(f">> System config requested")
             config = self.get_system_config()
             config["model_list"] = self.generate.model_cache.list_models()
-            config["infill_methods"] = Infill().infill_methods()
+            config["infill_methods"] = infill_methods()
             socketio.emit("systemConfig", config)
 
         @socketio.on("requestModelChange")

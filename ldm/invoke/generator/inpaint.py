@@ -17,47 +17,22 @@ from ldm.models.diffusion.ddim     import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.invoke.generator.base import downsampling
 from ldm.util import debug_image
+from ldm.invoke.patchmatch import patchmatch 
 from ldm.invoke.globals import Globals
 
-class Infill (object):
-    '''
-    Thin class wrapper around the patchmatch function.
-    '''
-    
-    def __init__(self):
-        self.patch_match = None
-        if Globals.try_patchmatch:
-            from patchmatch import patch_match as pm
-            if pm.patchmatch_available:
-                print('>> Patchmatch initialized')
-            else:
-                print('>> Patchmatch not loaded (nonfatal)')
-            self.patch_match = pm
-        else:
-            print('>> Patchmatch loading disabled')
-        super().__init__()
+def infill_methods()->list[str]:
+    methods = list()
+    if patchmatch.patchmatch_available():
+        methods.append('patchmatch')
+    methods.append('tile')
+    return methods
 
-    def patchmatch_available(self)->bool:
-        return self.patch_match and self.patch_match.patchmatch_available
-
-    def infill_methods(self)->list[str]:
-        methods = list()
-        if self.patchmatch_available():
-            methods.append('patchmatch')
-        methods.append('tile')
-        return methods
-
-    def inpaint(self,*args,**kwargs)->np.ndarray:
-        if self.patchmatch_available():
-            return self.patch_match.inpaint(*args,**kwargs)
-        
 class Inpaint(Img2Img):
     def __init__(self, model, precision):
         self.init_latent = None
         self.pil_image = None
         self.pil_mask = None
         self.mask_blur_radius = 0
-        self.infill = Infill()
         super().__init__(model, precision)
 
     # Outpaint support code
@@ -82,11 +57,11 @@ class Inpaint(Img2Img):
             return im
 
         # Skip patchmatch if patchmatch isn't available
-        if not self.infill.patchmatch_available():
+        if not patchmatch.patchmatch_available():
             return im
 
         # Patchmatch (note, we may want to expose patch_size? Increasing it significantly impacts performance though)
-        im_patched_np = self.infill.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
+        im_patched_np = patchmatch.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
         im_patched = Image.fromarray(im_patched_np, mode = 'RGB')
         return im_patched
 
@@ -216,7 +191,7 @@ class Inpaint(Img2Img):
         """
 
         self.enable_image_debugging = enable_image_debugging
-        self.infill_method = self.infill.infill_methods()[0], # The infill method to use
+        self.infill_method = infill_methods()[0], # The infill method to use
         
         self.inpaint_width = inpaint_width
         self.inpaint_height = inpaint_height
@@ -225,7 +200,7 @@ class Inpaint(Img2Img):
             self.pil_image = init_image.copy()
 
             # Do infill
-            if infill_method == 'patchmatch' and self.infill.patchmatch_available:
+            if infill_method == 'patchmatch' and patchmatch.patchmatch_available:
                 init_filled = self.infill_patchmatch(self.pil_image.copy())
             else: # if infill_method == 'tile': # Only two methods right now, so always use 'tile' if not patchmatch
                 init_filled = self.tile_fill_missing(
