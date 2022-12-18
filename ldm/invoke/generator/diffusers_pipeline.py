@@ -32,7 +32,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
-from ldm.modules.embedding_manager import EmbeddingManager
+from ldm.modules.textual_inversion_manager import TextualInversionManager
 from ldm.modules.encoders.modules import WeightedFrozenCLIPEmbedder
 
 
@@ -238,7 +238,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
         safety_checker: Optional[StableDiffusionSafetyChecker],
         feature_extractor: Optional[CLIPFeatureExtractor],
-        requires_safety_checker: bool = False
+        requires_safety_checker: bool = False,
+        precision: str = 'full',
     ):
         super().__init__(vae, text_encoder, tokenizer, unet, scheduler,
                          safety_checker, feature_extractor, requires_safety_checker)
@@ -258,7 +259,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             transformer=self.text_encoder
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
-        self.embedding_manager = EmbeddingManager(self.clip_embedder, **_default_personalization_config_params)
+        use_full_precision = (precision == 'float32' or precision == 'autocast')
+        self.textual_inversion_manager = TextualInversionManager(self.clip_embedder, use_full_precision)
+        self.clip_embedder.set_textual_inversion_manager(self.textual_inversion_manager)
 
         if is_xformers_available():
             self.enable_xformers_memory_efficient_attention()
@@ -562,7 +565,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
         """
-        return self.clip_embedder.encode(c, return_tokens=return_tokens, fragment_weights=fragment_weights, embedding_manager=self.embedding_manager)
+        return self.clip_embedder.encode(c, return_tokens=return_tokens, fragment_weights=fragment_weights)
 
     @property
     def cond_stage_model(self):

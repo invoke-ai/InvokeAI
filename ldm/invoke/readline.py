@@ -12,7 +12,7 @@ import os
 import re
 import atexit
 from ldm.invoke.args import Args
-from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.globals import Globals
 
 # ---------------readline utilities---------------------
@@ -276,7 +276,7 @@ class Completer(object):
 
     def _concept_completions(self, text, state):
         if self.concepts is None:
-            self.concepts = set(Concepts().list_concepts())
+            self.concepts = set(HuggingFaceConceptsLibrary().list_concepts())
             self.embedding_terms.update(self.concepts)
 
         partial = text[1:]  # this removes the leading '<'
