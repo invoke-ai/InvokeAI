@@ -16,6 +16,7 @@ from .prompt_parser import PromptParser, Blend, FlattenedPrompt, \
 from ..models.diffusion import cross_attention_control
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
+from ..modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
 
 def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
@@ -216,7 +217,7 @@ def _get_conditioning_for_blend(model, blend: Blend, log_tokens: bool = False):
                                                                   log_display_label=f"(blend part {i + 1}, weight={blend.weights[i]})")
         embeddings_to_blend = this_embedding if embeddings_to_blend is None else torch.cat(
             (embeddings_to_blend, this_embedding))
-    conditioning = WeightedFrozenCLIPEmbedder.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
+    conditioning = WeightedPromptFragmentsToEmbeddingsConverter.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
                                                                       blend.weights,
                                                                       normalize=blend.normalize_weights)
     return conditioning

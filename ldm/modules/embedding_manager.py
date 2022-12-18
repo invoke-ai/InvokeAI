@@ -19,13 +19,6 @@ def get_clip_token_id_for_string(tokenizer: CLIPTokenizer, token_str: str) -> in
     token_id = tokenizer.convert_tokens_to_ids(token_str)
     return token_id
 
-def get_bert_token_id_for_string(tokenizer, string) -> int:
-    token = tokenizer(string)
-    # assert torch.count_nonzero(token) == 3, f"String '{string}' maps to more than a single token. Please use another string"
-    token = token[0, 1]
-    return token.item()
-
-
 def get_embedding_for_clip_token_id(embedder, token_id):
     if type(token_id) is not torch.Tensor:
         token_id = torch.tensor(token_id, dtype=torch.int)
@@ -289,7 +282,7 @@ class EmbeddingManager(nn.Module):
                     print('>> More than 1 embedding found. Will use the first one')
 
                 embedding = list(embedding_ckpt['string_to_param'].values())[0]
-            except (AttributeError,KeyError): 
+            except (AttributeError,KeyError):
                 return self.handle_broken_pt_variants(embedding_ckpt, embedding_file)
 
             embedding_info['embedding'] = embedding

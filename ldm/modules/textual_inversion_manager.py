@@ -5,10 +5,9 @@ from typing import Union
 import torch
 from attr import dataclass
 from picklescan.scanner import scan_file_path
+from transformers import CLIPTokenizer, CLIPTextModel
 
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
-from ldm.modules.embedding_manager import get_clip_token_id_for_string
-from ldm.modules.encoders.modules import FrozenCLIPEmbedder
 
 
 @dataclass
@@ -23,8 +22,12 @@ class TextualInversion:
         return self.embedding.shape[0]
 
 class TextualInversionManager():
-    def __init__(self, clip_embedder: FrozenCLIPEmbedder, full_precision: bool=True):
-        self.clip_embedder = clip_embedder
+    def __init__(self,
+                 tokenizer: CLIPTokenizer,
+                 text_encoder: CLIPTextModel,
+                 full_precision: bool=True):
+        self.tokenizer = tokenizer
+        self.text_encoder = text_encoder
         self.full_precision = full_precision
         self.hf_concepts_library = HuggingFaceConceptsLibrary()
         default_textual_inversions: list[TextualInversion] = []
@@ -124,9 +127,9 @@ class TextualInversionManager():
         if len(prompt_token_ids) == 0:
             return prompt_token_ids
 
-        if prompt_token_ids[0] == self.clip_embedder.tokenizer.bos_token_id:
+        if prompt_token_ids[0] == self.tokenizer.bos_token_id:
             raise ValueError("prompt_token_ids must not start with bos_token_id")
-        if prompt_token_ids[-1] == self.clip_embedder.tokenizer.eos_token_id:
+        if prompt_token_ids[-1] == self.tokenizer.eos_token_id:
             raise ValueError("prompt_token_ids must not end with eos_token_id")
         textual_inversion_trigger_token_ids = [ti.trigger_token_id for ti in self.textual_inversions]
         prompt_token_ids = prompt_token_ids.copy()
@@ -141,19 +144,22 @@ class TextualInversionManager():
     def _get_or_create_token_id_and_assign_embedding(self, token_str: str, embedding: torch.Tensor):
         if len(embedding.shape) != 1:
             raise ValueError("Embedding has incorrect shape - must be [token_dim] where token_dim is 768 for SD1 or 1280 for SD2")
-        existing_token_id = get_clip_token_id_for_string(self.clip_embedder.tokenizer, token_str)
-        if existing_token_id == self.clip_embedder.tokenizer.unk_token_id:
-            num_tokens_added = self.clip_embedder.tokenizer.add_tokens(token_str)
-            current_embeddings = self.clip_embedder.transformer.resize_token_embeddings(None)
+        existing_token_id = self.tokenizer.convert_tokens_to_ids(token_str)
+        if existing_token_id == self.tokenizer.unk_token_id:
+            num_tokens_added = self.tokenizer.add_tokens(token_str)
+            current_embeddings = self.text_encoder.resize_token_embeddings(None)
             current_token_count = current_embeddings.num_embeddings
             new_token_count = current_token_count + num_tokens_added
             # the following call is slow - todo make batched for better performance with vector length >1
-            self.clip_embedder.transformer.resize_token_embeddings(new_token_count)
+            self.text_encoder.resize_token_embeddings(new_token_count)
 
-        token_id = get_clip_token_id_for_string(self.clip_embedder.tokenizer, token_str)
-        self.clip_embedder.transformer.get_input_embeddings().weight.data[token_id] = embedding
+        token_id = self.tokenizer.convert_tokens_to_ids(token_str)
+        if token_id == self.tokenizer.unk_token_id:
+            raise RuntimeError(f"Unable to find token id for token '{token_str}'")
+        self.text_encoder.get_input_embeddings().weight.data[token_id] = embedding
 
         return token_id
+
     def _parse_embedding(self, embedding_file: str):
         file_type = embedding_file.split('.')[-1]
         if file_type == 'pt':

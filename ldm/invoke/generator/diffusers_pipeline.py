@@ -15,6 +15,7 @@ from diffusers.utils.import_utils import is_xformers_available
 
 from ...models.diffusion import cross_attention_control
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
+from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
 # monkeypatch diffusers CrossAttention 🙈
 # this is to make prompt2prompt and (future) attention maps work
@@ -239,7 +240,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         safety_checker: Optional[StableDiffusionSafetyChecker],
         feature_extractor: Optional[CLIPFeatureExtractor],
         requires_safety_checker: bool = False,
-        precision: str = 'full',
+        precision: str = 'float32',
     ):
         super().__init__(vae, text_encoder, tokenizer, unet, scheduler,
                          safety_checker, feature_extractor, requires_safety_checker)
@@ -253,15 +254,17 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        # InvokeAI's interface for text embeddings and whatnot
-        self.clip_embedder = WeightedFrozenCLIPEmbedder(
-            tokenizer=self.tokenizer,
-            transformer=self.text_encoder
-        )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
         use_full_precision = (precision == 'float32' or precision == 'autocast')
-        self.textual_inversion_manager = TextualInversionManager(self.clip_embedder, use_full_precision)
-        self.clip_embedder.set_textual_inversion_manager(self.textual_inversion_manager)
+        self.textual_inversion_manager = TextualInversionManager(tokenizer=self.tokenizer,
+                                                                 text_encoder=self.text_encoder,
+                                                                 full_precision=use_full_precision)
+        # InvokeAI's interface for text embeddings and whatnot
+        self.prompt_fragments_to_embeddings_converter = WeightedPromptFragmentsToEmbeddingsConverter(
+            tokenizer=self.tokenizer,
+            text_encoder=self.text_encoder,
+            textual_inversion_manager=self.textual_inversion_manager
+        )
 
         if is_xformers_available():
             self.enable_xformers_memory_efficient_attention()
@@ -565,12 +568,16 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         Compatibility function for ldm.models.diffusion.ddpm.LatentDiffusion.
         """
-        return self.clip_embedder.encode(c, return_tokens=return_tokens, fragment_weights=fragment_weights)
+        return self.prompt_fragments_to_embeddings_converter.get_embeddings_for_weighted_prompt_fragments(
+            text=c,
+            fragment_weights=fragment_weights,
+            should_return_tokens=return_tokens,
+            device=self.device)
 
     @property
     def cond_stage_model(self):
         warnings.warn("legacy compatibility layer", DeprecationWarning)
-        return self.clip_embedder
+        return self.prompt_fragments_to_embeddings_converter
 
     @torch.inference_mode()
     def _tokenize(self, prompt: Union[str, List[str]]):
