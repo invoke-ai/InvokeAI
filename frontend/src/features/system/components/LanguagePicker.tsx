@@ -30,6 +30,7 @@ export default function LanguagePicker() {
           aria-label={LANGUAGES[lang as keyof typeof LANGUAGES]}
           tooltip={LANGUAGES[lang as keyof typeof LANGUAGES]}
           size="sm"
+          minWidth="100px"
         >
           {LANGUAGES[lang as keyof typeof LANGUAGES]}
         </IAIButton>
