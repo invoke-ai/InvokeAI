@@ -78,23 +78,31 @@ version of InvokeAI with the option to upgrade to experimental versions later.
 
     === "Linux users"
 
-    	For reasons that are not entirely clear, installing the correct version of Python can be a bit of a challenge on Ubuntu, Linux Mint, and otherUbuntu-derived distributions.
+        For reasons that are not entirely clear, installing the correct version of Python can be a bit of a challenge on Ubuntu, Linux Mint, Pop!_OS, and other Debian-derived distributions.
 
-	In particular, Ubuntu version 20.04 LTS comes with an old version of Python, does not come with the PIP package manager installed, and to make matters worse, the `python` command points to Python2, not Python3.
+        On Ubuntu 22.04 and higher, run the following:
 
-	Here is the quick recipe for bringing your system up to date:
+        ```
+        sudo apt update
+        sudo apt install -y python3 python3-pip python3-venv
+        sudo update-alternatives --install /usr/local/bin/python python /usr/bin/python3.10 3
+        ```
 
-	```
-	sudo apt update
-	sudo apt install python3.9
-	sudo apt install python3-pip
-	cd /usr/bin
-	sudo ln -sf python3.9 python3
-	sudo ln -sf python3 python
-	```
+        On Ubuntu 20.04, the process is slightly different:
 
-	You can still access older versions of Python by calling `python2`, `python3.8`,
-	etc.
+        ```
+        sudo apt update
+        sudo apt install -y software-properties-common
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt install python3.10 python3-pip python3.10-venv
+        sudo update-alternatives --install /usr/local/bin/python python /usr/bin/python3.10 3
+        ```
+
+        Both `python` and `python3` commands are now pointing at Python3.10. You can still access older versions of Python by calling `python2`, `python3.8`, etc.
+
+        Linux systems require a couple of additional graphics libraries to be installed for proper functioning of `python3-opencv`. Please run the following:
+
+        `sudo apt update && sudo apt install -y libglib2.0-0 libgl1-mesa-glx`
 
 3.  The source installer is distributed in ZIP files. Go to the
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
