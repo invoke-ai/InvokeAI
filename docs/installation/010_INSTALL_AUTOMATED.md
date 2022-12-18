@@ -24,6 +24,8 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         Installation requires roughly 18G of free disk space to load the libraries and
         recommended model weights files.
 
+        Regardless of your destination disk, your *system drive* (`C:\` on Windows, `/` on macOS/Linux) requires at least 6GB of free disk space to download and cache python dependencies. NOTE for Linux users: if your temporary directory is mounted as a `tmpfs`, ensure it has sufficient space.
+
 2.  Check that your system has an up-to-date Python installed. To do this, open
     up a command-line window ("Terminal" on Linux and Macintosh, "Command" or
     "Powershell" on Windows) and type `python --version`. If Python is
