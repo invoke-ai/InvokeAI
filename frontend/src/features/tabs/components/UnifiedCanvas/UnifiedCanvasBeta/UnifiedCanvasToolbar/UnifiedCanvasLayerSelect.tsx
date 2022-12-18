@@ -13,6 +13,7 @@ import {
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -29,6 +30,7 @@ const selector = createSelector(
 
 export default function UnifiedCanvasLayerSelect() {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const { layer, isMaskEnabled, isStaging } = useAppSelector(selector);
 
@@ -57,7 +59,7 @@ export default function UnifiedCanvasLayerSelect() {
   };
   return (
     <IAISelect
-      tooltip={'Layer (Q)'}
+      tooltip={`${t('unifiedcanvas:layer')} (Q)`}
       tooltipProps={{ hasArrow: true, placement: 'top' }}
       value={layer}
       validValues={LAYER_NAMES_DICT}

@@ -10,10 +10,18 @@ i18n
   .init({
     fallbackLng: 'en',
     debug: true,
+    ns: [
+      'common',
+      'options',
+      'unifiedcanvas',
+      'gallery',
+      'toast',
+      'hotkeys',
+      'settings',
+    ],
     backend: {
-      loadPath: 'src/locales/{{ns}}/{{lng}}.json',
+      loadPath: '/locales/{{ns}}/{{lng}}.json',
     },
-    ns: ['common', 'options', 'unifiedcanvas'],
     returnNull: false,
   });
 
