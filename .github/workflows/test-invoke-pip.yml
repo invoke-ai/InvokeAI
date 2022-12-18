@@ -3,18 +3,28 @@ on:
   push:
     branches:
       - 'main'
-      - 'development'
   pull_request:
     branches:
       - 'main'
-      - 'development'
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+      - 'converted_to_draft'
 
 concurrency:
    group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
    cancel-in-progress: true
 
 jobs:
+  fail_if_pull_request_is_draft:
+    if: github.event.pull_request.draft == true
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Fails in order to indicate that pull request needs to be marked as ready to review and unit tests workflow needs to pass.
+      run: exit 1
   matrix:
+    if: github.event.pull_request.draft == false
     strategy:
       matrix:
         stable-diffusion-model:
