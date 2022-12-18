@@ -116,7 +116,7 @@ jobs:
       - name: run configure_invokeai.py
         id: run-preload-models
         run: |
-          python scripts/configure_invokeai.py --no-interactive --yes
+          python scripts/configure_invokeai.py --skip-sd-weights --yes
 
       - name: cat invokeai.init
         id: cat-invokeai

@@ -43,6 +43,22 @@ You can also combine styles and concepts:
 </figure>
 ## Using a Hugging Face Concept
 
+!!! warning "Authenticating to HuggingFace"
+
+    Some concepts require valid authentication to HuggingFace. Without it, they will not be downloaded
+    and will be silently ignored.
+
+    If you used an installer to install InvokeAI, you may have already set a HuggingFace token.
+    If you skipped this step, you can:
+
+    - run the InvokeAI configuration script again (if you used a manual installer): `scripts/configure_invokeai.py`
+    - set one of the `HUGGINGFACE_TOKEN` or `HUGGING_FACE_HUB_TOKEN` environment variables to contain your token
+
+    Finally, if you already used any HuggingFace library on your computer, you might already have a token
+    in your local cache. Check for a hidden `.huggingface` directory in your home folder. If it
+    contains a `token` file, then you are all set.
+
+
 Hugging Face TI concepts are downloaded and installed automatically as you
 require them. This requires your machine to be connected to the Internet. To
 find out what each concept is for, you can browse the

@@ -118,7 +118,7 @@ jobs:
 
       - name: run configure_invokeai.py
         id: run-preload-models
-        run: python3 scripts/configure_invokeai.py --no-interactive --yes
+        run: python3 scripts/configure_invokeai.py --skip-sd-weights --yes
 
       - name: Run the tests
         id: run-tests
