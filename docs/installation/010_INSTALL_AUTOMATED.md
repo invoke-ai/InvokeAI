@@ -108,9 +108,9 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - [InvokeAI-installer-2.2.4-mac.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/InvokeAI-installer-2.2.4-mac.zip)
-    - [InvokeAI-installer-2.2.4-windows.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/InvokeAI-installer-2.2.4-windows.zip)
-    - [InvokeAI-installer-2.2.4-linux.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/InvokeAI-installer-2.2.4-linux.zip)
+    - [InvokeAI-installer-2.2.4-p5-mac.zip](https://github.com/invoke-ai/InvokeAI/files/10254728/InvokeAI-installer-2.2.4-p5-mac.zip)
+    - [InvokeAI-installer-2.2.4-p5-windows.zip](https://github.com/invoke-ai/InvokeAI/files/10254729/InvokeAI-installer-2.2.4-p5-windows.zip)
+    - [InvokeAI-installer-2.2.4-p5-linux.zip](https://github.com/invoke-ai/InvokeAI/files/10254727/InvokeAI-installer-2.2.4-p5-linux.zip)
 
     Download the one that is appropriate for your operating system.
 
