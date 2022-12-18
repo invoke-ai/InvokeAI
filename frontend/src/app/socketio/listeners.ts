@@ -59,7 +59,7 @@ const makeSocketIOListeners = (
     onConnect: () => {
       try {
         dispatch(setIsConnected(true));
-        dispatch(setCurrentStatus('Connected'));
+        dispatch(setCurrentStatus(i18n.t('common:statusConnected')));
         dispatch(requestSystemConfig());
         const gallery: GalleryState = getState().gallery;
 
@@ -84,7 +84,7 @@ const makeSocketIOListeners = (
     onDisconnect: () => {
       try {
         dispatch(setIsConnected(false));
-        dispatch(setCurrentStatus('Disconnected'));
+        dispatch(setCurrentStatus(i18n.t('common:statusDisconnected')));
 
         dispatch(
           addLogEntry({
@@ -354,7 +354,7 @@ const makeSocketIOListeners = (
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
       dispatch(setModelList(model_list));
-      dispatch(setCurrentStatus('Model Changed'));
+      dispatch(setCurrentStatus(i18n.t('common:statusModelChanged')));
       dispatch(setIsProcessing(false));
       dispatch(setIsCancelable(true));
       dispatch(

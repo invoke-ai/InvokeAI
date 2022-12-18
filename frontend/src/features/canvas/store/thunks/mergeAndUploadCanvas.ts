@@ -167,6 +167,6 @@ export const mergeAndUploadCanvas =
     }
 
     dispatch(setIsProcessing(false));
-    dispatch(setCurrentStatus('Connected'));
+    dispatch(setCurrentStatus(i18n.t('common:statusConnected')));
     dispatch(setIsCancelable(true));
   };
