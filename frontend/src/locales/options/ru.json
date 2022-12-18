@@ -21,14 +21,14 @@
   "otherOptions": "Другие параметры",
   "seamlessTiling": "Бесшовный узор",
   "hiresOptim": "Высокое разрешение",
-  "imageFit": "Уместить изображение в заданный размер",
+  "imageFit": "Уместить изображение",
   "codeformerFidelity": "Точность",
   "seamSize": "Размер шва",
   "seamBlur": "Размытие шва",
   "seamStrength": "Сила шва",
   "seamSteps": "Шаги шва",
   "inpaintReplace": "Inpaint-замена",
-  "scaleBeforeProcessing": "Масштабировать перед обработкой",
+  "scaleBeforeProcessing": "Масштабировать",
   "scaledWidth": "Масштаб Ш",
   "scaledHeight": "Масштаб В",
   "infillMethod": "Способ заполнения",
@@ -41,3 +41,4 @@
   "invoke": "Вызвать",
   "cancel": "Отменить"
 }
+ 
