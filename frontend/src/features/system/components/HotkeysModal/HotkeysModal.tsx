@@ -93,8 +93,12 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       desc: 'Use all parameters of the current image',
       hotkey: 'A',
     },
-    { title: 'Restore Faces', desc: 'Restore the current image', hotkey: 'R' },
-    { title: 'Upscale', desc: 'Upscale the current image', hotkey: 'U' },
+    {
+      title: 'Restore Faces',
+      desc: 'Restore the current image',
+      hotkey: 'Shift+R',
+    },
+    { title: 'Upscale', desc: 'Upscale the current image', hotkey: 'Shift+U' },
     {
       title: 'Show Info',
       desc: 'Show metadata info of the current image',
@@ -254,17 +258,17 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'R',
     },
     {
-      title: 'Previous Image',
+      title: 'Previous Staging Image',
       desc: 'Previous Staging Area Image',
       hotkey: 'Arrow Left',
     },
     {
-      title: 'Next Image',
+      title: 'Next Staging Image',
       desc: 'Next Staging Area Image',
       hotkey: 'Arrow Right',
     },
     {
-      title: 'Accept Image',
+      title: 'Accept Staging Image',
       desc: 'Accept Current Staging Area Image',
       hotkey: 'Enter',
     },

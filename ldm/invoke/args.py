@@ -119,7 +119,7 @@ PRECISION_CHOICES = [
 
 # is there a way to pick this up during git commits?
 APP_ID      = 'invoke-ai/InvokeAI'
-APP_VERSION = 'v2.2.3'
+APP_VERSION = 'v2.2.4'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -172,14 +172,20 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             sysargs = sys.argv[1:]
-            initfile = os.path.expanduser(Globals.initfile)
+            # pre-parse to get the root directory; ignore the rest
+            switches = self._arg_parser.parse_args(sysargs)
+            Globals.root = os.path.abspath(switches.root_dir or Globals.root)
+
+            # now use root directory to find the init file
+            initfile = os.path.expanduser(os.path.join(Globals.root,Globals.initfile))
+            legacyinit = os.path.expanduser('~/.invokeai')
             if os.path.exists(initfile):
                 print(f'>> Initialization file {initfile} found. Loading...')
                 sysargs.insert(0,f'@{initfile}')
-            else:
-                from ldm.invoke.CLI import emergency_model_reconfigure
-                emergency_model_reconfigure()
-                sys.exit(-1)
+            elif os.path.exists(legacyinit):
+                print(f'>> WARNING: Old initialization file found at {legacyinit}. This location is deprecated. Please move it to {Globals.root}/invokeai.init.')
+                sysargs.insert(0,f'@{legacyinit}')
+
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
         except Exception as e:
@@ -411,7 +417,7 @@ class Args(object):
         model_group.add_argument(
             '--root_dir',
             default=None,
-            help='Path to directory containing "models", "outputs" and "configs". If not present will try to read from ~/.invokeai and then from environment variable INVOKEAI_ROOT. Defaults to the current directory as a last resort.',
+            help='Path to directory containing "models", "outputs" and "configs". If not present will read from environment variable INVOKEAI_ROOT. Defaults to ~/invokeai.',
         )
         model_group.add_argument(
             '--config',
@@ -424,6 +430,12 @@ class Args(object):
         model_group.add_argument(
             '--model',
             help='Indicates which diffusion model to load (defaults to "default" stanza in configs/models.yaml)',
+        )
+        model_group.add_argument(
+            '--weight_dirs',
+            nargs='+',
+            type=str,
+            help='List of one or more directories that will be auto-scanned for new model weights to import',
         )
         model_group.add_argument(
             '--png_compression','-z',
@@ -576,6 +588,12 @@ class Args(object):
             '--enable_image_debugging',
             action='store_true',
             help='Generates debugging image to display'
+        )
+        render_group.add_argument(
+            '--karras_max',
+            type=int,
+            default=None,
+            help="control the point at which the K* samplers will shift from using the Karras noise schedule (good for low step counts) to the LatentDiffusion noise schedule (good for high step counts). Set to 0 to use LatentDiffusion for all step values, and to a high value (e.g. 1000) to use Karras for all step values. [29]."
         )
         # Restoration related args
         postprocessing_group.add_argument(

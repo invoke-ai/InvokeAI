@@ -15,11 +15,11 @@ declare global {
      */
     findLast<S extends T>(
       predicate: (this: void, value: T, index: number, obj: T[]) => value is S,
-      thisArg?: any
+      thisArg?: unknown
     ): S | undefined;
     findLast(
       predicate: (value: T, index: number, obj: T[]) => unknown,
-      thisArg?: any
+      thisArg?: unknown
     ): T | undefined;
 
     /**
@@ -33,7 +33,7 @@ declare global {
      */
     findLastIndex(
       predicate: (value: T, index: number, obj: T[]) => unknown,
-      thisArg?: any
+      thisArg?: unknown
     ): number;
   }
 }

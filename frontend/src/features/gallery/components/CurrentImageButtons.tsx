@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
 import {
   OptionsState,
@@ -256,7 +256,7 @@ const CurrentImageButtons = () => {
   };
 
   useHotkeys(
-    'u',
+    'Shift+U',
     () => {
       if (
         isESRGANAvailable &&
@@ -290,7 +290,7 @@ const CurrentImageButtons = () => {
   };
 
   useHotkeys(
-    'r',
+    'Shift+R',
     () => {
       if (
         isGFPGANAvailable &&

@@ -9,6 +9,10 @@ on:
       - 'main'
       - 'development'
 
+concurrency:
+   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+   cancel-in-progress: true
+
 jobs:
   matrix:
     strategy:
@@ -114,9 +118,9 @@ jobs:
         run: |
           python scripts/configure_invokeai.py --no-interactive --yes
 
-      - name: cat ~/.invokeai
+      - name: cat invokeai.init
         id: cat-invokeai
-        run: cat ~/.invokeai
+        run: cat ${{ env.INVOKEAI_ROOT }}/invokeai.init
 
       - name: Run the tests
         id: run-tests

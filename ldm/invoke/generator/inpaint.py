@@ -59,7 +59,7 @@ class Inpaint(Img2Img):
             writeable=False
         )
 
-    def infill_patchmatch(self, im: Image.Image) -> Image:        
+    def infill_patchmatch(self, im: Image.Image) -> Image:
         if im.mode != 'RGBA':
             return im
 
@@ -128,7 +128,7 @@ class Inpaint(Img2Img):
         # Combine
         npmask = npgradient + npedge
 
-        # Expand 
+        # Expand
         npmask = cv.dilate(npmask, np.ones((3,3), np.uint8), iterations = int(edge_size / 2))
 
         new_mask = Image.fromarray(npmask)
@@ -221,7 +221,7 @@ class Inpaint(Img2Img):
                 init_filled = init_filled.resize((inpaint_width, inpaint_height))
 
             debug_image(init_filled, "init_filled", debug_status=self.enable_image_debugging)
-            
+
             # Create init tensor
             init_image = self._image_to_tensor(init_filled.convert('RGB'))
 
@@ -254,7 +254,7 @@ class Inpaint(Img2Img):
                 f">> Using recommended DDIM sampler for inpainting."
             )
             sampler = DDIMSampler(self.model, device=self.model.device)
-        
+
         sampler.make_schedule(
             ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
         )
@@ -279,7 +279,7 @@ class Inpaint(Img2Img):
             # encode (scaled latent)
             z_enc = sampler.stochastic_encode(
                 self.init_latent,
-                torch.tensor([t_enc]).to(self.model.device),
+                torch.tensor([t_enc - 1]).to(self.model.device),
                 noise=x_T
             )
 
@@ -290,6 +290,9 @@ class Inpaint(Img2Img):
                 inverted_mask = 1.0-mask_image  # there will be 1s where the mask is
                 masked_region = (1.0-inpaint_replace) * inverted_mask * z_enc + inpaint_replace * inverted_mask * l_noise
                 z_enc   = z_enc * mask_image + masked_region
+
+            if self.free_gpu_mem and self.model.model.device != self.model.device:
+                self.model.model.to(self.model.device)
 
             # decode it
             samples = sampler.decode(
@@ -353,7 +356,7 @@ class Inpaint(Img2Img):
 
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
-        
+
         corrected_result = super().repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
         debug_image(corrected_result, "corrected_result", debug_status=self.enable_image_debugging)
 

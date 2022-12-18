@@ -1,4 +1,5 @@
-import { RootState, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import ImageUploadButton from 'common/components/ImageUploaderButton';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
 import InitImagePreview from './InitImagePreview';

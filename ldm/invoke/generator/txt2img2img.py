@@ -5,6 +5,7 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 import torch
 import numpy as  np
 import math
+import gc
 from ldm.invoke.generator.base import Generator
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.invoke.generator.omnibus import Omnibus
@@ -83,7 +84,7 @@ class Txt2Img2Img(Generator):
 
             z_enc = ddim_sampler.stochastic_encode(
                 samples,
-                torch.tensor([t_enc]).to(self.model.device),
+                torch.tensor([t_enc-1]).to(self.model.device),
                 noise=self.get_noise(width,height,False)
             )
 
@@ -100,7 +101,11 @@ class Txt2Img2Img(Generator):
             )
 
             if self.free_gpu_mem:
-                self.model.model.to("cpu")
+                self.model.model.to('cpu')
+                self.model.cond_stage_model.device = 'cpu'
+                self.model.cond_stage_model.to('cpu')
+                gc.collect()
+                torch.cuda.empty_cache()
 
             return self.sample_to_image(samples)
 
@@ -142,7 +147,7 @@ class Txt2Img2Img(Generator):
                 **kwargs
                 )
             return result[0][0]
-            
+
         if sampler.uses_inpainting_model():
             return inpaint_make_image
         else:

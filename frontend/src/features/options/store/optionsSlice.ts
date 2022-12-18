@@ -4,7 +4,7 @@ import * as InvokeAI from 'app/invokeai';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { FACETOOL_TYPES } from 'app/constants';
-import { InvokeTabName, tabMap } from 'features/tabs/components/InvokeTabs';
+import { InvokeTabName, tabMap } from 'features/tabs/tabMap';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -55,6 +55,7 @@ export interface OptionsState {
   upscalingStrength: number;
   variationAmount: number;
   width: number;
+  shouldUseCanvasBetaLayout: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -101,6 +102,7 @@ const initialOptionsState: OptionsState = {
   upscalingStrength: 0.75,
   variationAmount: 0.1,
   width: 512,
+  shouldUseCanvasBetaLayout: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -234,8 +236,11 @@ export const optionsSlice = createSlice({
       if (sampler) state.sampler = sampler;
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
-      if (threshold) state.threshold = threshold;
-      if (typeof threshold === 'undefined') state.threshold = 0;
+      if (typeof threshold === 'undefined') {
+        state.threshold = 0;
+      } else {
+        state.threshold = threshold;
+      }
       if (perlin) state.perlin = perlin;
       if (typeof perlin === 'undefined') state.perlin = 0;
       if (typeof seamless === 'boolean') state.seamless = seamless;
@@ -396,6 +401,9 @@ export const optionsSlice = createSlice({
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
     },
+    setShouldUseCanvasBetaLayout: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseCanvasBetaLayout = action.payload;
+    },
   },
 });
 
@@ -451,6 +459,7 @@ export const {
   setUpscalingStrength,
   setVariationAmount,
   setWidth,
+  setShouldUseCanvasBetaLayout,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

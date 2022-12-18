@@ -11,15 +11,21 @@ the attributes:
 '''
 
 import os
+import os.path as osp
 from argparse import Namespace
 
 Globals = Namespace()
 
 # This is usually overwritten by the command line and/or environment variables
-Globals.root = '.'
+if os.environ.get('INVOKEAI_ROOT'):
+    Globals.root = osp.abspath(os.environ.get('INVOKEAI_ROOT'))
+elif os.environ.get('VIRTUAL_ENV'):
+    Globals.root = osp.abspath(osp.join(os.environ.get('VIRTUAL_ENV'), '..'))
+else:
+    Globals.root = osp.abspath(osp.expanduser('~/invokeai'))
 
 # Where to look for the initialization file
-Globals.initfile = os.path.expanduser('~/.invokeai')
+Globals.initfile = 'invokeai.init'
 
 # Awkward workaround to disable attempted loading of pypatchmatch
 # which is causing CI tests to error out.

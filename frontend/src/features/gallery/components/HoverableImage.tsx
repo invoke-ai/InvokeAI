@@ -6,7 +6,7 @@ import {
   Tooltip,
   useToast,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
   setCurrentImage,
   setShouldHoldGalleryOpen,

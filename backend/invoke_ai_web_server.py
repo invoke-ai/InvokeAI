@@ -18,9 +18,11 @@ from PIL.Image import Image as ImageType
 from uuid import uuid4
 from threading import Event
 
+from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.prompt_parser import split_weighted_subprompts
+from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 from ldm.invoke.generator.inpaint import infill_methods
 
 from backend.modules.parameters import parameters_to_command
@@ -39,7 +41,7 @@ if not os.path.isabs(args.outdir):
 
 
 class InvokeAIWebServer:
-    def __init__(self, generate, gfpgan, codeformer, esrgan) -> None:
+    def __init__(self, generate: Generate, gfpgan, codeformer, esrgan) -> None:
         self.host = args.host
         self.port = args.port
 
@@ -207,10 +209,9 @@ class InvokeAIWebServer:
                 FlaskUI(
                     app=self.app,
                     socketio=self.socketio,
-                    start_server="flask-socketio",
+                    server="flask_socketio",
                     width=1600,
                     height=1000,
-                    idle_interval=10,
                     port=self.port
                 ).run()
             except KeyboardInterrupt:
@@ -244,13 +245,15 @@ class InvokeAIWebServer:
 
     def find_frontend(self):
         my_dir = os.path.dirname(__file__)
-        for candidate in (os.path.join(my_dir,'..','frontend','dist'),         # pip install -e .
-                          os.path.join(my_dir,'../../../../frontend','dist')   # pip install .
+        # LS: setup.py seems to put the frontend in different places on different systems, so
+        # this is fragile and needs to be replaced with a better way of finding the front end.
+        for candidate in (os.path.join(my_dir,'..','frontend','dist'),          # pip install -e .
+                          os.path.join(my_dir,'../../../../frontend','dist'),   # pip install . (Linux, Mac)
+                          os.path.join(my_dir,'../../../frontend','dist'),      # pip install . (Windows)
         ):
             if os.path.exists(candidate):
                 return candidate
         assert "Frontend files cannot be found. Cannot continue"
-
 
     def setup_app(self):
         self.result_url = "outputs/"
@@ -905,16 +908,13 @@ class InvokeAIWebServer:
                         },
                     )
 
+
                 if generation_parameters["progress_latents"]:
                     image = self.generate.sample_to_lowres_estimated_image(sample)
                     (width, height) = image.size
                     width *= 8
                     height *= 8
-                    buffered = io.BytesIO()
-                    image.save(buffered, format="PNG")
-                    img_base64 = "data:image/png;base64," + base64.b64encode(
-                        buffered.getvalue()
-                    ).decode("UTF-8")
+                    img_base64 = image_to_dataURL(image)
                     self.socketio.emit(
                         "intermediateResult",
                         {
@@ -932,7 +932,7 @@ class InvokeAIWebServer:
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
-            def image_done(image, seed, first_seed):
+            def image_done(image, seed, first_seed, attention_maps_image=None):
                 if self.canceled.is_set():
                     raise CanceledException
 
@@ -1094,6 +1094,12 @@ class InvokeAIWebServer:
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
+                parsed_prompt, _ = get_prompt_structure(generation_parameters["prompt"])
+                tokens = None if type(parsed_prompt) is Blend else \
+                    get_tokens_for_prompt(self.generate.model, parsed_prompt)
+                attention_maps_image_base64_url = None if attention_maps_image is None \
+                    else image_to_dataURL(attention_maps_image)
+
                 self.socketio.emit(
                     "generationResult",
                     {
@@ -1106,6 +1112,8 @@ class InvokeAIWebServer:
                         "height": height,
                         "boundingBox": original_bounding_box,
                         "generationMode": generation_parameters["generation_mode"],
+                        "attentionMaps": attention_maps_image_base64_url,
+                        "tokens": tokens,
                     },
                 )
                 eventlet.sleep(0)
@@ -1117,7 +1125,7 @@ class InvokeAIWebServer:
             self.generate.prompt2image(
                 **generation_parameters,
                 step_callback=image_progress,
-                image_callback=image_done,
+                image_callback=image_done
             )
 
         except KeyboardInterrupt:
@@ -1563,6 +1571,19 @@ def dataURL_to_image(dataURL: str) -> ImageType:
         )
     )
     return image
+
+"""
+Converts an image into a base64 image dataURL.
+"""
+
+def image_to_dataURL(image: ImageType) -> str:
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    image_base64 = "data:image/png;base64," + base64.b64encode(
+        buffered.getvalue()
+    ).decode("UTF-8")
+    return image_base64
+
 
 
 """

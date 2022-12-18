@@ -4,180 +4,275 @@ title: Changelog
 
 # :octicons-log-16: **Changelog**
 
+## v2.2.4 <small>(11 December 2022)</small>
+
+**the `invokeai` directory**
+
+Previously there were two directories to worry about, the directory that
+contained the InvokeAI source code and the launcher scripts, and the `invokeai`
+directory that contained the models files, embeddings, configuration and
+outputs. With the 2.2.4 release, this dual system is done away with, and
+everything, including the `invoke.bat` and `invoke.sh` launcher scripts, now
+live in a directory named `invokeai`. By default this directory is located in
+your home directory (e.g. `\Users\yourname` on Windows), but you can select
+where it goes at install time.
+
+After installation, you can delete the install directory (the one that the zip
+file creates when it unpacks). Do **not** delete or move the `invokeai`
+directory!
+
+**Initialization file `invokeai/invokeai.init`**
+
+You can place frequently-used startup options in this file, such as the default
+number of steps or your preferred sampler. To keep everything in one place, this
+file has now been moved into the `invokeai` directory and is named
+`invokeai.init`.
+
+**To update from Version 2.2.3**
+
+The easiest route is to download and unpack one of the 2.2.4 installer files.
+When it asks you for the location of the `invokeai` runtime directory, respond
+with the path to the directory that contains your 2.2.3 `invokeai`. That is, if
+`invokeai` lives at `C:\Users\fred\invokeai`, then answer with `C:\Users\fred`
+and answer "Y" when asked if you want to reuse the directory.
+
+The `update.sh` (`update.bat`) script that came with the 2.2.3 source installer
+does not know about the new directory layout and won't be fully functional.
+
+**To update to 2.2.5 (and beyond) there's now an update path**
+
+As they become available, you can update to more recent versions of InvokeAI
+using an `update.sh` (`update.bat`) script located in the `invokeai` directory.
+Running it without any arguments will install the most recent version of
+InvokeAI. Alternatively, you can get set releases by running the `update.sh`
+script with an argument in the command shell. This syntax accepts the path to
+the desired release's zip file, which you can find by clicking on the green
+"Code" button on this repository's home page.
+
+**Other 2.2.4 Improvements**
+
+- Fix InvokeAI GUI initialization by @addianto in #1687
+- fix link in documentation by @lstein in #1728
+- Fix broken link by @ShawnZhong in #1736
+- Remove reference to binary installer by @lstein in #1731
+- documentation fixes for 2.2.3 by @lstein in #1740
+- Modify installer links to point closer to the source installer by @ebr in
+  #1745
+- add documentation warning about 1650/60 cards by @lstein in #1753
+- Fix Linux source URL in installation docs by @andybearman in #1756
+- Make install instructions discoverable in readme by @damian0815 in #1752
+- typo fix by @ofirkris in #1755
+- Non-interactive model download (support HUGGINGFACE_TOKEN) by @ebr in #1578
+- fix(srcinstall): shell installer - cp scripts instead of linking by @tildebyte
+  in #1765
+- stability and usage improvements to binary & source installers by @lstein in
+  #1760
+- fix off-by-one bug in cross-attention-control by @damian0815 in #1774
+- Eventually update APP_VERSION to 2.2.3 by @spezialspezial in #1768
+- invoke script cds to its location before running by @lstein in #1805
+- Make PaperCut and VoxelArt models load again by @lstein in #1730
+- Fix --embedding_directory / --embedding_path not working by @blessedcoolant in
+  #1817
+- Clean up readme by @hipsterusername in #1820
+- Optimized Docker build with support for external working directory by @ebr in
+  #1544
+- disable pushing the cloud container by @mauwii in #1831
+- Fix docker push github action and expand with additional metadata by @ebr in
+  #1837
+- Fix Broken Link To Notebook by @VedantMadane in #1821
+- Account for flat models by @spezialspezial in #1766
+- Update invoke.bat.in isolate environment variables by @lynnewu in #1833
+- Arch Linux Specific PatchMatch Instructions & fixing conda install on linux by
+  @SammCheese in #1848
+- Make force free GPU memory work in img2img by @addianto in #1844
+- New installer by @lstein
+
+## v2.2.3 <small>(2 December 2022)</small>
+
+!!! Note
+
+    This point release removes references to the binary installer from the
+    installation guide. The binary installer is not stable at the current
+    time. First time users are encouraged to use the "source" installer as
+    described in [Installing InvokeAI with the Source Installer](installation/INSTALL_SOURCE.md)
+
+With InvokeAI 2.2, this project now provides enthusiasts and professionals a
+robust workflow solution for creating AI-generated and human facilitated
+compositions. Additional enhancements have been made as well, improving safety,
+ease of use, and installation.
+
+Optimized for efficiency, InvokeAI needs only ~3.5GB of VRAM to generate a
+512x768 image (and less for smaller images), and is compatible with
+Windows/Linux/Mac (M1 & M2).
+
+You can see the [release video](https://youtu.be/hIYBfDtKaus) here, which
+introduces the main WebUI enhancement for version 2.2 -
+[The Unified Canvas](features/UNIFIED_CANVAS.md). This new workflow is the
+biggest enhancement added to the WebUI to date, and unlocks a stunning amount of
+potential for users to create and iterate on their creations. The following
+sections describe what's new for InvokeAI.
+
+## v2.2.2 <small>(30 November 2022)</small>
+
+!!! note
+
+    The binary installer is not ready for prime time. First time users are recommended to install via the "source" installer accessible through the links at the bottom of this page.****
+
+With InvokeAI 2.2, this project now provides enthusiasts and professionals a
+robust workflow solution for creating AI-generated and human facilitated
+compositions. Additional enhancements have been made as well, improving safety,
+ease of use, and installation.
+
+Optimized for efficiency, InvokeAI needs only ~3.5GB of VRAM to generate a
+512x768 image (and less for smaller images), and is compatible with
+Windows/Linux/Mac (M1 & M2).
+
+You can see the [release video](https://youtu.be/hIYBfDtKaus) here, which
+introduces the main WebUI enhancement for version 2.2 -
+[The Unified Canvas](https://invoke-ai.github.io/InvokeAI/features/UNIFIED_CANVAS/).
+This new workflow is the biggest enhancement added to the WebUI to date, and
+unlocks a stunning amount of potential for users to create and iterate on their
+creations. The following sections describe what's new for InvokeAI.
+
+## v2.2.0 <small>(2 December 2022)</small>
+
+With InvokeAI 2.2, this project now provides enthusiasts and professionals a
+robust workflow solution for creating AI-generated and human facilitated
+compositions. Additional enhancements have been made as well, improving safety,
+ease of use, and installation.
+
+Optimized for efficiency, InvokeAI needs only ~3.5GB of VRAM to generate a
+512x768 image (and less for smaller images), and is compatible with
+Windows/Linux/Mac (M1 & M2).
+
+You can see the [release video](https://youtu.be/hIYBfDtKaus) here, which
+introduces the main WebUI enhancement for version 2.2 -
+[The Unified Canvas](features/UNIFIED_CANVAS.md). This new workflow is the
+biggest enhancement added to the WebUI to date, and unlocks a stunning amount of
+potential for users to create and iterate on their creations. The following
+sections describe what's new for InvokeAI.
+
+## v2.1.3 <small>(13 November 2022)</small>
+
+- A choice of installer scripts that automate installation and configuration.
+  See
+  [Installation](installation/index.md).
+- A streamlined manual installation process that works for both Conda and
+  PIP-only installs. See
+  [Manual Installation](installation/INSTALL_MANUAL.md).
+- The ability to save frequently-used startup options (model to load, steps,
+  sampler, etc) in a `.invokeai` file. See
+  [Client](features/CLI.md)
+- Support for AMD GPU cards (non-CUDA) on Linux machines.
+- Multiple bugs and edge cases squashed.
+
 ## v2.1.0 <small>(2 November 2022)</small>
 
-- update mac instructions to use invokeai for env name by @willwillems in
-  https://github.com/invoke-ai/InvokeAI/pull/1030
-- Update .gitignore by @blessedcoolant in
-  https://github.com/invoke-ai/InvokeAI/pull/1040
-- reintroduce fix for m1 from https://github.com/invoke-ai/InvokeAI/pull/579
-  missing after merge by @skurovec in
-  https://github.com/invoke-ai/InvokeAI/pull/1056
-- Update Stable_Diffusion_AI_Notebook.ipynb (Take 2) by @ChloeL19 in
-  https://github.com/invoke-ai/InvokeAI/pull/1060
-- Print out the device type which is used by @manzke in
-  https://github.com/invoke-ai/InvokeAI/pull/1073
-- Hires Addition by @hipsterusername in
-  https://github.com/invoke-ai/InvokeAI/pull/1063
+- update mac instructions to use invokeai for env name by @willwillems in #1030
+- Update .gitignore by @blessedcoolant in #1040
+- reintroduce fix for m1 from #579 missing after merge by @skurovec in #1056
+- Update Stable_Diffusion_AI_Notebook.ipynb (Take 2) by @ChloeL19 in #1060
+- Print out the device type which is used by @manzke in #1073
+- Hires Addition by @hipsterusername in #1063
 - fix for "1 leaked semaphore objects to clean up at shutdown" on M1 by
-  @skurovec in https://github.com/invoke-ai/InvokeAI/pull/1081
+  @skurovec in #1081
 - Forward dream.py to invoke.py using the same interpreter, add deprecation
-  warning by @db3000 in https://github.com/invoke-ai/InvokeAI/pull/1077
-- fix noisy images at high step counts by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1086
-- Generalize facetool strength argument by @db3000 in
-  https://github.com/invoke-ai/InvokeAI/pull/1078
+  warning by @db3000 in #1077
+- fix noisy images at high step counts by @lstein in #1086
+- Generalize facetool strength argument by @db3000 in #1078
 - Enable fast switching among models at the invoke> command line by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1066
-- Fix Typo, committed changing ldm environment to invokeai by @jdries3 in
-  https://github.com/invoke-ai/InvokeAI/pull/1095
-- Update generate.py by @unreleased in
-  https://github.com/invoke-ai/InvokeAI/pull/1109
-- Update 'ldm' env to 'invokeai' in troubleshooting steps by @19wolf in
-  https://github.com/invoke-ai/InvokeAI/pull/1125
-- Fixed documentation typos and resolved merge conflicts by @rupeshs in
-  https://github.com/invoke-ai/InvokeAI/pull/1123
-- Fix broken doc links, fix malaprop in the project subtitle by @majick in
-  https://github.com/invoke-ai/InvokeAI/pull/1131
-- Only output facetool parameters if enhancing faces by @db3000 in
-  https://github.com/invoke-ai/InvokeAI/pull/1119
+  #1066
+- Fix Typo, committed changing ldm environment to invokeai by @jdries3 in #1095
+- Update generate.py by @unreleased in #1109
+- Update 'ldm' env to 'invokeai' in troubleshooting steps by @19wolf in #1125
+- Fixed documentation typos and resolved merge conflicts by @rupeshs in #1123
+- Fix broken doc links, fix malaprop in the project subtitle by @majick in #1131
+- Only output facetool parameters if enhancing faces by @db3000 in #1119
 - Update gitignore to ignore codeformer weights at new location by
-  @spezialspezial in https://github.com/invoke-ai/InvokeAI/pull/1136
-- fix links to point to invoke-ai.github.io #1117 by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1143
-- Rework-mkdocs by @mauwii in https://github.com/invoke-ai/InvokeAI/pull/1144
+  @spezialspezial in #1136
+- fix links to point to invoke-ai.github.io #1117 by @mauwii in #1143
+- Rework-mkdocs by @mauwii in #1144
 - add option to CLI and pngwriter that allows user to set PNG compression level
-  by @lstein in https://github.com/invoke-ai/InvokeAI/pull/1127
-- Fix img2img DDIM index out of bound by @wfng92 in
-  https://github.com/invoke-ai/InvokeAI/pull/1137
-- Fix gh actions by @mauwii in https://github.com/invoke-ai/InvokeAI/pull/1128
-- update mac instructions to use invokeai for env name by @willwillems in
-  https://github.com/invoke-ai/InvokeAI/pull/1030
-- Update .gitignore by @blessedcoolant in
-  https://github.com/invoke-ai/InvokeAI/pull/1040
-- reintroduce fix for m1 from https://github.com/invoke-ai/InvokeAI/pull/579
-  missing after merge by @skurovec in
-  https://github.com/invoke-ai/InvokeAI/pull/1056
-- Update Stable_Diffusion_AI_Notebook.ipynb (Take 2) by @ChloeL19 in
-  https://github.com/invoke-ai/InvokeAI/pull/1060
-- Print out the device type which is used by @manzke in
-  https://github.com/invoke-ai/InvokeAI/pull/1073
-- Hires Addition by @hipsterusername in
-  https://github.com/invoke-ai/InvokeAI/pull/1063
+  by @lstein in #1127
+- Fix img2img DDIM index out of bound by @wfng92 in #1137
+- Fix gh actions by @mauwii in #1128
+- update mac instructions to use invokeai for env name by @willwillems in #1030
+- Update .gitignore by @blessedcoolant in #1040
+- reintroduce fix for m1 from #579 missing after merge by @skurovec in #1056
+- Update Stable_Diffusion_AI_Notebook.ipynb (Take 2) by @ChloeL19 in #1060
+- Print out the device type which is used by @manzke in #1073
+- Hires Addition by @hipsterusername in #1063
 - fix for "1 leaked semaphore objects to clean up at shutdown" on M1 by
-  @skurovec in https://github.com/invoke-ai/InvokeAI/pull/1081
+  @skurovec in #1081
 - Forward dream.py to invoke.py using the same interpreter, add deprecation
-  warning by @db3000 in https://github.com/invoke-ai/InvokeAI/pull/1077
-- fix noisy images at high step counts by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1086
-- Generalize facetool strength argument by @db3000 in
-  https://github.com/invoke-ai/InvokeAI/pull/1078
+  warning by @db3000 in #1077
+- fix noisy images at high step counts by @lstein in #1086
+- Generalize facetool strength argument by @db3000 in #1078
 - Enable fast switching among models at the invoke> command line by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1066
-- Fix Typo, committed changing ldm environment to invokeai by @jdries3 in
-  https://github.com/invoke-ai/InvokeAI/pull/1095
-- Fixed documentation typos and resolved merge conflicts by @rupeshs in
-  https://github.com/invoke-ai/InvokeAI/pull/1123
-- Only output facetool parameters if enhancing faces by @db3000 in
-  https://github.com/invoke-ai/InvokeAI/pull/1119
+  #1066
+- Fix Typo, committed changing ldm environment to invokeai by @jdries3 in #1095
+- Fixed documentation typos and resolved merge conflicts by @rupeshs in #1123
+- Only output facetool parameters if enhancing faces by @db3000 in #1119
 - add option to CLI and pngwriter that allows user to set PNG compression level
-  by @lstein in https://github.com/invoke-ai/InvokeAI/pull/1127
-- Fix img2img DDIM index out of bound by @wfng92 in
-  https://github.com/invoke-ai/InvokeAI/pull/1137
-- Add text prompt to inpaint mask support by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1133
+  by @lstein in #1127
+- Fix img2img DDIM index out of bound by @wfng92 in #1137
+- Add text prompt to inpaint mask support by @lstein in #1133
 - Respect http[s] protocol when making socket.io middleware by @damian0815 in
-  https://github.com/invoke-ai/InvokeAI/pull/976
-- WebUI: Adds Codeformer support by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1151
-- Skips normalizing prompts for web UI metadata by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1165
-- Add Asymmetric Tiling by @carson-katri in
-  https://github.com/invoke-ai/InvokeAI/pull/1132
-- Web UI: Increases max CFG Scale to 200 by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1172
+  #976
+- WebUI: Adds Codeformer support by @psychedelicious in #1151
+- Skips normalizing prompts for web UI metadata by @psychedelicious in #1165
+- Add Asymmetric Tiling by @carson-katri in #1132
+- Web UI: Increases max CFG Scale to 200 by @psychedelicious in #1172
 - Corrects color channels in face restoration; Fixes #1167 by @psychedelicious
-  in https://github.com/invoke-ai/InvokeAI/pull/1175
+  in #1175
 - Flips channels using array slicing instead of using OpenCV by @psychedelicious
-  in https://github.com/invoke-ai/InvokeAI/pull/1178
-- Fix typo in docs: s/Formally/Formerly by @noodlebox in
-  https://github.com/invoke-ai/InvokeAI/pull/1176
-- fix clipseg loading problems by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1177
-- Correct color channels in upscale using array slicing by @wfng92 in
-  https://github.com/invoke-ai/InvokeAI/pull/1181
+  in #1178
+- Fix typo in docs: s/Formally/Formerly by @noodlebox in #1176
+- fix clipseg loading problems by @lstein in #1177
+- Correct color channels in upscale using array slicing by @wfng92 in #1181
 - Web UI: Filters existing images when adding new images; Fixes #1085 by
-  @psychedelicious in https://github.com/invoke-ai/InvokeAI/pull/1171
-- fix a number of bugs in textual inversion by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1190
-- Improve !fetch, add !replay command by @ArDiouscuros in
-  https://github.com/invoke-ai/InvokeAI/pull/882
-- Fix generation of image with s>1000 by @holstvoogd in
-  https://github.com/invoke-ai/InvokeAI/pull/951
-- Web UI: Gallery improvements by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1198
-- Update CLI.md by @krummrey in https://github.com/invoke-ai/InvokeAI/pull/1211
-- outcropping improvements by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1207
-- add support for loading VAE autoencoders by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1216
-- remove duplicate fix_func for MPS by @wfng92 in
-  https://github.com/invoke-ai/InvokeAI/pull/1210
-- Metadata storage and retrieval fixes by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1204
-- nix: add shell.nix file by @Cloudef in
-  https://github.com/invoke-ai/InvokeAI/pull/1170
-- Web UI: Changes vite dist asset paths to relative by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1185
-- Web UI: Removes isDisabled from PromptInput by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1187
+  @psychedelicious in #1171
+- fix a number of bugs in textual inversion by @lstein in #1190
+- Improve !fetch, add !replay command by @ArDiouscuros in #882
+- Fix generation of image with s>1000 by @holstvoogd in #951
+- Web UI: Gallery improvements by @psychedelicious in #1198
+- Update CLI.md by @krummrey in #1211
+- outcropping improvements by @lstein in #1207
+- add support for loading VAE autoencoders by @lstein in #1216
+- remove duplicate fix_func for MPS by @wfng92 in #1210
+- Metadata storage and retrieval fixes by @lstein in #1204
+- nix: add shell.nix file by @Cloudef in #1170
+- Web UI: Changes vite dist asset paths to relative by @psychedelicious in #1185
+- Web UI: Removes isDisabled from PromptInput by @psychedelicious in #1187
 - Allow user to generate images with initial noise as on M1 / mps system by
-  @ArDiouscuros in https://github.com/invoke-ai/InvokeAI/pull/981
-- feat: adding filename format template by @plucked in
-  https://github.com/invoke-ai/InvokeAI/pull/968
-- Web UI: Fixes broken bundle by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1242
-- Support runwayML custom inpainting model by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1243
-- Update IMG2IMG.md by @talitore in
-  https://github.com/invoke-ai/InvokeAI/pull/1262
+  @ArDiouscuros in #981
+- feat: adding filename format template by @plucked in #968
+- Web UI: Fixes broken bundle by @psychedelicious in #1242
+- Support runwayML custom inpainting model by @lstein in #1243
+- Update IMG2IMG.md by @talitore in #1262
 - New dockerfile - including a build- and a run- script as well as a GH-Action
-  by @mauwii in https://github.com/invoke-ai/InvokeAI/pull/1233
+  by @mauwii in #1233
 - cut over from karras to model noise schedule for higher steps by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1222
-- Prompt tweaks by @lstein in https://github.com/invoke-ai/InvokeAI/pull/1268
-- Outpainting implementation by @Kyle0654 in
-  https://github.com/invoke-ai/InvokeAI/pull/1251
-- fixing aspect ratio on hires by @tjennings in
-  https://github.com/invoke-ai/InvokeAI/pull/1249
-- Fix-build-container-action by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1274
-- handle all unicode characters by @damian0815 in
-  https://github.com/invoke-ai/InvokeAI/pull/1276
-- adds models.user.yml to .gitignore by @JakeHL in
-  https://github.com/invoke-ai/InvokeAI/pull/1281
-- remove debug branch, set fail-fast to false by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1284
-- Protect-secrets-on-pr by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1285
-- Web UI: Adds initial inpainting implementation by @psychedelicious in
-  https://github.com/invoke-ai/InvokeAI/pull/1225
-- fix environment-mac.yml - tested on x64 and arm64 by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1289
-- Use proper authentication to download model by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1287
-- Prevent indexing error for mode RGB by @spezialspezial in
-  https://github.com/invoke-ai/InvokeAI/pull/1294
+  #1222
+- Prompt tweaks by @lstein in #1268
+- Outpainting implementation by @Kyle0654 in #1251
+- fixing aspect ratio on hires by @tjennings in #1249
+- Fix-build-container-action by @mauwii in #1274
+- handle all unicode characters by @damian0815 in #1276
+- adds models.user.yml to .gitignore by @JakeHL in #1281
+- remove debug branch, set fail-fast to false by @mauwii in #1284
+- Protect-secrets-on-pr by @mauwii in #1285
+- Web UI: Adds initial inpainting implementation by @psychedelicious in #1225
+- fix environment-mac.yml - tested on x64 and arm64 by @mauwii in #1289
+- Use proper authentication to download model by @mauwii in #1287
+- Prevent indexing error for mode RGB by @spezialspezial in #1294
 - Integrate sd-v1-5 model into test matrix (easily expandable), remove
-  unecesarry caches by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1293
-- add --no-interactive to configure_invokeai step by @mauwii in
-  https://github.com/invoke-ai/InvokeAI/pull/1302
+  unecesarry caches by @mauwii in #1293
+- add --no-interactive to configure_invokeai step by @mauwii in #1302
 - 1-click installer and updater. Uses micromamba to install git and conda into a
   contained environment (if necessary) before running the normal installation
-  script by @cmdr2 in https://github.com/invoke-ai/InvokeAI/pull/1253
-- configure_invokeai.py script downloads the weight files by @lstein in
-  https://github.com/invoke-ai/InvokeAI/pull/1290
+  script by @cmdr2 in #1253
+- configure_invokeai.py script downloads the weight files by @lstein in #1290
 
 ## v2.0.1 <small>(13 October 2022)</small>
 

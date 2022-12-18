@@ -8,6 +8,10 @@
     "build": "tsc && vite build",
     "build-dev": "tsc && vite build -m development",
     "preview": "vite preview",
+    "madge": "madge --circular src/main.tsx",
+    "lint": "eslint src/",
+    "prettier": "prettier '*.{json,cjs,ts,html}' 'src/**/*.{ts,tsx}'",
+    "fmt": "npm run prettier -- --write",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -53,17 +57,31 @@
     "@types/react-transition-group": "^4.4.5",
     "@typescript-eslint/eslint-plugin": "^5.36.2",
     "@typescript-eslint/parser": "^5.36.2",
+    "@vitejs/plugin-legacy": "^3.0.1",
     "@vitejs/plugin-react": "^2.0.1",
     "eslint": "^8.23.0",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "madge": "^5.0.1",
     "patch-package": "^6.5.0",
     "postinstall-postinstall": "^2.1.0",
+    "prettier": "^2.8.1",
     "sass": "^1.55.0",
+    "terser": "^5.16.1",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.6.4",
     "vite": "^3.0.7",
     "vite-plugin-eslint": "^1.8.1",
     "vite-tsconfig-paths": "^3.5.2"
+  },
+  "madge": {
+    "detectiveOptions": {
+      "ts": {
+        "skipTypeImports": true
+      },
+      "tsx": {
+        "skipTypeImports": true
+      }
+    }
   }
 }

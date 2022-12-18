@@ -51,7 +51,7 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 For full installation and upgrade instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
-1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/tag/v2.2.3)
+1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
 2. Download the .zip file for your OS (Windows/macOS/Linux).
 3. Unzip the file. 
 4. If you are on Windows, double-click on the `install.bat` script. On macOS, open a Terminal window, drag the file `install.sh` from Finder into the Terminal, and press return. On Linux, run `install.sh`.
@@ -167,10 +167,7 @@ To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the 
 
 If you are unfamiliar with how
 to contribute to GitHub projects, here is a
-[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress, but for now the most
-important thing is to **make your pull request against the "development" branch**, and not against
-"main". This will help keep public breakage to a minimum and will allow you to propose more radical
-changes.
+[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress. You can **make your pull request against the "main" branch**. 
 
 We hope you enjoy using our software as much as we enjoy creating it,
 and we hope that some of those of you who are reading this will elect

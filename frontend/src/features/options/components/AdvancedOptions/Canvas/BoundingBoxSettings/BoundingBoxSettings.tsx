@@ -1,6 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
@@ -9,7 +9,8 @@ import _ from 'lodash';
 const selector = createSelector(
   canvasSelector,
   (canvas) => {
-    const { boundingBoxDimensions, boundingBoxScaleMethod: boundingBoxScale } = canvas;
+    const { boundingBoxDimensions, boundingBoxScaleMethod: boundingBoxScale } =
+      canvas;
     return {
       boundingBoxDimensions,
       boundingBoxScale,

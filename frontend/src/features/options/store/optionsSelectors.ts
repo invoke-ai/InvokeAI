@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import { RootState } from 'app/store';
-import { tabMap } from 'features/tabs/components/InvokeTabs';
+import { tabMap } from 'features/tabs/tabMap';
 import { OptionsState } from './optionsSlice';
 
 export const activeTabNameSelector = createSelector(

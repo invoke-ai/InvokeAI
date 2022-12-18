@@ -1,7 +1,6 @@
 import { Tooltip } from '@chakra-ui/react';
 import * as Slider from '@radix-ui/react-slider';
 import React from 'react';
-import IAITooltip from './IAITooltip';
 
 type IAISliderProps = Slider.SliderProps & {
   value: number[];

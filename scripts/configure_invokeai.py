@@ -40,7 +40,7 @@ Dataset_path = './configs/INITIAL_MODELS.yaml'
 Default_config_file = './configs/models.yaml'
 SD_Configs = './configs/stable-diffusion'
 
-assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the InvokeAI distribution directory, or from within the invokeai runtime directory."
+assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the invokeai runtime directory."
 
 Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(['yes','no'])
@@ -65,16 +65,23 @@ this program and resume later.\n'''
 #--------------------------------------------
 def postscript(errors: None):
     if not any(errors):
-        message='''\n** Model Installation Successful **\nYou're all set! You may now launch InvokeAI using one of these two commands:
-Web version:
-    python scripts/invoke.py --web  (connect to http://localhost:9090)
-Command-line version:
-   python scripts/invoke.py
+        message='''
+** Model Installation Successful **
 
-If you installed manually, remember to activate the 'invokeai'
-environment before running invoke.py. If you installed using the
-automated installation script, execute "invoke.sh" (Linux/Mac) or
-"invoke.bat" (Windows) to start InvokeAI.
+You're all set!
+
+If you installed using one of the automated installation scripts,
+execute 'invoke.sh' (Linux/macOS) or 'invoke.bat' (Windows) to
+start InvokeAI.
+
+If you installed manually, activate the 'invokeai' environment
+(e.g. 'conda activate invokeai'), then run one of the following
+commands to start InvokeAI.
+
+Web UI:
+    python scripts/invoke.py --web # (connect to http://localhost:9090)
+Command-line interface:
+   python scripts/invoke.py
 
 Have fun!
 '''
@@ -106,7 +113,7 @@ def user_wants_to_download_weights()->str:
     print('''You can download and configure the weights files manually or let this
 script do it for you. Manual installation is described at:
 
-https://github.com/invoke-ai/InvokeAI/blob/main/docs/installation/INSTALLING_MODELS.md
+https://invoke-ai.github.io/InvokeAI/installation/020_INSTALL_MANUAL/
 
 You may download the recommended models (about 10GB total), select a customized set, or
 completely skip this step.
@@ -234,7 +241,7 @@ This involves a few easy steps.
    "Role" should be "read").
 
    Now copy the token to your clipboard and paste it at the prompt. Windows
-   users can paste with right-click.
+   users can paste with right-click or Ctrl-Shift-V.
    Token: '''
         )
         access_token = getpass_asterisk.getpass_asterisk()
@@ -580,22 +587,7 @@ def get_root(root:str=None)->str:
     elif os.environ.get('INVOKEAI_ROOT'):
         return os.environ.get('INVOKEAI_ROOT')
     else:
-        init_file = os.path.expanduser(Globals.initfile)
-        if not os.path.exists(init_file):
-            return None
-
-    # if we get here, then we read from initfile
-    root = None
-    with open(init_file, 'r') as infile:
-        lines = infile.readlines()
-        for l in lines:
-            if re.search('\s*#',l): # ignore comments
-                continue
-            match = re.search('--root\s*=?\s*"?([^"]+)"?',l)
-            if match:
-                root = match.groups()[0]
-                root = root.strip()
-    return root
+        return Globals.root
 
 #-------------------------------------
 def select_root(root:str, yes_to_all:bool=False):
@@ -626,48 +618,26 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root_selected = False
     while not root_selected:
-        root = select_root(root,yes_to_all)
         outputs = select_outputs(root,yes_to_all)
-        Globals.root = os.path.abspath(root)
         outputs = outputs if os.path.isabs(outputs) else os.path.abspath(os.path.join(Globals.root,outputs))
 
-        print(f'\nInvokeAI models and configuration files will be placed into "{root}" and image outputs will be placed into "{outputs}".')
+        print(f'\nInvokeAI image outputs will be placed into "{outputs}".')
         if not yes_to_all:
-            root_selected = yes_or_no('Accept these locations?')
+            root_selected = yes_or_no('Accept this location?')
         else:
             root_selected = True
 
-    print(f'\nYou may change the chosen directories at any time by editing the --root and --outdir options in "{Globals.initfile}",')
+    print(f'\nYou may change the chosen output directory at any time by editing the --outdir options in "{Globals.initfile}",')
     print(f'You may also change the runtime directory by setting the environment variable INVOKEAI_ROOT.\n')
 
     enable_safety_checker = True
-    default_sampler = 'k_heun'
-    default_steps = '20'  # deliberately a string - see test below
-
-    sampler_choices =['ddim','k_dpm_2_a','k_dpm_2','k_euler_a','k_euler','k_heun','k_lms','plms']
-
     if not yes_to_all:
         print('The NSFW (not safe for work) checker blurs out images that potentially contain sexual imagery.')
         print('It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker.')
         print('The following option will set whether the checker is enabled by default. Like other options, you can')
         print(f'change this setting later by editing the file {Globals.initfile}.')
+        print(f"This is NOT recommended for systems with less than 6G VRAM because of the checker's memory requirements.")
         enable_safety_checker = yes_or_no('Enable the NSFW checker by default?',enable_safety_checker)
-
-        print('\nThe next choice selects the sampler to use by default. Samplers have different speed/performance')
-        print('tradeoffs. If you are not sure what to select, accept the default.')
-        sampler = None
-        while sampler not in sampler_choices:
-            sampler = input(f'Default sampler to use? ({", ".join(sampler_choices)}) [{default_sampler}]:') or default_sampler
-
-        print('\nThe number of denoising steps affects both the speed and quality of the images generated.')
-        print('Higher steps often (but not always) increases the quality of the image, but increases image')
-        print('generation time. This can be changed at run time. Accept the default if you are unsure.')
-        steps = ''
-        while not steps.isnumeric():
-            steps = input(f'Default number of steps to use during generation? [{default_steps}]:') or default_steps
-    else:
-        sampler = default_sampler
-        steps = default_steps
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
@@ -679,7 +649,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
             shutil.copytree(src,dest,dirs_exist_ok=True)
         os.makedirs(outputs, exist_ok=True)
 
-    init_file = os.path.expanduser(Globals.initfile)
+    init_file = os.path.join(Globals.root,Globals.initfile)
 
     print(f'Creating the initialization file at "{init_file}".\n')
     with open(init_file,'w') as f:
@@ -688,16 +658,11 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
 # or renaming it and then running configure_invokeai.py again.
 
-# The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
---root="{Globals.root}"
-
 # the --outdir option controls the default location of image files.
 --outdir="{outputs}"
 
 # generation arguments
 {safety_checker}
---sampler={sampler}
---steps={steps}
 
 # You may place other  frequently-used startup commands here, one or more per line.
 # Examples:
@@ -741,7 +706,7 @@ def main():
                         type=str,
                         default='./configs/models.yaml',
                         help='path to configuration file to create')
-    parser.add_argument('--root',
+    parser.add_argument('--root_dir',
                         dest='root',
                         type=str,
                         default=None,
@@ -757,7 +722,7 @@ def main():
 
         # We check for to see if the runtime directory is correctly initialized.
         if Globals.root == '' \
-           or not os.path.exists(os.path.join(Globals.root,'configs/stable-diffusion/v1-inference.yaml')):
+           or not os.path.exists(os.path.join(Globals.root,'invokeai.init')):
             initialize_rootdir(Globals.root,opt.yes_to_all)
 
         # Optimistically try to download all required assets. If any errors occur, add them and proceed anyway.

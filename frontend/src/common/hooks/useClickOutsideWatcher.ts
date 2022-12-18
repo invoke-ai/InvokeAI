@@ -1,5 +1,4 @@
-import { RefObject, useEffect, useRef } from 'react';
-import { Rect } from 'react-konva';
+import { RefObject, useEffect } from 'react';
 
 const watchers: {
   ref: RefObject<HTMLElement>;
