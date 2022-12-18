@@ -1,5 +1,6 @@
 import { Image, useToast } from '@chakra-ui/react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageUploaderIconButton from 'common/components/ImageUploaderIconButton';
 import { clearInitialImage } from 'features/options/store/optionsSlice';
 
@@ -30,7 +31,7 @@ export default function InitImagePreview() {
   return (
     <>
       <div className="init-image-preview-header">
-      {/* <div className="init-image-preview-header"> */}
+        {/* <div className="init-image-preview-header"> */}
         <h2>Initial Image</h2>
         {/* <IconButton
           isDisabled={!initialImage}

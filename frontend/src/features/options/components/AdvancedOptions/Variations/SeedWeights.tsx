@@ -1,9 +1,6 @@
 import React, { ChangeEvent } from 'react';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIInput from 'common/components/IAIInput';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { setSeedWeights } from 'features/options/store/optionsSlice';

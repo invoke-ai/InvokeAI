@@ -1,8 +1,8 @@
 import React from 'react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { setSteps } from 'features/options/store/optionsSlice';
-import { inputWidth } from './MainOptions';
 
 export default function MainSteps() {
   const dispatch = useAppDispatch();
@@ -18,7 +18,7 @@ export default function MainSteps() {
       step={1}
       onChange={handleChangeSteps}
       value={steps}
-      width={inputWidth}
+      width="auto"
       styleClass="main-option-block"
       textAlign="center"
     />

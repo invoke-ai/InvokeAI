@@ -1,4 +1,5 @@
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { setShouldSnapToGrid } from 'features/canvas/store/canvasSlice';
 import React, { ChangeEvent } from 'react';

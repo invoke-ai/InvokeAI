@@ -38,7 +38,7 @@ export const uploadImage =
     });
 
     const image = (await response.json()) as InvokeAI.ImageUploadResponse;
-    console.log(image)
+    console.log(image);
     const newImage: InvokeAI.Image = {
       uuid: uuidv4(),
       category: 'user',

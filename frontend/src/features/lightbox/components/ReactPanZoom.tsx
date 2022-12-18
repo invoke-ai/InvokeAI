@@ -14,7 +14,7 @@ type ReactPanZoomProps = {
   image: string;
   styleClass?: string;
   alt?: string;
-  ref?: any;
+  ref?: React.Ref<HTMLImageElement>;
 };
 
 export default function ReactPanZoom({

@@ -1,13 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
 import React from 'react';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import type { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import {
   OptionsState,
   setIterations,
 } from 'features/options/store/optionsSlice';
-import { inputWidth } from './MainOptions';
 
 const mainIterationsSelector = createSelector(
   [(state: RootState) => state.options],
@@ -39,7 +39,7 @@ export default function MainIterations() {
       max={9999}
       onChange={handleChangeIterations}
       value={iterations}
-      width={inputWidth}
+      width="auto"
       labelFontSize={0.5}
       styleClass="main-option-block"
       textAlign="center"

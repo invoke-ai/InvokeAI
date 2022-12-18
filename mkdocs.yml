@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
 # General
-site_name: Stable Diffusion Toolkit Docs
+site_name: InvokeAI Stable Diffusion Toolkit Docs
 site_url: https://invoke-ai.github.io/InvokeAI
 site_author: mauwii
 dev_addr: '127.0.0.1:8080'
@@ -87,3 +87,11 @@ plugins:
   - search
   - git-revision-date-localized:
       enable_creation_date: true
+  - redirects:
+      redirect_maps:
+          'installation/INSTALL_AUTOMATED.md': 'installation/010_INSTALL_AUTOMATED.md'
+          'installation/INSTALL_MANUAL.md': 'installation/020_INSTALL_MANUAL.md'
+          'installation/INSTALL_SOURCE.md': 'installation/020_INSTALL_MANUAL.md'
+          'installation/INSTALL_DOCKER.md': 'installation/040_INSTALL_DOCKER.md'
+          'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
+          'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'

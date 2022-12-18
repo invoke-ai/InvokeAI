@@ -1,10 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { ChangeEvent } from 'react';
-import {
-  RootState,
-  useAppDispatch,
-  useAppSelector,
-} from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setHiresFix } from 'features/options/store/optionsSlice';
 

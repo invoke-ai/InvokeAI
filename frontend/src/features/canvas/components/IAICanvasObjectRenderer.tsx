@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import _ from 'lodash';
 import { Group, Line, Rect } from 'react-konva';
 import {

@@ -6,15 +6,14 @@ title: Home
   The Docs you find here (/docs/*) are built and deployed via mkdocs. If you want to run a local version to verify your changes, it's as simple as::
 
   ```bash
-  pip install -r requirements-mkdocs.txt
+  pip install -r docs/requirements-mkdocs.txt
   mkdocs serve
   ```
 -->
+
 <div align="center" markdown>
 
-# ^^**InvokeAI: A Stable Diffusion Toolkit**^^ :tools: <br> <small>Formerly known as lstein/stable-diffusion</small>
-
-[![project logo](assets/logo.png)](https://github.com/invoke-ai/InvokeAI)
+[![project logo](assets/invoke_ai_banner.png)](https://github.com/invoke-ai/InvokeAI)
 
 [![discord badge]][discord link]
 
@@ -70,7 +69,11 @@ image-to-image generator. It provides a streamlined process with various new
 features and options to aid the image generation process. It runs on Windows,
 Mac and Linux machines, and runs on GPU cards with as little as 4 GB or RAM.
 
-**Quick links**: [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
+**Quick links**: [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>]
+[<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a
+href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a
+href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas &
+Q&A</a>]
 
 <div align="center"><img src="assets/invoke-web-server-1.png" width=640></div>
 
@@ -80,20 +83,19 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB or RAM.
 
 ## :octicons-package-dependencies-24: Installation
 
-This fork is supported across Linux, Windows and Macintosh. Linux
-users can use either an Nvidia-based card (with CUDA support) or an
-AMD card (using the ROCm driver).
+This fork is supported across Linux, Windows and Macintosh. Linux users can use
+either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
+driver).
 
-First time users, please see [Automated
-Installer](installation/INSTALL_AUTOMATED.md) for a walkthrough of
-getting InvokeAI up and running on your system. For alternative
-installation and upgrade instructions, please see: [InvokeAI
-Installation Overview](installation/)
+First time users, please see
+[Automated Installer](installation/INSTALL_AUTOMATED.md) for a walkthrough of
+getting InvokeAI up and running on your system. For alternative installation and
+upgrade instructions, please see:
+[InvokeAI Installation Overview](installation/)
 
-Linux users who wish to make use of the PyPatchMatch inpainting
-functions will need to perform a bit of extra work to enable this
-module. Instructions can be found at [Installing
-PyPatchMatch](installation/INSTALL_PATCHMATCH.md).
+Linux users who wish to make use of the PyPatchMatch inpainting functions will
+need to perform a bit of extra work to enable this module. Instructions can be
+found at [Installing PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md).
 
 ## :fontawesome-solid-computer: Hardware Requirements
 
@@ -102,12 +104,13 @@ PyPatchMatch](installation/INSTALL_PATCHMATCH.md).
 You wil need one of the following:
 
 - :simple-nvidia: An NVIDIA-based graphics card with 4 GB or more VRAM memory.
-- :simple-amd: An AMD-based graphics card with 4 GB or more VRAM memory (Linux only)
+- :simple-amd: An AMD-based graphics card with 4 GB or more VRAM memory (Linux
+  only)
 - :fontawesome-brands-apple: An Apple computer with an M1 chip.
 
-We do **not recommend** the following video cards due to issues with
-their running in half-precision mode and having insufficient VRAM to
-render 512x512 images in full-precision mode:
+We do **not recommend** the following video cards due to issues with their
+running in half-precision mode and having insufficient VRAM to render 512x512
+images in full-precision mode:
 
 - NVIDIA 10xx series cards such as the 1080ti
 - GTX 1650 series cards
@@ -131,123 +134,115 @@ render 512x512 images in full-precision mode:
     ```bash
     (invokeai) ~/InvokeAI$ python scripts/invoke.py --full_precision
     ```
+
 ## :octicons-gift-24: InvokeAI Features
 
-- [The InvokeAI Web Interface](features/WEB.md)
-    - [WebGUI hotkey reference guide](features/WEBUIHOTKEYS.md)
-    - [WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
+- [The InvokeAI Web Interface](features/WEB.md) -
+[WebGUI hotkey reference guide](features/WEBUIHOTKEYS.md) -
+[WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
 <!-- seperator -->
-- [The Command Line Interace](features/CLI.md)
-    - [Image2Image](features/IMG2IMG.md)
-    - [Inpainting](features/INPAINTING.md)
-    - [Outpainting](features/OUTPAINTING.md)
-    - [Adding custom styles and subjects](features/CONCEPTS.md)
-    - [Upscaling and Face Reconstruction](features/POSTPROCESS.md)
+- [The Command Line Interace](features/CLI.md) -
+[Image2Image](features/IMG2IMG.md) - [Inpainting](features/INPAINTING.md) -
+[Outpainting](features/OUTPAINTING.md) -
+[Adding custom styles and subjects](features/CONCEPTS.md) -
+[Upscaling and Face Reconstruction](features/POSTPROCESS.md)
 <!-- seperator -->
 - [Generating Variations](features/VARIATIONS.md)
 <!-- seperator -->
 - [Prompt Engineering](features/PROMPTS.md)
 <!-- seperator -->
 - Miscellaneous
-    - [NSFW Checker](features/NSFW.md)
-    - [Embiggen upscaling](features/EMBIGGEN.md)
-    - [Other](features/OTHER.md)
+  - [NSFW Checker](features/NSFW.md)
+  - [Embiggen upscaling](features/EMBIGGEN.md)
+  - [Other](features/OTHER.md)
 
 ## :octicons-log-16: Latest Changes
 
-### v2.1.3 <small>(13 November 2022)</small>
+### v2.2.4 <small>(11 December 2022)</small>
 
-- A choice of installer scripts that automate installation and configuration. See [Installation](https://github.com/invoke-ai/InvokeAI/blob/2.1.3-rc6/docs/installation/INSTALL.md).
-- A streamlined manual installation process that works for both Conda and PIP-only installs. See [Manual Installation](https://github.com/invoke-ai/InvokeAI/blob/2.1.3-rc6/docs/installation/INSTALL_MANUAL.md).
-- The ability to save frequently-used startup options (model to load, steps, sampler, etc) in a `.invokeai` file. See [Client](https://github.com/invoke-ai/InvokeAI/blob/2.1.3-rc6/docs/features/CLI.md)
-- Support for AMD GPU cards (non-CUDA) on Linux machines.
-- Multiple bugs and edge cases squashed.
+#### the `invokeai` directory
 
-### v2.1.0 <small>(2 November 2022)</small>
+Previously there were two directories to worry about, the directory that
+contained the InvokeAI source code and the launcher scripts, and the `invokeai`
+directory that contained the models files, embeddings, configuration and
+outputs. With the 2.2.4 release, this dual system is done away with, and
+everything, including the `invoke.bat` and `invoke.sh` launcher scripts, now
+live in a directory named `invokeai`. By default this directory is located in
+your home directory (e.g. `\Users\yourname` on Windows), but you can select
+where it goes at install time.
 
-- [Inpainting](https://invoke-ai.github.io/InvokeAI/features/INPAINTING/)
-  support in the WebGUI
-- Greatly improved navigation and user experience in the
-  [WebGUI](https://invoke-ai.github.io/InvokeAI/features/WEB/)
-- The prompt syntax has been enhanced with
-  [prompt weighting, cross-attention and prompt merging](https://invoke-ai.github.io/InvokeAI/features/PROMPTS/).
-- You can now load
-  [multiple models and switch among them quickly](https://docs.google.com/presentation/d/1WywGA1rny7bpFh7CLSdTr4nNpVKdlUeT0Bj0jCsILyU/edit?usp=sharing)
-  without leaving the CLI.
-- The installation process (via `scripts/configure_invokeai.py`) now lets you select
-  among several popular
-  [Stable Diffusion models](https://invoke-ai.github.io/InvokeAI/installation/INSTALLING_MODELS/)
-  and downloads and installs them on your behalf. Among other models, this
-  script will install the current Stable Diffusion 1.5 model as well as a
-  StabilityAI variable autoencoder (VAE) which improves face generation.
-- Tired of struggling with photoeditors to get the masked region of for
-  inpainting just right? Let the AI make the mask for you using
-  [text masking](https://docs.google.com/presentation/d/1pWoY510hCVjz0M6X9CBbTznZgW2W5BYNKrmZm7B45q8/edit#slide=id.p).
-  This feature allows you to specify the part of the image to paint over using
-  just English-language phrases.
-- Tired of seeing the head of your subjects cropped off? Uncrop them in the CLI
-  with the
-  [outcrop feature](https://invoke-ai.github.io/InvokeAI/features/OUTPAINTING/#outcrop).
-- Tired of seeing your subject's bodies duplicated or mangled when generating
-  larger-dimension images? Check out the `--hires` option in the CLI, or select
-  the corresponding toggle in the WebGUI.
-- We now support textual inversion and fine-tune .bin styles and subjects from
-  the Hugging Face archive of
-  [SD Concepts](https://huggingface.co/sd-concepts-library). Load the .bin file
-  using the `--embedding_path` option. (The next version will support merging
-  and loading of multiple simultaneous models).
-- ...
+After installation, you can delete the install directory (the one that the zip
+file creates when it unpacks). Do **not** delete or move the `invokeai`
+directory!
 
-### v2.0.1 <small>(13 October 2022)</small>
+##### Initialization file `invokeai/invokeai.init`
 
-- fix noisy images at high step count when using k\* samplers
-- dream.py script now calls invoke.py module directly rather than via a new
-  python process (which could break the environment)
+You can place frequently-used startup options in this file, such as the default
+number of steps or your preferred sampler. To keep everything in one place, this
+file has now been moved into the `invokeai` directory and is named
+`invokeai.init`.
 
-### v2.0.0 <small>(9 October 2022)</small>
+#### To update from Version 2.2.3
 
-- `dream.py` script renamed `invoke.py`. A `dream.py` script wrapper remains for
-  backward compatibility.
-- Completely new WebGUI - launch with `python3 scripts/invoke.py --web`
-- Support for
-  <a href="https://invoke-ai.github.io/InvokeAI/features/INPAINTING/">inpainting</a>
-  and
-  <a href="https://invoke-ai.github.io/InvokeAI/features/OUTPAINTING/">outpainting</a>
-- img2img runs on all k\* samplers
-- Support for
-  <a href="https://invoke-ai.github.io/InvokeAI/features/PROMPTS/#negative-and-unconditioned-prompts">negative
-  prompts</a>
-- Support for CodeFormer face reconstruction
-- Support for Textual Inversion on Macintoshes
-- Support in both WebGUI and CLI for
-  <a href="https://invoke-ai.github.io/InvokeAI/features/POSTPROCESS/">post-processing
-  of previously-generated images</a> using facial reconstruction, ESRGAN
-  upscaling, outcropping (similar to DALL-E infinite canvas), and "embiggen"
-  upscaling. See the `!fix` command.
-- New `--hires` option on `invoke>` line allows
-  <a href="https://invoke-ai.github.io/InvokeAI/features/CLI/#txt2img">larger
-  images to be created without duplicating elements</a>, at the cost of some
-  performance.
-- New `--perlin` and `--threshold` options allow you to add and control
-  variation during image generation (see
-  <a href="https://github.com/invoke-ai/InvokeAI/blob/main/docs/features/OTHER.md#thresholding-and-perlin-noise-initialization-options">Thresholding
-  and Perlin Noise Initialization</a>
-- Extensive metadata now written into PNG files, allowing reliable regeneration
-  of images and tweaking of previous settings.
-- Command-line completion in `invoke.py` now works on Windows, Linux and Mac
-  platforms.
-- Improved
-  <a href="https://invoke-ai.github.io/InvokeAI/features/CLI/">command-line
-  completion behavior</a>. New commands added:
-  - List command-line history with `!history`
-  - Search command-line history with `!search`
-  - Clear history with `!clear`
-- Deprecated `--full_precision` / `-F`. Simply omit it and `invoke.py` will auto
-  configure. To switch away from auto use the new flag like
-  `--precision=float32`.
+The easiest route is to download and unpack one of the 2.2.4 installer files.
+When it asks you for the location of the `invokeai` runtime directory, respond
+with the path to the directory that contains your 2.2.3 `invokeai`. That is, if
+`invokeai` lives at `C:\Users\fred\invokeai`, then answer with `C:\Users\fred`
+and answer "Y" when asked if you want to reuse the directory.
+
+The `update.sh` (`update.bat`) script that came with the 2.2.3 source installer
+does not know about the new directory layout and won't be fully functional.
+
+#### To update to 2.2.5 (and beyond) there's now an update path.
+
+As they become available, you can update to more recent versions of InvokeAI
+using an `update.sh` (`update.bat`) script located in the `invokeai` directory.
+Running it without any arguments will install the most recent version of
+InvokeAI. Alternatively, you can get set releases by running the `update.sh`
+script with an argument in the command shell. This syntax accepts the path to
+the desired release's zip file, which you can find by clicking on the green
+"Code" button on this repository's home page.
+
+#### Other 2.2.4 Improvements
+
+- Fix InvokeAI GUI initialization by @addianto in #1687
+- fix link in documentation by @lstein in #1728
+- Fix broken link by @ShawnZhong in #1736
+- Remove reference to binary installer by @lstein in #1731
+- documentation fixes for 2.2.3 by @lstein in #1740
+- Modify installer links to point closer to the source installer by @ebr in
+  #1745
+- add documentation warning about 1650/60 cards by @lstein in #1753
+- Fix Linux source URL in installation docs by @andybearman in #1756
+- Make install instructions discoverable in readme by @damian0815 in #1752
+- typo fix by @ofirkris in #1755
+- Non-interactive model download (support HUGGINGFACE_TOKEN) by @ebr in #1578
+- fix(srcinstall): shell installer - cp scripts instead of linking by @tildebyte
+  in #1765
+- stability and usage improvements to binary & source installers by @lstein in
+  #1760
+- fix off-by-one bug in cross-attention-control by @damian0815 in #1774
+- Eventually update APP_VERSION to 2.2.3 by @spezialspezial in #1768
+- invoke script cds to its location before running by @lstein in #1805
+- Make PaperCut and VoxelArt models load again by @lstein in #1730
+- Fix --embedding_directory / --embedding_path not working by @blessedcoolant in
+  #1817
+- Clean up readme by @hipsterusername in #1820
+- Optimized Docker build with support for external working directory by @ebr in
+  #1544
+- disable pushing the cloud container by @mauwii in #1831
+- Fix docker push github action and expand with additional metadata by @ebr in
+  #1837
+- Fix Broken Link To Notebook by @VedantMadane in #1821
+- Account for flat models by @spezialspezial in #1766
+- Update invoke.bat.in isolate environment variables by @lynnewu in #1833
+- Arch Linux Specific PatchMatch Instructions & fixing conda install on linux by
+  @SammCheese in #1848
+- Make force free GPU memory work in img2img by @addianto in #1844
+- New installer by @lstein
 
 For older changelogs, please visit the
-**[CHANGELOG](CHANGELOG/#v114-11-september-2022)**.
+**[CHANGELOG](CHANGELOG/#v223-2-december-2022)**.
 
 ## :material-target: Troubleshooting
 

@@ -1,6 +1,7 @@
 import React, { ChangeEvent } from 'react';
 import { SAMPLERS } from 'app/constants';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import { setSampler } from 'features/options/store/optionsSlice';
 

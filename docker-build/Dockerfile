@@ -14,9 +14,10 @@ RUN apt-get update \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# set workdir, PATH and copy sources
-WORKDIR /usr/src/app
-ENV PATH /usr/src/app/.venv/bin:$PATH
+# set WORKDIR, PATH and copy sources
+ARG WORKDIR=/usr/src/app
+WORKDIR ${WORKDIR}
+ENV PATH ${WORKDIR}/.venv/bin:$PATH
 ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
 COPY . ./environments-and-requirements/${PIP_REQUIREMENTS} ./
 
@@ -38,18 +39,28 @@ FROM python:3.10-slim AS runtime
 RUN apt-get update \
   && apt-get install -y \
     --no-install-recommends \
+    build-essential=12.9 \
     libgl1-mesa-glx=20.3.* \
     libglib2.0-0=2.66.* \
+    libopencv-dev=4.5.* \
+    python3-opencv=4.5.* \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/app
-COPY --from=builder /usr/src/app .
-
-# set Environment, Entrypoint and default CMD
+# setup environment
+ARG WORKDIR=/usr/src/app
+WORKDIR ${WORKDIR}
+COPY --from=builder ${WORKDIR} .
+ENV PATH=${WORKDIR}/.venv/bin:$PATH
 ENV INVOKEAI_ROOT /data
 ENV INVOKE_MODEL_RECONFIGURE --yes
-ENV PATH=/usr/src/app/.venv/bin:$PATH
 
+# Initialize patchmatch
+RUN ln -sf \
+  /usr/lib/"$(arch)"-linux-gnu/pkgconfig/opencv4.pc \
+  /usr/lib/"$(arch)"-linux-gnu/pkgconfig/opencv.pc \
+  && python3 -c "from patchmatch import patch_match"
+
+# set Entrypoint and default CMD
 ENTRYPOINT [ "python3", "scripts/invoke.py" ]
 CMD [ "--web", "--host=0.0.0.0" ]

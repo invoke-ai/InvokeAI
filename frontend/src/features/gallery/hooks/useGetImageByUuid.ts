@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { gallerySelector } from '../store/gallerySliceSelectors';
 
 const selector = createSelector(gallerySelector, (gallery) => ({

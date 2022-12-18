@@ -158,7 +158,7 @@ when filling in missing regions. It has an almost uncanny ability to blend the
 new regions with existing ones in a semantically coherent way.
 
 To install the inpainting model, follow the
-[instructions](../installation/INSTALLING_MODELS.md) for installing a new model.
+[instructions](../installation/050_INSTALLING_MODELS.md) for installing a new model.
 You may use either the CLI (`invoke.py` script) or directly edit the
 `configs/models.yaml` configuration file to do this. The main thing to watch out
 for is that the the model `config` option must be set up to use

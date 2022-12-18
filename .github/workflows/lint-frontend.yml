@@ -1,0 +1,28 @@
+name: Lint frontend
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+  push:
+    paths:
+      - 'frontend/**'
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  lint-frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Setup Node 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - uses: actions/checkout@v3
+      - run: 'yarn install --frozen-lockfile'
+      - run: 'yarn tsc'
+      - run: 'yarn run madge'
+      - run: 'yarn run lint --max-warnings=0'
+      - run: 'yarn run prettier --check'
