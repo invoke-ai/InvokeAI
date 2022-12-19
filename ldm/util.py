@@ -258,3 +258,4 @@ def debug_image(debug_image, debug_text, debug_show=True, debug_result=False, de
 
     if debug_result:
         return image_copy
+

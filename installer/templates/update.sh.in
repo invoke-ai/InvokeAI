@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eu
 
@@ -36,13 +36,13 @@ read -p "Press any key to continue, or CTRL-C to exit..."
 
 . .venv/bin/activate
 
-pip install -r requirements.txt
+./.venv/bin/python -mpip install -r requirements.txt
 _err_exit $? "The pip program failed to install InvokeAI's requirements."
 
-pip install $INVOKE_AI_SRC
+./.venv/bin/python -mpip install $INVOKE_AI_SRC
 _err_exit $? "The pip program failed to install InvokeAI."
 
-python .venv/bin/configure_invoke.py
+./.venv/bin/python .venv/bin/configure_invokeai.py --root .
 _err_exit $? "The configure script failed to run successfully."
 
 

@@ -1,4 +1,4 @@
-The Unified Canvas is a tool designed to streamline and simplify the process of composing an image using Stable Diffusion. It offers artists all of the available Stable Diffusion generation modes (Text To Image, Image To Image, Inpainting, and Outpainting) as a single unified workflow. The flexibility of the tool allows you to tweak and edit image generations, extend images beyond their initial size, and to create new content in a freeform way both inside and outside of existing images. 
+The Unified Canvas is a tool designed to streamline and simplify the process of composing an image using Stable Diffusion. It offers artists all of the available Stable Diffusion generation modes (Text To Image, Image To Image, Inpainting, and Outpainting) as a single unified workflow. The flexibility of the tool allows you to tweak and edit image generations, extend images beyond their initial size, and to create new content in a freeform way both inside and outside of existing images.
 
 This document explains the basics of using the Unified Canvas, introducing you to its features and tools one by one. It also describes some of the more advanced tools available to power users of the Canvas.
 
@@ -21,7 +21,7 @@ Accepting generations will commit the new generation to the **Base Layer**. You 
 The **Mask Layer** consists of any masked sections that have been created to inform Inpainting generations. You can paint a new mask, or edit an existing mask, using the Brush tool and the Eraser with the Mask layer set as your Active layer. Any masked areas will only affect generation inside of the current bounding box.
 
 ### Bounding Box
-When generating a new image, Invoke will process and apply new images within the area denoted by the **Bounding Box**. The Width & Height settings of the Bounding Box, as well as its location within the Unified Canvas and pixels or empty space that it encloses, determine how new invocations are generated - see [Inpainting & Outpainting](#inpainting-and-outpainting) below. The Bounding Box can be moved and resized using the Move (V) tool. It can also be resized using the Bounding Box options in the Options Panel. By using these controls you can generate larger or smaller images, control which sections of the image are being processed, as well as control Bounding Box tools like the Bounding Box fill/erase. 
+When generating a new image, Invoke will process and apply new images within the area denoted by the **Bounding Box**. The Width & Height settings of the Bounding Box, as well as its location within the Unified Canvas and pixels or empty space that it encloses, determine how new invocations are generated - see [Inpainting & Outpainting](#inpainting-and-outpainting) below. The Bounding Box can be moved and resized using the Move (V) tool. It can also be resized using the Bounding Box options in the Options Panel. By using these controls you can generate larger or smaller images, control which sections of the image are being processed, as well as control Bounding Box tools like the Bounding Box fill/erase.
 
 ### <a name="inpainting-and-outpainting"></a> Inpainting & Outpainting
 "Inpainting" means asking the AI to refine part of an image while leaving the rest alone. For example, updating a portrait of your grandmother to have her wear a biker's jacket.
@@ -48,9 +48,9 @@ To get started with the Unified Canvas, you will want to generate a new base lay
 
 From there, you can consider the following techniques to augment your image:
 * **New Images**: Move the bounding box to an empty area of the Canvas, type in your prompt, and Invoke, to generate a new image using the Text to Image function.
-* **Image Correction**: Use the color picker and brush tool to paint corrections on the image, switch to the Mask layer, and brush a mask over your painted area to use **Inpainting**. You can also use the **ImageToImage** generation method to invoke new interpretations of the image. 
+* **Image Correction**: Use the color picker and brush tool to paint corrections on the image, switch to the Mask layer, and brush a mask over your painted area to use **Inpainting**. You can also use the **ImageToImage** generation method to invoke new interpretations of the image.
 * **Image Expansion**: Move the bounding box to include a portion of your initial image, and a portion of transparent/empty pixels, then Invoke using a prompt that describes what you'd like to see in that area. This will Outpaint the image. You'll typically find more coherent results if you keep about 50-60% of the original image in the bounding box. Make sure that the Image To Image Strength slider is set to a high value - you may need to set it higher than you are used to.
-* **New Content on Existing Images**: If you want to add new details or objects into your image, use the brush tool to paint a sketch of what you'd like to see on the image, switch to the Mask layer, and brush a mask over your painted area to use **Inpainting**. If the masked area is small, consider using a smaller bounding box to take advantage of Invoke's automatic Scaling features, which can help to produce better details. 
+* **New Content on Existing Images**: If you want to add new details or objects into your image, use the brush tool to paint a sketch of what you'd like to see on the image, switch to the Mask layer, and brush a mask over your painted area to use **Inpainting**. If the masked area is small, consider using a smaller bounding box to take advantage of Invoke's automatic Scaling features, which can help to produce better details.
 * **And more**: There are a number of creative ways to use the Canvas, and the above are just starting points. We're excited to see what you come up with!
 
 
@@ -82,27 +82,27 @@ Features with non-obvious behavior are detailed below, in order to provide clari
 ## Toolbar
 
 ### Mask Options
-* **Enable Mask** - This flag can be used to Enable or Disable the currently painted mask. If you have painted a mask, but you don't want it affect the next invocation, but you *also* don't want to delete it, then you can set this option to Disable. When you want the mask back, set this back to Enable. 
+* **Enable Mask** - This flag can be used to Enable or Disable the currently painted mask. If you have painted a mask, but you don't want it affect the next invocation, but you *also* don't want to delete it, then you can set this option to Disable. When you want the mask back, set this back to Enable.
 * **Preserve Masked Area** - When enabled, Preserve Masked Area inverts the effect of the Mask on the Inpainting process. Pixels in masked areas will be kept unchanged, and unmasked areas will be regenerated.
 
 ### Creative Tools
-* **Brush - Base/Mask Modes** - The Brush tool switches automatically between different modes of operation for the Base and Mask layers respectively. 
-  * On the Base layer, the brush will directly paint on the Canvas using the color selected on the Brush Options menu. 
+* **Brush - Base/Mask Modes** - The Brush tool switches automatically between different modes of operation for the Base and Mask layers respectively.
+  * On the Base layer, the brush will directly paint on the Canvas using the color selected on the Brush Options menu.
   * On the Mask layer, the brush will create a new mask. If you're finding the mask difficult to see over the existing content of the Unified Canvas, you can change the color it is drawn with using the color selector on the Mask Options dropdown.
 * **Erase Bounding Box** - On the Base layer, erases all pixels within the Bounding Box.
 * **Fill Bounding Box** - On the Base layer, fills all pixels within the Bounding Box with the currently selected color.
 
 ### Canvas Tools
 * **Move Tool** - Allows for manipulation of the Canvas view (by dragging on the Canvas, outside the bounding box), the Bounding Box (by dragging the edges of the box), or the Width/Height of the Bounding Box (by dragging one of the 9 directional handles).
-* **Reset View** - Click to re-orients the view to the center of the Bounding Box. 
+* **Reset View** - Click to re-orients the view to the center of the Bounding Box.
 * **Merge Visible** - If your browser is having performance problems drawing the image in the Unified Canvas, click this to consolidate all of the information currently being rendered by your browser into a merged copy of the image. This lowers the resource requirements and should improve performance.
 
 ## Seam Correction
-When doing Inpainting or Outpainting, Invoke needs to merge the pixels generated by Stable Diffusion into your existing image. To do this, the area around the `seam` at the boundary between your image and the new generation is automatically blended to produce a seamless output. In a fully automatic process, a mask is generated to cover the seam, and then the area of the seam is Inpainted. 
+When doing Inpainting or Outpainting, Invoke needs to merge the pixels generated by Stable Diffusion into your existing image. To do this, the area around the `seam` at the boundary between your image and the new generation is automatically blended to produce a seamless output. In a fully automatic process, a mask is generated to cover the seam, and then the area of the seam is Inpainted.
 
 Although the default options should work well most of the time, sometimes it can help to alter the parameters that control the seam Inpainting. A wider seam and a blur setting of about 1/3 of the seam have been noted as producing consistently strong results (e.g. 96 wide and 16 blur - adds up to 32 blur with both sides). Seam strength of 0.7 is best for reducing hard seams.
 * **Seam Size** - The size of the seam masked area. Set higher to make a larger mask around the seam.
-* **Seam Blur** - The size of the blur that is applied on *each* side of the masked area. 
+* **Seam Blur** - The size of the blur that is applied on *each* side of the masked area.
 * **Seam Strength** - The Image To Image Strength parameter used for the Inpainting generation that is applied to the seam area.
 * **Seam Steps** - The number of generation steps that should be used to Inpaint the seam.
 

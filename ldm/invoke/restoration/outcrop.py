@@ -51,7 +51,7 @@ class Outcrop(object):
             color_match = True,
             force_outpaint = True,  # this just stops the warning about erased regions
         )
-        
+
         # swap sampler back
         self.generate.sampler = curr_sampler
         return result

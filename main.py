@@ -474,7 +474,7 @@ class ImageLogger(Callback):
             self.check_frequency(check_idx)
             and hasattr(  # batch_idx % self.batch_freq == 0
                 pl_module, 'log_images'
-            ) 
+            )
             and callable(pl_module.log_images)
             and self.max_images > 0
         ):
@@ -868,7 +868,7 @@ if __name__ == '__main__':
         if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
             trainer_opt.accelerator = 'mps'
             trainer_opt.detect_anomaly = False
-        
+
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
         trainer.logdir = logdir  ###
 

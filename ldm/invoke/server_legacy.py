@@ -45,7 +45,7 @@ def build_opt(post_data, seed, gfpgan_model_exists):
                 broken = True
                 break
             opt.with_variations.append([seed, weight])
-    
+
     if broken:
         raise CanceledException
 
@@ -84,7 +84,7 @@ class DreamServer(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             output = []
-            
+
             log_file = os.path.join(self.outdir, "dream_web_log.txt")
             if os.path.exists(log_file):
                 with open(log_file, "r") as log:

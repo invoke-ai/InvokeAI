@@ -9,7 +9,7 @@ function toBase64(file) {
 
 function appendOutput(src, seed, config) {
     let outputNode = document.createElement("figure");
-    
+
     let variations = config.with_variations;
     if (config.variation_amount > 0) {
         variations = (variations ? variations + ',' : '') + seed + ':' + config.variation_amount;

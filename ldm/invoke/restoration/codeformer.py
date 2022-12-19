@@ -14,7 +14,7 @@ class CodeFormerRestoration():
 
         if not os.path.isabs(codeformer_dir):
             codeformer_dir = os.path.join(Globals.root, codeformer_dir)
-        
+
         self.model_path = os.path.join(codeformer_dir, codeformer_model_path)
         self.codeformer_model_exists = os.path.isfile(self.model_path)
 
@@ -35,9 +35,9 @@ class CodeFormerRestoration():
             from ldm.invoke.restoration.codeformer_arch import CodeFormer
             from torchvision.transforms.functional import normalize
             from PIL import Image
-            
+
             cf_class = CodeFormer
-            
+
             cf = cf_class(
                 dim_embd=512,
                 codebook_size=1024,
