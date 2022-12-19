@@ -26,8 +26,6 @@ RUN python3 -m venv .venv \
   && pip install \
     --upgrade \
     --no-cache-dir \
-    'pip>=22.3.1' \
-    'setuptools>=65.5.0' \
     'wheel>=0.38.4' \
   && pip install \
     --no-cache-dir \
