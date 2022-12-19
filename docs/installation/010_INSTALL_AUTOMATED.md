@@ -24,6 +24,8 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         Installation requires roughly 18G of free disk space to load the libraries and
         recommended model weights files.
 
+        Regardless of your destination disk, your *system drive* (`C:\` on Windows, `/` on macOS/Linux) requires at least 6GB of free disk space to download and cache python dependencies. NOTE for Linux users: if your temporary directory is mounted as a `tmpfs`, ensure it has sufficient space.
+
 2.  Check that your system has an up-to-date Python installed. To do this, open
     up a command-line window ("Terminal" on Linux and Macintosh, "Command" or
     "Powershell" on Windows) and type `python --version`. If Python is
@@ -76,31 +78,39 @@ version of InvokeAI with the option to upgrade to experimental versions later.
 
     === "Linux users"
 
-    	For reasons that are not entirely clear, installing the correct version of Python can be a bit of a challenge on Ubuntu, Linux Mint, and otherUbuntu-derived distributions.
+        For reasons that are not entirely clear, installing the correct version of Python can be a bit of a challenge on Ubuntu, Linux Mint, Pop!_OS, and other Debian-derived distributions.
 
-	In particular, Ubuntu version 20.04 LTS comes with an old version of Python, does not come with the PIP package manager installed, and to make matters worse, the `python` command points to Python2, not Python3.
+        On Ubuntu 22.04 and higher, run the following:
 
-	Here is the quick recipe for bringing your system up to date:
+        ```
+        sudo apt update
+        sudo apt install -y python3 python3-pip python3-venv
+        sudo update-alternatives --install /usr/local/bin/python python /usr/bin/python3.10 3
+        ```
 
-	```
-	sudo apt update
-	sudo apt install python3.9
-	sudo apt install python3-pip
-	cd /usr/bin
-	sudo ln -sf python3.9 python3
-	sudo ln -sf python3 python
-	```
+        On Ubuntu 20.04, the process is slightly different:
 
-	You can still access older versions of Python by calling `python2`, `python3.8`,
-	etc.
+        ```
+        sudo apt update
+        sudo apt install -y software-properties-common
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt install python3.10 python3-pip python3.10-venv
+        sudo update-alternatives --install /usr/local/bin/python python /usr/bin/python3.10 3
+        ```
+
+        Both `python` and `python3` commands are now pointing at Python3.10. You can still access older versions of Python by calling `python2`, `python3.8`, etc.
+
+        Linux systems require a couple of additional graphics libraries to be installed for proper functioning of `python3-opencv`. Please run the following:
+
+        `sudo apt update && sudo apt install -y libglib2.0-0 libgl1-mesa-glx`
 
 3.  The source installer is distributed in ZIP files. Go to the
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - [InvokeAI-installer-2.2.4-mac.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/InvokeAI-installer-2.2.4-mac.zip)
-    - [InvokeAI-installer-2.2.4-windows.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/InvokeAI-installer-2.2.4-windows.zip)
-    - [InvokeAI-installer-2.2.4-linux.zip](https://github.com/invoke-ai/InvokeAI/releases/latest/download/InvokeAI-installer-2.2.4-linux.zip)
+    - [InvokeAI-installer-2.2.4-p5-mac.zip](https://github.com/invoke-ai/InvokeAI/files/10254728/InvokeAI-installer-2.2.4-p5-mac.zip)
+    - [InvokeAI-installer-2.2.4-p5-windows.zip](https://github.com/invoke-ai/InvokeAI/files/10254729/InvokeAI-installer-2.2.4-p5-windows.zip)
+    - [InvokeAI-installer-2.2.4-p5-linux.zip](https://github.com/invoke-ai/InvokeAI/files/10254727/InvokeAI-installer-2.2.4-p5-linux.zip)
 
     Download the one that is appropriate for your operating system.
 

@@ -220,7 +220,7 @@ class AttnBlock(nn.Module):
 
             if mem_required > mem_free_total:
                 steps = 2**(math.ceil(math.log(mem_required / mem_free_total, 2)))
-            
+
             slice_size = q.shape[1] // steps if (q.shape[1] % steps) == 0 else q.shape[1]
 
         else:
@@ -228,7 +228,7 @@ class AttnBlock(nn.Module):
                 slice_size = 1
             else:
                 slice_size = min(q.shape[1], math.floor(2**30 / (q.shape[0] * q.shape[1])))
-        
+
         for i in range(0, q.shape[1], slice_size):
             end = i + slice_size
 

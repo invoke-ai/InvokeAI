@@ -100,7 +100,7 @@ directory
         The original Stable Diffusion version 1.4 weight file (4.27 GB)
         Download? [n] n
     [4] waifu-diffusion-1.3:
-        Stable Diffusion 1.4 fine tuned on anime-styled images (4.27)
+        Stable Diffusion 1.4 fine tuned on anime-styled images (4.27 GB)
         Download? [n] y
     [5] ft-mse-improved-autoencoder-840000:
         StabilityAI improved autoencoder fine-tuned for human faces (recommended; 335 MB) (recommended)

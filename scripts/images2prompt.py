@@ -24,7 +24,7 @@ for f in filenames:
     except PermissionError:
         sys.stderr.write(f'{f} could not be opened due to inadequate permissions\n')
         continue
-        
+
 
 
 
