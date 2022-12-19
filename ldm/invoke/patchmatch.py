@@ -7,16 +7,18 @@ be suppressed or deferred
 from ldm.invoke.globals import Globals
 import numpy as  np
 
-class Patchmatch (object):
+class Patchmatch:
     '''
     Thin class wrapper around the patchmatch function.
     '''
+
+    patch_match = None
+    tried_load:bool = False
     
     def __init__(self):
-        self.patch_match = None
-        self.tried_load:bool = False
         super().__init__()
 
+    @classmethod
     def _load_patch_match(self):
         if self.tried_load:
             return
@@ -31,13 +33,12 @@ class Patchmatch (object):
             print('>> Patchmatch loading disabled')
         self.tried_load = True
 
+    @classmethod
     def patchmatch_available(self)->bool:
         self._load_patch_match()
         return self.patch_match and self.patch_match.patchmatch_available
 
+    @classmethod
     def inpaint(self,*args,**kwargs)->np.ndarray:
         if self.patchmatch_available():
             return self.patch_match.inpaint(*args,**kwargs)
-
-
-patchmatch=Patchmatch()
