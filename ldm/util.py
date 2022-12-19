@@ -221,7 +221,7 @@ def rand_perlin_2d(shape, res, device, fade = lambda t: 6*t**5 - 15*t**4 + 10*t*
     grid = torch.stack(torch.meshgrid(torch.arange(0, res[0], delta[0]), torch.arange(0, res[1], delta[1]), indexing='ij'), dim = -1).to(device) % 1
 
     rand_val = torch.rand(res[0]+1, res[1]+1)
-    
+
     angles = 2*math.pi*rand_val
     gradients = torch.stack((torch.cos(angles), torch.sin(angles)), dim = -1).to(device)
 
@@ -249,7 +249,7 @@ def ask_user(question: str, answers: list):
 def debug_image(debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False ):
     if not debug_status:
         return
-    
+
     image_copy = debug_image.copy()
     ImageDraw.Draw(image_copy).text(
         (5, 5),

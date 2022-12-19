@@ -398,7 +398,7 @@ SAMPLER_CHOICES = [
 def create_argv_parser():
     parser = argparse.ArgumentParser(
         description="""Generate images using Stable Diffusion.
-        Use --web to launch the web interface. 
+        Use --web to launch the web interface.
         Use --from_file to load prompts from a file path or standard input ("-").
         Otherwise you will be dropped into an interactive command prompt (type -h for help.)
         Other command-line arguments are defaults that can usually be overridden

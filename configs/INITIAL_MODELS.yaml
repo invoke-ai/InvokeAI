@@ -31,7 +31,7 @@ stable-diffusion-1.4:
    width: 512
    height: 512
 waifu-diffusion-1.3:
-   description: Stable Diffusion 1.4 fine tuned on anime-styled images (4.27)
+   description: Stable Diffusion 1.4 fine tuned on anime-styled images (4.27 GB)
    repo_id: hakurei/waifu-diffusion-v1-3
    config: v1-inference.yaml
    file: model-epoch09-float32.ckpt

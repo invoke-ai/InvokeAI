@@ -67,7 +67,7 @@ class ESRGAN():
 
         # REALSRGAN expects a BGR np array; make array and flip channels
         bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
-        
+
         output, _ = upsampler.enhance(
             bgr_image_array,
             outscale=upsampler_scale,
