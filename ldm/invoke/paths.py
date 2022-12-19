@@ -1,21 +1,36 @@
 """
 Filesystem paths
+
+Provides a singleton class
+
+Configurable:
+- path to runtime dir
+- path and/or filename for models.yaml
+- path and/or dirname for outputs
+
 """
 
-from pathlib import Path
-from typing import Union, Optional
-from dataclasses import dataclass
 import inspect
 import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Union
 
-DEFAULT_ROOT_DIR = "~/invokeai"
+DEFAULT_RUNTIME_DIR = "~/invokeai"
 
 
 @dataclass
 class PathSpec:
+    """
+    A PathSpec describes a location on the filesystem together with its metadata
+    """
+
     kind: str
     description: str
     location: Path
+
+    def __repr__(self) -> str:
+        return str(self.location.expanduser().resolve())
 
 
 class InvokePaths:
@@ -23,22 +38,26 @@ class InvokePaths:
     Singleton class to manage paths
     """
 
-    def __new__(cls):
-        if not hasattr(cls, "instance"):
-            cls.instance = super(InvokePaths, cls).__new__(cls)
-        return cls.instance
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, "_instance"):
+            cls._instance = super(InvokePaths, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
 
     def __init__(
-        self, root: Union[str, Path] = None, outdir: Union[str, Path] = None
+        self,
+        root: Union[str, Path] = None,
+        outdir: Union[str, Path] = None,
+        config: Union[str, Path] = None,
     ) -> None:
         self.root = root
-        self.outdir = outdir
+        self.outdir = outdir or self.root.location / "outputs"
+        self.config = config or self.configdir.location / "models.yaml"
+
+    #### Runtime directory
 
     @property
     def root(self):
-        return PathSpec(
-            kind="directory", description="InvokeAI application", location=self._root
-        )
+        return self._root
 
     @root.setter
     def root(self, path: Union[str, Path] = None) -> None:
@@ -50,88 +69,112 @@ class InvokePaths:
                 # https://github.com/invoke-ai/InvokeAI/issues/2064
                 location = Path(os.environ.get("VIRTUAL_ENV")).parent
             else:
-                location = Path(DEFAULT_ROOT_DIR)
+                location = Path(DEFAULT_RUNTIME_DIR)
         else:
             location = Path(path)
-        self._root = location
+        self._root = PathSpec(
+            kind="directory", description="InvokeAI runtime", location=location
+        )
+
+    ### Image outputs
+
+    @property
+    def outdir(self) -> PathSpec:
+        return self._outdir
+
+    @outdir.setter
+    def outdir(self, path: Union[str, Path] = None) -> None:
+        path = "outputs" if path is None else path
+        path = Path(path).expanduser()
+        location = self.root.location / path if not path.is_absolute() else path
+        self._outdir = PathSpec(
+            kind="directory", description="Image outputs", location=location
+        )
+
+    ### Main config file (model configuration)
+
+    @property
+    def config(self) -> PathSpec:
+        return self._config
+
+    @config.setter
+    def config(self, path: Union[str, Path] = None) -> None:
+        path = "models.yaml" if path is None else path
+        path = Path(path).expanduser()
+        location = self.configdir.location / path if not path.is_absolute() else path
+        # should we verify this is indeed a YAML file? raise?
+        self._config = PathSpec(
+            kind="file", description="Main configuration", location=location
+        )
+
+    ### Model cache
 
     @property
     def models(self) -> PathSpec:
         return PathSpec(
-            kind = "directory",
-            description = "Model cache",
-            location = self.root.location / "models"
+            kind="directory",
+            description="Model cache",
+            location=self.root.location / "models",
         )
 
-    @property
-    def configs(self) -> PathSpec:
-        return PathSpec(
-            kind = "directory",
-            description = "Common configuration files",
-            location = self.root.location / "configs"
-        )
+    ### Configuration store
 
     @property
-    def outdir(self) -> PathSpec:
+    def configdir(self) -> PathSpec:
         return PathSpec(
-            kind = "directory",
-            description = "Image outputs",
-            location = self.root.location / "outputs"
+            kind="directory",
+            description="Common configuration files",
+            location=self.root.location / "configs",
         )
+
+    ### SD weights store
 
     @property
     def default_weights(self) -> PathSpec:
         return PathSpec(
-            kind = "directory",
-            description = "Default SD weights",
-            location = self.models.location / "ldm/stable-diffusion-v1"
+            kind="directory",
+            description="Stable Diffusion weights",
+            location=self.models.location / "ldm/stable-diffusion-v1",
         )
+
+    ### SD specific config files
 
     @property
     def sd_configs(self) -> PathSpec:
         return PathSpec(
-            kind = "directory",
-            description = "SD model parameters",
-            location = self.configs.location / "stable-diffusion"
+            kind="directory",
+            description="SD model parameters",
+            location=self.configdir.location / "stable-diffusion",
         )
 
-    @property
-    def models_config(self) -> PathSpec:
-        return PathSpec(
-            kind = "file",
-            description = "Active models configuration",
-            location = self.configs.location / "models.yaml"
-        )
+    ### App initialization file (default CLI switches)
 
     @property
     def initfile(self) -> PathSpec:
         return PathSpec(
-            kind = "file",
-            description = "Application init",
-            location = self.root.location / "invokeai.init"
+            kind="file",
+            description="Application init",
+            location=self.root.location / "invokeai.init",
         )
+
+    ### Default model configs - initial source for the main config file
 
     @property
     def init_models(self) -> PathSpec:
         return PathSpec(
-            kind = "file",
-            description = "Core supported models config",
-            location = self.configs.location / "INITIAL_MODELS.yaml"
+            kind="file",
+            description="Initial models configuration",
+            location=self.configdir.location / "INITIAL_MODELS.yaml",
         )
-
-    ## not yet in use - a unified config file is a proposed change
-    # @property
-    # def main_config(self) -> PathSpec:
-    #     return PathSpec(
-    #         kind = "file",
-    #         description = "Application configuration",
-    #         location = self.root.location / "invokeai.yaml"
-    #     )
 
     def get(self) -> list[PathSpec]:
         """
         Returns a list of all defined PathSpecs
         """
 
-        attrs = inspect.getmembers(self, predicate = lambda m: not (inspect.isroutine(m)))
-        return [a[1] for a in attrs if isinstance(a[1], PathSpec)]
+        attrs = inspect.getmembers(self, predicate=lambda m: not (inspect.isroutine(m)))
+        return [
+            a[1]
+            for a in attrs
+            if ((isinstance(a[1], PathSpec)) and not (a[0].startswith("_")))
+        ]

@@ -1,5 +1,5 @@
 import pytest
-from ldm.invoke.paths import InvokePaths, DEFAULT_ROOT_DIR
+from ldm.invoke.paths import InvokePaths, DEFAULT_RUNTIME_DIR
 from pathlib import Path
 
 @pytest.fixture(autouse=True)
@@ -41,7 +41,7 @@ class TestInvokePathsRootDir:
         monkeypatch.delenv("VIRTUAL_ENV", raising = False)
         monkeypatch.delenv("INVOKEAI_ROOT", raising = False)
         p = InvokePaths()
-        assert p.root.location == Path(DEFAULT_ROOT_DIR)
+        assert p.root.location == Path(DEFAULT_RUNTIME_DIR)
 
     def test_root_envvar(self, monkeypatch):
         """
@@ -66,9 +66,9 @@ class TestInvokePathsRootDir:
         """
 
         monkeypatch.delenv("INVOKEAI_ROOT", raising = False)
-        monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_ROOT_DIR}/.venv")
+        monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_RUNTIME_DIR}/.venv")
         p = InvokePaths()
-        assert p.root.location == Path(DEFAULT_ROOT_DIR)
+        assert p.root.location == Path(DEFAULT_RUNTIME_DIR)
 
     def test_both_envvars(self, monkeypatch):
         """
@@ -76,7 +76,7 @@ class TestInvokePathsRootDir:
         """
 
         monkeypatch.setenv("INVOKEAI_ROOT", "/someplace")
-        monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_ROOT_DIR}/.venv")
+        monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_RUNTIME_DIR}/.venv")
         p = InvokePaths()
         assert p.root.location == Path("/someplace")
 
@@ -95,7 +95,7 @@ class TestInvokePathsRootDir:
     #     monkeypatch.delenv("VIRTUAL_ENV", raising = False)
     #     monkeypatch.delenv("INVOKEAI_ROOT", raising = False)
     #     p = InvokePaths()
-    #     assert p.root.location == Path(DEFAULT_ROOT_DIR)
+    #     assert p.root.location == Path(DEFAULT_RUNTIME_DIR)
 
     # def test_root_envvar(self, monkeypatch):
     #     """
@@ -120,9 +120,9 @@ class TestInvokePathsRootDir:
     #     """
 
     #     monkeypatch.delenv("INVOKEAI_ROOT", raising = False)
-    #     monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_ROOT_DIR}/.venv")
+    #     monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_RUNTIME_DIR}/.venv")
     #     p = InvokePaths()
-    #     assert p.root.location == Path(DEFAULT_ROOT_DIR)
+    #     assert p.root.location == Path(DEFAULT_RUNTIME_DIR)
 
     # def test_both_envvars(self, monkeypatch):
     #     """
@@ -130,6 +130,6 @@ class TestInvokePathsRootDir:
     #     """
 
     #     monkeypatch.setenv("INVOKEAI_ROOT", "/someplace")
-    #     monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_ROOT_DIR}/.venv")
+    #     monkeypatch.setenv("VIRTUAL_ENV", f"{DEFAULT_RUNTIME_DIR}/.venv")
     #     p = InvokePaths()
     #     assert p.root.location == Path("/someplace")
