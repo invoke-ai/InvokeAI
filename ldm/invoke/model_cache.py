@@ -1,5 +1,5 @@
 '''
-Manage a cache of Stable Diffusion model files for fast switching. 
+Manage a cache of Stable Diffusion model files for fast switching.
 They are moved between GPU and CPU as necessary. If CPU memory falls
 below a preset minimum, the least recently used model will be
 cleared and loaded from disk when next needed.
@@ -51,7 +51,7 @@ class ModelCache(object):
         identifier.
         '''
         return model_name in self.config
-    
+
     def get_model(self, model_name:str):
         '''
         Given a model named identified in models.yaml, return
@@ -66,7 +66,7 @@ class ModelCache(object):
             if model_name not in self.models: # make room for a new one
                 self._make_cache_room()
             self.offload_model(self.current_model)
-        
+
         if model_name in self.models:
             requested_model = self.models[model_name]['model']
             print(f'>> Retrieving model {model_name} from system RAM cache')
@@ -92,7 +92,7 @@ class ModelCache(object):
                 print(f'** restoring {self.current_model}')
                 self.get_model(self.current_model)
                 return
-        
+
         self.current_model = model_name
         self._push_newest_model(model_name)
         return {
@@ -191,7 +191,7 @@ class ModelCache(object):
         omega[model_name] = config
         if clobber:
             self._invalidate_cached_model(model_name)
-    
+
     def _load_model(self, model_name:str):
         """Load and initialize the model from configuration variables passed at object creation time"""
         if model_name not in self.config:
@@ -254,7 +254,7 @@ class ModelCache(object):
         model.to(self.device)
         # model.to doesn't change the cond_stage_model.device used to move the tokenizer output, so set it here
         model.cond_stage_model.device = self.device
-        
+
         model.eval()
 
         for module in model.modules():
@@ -274,7 +274,7 @@ class ModelCache(object):
             )
 
         return model, width, height, model_hash
-        
+
     def offload_model(self, model_name:str) -> None:
         '''
         Offload the indicated model to CPU. Will call
@@ -290,7 +290,7 @@ class ModelCache(object):
         gc.collect()
         if self._has_cuda():
             torch.cuda.empty_cache()
-    
+
     def scan_model(self, model_name, checkpoint):
         # scan model
         print(f'>> Scanning Model: {model_name}')
@@ -320,7 +320,7 @@ class ModelCache(object):
             if least_recent_model is not None:
                 del self.models[least_recent_model]
                 gc.collect()
-        
+
     def print_vram_usage(self) -> None:
         if self._has_cuda:
             print('>> Current VRAM usage: ','%4.2fG' % (torch.cuda.memory_allocated() / 1e9))
@@ -355,12 +355,12 @@ class ModelCache(object):
         if model_name in self.stack:
             self.stack.remove(model_name)
         self.models.pop(model_name,None)
-        
+
     def _model_to_cpu(self,model):
         if self.device != 'cpu':
             model.cond_stage_model.device = 'cpu'
             model.first_stage_model.to('cpu')
-            model.cond_stage_model.to('cpu') 
+            model.cond_stage_model.to('cpu')
             model.model.to('cpu')
             return model.to('cpu')
         else:
@@ -390,7 +390,7 @@ class ModelCache(object):
         with contextlib.suppress(ValueError):
             self.stack.remove(model_name)
         self.stack.append(model_name)
-        
+
     def _has_cuda(self) -> bool:
         return self.device.type == 'cuda'
 

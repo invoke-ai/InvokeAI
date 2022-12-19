@@ -241,7 +241,7 @@ class EmbeddingManager(nn.Module):
         # both will be stored in this dictionary
         for term in self.string_to_param_dict.keys():
             term = term.strip('<').strip('>')
-            self.concepts_loaded[term] = True  
+            self.concepts_loaded[term] = True
         print(f'>> Current embedding manager terms: {", ".join(self.string_to_param_dict.keys())}')
 
     def _expand_directories(self, paths:list[str]):

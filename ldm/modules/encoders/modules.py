@@ -548,7 +548,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
 
             #print(f"assembled tokens for '{fragments}' into tensor of shape {lerped_embeddings.shape}")
 
-            # append to batch 
+            # append to batch
             batch_z = lerped_embeddings.unsqueeze(0) if batch_z is None else torch.cat([batch_z, lerped_embeddings.unsqueeze(0)], dim=1)
             batch_tokens = tokens.unsqueeze(0) if batch_tokens is None else torch.cat([batch_tokens, tokens.unsqueeze(0)], dim=1)
 
