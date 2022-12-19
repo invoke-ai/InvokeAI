@@ -27,19 +27,19 @@ echo This script will update InvokeAI and all its dependencies to !INVOKE_AI_SRC
 echo If you do not want to do this, press control-C now!
 pause
 
-call pip install -r requirements.txt
+call .venv\Scripts\python -mpip install -r requirements.txt
 if %errorlevel% neq 0 (
    echo Installation of requirements failed. See https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting for suggestions.
    exit /b
 )
 
-call pip install !INVOKE_AI_SRC!
+call .venv\Scripts\python -mpip install !INVOKE_AI_SRC!
 if %errorlevel% neq 0 (
    echo Installation of InvokeAI failed. See https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting for suggestions.
    exit /b
 )
 
-call .venv\Scripts\python .venv\Scripts\configure_invokeai.py --root="%rootdir%"
+call .venv\Scripts\python .venv\Scripts\configure_invokeai.py --root=.
 
 if %errorlevel% neq 0 (
    echo Configuration InvokeAI failed. See https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting for suggestions.

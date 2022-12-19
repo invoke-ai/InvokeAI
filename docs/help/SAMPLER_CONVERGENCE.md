@@ -39,7 +39,7 @@ Looking for a short version? Here's a TL;DR in 3 tables.
 !!! tip "suggestions"
 
     For most use cases, `K_LMS`, `K_HEUN` and `K_DPM_2` are the best choices (the latter 2 run 0.5x as quick, but tend to converge 2x as quick as `K_LMS`). At very low steps (≤ `-s8`), `K_HEUN` and `K_DPM_2` are not recommended. Use `K_LMS` instead.
-    
+
     For variability, use `K_EULER_A` (runs 2x as quick as `K_DPM_2_A`).
 
 ---

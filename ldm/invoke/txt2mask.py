@@ -2,13 +2,13 @@
 assignment of masks via text prompt using clipseg.
 
 Here is typical usage:
-    
+
     from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
     from PIL import Image
 
     txt2mask = Txt2Mask(self.device)
     segmented = txt2mask.segment(Image.open('/path/to/img.png'),'a bagel')
-    
+
     # this will return a grayscale Image of the segmented data
     grayscale = segmented.to_grayscale()
 
@@ -45,7 +45,7 @@ class SegmentedGrayscale(object):
     def __init__(self, image:Image, heatmap:torch.Tensor):
         self.heatmap = heatmap
         self.image = image
-        
+
     def to_grayscale(self,invert:bool=False)->Image:
         return self._rescale(Image.fromarray(np.uint8(255 - self.heatmap * 255 if invert else self.heatmap * 255)))
 

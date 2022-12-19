@@ -124,8 +124,6 @@ call "%rootdir%\.venv\Scripts\activate.bat"
 set PYTHON=%rootdir%\.venv\Scripts\python
 echo updating pip with "%PYTHON%"
 call "%PYTHON%" -mensurepip --upgrade
-
-copy environments-and-requirements\requirements-win-colab-cuda.txt .\requirements.txt
 call "%PYTHON%" -mpip install --prefer-binary -r requirements.txt
 if %errorlevel% neq 0 (
    set err_msg=Requirements installation failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.

@@ -54,7 +54,7 @@ function loadPriorResults() {
         appendOutput(src, seed, metadata, true);
       });
     });
-    
+
     // Load until page is full
     if (!priorResultsLoadState.initialized) {
       if (document.body.scrollHeight <= window.innerHeight) {

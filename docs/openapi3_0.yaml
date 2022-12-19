@@ -3,10 +3,10 @@ info:
   title: Stable Diffusion
   description: |-
     TODO: Description Here
-    
+
     Some useful links:
     - [Stable Diffusion Dream Server](https://github.com/lstein/stable-diffusion)
-    
+
   license:
     name: MIT License
     url: https://github.com/lstein/stable-diffusion/blob/main/LICENSE
@@ -36,7 +36,7 @@ paths:
           description: successful operation
           content:
             image/png:
-              schema: 
+              schema:
                 type: string
                 format: binary
         '404':
@@ -66,7 +66,7 @@ paths:
           description: successful operation
           content:
             image/png:
-              schema: 
+              schema:
                 type: string
                 format: binary
         '404':

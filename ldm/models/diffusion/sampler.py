@@ -113,7 +113,7 @@ class Sampler(object):
             'ddim_sigmas_for_original_num_steps',
             sigmas_for_original_sampling_steps,
         )
-        
+
     @torch.no_grad()
     def stochastic_encode(self, x0, t, use_original_steps=False, noise=None):
         # fast, but does not allow for exact reconstruction
@@ -340,7 +340,7 @@ class Sampler(object):
         x_dec    = x_latent
         x0       = init_latent
         self.prepare_to_sample(t_enc=total_steps, all_timesteps_count=all_timesteps_count, **kwargs)
-        
+
         for i, step in enumerate(iterator):
             index = total_steps - i - 1
             ts = torch.full(
@@ -373,7 +373,7 @@ class Sampler(object):
                 t_next = ts_next,
                 step_count=len(self.ddim_timesteps)
             )
-            
+
             x_dec, pred_x0, e_t = outs
             if img_callback:
                 img_callback(x_dec,i)
@@ -385,7 +385,7 @@ class Sampler(object):
             return torch.randn(shape, device=self.device)
         else:
             return x_T
-    
+
     def p_sample(
             self,
             img,
@@ -423,10 +423,10 @@ class Sampler(object):
         timesteps that will be used for sampling, depending on the t_enc in img2img.
         '''
         return self.ddim_timesteps[:ddim_steps]
-    
+
     def q_sample(self,x0,ts):
         '''
-        Returns self.model.q_sample(x0,ts). Is overridden in the k* samplers to 
+        Returns self.model.q_sample(x0,ts). Is overridden in the k* samplers to
         return self.model.inner_model.q_sample(x0,ts)
         '''
         return self.model.q_sample(x0,ts)

@@ -10,7 +10,7 @@ class Restoration():
         else:
             print('>> GFPGAN Disabled')
             gfpgan = None
-        
+
         # Load CodeFormer
         codeformer = self.load_codeformer()
         if codeformer.codeformer_model_exists:
@@ -18,7 +18,7 @@ class Restoration():
         else:
             print('>> CodeFormer Disabled')
             codeformer = None
-        
+
         return gfpgan, codeformer
 
     # Face Restore Models

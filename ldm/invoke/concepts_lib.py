@@ -46,6 +46,9 @@ class Concepts(object):
         the named concept. Returns None if invalid or cannot
         be downloaded.
         '''
+        if not concept_name in self.list_concepts():
+            print(f'This concept is not known to the Hugging Face library. Generation will continue without the concept.')
+            return None
         return self.get_concept_file(concept_name.lower(),'learned_embeds.bin')
 
     def concept_to_trigger(self, concept_name:str)->str:
@@ -116,11 +119,11 @@ class Concepts(object):
             self.download_concept(concept_name)
         path = os.path.join(self._concept_path(concept_name), file_name)
         return path if os.path.exists(path) else None
-        
+
     def concept_is_downloaded(self, concept_name)->bool:
         concept_directory = self._concept_path(concept_name)
         return os.path.exists(concept_directory)
-        
+
     def download_concept(self,concept_name)->bool:
         repo_id = self._concept_id(concept_name)
         dest = self._concept_path(concept_name)
@@ -133,7 +136,7 @@ class Concepts(object):
 
         os.makedirs(dest, exist_ok=True)
         succeeded = True
-        
+
         bytes = 0
         def tally_download_size(chunk, size, total):
             nonlocal bytes
