@@ -3,7 +3,7 @@
 cd "$(dirname "$0")"
 
 VERSION=$(grep ^VERSION ../setup.py | awk '{ print $3 }' | sed "s/'//g" )
-VERSION="$VERSION-p1"
+VERSION="$VERSION-p5"
 
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
@@ -36,8 +36,8 @@ cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
 # this gets rid of the "-e ." at the end of the windows requirements file
 # because it is easier to do it now than in the .bat install script
-egrep -v '^-e .' InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt >requirements.txt
-mv requirements.txt InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt
+egrep -v '^-e .' InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt > InvokeAI-Installer/requirements.txt
+cp InvokeAI-Installer/requirements.txt InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt
 zip -r InvokeAI-installer-$VERSION-windows.zip InvokeAI-Installer
 
 # clean up
