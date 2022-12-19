@@ -5,32 +5,27 @@ otherwise have to be passed through long and complex call chains.
 It defines a Namespace object named "Globals" that contains
 the attributes:
 
-  - root           - the root directory under which "models" and "outputs" can be found
+  - root           - the root directory under which e.g. "models" and "outputs" can be found
   - initfile       - path to the initialization file
+  - outdir         - output directory
+  - config         - models config file
   - try_patchmatch - option to globally disable loading of 'patchmatch' module
   - always_use_cpu - force use of CPU even if GPU is available
 '''
 
-import os
-import os.path as osp
-from pathlib import Path
 from argparse import Namespace
+from .paths import InvokePaths
 
 Globals = Namespace()
+Paths = InvokePaths()
 
-# This is usually overwritten by the command line and/or environment variables
-if os.environ.get('INVOKEAI_ROOT'):
-    Globals.root = osp.abspath(os.environ.get('INVOKEAI_ROOT'))
-elif os.environ.get('VIRTUAL_ENV'):
-    Globals.root = osp.abspath(osp.join(os.environ.get('VIRTUAL_ENV'), '..'))
-else:
-    Globals.root = osp.abspath(osp.expanduser('~/invokeai'))
-
-# Where to look for the initialization file
-Globals.initfile = 'invokeai.init'
-Globals.models_dir = 'models'
-Globals.config_dir = 'configs'
-Globals.autoscan_dir = 'weights'
+Globals.root = Paths.root
+Globals.initfile = Paths.initfile
+Globals.outdir = Paths.outdir
+Globals.config = Paths.config
+Globals.config_dir = Paths.configdir
+Globals.models_dir = Paths.models
+Globals.autoscan_dir = Paths.default_weights
 
 # Try loading patchmatch
 Globals.try_patchmatch = True
@@ -41,13 +36,3 @@ Globals.always_use_cpu = False
 # Whether the internet is reachable for dynamic downloads
 # The CLI will test connectivity at startup time.
 Globals.internet_available = True
-
-def global_config_dir()->str:
-    return Path(Globals.root, Globals.config_dir)
-
-def global_models_dir()->str:
-    return Path(Globals.root, Globals.models_dir)
-
-def global_autoscan_dir()->str:
-    return Path(Globals.root, Globals.autoscan_dir)
-
