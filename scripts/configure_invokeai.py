@@ -330,13 +330,10 @@ def download_weight_datasets(models:dict, access_token:str):
             successful[mod] = True
     if len(successful) < len(models):
         print(f'\n\n** There were errors downloading one or more files. **')
-        print('Please double-check your license agreements, and your access token.')
-        HfFolder.delete_token()
         print('Press any key to try again. Type ^C to quit.\n')
         input()
         return None
 
-    HfFolder.save_token(access_token)
     keys = ', '.join(successful.keys())
     print(f'Successfully installed {keys}')
     return successful
