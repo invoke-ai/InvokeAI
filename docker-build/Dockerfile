@@ -15,9 +15,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # set WORKDIR, PATH and copy sources
-ARG WORKDIR=/usr/src/app
-WORKDIR ${WORKDIR}
-ENV PATH ${WORKDIR}/.venv/bin:$PATH
+ARG APPDIR=/usr/src/app
+WORKDIR ${APPDIR}
+ENV PATH ${APPDIR}/.venv/bin:$PATH
 ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
 COPY . ./environments-and-requirements/${PIP_REQUIREMENTS} ./
 
@@ -34,11 +34,11 @@ RUN python3 -m venv .venv \
 FROM python:3.10-slim AS runtime
 
 # setup environment
-ARG WORKDIR=/usr/src/app
-WORKDIR ${WORKDIR}
-COPY --from=builder ${WORKDIR} .
+ARG APPDIR=/usr/src/app
+WORKDIR ${APPDIR}
+COPY --from=builder ${APPDIR} .
 ENV \
-  PATH=${WORKDIR}/.venv/bin:$PATH \
+  PATH=${APPDIR}/.venv/bin:$PATH \
   INVOKEAI_ROOT=/data \
   INVOKE_MODEL_RECONFIGURE=--yes
 
