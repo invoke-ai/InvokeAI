@@ -20,18 +20,18 @@ would type at the invoke> prompt:
 Then pass this file's name to `invoke.py` when you invoke it:
 
 ```bash
-(invokeai) ~/stable-diffusion$ python3 scripts/invoke.py --from_file "/path/to/prompts.txt"
+python scripts/invoke.py --from_file "/path/to/prompts.txt"
 ```
 
-You may read a series of prompts from standard input by providing a
-filename of `-`. For example, here is a python script that creates a
+You may also read a series of prompts from standard input by providing
+a filename of `-`. For example, here is a python script that creates a
 matrix of prompts, each one varying slightly:
 
 ```bash
 #!/usr/bin/env python
 
 adjectives = ['sunny','rainy','overcast']
-samplers = ['klms','k_euler_a','k_heun']
+samplers = ['k_lms','k_euler_a','k_heun']
 cfg = [7.5, 9, 11]
 
 for adj in adjectives:
