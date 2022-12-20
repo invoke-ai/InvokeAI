@@ -20,15 +20,47 @@ would type at the invoke> prompt:
 Then pass this file's name to `invoke.py` when you invoke it:
 
 ```bash
-(invokeai) ~/stable-diffusion$ python3 scripts/invoke.py --from_file "path/to/prompts.txt"
+(invokeai) ~/stable-diffusion$ python3 scripts/invoke.py --from_file "/path/to/prompts.txt"
 ```
 
-You may read a series of prompts from standard input by providing a filename of
-`-`:
+You may read a series of prompts from standard input by providing a
+filename of `-`. For example, here is a python script that creates a
+matrix of prompts, each one varying slightly:
 
 ```bash
-(invokeai) ~/stable-diffusion$ echo "a beautiful day" | python3 scripts/invoke.py --from_file -
+#!/usr/bin/env python
+
+adjectives = ['sunny','rainy','overcast']
+samplers = ['klms','k_euler_a','k_heun']
+cfg = [7.5, 9, 11]
+
+for adj in adjectives:
+    for samp in samplers:
+        for cg in cfg:
+            print(f'a {adj} day -A{samp} -C{cg}')
 ```
+
+It's output looks like this (abbreviated):
+
+```bash
+a sunny day -Aklms -C7.5
+a sunny day -Aklms -C9
+a sunny day -Aklms -C11
+a sunny day -Ak_euler_a -C7.5
+a sunny day -Ak_euler_a -C9
+...
+a overcast day -Ak_heun -C9
+a overcast day -Ak_heun -C11
+```
+
+To feed it to invoke.py, pass the filename of "-"
+
+```bash
+python matrix.py | python scripts/invoke.py --from_file -
+```
+
+When the script is finished, each of the 27 combinations
+of adjective, sampler and CFG will be executed.
 
 ---
 
