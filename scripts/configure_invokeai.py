@@ -212,7 +212,7 @@ def HfLogin(access_token) -> str:
 #-------------------------------Authenticate against Hugging Face
 def authenticate(yes_to_all=False):
     print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
-    print("=" * os.get_terminal_size()[0])
+    print("=" * shutil.get_terminal_size()[0])
     print('''
 By downloading the Stable Diffusion weight files from the official Hugging Face
 repository, you agree to have read and accepted the CreativeML Responsible AI License.
@@ -221,7 +221,7 @@ The license terms are located here:
    https://huggingface.co/spaces/CompVis/stable-diffusion-license
 
 ''')
-    print("=" * os.get_terminal_size()[0])
+    print("=" * shutil.get_terminal_size()[0])
 
     if not yes_to_all:
         accepted = False
@@ -237,7 +237,7 @@ The license terms are located here:
     # Authenticate to Huggingface using environment variables.
     # If successful, authentication will persist for either interactive or non-interactive use.
     # Default env var expected by HuggingFace is HUGGING_FACE_HUB_TOKEN.
-    print("=" * os.get_terminal_size()[0])
+    print("=" * shutil.get_terminal_size()[0])
     print('Authenticating to Huggingface')
     hf_envvars = [ "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN" ]
     if not (access_token := HfFolder.get_token()):
@@ -294,7 +294,7 @@ You may re-run the configuration script again in the future if you do not wish t
         print()
         print(f"Re-run the configuration script without '--yes' to set the HuggingFace token interactively, or use one of the environment variables: {', '.join(hf_envvars)}")
 
-    print("=" * os.get_terminal_size()[0])
+    print("=" * shutil.get_terminal_size()[0])
 
     return access_token
 
@@ -330,13 +330,10 @@ def download_weight_datasets(models:dict, access_token:str):
             successful[mod] = True
     if len(successful) < len(models):
         print(f'\n\n** There were errors downloading one or more files. **')
-        print('Please double-check your license agreements, and your access token.')
-        HfFolder.delete_token()
         print('Press any key to try again. Type ^C to quit.\n')
         input()
         return None
 
-    HfFolder.save_token(access_token)
     keys = ', '.join(successful.keys())
     print(f'Successfully installed {keys}')
     return successful
