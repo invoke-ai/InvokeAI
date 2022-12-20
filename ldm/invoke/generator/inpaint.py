@@ -17,12 +17,12 @@ from ldm.models.diffusion.ddim     import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.invoke.generator.base import downsampling
 from ldm.util import debug_image
-from ldm.invoke.patchmatch import Patchmatch 
+from ldm.invoke.patchmatch import PatchMatch 
 from ldm.invoke.globals import Globals
 
 def infill_methods()->list[str]:
     methods = list()
-    if Patchmatch.patchmatch_available():
+    if PatchMatch.patchmatch_available():
         methods.append('patchmatch')
     methods.append('tile')
     return methods
@@ -33,6 +33,7 @@ class Inpaint(Img2Img):
         self.pil_image = None
         self.pil_mask = None
         self.mask_blur_radius = 0
+        self.infill_method = None
         super().__init__(model, precision)
 
     # Outpaint support code
@@ -57,11 +58,11 @@ class Inpaint(Img2Img):
             return im
 
         # Skip patchmatch if patchmatch isn't available
-        if not Patchmatch.patchmatch_available():
+        if not PatchMatch.patchmatch_available():
             return im
 
         # Patchmatch (note, we may want to expose patch_size? Increasing it significantly impacts performance though)
-        im_patched_np = Patchmatch.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
+        im_patched_np = PatchMatch.inpaint(im.convert('RGB'), ImageOps.invert(im.split()[-1]), patch_size = 3)
         im_patched = Image.fromarray(im_patched_np, mode = 'RGB')
         return im_patched
 
@@ -191,7 +192,7 @@ class Inpaint(Img2Img):
         """
 
         self.enable_image_debugging = enable_image_debugging
-        self.infill_method = self.infill_method or infill_methods()[0], # The infill method to use
+        self.infill_method = infill_method or infill_methods()[0], # The infill method to use
         
         self.inpaint_width = inpaint_width
         self.inpaint_height = inpaint_height
@@ -200,7 +201,7 @@ class Inpaint(Img2Img):
             self.pil_image = init_image.copy()
 
             # Do infill
-            if infill_method == 'patchmatch' and Patchmatch.patchmatch_available():
+            if infill_method == 'patchmatch' and PatchMatch.patchmatch_available():
                 init_filled = self.infill_patchmatch(self.pil_image.copy())
             else: # if infill_method == 'tile': # Only two methods right now, so always use 'tile' if not patchmatch
                 init_filled = self.tile_fill_missing(

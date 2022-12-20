@@ -7,7 +7,7 @@ be suppressed or deferred
 from ldm.invoke.globals import Globals
 import numpy as  np
 
-class Patchmatch:
+class PatchMatch:
     '''
     Thin class wrapper around the patchmatch function.
     '''
