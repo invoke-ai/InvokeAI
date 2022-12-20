@@ -16,7 +16,6 @@ export default function LanguagePicker() {
     ru: t('common:langRussian'),
     it: t('common:langItalian'),
     pt: t('common:langPortuguese'),
-    fr: t('common:langFrench'),
   };
 
   const renderLanguagePicker = () => {
