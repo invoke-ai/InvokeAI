@@ -12,7 +12,9 @@ The **Base Layer** is the image content currently managed by the Canvas, and can
 When you generate images, they will display in the Canvas's **Staging Area**, alongside the Staging Area toolbar buttons. While the Staging Area is active, you cannot interact with the Canvas itself.
 
 <figure markdown>
+
 ![staging area](../assets/canvas/staging_area.png)
+
 </figure>
 
 Accepting generations will commit the new generation to the **Base Layer**. You can review all generated images using the Prev/Next arrows, save any individual generations to your gallery (without committing to the Base layer) or discard generations. While you can Undo a discard in an individual Canvas session, any generations that are not saved will be lost when the Canvas resets.
@@ -26,18 +28,16 @@ When generating a new image, Invoke will process and apply new images within the
 ### <a name="inpainting-and-outpainting"></a> Inpainting & Outpainting
 "Inpainting" means asking the AI to refine part of an image while leaving the rest alone. For example, updating a portrait of your grandmother to have her wear a biker's jacket.
 
-<figure markdown>
-![granny with a mask applied](../assets/canvas/mask_granny.png)
-</figure>
-
-<figure markdown>
-![just like magic, granny with a biker's jacket](../assets/canvas/biker_granny.png)
-</figure>
+| masked original | inpaint result |
+| :-------------: | :------------: |
+| ![granny with a mask applied](../assets/canvas/mask_granny.png) | ![just like magic, granny with a biker's jacket](../assets/canvas/biker_jacket_granny.png) |
 
 "Outpainting" means asking the AI to expand the original image beyond its original borders, making a bigger image that's still based on the original. For example, extending the above image of your Grandmother in a biker's jacket to include her wearing jeans (and while we're at it, a motorcycle!)
 
 <figure markdown>
-![more magic - granny with a tattooed arm, denim pants, and an obscured motorcycle](../assets/canvas/biker_jacket_granny.png)
+
+![more magic - granny with a tattooed arm, denim pants, and an obscured motorcycle](../assets/canvas/biker_granny.png)
+
 </figure>
 
 When you are using the Unified Canvas, Invoke decides automatically whether to do Inpainting, Outpainting, ImageToImage, or TextToImage by looking inside the area enclosed by the Bounding Box. It chooses the appropriate type of generation based on whether the Bounding Box contains empty (transparent) areas on the Base layer, or whether it contains colored areas from previous generations (or from painted brushstrokes) on the Base layer, and/or whether the Mask layer contains any brushstrokes. See [Generation Methods](#generation-methods) below for more information.
