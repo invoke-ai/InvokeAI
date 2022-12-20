@@ -93,9 +93,14 @@ import copy
 import base64
 import functools
 import warnings
+import ldm.invoke
 import ldm.invoke.pngwriter
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
+
+APP_ID = ldm.invoke.__app_id__
+APP_NAME = ldm.invoke.__app_name__
+APP_VERSION = ldm.invoke.__version__
 
 SAMPLER_CHOICES = [
     'ddim',
@@ -116,10 +121,6 @@ PRECISION_CHOICES = [
     'autocast',
     'float16',
 ]
-
-# is there a way to pick this up during git commits?
-APP_ID      = 'invoke-ai/InvokeAI'
-APP_VERSION = 'v2.2.4'
 
 class ArgFormatter(argparse.RawTextHelpFormatter):
         # use defined argument order to display usage
@@ -172,15 +173,22 @@ class Args(object):
         '''Parse the shell switches and store.'''
         try:
             sysargs = sys.argv[1:]
-            # pre-parse to get the root directory; ignore the rest
+            # pre-parse before we do any initialization to get root directory
+            # and intercept --version request
             switches = self._arg_parser.parse_args(sysargs)
+            if switches.version:
+                print(f'{ldm.invoke.__app_name__} {ldm.invoke.__version__}')
+                sys.exit(0)
+
+            print('* Initializing, be patient...')
             Globals.root = os.path.abspath(switches.root_dir or Globals.root)
+            Globals.try_patchmatch = switches.patchmatch
 
             # now use root directory to find the init file
             initfile = os.path.expanduser(os.path.join(Globals.root,Globals.initfile))
             legacyinit = os.path.expanduser('~/.invokeai')
             if os.path.exists(initfile):
-                print(f'>> Initialization file {initfile} found. Loading...')
+                print(f'>> Initialization file {initfile} found. Loading...',file=sys.stderr)
                 sysargs.insert(0,f'@{initfile}')
             elif os.path.exists(legacyinit):
                 print(f'>> WARNING: Old initialization file found at {legacyinit}. This location is deprecated. Please move it to {Globals.root}/invokeai.init.')
@@ -405,6 +413,7 @@ class Args(object):
             """,
             fromfile_prefix_chars='@',
         )
+        general_group    = parser.add_argument_group('General')
         model_group      = parser.add_argument_group('Model selection')
         file_group       = parser.add_argument_group('Input/output')
         web_server_group = parser.add_argument_group('Web server')
@@ -414,6 +423,11 @@ class Args(object):
 
         deprecated_group.add_argument('--laion400m')
         deprecated_group.add_argument('--weights') # deprecated
+        general_group.add_argument(
+            '--version','-V',
+            action='store_true',
+            help='Print InvokeAI version number'
+        )
         model_group.add_argument(
             '--root_dir',
             default=None,
@@ -1061,8 +1075,8 @@ def metadata_dumps(opt,
         'model'       : 'stable diffusion',
         'model_id'    : opt.model,
         'model_hash'  : model_hash,
-        'app_id'      : APP_ID,
-        'app_version' : APP_VERSION,
+        'app_id'      : ldm.invoke.__app_id__,
+        'app_version' : ldm.invoke.__version__,
     }
 
     # # add some RFC266 fields that are generated internally, and not as
