@@ -62,6 +62,13 @@ python matrix.py | python scripts/invoke.py --from_file -
 When the script is finished, each of the 27 combinations
 of adjective, sampler and CFG will be executed.
 
+The command-line interface provides `!fetch` and `!replay` commands
+which allow you to read the prompts from a single previously-generated
+image or a whole directory of them, write the prompts to a file, and
+then replay them. Or you can create your own file of prompts and feed
+them to the command-line client from within an interactive session.
+See [Command-Line Interface](CLI.md) for details.
+
 ---
 
 ## **Negative and Unconditioned Prompts**
