@@ -8,8 +8,8 @@ import time
 import traceback
 import yaml
 
-from ldm.generate import Generate
 from ldm.invoke.globals import Globals
+from ldm.generate import Generate
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.invoke.readline import get_completer, Completer
 from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
@@ -27,7 +27,6 @@ infile = None
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
-    print('* Initializing, be patient...')
 
     opt  = Args()
     args = opt.parse_args()
@@ -44,9 +43,6 @@ def main():
         if args.max_loaded_models <= 0:
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
-
-    # alert - setting a global here
-    Globals.try_patchmatch = args.patchmatch
 
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
