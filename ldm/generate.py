@@ -42,6 +42,7 @@ from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
 from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.generator.inpaint import infill_methods
 
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -264,8 +265,6 @@ class Generate:
             'init_img' in kwargs
         ), 'call to img2img() must include the init_img argument'
         return self.prompt2png(prompt, outdir, **kwargs)
-
-    from ldm.invoke.generator.inpaint import infill_methods
 
     def prompt2image(
             self,
