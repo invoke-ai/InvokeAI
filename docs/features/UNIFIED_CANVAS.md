@@ -31,7 +31,7 @@ When generating a new image, Invoke will process and apply new images within the
 </figure>
 
 <figure markdown>
-![just like magic, granny with a biker's jacket](../assets/canvas/biker_jacket_granny.png)
+![just like magic, granny with a biker's jacket](../assets/canvas/biker_granny.png)
 </figure>
 
 "Outpainting" means asking the AI to expand the original image beyond its original borders, making a bigger image that's still based on the original. For example, extending the above image of your Grandmother in a biker's jacket to include her wearing jeans (and while we're at it, a motorcycle!)
