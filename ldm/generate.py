@@ -39,11 +39,13 @@ from ldm.invoke.image_util import InitImageResizer
 from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.seamless import configure_model_padding
-from ldm.invoke.txt2mask import Txt2Mask
+from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
+from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.generator.inpaint import infill_methods
+
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.ksampler import KSampler
 from ldm.models.diffusion.plms import PLMSSampler
-
 
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -266,8 +268,6 @@ class Generate:
             'init_img' in kwargs
         ), 'call to img2img() must include the init_img argument'
         return self.prompt2png(prompt, outdir, **kwargs)
-
-    from ldm.invoke.generator.inpaint import infill_methods
 
     def prompt2image(
             self,
@@ -550,7 +550,7 @@ class Generate:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
-        except (RuntimeError, Exception) as e:
+        except RuntimeError as e:
             print(traceback.format_exc(), file=sys.stderr)
             print('>> Could not generate image.')
 
