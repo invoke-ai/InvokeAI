@@ -99,8 +99,8 @@ manager, please follow these steps:
             Please do not link or copy `environments-and-requirements/requirements-base.txt`.
             This is a base requirements file that does not have the platform-specific
             libraries. Also, be sure to link or copy the platform-specific file to
-	    a top-level file named `requirements.txt` as shown here. Running pip on
-	    a requirements file in a subdirectory will not work as expected.
+            a top-level file named `requirements.txt` as shown here. Running pip on
+            a requirements file in a subdirectory will not work as expected.
 
     When this is done, confirm that a file named `requirements.txt` has been
     created in the InvokeAI root directory and that it points to the correct
