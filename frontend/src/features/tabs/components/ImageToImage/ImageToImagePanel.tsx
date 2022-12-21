@@ -3,7 +3,7 @@ import FaceRestoreOptions from 'features/options/components/AdvancedOptions/Face
 import FaceRestoreToggle from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreToggle';
 import ImageFit from 'features/options/components/AdvancedOptions/ImageToImage/ImageFit';
 import ImageToImageStrength from 'features/options/components/AdvancedOptions/ImageToImage/ImageToImageStrength';
-import OutputOptions from 'features/options/components/AdvancedOptions/Output/OutputOptions';
+import ImageToImageOutputOptions from 'features/options/components/AdvancedOptions/Output/ImageToImageOutputOptions';
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
 import UpscaleOptions from 'features/options/components/AdvancedOptions/Upscale/UpscaleOptions';
 import UpscaleToggle from 'features/options/components/AdvancedOptions/Upscale/UpscaleToggle';
@@ -13,6 +13,8 @@ import MainOptions from 'features/options/components/MainOptions/MainOptions';
 import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/options/components/PromptInput/PromptInput';
+import { setHiresFix } from 'features/options/store/optionsSlice';
+import { useAppDispatch } from 'app/storeHooks';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 
 export default function ImageToImagePanel() {
@@ -43,9 +45,15 @@ export default function ImageToImagePanel() {
     other: {
       header: 'Other Options',
       feature: Feature.OTHER,
-      content: <OutputOptions />,
-    },
-  };
+      content: <ImageToImageOutputOptions />,
+    },}
+
+  const dispatch = useAppDispatch();
+
+  const handleChangeHiresFix = () =>
+    dispatch(setHiresFix(false));
+  
+  handleChangeHiresFix()
 
   return (
     <InvokeOptionsPanel>
@@ -59,5 +67,6 @@ export default function ImageToImagePanel() {
       <ImageFit />
       <OptionsAccordion accordionInfo={imageToImageAccordions} />
     </InvokeOptionsPanel>
-  );
-}
+  );}
+  
+
