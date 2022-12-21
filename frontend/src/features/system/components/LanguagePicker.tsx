@@ -15,7 +15,7 @@ export default function LanguagePicker() {
     en: t('common:langEnglish'),
     ru: t('common:langRussian'),
     it: t('common:langItalian'),
-    pt: t('common:langPortuguese'),
+    pt_br: t('common:langBrPortuguese'),
   };
 
   const renderLanguagePicker = () => {
@@ -30,7 +30,7 @@ export default function LanguagePicker() {
           aria-label={LANGUAGES[lang as keyof typeof LANGUAGES]}
           tooltip={LANGUAGES[lang as keyof typeof LANGUAGES]}
           size="sm"
-          minWidth="150px"
+          minWidth="200px"
         >
           {LANGUAGES[lang as keyof typeof LANGUAGES]}
         </IAIButton>
