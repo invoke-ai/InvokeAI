@@ -25,6 +25,7 @@ from diffusers import AutoencoderKL
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import RevisionNotFoundError
 from omegaconf import OmegaConf
+from omegaconf.dictconfig import DictConfig
 from omegaconf.errors import ConfigAttributeError
 from picklescan.scanner import scan_file_path
 
@@ -319,77 +320,60 @@ class ModelCache(object):
 
     def _load_diffusers_model(self, mconfig):
         pipeline_args = {}
-        if 'path' in mconfig:
-            name_or_path = Path(mconfig['path'])
-            if not name_or_path.is_absolute():
-                name_or_path = Path(Globals.root, name_or_path).resolve()
-            # FIXME: What should the model_hash be? A hash of the unet weights? Of all files of all
-            #     the submodels hashed together? The commit ID from the repo?
-            model_hash = "FIXME TOO"
-        elif 'repo_id' in mconfig:
-            name_or_path = mconfig['repo_id']
-            model_hash = "FIXME"
-            # model_hash = huggingface_hub.get_hf_file_metadata(url).commit_hash
-        elif 'repo_name' in mconfig:
-            name_or_path = mconfig['repo_name']
-            model_hash = "FIXME"
-            # model_hash = huggingface_hub.get_hf_file_metadata(url).commit_hash
-        else:
-            raise ValueError("Model config must specify either repo_name or path.")
+        name_or_path = self.model_name_or_path(mconfig)
+        model_hash = 'FIXME'
+        using_fp16 = False
         print(f'>> Loading diffusers model from {name_or_path}')
 
         # TODO: scan weights maybe?
-
         if 'vae' in mconfig:
             vae = self._load_vae(mconfig['vae'])
             pipeline_args.update(vae=vae)
 
-        # FIX: if name is a path, this is not right
-        cache_dir = os.path.join(Globals.root,'models',name_or_path) if type(name_or_path) == str else None
-        # FIX: this commented block is causing the cache read to fail in from_pretrained()
-        # if self.precision == 'float16':
-        #     print('   | Using faster float16 precision')
+        cache_dir = None if isinstance(name_or_path,Path) else os.path.join(Globals.root,'models',name_or_path)
+        if self.precision == 'float16':
+            print('   | Using faster float16 precision')
+            using_fp16 = True
+            pipeline_args.update(revision="fp16")
+            pipeline_args.update(torch_dtype=torch.float16)
+        else:
+            # TODO: more accurately, "using the model's default precision."
+            #     How do we find out what that is?
+            print('   | Using more accurate float32 precision')
+        try:
+            pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
+                name_or_path,
+                safety_checker=None,
+                cache_dir=cache_dir,
+                #  local_files_only=True,
+                **pipeline_args,
+            )
+        except Exception as e:
+            if using_fp16:
+                pipeline_args.pop('revision')
+                pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
+                    name_or_path,
+                    safety_checker=None,
+                    cache_dir=cache_dir,
+                    #  local_files_only=True,
+                    **pipeline_args,
+                )
 
-        #     if not isinstance(name, Path):
-        #         # hub has no explicit API for different data types, but the main Stable Diffusion
-        #         # releases set a precedent for putting float16 weights in a fp16 branch.
-        #         try:
-        #             hf_hub_download(name, "model_index.json", revision="fp16", cache_dir=cache_dir)
-        #         except RevisionNotFoundError:
-        #             pass  # no such branch, assume we should use the default.
-        #         else:
-        #             pipeline_args.update(revision="fp16")
-
-        #     pipeline_args.update(torch_dtype=torch.float16)
-        # else:
-        #     # TODO: more accurately, "using the model's default precision."
-        #     #     How do we find out what that is?
-        #     print('   | Using more accurate float32 precision')
-
-        pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
-            name_or_path,
-            # TODO: Safety checker is currently handled at a different stage in the code:
-            #     ldm.invoke.generator.base.Generator.safety_check
-            #     We might want to move that here for consistency with diffusers API, or we might
-            #     want to leave it as a separate processing node. It ends up using the same diffusers
-            #     code either way, so we can table it for now.
-            safety_checker=None,
-            cache_dir=cache_dir,
-#            local_files_only=True,
-            **pipeline_args,
-        )
         pipeline.to(self.device)
 
-        width = pipeline.vae.block_out_channels[-1]
+        width = pipeline.vae.block_out_channels[-2]
         height = pipeline.vae.block_out_channels[-1]
 
         return pipeline, width, height, model_hash
 
-    def model_name_or_path(self, model_name:str) -> str | Path:
-        if model_name not in self.config:
+    def model_name_or_path(self, model_name:Union[str,DictConfig]) -> str | Path:
+        if isinstance(model_name,DictConfig):
+            mconfig = model_name
+        elif model_name in self.config:
+            mconfig = self.config[model_name]            
+        else:
             raise ValueError(f'"{model_name}" is not a known model name. Please check your models.yaml file')
 
-        mconfig = self.config[model_name]
         if 'path' in mconfig:
             path = Path(mconfig['path'])
             if not path.is_absolute():
@@ -484,27 +468,36 @@ class ModelCache(object):
         self.models.pop(model_name,None)
 
     def _model_to_cpu(self,model):
-        if self.device != 'cpu':
-            try:
-                model.cond_stage_model.device = 'cpu'
-                model.first_stage_model.to('cpu')
-                model.cond_stage_model.to('cpu')
-                model.model.to('cpu')
-            except AttributeError as e:
-                warnings.warn(f"TODO: clean up legacy model-management: {e}")
-            return model.to('cpu')
-        else:
+        if self.device == 'cpu':
             return model
 
-    def _model_from_cpu(self,model):
-        if self.device != 'cpu':
-            model.to(self.device)
+        # diffusers really really doesn't like us moving a float16 model onto CPU
+        import logging
+        logging.getLogger('diffusers.pipeline_utils').setLevel(logging.CRITICAL)
+        model.cond_stage_model.device = 'cpu'
+        model.to('cpu')
+        logging.getLogger('pipeline_utils').setLevel(logging.INFO)
+
+        for submodel in ('first_stage_model','cond_stage_model','model'):
             try:
-                model.first_stage_model.to(self.device)
-                model.cond_stage_model.to(self.device)
-                model.cond_stage_model.device = self.device
-            except AttributeError as e:
-                warnings.warn(f"TODO: clean up legacy model-management: {e}")
+                getattr(model,submodel).to('cpu')
+            except AttributeError:
+                pass
+        return model
+
+    def _model_from_cpu(self,model):
+        if self.device == 'cpu':
+            return model
+        
+        model.to(self.device)
+        model.cond_stage_model.device = self.device
+
+        for submodel in ('first_stage_model','cond_stage_model','model'):
+            try:
+                getattr(model,submodel).to(self.device)
+            except AttributeError:
+                pass
+
         return model
 
     def _pop_oldest_model(self):
@@ -552,40 +545,31 @@ class ModelCache(object):
 
     def _load_vae(self, vae_config):
         vae_args = {}
-
-        if 'path' in vae_config:
-            name_or_path = Path(vae_config['path'])
-            if not name_or_path.is_absolute():
-                name_or_path = Path(Globals.root, name_or_path).resolve()
-        elif 'repo_id' in vae_config:
-            name_or_path = vae_config['repo_id']
-        elif 'repo_name' in vae_config:
-            print('** "repo_name" is deprecated in models.yaml. Use "repo_id" instead.')
-            name_or_path = vae_config['repo_name']
-        else:
-            raise ValueError("VAE config must specify either repo_id or path.")
+        name_or_path = self.model_name_or_path(vae_config)
+        using_fp16 = False        
 
         print(f'>> Loading diffusers VAE from {name_or_path}')
         if self.precision == 'float16':
             print('   | Using faster float16 precision')
-
-            if not isinstance(name_or_path, Path):
-                try:
-                    hf_hub_download(name_or_path, "model_index.json", revision="fp16")
-                except RevisionNotFoundError:
-                    pass
-                else:
-                    vae_args.update(revision="fp16")
-
+            using_fp16 = True
+            vae_args.update(revision="fp16")
             vae_args.update(torch_dtype=torch.float16)
         else:
             # TODO: more accurately, "using the model's default precision."
             #     How do we find out what that is?
             print('   | Using more accurate float32 precision')
 
+        # At some point we might need to be able to use different classes here? But for now I think
+        # all Stable Diffusion VAE are AutoencoderKL.
+        try:
+            vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args)
+        except Exception as e:
+            if using_fp16:
+                vae_args.pop('revision')
+                vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args)
+
+        # comment by lstein: I don't know what this does
         if 'subfolder' in vae_config:
             vae_args['subfolder'] = vae_config['subfolder']
 
-        # At some point we might need to be able to use different classes here? But for now I think
-        # all Stable Diffusion VAE are AutoencoderKL.
-        return AutoencoderKL.from_pretrained(name_or_path, **vae_args)
+        return vae

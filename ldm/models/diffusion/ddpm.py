@@ -679,7 +679,11 @@ class LatentDiffusion(DDPM):
         self.embedding_manager = self.instantiate_embedding_manager(
             personalization_config, self.cond_stage_model
         )
-        self.textual_inversion_manager = TextualInversionManager(self.cond_stage_model, full_precision=True)
+        self.textual_inversion_manager = TextualInversionManager(
+            tokenizer = self.cond_stage_model.tokenizer,
+            text_encoder = self.cond_stage_model.transformer,
+            full_precision = True
+        )
         # this circular component dependency is gross and bad, needs to be rethought
         self.cond_stage_model.set_textual_inversion_manager(self.textual_inversion_manager)
 

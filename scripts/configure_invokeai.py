@@ -25,7 +25,9 @@ from diffusers import StableDiffusionPipeline, AutoencoderKL
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from getpass_asterisk import getpass_asterisk
 from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login, whoami as hf_whoami
+from huggingface_hub.utils._errors import RevisionNotFoundError
 from omegaconf import OmegaConf
+from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
 from transformers import CLIPTokenizer, CLIPTextModel
 
@@ -158,9 +160,10 @@ will be given the option to view and change your selections.
 '''
         )
             for ds in Datasets.keys():
-                recommended = '(recommended)' if Datasets[ds]['recommended'] else ''
-                print(f'[{counter}] {ds}:\n    {Datasets[ds]["description"]} {recommended}')
-                if yes_or_no('    Download?',default_yes=Datasets[ds]['recommended']):
+                recommended = Datasets[ds].get('recommended',False)
+                r_str = '(recommended)' if recommended else ''
+                print(f'[{counter}] {ds}:\n    {Datasets[ds]["description"]} {r_str}')
+                if yes_or_no('    Download?',default_yes=recommended):
                     datasets[ds]=counter
                     counter += 1
         else:
@@ -329,17 +332,101 @@ def download_weight_datasets(models:dict, access_token:str):
     migrate_models_ckpt()
     successful = dict()
     for mod in models.keys():
-        repo_id = Datasets[mod]['repo_id']
-        model_class = StableDiffusionGeneratorPipeline if Datasets[mod]['format']=='diffusers' else AutoencoderKL
+        print(f'{mod}...',file=sys.stderr,end='')
+        successful[mod] = _download_repo_or_file(Datasets[mod], access_token)
+    return successful
+
+def _download_repo_or_file(mconfig:DictConfig, access_token:str)->Path:
+    path = None
+    if mconfig['format'] == 'ckpt':
+        path = _download_ckpt_weights(mconfig, access_token)
+    else:
+        path = _download_diffusion_weights(mconfig, access_token)
+    return path
+
+def _download_ckpt_weights(mconfig:DictConfig, access_token:str)->Path:
+    repo_id = mconfig['repo_id']
+    filename = mconfig['file']
+    cache_dir = os.path.join(Globals.root, Model_dir, Weights_dir)
+    return hf_download_with_resume(
+        repo_id=repo_id,
+        model_dir=cache_dir,
+        model_name=filename,
+        access_token=access_token
+    )
+
+def _download_diffusion_weights(mconfig:DictConfig, access_token:str):
+    repo_id = mconfig['repo_id']
+    model_class = StableDiffusionGeneratorPipeline if mconfig['format']=='diffusers' else AutoencoderKL
+    path = None
+    try:
+        path = download_from_hf(
+            model_class,
+            repo_id,
+            safety_checker=None,
+            revision='fp16',
+        )
+    except OSError:
         path = download_from_hf(
             model_class,
             repo_id,
             safety_checker=None,
         )
-        if path:
-            successful[mod] = path
-    return successful
+    except Exception as e:
+        print(f'could not download; exception = {type(e)}')
+    return path
 
+#---------------------------------------------
+def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_token:str=None)->Path:
+    model_dest = Path(os.path.join(model_dir, model_name))
+    os.makedirs(model_dir, exist_ok=True)
+
+    url = hf_hub_url(repo_id, model_name)
+
+    header = {"Authorization": f'Bearer {access_token}'} if access_token else {}
+    open_mode = 'wb'
+    exist_size = 0
+
+    if os.path.exists(model_dest):
+        exist_size = os.path.getsize(model_dest)
+        header['Range'] = f'bytes={exist_size}-'
+        open_mode = 'ab'
+
+    resp = requests.get(url, headers=header, stream=True)
+    total = int(resp.headers.get('content-length', 0))
+
+    if resp.status_code==416:  # "range not satisfiable", which means nothing to return
+        print(f'* {model_name}: complete file found. Skipping.')
+        return model_dest
+    elif resp.status_code != 200:
+        print(f'** An error occurred during downloading {model_name}: {resp.reason}')
+    elif exist_size > 0:
+        print(f'* {model_name}: partial file found. Resuming...')
+    else:
+        print(f'* {model_name}: Downloading...')
+
+    try:
+        if total < 2000:
+            print(f'*** ERROR DOWNLOADING {model_name}: {resp.text}')
+            return None
+
+        with open(model_dest, open_mode) as file, tqdm(
+                desc=model_name,
+                initial=exist_size,
+                total=total+exist_size,
+                unit='iB',
+                unit_scale=True,
+                unit_divisor=1000,
+        ) as bar:
+            for data in resp.iter_content(chunk_size=1024):
+                size = file.write(data)
+                bar.update(size)
+    except Exception as e:
+        print(f'An error occurred while downloading {model_name}: {str(e)}')
+        return None
+    return model_dest
+
+# -----------------------------------------------------------------------------------
 #---------------------------------------------
 def is_huggingface_authenticated():
     # huggingface_hub 0.10 API isn't great for this, it could be OSError, ValueError,
@@ -405,24 +492,23 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
     default_selected = False
 
     for model in successfully_downloaded:
-        # TODO: fix VAEs
-        if Datasets[model]['format']=='vae':
-            continue
         stanza = conf[model] if model in conf else { }
-        stanza['description'] = Datasets[model]['description']
-        stanza['repo_id'] = Datasets[model]['repo_id']
-        stanza['format'] = 'diffusers'
-        stanza['width'] = Datasets[model]['width']
-        stanza['height'] = Datasets[model]['height']
+        mod = Datasets[model]
+        stanza['description'] = mod['description']
+        stanza['repo_id'] = mod['repo_id']
+        stanza['format'] = mod['format']
+        stanza['width'] = mod['width']
+        stanza['height'] = mod['height']
+        if 'file' in mod:
+            stanza['weights'] = os.path.relpath(successfully_downloaded[model], start=Globals.root)
+            stanza['config'] = os.path.normpath(os.path.join(SD_Configs,mod['config']))
+        if 'vae' in mod:
+            if 'file' in mod['vae']:
+                stanza['vae'] = os.path.normpath(os.path.join(Model_dir, Weights_dir,mod['vae']['file']))
+            else:
+                stanza['vae'] = mod['vae']
         stanza.pop('default',None)  # this will be set later
 
-        # FIX: handle the VAE
-        # if vaes:
-        #     for target in vaes:
-        #         if re.search(target, model, flags=re.IGNORECASE):
-        #             stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes[target]))
-        #         else:
-        #             stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes['default']))
         # BUG - the first stanza is always the default. User should select.
         if not default_selected:
             stanza['default'] = True
