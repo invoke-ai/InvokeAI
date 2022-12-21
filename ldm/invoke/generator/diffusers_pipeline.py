@@ -3,7 +3,12 @@ from __future__ import annotations
 import secrets
 import warnings
 from dataclasses import dataclass
-from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any, ParamSpec
+import sys
+from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any
+if sys.version_info < (3, 10):
+    from typing_extensions import ParamSpec
+else:
+    from typing import ParamSpec
 
 import PIL.Image
 import einops

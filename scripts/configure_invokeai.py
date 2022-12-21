@@ -22,6 +22,7 @@ from urllib import request
 import requests
 import transformers
 from diffusers import StableDiffusionPipeline, AutoencoderKL
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from getpass_asterisk import getpass_asterisk
 from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login, whoami as hf_whoami
 from omegaconf import OmegaConf
@@ -247,6 +248,7 @@ The license terms are located here:
     print("=" * os.get_terminal_size()[0])
     print('Authenticating to Huggingface')
     hf_envvars = [ "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN" ]
+    token_found = False
     if not (access_token := HfFolder.get_token()):
         print(f"Huggingface token not found in cache.")
 
@@ -264,13 +266,16 @@ The license terms are located here:
         print(f"Huggingface token found in cache.")
         try:
             HfLogin(access_token)
+            token_found = True
         except ValueError:
             print(f"Login failed due to invalid token found in cache")
 
-    if not yes_to_all:
-        print('''
-You may optionally enter your Huggingface token now. InvokeAI *will* work without it, but some functionality may be limited.
-See https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept for more information.
+    if not (yes_to_all or token_found):
+        print(''' You may optionally enter your Huggingface token now. InvokeAI
+*will* work without it but you will not be able to automatically
+download some of the Hugging Face style concepts.  See
+https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept
+for more information.
 
 Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
 
@@ -325,27 +330,14 @@ def download_weight_datasets(models:dict, access_token:str):
     successful = dict()
     for mod in models.keys():
         repo_id = Datasets[mod]['repo_id']
-        filename = Datasets[mod]['file']
-        dest = os.path.join(Globals.root,Model_dir,Weights_dir)
-        success = hf_download_with_resume(
-            repo_id=repo_id,
-            model_dir=dest,
-            model_name=filename,
-            access_token=access_token
+        model_class = StableDiffusionGeneratorPipeline if Datasets[mod]['format']=='diffusers' else AutoencoderKL
+        path = download_from_hf(
+            model_class,
+            repo_id,
+            safety_checker=None,
         )
-        if success:
-            successful[mod] = True
-    if len(successful) < len(models):
-        print(f'\n\n** There were errors downloading one or more files. **')
-        print('Please double-check your license agreements, and your access token.')
-        HfFolder.delete_token()
-        print('Press any key to try again. Type ^C to quit.\n')
-        input()
-        return None
-
-    HfFolder.save_token(access_token)
-    keys = ', '.join(successful.keys())
-    print(f'Successfully installed {keys}')
+        if path:
+            successful[mod] = path
     return successful
 
 #---------------------------------------------
@@ -362,56 +354,6 @@ def is_huggingface_authenticated():
     return False
 
 #---------------------------------------------
-def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_token:str=None)->bool:
-    model_dest = os.path.join(model_dir, model_name)
-    os.makedirs(model_dir, exist_ok=True)
-
-    url = hf_hub_url(repo_id, model_name)
-
-    header = {"Authorization": f'Bearer {access_token}'} if access_token else {}
-    open_mode = 'wb'
-    exist_size = 0
-
-    if os.path.exists(model_dest):
-        exist_size = os.path.getsize(model_dest)
-        header['Range'] = f'bytes={exist_size}-'
-        open_mode = 'ab'
-
-    resp = requests.get(url, headers=header, stream=True)
-    total = int(resp.headers.get('content-length', 0))
-
-    if resp.status_code==416:  # "range not satisfiable", which means nothing to return
-        print(f'* {model_name}: complete file found. Skipping.')
-        return True
-    elif resp.status_code != 200:
-        print(f'** An error occurred during downloading {model_name}: {resp.reason}')
-    elif exist_size > 0:
-        print(f'* {model_name}: partial file found. Resuming...')
-    else:
-        print(f'* {model_name}: Downloading...')
-
-    try:
-        if total < 2000:
-            print(f'*** ERROR DOWNLOADING {model_name}: {resp.text}')
-            return False
-
-        with open(model_dest, open_mode) as file, tqdm(
-                desc=model_name,
-                initial=exist_size,
-                total=total+exist_size,
-                unit='iB',
-                unit_scale=True,
-                unit_divisor=1000,
-        ) as bar:
-            for data in resp.iter_content(chunk_size=1024):
-                size = file.write(data)
-                bar.update(size)
-    except Exception as e:
-        print(f'An error occurred while downloading {model_name}: {str(e)}')
-        return False
-    return True
-
-#---------------------------------------------
 def download_with_progress_bar(model_url:str, model_dest:str, label:str='the'):
     try:
         print(f'Installing {label} model file {model_url}...',end='',file=sys.stderr)
@@ -426,59 +368,6 @@ def download_with_progress_bar(model_url:str, model_dest:str, label:str='the'):
         print('...download failed')
         print(f'Error downloading {label} model')
         print(traceback.format_exc())
-
-
-#---------------------------------------------
-def download_diffusers(models: Dict, full_precision: bool):
-    # This is a minimal implementation until https://github.com/invoke-ai/InvokeAI/pull/1490 lands,
-    # which moves a bunch of stuff.
-    # We can be more complete after we know it won't be all merge conflicts.
-    diffusers_repos = {
-        'CompVis/stable-diffusion-v1-4-original': 'CompVis/stable-diffusion-v1-4',
-        'runwayml/stable-diffusion-v1-5': 'runwayml/stable-diffusion-v1-5',
-        'runwayml/stable-diffusion-inpainting': 'runwayml/stable-diffusion-inpainting',
-        'hakurei/waifu-diffusion-v1-3': 'hakurei/waifu-diffusion'
-    }
-    vae_repos = {
-        'stabilityai/sd-vae-ft-mse-original': 'stabilityai/sd-vae-ft-mse',
-    }
-    precision_args = {}
-    if not full_precision:
-        precision_args.update(revision='fp16')
-
-    for model_name, model in models.items():
-        repo_id = model['repo_id']
-        if repo_id in vae_repos:
-            print(f" * Downloading diffusers VAE {model_name}...")
-            # TODO: can we autodetect when a repo has no fp16 revision?
-            AutoencoderKL.from_pretrained(repo_id)
-        elif repo_id not in diffusers_repos:
-            print(f" * Downloading diffusers {model_name}...")
-            StableDiffusionPipeline.from_pretrained(repo_id, **precision_args)
-        else:
-            warnings.warn(f" ⚠ FIXME: add diffusers repo for {repo_id}")
-            continue
-
-
-def download_diffusers_in_config(config_path: Path, full_precision: bool):
-    # This is a minimal implementation until https://github.com/invoke-ai/InvokeAI/pull/1490 lands,
-    # which moves a bunch of stuff.
-    # We can be more complete after we know it won't be all merge conflicts.
-    if not is_huggingface_authenticated():
-        print("*⚠ No Hugging Face access token; some downloads may be blocked.")
-
-    precision = 'full' if full_precision else 'float16'
-    cache = ModelCache(OmegaConf.load(config_path), precision=precision,
-                       device_type='cpu', max_loaded_models=1)
-    for model_name in cache.list_models():
-        # TODO: download model without loading it.
-        #   https://github.com/huggingface/diffusers/issues/1301
-        model_config = cache.config[model_name]
-        if model_config.get('format') == 'diffusers':
-            print(f" * Downloading diffusers {model_name}...")
-            cache.get_model(model_name)
-            cache.offload_model(model_name)
-
 
 #---------------------------------------------
 def update_config_file(successfully_downloaded:dict,opt:dict):
@@ -516,29 +405,24 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
     default_selected = False
 
     for model in successfully_downloaded:
-        a = Datasets[model]['config'].split('/')
-        if a[0] != 'VAE':
-            continue
-        vae_target = a[1] if len(a)>1 else 'default'
-        vaes[vae_target] = Datasets[model]['file']
-
-    for model in successfully_downloaded:
-        if Datasets[model]['config'].startswith('VAE'): # skip VAE entries
+        # TODO: fix VAEs
+        if Datasets[model]['format']=='vae':
             continue
         stanza = conf[model] if model in conf else { }
-
         stanza['description'] = Datasets[model]['description']
-        stanza['weights'] = os.path.join(Model_dir,Weights_dir,Datasets[model]['file'])
-        stanza['config'] = os.path.normpath(os.path.join(SD_Configs, Datasets[model]['config']))
+        stanza['repo_id'] = Datasets[model]['repo_id']
+        stanza['format'] = 'diffusers'
         stanza['width'] = Datasets[model]['width']
         stanza['height'] = Datasets[model]['height']
         stanza.pop('default',None)  # this will be set later
-        if vaes:
-            for target in vaes:
-                if re.search(target, model, flags=re.IGNORECASE):
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes[target]))
-                else:
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes['default']))
+
+        # FIX: handle the VAE
+        # if vaes:
+        #     for target in vaes:
+        #         if re.search(target, model, flags=re.IGNORECASE):
+        #             stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes[target]))
+        #         else:
+        #             stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes['default']))
         # BUG - the first stanza is always the default. User should select.
         if not default_selected:
             stanza['default'] = True
@@ -557,12 +441,15 @@ def download_bert():
         print('...success',file=sys.stderr)
 
 #---------------------------------------------
-def download_from_hf(model_class:object, model_name:str):
+def download_from_hf(model_class:object, model_name:str, **kwargs):
     print('',file=sys.stderr)  # to prevent tqdm from overwriting
-    return model_class.from_pretrained(model_name,
-                                       cache_dir=os.path.join(Globals.root,Model_dir,model_name),
-                                       resume_download=True
+    path = os.path.join(Globals.root,Model_dir,model_name)
+    model = model_class.from_pretrained(model_name,
+                                        cache_dir=path,
+                                        resume_download=True,
+                                        **kwargs,
     )
+    return path if model else None
 
 #---------------------------------------------
 def download_clip():
@@ -682,8 +569,8 @@ def download_weights(opt:dict) -> Union[str, None]:
     else:  # 'skip'
         return
 
-
     access_token = authenticate()
+    HfFolder.save_token(access_token)
 
     print('\n** DOWNLOADING WEIGHTS **')
     successfully_downloaded = download_weight_datasets(models, access_token)
@@ -859,11 +746,6 @@ def main():
         else:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
             errors.add(download_weights(opt))
-            config_path = Path(Globals.root, opt.config_file or Default_config_file)
-            if config_path.exists():
-                download_diffusers_in_config(config_path, full_precision=opt.full_precision)
-            else:
-                print(f"*⚠ No config file found; downloading no weights. Looked in {config_path}")
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
         download_clip()
