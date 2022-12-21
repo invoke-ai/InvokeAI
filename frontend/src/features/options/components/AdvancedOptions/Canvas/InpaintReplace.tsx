@@ -59,6 +59,7 @@ export default function InpaintReplace() {
         onChange={(e: ChangeEvent<HTMLInputElement>) =>
           dispatch(setShouldUseInpaintReplace(e.target.checked))
         }
+        marginTop="1.25rem"
       />
     </Flex>
   );

@@ -1,4 +1,5 @@
 import {
+  Flex,
   FormControl,
   FormControlProps,
   FormLabel,
@@ -151,7 +152,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
         {label}
       </FormLabel>
 
-      <HStack w={'100%'} gap={2}>
+      <HStack w={'100%'} gap={2} alignItems="center">
         <Slider
           aria-label={label}
           value={value}
