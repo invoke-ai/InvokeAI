@@ -28,5 +28,4 @@ docker run \
   --publish=9090:9090 \
   --cap-add=sys_nice \
   ${GPU_FLAGS:+--gpus=${GPU_FLAGS}} \
-  "$INVOKEAI_TAG" ${1:+$@} \
-  $CMD_OVERRIDE
+  "$INVOKEAI_TAG" ${1:+$@}
