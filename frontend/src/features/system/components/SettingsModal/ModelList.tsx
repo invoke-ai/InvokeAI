@@ -7,6 +7,7 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  Text,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
@@ -85,7 +86,13 @@ const ModelList = () => {
       <AccordionItem>
         <AccordionButton>
           <div className="model-list-button">
-            <h2>{t('settings:models')}</h2>
+            <Text
+              fontSize="sm"
+              fontWeight="bold"
+              color="var(--text-color-secondary)"
+            >
+              {t('settings:models')}
+            </Text>
             <AccordionIcon />
           </div>
         </AccordionButton>
