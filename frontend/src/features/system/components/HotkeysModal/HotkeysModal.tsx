@@ -331,7 +331,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
             <Accordion allowMultiple>
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>App Hotkeys</h2>
+                  <h2>{t('hotkeys:appHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
@@ -341,7 +341,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>General Hotkeys</h2>
+                  <h2>{t('hotkeys:generalHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
@@ -351,7 +351,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>Gallery Hotkeys</h2>
+                  <h2>{t('hotkeys:galleryHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
@@ -361,7 +361,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>Unified Canvas Hotkeys</h2>
+                  <h2>{t('hotkeys:unifiedCanvasHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
