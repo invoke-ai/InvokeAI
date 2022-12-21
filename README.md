@@ -53,11 +53,11 @@ For full installation and upgrade instructions, please see:
 
 1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
 2. Download the .zip file for your OS (Windows/macOS/Linux).
-3. Unzip the file. 
+3. Unzip the file.
 4. If you are on Windows, double-click on the `install.bat` script. On macOS, open a Terminal window, drag the file `install.sh` from Finder into the Terminal, and press return. On Linux, run `install.sh`.
-5. Wait a while, until it is done. 
+5. Wait a while, until it is done.
 6. The folder where you ran the installer from will now be filled with lots of files. If you are on Windows, double-click on the `invoke.bat` file. On macOS, open a Terminal window, drag `invoke.sh` from the folder into the Terminal, and press return. On Linux, run `invoke.sh`
-7. Press 2 to open the "browser-based UI", press enter/return, wait a minute or two for Stable Diffusion to start up, then open your browser and go to http://localhost:9090. 
+7. Press 2 to open the "browser-based UI", press enter/return, wait a minute or two for Stable Diffusion to start up, then open your browser and go to http://localhost:9090.
 8. Type `banana sushi` in the box on the top left and click `Invoke`:
 
 <div align="center"><img src="docs/assets/invoke-web-server-1.png" width=640></div>
@@ -161,9 +161,9 @@ problems and other issues.
 # Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
-cleanup, testing, or code reviews, is very much encouraged to do so. 
+cleanup, testing, or code reviews, is very much encouraged to do so.
 
-To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board. 
+To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board.
 
 If you are unfamiliar with how
 to contribute to GitHub projects, here is a

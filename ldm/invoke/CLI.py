@@ -8,8 +8,8 @@ import time
 import traceback
 import yaml
 
-from ldm.generate import Generate
 from ldm.invoke.globals import Globals
+from ldm.generate import Generate
 from ldm.invoke.prompt_parser import PromptParser
 from ldm.invoke.readline import get_completer, Completer
 from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
@@ -27,7 +27,6 @@ infile = None
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
-    print('* Initializing, be patient...')
 
     opt  = Args()
     args = opt.parse_args()
@@ -44,9 +43,6 @@ def main():
         if args.max_loaded_models <= 0:
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
-
-    # alert - setting a global here
-    Globals.try_patchmatch = args.patchmatch
 
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
@@ -110,7 +106,7 @@ def main():
             max_loaded_models=opt.max_loaded_models,
             )
     except (FileNotFoundError, TypeError, AssertionError):
-        emergency_model_reconfigure()
+        emergency_model_reconfigure(opt)
         sys.exit(-1)
     except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
@@ -123,7 +119,7 @@ def main():
     try:
         gen.load_model()
     except AssertionError:
-        emergency_model_reconfigure()
+        emergency_model_reconfigure(opt)
         sys.exit(-1)
 
     # web server loops forever
@@ -939,7 +935,7 @@ def write_commands(opt, file_path:str, outfilepath:str):
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
 
-def emergency_model_reconfigure():
+def emergency_model_reconfigure(opt):
     print()
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('   You appear to have a missing or misconfigured model file(s).                   ')
@@ -948,11 +944,17 @@ def emergency_model_reconfigure():
     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     print('configure_invokeai is launching....\n')
 
-    sys.argv = [
-        'configure_invokeai',
-        os.environ.get(
-            'INVOKE_MODEL_RECONFIGURE',
-            '--interactive')]
+    # Match arguments that were set on the CLI
+    # only the arguments accepted by the configuration script are parsed
+    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
+    config = ["--config", opt.conf] if opt.conf is not None else []
+    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
+
+    sys.argv = [ 'configure_invokeai' ]
+    sys.argv.extend(root_dir)
+    sys.argv.extend(config)
+    if yes_to_all is not None:
+        sys.argv.append(yes_to_all)
+
     import configure_invokeai
     configure_invokeai.main()
-

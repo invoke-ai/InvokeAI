@@ -27,6 +27,5 @@ else:
 # Where to look for the initialization file
 Globals.initfile = 'invokeai.init'
 
-# Awkward workaround to disable attempted loading of pypatchmatch
-# which is causing CI tests to error out.
+# Try loading patchmatch
 Globals.try_patchmatch = True
