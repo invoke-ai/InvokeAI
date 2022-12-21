@@ -319,20 +319,24 @@ class ModelCache(object):
 
     def _load_diffusers_model(self, mconfig):
         pipeline_args = {}
-
-        # look for local files first, then use the hugging face cache mechanism
-        if 'repo_id' in mconfig:  # "repo_name" => "repo_id" in order to be consistent with Hugging Face convention
-            name = mconfig['repo_id']
+        if 'path' in mconfig:
+            name_or_path = Path(mconfig['path'])
+            if not name_or_path.is_absolute():
+                name_or_path = Path(Globals.root, name_or_path).resolve()
+            # FIXME: What should the model_hash be? A hash of the unet weights? Of all files of all
+            #     the submodels hashed together? The commit ID from the repo?
+            model_hash = "FIXME TOO"
+        elif 'repo_id' in mconfig:
+            name_or_path = mconfig['repo_id']
             model_hash = "FIXME"
             # model_hash = huggingface_hub.get_hf_file_metadata(url).commit_hash
-        elif 'repo_name' in mconfig:    # to avoid breakage
-            print('** "repo_name" is deprecated in models.yaml. Please use "repo_id"')
-            name = mconfig['repo_id']
+        elif 'repo_name' in mconfig:
+            name_or_path = mconfig['repo_name']
             model_hash = "FIXME"
+            # model_hash = huggingface_hub.get_hf_file_metadata(url).commit_hash
         else:
-            raise ValueError("Model config must specify repo_id.")
-
-        print(f'>> Loading diffusers model from {name}')
+            raise ValueError("Model config must specify either repo_name or path.")
+        print(f'>> Loading diffusers model from {name_or_path}')
 
         # TODO: scan weights maybe?
 
@@ -340,7 +344,8 @@ class ModelCache(object):
             vae = self._load_vae(mconfig['vae'])
             pipeline_args.update(vae=vae)
 
-        cache_dir = os.path.join(Globals.root,'models',name)
+        # FIX: if name is a path, this is not right
+        cache_dir = os.path.join(Globals.root,'models',name_or_path) if type(name_or_path) == str else None
         # FIX: this commented block is causing the cache read to fail in from_pretrained()
         # if self.precision == 'float16':
         #     print('   | Using faster float16 precision')
@@ -362,7 +367,7 @@ class ModelCache(object):
         #     print('   | Using more accurate float32 precision')
 
         pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
-            name,
+            name_or_path,
             # TODO: Safety checker is currently handled at a different stage in the code:
             #     ldm.invoke.generator.base.Generator.safety_check
             #     We might want to move that here for consistency with diffusers API, or we might
@@ -385,18 +390,17 @@ class ModelCache(object):
             raise ValueError(f'"{model_name}" is not a known model name. Please check your models.yaml file')
 
         mconfig = self.config[model_name]
-        if 'repo_id' in mconfig:
-            return mconfig['repo_id']
-        elif 'repo_name' in mconfig:
-            return mconfig['repo_name']
-        elif 'path' in mconfig:
-            assert f'there should be no paths in {mconfig}'
+        if 'path' in mconfig:
             path = Path(mconfig['path'])
             if not path.is_absolute():
                 path = Path(Globals.root, path).resolve()
             return path
+        elif 'repo_id' in mconfig:
+            return mconfig['repo_id']
+        elif 'repo_name' in mconfig:
+            return mconfig['repo_name']
         else:
-            raise ValueError("Model config must specify either repo_name or path.")
+            raise ValueError("Model config must specify either repo_id or path.")
 
     def offload_model(self, model_name:str) -> None:
         '''

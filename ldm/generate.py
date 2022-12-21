@@ -40,7 +40,6 @@ from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
-from ldm.invoke.concepts_lib import Concepts
 from ldm.invoke.generator.inpaint import infill_methods
 
 from ldm.models.diffusion.ddim import DDIMSampler
