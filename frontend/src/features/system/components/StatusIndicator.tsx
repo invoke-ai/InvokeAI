@@ -58,8 +58,6 @@ const StatusIndicator = () => {
     statusStyle = 'status-working';
   }
 
-  console.log(statusMessage);
-
   if (statusMessage)
     if (isProcessing) {
       if (totalIterations > 1) {

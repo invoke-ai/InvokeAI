@@ -129,7 +129,11 @@ const IAINumberInput = (props: Props) => {
           <FormLabel
             className="invokeai__number-input-form-label"
             style={{ display: label ? 'block' : 'none' }}
-            fontSize={labelFontSize}
+            fontSize="sm"
+            fontWeight="bold"
+            marginRight={0}
+            marginBottom={0}
+            whiteSpace="nowrap"
             {...formLabelProps}
           >
             {label}

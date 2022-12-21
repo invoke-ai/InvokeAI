@@ -126,10 +126,16 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         onClick: onSettingsModalOpen,
       })}
 
-      <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
+      <Modal
+        isOpen={isSettingsModalOpen}
+        onClose={onSettingsModalClose}
+        size="lg"
+      >
         <ModalOverlay />
         <ModalContent className="modal settings-modal">
-          <ModalHeader className="settings-modal-header">{t('common:settingsLabel')}</ModalHeader>
+          <ModalHeader className="settings-modal-header">
+            {t('common:settingsLabel')}
+          </ModalHeader>
           <ModalCloseButton className="modal-close-btn" />
           <ModalBody className="settings-modal-content">
             <div className="settings-modal-items">
