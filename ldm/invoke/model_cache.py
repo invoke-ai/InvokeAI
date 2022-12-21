@@ -370,7 +370,7 @@ class ModelCache(object):
             #     code either way, so we can table it for now.
             safety_checker=None,
             cache_dir=cache_dir,
-            local_files_only=True,
+#            local_files_only=True,
             **pipeline_args,
         )
         pipeline.to(self.device)
