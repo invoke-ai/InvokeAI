@@ -46,15 +46,15 @@ export default function ImageToImagePanel() {
       header: 'Other Options',
       feature: Feature.OTHER,
       content: <ImageToImageOutputOptions />,
-    },}
+    },
+  };
 
   const dispatch = useAppDispatch();
 
-  const handleChangeHiresFix = () =>
-    dispatch(setHiresFix(false));
-  
-  handleChangeHiresFix() 
- 
+  const handleChangeHiresFix = () => dispatch(setHiresFix(false));
+
+  handleChangeHiresFix();
+
   return (
     <InvokeOptionsPanel>
       <PromptInput />
@@ -67,6 +67,5 @@ export default function ImageToImagePanel() {
       <ImageFit />
       <OptionsAccordion accordionInfo={imageToImageAccordions} />
     </InvokeOptionsPanel>
-  );}
-  
-
+  );
+}
