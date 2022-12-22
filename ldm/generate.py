@@ -773,19 +773,19 @@ class Generate:
         return init_image,init_mask
 
     def _make_base(self):
-        return self._load_generator('generator','Generator')
+        return self._load_generator('','Generator')
 
     def _make_txt2img(self):
-        return self._load_generator('txt2img','Txt2Img')
+        return self._load_generator('.txt2img','Txt2Img')
 
     def _make_img2img(self):
-        return self._load_generator('img2img','Img2Img')
+        return self._load_generator('.img2img','Img2Img')
 
     def _make_embiggen(self):
-        return self._load_generator('embiggen','Embiggen')
+        return self._load_generator('.embiggen','Embiggen')
    
     def _make_txt2img2img(self):
-        return self._load_generator('txt2img2img','Txt2Img2Img')
+        return self._load_generator('.txt2img2img','Txt2Img2Img')
 
     def _make_inpaint(self):
         return self._load_generator('inpaint','Inpaint')
@@ -795,13 +795,14 @@ class Generate:
 
     def _load_generator(self, module, class_name):
         if self.is_legacy_model(self.model_name):
-            mn = f'ldm.invoke.ckpt_{module}'
+            mn = f'ldm.invoke.ckpt_generator{module}'
             cn = f'Ckpt{class_name}'
         else:
-            mn = f'ldm.invoke.{module}'
+            mn = f'ldm.invoke.generator{module}'
             cn = class_name
-        importlib.import_module(mn)
-        return cn(self.model, self.precision)
+        module = importlib.import_module(mn)
+        constructor = getattr(module,cn)
+        return constructor(self.model, self.precision)
 
     def load_model(self):
         '''
@@ -962,7 +963,7 @@ class Generate:
     def sample_to_lowres_estimated_image(self, samples):
         return self._make_base().sample_to_lowres_estimated_image(samples)
 
-    def is_legacy_model(model_name)->bool:
+    def is_legacy_model(self,model_name)->bool:
         return self.model_cache.is_legacy(model_name)
 
     def _set_sampler(self):
