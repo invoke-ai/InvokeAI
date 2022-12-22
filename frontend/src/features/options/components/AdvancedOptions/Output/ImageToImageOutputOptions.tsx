@@ -7,6 +7,6 @@ const ImageToImageOutputOptions = () => {
       <SeamlessOptions />
     </Flex>
   );
-};
+}; 
  
 export default ImageToImageOutputOptions;

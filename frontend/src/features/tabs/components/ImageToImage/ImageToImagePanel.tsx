@@ -53,7 +53,7 @@ export default function ImageToImagePanel() {
   const handleChangeHiresFix = () =>
     dispatch(setHiresFix(false));
   
-  handleChangeHiresFix()
+  handleChangeHiresFix() 
  
   return (
     <InvokeOptionsPanel>
