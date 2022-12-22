@@ -180,7 +180,7 @@ class ModelCache(object):
         if model_name in self.stack:
             self.stack.remove(model_name)
 
-    def add_model(self, model_name:str, model_attributes:dict, clobber=False) -> None:
+    def add_model(self, model_name:str, model_attributes:dict, clobber:bool=False) -> None:
         '''
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -189,8 +189,14 @@ class ModelCache(object):
         attributes are incorrect or the model name is missing.
         '''
         omega = self.config
-        for field in ('description','weights','height','width','config'):
-            assert field in model_attributes, f'required field {field} is missing'
+        assert 'format' in model_attributes, f'missing required field "format"'
+        if model_attributes['format']=='diffusers':
+            assert 'description' in model_attributes, 'required field "description" is missing'
+            assert 'path' in model_attributes or 'repo_id' in model_attributes,'model must have either the "path" or "repo_id" fields defined'
+        else:
+            for field in ('description','weights','height','width','config'):
+                assert field in model_attributes, f'required field {field} is missing'
+
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
 
         config = omega[model_name] if model_name in omega else {}
@@ -367,6 +373,8 @@ class ModelCache(object):
 
         width = pipeline.vae.block_out_channels[-2]
         height = pipeline.vae.block_out_channels[-1]
+
+        print(f'  | training width x height = ({width} x {height})')
 
         return pipeline, width, height, model_hash
 
@@ -569,7 +577,7 @@ class ModelCache(object):
                 vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args, **fp_args)
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print(f'Could not fetch half-precision version of model {repo_id}; fetching full-precision instead')
+                    print(f'Could not fetch half-precision version of model {name_or_path}; fetching full-precision instead')
                 else:
                     print(f'An unexpected error occurred while downloading the model: {e})')
             if vae:

@@ -724,11 +724,12 @@ class Args(object):
             !NN retrieves the NNth command from the history
 
             *Model manipulation*
-            !models                                 -- list models in configs/models.yaml
-            !switch <model_name>                    -- switch to model named <model_name>
-            !import_model path/to/weights/file.ckpt -- adds a model to your config
-            !edit_model <model_name>                -- edit a model's description
-            !del_model <model_name>                 -- delete a model
+            !models                                   -- list models in configs/models.yaml
+            !switch <model_name>                      -- switch to model named <model_name>
+            !import_model path/to/weights/file.ckpt   -- adds a .ckpt model to your config
+            !optimize_model path/to/weights/file.ckpt -- converts a .ckpt file model a diffusers model
+            !edit_model <model_name>                  -- edit a model's description
+            !del_model <model_name>                   -- delete a model
             """
         )
         render_group     = parser.add_argument_group('General rendering')

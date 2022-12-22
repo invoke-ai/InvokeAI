@@ -460,6 +460,17 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         completer.add_history(command)
         operation = None
 
+    elif command.startswith('!optimize'):
+        path = shlex.split(command)
+        if len(path) < 2:
+            print('** please provide a path to a .ckpt file')
+        elif not os.path.exists(path[1]):
+            print(f'** {path[1]}: file not found')
+        else:
+            optimize_model(path[1], gen, opt, completer)
+        completer.add_history(command)
+        operation = None
+
     elif command.startswith('!edit'):
         path = shlex.split(command)
         if len(path) < 2:
@@ -532,6 +543,7 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
 
     new_config = {}
     new_config['weights'] = model_path
+    new_config['format'] = 'ckpt'
 
     done = False
     while not done:
@@ -579,6 +591,36 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
     if write_config_file(opt.conf, gen, model_name, new_config, make_default=make_default):
         completer.add_model(model_name)
 
+def optimize_model(model_path:str, gen, opt, completer):
+    from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
+    import transformers
+    basename = os.path.basename(os.path.splitext(model_path)[0])
+    dump_path = os.path.join(Globals.root, 'models','optimized-ckpts',basename)
+    if os.path.exists(dump_path):
+        print(f'ERROR: The path {dump_path} already exists. Please move or remove it and try again.')
+        return
+    
+    print(f'INFO: Converting legacy weights file {model_path} to optimized diffuser model.')
+    print(f'      This operation will take 30-60s to complete.')
+    try:
+        verbosity =transformers.logging.get_verbosity()
+        transformers.logging.set_verbosity_error()
+        convert_ckpt_to_diffuser(model_path, dump_path)
+        transformers.logging.set_verbosity(verbosity)
+        print(f'Success. Optimized model is now located at {dump_path}')
+        print(f'Writing new config file entry for {basename}...')
+        model_name = basename
+        new_config = dict(
+            path=dump_path,
+            description=f'Optimized version of {basename}',
+            format='diffusers',
+        )
+        if write_config_file(opt.conf, gen, model_name, new_config):
+            completer.add_model(model_name)
+    except Exception as e:
+        print(f'** Conversion failed: {str(e)}')
+        traceback.print_exc()
+
 def del_config(model_name:str, gen, opt, completer):
     current_model = gen.model_name
     if model_name == current_model:
@@ -601,7 +643,7 @@ def edit_config(model_name:str, gen, opt, completer):
     conf = config[model_name]
     new_config = {}
     completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
-    for field in ('description', 'weights', 'vae', 'config', 'width','height'):
+    for field in ('description', 'weights', 'vae', 'config', 'width', 'height', 'format'):
         completer.linebuffer = str(conf[field]) if field in conf else ''
         new_value = input(f'{field}: ')
         new_config[field] = int(new_value) if field in ('width','height') else new_value
@@ -625,8 +667,12 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
         gen.model_cache.add_model(model_name, new_config, clobber)
         assert gen.set_model(model_name) is not None, 'model failed to load'
     except AssertionError as e:
+        traceback.print_exc()
         print(f'** aborting **')
-        gen.model_cache.del_model(model_name)
+        try:
+            gen.model_cache.del_model(model_name)
+        except Exception:
+            pass
         return False
 
     if make_default:

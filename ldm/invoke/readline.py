@@ -59,7 +59,7 @@ COMMANDS = (
     '--png_compression','-z',
     '--text_mask','-tm',
     '!fix','!fetch','!replay','!history','!search','!clear',
-    '!models','!switch','!import_model','!edit_model','!del_model',
+    '!models','!switch','!import_model','!optimize_model','!edit_model','!del_model',
     '!mask',
     )
 MODEL_COMMANDS = (
@@ -68,7 +68,7 @@ MODEL_COMMANDS = (
     '!del_model',
     )
 WEIGHT_COMMANDS = (
-    '!import_model',
+    '!import_model','!optimize_model',
     )
 IMG_PATH_COMMANDS = (
     '--outdir[=\s]',
