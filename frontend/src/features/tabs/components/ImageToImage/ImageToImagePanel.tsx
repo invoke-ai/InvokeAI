@@ -54,7 +54,7 @@ export default function ImageToImagePanel() {
     dispatch(setHiresFix(false));
   
   handleChangeHiresFix()
-
+ 
   return (
     <InvokeOptionsPanel>
       <PromptInput />
