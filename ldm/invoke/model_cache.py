@@ -132,6 +132,21 @@ class ModelCache(object):
             config[model].pop('default',None)
         config[model_name]['default'] = True
 
+    def model_info(self, model_name:str)->dict:
+        '''
+        Given a model name returns the config object describing it.
+        '''
+        if model_name not in self.config:
+            return None
+        return self.config[model_name]
+
+    def is_legacy(self,model_name:str)->bool:
+        '''
+        Return true if this is a legacy (.ckpt) model
+        '''
+        info = self.model_info(model_name)
+        return info['format']=='ckpt' if info else False
+        
     def list_models(self) -> dict:
         '''
         Return a dict of models in the format:
