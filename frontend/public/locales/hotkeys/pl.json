@@ -1,0 +1,207 @@
+{
+  "keyboardShortcuts": "Skróty klawiszowe",
+  "appHotkeys": "Podstawowe",
+  "generalHotkeys": "Pomocnicze",
+  "galleryHotkeys": "Galeria",
+  "unifiedCanvasHotkeys": "Tryb uniwersalny",
+  "invoke": {
+    "title": "Wywołaj",
+    "desc": "Generuje nowy obraz"
+  },
+  "cancel": {
+    "title": "Anuluj",
+    "desc": "Zatrzymuje generowanie obrazu"
+  },
+  "focusPrompt": {
+    "title": "Aktywuj pole tekstowe",
+    "desc": "Aktywuje pole wprowadzania sugestii"
+  },
+  "toggleOptions": {
+    "title": "Przełącz panel opcji",
+    "desc": "Wysuwa lub chowa panel opcji"
+  },
+  "pinOptions": {
+    "title": "Przypnij opcje",
+    "desc": "Przypina panel opcji"
+  },
+  "toggleViewer": {
+    "title": "Przełącz podgląd",
+    "desc": "Otwiera lub zamyka widok podglądu"
+  },
+  "toggleGallery": {
+    "title": "Przełącz galerię",
+    "desc": "Wysuwa lub chowa galerię"
+  },
+  "maximizeWorkSpace": {
+    "title": "Powiększ obraz roboczy",
+    "desc": "Chowa wszystkie panele, zostawia tylko podgląd obrazu"
+  },
+  "changeTabs": {
+    "title": "Przełącznie trybu",
+    "desc": "Przełącza na n-ty tryb pracy"
+  },
+  "consoleToggle": {
+    "title": "Przełącz konsolę",
+    "desc": "Otwiera lub chowa widok konsoli"
+  },
+  "setPrompt": {
+    "title": "Skopiuj sugestie",
+    "desc": "Kopiuje sugestie z aktywnego obrazu"
+  },
+  "setSeed": {
+    "title": "Skopiuj inicjator",
+    "desc": "Kopiuje inicjator z aktywnego obrazu"
+  },
+  "setParameters": {
+    "title": "Skopiuj wszystko",
+    "desc": "Kopiuje wszystkie parametry z aktualnie aktywnego obrazu"
+  },
+  "restoreFaces": {
+    "title": "Popraw twarze",
+    "desc": "Uruchamia proces poprawiania twarzy dla aktywnego obrazu"
+  },
+  "upscale": {
+    "title": "Powiększ",
+    "desc": "Uruchamia proces powiększania aktywnego obrazu"
+  },
+  "showInfo": {
+    "title": "Pokaż informacje",
+    "desc": "Pokazuje metadane zapisane w aktywnym obrazie"
+  },
+  "sendToImageToImage": {
+    "title": "Użyj w trybie \"Obraz na obraz\"",
+    "desc": "Ustawia aktywny obraz jako źródło w trybie \"Obraz na obraz\""
+  },
+  "deleteImage": {
+    "title": "Usuń obraz",
+    "desc": "Usuwa aktywny obraz"
+  },
+  "closePanels": {
+    "title": "Zamknij panele",
+    "desc": "Zamyka wszystkie otwarte panele"
+  },
+  "previousImage": {
+    "title": "Poprzedni obraz",
+    "desc": "Aktywuje poprzedni obraz z galerii"
+  },
+  "nextImage": {
+    "title": "Następny obraz",
+    "desc": "Aktywuje następny obraz z galerii"
+  },
+  "toggleGalleryPin": {
+    "title": "Przypnij galerię",
+    "desc": "Przypina lub odpina widok galerii"
+  },
+  "increaseGalleryThumbSize": {
+    "title": "Powiększ obrazy",
+    "desc": "Powiększa rozmiar obrazów w galerii"
+  },
+  "decreaseGalleryThumbSize": {
+    "title": "Pomniejsz obrazy",
+    "desc": "Pomniejsza rozmiar obrazów w galerii"
+  },
+  "selectBrush": {
+    "title": "Aktywuj pędzel",
+    "desc": "Aktywuje narzędzie malowania"
+  },
+  "selectEraser": {
+    "title": "Aktywuj gumkę",
+    "desc": "Aktywuje narzędzie usuwania"
+  },
+  "decreaseBrushSize": {
+    "title": "Zmniejsz rozmiar narzędzia",
+    "desc": "Zmniejsza rozmiar aktywnego narzędzia"
+  },
+  "increaseBrushSize": {
+    "title": "Zwiększ rozmiar narzędzia",
+    "desc": "Zwiększa rozmiar aktywnego narzędzia"
+  },
+  "decreaseBrushOpacity": {
+    "title": "Zmniejsz krycie",
+    "desc": "Zmniejsza poziom krycia pędzla"
+  },
+  "increaseBrushOpacity": {
+    "title": "Zwiększ",
+    "desc": "Zwiększa poziom krycia pędzla"
+  },
+  "moveTool": {
+    "title": "Aktywuj przesunięcie",
+    "desc": "Włącza narzędzie przesuwania"
+  },
+  "fillBoundingBox": {
+    "title": "Wypełnij zaznaczenie",
+    "desc": "Wypełnia zaznaczony obszar aktualnym kolorem pędzla"
+  },
+  "eraseBoundingBox": {
+    "title": "Wyczyść zaznaczenia",
+    "desc": "Usuwa całą zawartość zaznaczonego obszaru"
+  },
+  "colorPicker": {
+    "title": "Aktywuj pipetę",
+    "desc": "Włącza narzędzie kopiowania koloru"
+  },
+  "toggleSnap": {
+    "title": "Przyciąganie do siatki",
+    "desc": "Włącza lub wyłącza opcje przyciągania do siatki"
+  },
+  "quickToggleMove": {
+    "title": "Szybkie przesunięcie",
+    "desc": "Tymczasowo włącza tryb przesuwania obszaru roboczego"
+  },
+  "toggleLayer": {
+    "title": "Przełącz wartwę",
+    "desc": "Przełącza pomiędzy warstwą bazową i maskowania"
+  },
+  "clearMask": {
+    "title": "Wyczyść maskę",
+    "desc": "Usuwa całą zawartość warstwy maskowania"
+  },
+  "hideMask": {
+    "title": "Przełącz maskę",
+    "desc": "Pokazuje lub ukrywa podgląd maski"
+  },
+  "showHideBoundingBox": {
+    "title": "Przełącz zaznaczenie",
+    "desc": "Pokazuje lub ukrywa podgląd zaznaczenia"
+  },
+  "mergeVisible": {
+    "title": "Połącz widoczne",
+    "desc": "Łączy wszystkie widoczne maski w jeden obraz"
+  },
+  "saveToGallery": {
+    "title": "Zapisz w galerii",
+    "desc": "Zapisuje całą zawartość płótna w galerii"
+  },
+  "copyToClipboard": {
+    "title": "Skopiuj do schowka",
+    "desc": "Zapisuje zawartość płótna w schowku systemowym"
+  },
+  "downloadImage": {
+    "title": "Pobierz obraz",
+    "desc": "Zapisuje zawartość płótna do pliku obrazu"
+  },
+  "undoStroke": {
+    "title": "Cofnij",
+    "desc": "Cofa ostatnie pociągnięcie pędzlem"
+  },
+  "redoStroke": {
+    "title": "Ponawia",
+    "desc": "Ponawia cofnięte pociągnięcie pędzlem"
+  },
+  "resetView": {
+    "title": "Resetuj widok",
+    "desc": "Centruje widok płótna"
+  },
+  "previousStagingImage": {
+    "title": "Poprzedni obraz tymczasowy",
+    "desc": "Pokazuje poprzedni obraz tymczasowy"
+  },
+  "nextStagingImage": {
+    "title": "Następny obraz tymczasowy",
+    "desc": "Pokazuje następny obraz tymczasowy"
+  },
+  "acceptStagingImage": {
+    "title": "Akceptuj obraz tymczasowy",
+    "desc": "Akceptuje aktualnie wybrany obraz tymczasowy"
+  }
+}
