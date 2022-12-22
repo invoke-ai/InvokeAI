@@ -23,6 +23,7 @@ import requests
 import transformers
 from diffusers import StableDiffusionPipeline, AutoencoderKL
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ldm.invoke.devices import choose_precision, choose_torch_device
 from getpass_asterisk import getpass_asterisk
 from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login, whoami as hf_whoami
 from huggingface_hub.utils._errors import RevisionNotFoundError
@@ -328,20 +329,20 @@ def migrate_models_ckpt():
         os.replace(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
 
 #---------------------------------------------
-def download_weight_datasets(models:dict, access_token:str):
+def download_weight_datasets(models:dict, access_token:str, precision:str='float32'):
     migrate_models_ckpt()
     successful = dict()
     for mod in models.keys():
         print(f'{mod}...',file=sys.stderr,end='')
-        successful[mod] = _download_repo_or_file(Datasets[mod], access_token)
+        successful[mod] = _download_repo_or_file(Datasets[mod], access_token, precision=precision)
     return successful
 
-def _download_repo_or_file(mconfig:DictConfig, access_token:str)->Path:
+def _download_repo_or_file(mconfig:DictConfig, access_token:str, precision:str='float32')->Path:
     path = None
     if mconfig['format'] == 'ckpt':
         path = _download_ckpt_weights(mconfig, access_token)
     else:
-        path = _download_diffusion_weights(mconfig, access_token)
+        path = _download_diffusion_weights(mconfig, access_token, precision=precision)
     return path
 
 def _download_ckpt_weights(mconfig:DictConfig, access_token:str)->Path:
@@ -355,25 +356,26 @@ def _download_ckpt_weights(mconfig:DictConfig, access_token:str)->Path:
         access_token=access_token
     )
 
-def _download_diffusion_weights(mconfig:DictConfig, access_token:str):
+def _download_diffusion_weights(mconfig:DictConfig, access_token:str, precision:str='float32'):
     repo_id = mconfig['repo_id']
     model_class = StableDiffusionGeneratorPipeline if mconfig['format']=='diffusers' else AutoencoderKL
+    extra_arg_list = [{'revision':'fp16'},{}] if precision=='float16' else [{}]
     path = None
-    try:
-        path = download_from_hf(
-            model_class,
-            repo_id,
-            safety_checker=None,
-            revision='fp16',
-        )
-    except OSError:
-        path = download_from_hf(
-            model_class,
-            repo_id,
-            safety_checker=None,
-        )
-    except Exception as e:
-        print(f'could not download; exception = {type(e)}')
+    for extra_args in extra_arg_list:
+        try:
+            path = download_from_hf(
+                model_class,
+                repo_id,
+                safety_checker=None,
+                **extra_args,
+            )
+        except OSError as e:
+            if str(e).startswith('fp16 is not a valid'):
+                print(f'Could not fetch half-precision version of model {repo_id}; fetching full-precision instead')
+            else:
+                print(f'An unexpected error occurred while downloading the model: {e})')
+        if path:
+            break
     return path
 
 #---------------------------------------------
@@ -497,8 +499,12 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
         stanza['description'] = mod['description']
         stanza['repo_id'] = mod['repo_id']
         stanza['format'] = mod['format']
-        stanza['width'] = mod['width']
-        stanza['height'] = mod['height']
+        # diffusers don't need width and height (probably .ckpt doesn't either)
+        # so we no longer require these in INITIAL_MODELS.yaml
+        if 'width' in mod:
+            stanza['width'] = mod['width']
+        if 'height' in mod:
+            stanza['height'] = mod['height']
         if 'file' in mod:
             stanza['weights'] = os.path.relpath(successfully_downloaded[model], start=Globals.root)
             stanza['config'] = os.path.normpath(os.path.join(SD_Configs,mod['config']))
@@ -633,11 +639,13 @@ def download_safety_checker():
 #-------------------------------------
 def download_weights(opt:dict) -> Union[str, None]:
 
+    precision = 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
+
     if opt.yes_to_all:
         models = recommended_datasets()
         access_token = authenticate(opt.yes_to_all)
         if len(models)>0:
-            successfully_downloaded = download_weight_datasets(models, access_token)
+            successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)
             update_config_file(successfully_downloaded,opt)
             return
 
@@ -659,7 +667,7 @@ def download_weights(opt:dict) -> Union[str, None]:
     HfFolder.save_token(access_token)
 
     print('\n** DOWNLOADING WEIGHTS **')
-    successfully_downloaded = download_weight_datasets(models, access_token)
+    successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)
 
     update_config_file(successfully_downloaded,opt)
     if len(successfully_downloaded) < len(models):

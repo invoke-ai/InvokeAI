@@ -319,45 +319,49 @@ class ModelCache(object):
         return model, width, height, model_hash
 
     def _load_diffusers_model(self, mconfig):
-        pipeline_args = {}
         name_or_path = self.model_name_or_path(mconfig)
         model_hash = 'FIXME'
-        using_fp16 = False
+        using_fp16 = self.precision == 'float16'
+
         print(f'>> Loading diffusers model from {name_or_path}')
+        if using_fp16:
+            print(f'  | Using faster float16 precision')
+        else:
+            print(f'  | Using more accurate float32 precision')
 
         # TODO: scan weights maybe?
+        pipeline_args = dict(
+            safety_checker=None,
+            #local_files_only=True
+        )
         if 'vae' in mconfig:
             vae = self._load_vae(mconfig['vae'])
             pipeline_args.update(vae=vae)
-
-        cache_dir = None if isinstance(name_or_path,Path) else os.path.join(Globals.root,'models',name_or_path)
-        if self.precision == 'float16':
-            print('   | Using faster float16 precision')
-            using_fp16 = True
-            pipeline_args.update(revision="fp16")
+        if not isinstance(name_or_path,Path):
+            pipeline_args.update(cache_dir=os.path.join(Globals.root,'models',name_or_path))
+        if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
+            fp_args_list = [{'revision':'fp16'},{}]
         else:
-            # TODO: more accurately, "using the model's default precision."
-            #     How do we find out what that is?
-            print('   | Using more accurate float32 precision')
-        try:
-            pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
-                name_or_path,
-                safety_checker=None,
-                cache_dir=cache_dir,
-                #  local_files_only=True,
-                **pipeline_args,
-            )
-        except Exception as e:
-            if using_fp16:
-                pipeline_args.pop('revision')
+            fp_args_list = [{}]            
+
+        pipeline = None
+        for fp_args in fp_args_list:
+            try:
                 pipeline = StableDiffusionGeneratorPipeline.from_pretrained(
                     name_or_path,
-                    safety_checker=None,
-                    cache_dir=cache_dir,
-                    #  local_files_only=True,
                     **pipeline_args,
+                    **fp_args,
                 )
+            except OSError as e:
+                if str(e).startswith('fp16 is not a valid'):
+                    print(f'Could not fetch half-precision version of model {repo_id}; fetching full-precision instead')
+                else:
+                    print(f'An unexpected error occurred while downloading the model: {e})')
+            if pipeline:
+                break
+
+            assert pipeline is not None, OSError(f'"{model_name}" could not be loaded')        
 
         pipeline.to(self.device)
 
@@ -546,27 +550,30 @@ class ModelCache(object):
     def _load_vae(self, vae_config):
         vae_args = {}
         name_or_path = self.model_name_or_path(vae_config)
-        using_fp16 = False        
+        using_fp16 = self.precision == 'float16'
 
         print(f'>> Loading diffusers VAE from {name_or_path}')
-        if self.precision == 'float16':
-            print('   | Using faster float16 precision')
-            using_fp16 = True
-            vae_args.update(revision="fp16")
+        if using_fp16:
+            print(f'  | Using faster float16 precision')
             vae_args.update(torch_dtype=torch.float16)
+            fp_args_list = [{'revision':'fp16'},{}]
         else:
-            # TODO: more accurately, "using the model's default precision."
-            #     How do we find out what that is?
-            print('   | Using more accurate float32 precision')
+            print(f'  | Using more accurate float32 precision')
+            fp_args_list = [{}]
 
-        # At some point we might need to be able to use different classes here? But for now I think
-        # all Stable Diffusion VAE are AutoencoderKL.
-        try:
-            vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args)
-        except Exception as e:
-            if using_fp16:
-                vae_args.pop('revision')
-                vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args)
+        vae = None
+        for fp_args in fp_args_list:
+            # At some point we might need to be able to use different classes here? But for now I think
+            # all Stable Diffusion VAE are AutoencoderKL.
+            try:
+                vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args, **fp_args)
+            except OSError as e:
+                if str(e).startswith('fp16 is not a valid'):
+                    print(f'Could not fetch half-precision version of model {repo_id}; fetching full-precision instead')
+                else:
+                    print(f'An unexpected error occurred while downloading the model: {e})')
+            if vae:
+                break
 
         # comment by lstein: I don't know what this does
         if 'subfolder' in vae_config:

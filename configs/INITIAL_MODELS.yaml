@@ -1,5 +1,10 @@
+stable-diffusion-2.1:
+   description: Stable Diffusion version 2.1 diffusers model (5.21 GB)
+   repo_id: stabilityai/stable-diffusion-2-1
+   format: diffusers
+   recommended: True
 stable-diffusion-1.5:
-   description: The newest Stable Diffusion version 1.5 weight file (4.27 GB)
+   description: Stable Diffusion version 1.5 weight file (4.27 GB)
    repo_id: runwayml/stable-diffusion-v1-5
    format: diffusers
    recommended: True
