@@ -1,4 +1,4 @@
-FROM python:3.10-slim AS builder
+FROM python:3.9-slim AS builder
 
 # use bash
 SHELL [ "/bin/bash", "-c" ]
@@ -26,12 +26,14 @@ RUN python3 -m venv .venv \
   && pip install \
     --upgrade \
     --no-cache-dir \
+    'pip>=22.3.1' \
+    'setuptools>=65.6.3' \
     'wheel>=0.38.4' \
   && pip install \
     --no-cache-dir \
     -r ${PIP_REQUIREMENTS}
 
-FROM python:3.10-slim AS runtime
+FROM python:3.9-slim AS runtime
 
 # setup environment
 ARG APPDIR=/usr/src/app
@@ -50,9 +52,6 @@ RUN apt-get update \
     libgl1-mesa-glx=20.3.* \
     libglib2.0-0=2.66.* \
     libopencv-dev=4.5.* \
-  && ln -sf \
-    /usr/lib/"$(arch)"-linux-gnu/pkgconfig/opencv4.pc \
-    /usr/lib/"$(arch)"-linux-gnu/pkgconfig/opencv.pc \
   && python3 -c "from patchmatch import patch_match" \
   && apt-get remove -y \
     --autoremove \
