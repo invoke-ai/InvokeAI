@@ -16,6 +16,7 @@ from ldm.invoke.generator.img2img import Img2Img
 from ldm.invoke.patchmatch import PatchMatch
 from ldm.util import debug_image
 
+
 def infill_methods()->list[str]:
     methods = list()
     if PatchMatch.patchmatch_available():
@@ -180,6 +181,7 @@ class Inpaint(Img2Img):
                        infill_method = None,
                        inpaint_width=None,
                        inpaint_height=None,
+                       attention_maps_callback=None,
                        **kwargs):
         """
         Returns a function returning an image derived from the prompt and
