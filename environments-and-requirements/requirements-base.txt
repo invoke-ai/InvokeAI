@@ -1,15 +1,18 @@
+torch
+torchvision
+
 # pip will resolve the version which matches torch
 albumentations
-diffusers==0.10.*
+diffusers >= 0.10, < 0.11
 einops
 eventlet
 facexlib
-flask==2.1.3
-flask_cors==3.0.10
-flask_socketio==5.3.0
-flaskwebgui==1.0.3
+flask == 2.1.3
+flask_cors == 3.0.10
+flask_socketio == 5.3.0
+flaskwebgui == 1.0.3
 getpass_asterisk
-gfpgan==1.3.8
+gfpgan == 1.3.8
 huggingface-hub
 imageio
 imageio-ffmpeg
@@ -19,21 +22,19 @@ omegaconf
 opencv-python
 picklescan
 pillow
-pip>=22
 pudb
 pyreadline3
-pytorch-lightning==1.7.7
+pytorch-lightning == 1.7.7
 realesrgan
-requests==2.25.1
-scikit-image>=0.19
+requests == 2.25.1
+scikit-image >= 0.19
 send2trash
 streamlit
 taming-transformers-rom1504
-test-tube>=0.7.5
+test-tube >= 0.7.5
 torch-fidelity
 torchmetrics
-transformers==4.25.*
-https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip#egg=k-diffusion
-https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip#egg=pypatchmatch
-https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip#egg=clip
-https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip#egg=clipseg
+transformers >= 4.25, < 4.26
+clipseg @ https://github.com/timojl/clipseg/archive/a5dc13f3649ce67d58505401ce7a7dd25601ffba.zip
+k-diffusion @ https://github.com/crowsonkb/k-diffusion/archive/refs/tags/v0.0.12.zip
+pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip

@@ -38,9 +38,7 @@ dependencies:
     - torch-fidelity==0.3.0
     - torchmetrics==0.7.0
     - transformers==4.21.3
-    - git+https://github.com/openai/CLIP.git@main#egg=clip
-    - git+https://github.com/Birch-san/k-diffusion.git@mps#egg=k_diffusion
-    - git+https://github.com/invoke-ai/clipseg.git@relaxed-python-requirement#egg=clipseg
-    - git+https://github.com/invoke-ai/GFPGAN@basicsr-1.4.1#egg=gfpgan
-    - git+https://github.com/invoke-ai/PyPatchMatch@0.1.5#egg=pypatchmatch
+    - k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/tags/v0.0.10.zip
+    - pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip
+    - clipseg @ https://github.com/timojl/clipseg/archive/a5dc13f3649ce67d58505401ce7a7dd25601ffba.zip
     - -e .
