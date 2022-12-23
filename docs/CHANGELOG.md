@@ -94,7 +94,7 @@ the desired release's zip file, which you can find by clicking on the green
     This point release removes references to the binary installer from the
     installation guide. The binary installer is not stable at the current
     time. First time users are encouraged to use the "source" installer as
-    described in [Installing InvokeAI with the Source Installer](installation/INSTALL_SOURCE.md)
+    described in [Installing InvokeAI with the Source Installer](installation/deprecated_documentation/INSTALL_SOURCE.md)
 
 With InvokeAI 2.2, this project now provides enthusiasts and professionals a
 robust workflow solution for creating AI-generated and human facilitated
