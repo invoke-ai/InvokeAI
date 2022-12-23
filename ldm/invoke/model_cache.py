@@ -21,7 +21,7 @@ from typing import Union
 
 import torch
 import transformers
-from diffusers import AutoencoderKL
+from diffusers import AutoencoderKL, logging as dlogging
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import RevisionNotFoundError
 from omegaconf import OmegaConf
@@ -30,7 +30,7 @@ from omegaconf.errors import ConfigAttributeError
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from ldm.invoke.globals import Globals
+from ldm.invoke.globals import Globals, global_config_dir, global_models_dir, global_autoscan_dir
 from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
@@ -96,7 +96,7 @@ class ModelCache(object):
 
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
-                print(traceback.format_exc())
+                traceback.print_exc()
                 assert self.current_model,'** FATAL: no current model to restore to'
                 print(f'** restoring {self.current_model}')
                 self.get_model(self.current_model)
@@ -366,6 +366,9 @@ class ModelCache(object):
         else:
             fp_args_list = [{}]            
 
+        verbosity = dlogging.get_verbosity()
+        dlogging.set_verbosity_error()
+
         pipeline = None
         for fp_args in fp_args_list:
             try:
@@ -374,6 +377,7 @@ class ModelCache(object):
                     **pipeline_args,
                     **fp_args,
                 )
+                
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
                     print(f'Could not fetch half-precision version of model {repo_id}; fetching full-precision instead')
@@ -382,6 +386,7 @@ class ModelCache(object):
             if pipeline:
                 break
 
+            dlogging.set_verbosity_error()
             assert pipeline is not None, OSError(f'"{model_name}" could not be loaded')        
 
         pipeline.to(self.device)
@@ -430,6 +435,10 @@ class ModelCache(object):
             torch.cuda.empty_cache()
 
     def scan_model(self, model_name, checkpoint):
+        '''
+        Apply picklescanner to the indicated checkpoint and issue a warning
+        and option to exit if an infected file is identified.
+        '''
         # scan model
         print(f'>> Scanning Model: {model_name}')
         scan_result = scan_file_path(checkpoint)
@@ -448,7 +457,81 @@ class ModelCache(object):
                     print("### Exiting InvokeAI")
                     sys.exit()
         else:
-            print('>> Model Scanned. OK!!')
+            print('>> Model scanned ok!')
+
+    def autoconvert_weights(
+            self,
+            conf_path:Path,
+            weights_directory:Path=None,
+            dest_directory:Path=None,
+    ):
+        '''
+        Scan the indicated directory for .ckpt files, convert into diffuser models,
+        and import.
+        '''
+        weights_directory = weights_directory or global_autoscan_dir()
+        dest_directory = dest_directory or Path(global_models_dir(), 'optimized-ckpts')
+        
+        print('>> Checking for unconverted .ckpt files in {weights_directory}')
+        ckpt_files = dict()
+        for root, dirs, files in os.walk(weights_directory):
+            for f in files:
+                if not f.endswith('.ckpt'):
+                    continue
+                basename = Path(f).stem
+                dest = Path(dest_directory,basename)
+                if not dest.exists():
+                    ckpt_files[Path(root,f)]=dest
+                
+        if len(ckpt_files)==0:
+            return
+
+        print(f'>> New .ckpt file(s) found in {weights_directory}. Optimizing and importing...')
+        for ckpt in ckpt_files:
+            self.convert_and_import(ckpt, ckpt_files[ckpt])
+        self.commit(conf_path)
+
+    def convert_and_import(self, ckpt_path:Path, diffuser_path:Path)->dict:
+        '''
+        Convert a legacy ckpt weights file to diffuser model and import
+        into models.yaml.
+        '''
+        from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
+        import transformers
+        if diffuser_path.exists():
+            print(f'ERROR: The path {str(diffuser_path)} already exists. Please move or remove it and try again.')
+            return
+
+        print(f'>> {ckpt_path.name}: optimizing (30-60s).')
+        try:
+            model_name = diffuser_path.name
+            verbosity =transformers.logging.get_verbosity()
+            transformers.logging.set_verbosity_error()
+            convert_ckpt_to_diffuser(ckpt_path, diffuser_path)
+            transformers.logging.set_verbosity(verbosity)
+            print(f'>> Success. Optimized model is now located at {str(diffuser_path)}')
+            print(f'>> Writing new config file entry for {model_name}...',end='')
+            new_config = dict(
+                path=str(diffuser_path),
+                description=f'Optimized version of {model_name}',
+                format='diffusers',
+            )
+            self.add_model(model_name, new_config, True)
+            print('done.')
+        except Exception as e:
+            print(f'** Conversion failed: {str(e)}')
+            traceback.print_exc()
+        return new_config
+
+    def del_config(model_name:str, gen, opt, completer):
+        current_model = gen.model_name
+        if model_name == current_model:
+            print("** Can't delete active model. !switch to another model first. **")
+            return
+        gen.model_cache.del_model(model_name)
+        gen.model_cache.commit(opt.conf)
+        print(f'** {model_name} deleted')
+        completer.del_model(model_name)
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)

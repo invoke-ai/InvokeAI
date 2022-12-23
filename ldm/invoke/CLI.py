@@ -17,6 +17,7 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
+from ldm.invoke.model_cache import ModelCache
 from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
@@ -125,6 +126,14 @@ def main():
     except AssertionError:
         emergency_model_reconfigure(opt)
         sys.exit(-1)
+
+    # try to autoconvert new models
+    # autoimport new .ckpt files
+    if path := opt.autoconvert:
+        gen.model_cache.autoconvert_weights(
+            conf_path=opt.conf,
+            weights_directory=path,
+        )
 
     # web server loops forever
     if opt.web or opt.gui:
@@ -591,35 +600,16 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
     if write_config_file(opt.conf, gen, model_name, new_config, make_default=make_default):
         completer.add_model(model_name)
 
-def optimize_model(model_path:str, gen, opt, completer):
-    from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
-    import transformers
-    basename = os.path.basename(os.path.splitext(model_path)[0])
-    dump_path = os.path.join(Globals.root, 'models','optimized-ckpts',basename)
-    if os.path.exists(dump_path):
-        print(f'ERROR: The path {dump_path} already exists. Please move or remove it and try again.')
+def optimize_model(ckpt_path:str, gen, opt, completer):
+    ckpt_path = Path(ckpt_path)
+    basename = ckpt_path.stem
+    diffuser_path = Path(Globals.root, 'models','optimized-ckpts',basename)
+    if diffuser_path.exists():
+        print(f'** {basename} is already optimized. Will not overwrite.')
         return
-    
-    print(f'INFO: Converting legacy weights file {model_path} to optimized diffuser model.')
-    print(f'      This operation will take 30-60s to complete.')
-    try:
-        verbosity =transformers.logging.get_verbosity()
-        transformers.logging.set_verbosity_error()
-        convert_ckpt_to_diffuser(model_path, dump_path)
-        transformers.logging.set_verbosity(verbosity)
-        print(f'Success. Optimized model is now located at {dump_path}')
-        print(f'Writing new config file entry for {basename}...')
-        model_name = basename
-        new_config = dict(
-            path=dump_path,
-            description=f'Optimized version of {basename}',
-            format='diffusers',
-        )
-        if write_config_file(opt.conf, gen, model_name, new_config):
-            completer.add_model(model_name)
-    except Exception as e:
-        print(f'** Conversion failed: {str(e)}')
-        traceback.print_exc()
+    new_config = gen.model_cache.convert_and_import(ckpt_path, diffuser_path)
+    if write_config_file(opt.conf, gen, basename, new_config, clobber=False):
+        completer.add_model(basename)
 
 def del_config(model_name:str, gen, opt, completer):
     current_model = gen.model_name
