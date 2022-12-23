@@ -1,5 +1,5 @@
 ---
-title: CLI
+title: Command-Line Interface
 ---
 
 # :material-bash: CLI
