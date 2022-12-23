@@ -60,7 +60,7 @@ export default function ImageToImagePanel() {
       const handleChangeHiresFix = () => dispatch(setHiresFix(false));
       handleChangeHiresFix();
     }
-  }, [activeTabName, dispatch]);
+  }, [activeTabName]);
 
   return (
     <InvokeOptionsPanel>
