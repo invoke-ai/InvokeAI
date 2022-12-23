@@ -294,7 +294,7 @@ class InvokeAIWebServer:
             print(f">> System config requested")
             config = self.get_system_config()
             config["model_list"] = self.generate.model_cache.list_models()
-            config["infill_methods"] = infill_methods
+            config["infill_methods"] = infill_methods()
             socketio.emit("systemConfig", config)
 
         @socketio.on("requestModelChange")

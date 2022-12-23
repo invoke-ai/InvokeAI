@@ -81,5 +81,4 @@ area. Disputes are resolved by open and honest communication.
 
 ## Signature
 
-This document has been collectively crafted and approved by the current InvokeAI team members, as of 28 Nov 2022: **lstein** (Lincoln Stein), **blessedcoolant**, **hipsterusername** (Kent Keirsey), **Kyle0654** (Kyle Schouviller), **damian0815**, **mauwii** (Matthias Wild), **Netsvetaev** (Artur Netsvetaev), **psychedelicious**, **tildebyte**, and **keturn**. Although individuals within the group may hold differing views on particular details and/or their implications, we are all in agreement about its fundamental statements, as well as their significance and importance to this project moving forward.
-
+This document has been collectively crafted and approved by the current InvokeAI team members, as of 28 Nov 2022: **lstein** (Lincoln Stein), **blessedcoolant**, **hipsterusername** (Kent Keirsey), **Kyle0654** (Kyle Schouviller), **damian0815**, **mauwii** (Matthias Wild), **Netsvetaev** (Artur Netsvetaev), **psychedelicious**, **tildebyte**, **keturn**, and **ebr** (Eugene Brodsky). Although individuals within the group may hold differing views on particular details and/or their implications, we are all in agreement about its fundamental statements, as well as their significance and importance to this project moving forward.
