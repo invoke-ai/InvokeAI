@@ -35,6 +35,7 @@ test-tube >= 0.7.5
 torch-fidelity
 torchmetrics
 transformers >= 4.25, < 4.26
-clipseg @ https://github.com/timojl/clipseg/archive/a5dc13f3649ce67d58505401ce7a7dd25601ffba.zip
+clip @ https://github.com/openai/CLIP/archive/refs/heads/main.zip
+clipseg @ https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip
 k-diffusion @ https://github.com/crowsonkb/k-diffusion/archive/refs/tags/v0.0.12.zip
 pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip
