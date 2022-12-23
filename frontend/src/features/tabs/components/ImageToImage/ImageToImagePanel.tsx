@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Feature } from 'app/features';
 import FaceRestoreOptions from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import FaceRestoreToggle from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreToggle';
@@ -14,8 +15,9 @@ import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import { setHiresFix } from 'features/options/store/optionsSlice';
-import { useAppDispatch } from 'app/storeHooks';
+import { useAppDispatch , useAppSelector } from 'app/storeHooks';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
+import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 
 export default function ImageToImagePanel() {
   const imageToImageAccordions = {
@@ -51,9 +53,14 @@ export default function ImageToImagePanel() {
 
   const dispatch = useAppDispatch();
 
-  const handleChangeHiresFix = () => dispatch(setHiresFix(false));
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
-  handleChangeHiresFix();
+  useEffect(() => {
+    if (activeTabName === 'img2img') {
+      const handleChangeHiresFix = () => dispatch(setHiresFix(false));
+      handleChangeHiresFix();
+    }
+  }, [activeTabName, dispatch]);
 
   return (
     <InvokeOptionsPanel>
