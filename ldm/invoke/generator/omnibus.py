@@ -165,6 +165,8 @@ class Omnibus(Img2Img,Txt2Img):
 
         if self.pil_image is None or self.pil_mask is None:
             return gen_result
+        if self.pil_image.size != self.pil_mask.size:
+            return gen_result
 
         corrected_result = super(Img2Img, self).repaste_and_color_correct(gen_result, self.pil_image, self.pil_mask, self.mask_blur_radius)
 
