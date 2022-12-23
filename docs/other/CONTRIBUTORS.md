@@ -25,6 +25,7 @@ We thank them for all of their time and hard work.
 * @Netsvetaev (Artur Netsvetaev) - UI/UX Developer
 * @tildebyte - general gadfly and resident (self-appointed) know-it-all
 * @keturn - Lead for Diffusers port
+* @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
 
 ## **Contributions by**
 
@@ -74,6 +75,7 @@ We thank them for all of their time and hard work.
 - [Kent Keirsey](https://github.com/hipsterusername)
 - [psychedelicious](https://github.com/psychedelicious)
 - [damian0815](https://github.com/damian0815)
+- [Eugene Brodsky](https://github.com/ebr)
 
 ## **Original CompVis Authors**
 
