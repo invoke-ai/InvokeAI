@@ -6,6 +6,7 @@ import psutil
 import torch
 import diffusers
 from torch import nn
+from diffusers.models.unet_2d_condition import UNet2DConditionModel
 
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
@@ -338,7 +339,8 @@ def setup_cross_attention_control(model, context: Context):
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
-    cross_attention_class: type = InvokeAIDiffusersCrossAttention
+    from ldm.modules.attention import CrossAttention # avoid circular import
+    cross_attention_class: type = InvokeAIDiffusersCrossAttention if isinstance(model,UNet2DConditionModel) else CrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [(name,module) for name, module in model.named_modules() if
                 isinstance(module, cross_attention_class) and which_attn in name]

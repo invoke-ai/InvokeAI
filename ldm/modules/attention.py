@@ -164,7 +164,6 @@ def get_mem_free_total(device):
 
 class CrossAttention(nn.Module, InvokeAICrossAttentionMixin):
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
-        print(f"Warning! ldm.modules.attention.CrossAttention is no longer being maintained. Please use InvokeAICrossAttention instead.")
         super().__init__()
         InvokeAICrossAttentionMixin.__init__(self)
         inner_dim = dim_head * heads

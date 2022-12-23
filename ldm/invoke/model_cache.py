@@ -389,7 +389,7 @@ class ModelCache(object):
         width = pipeline.vae.block_out_channels[-2]
         height = pipeline.vae.block_out_channels[-1]
 
-        print(f'  | training width x height = ({width} x {height})')
+        print(f'  | default image dimensions = {width} x {height}')
 
         return pipeline, width, height, model_hash
 
@@ -575,7 +575,7 @@ class ModelCache(object):
         name_or_path = self.model_name_or_path(vae_config)
         using_fp16 = self.precision == 'float16'
 
-        print(f'>> Loading diffusers VAE from {name_or_path}')
+        print(f'  | Loading diffusers VAE from {name_or_path}')
         if using_fp16:
             print(f'  | Using faster float16 precision')
             vae_args.update(torch_dtype=torch.float16)
@@ -592,9 +592,9 @@ class ModelCache(object):
                 vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args, **fp_args)
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print(f'Could not fetch half-precision version of model {name_or_path}; fetching full-precision instead')
+                    print(f'  | Half-precision version of model not available; fetching full-precision instead')
                 else:
-                    print(f'An unexpected error occurred while downloading the model: {e})')
+                    print(f'** An unexpected error occurred while downloading the model: {e})')
             if vae:
                 break
 
