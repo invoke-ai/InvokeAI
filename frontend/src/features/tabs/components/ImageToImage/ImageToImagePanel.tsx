@@ -15,7 +15,7 @@ import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import { setHiresFix } from 'features/options/store/optionsSlice';
-import { useAppDispatch , useAppSelector } from 'app/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 
