@@ -2,7 +2,7 @@
   "models": "Modelli",
   "displayInProgress": "Visualizza immagini in corso",
   "saveSteps": "Salva le immagini ogni n passaggi",
-  "confirmOnDelete": "Conferma all'eliminazione",
+  "confirmOnDelete": "Conferma l'eliminazione",
   "displayHelpIcons": "Visualizza le icone della Guida",
   "useCanvasBeta": "Utilizza il layout beta di Canvas",
   "enableImageDebugging": "Abilita il debug dell'immagine",

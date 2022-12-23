@@ -30,14 +30,14 @@
   },
   "toggleGallery": {
     "title": "Attiva/disattiva Galleria",
-    "desc": "Apri e chiudi il pannello della galleria"
+    "desc": "Apre e chiude il pannello della galleria"
   },
   "maximizeWorkSpace": {
     "title": "Massimizza lo spazio di lavoro",
     "desc": "Chiude i pannelli e massimizza l'area di lavoro"
   },
   "changeTabs": {
-    "title": "Cambia schede",
+    "title": "Cambia scheda",
     "desc": "Passa a un'altra area di lavoro"
   },
   "consoleToggle": {
@@ -57,7 +57,7 @@
     "desc": "Utilizza tutti i parametri dell'immagine corrente"
   },
   "restoreFaces": {
-    "title": "Restaura i volti",
+    "title": "Restaura volti",
     "desc": "Restaura l'immagine corrente"
   },
   "upscale": {
@@ -90,7 +90,7 @@
   },
   "toggleGalleryPin": {
     "title": "Attiva/disattiva il blocco della galleria",
-    "desc": "Blocca e sblocca la galleria dall'interfaccia utente"
+    "desc": "Blocca/sblocca la galleria dall'interfaccia utente"
   },
   "increaseGalleryThumbSize": {
     "title": "Aumenta dimensione immagini nella galleria",
@@ -153,7 +153,7 @@
     "desc": "Attiva/disattiva la selezione del livello base/maschera"
   },
   "clearMask": {
-    "title": "Cancella Mashera",
+    "title": "Cancella maschera",
     "desc": "Cancella l'intera maschera"
   },
   "hideMask": {
