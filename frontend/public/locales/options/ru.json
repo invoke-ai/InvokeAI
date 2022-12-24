@@ -5,7 +5,7 @@
   "width": "Ширина",
   "height": "Высота",
   "sampler": "Семплер",
-  "seed": "Сид",
+  "seed": "Сид (Seed)",
   "randomizeSeed": "Случайный сид",
   "shuffle": "Обновить",
   "noiseThreshold": "Порог шума",
@@ -45,7 +45,7 @@
   "cancel": "Отменить",
   "promptPlaceholder": "Введите запрос здесь (на английском). [исключенные токены], (более значимые)++, (менее значимые)--, swap и blend тоже доступны (смотрите Github)",
   "sendTo": "Отправить",
-  "sendToImg2Img": "Отправить в Image to Image",
+  "sendToImg2Img": "Отправить в img2img",
   "sendToUnifiedCanvas": "Отправить на холст",
   "copyImageToLink": "Скопировать ссылку",
   "downloadImage": "Скачать",
@@ -60,3 +60,4 @@
   "initialImage": "Исходное изображение",
   "showOptionsPanel": "Показать панель настроек"
 }
+
