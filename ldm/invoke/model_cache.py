@@ -17,20 +17,18 @@ import time
 import traceback
 import warnings
 from pathlib import Path
-from typing import Union
+from typing import Union, Any
 
 import torch
 import transformers
 from diffusers import AutoencoderKL, logging as dlogging
-from huggingface_hub import hf_hub_download, logging as hlogging
-from huggingface_hub.utils import RevisionNotFoundError
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from omegaconf.errors import ConfigAttributeError
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from ldm.invoke.globals import Globals, global_config_dir, global_models_dir, global_autoscan_dir
+from ldm.invoke.globals import Globals, global_models_dir, global_autoscan_dir
 from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
@@ -146,7 +144,7 @@ class ModelCache(object):
         '''
         info = self.model_info(model_name)
         return info['format']=='ckpt' if info else False
-        
+
     def list_models(self) -> dict:
         '''
         Return a dict of models in the format:
@@ -353,7 +351,7 @@ class ModelCache(object):
             print(f'  | Using more accurate float32 precision')
 
         # TODO: scan weights maybe?
-        pipeline_args = dict(
+        pipeline_args: dict[str, Any] = dict(
             safety_checker=None,
             local_files_only=not Globals.internet_available
         )
@@ -366,7 +364,7 @@ class ModelCache(object):
             pipeline_args.update(torch_dtype=torch.float16)
             fp_args_list = [{'revision':'fp16'},{}]
         else:
-            fp_args_list = [{}]            
+            fp_args_list = [{}]
 
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
@@ -379,17 +377,17 @@ class ModelCache(object):
                     **pipeline_args,
                     **fp_args,
                 )
-                
+
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print(f'Could not fetch half-precision version of model {repo_id}; fetching full-precision instead')
+                    print(f'Could not fetch half-precision version of model {name_or_path}; fetching full-precision instead')
                 else:
                     print(f'An unexpected error occurred while downloading the model: {e})')
             if pipeline:
                 break
 
-            dlogging.set_verbosity_error()
-            assert pipeline is not None, OSError(f'"{model_name}" could not be loaded')        
+        dlogging.set_verbosity(verbosity)
+        assert pipeline is not None, OSError(f'"{name_or_path}" could not be loaded')
 
         pipeline.to(self.device)
 
@@ -405,7 +403,7 @@ class ModelCache(object):
         if isinstance(model_name,DictConfig):
             mconfig = model_name
         elif model_name in self.config:
-            mconfig = self.config[model_name]            
+            mconfig = self.config[model_name]
         else:
             raise ValueError(f'"{model_name}" is not a known model name. Please check your models.yaml file')
 
@@ -474,7 +472,7 @@ class ModelCache(object):
         '''
         weights_directory = weights_directory or global_autoscan_dir()
         dest_directory = dest_directory or Path(global_models_dir(), 'optimized-ckpts')
-        
+
         print('>> Checking for unconverted .ckpt files in {weights_directory}')
         ckpt_files = dict()
         for root, dirs, files in os.walk(weights_directory):
@@ -485,7 +483,7 @@ class ModelCache(object):
                 dest = Path(dest_directory,basename)
                 if not dest.exists():
                     ckpt_files[Path(root,f)]=dest
-                
+
         if len(ckpt_files)==0:
             return
 
@@ -526,7 +524,7 @@ class ModelCache(object):
             traceback.print_exc()
         return new_config
 
-    def del_config(model_name:str, gen, opt, completer):
+    def del_config(self, model_name:str, gen, opt, completer):
         current_model = gen.model_name
         if model_name == current_model:
             print("** Can't delete active model. !switch to another model first. **")
@@ -601,7 +599,7 @@ class ModelCache(object):
     def _model_from_cpu(self,model):
         if self.device == 'cpu':
             return model
-        
+
         model.to(self.device)
         model.cond_stage_model.device = self.device
 
@@ -660,12 +658,12 @@ class ModelCache(object):
         vae_args = {}
         name_or_path = self.model_name_or_path(vae_config)
         using_fp16 = self.precision == 'float16'
-                
+
         vae_args.update(
             cache_dir=os.path.join(Globals.root,'models',name_or_path),
             local_files_only=not Globals.internet_available,
         )
-        
+
         print(f'  | Loading diffusers VAE from {name_or_path}')
         if using_fp16:
             vae_args.update(torch_dtype=torch.float16)
