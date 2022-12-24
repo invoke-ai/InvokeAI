@@ -18,6 +18,7 @@ i18n
       'toast',
       'hotkeys',
       'settings',
+      'modelmanager',
     ],
     backend: {
       loadPath: '/locales/{{ns}}/{{lng}}.json',

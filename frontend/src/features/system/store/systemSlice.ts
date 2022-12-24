@@ -47,6 +47,8 @@ export interface SystemState
   saveIntermediatesInterval: number;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
+  searchFolder: string | null;
+  foundModels: InvokeAI.FoundModel[] | null;
 }
 
 const initialSystemState: SystemState = {
@@ -82,6 +84,8 @@ const initialSystemState: SystemState = {
   saveIntermediatesInterval: 5,
   enableImageDebugging: false,
   toastQueue: [],
+  searchFolder: null,
+  foundModels: null,
 };
 
 export const systemSlice = createSlice({
@@ -225,6 +229,15 @@ export const systemSlice = createSlice({
       state.currentStatus = action.payload;
       state.currentStatusHasSteps = false;
     },
+    setSearchFolder: (state, action: PayloadAction<string | null>) => {
+      state.searchFolder = action.payload;
+    },
+    setFoundModels: (
+      state,
+      action: PayloadAction<InvokeAI.FoundModel[] | null>
+    ) => {
+      state.foundModels = action.payload;
+    },
   },
 });
 
@@ -253,6 +266,8 @@ export const {
   addToast,
   clearToastQueue,
   setProcessingIndeterminateTask,
+  setSearchFolder,
+  setFoundModels,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

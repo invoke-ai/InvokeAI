@@ -6,6 +6,7 @@ import {
   FaBug,
   FaKeyboard,
   FaWrench,
+  FaCube,
 } from 'react-icons/fa';
 
 import InvokeAILogo from 'assets/images/logo.png';
@@ -17,6 +18,8 @@ import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 import ThemeChanger from './ThemeChanger';
 import ModelSelect from './ModelSelect';
+import ModelManagerModal from './ModelManager/ModelManagerModal';
+
 import LanguagePicker from './LanguagePicker';
 
 import { useTranslation } from 'react-i18next';
@@ -40,6 +43,18 @@ const SiteHeader = () => {
         <StatusIndicator />
 
         <ModelSelect />
+
+        <ModelManagerModal>
+          <IAIIconButton
+            aria-label={t('modelmanager:modelManager')}
+            tooltip={t('modelmanager:modelManager')}
+            size={'sm'}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            icon={<FaCube />}
+          />
+        </ModelManagerModal>
 
         <HotkeysModal>
           <IAIIconButton
