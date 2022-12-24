@@ -23,6 +23,7 @@ from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config, ask_user
 from ldm.invoke.globals import Globals
 from picklescan.scanner import scan_file_path
+from pathlib import Path
 
 DEFAULT_MAX_MODELS=2
 
@@ -135,8 +136,10 @@ class ModelCache(object):
         for name in self.config:
             try:
                 description = self.config[name].description
+                weights = self.config[name].weights
             except ConfigAttributeError:
                 description = '<no description>'
+                weights = '<not found>'
 
             if self.current_model == name:
                 status = 'active'
@@ -147,7 +150,8 @@ class ModelCache(object):
 
             models[name]={
                 'status' : status,
-                'description' : description
+                'description' : description,
+                'weights': weights
             }
         return models
 
@@ -186,6 +190,8 @@ class ModelCache(object):
 
         config = omega[model_name] if model_name in omega else {}
         for field in model_attributes:
+            if field == 'weights':
+                field.replace('\\', '/')
             config[field] = model_attributes[field]
 
         omega[model_name] = config
@@ -311,6 +317,22 @@ class ModelCache(object):
                     sys.exit()
         else:
             print('>> Model Scanned. OK!!')
+    
+    def search_models(self, search_folder):
+
+        print(f'>> Finding Models In: {search_folder}')
+        models_folder = Path(search_folder).glob('**/*.ckpt')
+
+        files = [x for x in models_folder if x.is_file()]
+
+        found_models = []
+        for file in files:
+            found_models.append({
+                'name': file.stem,
+                'location': str(file.resolve()).replace('\\', '/')
+            })
+
+        return search_folder, found_models
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
