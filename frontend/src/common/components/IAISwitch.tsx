@@ -33,16 +33,26 @@ const IAISwitch = (props: Props) => {
       isDisabled={isDisabled}
       width={width}
       className={`invokeai__switch-form-control ${styleClass}`}
+      display="flex"
+      columnGap="1rem"
+      alignItems="center"
+      justifyContent="space-between"
       {...formControlProps}
     >
       <FormLabel
         className="invokeai__switch-form-label"
         whiteSpace="nowrap"
+        marginRight={0}
+        marginTop={0.5}
+        marginBottom={0.5}
+        fontSize="sm"
+        fontWeight="bold"
+        width="auto"
         {...formLabelProps}
       >
         {label}
-        <Switch className="invokeai__switch-root" {...rest} />
       </FormLabel>
+      <Switch className="invokeai__switch-root" {...rest} />
     </FormControl>
   );
 };
