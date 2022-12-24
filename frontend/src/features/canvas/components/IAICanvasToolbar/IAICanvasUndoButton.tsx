@@ -9,6 +9,7 @@ import _ from 'lodash';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { undo } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { useTranslation } from 'react-i18next';
 
 const canvasUndoSelector = createSelector(
   [canvasSelector, activeTabNameSelector, systemSelector],
@@ -30,6 +31,8 @@ const canvasUndoSelector = createSelector(
 export default function IAICanvasUndoButton() {
   const dispatch = useAppDispatch();
 
+  const { t } = useTranslation();
+
   const { canUndo, activeTabName } = useAppSelector(canvasUndoSelector);
 
   const handleUndo = () => {
@@ -50,8 +53,8 @@ export default function IAICanvasUndoButton() {
 
   return (
     <IAIIconButton
-      aria-label="Undo (Ctrl+Z)"
-      tooltip="Undo (Ctrl+Z)"
+      aria-label={`${t('unifiedcanvas:undo')} (Ctrl+Z)`}
+      tooltip={`${t('unifiedcanvas:undo')} (Ctrl+Z)`}
       icon={<FaUndo />}
       onClick={handleUndo}
       isDisabled={!canUndo}

@@ -10,6 +10,7 @@ import {
   setSeamStrength,
 } from 'features/options/store/optionsSlice';
 import _ from 'lodash';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [optionsSelector],
@@ -35,11 +36,13 @@ const SeamCorrectionOptions = () => {
   const { seamSize, seamBlur, seamStrength, seamSteps } =
     useAppSelector(selector);
 
+  const { t } = useTranslation();
+
   return (
     <Flex direction="column" gap="1rem">
       <IAISlider
         sliderMarkRightOffset={-6}
-        label={'Seam Size'}
+        label={t('options:seamSize')}
         min={1}
         max={256}
         sliderNumberInputProps={{ max: 512 }}
@@ -54,7 +57,7 @@ const SeamCorrectionOptions = () => {
       />
       <IAISlider
         sliderMarkRightOffset={-4}
-        label={'Seam Blur'}
+        label={t('options:seamBlur')}
         min={0}
         max={64}
         sliderNumberInputProps={{ max: 512 }}
@@ -70,8 +73,8 @@ const SeamCorrectionOptions = () => {
         withReset
       />
       <IAISlider
-        sliderMarkRightOffset={-2}
-        label={'Seam Strength'}
+        sliderMarkRightOffset={-7}
+        label={t('options:seamStrength')}
         min={0.01}
         max={0.99}
         step={0.01}
@@ -88,7 +91,7 @@ const SeamCorrectionOptions = () => {
       />
       <IAISlider
         sliderMarkRightOffset={-4}
-        label={'Seam Steps'}
+        label={t('options:seamSteps')}
         min={1}
         max={32}
         sliderNumberInputProps={{ max: 100 }}

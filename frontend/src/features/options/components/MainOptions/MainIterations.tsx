@@ -8,6 +8,7 @@ import {
   OptionsState,
   setIterations,
 } from 'features/options/store/optionsSlice';
+import { useTranslation } from 'react-i18next';
 
 const mainIterationsSelector = createSelector(
   [(state: RootState) => state.options],
@@ -28,12 +29,13 @@ const mainIterationsSelector = createSelector(
 export default function MainIterations() {
   const dispatch = useAppDispatch();
   const { iterations } = useAppSelector(mainIterationsSelector);
+  const { t } = useTranslation();
 
   const handleChangeIterations = (v: number) => dispatch(setIterations(v));
 
   return (
     <IAINumberInput
-      label="Images"
+      label={t('options:images')}
       step={1}
       min={1}
       max={9999}

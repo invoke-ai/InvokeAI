@@ -2,30 +2,29 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';
+import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 import { isStagingSelector } from '../store/canvasSelectors';
 
 const ClearCanvasHistoryButtonModal = () => {
   const isStaging = useAppSelector(isStagingSelector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   return (
     <IAIAlertDialog
-      title={'Clear Canvas History'}
+      title={t('unifiedcanvas:clearCanvasHistory')}
       acceptCallback={() => dispatch(clearCanvasHistory())}
-      acceptButtonText={'Clear History'}
+      acceptButtonText={t('unifiedcanvas:clearHistory')}
       triggerComponent={
         <IAIButton size={'sm'} leftIcon={<FaTrash />} isDisabled={isStaging}>
-          Clear Canvas History
+          {t('unifiedcanvas:clearCanvasHistory')}
         </IAIButton>
       }
     >
-      <p>
-        Clearing the canvas history leaves your current canvas intact, but
-        irreversibly clears the undo and redo history.
-      </p>
+      <p>{t('unifiedcanvas:clearCanvasHistoryMessage')}</p>
       <br />
-      <p>Are you sure you want to clear the canvas history?</p>
+      <p>{t('unifiedcanvas:clearCanvasHistoryConfirm')}</p>
     </IAIAlertDialog>
   );
 };

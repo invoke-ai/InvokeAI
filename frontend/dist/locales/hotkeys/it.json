@@ -1,0 +1,207 @@
+{
+  "keyboardShortcuts": "Tasti rapidi",
+  "appHotkeys": "Tasti di scelta rapida dell'applicazione",
+  "generalHotkeys": "Tasti di scelta rapida generali",
+  "galleryHotkeys": "Tasti di scelta rapida della galleria",
+  "unifiedCanvasHotkeys": "Tasti di scelta rapida Tela Unificata",
+  "invoke": {
+    "title": "Invoca",
+    "desc": "Genera un'immagine"
+  },
+  "cancel": {
+    "title": "Annulla",
+    "desc": "Annulla la generazione dell'immagine"
+  },
+  "focusPrompt": {
+    "title": "Metti a fuoco il Prompt",
+    "desc": "Mette a fuoco l'area di immissione del prompt"
+  },
+  "toggleOptions": {
+    "title": "Attiva/disattiva le opzioni",
+    "desc": "Apre e chiude il pannello delle opzioni"
+  },
+  "pinOptions": {
+    "title": "Appunta le opzioni",
+    "desc": "Blocca il pannello delle opzioni"
+  },
+  "toggleViewer": {
+    "title": "Attiva/disattiva visualizzatore",
+    "desc": "Apre e chiude il visualizzatore immagini"
+  },
+  "toggleGallery": {
+    "title": "Attiva/disattiva Galleria",
+    "desc": "Apre e chiude il pannello della galleria"
+  },
+  "maximizeWorkSpace": {
+    "title": "Massimizza lo spazio di lavoro",
+    "desc": "Chiude i pannelli e massimizza l'area di lavoro"
+  },
+  "changeTabs": {
+    "title": "Cambia scheda",
+    "desc": "Passa a un'altra area di lavoro"
+  },
+  "consoleToggle": {
+    "title": "Attiva/disattiva console",
+    "desc": "Apre e chiude la console"
+  },
+  "setPrompt": {
+    "title": "Imposta Prompt",
+    "desc": "Usa il prompt dell'immagine corrente"
+  },
+  "setSeed": {
+    "title": "Imposta seme",
+    "desc": "Usa il seme dell'immagine corrente"
+  },
+  "setParameters": {
+    "title": "Imposta parametri",
+    "desc": "Utilizza tutti i parametri dell'immagine corrente"
+  },
+  "restoreFaces": {
+    "title": "Restaura volti",
+    "desc": "Restaura l'immagine corrente"
+  },
+  "upscale": {
+    "title": "Amplia",
+    "desc": "Amplia l'immagine corrente"
+  },
+  "showInfo": {
+    "title": "Mostra informazioni",
+    "desc": "Mostra le informazioni sui metadati dell'immagine corrente"
+  },
+  "sendToImageToImage": {
+    "title": "Invia a da Immagine a Immagine",
+    "desc": "Invia l'immagine corrente a da Immagine a Immagine"
+  },
+  "deleteImage": {
+    "title": "Elimina immagine",
+    "desc": "Elimina l'immagine corrente"
+  },
+  "closePanels": {
+    "title": "Chiudi pannelli",
+    "desc": "Chiude i pannelli aperti"
+  },
+  "previousImage": {
+    "title": "Immagine precedente",
+    "desc": "Visualizza l'immagine precedente nella galleria"
+  },
+  "nextImage": {
+    "title": "Immagine successiva",
+    "desc": "Visualizza l'immagine successiva nella galleria"
+  },
+  "toggleGalleryPin": {
+    "title": "Attiva/disattiva il blocco della galleria",
+    "desc": "Blocca/sblocca la galleria dall'interfaccia utente"
+  },
+  "increaseGalleryThumbSize": {
+    "title": "Aumenta dimensione immagini nella galleria",
+    "desc": "Aumenta la dimensione delle miniature della galleria"
+  },
+  "decreaseGalleryThumbSize": {
+    "title": "Riduci dimensione immagini nella galleria",
+    "desc": "Riduce le dimensioni delle miniature della galleria"
+  },
+  "selectBrush": {
+    "title": "Seleziona Pennello",
+    "desc": "Seleziona il pennello della tela"
+  },
+  "selectEraser": {
+    "title": "Seleziona Cancellino",
+    "desc": "Seleziona il cancellino della tela"
+  },
+  "decreaseBrushSize": {
+    "title": "Riduci la dimensione del pennello",
+    "desc": "Riduce la dimensione del pennello/cancellino della tela"
+  },
+  "increaseBrushSize": {
+    "title": "Aumenta la dimensione del pennello",
+    "desc": "Aumenta la dimensione del pennello/cancellino della tela"
+  },
+  "decreaseBrushOpacity": {
+    "title": "Riduci l'opacità del pennello",
+    "desc": "Diminuisce l'opacità del pennello della tela"
+  },
+  "increaseBrushOpacity": {
+    "title": "Aumenta l'opacità del pennello",
+    "desc": "Aumenta l'opacità del pennello della tela"
+  },
+  "moveTool": {
+    "title": "Strumento Sposta",
+    "desc": "Consente la navigazione nella tela"
+  },
+  "fillBoundingBox": {
+    "title": "Riempi riquadro di selezione",
+    "desc": "Riempie il riquadro di selezione con il colore del pennello"
+  },
+  "eraseBoundingBox": {
+    "title": "Cancella riquadro di selezione",
+    "desc": "Cancella l'area del riquadro di selezione"
+  },
+  "colorPicker": {
+    "title": "Seleziona Selettore colore",
+    "desc": "Seleziona il selettore colore della tela"
+  },
+  "toggleSnap": {
+    "title": "Attiva/disattiva Aggancia",
+    "desc": "Attiva/disattiva Aggancia alla griglia"
+  },
+  "quickToggleMove": {
+    "title": "Attiva/disattiva Sposta rapido",
+    "desc": "Attiva/disattiva temporaneamente la modalità Sposta"
+  },
+  "toggleLayer": {
+    "title": "Attiva/disattiva livello",
+    "desc": "Attiva/disattiva la selezione del livello base/maschera"
+  },
+  "clearMask": {
+    "title": "Cancella maschera",
+    "desc": "Cancella l'intera maschera"
+  },
+  "hideMask": {
+    "title": "Nascondi maschera",
+    "desc": "Nasconde e mostra la maschera"
+  },
+  "showHideBoundingBox": {
+    "title": "Mostra/Nascondi riquadro di selezione",
+    "desc": "Attiva/disattiva la visibilità del riquadro di selezione"
+  },
+  "mergeVisible": {
+    "title": "Fondi il visibile",
+    "desc": "Fonde tutti gli strati visibili della tela"
+  },
+  "saveToGallery": {
+    "title": "Salva nella galleria",
+    "desc": "Salva la tela corrente nella galleria"
+  },
+  "copyToClipboard": {
+    "title": "Copia negli appunti",
+    "desc": "Copia la tela corrente negli appunti"
+  },
+  "downloadImage": {
+    "title": "Scarica l'immagine",
+    "desc": "Scarica la tela corrente"
+  },
+  "undoStroke": {
+    "title": "Annulla tratto",
+    "desc": "Annulla una pennellata"
+  },
+  "redoStroke": {
+    "title": "Ripeti tratto",
+    "desc": "Ripeti una pennellata"
+  },
+  "resetView": {
+    "title": "Reimposta vista",
+    "desc": "Ripristina la visualizzazione della tela"
+  },
+  "previousStagingImage": {
+    "title": "Immagine della sessione precedente",
+    "desc": "Immagine dell'area della sessione precedente"
+  },
+  "nextStagingImage": {
+    "title": "Immagine della sessione successivo",
+    "desc": "Immagine dell'area della sessione successiva"
+  },
+  "acceptStagingImage": {
+    "title": "Accetta l'immagine della sessione",
+    "desc": "Accetta l'immagine dell'area della sessione corrente"
+  }
+}
