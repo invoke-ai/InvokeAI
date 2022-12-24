@@ -32,7 +32,8 @@ class Txt2Img(Generator):
 
         def make_image(x_T) -> PIL.Image.Image:
             pipeline_output = pipeline.image_from_embeddings(
-                latents=x_T,
+                latents=torch.zeros_like(x_T),
+                noise=x_T,
                 num_inference_steps=steps,
                 conditioning_data=conditioning_data,
                 callback=step_callback

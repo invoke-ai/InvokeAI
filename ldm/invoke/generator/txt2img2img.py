@@ -39,9 +39,10 @@ class Txt2Img2Img(Generator):
         def make_image(x_T):
 
             first_pass_latent_output, _ = pipeline.latents_from_embeddings(
-                latents=x_T,
+                latents=torch.zeros_like(x_T),
                 num_inference_steps=steps,
                 conditioning_data=conditioning_data,
+                noise=x_T,
                 callback=step_callback,
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
@@ -58,12 +59,14 @@ class Txt2Img2Img(Generator):
                 mode="bilinear"
             )
 
+            second_pass_noise = self.get_noise_like(resized_latents)
+
             pipeline_output = pipeline.img2img_from_latents_and_embeddings(
                 resized_latents,
                 num_inference_steps=steps,
                 conditioning_data=conditioning_data,
                 strength=strength,
-                noise_func=self.get_noise_like,
+                noise=second_pass_noise,
                 callback=step_callback)
 
             return pipeline.numpy_to_pil(pipeline_output.images)[0]

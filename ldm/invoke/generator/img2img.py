@@ -32,6 +32,8 @@ class Img2Img(Generator):
 
         def make_image(x_T):
             # FIXME: use x_T for initial seeded noise
+            # We're not at the moment because the pipeline automatically resizes init_image if
+            # necessary, which the x_T input might not match.
             pipeline_output = pipeline.img2img_from_embeddings(
                 init_image, strength, steps, conditioning_data,
                 noise_func=self.get_noise_like,

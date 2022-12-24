@@ -250,15 +250,6 @@ class Inpaint(Img2Img):
         pipeline.scheduler = sampler
 
         def make_image(x_T):
-            # FIXME: some of this z_enc and inpaint_replace stuff was probably important
-            # # to replace masked area with latent noise, weighted by inpaint_replace strength
-            # if inpaint_replace > 0.0:
-            #     print(f'>> inpaint will replace what was under the mask with a strength of {inpaint_replace}')
-            #     l_noise = self.get_noise(kwargs['width'],kwargs['height'])
-            #     inverted_mask = 1.0-mask  # there will be 1s where the mask is
-            #     masked_region = (1.0-inpaint_replace) * inverted_mask * z_enc + inpaint_replace * inverted_mask * l_noise
-            #     z_enc   = z_enc * mask + masked_region
-
             pipeline_output = pipeline.inpaint_from_embeddings(
                 init_image=init_image,
                 mask=1 - mask,  # expects white means "paint here."

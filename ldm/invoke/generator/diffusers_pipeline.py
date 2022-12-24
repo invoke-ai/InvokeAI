@@ -294,25 +294,31 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,
-                              *, callback: Callable[[PipelineIntermediateState], None]=None,
+                              *,
+                              noise: torch.Tensor,
+                              callback: Callable[[PipelineIntermediateState], None]=None,
                               run_id=None,
                               **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
         r"""
         Function invoked when calling the pipeline for generation.
 
         :param conditioning_data:
-        :param latents: Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for
+        :param latents: Pre-generated un-noised latents, to be used as inputs for
             image generation. Can be used to tweak the same generation with different prompts.
         :param num_inference_steps: The number of denoising steps. More denoising steps usually lead to a higher quality
             image at the expense of slower inference.
+        :param noise: Noise to add to the latents, sampled from a Gaussian distribution.
         :param callback:
         :param run_id:
         :param extra_step_kwargs:
         """
         result_latents, result_attention_map_saver = self.latents_from_embeddings(
-            latents, num_inference_steps, conditioning_data,
-            run_id=run_id, callback=callback, **extra_step_kwargs
-        )
+            latents, num_inference_steps,
+            conditioning_data,
+            noise=noise,
+            run_id=run_id,
+            callback=callback,
+            **extra_step_kwargs)
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
 
@@ -321,22 +327,20 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             output = InvokeAIStableDiffusionPipelineOutput(images=image, nsfw_content_detected=[], attention_map_saver=result_attention_map_saver)
             return self.check_for_safety(output, dtype=conditioning_data.dtype)
 
-    def latents_from_embeddings(
-        self, latents: torch.Tensor, num_inference_steps: int,
-        conditioning_data: ConditioningData,
-        *,
-        timesteps = None,
-        additional_guidance: List[Callable] = None,
-        run_id=None,
-        callback: Callable[[PipelineIntermediateState], None]=None,
-        **extra_step_kwargs
-    ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+    def latents_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
+                                conditioning_data: ConditioningData,
+                                *,
+                                noise: torch.Tensor,
+                                timesteps=None,
+                                additional_guidance: List[Callable] = None, run_id=None,
+                                callback: Callable[[PipelineIntermediateState], None] = None, **extra_step_kwargs) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if timesteps is None:
             self.scheduler.set_timesteps(num_inference_steps, device=self.unet.device)
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(self.generate_latents_from_embeddings, PipelineIntermediateState)
         result: PipelineIntermediateState = infer_latents_from_embeddings(
             latents, timesteps, conditioning_data,
+            noise=noise,
             additional_guidance=additional_guidance,
             run_id=run_id,
             callback=callback,
@@ -346,6 +350,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def generate_latents_from_embeddings(self, latents: torch.Tensor, timesteps,
                                          conditioning_data: ConditioningData,
                                          *,
+                                         noise: torch.Tensor,
                                          run_id: str = None,
                                          additional_guidance: List[Callable] = None, **extra_step_kwargs):
         if run_id is None:
@@ -359,14 +364,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         else:
             self.invokeai_diffuser.remove_cross_attention_control()
 
-        # scale the initial noise by the standard deviation required by the scheduler
-        latents *= self.scheduler.init_noise_sigma
         yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
                                         latents=latents)
 
         batch_size = latents.shape[0]
         batched_t = torch.full((batch_size,), timesteps[0],
                                dtype=timesteps.dtype, device=self.unet.device)
+        latents = self.scheduler.add_noise(latents, noise, batched_t)
 
         attention_map_saver: Optional[AttentionMapSaver] = None
         self.invokeai_diffuser.remove_attention_map_saving()
@@ -446,32 +450,30 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         device = self.unet.device
         latents_dtype = self.unet.dtype
         initial_latents = self.non_noised_latents_from_image(init_image, device=device, dtype=latents_dtype)
+        noise = noise_func(initial_latents)
 
         return self.img2img_from_latents_and_embeddings(initial_latents, num_inference_steps,
                                                         conditioning_data,
                                                         strength,
-                                                        noise_func, run_id, callback,
+                                                        noise, run_id, callback,
                                                         **extra_step_kwargs)
 
     def img2img_from_latents_and_embeddings(self, initial_latents, num_inference_steps,
                                             conditioning_data: ConditioningData,
                                             strength,
-                                            noise_func, run_id=None, callback=None, **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
+                                            noise: torch.Tensor, run_id=None, callback=None, **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
         device = self.unet.device
-        batch_size = initial_latents.size(0)
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
         timesteps, _ = img2img_pipeline.get_timesteps(num_inference_steps, strength, device=device)
-        latent_timestep = timesteps[:1].repeat(batch_size)
-        noise = noise_func(initial_latents)
-        noised_latents = self.scheduler.add_noise(initial_latents, noise, latent_timestep)
-        latents = noised_latents
 
         result_latents, result_attention_maps = self.latents_from_embeddings(
-            latents, num_inference_steps, conditioning_data,
+            initial_latents, num_inference_steps, conditioning_data,
             timesteps=timesteps,
+            noise=noise,
+            run_id=run_id,
             callback=callback,
-            run_id=run_id, **extra_step_kwargs)
+            **extra_step_kwargs)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -494,8 +496,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
         device = self.unet.device
         latents_dtype = self.unet.dtype
-        batch_size = 1
-        num_images_per_prompt = 1
 
         if isinstance(init_image, PIL.Image.Image):
             init_image = image_resized_to_grid_as_tensor(init_image.convert('RGB'))
@@ -512,16 +512,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         assert img2img_pipeline.scheduler is self.scheduler
 
         # 6. Prepare latent variables
-        latent_timestep = timesteps[:1].repeat(batch_size * num_images_per_prompt)
         # can't quite use upstream StableDiffusionImg2ImgPipeline.prepare_latents
         # because we have our own noise function
         init_image_latents = self.non_noised_latents_from_image(init_image, device=device, dtype=latents_dtype)
         noise = noise_func(init_image_latents)
-        latents = self.scheduler.add_noise(init_image_latents, noise, latent_timestep)
 
         if mask.dim() == 3:
             mask = mask.unsqueeze(0)
-        mask = tv_resize(mask, latents.shape[-2:], T.InterpolationMode.BILINEAR) \
+        mask = tv_resize(mask, init_image_latents.shape[-2:], T.InterpolationMode.BILINEAR) \
             .to(device=device, dtype=latents_dtype)
 
         guidance: List[Callable] = []
@@ -535,10 +533,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         try:
             result_latents, result_attention_maps = self.latents_from_embeddings(
-                latents, num_inference_steps, conditioning_data,
-                timesteps=timesteps,
-                run_id=run_id, additional_guidance=guidance,
-                callback=callback,
+                init_image_latents, num_inference_steps,
+                conditioning_data, noise=noise, timesteps=timesteps,
+                additional_guidance=guidance,
+                run_id=run_id, callback=callback,
                 **extra_step_kwargs)
         finally:
             self.invokeai_diffuser.model_forward_callback = self._unet_forward
