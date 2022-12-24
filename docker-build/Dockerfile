@@ -1,4 +1,4 @@
-FROM python:3.9-slim AS builder
+FROM python:3.10-slim AS builder
 
 # use bash
 SHELL [ "/bin/bash", "-c" ]
@@ -33,7 +33,7 @@ RUN python3 -m venv .venv \
     --no-cache-dir \
     -r ${PIP_REQUIREMENTS}
 
-FROM python:3.9-slim AS runtime
+FROM python:3.10-slim AS runtime
 
 # setup environment
 ARG APPDIR=/usr/src/app
