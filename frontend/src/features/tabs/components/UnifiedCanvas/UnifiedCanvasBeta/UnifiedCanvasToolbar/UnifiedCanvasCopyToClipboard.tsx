@@ -6,6 +6,7 @@ import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploa
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 
 export default function UnifiedCanvasCopyToClipboard() {
@@ -21,6 +22,7 @@ export default function UnifiedCanvasCopyToClipboard() {
   );
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   useHotkeys(
     ['meta+c', 'ctrl+c'],
@@ -46,8 +48,8 @@ export default function UnifiedCanvasCopyToClipboard() {
 
   return (
     <IAIIconButton
-      aria-label="Copy to Clipboard (Cmd/Ctrl+C)"
-      tooltip="Copy to Clipboard (Cmd/Ctrl+C)"
+      aria-label={`${t('unifiedcanvas:copyToClipboard')} (Cmd/Ctrl+C)`}
+      tooltip={`${t('unifiedcanvas:copyToClipboard')} (Cmd/Ctrl+C)`}
       icon={<FaCopy />}
       onClick={handleCopyImageToClipboard}
       isDisabled={isStaging}

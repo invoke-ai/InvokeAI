@@ -1,0 +1,13 @@
+{
+  "models": "Modelli",
+  "displayInProgress": "Visualizza immagini in corso",
+  "saveSteps": "Salva le immagini ogni n passaggi",
+  "confirmOnDelete": "Conferma l'eliminazione",
+  "displayHelpIcons": "Visualizza le icone della Guida",
+  "useCanvasBeta": "Utilizza il layout beta di Canvas",
+  "enableImageDebugging": "Abilita il debug dell'immagine",
+  "resetWebUI": "Reimposta l'interfaccia utente Web",
+  "resetWebUIDesc1": "Il ripristino dell'interfaccia utente Web reimposta solo la cache locale del browser delle immagini e le impostazioni memorizzate. Non cancella alcuna immagine dal disco.",
+  "resetWebUIDesc2": "Se le immagini non vengono visualizzate nella galleria o qualcos'altro non funziona, prova a reimpostare prima di segnalare un problema su GitHub.",
+  "resetComplete": "L'interfaccia utente Web è stata reimpostata. Aggiorna la pagina per ricaricarla."
+}

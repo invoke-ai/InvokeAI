@@ -14,7 +14,7 @@ export default function IAIInput(props: IAIInputProps) {
     label,
     styleClass,
     isDisabled = false,
-    fontSize = '1rem',
+    fontSize = 'sm',
     width,
     isInvalid,
     ...rest
@@ -25,12 +25,14 @@ export default function IAIInput(props: IAIInputProps) {
       className={`input ${styleClass}`}
       isInvalid={isInvalid}
       isDisabled={isDisabled}
-      flexGrow={1}
     >
       <FormLabel
         fontSize={fontSize}
-        marginBottom={1}
+        fontWeight="bold"
+        alignItems="center"
         whiteSpace="nowrap"
+        marginBottom={0}
+        marginRight={0}
         className="input-label"
       >
         {label}

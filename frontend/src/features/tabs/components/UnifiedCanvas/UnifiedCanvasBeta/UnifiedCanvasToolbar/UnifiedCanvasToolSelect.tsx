@@ -21,6 +21,7 @@ import {
 } from 'features/canvas/store/canvasSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],
@@ -43,6 +44,7 @@ export const selector = createSelector(
 
 const UnifiedCanvasToolSelect = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const { tool, isStaging } = useAppSelector(selector);
 
   useHotkeys(
@@ -113,16 +115,16 @@ const UnifiedCanvasToolSelect = () => {
     <Flex flexDirection={'column'} gap={'0.5rem'}>
       <ButtonGroup>
         <IAIIconButton
-          aria-label="Brush Tool (B)"
-          tooltip="Brush Tool (B)"
+          aria-label={`${t('unifiedcanvas:brush')} (B)`}
+          tooltip={`${t('unifiedcanvas:brush')} (B)`}
           icon={<FaPaintBrush />}
           data-selected={tool === 'brush' && !isStaging}
           onClick={handleSelectBrushTool}
           isDisabled={isStaging}
         />
         <IAIIconButton
-          aria-label="Eraser Tool (E)"
-          tooltip="Eraser Tool (E)"
+          aria-label={`${t('unifiedcanvas:eraser')} (E)`}
+          tooltip={`${t('unifiedcanvas:eraser')} (B)`}
           icon={<FaEraser />}
           data-selected={tool === 'eraser' && !isStaging}
           isDisabled={isStaging}
@@ -131,23 +133,23 @@ const UnifiedCanvasToolSelect = () => {
       </ButtonGroup>
       <ButtonGroup>
         <IAIIconButton
-          aria-label="Fill Bounding Box (Shift+F)"
-          tooltip="Fill Bounding Box (Shift+F)"
+          aria-label={`${t('unifiedcanvas:fillBoundingBox')} (Shift+F)`}
+          tooltip={`${t('unifiedcanvas:fillBoundingBox')} (Shift+F)`}
           icon={<FaFillDrip />}
           isDisabled={isStaging}
           onClick={handleFillRect}
         />
         <IAIIconButton
-          aria-label="Erase Bounding Box Area (Delete/Backspace)"
-          tooltip="Erase Bounding Box Area (Delete/Backspace)"
+          aria-label={`${t('unifiedcanvas:eraseBoundingBox')} (Del/Backspace)`}
+          tooltip={`${t('unifiedcanvas:eraseBoundingBox')} (Del/Backspace)`}
           icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
           isDisabled={isStaging}
           onClick={handleEraseBoundingBox}
         />
       </ButtonGroup>
       <IAIIconButton
-        aria-label="Color Picker (C)"
-        tooltip="Color Picker (C)"
+        aria-label={`${t('unifiedcanvas:colorPicker')} (C)`}
+        tooltip={`${t('unifiedcanvas:colorPicker')} (C)`}
         icon={<FaEyeDropper />}
         data-selected={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}

@@ -7,6 +7,7 @@ import CancelButton from 'features/options/components/ProcessButtons/CancelButto
 import InvokeButton from 'features/options/components/ProcessButtons/InvokeButton';
 import { setShouldShowOptionsPanel } from 'features/options/store/optionsSlice';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaSlidersH } from 'react-icons/fa';
 
 export default function UnifiedCanvasProcessingButtons() {
@@ -15,6 +16,7 @@ export default function UnifiedCanvasProcessingButtons() {
   );
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleShowOptionsPanel = () => {
     dispatch(setShouldShowOptionsPanel(true));
@@ -26,9 +28,9 @@ export default function UnifiedCanvasProcessingButtons() {
   return (
     <Flex flexDirection={'column'} gap="0.5rem">
       <IAIIconButton
-        tooltip="Show Options Panel (O)"
+        tooltip={`${t('options:showOptionsPanel')} (O)`}
         tooltipProps={{ placement: 'top' }}
-        aria-label="Show Options Panel"
+        aria-label={t('options:showOptionsPanel')}
         onClick={handleShowOptionsPanel}
       >
         <FaSlidersH />
