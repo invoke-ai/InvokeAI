@@ -1,14 +1,12 @@
 # from omegaconf import OmegaConf
-from pathlib import Path
 import os
+import readline
 import shutil
-
-# import readline
+from pathlib import Path
 
 from rich.console import Console
-from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
-from ldm.invoke import readline
+from rich.prompt import Confirm, Prompt
 
 console = Console()
 
@@ -30,9 +28,7 @@ class RuntimeDir:
                 if os.getenv(ev) is not None:
                     console.print(f"{ev}={os.getenv(ev)} found in environment")
 
-        console.print(
-            f"Using {self.paths.root.location.expanduser().resolve()} as the InvokeAI runtime directory"
-        )
+        console.print(f"Using {self.paths.root.location.expanduser().resolve()} as the InvokeAI runtime directory")
         console.line()
 
     def validate(self) -> bool:
@@ -40,9 +36,7 @@ class RuntimeDir:
         Validate that the runtime dir is correctly configured
         """
 
-        console.rule(
-            f"Validating directory structure at {self.paths.root.location.expanduser().resolve()}"
-        )
+        console.rule(f"Validating directory structure at {self.paths.root}")
         console.line()
 
         missing = False
@@ -61,12 +55,10 @@ class RuntimeDir:
     def select_outdir(self):
         current = str(self.paths.outdir.location.expanduser().resolve())
 
-        # readline.parse_and_bind("tab: complete")
         directory = Prompt.ask(
             prompt="Select the default directory for image outputs",
             default=current,
         )
-        # readline.parse_and_bind("/")
 
         self.paths.outdir = directory
         return directory
@@ -76,13 +68,12 @@ class RuntimeDir:
         Copy source config dir
         this is only needed for source install. Auto install would have already created it
 
-        TODO this is brittle! will break if we move source config dir
-        assumes the "configs" dir exists 2 levels up from this file.
-        there needs to be a better way of determining this
+        TODO this dir should be packaged with the wheel and not managed by the installer. we can get it from the wheel
         """
 
+        ### TEMP brittle way of finding the source config dir; remove once distributed with the wheel
         src = Path(__file__).parents[2] / "configs"
-        dest = self.paths.configdir.location
+        dest = self.paths.config_dir.location
         shutil.copytree(src, dest, dirs_exist_ok=True)
 
     @staticmethod
@@ -99,9 +90,7 @@ class RuntimeDir:
         )
 
         if not yes_to_all:
-            enable_safety_checker = Confirm.ask(
-                "Enable the NSFW checker by default?", default=enable_safety_checker
-            )
+            enable_safety_checker = Confirm.ask("Enable the NSFW checker by default?", default=enable_safety_checker)
         else:
             console.print(
                 f"Program was started with the --yes switch. NSFW checker is [bold red]{'ON' if enable_safety_checker else 'OFF'}[/]"
@@ -115,9 +104,7 @@ class RuntimeDir:
         TODO: template this
         """
 
-        console.print(
-            f'Creating the initialization file at "{self.paths.initfile.location}".\n'
-        )
+        console.print(f'Creating the initialization file at "{self.paths.initfile.location}".\n')
         with open(self.paths.initfile.location, "w") as f:
             f.write(
                 f"""# InvokeAI initialization file
@@ -151,9 +138,7 @@ f"{kwargs.get("safety_checker")}"
         if not yes_to_all:
             accepted = False
             while not accepted:
-                console.print(
-                    f"InvokeAI image outputs will be placed into {self.paths.outdir.location}"
-                )
+                console.print(f"InvokeAI image outputs will be placed into {self.paths.outdir.location}")
                 accepted = Confirm.ask("Accept this location?", default="y")
                 if not accepted:
                     self.select_outdir()
@@ -164,54 +149,11 @@ f"{kwargs.get("safety_checker")}"
         )
 
         # Create the directory tree
-        for location in [
-            path.location for path in self.paths.get() if path.kind == "directory"
-        ]:
+        for location in [path.location for path in self.paths.get() if path.kind == "directory"]:
             Path(location).expanduser().absolute().mkdir(exist_ok=True, parents=True)
 
         # If the default model config file doesn't exist, copy the config dir
-        if not self.paths.init_models.location.exists():
+        if not self.paths.initial_models_config.location.exists():
             self.copy_configdir()
 
         self.create_initfile(safety_checker=self.safety_checker_config(yes_to_all))
-
-
-# class PlainTextInitFile:
-#     """
-#     Manages the plaintext init file used to configure the launch scripts
-#     """
-
-#     def __init__(self, filepath, outputs, safety_checker, sampler, steps) -> None:
-#         self.filepath = filepath
-#         self.outputs = outputs
-#         self.safety_checker = safety_checker
-#         self.sampler = sampler
-#         self.steps = steps
-
-#     def create(self, filepath: Path):
-#         console.print(f"Creating the initialization file at {filepath}")
-#         with open(filepath, "w") as f:
-#             f.write(
-#                 # tempted to template this, but it will be deprecated soon
-#                 f"""
-# # InvokeAI initialization file
-# # This is the InvokeAI initialization file, which contains command-line default values.
-# # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
-# # or renaming it and then running configure_invokeai.py again.
-
-# # the --outdir option controls the default location of image files.
-# --outdir="{self.outputs}"
-
-# # generation arguments
-# {self.safety_checker}
-# --sampler={self.sampler}
-# --steps={self.steps}
-
-# # You may place other  frequently-used startup commands here, one or more per line.
-# # Examples:
-# # --web --host=0.0.0.0
-# # --steps=20
-# # -Ak_euler_a -C10.0
-# #
-# """
-#             )

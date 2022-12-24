@@ -95,6 +95,7 @@ import ldm.invoke
 import ldm.invoke.pngwriter
 
 from ldm.invoke.globals import Globals
+from .paths import InvokePaths
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 from argparse import Namespace
 
@@ -170,6 +171,7 @@ class Args(object):
         self._cmd_parser   = cmd_parser or self._create_dream_cmd_parser()
         self._arg_switches = self.parse_cmd('')   # fill in defaults
         self._cmd_switches = self.parse_cmd('')   # fill in defaults
+        self.paths = InvokePaths()
 
     def parse_args(self):
         '''Parse the shell switches and store.'''
@@ -730,7 +732,7 @@ class Args(object):
                 invoke> !fetch 0000015.8929913.png
                 invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
                 invoke> !fetch /path/to/images/*.png prompts.txt
- 
+
             !replay /path/to/prompts.txt
             Replays all the prompts contained in the file prompts.txt.
 
@@ -1279,4 +1281,3 @@ def legacy_metadata_load(meta,pathname) -> Args:
             opt.prompt = ''
             opt.seed = 0
     return opt
-

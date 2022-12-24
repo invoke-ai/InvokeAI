@@ -51,7 +51,7 @@ class InvokePaths:
     ) -> None:
         self.root = root
         self.outdir = outdir or self.root.location / "outputs"
-        self.config = config or self.configdir.location / "models.yaml"
+        self.config = config or self.config_dir.location / "models.yaml"
 
     #### Runtime directory
 
@@ -72,9 +72,7 @@ class InvokePaths:
                 location = Path(DEFAULT_RUNTIME_DIR)
         else:
             location = Path(path)
-        self._root = PathSpec(
-            kind="directory", description="InvokeAI runtime", location=location
-        )
+        self._root = PathSpec(kind="directory", description="InvokeAI runtime", location=location)
 
     ### Image outputs
 
@@ -87,9 +85,7 @@ class InvokePaths:
         path = "outputs" if path is None else path
         path = Path(path).expanduser()
         location = self.root.location / path if not path.is_absolute() else path
-        self._outdir = PathSpec(
-            kind="directory", description="Image outputs", location=location
-        )
+        self._outdir = PathSpec(kind="directory", description="Image outputs", location=location)
 
     ### Main config file (model configuration)
 
@@ -101,16 +97,14 @@ class InvokePaths:
     def config(self, path: Union[str, Path] = None) -> None:
         path = "models.yaml" if path is None else path
         path = Path(path).expanduser()
-        location = self.configdir.location / path if not path.is_absolute() else path
+        location = self.config_dir.location / path if not path.is_absolute() else path
         # should we verify this is indeed a YAML file? raise?
-        self._config = PathSpec(
-            kind="file", description="Main configuration", location=location
-        )
+        self._config = PathSpec(kind="file", description="Main configuration", location=location)
 
     ### Model cache
 
     @property
-    def models(self) -> PathSpec:
+    def models_dir(self) -> PathSpec:
         return PathSpec(
             kind="directory",
             description="Model cache",
@@ -120,7 +114,7 @@ class InvokePaths:
     ### Configuration store
 
     @property
-    def configdir(self) -> PathSpec:
+    def config_dir(self) -> PathSpec:
         return PathSpec(
             kind="directory",
             description="Common configuration files",
@@ -134,17 +128,17 @@ class InvokePaths:
         return PathSpec(
             kind="directory",
             description="Stable Diffusion weights",
-            location=self.models.location / "ldm/stable-diffusion-v1",
+            location=self.models_dir.location / "ldm/stable-diffusion-v1",
         )
 
     ### SD specific config files
 
     @property
-    def sd_configs(self) -> PathSpec:
+    def sd_configs_dir(self) -> PathSpec:
         return PathSpec(
             kind="directory",
             description="SD model parameters",
-            location=self.configdir.location / "stable-diffusion",
+            location=self.config_dir.location / "stable-diffusion",
         )
 
     ### App initialization file (default CLI switches)
@@ -160,11 +154,11 @@ class InvokePaths:
     ### Default model configs - initial source for the main config file
 
     @property
-    def init_models(self) -> PathSpec:
+    def initial_models_config(self) -> PathSpec:
         return PathSpec(
             kind="file",
             description="Initial models configuration",
-            location=self.configdir.location / "INITIAL_MODELS.yaml",
+            location=self.config_dir.location / "INITIAL_MODELS.yaml",
         )
 
     def get(self) -> list[PathSpec]:
@@ -173,8 +167,4 @@ class InvokePaths:
         """
 
         attrs = inspect.getmembers(self, predicate=lambda m: not (inspect.isroutine(m)))
-        return [
-            a[1]
-            for a in attrs
-            if ((isinstance(a[1], PathSpec)) and not (a[0].startswith("_")))
-        ]
+        return [a[1] for a in attrs if ((isinstance(a[1], PathSpec)) and not (a[0].startswith("_")))]

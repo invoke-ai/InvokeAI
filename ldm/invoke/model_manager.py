@@ -20,6 +20,7 @@ import safetensors.torch
 from pathlib import Path
 from typing import Union, Any
 from ldm.util import download_with_progress_bar
+from ldm.invoke.globals import Globals
 
 import torch
 import safetensors
@@ -30,10 +31,13 @@ from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from ldm.invoke.globals import Globals, global_models_dir, global_autoscan_dir
 from ldm.util import instantiate_from_config, ask_user
+from .paths import InvokePaths
 
 DEFAULT_MAX_MODELS=2
+LOCAL_FILES_ONLY=not Globals.internet_available
+
+Paths = InvokePaths()
 
 class ModelManager(object):
     def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
@@ -306,9 +310,9 @@ class ModelManager(object):
         height = mconfig.height
 
         if not os.path.isabs(config):
-            config = os.path.join(Globals.root,config)
+            config = Paths.config.location
         if not os.path.isabs(weights):
-            weights = os.path.normpath(os.path.join(Globals.root,weights))
+            weights = Paths.default_weights.location
         # scan model
         self.scan_model(model_name, weights)
 
@@ -323,7 +327,7 @@ class ModelManager(object):
 
         # this does the work
         if not os.path.isabs(config):
-            config = os.path.join(Globals.root,config)
+            config = Paths.config_dir
         omega_config = OmegaConf.load(config)
         with open(weights,'rb') as f:
             weight_bytes = f.read()
@@ -352,7 +356,7 @@ class ModelManager(object):
         # look and load a matching vae file. Code borrowed from AUTOMATIC1111 modules/sd_models.py
         if vae:
             if not os.path.isabs(vae):
-                vae = os.path.normpath(os.path.join(Globals.root,vae))
+                vae = Paths.root.location / vae
             if os.path.exists(vae):
                 print(f'   | Loading VAE weights from: {vae}')
                 vae_ckpt = torch.load(vae, map_location="cpu")
@@ -399,13 +403,13 @@ class ModelManager(object):
         # TODO: scan weights maybe?
         pipeline_args: dict[str, Any] = dict(
             safety_checker=None,
-            local_files_only=not Globals.internet_available
+            local_files_only=LOCAL_FILES_ONLY
         )
         if 'vae' in mconfig:
              vae = self._load_vae(mconfig['vae'])
              pipeline_args.update(vae=vae)
         if not isinstance(name_or_path,Path):
-            pipeline_args.update(cache_dir=os.path.join(Globals.root,'models',name_or_path))
+            pipeline_args.update(cache_dir=Paths.models_dir.location / name_or_path)
         if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
             fp_args_list = [{'revision':'fp16'},{}]
@@ -456,7 +460,7 @@ class ModelManager(object):
         if 'path' in mconfig:
             path = Path(mconfig['path'])
             if not path.is_absolute():
-                path = Path(Globals.root, path).resolve()
+                path = Paths.root.location / path
             return path
         elif 'repo_id' in mconfig:
             return mconfig['repo_id']
@@ -547,12 +551,12 @@ class ModelManager(object):
         '''
         Attempts to install the indicated ckpt file and returns True if successful.
 
-        "weights" can be either a path-like object corresponding to a local .ckpt file 
+        "weights" can be either a path-like object corresponding to a local .ckpt file
         or a http/https URL pointing to a remote model.
 
         "config" is the model config file to use with this ckpt file. It defaults to
         v1-inference.yaml. If a URL is provided, the config will be downloaded.
-        
+
         You can optionally provide a model name and/or description. If not provided,
         then these will be derived from the weight file name. If you provide a commit_to_conf
         path to the configuration file, then the new entry will be committed to the
@@ -565,7 +569,7 @@ class ModelManager(object):
             return False
         if config_path is None or not config_path.exists():
             return False
-            
+
         model_name = model_name or Path(weights).stem
         model_description = model_description or f'imported stable diffusion weights file {model_name}'
         new_config = dict(
@@ -580,7 +584,7 @@ class ModelManager(object):
         if commit_to_conf:
             self.commit(commit_to_conf)
         return True
-                       
+
     def autoconvert_weights(
             self,
             conf_path:Path,
@@ -591,8 +595,8 @@ class ModelManager(object):
         Scan the indicated directory for .ckpt files, convert into diffuser models,
         and import.
         '''
-        weights_directory = weights_directory or global_autoscan_dir()
-        dest_directory = dest_directory or Path(global_models_dir(), 'optimized-ckpts')
+        weights_directory = weights_directory or Paths.default_weights.location
+        dest_directory = dest_directory or (Paths.models_dir.location / 'optimized-ckpts')
 
         print('>> Checking for unconverted .ckpt files in {weights_directory}')
         ckpt_files = dict()
@@ -653,7 +657,7 @@ class ModelManager(object):
         except Exception as e:
             print(f'** Conversion failed: {str(e)}')
             traceback.print_exc()
-            
+
         print('done.')
         return new_config
 
@@ -705,7 +709,7 @@ class ModelManager(object):
         '''
         yaml_str = OmegaConf.to_yaml(self.config)
         if not os.path.isabs(config_file_path):
-            config_file_path = os.path.normpath(os.path.join(Globals.root,config_file_path))
+            config_file_path = Paths.config
         tmpfile = os.path.join(os.path.dirname(config_file_path),'new_config.tmp')
         with open(tmpfile, 'w', encoding="utf-8") as outfile:
             outfile.write(self.preamble())
@@ -731,13 +735,13 @@ class ModelManager(object):
         if source.startswith(('http:','https:','ftp:')):
             basename = os.path.basename(source)
             if not os.path.isabs(dest_directory):
-                dest_directory = os.path.join(Globals.root,dest_directory)
+                dest_directory = Paths.root.location / dest_directory
             dest = os.path.join(dest_directory,basename)
             if download_with_progress_bar(source,dest):
                 resolved_path = Path(dest)
         else:
             if not os.path.isabs(source):
-                source = os.path.join(Globals.root,source)
+                source = Paths.root.location / source
             resolved_path = Path(source)
         return resolved_path
 
@@ -829,8 +833,8 @@ class ModelManager(object):
         using_fp16 = self.precision == 'float16'
 
         vae_args.update(
-            cache_dir=os.path.join(Globals.root,'models',name_or_path),
-            local_files_only=not Globals.internet_available,
+            cache_dir= Paths.models_dir / name_or_path,
+            local_files_only=LOCAL_FILES_ONLY,
         )
 
         print(f'  | Loading diffusers VAE from {name_or_path}')
