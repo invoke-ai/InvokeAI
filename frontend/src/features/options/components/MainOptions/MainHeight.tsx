@@ -6,11 +6,13 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { setHeight } from 'features/options/store/optionsSlice';
+import { useTranslation } from 'react-i18next';
 
 export default function MainHeight() {
   const height = useAppSelector((state: RootState) => state.options.height);
   const activeTabName = useAppSelector(activeTabNameSelector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleChangeHeight = (e: ChangeEvent<HTMLSelectElement>) =>
     dispatch(setHeight(Number(e.target.value)));
@@ -18,7 +20,7 @@ export default function MainHeight() {
   return (
     <IAISelect
       isDisabled={activeTabName === 'unifiedCanvas'}
-      label="Height"
+      label={t('options:height')}
       value={height}
       flexGrow={1}
       onChange={handleChangeHeight}

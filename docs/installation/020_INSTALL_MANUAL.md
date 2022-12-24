@@ -143,7 +143,7 @@ manager, please follow these steps:
     Note that `configure_invokeai.py` and `invoke.py` should be installed
     under your virtual environment directory and the system should find them
     on the PATH. If this isn't working on your system, you can call the
-    scripts directory using `python scripts/configure_invoke.py` and
+    scripts directory using `python scripts/configure_invokeai.py` and
     `python scripts/invoke.py`.
 
     !!! tip

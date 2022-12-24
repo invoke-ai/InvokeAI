@@ -6,10 +6,12 @@ import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploa
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaLayerGroup } from 'react-icons/fa';
 
 export default function UnifiedCanvasMergeVisible() {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const canvasBaseLayer = getCanvasBaseLayer();
   const isStaging = useAppSelector(isStagingSelector);
   const isProcessing = useAppSelector(
@@ -38,8 +40,8 @@ export default function UnifiedCanvasMergeVisible() {
   };
   return (
     <IAIIconButton
-      aria-label="Merge Visible (Shift+M)"
-      tooltip="Merge Visible (Shift+M)"
+      aria-label={`${t('unifiedcanvas:mergeVisible')} (Shift+M)`}
+      tooltip={`${t('unifiedcanvas:mergeVisible')} (Shift+M)`}
       icon={<FaLayerGroup />}
       onClick={handleMergeVisible}
       isDisabled={isStaging}

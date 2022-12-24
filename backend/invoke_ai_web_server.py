@@ -294,7 +294,7 @@ class InvokeAIWebServer:
             print(f">> System config requested")
             config = self.get_system_config()
             config["model_list"] = self.generate.model_cache.list_models()
-            config["infill_methods"] = infill_methods
+            config["infill_methods"] = infill_methods()
             socketio.emit("systemConfig", config)
 
         @socketio.on("requestModelChange")
@@ -593,11 +593,11 @@ class InvokeAIWebServer:
                     pass
 
                 if postprocessing_parameters["type"] == "esrgan":
-                    progress.set_current_status("Upscaling (ESRGAN)")
+                    progress.set_current_status("common:statusUpscalingESRGAN")
                 elif postprocessing_parameters["type"] == "gfpgan":
-                    progress.set_current_status("Restoring Faces (GFPGAN)")
+                    progress.set_current_status("common:statusRestoringFacesGFPGAN")
                 elif postprocessing_parameters["type"] == "codeformer":
-                    progress.set_current_status("Restoring Faces (Codeformer)")
+                    progress.set_current_status("common:statusRestoringFacesCodeFormer")
 
                 socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -630,7 +630,7 @@ class InvokeAIWebServer:
                         f'{postprocessing_parameters["type"]} is not a valid postprocessing type'
                     )
 
-                progress.set_current_status("Saving Image")
+                progress.set_current_status("common:statusSavingImage")
                 socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
@@ -860,15 +860,15 @@ class InvokeAIWebServer:
                 nonlocal progress
 
                 generation_messages = {
-                    "txt2img": "Text to Image",
-                    "img2img": "Image to Image",
-                    "inpainting": "Inpainting",
-                    "outpainting": "Outpainting",
+                    "txt2img": "common:statusGeneratingTextToImage",
+                    "img2img": "common:statusGeneratingImageToImage",
+                    "inpainting": "common:statusGeneratingInpainting",
+                    "outpainting": "common:statusGeneratingOutpainting",
                 }
 
                 progress.set_current_step(step + 1)
                 progress.set_current_status(
-                    f"Generating ({generation_messages[actual_generation_mode]})"
+                    f"{generation_messages[actual_generation_mode]}"
                 )
                 progress.set_current_status_has_steps(True)
 
@@ -955,7 +955,7 @@ class InvokeAIWebServer:
                         **generation_parameters["bounding_box"],
                     )
 
-                progress.set_current_status("Generation Complete")
+                progress.set_current_status("common:statusGenerationComplete")
 
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -982,7 +982,7 @@ class InvokeAIWebServer:
                     raise CanceledException
 
                 if esrgan_parameters:
-                    progress.set_current_status("Upscaling")
+                    progress.set_current_status("common:statusUpscaling")
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                     eventlet.sleep(0)
@@ -1005,9 +1005,9 @@ class InvokeAIWebServer:
 
                 if facetool_parameters:
                     if facetool_parameters["type"] == "gfpgan":
-                        progress.set_current_status("Restoring Faces (GFPGAN)")
+                        progress.set_current_status("common:statusRestoringFacesGFPGAN")
                     elif facetool_parameters["type"] == "codeformer":
-                        progress.set_current_status("Restoring Faces (Codeformer)")
+                        progress.set_current_status("common:statusRestoringFacesCodeFormer")
 
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit("progressUpdate", progress.to_formatted_dict())
@@ -1039,7 +1039,7 @@ class InvokeAIWebServer:
                     ]
                     all_parameters["facetool_type"] = facetool_parameters["type"]
 
-                progress.set_current_status("Saving Image")
+                progress.set_current_status("common:statusSavingImage")
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
@@ -1086,7 +1086,7 @@ class InvokeAIWebServer:
 
                 if progress.total_iterations > progress.current_iteration:
                     progress.set_current_step(1)
-                    progress.set_current_status("Iteration complete")
+                    progress.set_current_status("common:statusIterationComplete")
                     progress.set_current_status_has_steps(False)
                 else:
                     progress.mark_complete()
@@ -1480,7 +1480,7 @@ class Progress:
         self.total_iterations = (
             generation_parameters["iterations"] if generation_parameters else 1
         )
-        self.current_status = "Preparing"
+        self.current_status = "common:statusPreparing"
         self.is_processing = True
         self.current_status_has_steps = False
         self.has_error = False
@@ -1510,7 +1510,7 @@ class Progress:
         self.has_error = has_error
 
     def mark_complete(self):
-        self.current_status = "Processing Complete"
+        self.current_status = "common:statusProcessingComplete"
         self.current_step = 0
         self.total_steps = 0
         self.current_iteration = 0

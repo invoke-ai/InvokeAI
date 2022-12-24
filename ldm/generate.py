@@ -190,6 +190,7 @@ class Generate:
         self.txt2mask = None
         self.safety_checker = None
         self.karras_max = None
+        self.infill_method = None
 
         # Note that in previous versions, there was an option to pass the
         # device to Generate(). However the device was then ignored, so
@@ -326,7 +327,7 @@ class Generate:
             seam_strength: float = 0.7,
             seam_steps: int  = 10,
             tile_size: int   = 32,
-            infill_method = infill_methods[0], # The infill method to use
+            infill_method = None,
             force_outpaint: bool = False,
             enable_image_debugging = False,
 
@@ -392,6 +393,7 @@ class Generate:
         self.log_tokenization = log_tokenization
         self.step_callback = step_callback
         self.karras_max = karras_max
+        self.infill_method = infill_method or infill_methods()[0], # The infill method to use
         with_variations = [] if with_variations is None else with_variations
 
         # will instantiate the model or return it from cache

@@ -9,6 +9,7 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import _ from 'lodash';
 import { redo } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { useTranslation } from 'react-i18next';
 
 const canvasRedoSelector = createSelector(
   [canvasSelector, activeTabNameSelector, systemSelector],
@@ -31,6 +32,8 @@ export default function IAICanvasRedoButton() {
   const dispatch = useAppDispatch();
   const { canRedo, activeTabName } = useAppSelector(canvasRedoSelector);
 
+  const { t } = useTranslation();
+
   const handleRedo = () => {
     dispatch(redo());
   };
@@ -49,8 +52,8 @@ export default function IAICanvasRedoButton() {
 
   return (
     <IAIIconButton
-      aria-label="Redo (Ctrl+Shift+Z)"
-      tooltip="Redo (Ctrl+Shift+Z)"
+      aria-label={`${t('unifiedcanvas:redo')} (Ctrl+Shift+Z)`}
+      tooltip={`${t('unifiedcanvas:redo')} (Ctrl+Shift+Z)`}
       icon={<FaRedo />}
       onClick={handleRedo}
       isDisabled={!canRedo}

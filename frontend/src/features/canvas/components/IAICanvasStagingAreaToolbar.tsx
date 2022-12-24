@@ -24,6 +24,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [canvasSelector],
@@ -60,6 +61,8 @@ const IAICanvasStagingAreaToolbar = () => {
     currentStagingAreaImage,
     shouldShowStagingImage,
   } = useAppSelector(selector);
+
+  const { t } = useTranslation();
 
   const handleMouseOver = useCallback(() => {
     dispatch(setShouldShowStagingOutline(true));
@@ -121,31 +124,31 @@ const IAICanvasStagingAreaToolbar = () => {
     >
       <ButtonGroup isAttached>
         <IAIIconButton
-          tooltip="Previous (Left)"
-          aria-label="Previous (Left)"
+          tooltip={`${t('unifiedcanvas:previous')} (Left)`}
+          aria-label={`${t('unifiedcanvas:previous')} (Left)`}
           icon={<FaArrowLeft />}
           onClick={handlePrevImage}
           data-selected={true}
           isDisabled={isOnFirstImage}
         />
         <IAIIconButton
-          tooltip="Next (Right)"
-          aria-label="Next (Right)"
+          tooltip={`${t('unifiedcanvas:next')} (Right)`}
+          aria-label={`${t('unifiedcanvas:next')} (Right)`}
           icon={<FaArrowRight />}
           onClick={handleNextImage}
           data-selected={true}
           isDisabled={isOnLastImage}
         />
         <IAIIconButton
-          tooltip="Accept (Enter)"
-          aria-label="Accept (Enter)"
+          tooltip={`${t('unifiedcanvas:accept')} (Enter)`}
+          aria-label={`${t('unifiedcanvas:accept')} (Enter)`}
           icon={<FaCheck />}
           onClick={handleAccept}
           data-selected={true}
         />
         <IAIIconButton
-          tooltip="Show/Hide"
-          aria-label="Show/Hide"
+          tooltip={t('unifiedcanvas:showHide')}
+          aria-label={t('unifiedcanvas:showHide')}
           data-alert={!shouldShowStagingImage}
           icon={shouldShowStagingImage ? <FaEye /> : <FaEyeSlash />}
           onClick={() =>
@@ -154,8 +157,8 @@ const IAICanvasStagingAreaToolbar = () => {
           data-selected={true}
         />
         <IAIIconButton
-          tooltip="Save to Gallery"
-          aria-label="Save to Gallery"
+          tooltip={t('unifiedcanvas:saveToGallery')}
+          aria-label={t('unifiedcanvas:saveToGallery')}
           icon={<FaSave />}
           onClick={() =>
             dispatch(
@@ -165,8 +168,8 @@ const IAICanvasStagingAreaToolbar = () => {
           data-selected={true}
         />
         <IAIIconButton
-          tooltip="Discard All"
-          aria-label="Discard All"
+          tooltip={t('unifiedcanvas:discardAll')}
+          aria-label={t('unifiedcanvas:discardAll')}
           icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
           onClick={() => dispatch(discardStagedImages())}
           data-selected={true}
