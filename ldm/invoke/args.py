@@ -501,6 +501,13 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
+            '--internet',
+            action=argparse.BooleanOptionalAction,
+            dest='internet_available',
+            default=True,
+            help='Indicate whether internet is available for just-in-time model downloading (default: probe automatically).',
+        )
+        model_group.add_argument(
             '--nsfw_checker',
             '--safety_checker',
             action=argparse.BooleanOptionalAction,

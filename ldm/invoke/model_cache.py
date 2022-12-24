@@ -22,7 +22,7 @@ from typing import Union
 import torch
 import transformers
 from diffusers import AutoencoderKL, logging as dlogging
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, logging as hlogging
 from huggingface_hub.utils import RevisionNotFoundError
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
@@ -355,7 +355,7 @@ class ModelCache(object):
         # TODO: scan weights maybe?
         pipeline_args = dict(
             safety_checker=None,
-            #local_files_only=True
+            local_files_only=not Globals.internet_available
         )
         if 'vae' in mconfig:
              vae = self._load_vae(mconfig['vae'])
@@ -397,7 +397,7 @@ class ModelCache(object):
         width = pipeline.unet.config.sample_size * pipeline.vae_scale_factor
         height = width
 
-        print(f'  | default image dimensions = {width} x {height}')
+        print(f'  | Default image dimensions = {width} x {height}')
 
         return pipeline, width, height, model_hash
 
@@ -660,11 +660,14 @@ class ModelCache(object):
         vae_args = {}
         name_or_path = self.model_name_or_path(vae_config)
         using_fp16 = self.precision == 'float16'
-        vae_args.update(cache_dir=os.path.join(Globals.root,'models',name_or_path))
+                
+        vae_args.update(
+            cache_dir=os.path.join(Globals.root,'models',name_or_path),
+            local_files_only=not Globals.internet_available,
+        )
         
         print(f'  | Loading diffusers VAE from {name_or_path}')
         if using_fp16:
-            print(f'  | Using faster float16 precision')
             vae_args.update(torch_dtype=torch.float16)
             fp_args_list = [{'revision':'fp16'},{}]
         else:
@@ -672,6 +675,8 @@ class ModelCache(object):
             fp_args_list = [{}]
 
         vae = None
+        deferred_error = None
+
         for fp_args in fp_args_list:
             # At some point we might need to be able to use different classes here? But for now I think
             # all Stable Diffusion VAE are AutoencoderKL.
@@ -681,9 +686,12 @@ class ModelCache(object):
                 if str(e).startswith('fp16 is not a valid'):
                     print(f'  | Half-precision version of model not available; fetching full-precision instead')
                 else:
-                    print(f'** An unexpected error occurred while downloading the model: {e})')
+                    deferred_error = e
             if vae:
                 break
+
+        if not vae and deferred_error:
+            print(f'** Could not load VAE {name_or_path}: {str(deferred_error)}')
 
         # comment by lstein: I don't know what this does
         if 'subfolder' in vae_config:

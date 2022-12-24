@@ -38,6 +38,10 @@ Globals.try_patchmatch = True
 # Use CPU even if GPU is available (main use case is for debugging MPS issues)
 Globals.always_use_cpu = False
 
+# Whether the internet is reachable for dynamic downloads
+# The CLI will test connectivity at startup time.
+Globals.internet_available = True
+
 def global_config_dir()->str:
     return Path(Globals.root, Globals.config_dir)
 

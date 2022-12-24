@@ -48,6 +48,8 @@ def main():
     # alert - setting a global here
     Globals.try_patchmatch = args.patchmatch
     Globals.always_use_cpu = args.always_use_cpu
+    Globals.internet_available = args.internet_available and check_internet()
+    print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
@@ -1003,3 +1005,16 @@ def emergency_model_reconfigure(opt):
 
     import configure_invokeai
     configure_invokeai.main()
+
+def check_internet()->bool:
+    '''
+    Return true if the internet is reachable.
+    It does this by pinging huggingface.co.
+    '''
+    import urllib.request
+    host = 'http://huggingface.co'
+    try:
+        urllib.request.urlopen(host,timeout=1)
+        return True
+    except:
+        return False
