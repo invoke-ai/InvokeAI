@@ -243,7 +243,9 @@ class ModelCache(object):
             print(f'>> Loading {model_name} from {weights}')
             model, width, height, model_hash = self._load_ckpt_model(model_name, mconfig)
         elif model_format == 'diffusers':
-            model, width, height, model_hash = self._load_diffusers_model(mconfig)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                model, width, height, model_hash = self._load_diffusers_model(mconfig)
         else:
             raise NotImplementedError(f"Unknown model format {model_name}: {model_format}")
 

@@ -19,7 +19,7 @@ dependencies:
   # sed -E 's/invokeai/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
   # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
   # ```
-
+  - accelerate
   - albumentations=1.2
   - coloredlogs=15.0
   - diffusers~=0.11
@@ -44,6 +44,7 @@ dependencies:
   - pudb=2019.2
   - protobuf=3.20
   - py-opencv=4.6
+  - safetensors
   - scipy=1.9
   - streamlit=1.12
   - sympy=1.10

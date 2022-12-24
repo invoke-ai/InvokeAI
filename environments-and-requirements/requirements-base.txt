@@ -1,4 +1,5 @@
 # pip will resolve the version which matches torch
+accelerate
 albumentations
 diffusers[torch]~=0.11
 einops
@@ -25,6 +26,7 @@ pyreadline3
 pytorch-lightning==1.7.7
 realesrgan
 requests==2.25.1
+safetensors
 scikit-image>=0.19
 send2trash
 streamlit

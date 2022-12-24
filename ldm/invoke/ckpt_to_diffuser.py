@@ -942,5 +942,5 @@ def convert_ckpt_to_diffuser(checkpoint_path:str,
 
     pipe.save_pretrained(
         dump_path,
-#        safe_serialization=1,                 
+        safe_serialization=1,                 
     )

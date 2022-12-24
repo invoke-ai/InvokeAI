@@ -21,7 +21,7 @@ inpainting-1.5:
    height: 512
 stable-diffusion-1.4:
    description: The original Stable Diffusion version 1.4 weight file (4.27 GB)
-   repo_id: CompVis/stable-diffusion-v-1-4-original
+   repo_id: CompVis/stable-diffusion-v1-4
    recommended: False
    format: diffusers
    vae:
@@ -77,6 +77,24 @@ voxel_art-1.0:
    format: ckpt
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
+   recommended: False
+   width: 512
+   height: 512
+ft-mse-improved-autoencoder-840000:
+   description: StabilityAI improved autoencoder fine-tuned for human faces for legacy .ckpt models only (335 MB)
+   repo_id: stabilityai/sd-vae-ft-mse-original
+   format: ckpt
+   config: VAE/default
+   file: vae-ft-mse-840000-ema-pruned.ckpt
+   recommended: True
+   width: 512
+   height: 512
+trinart_vae:
+   description: Custom autoencoder for trinart_characters for legacy .ckpt models only (335 MB)
+   repo_id: naclbit/trinart_characters_19.2m_stable_diffusion_v1
+   config: VAE/trinart
+   format: ckpt
+   file: autoencoder_fix_kl-f8-trinart_characters.ckpt
    recommended: False
    width: 512
    height: 512

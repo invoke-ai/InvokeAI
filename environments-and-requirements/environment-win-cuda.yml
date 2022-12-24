@@ -12,6 +12,7 @@ dependencies:
   - pytorch=1.12.1
   - cudatoolkit=11.6
   - pip:
+    - accelerate
     - albumentations==0.4.3
     - diffusers~=0.11
     - einops==0.3.0
@@ -31,6 +32,7 @@ dependencies:
     - pyreadline3
     - pytorch-lightning==1.7.7
     - realesrgan
+    - safetensors
     - send2trash==1.8.0
     - streamlit==1.12.0
     - taming-transformers-rom1504
