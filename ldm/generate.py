@@ -790,10 +790,10 @@ class Generate:
         return self._load_generator('.txt2img2img','Txt2Img2Img')
 
     def _make_inpaint(self):
-        return self._load_generator('inpaint','Inpaint')
+        return self._load_generator('.inpaint','Inpaint')
 
     def _make_omnibus(self):
-        return self._load_generator('omnibus','Omnibus')
+        return self._load_generator('.omnibus','Omnibus')
 
     def _load_generator(self, module, class_name):
         if self.is_legacy_model(self.model_name):
