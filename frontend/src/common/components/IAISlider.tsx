@@ -50,6 +50,7 @@ export type IAIFullSliderProps = {
   isInputDisabled?: boolean;
   tooltipSuffix?: string;
   hideTooltip?: boolean;
+  isCompact?: boolean;
   styleClass?: string;
   sliderFormControlProps?: FormControlProps;
   sliderFormLabelProps?: FormLabelProps;
@@ -83,6 +84,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
     inputReadOnly = true,
     withReset = false,
     hideTooltip = false,
+    isCompact = false,
     handleReset,
     isResetDisabled,
     isSliderDisabled,
@@ -142,6 +144,18 @@ export default function IAISlider(props: IAIFullSliderProps) {
           : `invokeai__slider-component`
       }
       data-markers={withSliderMarks}
+      style={
+        isCompact
+          ? {
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              columnGap: '1rem',
+              margin: 0,
+              padding: 0,
+            }
+          : {}
+      }
       {...sliderFormControlProps}
     >
       <FormLabel

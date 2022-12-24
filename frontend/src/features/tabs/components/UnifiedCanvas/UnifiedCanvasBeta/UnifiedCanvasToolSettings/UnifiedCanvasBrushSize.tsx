@@ -51,6 +51,7 @@ export default function UnifiedCanvasBrushSize() {
       sliderNumberInputProps={{ max: 500 }}
       inputReadOnly={false}
       width={'100px'}
+      isCompact
     />
   );
 }
