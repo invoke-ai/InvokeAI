@@ -5,7 +5,7 @@ import PIL.Image
 import torch
 
 from .base import Generator
-from .diffusers_pipeline import StableDiffusionGeneratorPipeline
+from .diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
 
 
 class Txt2Img(Generator):
@@ -24,6 +24,7 @@ class Txt2Img(Generator):
         """
         self.perlin = perlin
         uc, c, extra_conditioning_info   = conditioning
+        conditioning_data = ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
@@ -33,11 +34,8 @@ class Txt2Img(Generator):
             pipeline_output = pipeline.image_from_embeddings(
                 latents=x_T,
                 num_inference_steps=steps,
-                text_embeddings=c,
-                unconditioned_embeddings=uc,
-                guidance_scale=cfg_scale,
-                callback=step_callback,
-                extra_conditioning_info=extra_conditioning_info
+                conditioning_data=conditioning_data,
+                callback=step_callback
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
             )

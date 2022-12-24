@@ -8,7 +8,8 @@ from typing import Callable, Optional
 import torch
 
 from ldm.invoke.generator.base import Generator
-from ldm.invoke.generator.diffusers_pipeline import trim_to_multiple_of, StableDiffusionGeneratorPipeline
+from ldm.invoke.generator.diffusers_pipeline import trim_to_multiple_of, StableDiffusionGeneratorPipeline, \
+    ConditioningData
 
 
 class Txt2Img2Img(Generator):
@@ -25,6 +26,7 @@ class Txt2Img2Img(Generator):
         kwargs are 'width' and 'height'
         """
         uc, c, extra_conditioning_info = conditioning
+        conditioning_data = ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
         scale_dim = min(width, height)
         scale = 512 / scale_dim
 
@@ -39,11 +41,8 @@ class Txt2Img2Img(Generator):
             first_pass_latent_output, _ = pipeline.latents_from_embeddings(
                 latents=x_T,
                 num_inference_steps=steps,
-                text_embeddings=c,
-                unconditioned_embeddings=uc,
-                guidance_scale=cfg_scale,
+                conditioning_data=conditioning_data,
                 callback=step_callback,
-                extra_conditioning_info=extra_conditioning_info,
                 # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
             )
@@ -62,10 +61,8 @@ class Txt2Img2Img(Generator):
             pipeline_output = pipeline.img2img_from_latents_and_embeddings(
                 resized_latents,
                 num_inference_steps=steps,
-                text_embeddings=c,
-                unconditioned_embeddings=uc,
-                guidance_scale=cfg_scale, strength=strength,
-                extra_conditioning_info=extra_conditioning_info,
+                conditioning_data=conditioning_data,
+                strength=strength,
                 noise_func=self.get_noise_like,
                 callback=step_callback)
 

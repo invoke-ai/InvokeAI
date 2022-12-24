@@ -5,7 +5,7 @@ ldm.invoke.generator.img2img descends from ldm.invoke.generator
 import torch
 
 from ldm.invoke.generator.base import Generator
-from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
 
 
 class Img2Img(Generator):
@@ -24,6 +24,7 @@ class Img2Img(Generator):
         self.perlin = perlin
 
         uc, c, extra_conditioning_info   = conditioning
+        conditioning_data = ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
@@ -32,8 +33,7 @@ class Img2Img(Generator):
         def make_image(x_T):
             # FIXME: use x_T for initial seeded noise
             pipeline_output = pipeline.img2img_from_embeddings(
-                init_image, strength, steps, c, uc, cfg_scale,
-                extra_conditioning_info=extra_conditioning_info,
+                init_image, strength, steps, conditioning_data,
                 noise_func=self.get_noise_like,
                 callback=step_callback
             )

@@ -11,7 +11,8 @@ import numpy as np
 import torch
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 
-from ldm.invoke.generator.diffusers_pipeline import image_resized_to_grid_as_tensor, StableDiffusionGeneratorPipeline
+from ldm.invoke.generator.diffusers_pipeline import image_resized_to_grid_as_tensor, StableDiffusionGeneratorPipeline, \
+    ConditioningData
 from ldm.invoke.generator.img2img import Img2Img
 from ldm.invoke.patchmatch import PatchMatch
 from ldm.util import debug_image
@@ -242,6 +243,7 @@ class Inpaint(Img2Img):
 
         # todo: support cross-attention control
         uc, c, _ = conditioning
+        conditioning_data = ConditioningData(uc, c, cfg_scale)
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
@@ -262,9 +264,7 @@ class Inpaint(Img2Img):
                 mask=1 - mask,  # expects white means "paint here."
                 strength=strength,
                 num_inference_steps=steps,
-                text_embeddings=c,
-                unconditioned_embeddings=uc,
-                guidance_scale=cfg_scale,
+                conditioning_data=conditioning_data,
                 noise_func=self.get_noise_like,
                 callback=step_callback,
             )
