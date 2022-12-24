@@ -6,7 +6,7 @@ import torch
 
 from ldm.invoke.generator.base import Generator
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
-
+from diffusers import logging
 
 class Img2Img(Generator):
     def __init__(self, model, precision):
@@ -34,6 +34,7 @@ class Img2Img(Generator):
             # FIXME: use x_T for initial seeded noise
             # We're not at the moment because the pipeline automatically resizes init_image if
             # necessary, which the x_T input might not match.
+            logging.set_verbosity_error()   # quench safety check warnings
             pipeline_output = pipeline.img2img_from_embeddings(
                 init_image, strength, steps, conditioning_data,
                 noise_func=self.get_noise_like,
