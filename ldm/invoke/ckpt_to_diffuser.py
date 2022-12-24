@@ -940,4 +940,7 @@ def convert_ckpt_to_diffuser(checkpoint_path:str,
         tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
         pipe = LDMTextToImagePipeline(vqvae=vae, bert=text_model, tokenizer=tokenizer, unet=unet, scheduler=scheduler)
 
-    pipe.save_pretrained(dump_path)
+    pipe.save_pretrained(
+        dump_path,
+#        safe_serialization=1,                 
+    )

@@ -356,8 +356,8 @@ class ModelCache(object):
             #local_files_only=True
         )
         if 'vae' in mconfig:
-            vae = self._load_vae(mconfig['vae'])
-            pipeline_args.update(vae=vae)
+             vae = self._load_vae(mconfig['vae'])
+             pipeline_args.update(vae=vae)
         if not isinstance(name_or_path,Path):
             pipeline_args.update(cache_dir=os.path.join(Globals.root,'models',name_or_path))
         if using_fp16:
@@ -391,8 +391,9 @@ class ModelCache(object):
 
         pipeline.to(self.device)
 
-        width = pipeline.vae.block_out_channels[-2]
-        height = pipeline.vae.block_out_channels[-1]
+        # square images???
+        width = pipeline.unet.config.sample_size * pipeline.vae_scale_factor
+        height = width
 
         print(f'  | default image dimensions = {width} x {height}')
 
@@ -657,7 +658,8 @@ class ModelCache(object):
         vae_args = {}
         name_or_path = self.model_name_or_path(vae_config)
         using_fp16 = self.precision == 'float16'
-
+        vae_args.update(cache_dir=os.path.join(Globals.root,'models',name_or_path))
+        
         print(f'  | Loading diffusers VAE from {name_or_path}')
         if using_fp16:
             print(f'  | Using faster float16 precision')
