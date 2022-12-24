@@ -14,6 +14,7 @@ import { tabDict } from 'features/tabs/components/InvokeTabs';
 import ImageUploadOverlay from './ImageUploadOverlay';
 import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
 import useImageUploader from 'common/hooks/useImageUploader';
+import { useTranslation } from 'react-i18next';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -24,6 +25,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
   const toast = useToast({});
+  const { t } = useTranslation();
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const { setOpenUploader } = useImageUploader();
 
@@ -35,13 +37,13 @@ const ImageUploader = (props: ImageUploaderProps) => {
         ''
       );
       toast({
-        title: 'Upload failed',
+        title: t('toast:uploadFailed'),
         description: msg,
         status: 'error',
         isClosable: true,
       });
     },
-    [toast]
+    [t, toast]
   );
 
   const fileAcceptedCallback = useCallback(
@@ -103,8 +105,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
       if (imageItems.length > 1) {
         toast({
-          description:
-            'Multiple images pasted, may only upload one image at a time',
+          description: t('toast:uploadFailedMultipleImagesDesc'),
           status: 'error',
           isClosable: true,
         });
@@ -115,7 +116,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
       if (!file) {
         toast({
-          description: 'Unable to load file',
+          description: t('toast:uploadFailedUnableToLoadDesc'),
           status: 'error',
           isClosable: true,
         });
@@ -128,7 +129,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     return () => {
       document.removeEventListener('paste', pasteImageListener);
     };
-  }, [dispatch, toast, activeTabName]);
+  }, [t, dispatch, toast, activeTabName]);
 
   const overlaySecondaryText = ['img2img', 'unifiedCanvas'].includes(
     activeTabName

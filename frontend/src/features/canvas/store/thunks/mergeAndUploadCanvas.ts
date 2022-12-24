@@ -16,6 +16,7 @@ import {
 import { addImage } from 'features/gallery/store/gallerySlice';
 import { setMergedCanvas } from '../canvasSlice';
 import { CanvasState } from '../canvasTypes';
+import i18n from 'i18n';
 
 type MergeAndUploadCanvasConfig = {
   cropVisible?: boolean;
@@ -114,7 +115,7 @@ export const mergeAndUploadCanvas =
       downloadFile(url);
       dispatch(
         addToast({
-          title: 'Image Download Started',
+          title: i18n.t('toast:downloadImageStarted'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -126,7 +127,7 @@ export const mergeAndUploadCanvas =
       copyImage(url, width, height);
       dispatch(
         addToast({
-          title: 'Image Copied',
+          title: i18n.t('toast:imageCopied'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -138,7 +139,7 @@ export const mergeAndUploadCanvas =
       dispatch(addImage({ image: newImage, category: 'result' }));
       dispatch(
         addToast({
-          title: 'Image Saved to Gallery',
+          title: i18n.t('toast:imageSavedToGallery'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -157,7 +158,7 @@ export const mergeAndUploadCanvas =
       );
       dispatch(
         addToast({
-          title: 'Canvas Merged',
+          title: i18n.t('toast:canvasMerged'),
           status: 'success',
           duration: 2500,
           isClosable: true,
@@ -166,6 +167,6 @@ export const mergeAndUploadCanvas =
     }
 
     dispatch(setIsProcessing(false));
-    dispatch(setCurrentStatus('Connected'));
+    dispatch(setCurrentStatus(i18n.t('common:statusConnected')));
     dispatch(setIsCancelable(true));
   };

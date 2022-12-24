@@ -1,7 +1,6 @@
 .invokeai__slider-component {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
+  padding-bottom: 0.5rem;
+  border-radius: 0.5rem;
 
   .invokeai__slider-component-label {
     min-width: max-content;
@@ -26,7 +25,7 @@
   .invokeai__slider-mark {
     font-size: 0.75rem;
     font-weight: bold;
-    color: var(--slider-color);
+    color: var(--slider-mark-color);
     margin-top: 0.3rem;
   }
 

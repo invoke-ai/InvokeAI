@@ -20,6 +20,7 @@ import {
 import { systemSelector } from 'features/system/store/systemSelectors';
 import _ from 'lodash';
 import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import InpaintReplace from './InpaintReplace';
 
 const selector = createSelector(
@@ -60,6 +61,8 @@ const InfillAndScalingOptions = () => {
     isManual,
     scaledBoundingBoxDimensions,
   } = useAppSelector(selector);
+
+  const { t } = useTranslation();
 
   const handleChangeScaledWidth = (v: number) => {
     dispatch(
@@ -106,7 +109,7 @@ const InfillAndScalingOptions = () => {
   return (
     <Flex direction="column" gap="1rem">
       <IAISelect
-        label={'Scale Before Processing'}
+        label={t('options:scaleBeforeProcessing')}
         validValues={BOUNDING_BOX_SCALES_DICT}
         value={boundingBoxScale}
         onChange={handleChangeBoundingBoxScaleMethod}
@@ -115,7 +118,7 @@ const InfillAndScalingOptions = () => {
         isInputDisabled={!isManual}
         isResetDisabled={!isManual}
         isSliderDisabled={!isManual}
-        label={'Scaled W'}
+        label={t('options:scaledWidth')}
         min={64}
         max={1024}
         step={64}
@@ -131,7 +134,7 @@ const InfillAndScalingOptions = () => {
         isInputDisabled={!isManual}
         isResetDisabled={!isManual}
         isSliderDisabled={!isManual}
-        label={'Scaled H'}
+        label={t('options:scaledHeight')}
         min={64}
         max={1024}
         step={64}
@@ -145,7 +148,7 @@ const InfillAndScalingOptions = () => {
       />
       <InpaintReplace />
       <IAISelect
-        label="Infill Method"
+        label={t('options:infillMethod')}
         value={infillMethod}
         validValues={availableInfillMethods}
         onChange={(e) => dispatch(setInfillMethod(e.target.value))}
@@ -155,7 +158,7 @@ const InfillAndScalingOptions = () => {
         isResetDisabled={infillMethod !== 'tile'}
         isSliderDisabled={infillMethod !== 'tile'}
         sliderMarkRightOffset={-4}
-        label={'Tile Size'}
+        label={t('options:tileSize')}
         min={16}
         max={64}
         sliderNumberInputProps={{ max: 256 }}
