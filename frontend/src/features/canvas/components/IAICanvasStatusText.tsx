@@ -4,6 +4,7 @@ import _ from 'lodash';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
 import roundToHundreth from '../util/roundToHundreth';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [canvasSelector],
@@ -79,33 +80,45 @@ const IAICanvasStatusText = () => {
     shouldShowBoundingBox,
   } = useAppSelector(selector);
 
+  const { t } = useTranslation();
+
   return (
     <div className="canvas-status-text">
       <div
         style={{
           color: activeLayerColor,
         }}
-      >{`Active Layer: ${activeLayerString}`}</div>
-      <div>{`Canvas Scale: ${canvasScaleString}%`}</div>
+      >{`${t('unifiedcanvas:activeLayer')}: ${activeLayerString}`}</div>
+      <div>{`${t('unifiedcanvas:canvasScale')}: ${canvasScaleString}%`}</div>
       {shouldShowBoundingBox && (
         <div
           style={{
             color: boundingBoxColor,
           }}
-        >{`Bounding Box: ${boundingBoxDimensionsString}`}</div>
+        >{`${t(
+          'unifiedcanvas:boundingBox'
+        )}: ${boundingBoxDimensionsString}`}</div>
       )}
       {shouldShowScaledBoundingBox && (
         <div
           style={{
             color: boundingBoxColor,
           }}
-        >{`Scaled Bounding Box: ${scaledBoundingBoxDimensionsString}`}</div>
+        >{`${t(
+          'unifiedcanvas:scaledBoundingBox'
+        )}: ${scaledBoundingBoxDimensionsString}`}</div>
       )}
       {shouldShowCanvasDebugInfo && (
         <>
-          <div>{`Bounding Box Position: ${boundingBoxCoordinatesString}`}</div>
-          <div>{`Canvas Dimensions: ${canvasDimensionsString}`}</div>
-          <div>{`Canvas Position: ${canvasCoordinatesString}`}</div>
+          <div>{`${t(
+            'unifiedcanvas:boundingBoxPosition'
+          )}: ${boundingBoxCoordinatesString}`}</div>
+          <div>{`${t(
+            'unifiedcanvas:canvasDimensions'
+          )}: ${canvasDimensionsString}`}</div>
+          <div>{`${t(
+            'unifiedcanvas:canvasPosition'
+          )}: ${canvasCoordinatesString}`}</div>
           <IAICanvasStatusTextCursorPos />
         </>
       )}

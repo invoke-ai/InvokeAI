@@ -1,0 +1,13 @@
+{
+  "models": "Models",
+  "displayInProgress": "Bilder in Bearbeitung anzeigen",
+  "saveSteps": "Speichern der Bilder alle n Schritte",
+  "confirmOnDelete": "Bestätigen beim Löschen",
+  "displayHelpIcons": "Hilfesymbole anzeigen",
+  "useCanvasBeta": "Canvas Beta Layout verwenden",
+  "enableImageDebugging": "Bild-Debugging aktivieren",
+  "resetWebUI": "Web-Oberfläche zurücksetzen",
+  "resetWebUIDesc1": "Das Zurücksetzen der Web-Oberfläche setzt nur den lokalen Cache des Browsers mit Ihren Bildern und gespeicherten Einstellungen zurück. Es werden keine Bilder von der Festplatte gelöscht.",
+  "resetWebUIDesc2": "Wenn die Bilder nicht in der Galerie angezeigt werden oder etwas anderes nicht funktioniert, versuchen Sie bitte, die Einstellungen zurückzusetzen, bevor Sie einen Fehler auf GitHub melden.",
+  "resetComplete": "Die Web-Oberfläche wurde zurückgesetzt. Aktualisieren Sie die Seite, um sie neu zu laden."
+}

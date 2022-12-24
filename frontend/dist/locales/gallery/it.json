@@ -1,0 +1,16 @@
+{
+  "generations": "Generazioni",
+  "showGenerations": "Mostra Generazioni",
+  "uploads": "Caricamenti",
+  "showUploads": "Mostra caricamenti",
+  "galleryImageSize": "Dimensione dell'immagine",
+  "galleryImageResetSize": "Ripristina dimensioni",
+  "gallerySettings": "Impostazioni della galleria",
+  "maintainAspectRatio": "Mantenere le proporzioni",
+  "autoSwitchNewImages": "Passaggio automatico a nuove immagini",
+  "singleColumnLayout": "Layout a colonna singola",
+  "pinGallery": "Blocca la galleria",
+  "allImagesLoaded": "Tutte le immagini caricate",
+  "loadMore": "Carica di più",
+  "noImagesInGallery": "Nessuna immagine nella galleria"
+}

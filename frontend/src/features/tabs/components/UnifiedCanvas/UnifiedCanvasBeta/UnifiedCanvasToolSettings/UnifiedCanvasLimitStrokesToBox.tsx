@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { setShouldRestrictStrokesToBox } from 'features/canvas/store/canvasSlice';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function UnifiedCanvasLimitStrokesToBox() {
   const dispatch = useAppDispatch();
@@ -11,9 +12,11 @@ export default function UnifiedCanvasLimitStrokesToBox() {
     (state: RootState) => state.canvas.shouldRestrictStrokesToBox
   );
 
+  const { t } = useTranslation();
+
   return (
     <IAICheckbox
-      label="Limit To Box"
+      label={t('unifiedcanvas:betaLimitToBox')}
       isChecked={shouldRestrictStrokesToBox}
       onChange={(e) =>
         dispatch(setShouldRestrictStrokesToBox(e.target.checked))

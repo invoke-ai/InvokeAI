@@ -28,7 +28,7 @@ const IAISelect = (props: IAISelectProps) => {
     tooltip,
     tooltipProps,
     size = 'sm',
-    fontSize = 'md',
+    fontSize = 'sm',
     styleClass,
     ...rest
   } = props;
@@ -47,8 +47,9 @@ const IAISelect = (props: IAISelectProps) => {
         <FormLabel
           className="invokeai__select-label"
           fontSize={fontSize}
-          marginBottom={1}
-          flexGrow={2}
+          fontWeight="bold"
+          marginRight={0}
+          marginBottom={0}
           whiteSpace="nowrap"
         >
           {label}

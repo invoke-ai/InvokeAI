@@ -42,6 +42,7 @@ import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
 import IAIButton from 'common/components/IAIButton';
 import { InvokeTabName } from 'features/tabs/tabMap';
+import { useTranslation } from 'react-i18next';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 const GALLERY_IMAGE_WIDTH_OFFSET = 40;
@@ -62,6 +63,8 @@ const LIGHTBOX_GALLERY_WIDTH = 400;
 
 export default function ImageGallery() {
   const dispatch = useAppDispatch();
+
+  const { t } = useTranslation();
 
   const {
     images,
@@ -395,28 +398,28 @@ export default function ImageGallery() {
                     data-selected={currentCategory === 'result'}
                     onClick={() => dispatch(setCurrentCategory('result'))}
                   >
-                    Generations
+                    {t('gallery:generations')}
                   </IAIButton>
                   <IAIButton
                     size={'sm'}
                     data-selected={currentCategory === 'user'}
                     onClick={() => dispatch(setCurrentCategory('user'))}
                   >
-                    Uploads
+                    {t('gallery:uploads')}
                   </IAIButton>
                 </>
               ) : (
                 <>
                   <IAIIconButton
-                    aria-label="Show Generations"
-                    tooltip="Show Generations"
+                    aria-label={t('gallery:showGenerations')}
+                    tooltip={t('gallery:showGenerations')}
                     data-selected={currentCategory === 'result'}
                     icon={<FaImage />}
                     onClick={() => dispatch(setCurrentCategory('result'))}
                   />
                   <IAIIconButton
-                    aria-label="Show Uploads"
-                    tooltip="Show Uploads"
+                    aria-label={t('gallery:showUploads')}
+                    tooltip={t('gallery:showUploads')}
                     data-selected={currentCategory === 'user'}
                     icon={<FaUser />}
                     onClick={() => dispatch(setCurrentCategory('user'))}
@@ -433,7 +436,7 @@ export default function ImageGallery() {
                 triggerComponent={
                   <IAIIconButton
                     size={'sm'}
-                    aria-label={'Gallery Settings'}
+                    aria-label={t('gallery:gallerySettings')}
                     icon={<FaWrench />}
                     className="image-gallery-icon-btn"
                     cursor={'pointer'}
@@ -448,12 +451,12 @@ export default function ImageGallery() {
                       min={32}
                       max={256}
                       hideTooltip={true}
-                      label={'Image Size'}
+                      label={t('gallery:galleryImageSize')}
                     />
                     <IAIIconButton
                       size={'sm'}
-                      aria-label={'Reset'}
-                      tooltip={'Reset Size'}
+                      aria-label={t('gallery:galleryImageResetSize')}
+                      tooltip={t('gallery:galleryImageResetSize')}
                       onClick={() => dispatch(setGalleryImageMinimumWidth(64))}
                       icon={<BiReset />}
                       data-selected={shouldPinGallery}
@@ -462,7 +465,7 @@ export default function ImageGallery() {
                   </div>
                   <div>
                     <IAICheckbox
-                      label="Maintain Aspect Ratio"
+                      label={t('gallery:maintainAspectRatio')}
                       isChecked={galleryImageObjectFit === 'contain'}
                       onChange={() =>
                         dispatch(
@@ -477,7 +480,7 @@ export default function ImageGallery() {
                   </div>
                   <div>
                     <IAICheckbox
-                      label="Auto-Switch to New Images"
+                      label={t('gallery:autoSwitchNewImages')}
                       isChecked={shouldAutoSwitchToNewImages}
                       onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         dispatch(
@@ -488,7 +491,7 @@ export default function ImageGallery() {
                   </div>
                   <div>
                     <IAICheckbox
-                      label="Single Column Layout"
+                      label={t('gallery:singleColumnLayout')}
                       isChecked={shouldUseSingleGalleryColumn}
                       onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         dispatch(
@@ -503,8 +506,8 @@ export default function ImageGallery() {
               <IAIIconButton
                 size={'sm'}
                 className={'image-gallery-icon-btn'}
-                aria-label={'Pin Gallery'}
-                tooltip={'Pin Gallery (Shift+G)'}
+                aria-label={t('gallery:pinGallery')}
+                tooltip={`${t('gallery:pinGallery')} (Shift+G)`}
                 onClick={handleSetShouldPinGallery}
                 icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
               />
@@ -534,13 +537,15 @@ export default function ImageGallery() {
                   isDisabled={!areMoreImagesAvailable}
                   className="image-gallery-load-more-btn"
                 >
-                  {areMoreImagesAvailable ? 'Load More' : 'All Images Loaded'}
+                  {areMoreImagesAvailable
+                    ? t('gallery:loadMore')
+                    : t('gallery:allImagesLoaded')}
                 </Button>
               </>
             ) : (
               <div className="image-gallery-container-placeholder">
                 <MdPhotoLibrary />
-                <p>No Images In Gallery</p>
+                <p>{t('gallery:noImagesInGallery')}</p>
               </div>
             )}
           </div>
