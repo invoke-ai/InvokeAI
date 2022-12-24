@@ -1,0 +1,16 @@
+.add-model-modal {
+  display: flex;
+}
+
+.add-model-modal-body {
+  display: flex;
+  flex-direction: column;
+  row-gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.add-model-form {
+  display: flex;
+  flex-direction: column;
+  row-gap: 0.5rem;
+}
