@@ -721,9 +721,15 @@ class Args(object):
                 invoke> !fix 0000045.4829112.png -G1 -U4 -ft codeformer
 
             *History manipulation*
-            !fetch retrieves the command used to generate an earlier image.
+            !fetch retrieves the command used to generate an earlier image. Provide
+            a directory wildcard and the name of a file to write and all the commands
+            used to generate the images in the directory will be written to that file.
                 invoke> !fetch 0000015.8929913.png
                 invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
+                invoke> !fetch /path/to/images/*.png prompts.txt
+ 
+            !replay /path/to/prompts.txt
+            Replays all the prompts contained in the file prompts.txt.
 
             !history lists all the commands issued during the current session.
 
