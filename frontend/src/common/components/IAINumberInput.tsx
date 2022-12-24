@@ -44,7 +44,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
 const IAINumberInput = (props: Props) => {
   const {
     label,
-    labelFontSize = '1rem',
+    labelFontSize = 'sm',
     styleClass,
     isDisabled = false,
     showStepper = true,
@@ -129,7 +129,7 @@ const IAINumberInput = (props: Props) => {
           <FormLabel
             className="invokeai__number-input-form-label"
             style={{ display: label ? 'block' : 'none' }}
-            fontSize="sm"
+            fontSize={labelFontSize}
             fontWeight="bold"
             marginRight={0}
             marginBottom={0}
