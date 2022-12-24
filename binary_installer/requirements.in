@@ -4,7 +4,7 @@
 --trusted-host https://download.pytorch.org
 accelerate~=0.15
 albumentations
-diffusers[torch]~=0.10
+diffusers[torch]~=0.11
 einops
 eventlet
 flask_cors

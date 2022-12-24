@@ -1,6 +1,6 @@
 # pip will resolve the version which matches torch
 albumentations
-diffusers[torch]~=0.10
+diffusers[torch]~=0.11
 einops
 eventlet
 facexlib

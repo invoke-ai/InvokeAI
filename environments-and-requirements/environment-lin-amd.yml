@@ -10,7 +10,7 @@ dependencies:
   - pip:
     - --extra-index-url  https://download.pytorch.org/whl/rocm5.2/
     - albumentations==0.4.3
-    - diffusers~=0.10
+    - diffusers~=0.11
     - einops==0.3.0
     - eventlet
     - flask==2.1.3
