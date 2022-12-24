@@ -507,7 +507,7 @@ export default function ImageGallery() {
                 size={'sm'}
                 className={'image-gallery-icon-btn'}
                 aria-label={t('gallery:pinGallery')}
-                tooltip={`${t('gallery:showGenerations')} (Shift+G)`}
+                tooltip={`${t('gallery:pinGallery')} (Shift+G)`}
                 onClick={handleSetShouldPinGallery}
                 icon={shouldPinGallery ? <BsPinAngleFill /> : <BsPinAngle />}
               />
