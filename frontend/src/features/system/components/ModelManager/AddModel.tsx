@@ -26,9 +26,9 @@ import {
 import React from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { Field, FieldInputProps, Formik, FormikProps } from 'formik';
-import { RootState } from 'app/store';
+import type { RootState } from 'app/store';
 import { addNewModel } from 'app/socketio/actions';
-import { InvokeModelConfigProps } from 'app/invokeai';
+import type { InvokeModelConfigProps } from 'app/invokeai';
 import IAICheckbox from 'common/components/IAICheckbox';
 import IAIButton from 'common/components/IAIButton';
 import SearchModels from './SearchModels';
