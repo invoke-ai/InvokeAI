@@ -165,6 +165,11 @@ export declare type Model = {
   status: ModelStatus;
   description: string;
   weights: string;
+  config?: string;
+  vae?: string;
+  width?: number;
+  height?: number;
+  default?: boolean;
 };
 
 export declare type ModelList = Record<string, Model>;
@@ -258,4 +263,25 @@ export declare type UploadImagePayload = {
 export declare type UploadOutpaintingMergeImagePayload = {
   dataURL: string;
   name: string;
+};
+
+export declare type InvokeModelConfigProps = {
+  name: string;
+  description?: string;
+  config: string;
+  weights: string;
+  vae?: string;
+  width: number;
+  height: number;
+  default?: boolean;
+};
+
+export declare type OnFoundModelResponse = {
+  search_folder: string;
+  found_models: FoundModel[];
+};
+
+export declare type FoundModel = {
+  name: string;
+  location: string;
 };
