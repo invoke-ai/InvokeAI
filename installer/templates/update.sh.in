@@ -6,14 +6,15 @@ if [ $# -ge 1 ] && [ "${1:0:2}" == "-h" ]; then
     echo "Usage: update.sh <release>"
     echo "Updates InvokeAI to use the indicated version of the code base."
     echo "Find the version or branch for the release you want, and pass it as the argument."
-    echo "For example update.sh v2.2.5"
+    echo "For example: update.sh v2.2.5 for release 2.2.5."
+    echo "             update.sh main for the current development version."
     echo ""
-    echo "If no argument provided then will install the most recent development version, equivalent to"
-    echo "update.sh main"
+    echo "If no argument provided then will install the version tagged with 'latest', equivalent to"
+    echo "update.sh latest"
     exit -1
 fi
 
-INVOKE_AI_VERSION=${1:-main}
+INVOKE_AI_VERSION=${1:-latest}
     
 INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive/$INVOKE_AI_VERSION.zip"
 INVOKE_AI_DEP=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/environments-and-requirements/requirements-base.txt
