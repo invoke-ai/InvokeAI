@@ -1,4 +1,4 @@
-import { DeleteIcon } from '@chakra-ui/icons';
+import { EditIcon, DeleteIcon } from '@chakra-ui/icons';
 import {
   Button,
   Flex,
@@ -12,6 +12,7 @@ import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
+import { setOpenModel } from 'features/system/store/systemSlice';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,10 +30,15 @@ export default function ModelListItem(props: ModelListItemProps) {
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
+
   const { name, status, description } = props;
 
   const handleChangeModel = () => {
     dispatch(requestModelChange(name));
+  };
+
+  const openModel = () =>  {
+  dispatch(setOpenModel(name));       
   };
 
   const handleModelDelete = () => {
@@ -68,6 +74,14 @@ export default function ModelListItem(props: ModelListItemProps) {
         >
           {t('modelmanager:load')}
         </Button>
+        <IconButton
+              icon={<EditIcon />}
+              size={'sm'}
+              onClick={openModel}
+              aria-label="Modify Config"
+              isDisabled={status === 'active' || isProcessing || !isConnected}
+              className=" modal-close-btn"
+            />
         <IAIAlertDialog
           title={t('modelmanager:deleteModel')}
           acceptCallback={handleModelDelete}

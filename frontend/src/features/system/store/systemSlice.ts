@@ -49,6 +49,7 @@ export interface SystemState
   toastQueue: UseToastOptions[];
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
+  openModel: string | null,
 }
 
 const initialSystemState: SystemState = {
@@ -86,6 +87,7 @@ const initialSystemState: SystemState = {
   toastQueue: [],
   searchFolder: null,
   foundModels: null,
+  openModel: null,
 };
 
 export const systemSlice = createSlice({
@@ -238,6 +240,9 @@ export const systemSlice = createSlice({
     ) => {
       state.foundModels = action.payload;
     },
+    setOpenModel: (state, action: PayloadAction<string | null>) => {
+      state.openModel = action.payload;
+    },
   },
 });
 
@@ -268,6 +273,7 @@ export const {
   setProcessingIndeterminateTask,
   setSearchFolder,
   setFoundModels,
+  setOpenModel
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
