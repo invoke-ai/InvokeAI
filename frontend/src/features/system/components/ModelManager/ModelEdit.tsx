@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { Field, FieldInputProps, Formik, FormikProps } from 'formik';
-import { RootState, useAppDispatch, useAppSelector } from 'app/store';
+import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks'
 import { addNewModel,  } from 'app/socketio/actions';
 import { InvokeModelConfigProps } from 'app/invokeai';
 import { SystemState } from 'features/system/store/systemSlice';
