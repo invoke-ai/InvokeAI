@@ -134,12 +134,13 @@ class ModelCache(object):
         '''
         models = {}
         for name in self.config:
-            try:
-                description = self.config[name].description
-                weights = self.config[name].weights
-            except ConfigAttributeError:
-                description = '<no description>'
-                weights = '<not found>'
+            description = self.config[name].description if 'description' in self.config[name] else '<no description>'
+            weights = self.config[name].weights if 'weights' in self.config[name] else '<no weights>'
+            config = self.config[name].config if 'config' in self.config[name] else '<no config>'
+            width = self.config[name].width if 'width' in self.config[name] else 512
+            height = self.config[name].height if 'height' in self.config[name] else 512
+            default = self.config[name].default if 'default' in self.config[name] else False
+            vae = self.config[name].vae if 'vae' in self.config[name] else '<no vae>'
 
             if self.current_model == name:
                 status = 'active'
@@ -151,7 +152,12 @@ class ModelCache(object):
             models[name]={
                 'status' : status,
                 'description' : description,
-                'weights': weights
+                'weights': weights,
+                'config': config,
+                'width': width,
+                'height': height,
+                'vae': vae,
+                'default': default
             }
         return models
 
