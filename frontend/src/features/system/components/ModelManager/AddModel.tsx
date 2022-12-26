@@ -97,7 +97,7 @@ export default function AddModel() {
       <Modal
         isOpen={isOpen}
         onClose={addModelModalClose}
-        size="xl"
+        size="3xl"
         closeOnOverlayClick={false}
       >
         <ModalOverlay />
@@ -138,7 +138,7 @@ export default function AddModel() {
                             name="name"
                             type="text"
                             validate={baseValidation}
-                            width="lg"
+                            width="2xl"
                           />
                           {!!errors.name && touched.name ? (
                             <FormErrorMessage>{errors.name}</FormErrorMessage>
@@ -164,7 +164,7 @@ export default function AddModel() {
                             id="description"
                             name="description"
                             type="text"
-                            width="lg"
+                            width="2xl"
                           />
                           {!!errors.description && touched.description ? (
                             <FormErrorMessage>
@@ -192,7 +192,7 @@ export default function AddModel() {
                             id="config"
                             name="config"
                             type="text"
-                            width="lg"
+                            width="2xl"
                           />
                           {!!errors.config && touched.config ? (
                             <FormErrorMessage>{errors.config}</FormErrorMessage>
@@ -218,7 +218,7 @@ export default function AddModel() {
                             id="weights"
                             name="weights"
                             type="text"
-                            width="lg"
+                            width="2xl"
                           />
                           {!!errors.weights && touched.weights ? (
                             <FormErrorMessage>
@@ -243,7 +243,7 @@ export default function AddModel() {
                             id="vae"
                             name="vae"
                             type="text"
-                            width="lg"
+                            width="2xl"
                           />
                           {!!errors.vae && touched.vae ? (
                             <FormErrorMessage>{errors.vae}</FormErrorMessage>
@@ -278,6 +278,7 @@ export default function AddModel() {
                                   min={MIN_MODEL_SIZE}
                                   max={MAX_MODEL_SIZE}
                                   step={64}
+                                  width="90%"
                                   value={form.values.width}
                                   onChange={(value) =>
                                     form.setFieldValue(
@@ -322,6 +323,7 @@ export default function AddModel() {
                                   name="height"
                                   min={MIN_MODEL_SIZE}
                                   max={MAX_MODEL_SIZE}
+                                  width="90%"
                                   step={64}
                                   value={form.values.height}
                                   onChange={(value) =>

@@ -44,7 +44,11 @@ export default function ModelManagerModal({
         <ModalContent className=" modal">
           <ModalCloseButton className="modal-close-btn" />
           <ModalHeader>{t('modelmanager:modelManager')}</ModalHeader>
-          <Flex padding={'0 2rem 2rem 2rem'} width="100%" columnGap={'2rem'}>
+          <Flex
+            padding={'0 1.5rem 1.5rem 1.5rem'}
+            width="100%"
+            columnGap={'2rem'}
+          >
             <ModelList />
             <ModelEdit />
           </Flex>

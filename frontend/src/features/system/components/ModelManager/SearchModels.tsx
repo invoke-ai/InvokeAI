@@ -228,7 +228,7 @@ export default function SearchModels() {
             style={{
               fontWeight: 'bold',
               fontSize: '0.8rem',
-              backgroundColor: 'var(--background-color-secondary)',
+              backgroundColor: 'var(--accent-color)',
               padding: '0.2rem 1rem',
               width: 'max-content',
               borderRadius: '0.2rem',

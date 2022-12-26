@@ -73,7 +73,7 @@ const ModelList = () => {
   };
 
   return (
-    <Flex flexDirection={'column'} rowGap="2rem" width="45%" minWidth="45%">
+    <Flex flexDirection={'column'} rowGap="2rem" width="50%" minWidth="50%">
       <Flex justifyContent={'space-between'}>
         <Text fontSize={'1.4rem'} fontWeight="bold">
           {t('modelmanager:availableModels')}
