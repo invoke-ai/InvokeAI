@@ -1,0 +1,207 @@
+{
+  "keyboardShortcuts": "快捷方式",
+  "appHotkeys": "应用快捷方式",
+  "generalHotkeys": "一般快捷方式",
+  "galleryHotkeys": "图库快捷方式",
+  "unifiedCanvasHotkeys": "统一画布快捷方式",
+  "invoke": {
+    "title": "Invoke",
+    "desc": "生成图像"
+  },
+  "cancel": {
+    "title": "取消",
+    "desc": "取消图像生成"
+  },
+  "focusPrompt": {
+    "title": "打开提示框",
+    "desc": "打开提示文本框"
+  },
+  "toggleOptions": {
+    "title": "切换选项卡",
+    "desc": "打开或关闭选项卡"
+  },
+  "pinOptions": {
+    "title": "常开选项卡",
+    "desc": "保持选项卡常开"
+  },
+  "toggleViewer": {
+    "title": "切换图像视图",
+    "desc": "打开或关闭图像视图"
+  },
+  "toggleGallery": {
+    "title": "切换图库",
+    "desc": "打开或关闭图库"
+  },
+  "maximizeWorkSpace": {
+    "title": "工作台最大化",
+    "desc": "关闭所有浮窗，将工作区域最大化"
+  },
+  "changeTabs": {
+    "title": "切换卡片",
+    "desc": "切换到另一个工作区"
+  },
+  "consoleToggle": {
+    "title": "切换命令行",
+    "desc": "打开或关闭命令行"
+  },
+  "setPrompt": {
+    "title": "使用提示",
+    "desc": "使用当前图像的提示词"
+  },
+  "setSeed": {
+    "title": "使用种子",
+    "desc": "使用当前图像的种子"
+  },
+  "setParameters": {
+    "title": "使用所有参数",
+    "desc": "使用当前图像的所有参数"
+  },
+  "restoreFaces": {
+    "title": "脸部修复",
+    "desc": "对当前图像进行脸部修复"
+  },
+  "upscale": {
+    "title": "放大",
+    "desc": "对当前图像进行放大"
+  },
+  "showInfo": {
+    "title": "显示信息",
+    "desc": "显示当前图像的元数据"
+  },
+  "sendToImageToImage": {
+    "title": "送往图像到图像",
+    "desc": "将当前图像送往图像到图像"
+  },
+  "deleteImage": {
+    "title": "删除图像",
+    "desc": "删除当前图像"
+  },
+  "closePanels": {
+    "title": "关闭浮窗",
+    "desc": "关闭目前打开的浮窗"
+  },
+  "previousImage": {
+    "title": "上一张图像",
+    "desc": "显示相册中的上一张图像"
+  },
+  "nextImage": {
+    "title": "下一张图像",
+    "desc": "显示相册中的下一张图像"
+  },
+  "toggleGalleryPin": {
+    "title": "切换图库常开",
+    "desc": "开关图库在界面中的常开模式"
+  },
+  "increaseGalleryThumbSize": {
+    "title": "增大预览大小",
+    "desc": "增大图库中预览的大小"
+  },
+  "decreaseGalleryThumbSize": {
+    "title": "减小预览大小",
+    "desc": "减小图库中预览的大小"
+  },
+  "selectBrush": {
+    "title": "选择刷子",
+    "desc": "选择统一画布上的刷子"
+  },
+  "selectEraser": {
+    "title": "选择橡皮擦",
+    "desc": "选择统一画布上的橡皮擦"
+  },
+  "decreaseBrushSize": {
+    "title": "减小刷子大小",
+    "desc": "减小统一画布上的刷子或橡皮擦的大小"
+  },
+  "increaseBrushSize": {
+    "title": "增大刷子大小",
+    "desc": "增大统一画布上的刷子或橡皮擦的大小"
+  },
+  "decreaseBrushOpacity": {
+    "title": "减小刷子不透明度",
+    "desc": "减小统一画布上的刷子的不透明度"
+  },
+  "increaseBrushOpacity": {
+    "title": "增大刷子不透明度",
+    "desc": "增大统一画布上的刷子的不透明度"
+  },
+  "moveTool": {
+    "title": "移动工具",
+    "desc": "在画布上移动"
+  },
+  "fillBoundingBox": {
+    "title": "填充选择区域",
+    "desc": "在选择区域中填充刷子颜色"
+  },
+  "eraseBoundingBox": {
+    "title": "取消选择区域",
+    "desc": "将选择区域抹除"
+  },
+  "colorPicker": {
+    "title": "颜色提取工具",
+    "desc": "选择颜色提取工具"
+  },
+  "toggleSnap": {
+    "title": "切换网格对齐",
+    "desc": "打开或关闭网格对齐"
+  },
+  "quickToggleMove": {
+    "title": "快速切换移动模式",
+    "desc": "临时性地切换移动模式"
+  },
+  "toggleLayer": {
+    "title": "切换图层",
+    "desc": "切换遮罩/基础层的选择"
+  },
+  "clearMask": {
+    "title": "清除遮罩",
+    "desc": "清除整个遮罩层"
+  },
+  "hideMask": {
+    "title": "隐藏遮罩",
+    "desc": "隐藏或显示遮罩"
+  },
+  "showHideBoundingBox": {
+    "title": "显示/隐藏框选区",
+    "desc": "切换框选区的的显示状态"
+  },
+  "mergeVisible": {
+    "title": "合并可见层",
+    "desc": "将画板上可见层合并"
+  },
+  "saveToGallery": {
+    "title": "保存至图库",
+    "desc": "将画板当前内容保存至图库"
+  },
+  "copyToClipboard": {
+    "title": "复制到剪贴板",
+    "desc": "将画板当前内容复制到剪贴板"
+  },
+  "downloadImage": {
+    "title": "下载图像",
+    "desc": "下载画板当前内容"
+  },
+  "undoStroke": {
+    "title": "撤销画笔",
+    "desc": "撤销上一笔刷子的动作"
+  },
+  "redoStroke": {
+    "title": "重做画笔",
+    "desc": "重做上一笔刷子的动作"
+  },
+  "resetView": {
+    "title": "重置视图",
+    "desc": "重置画板视图"
+  },
+  "previousStagingImage": {
+    "title": "上一张暂存图像",
+    "desc": "上一张暂存区中的图像"
+  },
+  "nextStagingImage": {
+    "title": "下一张暂存图像",
+    "desc": "下一张暂存区中的图像"
+  },
+  "acceptStagingImage": {
+    "title": "接受暂存图像",
+    "desc": "接受当前暂存区中的图像"
+  }
+}
