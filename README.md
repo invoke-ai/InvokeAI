@@ -186,7 +186,7 @@ their time, hard work and effort.
 For support, please use this repository's GitHub Issues tracking service. Feel free to send me an
 email if you use and like the script.
 
-Original portions of the software are Copyright (c) 2020
+Original portions of the software are Copyright (c) 2022
 [Lincoln D. Stein](https://github.com/lstein)
 
 ### Further Reading
