@@ -180,14 +180,14 @@ export declare type FoundModel = {
 };
 
 export declare type InvokeModelConfigProps = {
-  name: string;
-  description: string;
-  config: string;
-  weights: string;
-  vae: string;
-  width: number;
-  height: number;
-  default: boolean;
+  name: string | undefined;
+  description: string | undefined;
+  config: string | undefined;
+  weights: string | undefined;
+  vae: string | undefined;
+  width: number | undefined;
+  height: number | undefined;
+  default: boolean | undefined;
 };
 
 /**
