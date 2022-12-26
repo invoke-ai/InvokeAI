@@ -1,23 +1,29 @@
-import { Box, Flex, VStack } from '@chakra-ui/react';
-import { addNewModel, searchForModels } from 'app/socketio/actions';
-import { RootState } from 'app/store';
+import React from 'react';
 import IAICheckbox from 'common/components/IAICheckbox';
-import React, { ReactNode, ChangeEvent } from 'react';
-import { MdFindInPage } from 'react-icons/md';
-import _ from 'lodash';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
+
+import { createSelector } from '@reduxjs/toolkit';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { Box, Flex, VStack } from '@chakra-ui/react';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useTranslation } from 'react-i18next';
+
 import { FaPlus } from 'react-icons/fa';
+import { MdFindInPage } from 'react-icons/md';
+
+import { addNewModel, searchForModels } from 'app/socketio/actions';
 import {
   setFoundModels,
   setSearchFolder,
 } from 'features/system/store/systemSlice';
-import { createSelector } from '@reduxjs/toolkit';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { setShouldShowExistingModelsInSearch } from 'features/options/store/optionsSlice';
-import { FoundModel } from 'app/invokeai';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { useTranslation } from 'react-i18next';
+
+import _ from 'lodash';
+
+import type { RootState } from 'app/store';
+import type { ReactNode, ChangeEvent } from 'react';
+import type { FoundModel } from 'app/invokeai';
 
 const existingModelsSelector = createSelector([systemSelector], (system) => {
   const { model_list } = system;

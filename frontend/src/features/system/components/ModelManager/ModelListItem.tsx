@@ -1,17 +1,11 @@
 import { EditIcon, DeleteIcon } from '@chakra-ui/icons';
-import {
-  Button,
-  Flex,
-  IconButton,
-  Spacer,
-  Text,
-  Tooltip,
-} from '@chakra-ui/react';
+import { Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
 import { ModelStatus } from 'app/invokeai';
 import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { setOpenModel } from 'features/system/store/systemSlice';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,12 +31,13 @@ export default function ModelListItem(props: ModelListItemProps) {
     dispatch(requestModelChange(name));
   };
 
-  const openModel = () =>  {
-  dispatch(setOpenModel(name));       
+  const openModel = () => {
+    dispatch(setOpenModel(name));
   };
 
   const handleModelDelete = () => {
     dispatch(deleteModel(name));
+    dispatch(setOpenModel(null));
   };
 
   const statusTextColor = () => {
@@ -63,9 +58,8 @@ export default function ModelListItem(props: ModelListItemProps) {
       </Tooltip>
       <Spacer />
 
-      <Flex gap={4} alignItems="center">
+      <Flex gap={2} alignItems="center">
         <Text color={statusTextColor()}>{status}</Text>
-
         <Button
           size={'sm'}
           onClick={handleChangeModel}
@@ -74,25 +68,26 @@ export default function ModelListItem(props: ModelListItemProps) {
         >
           {t('modelmanager:load')}
         </Button>
-        <IconButton
-              icon={<EditIcon />}
-              size={'sm'}
-              onClick={openModel}
-              aria-label="Modify Config"
-              isDisabled={status === 'active' || isProcessing || !isConnected}
-              className=" modal-close-btn"
-            />
+        <IAIIconButton
+          icon={<EditIcon />}
+          size={'sm'}
+          onClick={openModel}
+          aria-label="Modify Config"
+          isDisabled={status === 'active' || isProcessing || !isConnected}
+          className=" modal-close-btn"
+        />
         <IAIAlertDialog
           title={t('modelmanager:deleteModel')}
           acceptCallback={handleModelDelete}
           acceptButtonText={t('modelmanager:delete')}
           triggerComponent={
-            <IconButton
+            <IAIIconButton
               icon={<DeleteIcon />}
               size={'sm'}
               aria-label={t('modelmanager:deleteConfig')}
               isDisabled={status === 'active' || isProcessing || !isConnected}
               className=" modal-close-btn"
+              style={{ backgroundColor: 'var(--btn-delete-image)' }}
             />
           }
         >
