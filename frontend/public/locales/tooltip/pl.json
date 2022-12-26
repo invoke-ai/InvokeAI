@@ -9,7 +9,7 @@
     "faceCorrection": "Poprawianie twarzy próbuje identyfikować twarze na obrazie wyjściowym i korygować wszelkie defekty/nieprawidłowości. W GFPGAN im większa siła, tym mocniejszy efekt. W metodzie Codeformer wyższa wartość oznacza bardziej wierne odtworzenie oryginalnej twarzy, nawet kosztem siły korekcji.",
     "imageToImage": "Tryb \"Obraz na obraz\" pozwala na załadowanie obrazu wzorca, który obok wprowadzonych sugestii zostanie użyty porzez InvokeAI do wygenerowania nowego obrazu. Niższa wartość tego ustawienia będzie bardziej przypominać oryginalny obraz. Akceptowane są wartości od 0 do 1, a zalecany jest zakres od 0,25 do 0,75.",
     "boundingBox": "Zaznaczony obszar odpowiada ustawieniom wysokości i szerokości w trybach Tekst na obraz i Obraz na obraz. Jedynie piksele znajdujące się w obszarze zaznaczenia zostaną uwzględnione podczas wywoływania nowego obrazu.",
-    "seamCorrection": "Opcje wpłuwające na poziom widoczności szwów, które mogą wystąpić, gdy wygenerowany obraz jest ponownie wklejany na płótno.",
+    "seamCorrection": "Opcje wpływające na poziom widoczności szwów, które mogą wystąpić, gdy wygenerowany obraz jest ponownie wklejany na płótno.",
     "infillAndScaling": "Zarządzaj metodami wypełniania (używanymi na zamaskowanych lub wymazanych obszarach płótna) i skalowaniem (przydatne w przypadku zaznaczonego obszaru o b. małych rozmiarach)."
   }
 }
