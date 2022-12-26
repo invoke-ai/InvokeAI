@@ -24,7 +24,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
   labelFontSize?: string | number;
   width?: string | number;
   showStepper?: boolean;
-  value: number;
+  value?: number;
   onChange: (v: number) => void;
   min: number;
   max: number;

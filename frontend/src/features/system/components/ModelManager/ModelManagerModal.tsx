@@ -7,10 +7,13 @@ import {
   ModalOverlay,
   useDisclosure,
 } from '@chakra-ui/react';
-import React, { cloneElement, ReactElement } from 'react';
+import React, { cloneElement } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import ModelEdit from './ModelEdit';
 import ModelList from './ModelList';
+
+import type { ReactElement } from 'react';
 
 type ModelManagerModalProps = {
   children: ReactElement;

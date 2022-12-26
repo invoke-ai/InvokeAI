@@ -1,14 +1,19 @@
-import { useState, ChangeEvent, ReactNode } from 'react';
+import { useState } from 'react';
 import { Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
-import { SystemState } from 'features/system/store/systemSlice';
+import IAIInput from 'common/components/IAIInput';
+
 import AddModel from './AddModel';
 import ModelListItem from './ModelListItem';
-import _ from 'lodash';
-import IAIInput from 'common/components/IAIInput';
+
 import { useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
+
+import _ from 'lodash';
+
+import type { ChangeEvent, ReactNode } from 'react';
+import type { RootState } from 'app/store';
+import type { SystemState } from 'features/system/store/systemSlice';
 
 const modelListSelector = createSelector(
   (state: RootState) => state.system,

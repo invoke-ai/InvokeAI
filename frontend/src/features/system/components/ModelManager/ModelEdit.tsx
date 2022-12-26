@@ -1,30 +1,33 @@
 import { createSelector } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store';
+
+import React, { useEffect, useState } from 'react';
+import IAIInput from 'common/components/IAIInput';
+import IAINumberInput from 'common/components/IAINumberInput';
+import IAIButton from 'common/components/IAIButton';
+
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import React, { useEffect, useState } from 'react';
-import _ from 'lodash';
-import type { InvokeModelConfigProps } from 'app/invokeai';
+
 import {
-  Button,
   Flex,
   FormControl,
   FormErrorMessage,
   FormHelperText,
   FormLabel,
-  Input,
-  NumberDecrementStepper,
-  NumberIncrementStepper,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
+  HStack,
   Text,
   VStack,
 } from '@chakra-ui/react';
+
 import { Field, Formik } from 'formik';
-import type { FieldInputProps, FormikProps } from 'formik';
 import { useTranslation } from 'react-i18next';
 import { addNewModel } from 'app/socketio/actions';
+
+import _ from 'lodash';
+
+import type { RootState } from 'app/store';
+import type { FieldInputProps, FormikProps } from 'formik';
+import type { InvokeModelConfigProps } from 'app/invokeai';
 
 const selector = createSelector(
   [systemSelector],
@@ -115,15 +118,16 @@ export default function ModelEdit() {
                   isInvalid={!!errors.description && touched.description}
                   isRequired
                 >
-                  <FormLabel htmlFor="description">
+                  <FormLabel htmlFor="description" fontSize="sm">
                     {t('modelmanager:description')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
                     <Field
-                      as={Input}
+                      as={IAIInput}
                       id="description"
                       name="description"
                       type="text"
+                      width="lg"
                     />
                     {!!errors.description && touched.description ? (
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
@@ -140,11 +144,17 @@ export default function ModelEdit() {
                   isInvalid={!!errors.config && touched.config}
                   isRequired
                 >
-                  <FormLabel htmlFor="config">
+                  <FormLabel htmlFor="config" fontSize="sm">
                     {t('modelmanager:config')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
-                    <Field as={Input} id="config" name="config" type="text" />
+                    <Field
+                      as={IAIInput}
+                      id="config"
+                      name="config"
+                      type="text"
+                      width="lg"
+                    />
                     {!!errors.config && touched.config ? (
                       <FormErrorMessage>{errors.config}</FormErrorMessage>
                     ) : (
@@ -160,11 +170,17 @@ export default function ModelEdit() {
                   isInvalid={!!errors.weights && touched.weights}
                   isRequired
                 >
-                  <FormLabel htmlFor="config">
+                  <FormLabel htmlFor="config" fontSize="sm">
                     {t('modelmanager:modelLocation')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
-                    <Field as={Input} id="weights" name="weights" type="text" />
+                    <Field
+                      as={IAIInput}
+                      id="weights"
+                      name="weights"
+                      type="text"
+                      width="lg"
+                    />
                     {!!errors.weights && touched.weights ? (
                       <FormErrorMessage>{errors.weights}</FormErrorMessage>
                     ) : (
@@ -177,11 +193,17 @@ export default function ModelEdit() {
 
                 {/* VAE */}
                 <FormControl isInvalid={!!errors.vae && touched.vae}>
-                  <FormLabel htmlFor="vae">
+                  <FormLabel htmlFor="vae" fontSize="sm">
                     {t('modelmanager:vaeLocation')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
-                    <Field as={Input} id="vae" name="vae" type="text" />
+                    <Field
+                      as={IAIInput}
+                      id="vae"
+                      name="vae"
+                      type="text"
+                      width="lg"
+                    />
                     {!!errors.vae && touched.vae ? (
                       <FormErrorMessage>{errors.vae}</FormErrorMessage>
                     ) : (
@@ -192,10 +214,10 @@ export default function ModelEdit() {
                   </VStack>
                 </FormControl>
 
-                <VStack width={'100%'}>
+                <HStack width={'100%'}>
                   {/* Width */}
                   <FormControl isInvalid={!!errors.width && touched.width}>
-                    <FormLabel htmlFor="width">
+                    <FormLabel htmlFor="width" fontSize="sm">
                       {t('modelmanager:width')}
                     </FormLabel>
                     <VStack alignItems={'start'}>
@@ -207,23 +229,17 @@ export default function ModelEdit() {
                           field: FieldInputProps<number>;
                           form: FormikProps<InvokeModelConfigProps>;
                         }) => (
-                          <NumberInput
-                            {...field}
+                          <IAINumberInput
                             id="width"
                             name="width"
                             min={MIN_MODEL_SIZE}
                             max={MAX_MODEL_SIZE}
                             step={64}
+                            value={form.values.width}
                             onChange={(value) =>
                               form.setFieldValue(field.name, Number(value))
                             }
-                          >
-                            <NumberInputField />
-                            <NumberInputStepper>
-                              <NumberIncrementStepper />
-                              <NumberDecrementStepper />
-                            </NumberInputStepper>
-                          </NumberInput>
+                          />
                         )}
                       </Field>
 
@@ -239,7 +255,7 @@ export default function ModelEdit() {
 
                   {/* Height */}
                   <FormControl isInvalid={!!errors.height && touched.height}>
-                    <FormLabel htmlFor="height">
+                    <FormLabel htmlFor="height" fontSize="sm">
                       {t('modelmanager:height')}
                     </FormLabel>
                     <VStack alignItems={'start'}>
@@ -251,23 +267,17 @@ export default function ModelEdit() {
                           field: FieldInputProps<number>;
                           form: FormikProps<InvokeModelConfigProps>;
                         }) => (
-                          <NumberInput
-                            {...field}
+                          <IAINumberInput
                             id="height"
                             name="height"
                             min={MIN_MODEL_SIZE}
                             max={MAX_MODEL_SIZE}
                             step={64}
+                            value={form.values.height}
                             onChange={(value) =>
                               form.setFieldValue(field.name, Number(value))
                             }
-                          >
-                            <NumberInputField />
-                            <NumberInputStepper>
-                              <NumberIncrementStepper />
-                              <NumberDecrementStepper />
-                            </NumberInputStepper>
-                          </NumberInput>
+                          />
                         )}
                       </Field>
 
@@ -280,15 +290,15 @@ export default function ModelEdit() {
                       )}
                     </VStack>
                   </FormControl>
-                </VStack>
+                </HStack>
 
-                <Button
+                <IAIButton
                   type="submit"
                   className="modal-close-btn"
                   isLoading={isProcessing}
                 >
                   {t('modelmanager:updateModel')}
-                </Button>
+                </IAIButton>
               </VStack>
             </form>
           )}

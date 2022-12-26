@@ -23,6 +23,7 @@ import ModelManagerModal from './ModelManager/ModelManagerModal';
 import LanguagePicker from './LanguagePicker';
 
 import { useTranslation } from 'react-i18next';
+import { MdSettings } from 'react-icons/md';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
@@ -120,9 +121,9 @@ const SiteHeader = () => {
             tooltip={t('common:settingsLabel')}
             variant="link"
             data-variant="link"
-            fontSize={20}
+            fontSize={22}
             size={'sm'}
-            icon={<FaWrench />}
+            icon={<MdSettings />}
           />
         </SettingsModal>
       </div>
