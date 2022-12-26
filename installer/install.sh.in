@@ -166,8 +166,15 @@ if [ "$OS_NAME" == "osx" ]; then
     egrep -v '^-e .' environments-and-requirements/requirements-mac-mps-cpu.txt >requirements.txt
 else
     if (lsmod | grep amdgpu) &>/dev/null ; then
-	echo "Linux system with AMD GPU driver detected. Installing ROCm and CPU support"
-	egrep -v '^-e .' environments-and-requirements/requirements-lin-amd.txt >requirements.txt
+	readinput -e -p "Linux system with AMD GPU driver detected. Install ROCm AMD accelerated support? (Otherwise, CUDA support will be installed) [n]: " input
+	RESPONSE=${input:='n'}
+	if [ "$RESPONSE" != "n" ]; then
+	    echo "Installing ROCm (AMD) support"
+	    egrep -v '^-e .' environments-and-requirements/requirements-lin-amd.txt >requirements.txt
+	else
+	    echo "Installing CUDA support"
+	    egrep -v '^-e .' environments-and-requirements/requirements-lin-cuda.txt >requirements.txt
+	fi
     else
 	echo "Linux system detected. Installing CUDA and CPU support."
 	egrep -v '^-e .' environments-and-requirements/requirements-lin-cuda.txt >requirements.txt
