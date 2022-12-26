@@ -1,13 +1,6 @@
 import { Link } from '@chakra-ui/react';
 
-import {
-  FaGithub,
-  FaDiscord,
-  FaBug,
-  FaKeyboard,
-  FaWrench,
-  FaCube,
-} from 'react-icons/fa';
+import { FaGithub, FaDiscord, FaBug, FaKeyboard, FaCube } from 'react-icons/fa';
 
 import InvokeAILogo from 'assets/images/logo.png';
 import IAIIconButton from 'common/components/IAIIconButton';
