@@ -132,4 +132,8 @@
 
   // Checkerboard
   --checkboard-dots-color: rgb(35, 35, 39);
+
+  // Scrollbar
+  --scrollbar-color: var(--accent-color);
+  --scrollbar-color-hover: var(--accent-color-bright);
 }
