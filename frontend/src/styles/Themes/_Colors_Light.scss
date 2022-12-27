@@ -67,7 +67,8 @@
   --switch-bg-active-color: rgb(235, 185, 5);
 
   // Slider
-  --slider-color: rgb(0, 0, 0);
+  --slider-color: var(--accent-color);
+  --slider-mark-color: rgb(0, 0, 0);
 
   // Resizable
   --resizeable-handle-border-color: rgb(160, 162, 164);

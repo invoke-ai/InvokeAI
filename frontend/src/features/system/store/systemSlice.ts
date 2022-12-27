@@ -2,6 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
 import * as InvokeAI from 'app/invokeai';
+import i18n from 'i18n';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -64,7 +65,9 @@ const initialSystemState: SystemState = {
   totalSteps: 0,
   currentIteration: 0,
   totalIterations: 0,
-  currentStatus: 'Disconnected',
+  currentStatus: i18n.isInitialized
+    ? i18n.t('common:statusDisconnected')
+    : 'Disconnected',
   currentStatusHasSteps: false,
   model: '',
   model_id: '',
@@ -109,13 +112,15 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Error';
+      state.currentStatus = i18n.t('common:statusError');
       state.wasErrorSeen = false;
     },
     errorSeen: (state) => {
       state.hasError = false;
       state.wasErrorSeen = true;
-      state.currentStatus = state.isConnected ? 'Connected' : 'Disconnected';
+      state.currentStatus = state.isConnected
+        ? i18n.t('common:statusConnected')
+        : i18n.t('common:statusDisconnected');
     },
     addLogEntry: (
       state,
@@ -176,7 +181,7 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Processing canceled';
+      state.currentStatus = i18n.t('common:statusProcessingCanceled');
     },
     generationRequested: (state) => {
       state.isProcessing = true;
@@ -186,7 +191,7 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Preparing';
+      state.currentStatus = i18n.t('common:statusPreparing');
     },
     setModelList: (
       state,
@@ -198,7 +203,7 @@ export const systemSlice = createSlice({
       state.isCancelable = action.payload;
     },
     modelChangeRequested: (state) => {
-      state.currentStatus = 'Loading Model';
+      state.currentStatus = i18n.t('common:statusLoadingModel');
       state.isCancelable = false;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;

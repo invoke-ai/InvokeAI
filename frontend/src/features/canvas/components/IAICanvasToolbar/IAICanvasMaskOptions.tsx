@@ -21,6 +21,7 @@ import {
 } from 'features/canvas/store/canvasSelectors';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
+import { useTranslation } from 'react-i18next';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -45,6 +46,8 @@ export const selector = createSelector(
 );
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
   const {
     layer,
     maskColor,
@@ -104,8 +107,8 @@ const IAICanvasMaskOptions = () => {
       triggerComponent={
         <ButtonGroup>
           <IAIIconButton
-            aria-label="Masking Options"
-            tooltip="Masking Options"
+            aria-label={t('unifiedcanvas:maskingOptions')}
+            tooltip={t('unifiedcanvas:maskingOptions')}
             icon={<FaMask />}
             style={
               layer === 'mask'
@@ -119,12 +122,12 @@ const IAICanvasMaskOptions = () => {
     >
       <Flex direction={'column'} gap={'0.5rem'}>
         <IAICheckbox
-          label="Enable Mask (H)"
+          label={`${t('unifiedcanvas:enableMask')} (H)`}
           isChecked={isMaskEnabled}
           onChange={handleToggleEnableMask}
         />
         <IAICheckbox
-          label="Preserve Masked Area"
+          label={t('unifiedcanvas:preserveMaskedArea')}
           isChecked={shouldPreserveMaskedArea}
           onChange={(e) =>
             dispatch(setShouldPreserveMaskedArea(e.target.checked))
@@ -136,7 +139,7 @@ const IAICanvasMaskOptions = () => {
           onChange={(newColor) => dispatch(setMaskColor(newColor))}
         />
         <IAIButton size={'sm'} leftIcon={<FaTrash />} onClick={handleClearMask}>
-          Clear Mask (Shift+C)
+          {t('unifiedcanvas:clearMask')} (Shift+C)
         </IAIButton>
       </Flex>
     </IAIPopover>

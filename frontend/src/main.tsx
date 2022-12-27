@@ -19,13 +19,18 @@ export const emotionCache = createCache({
 // Custom Styling
 import './styles/index.scss';
 
+// Localization
+import './i18n';
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <Provider store={store}>
       <PersistGate loading={<Loading />} persistor={persistor}>
         <CacheProvider value={emotionCache}>
           <ChakraProvider>
-            <App />
+            <React.Suspense fallback={<Loading />}>
+              <App />
+            </React.Suspense>
           </ChakraProvider>
         </CacheProvider>
       </PersistGate>

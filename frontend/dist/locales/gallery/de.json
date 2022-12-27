@@ -1,0 +1,16 @@
+{
+  "generations": "Erzeugungen",
+  "showGenerations": "Zeige Erzeugnisse",
+  "uploads": "Uploads",
+  "showUploads": "Zeige Uploads",
+  "galleryImageSize": "Bildgröße",
+  "galleryImageResetSize": "Größe zurücksetzen",
+  "gallerySettings": "Galerie-Einstellungen",
+  "maintainAspectRatio": "Seitenverhältnis beibehalten",
+  "autoSwitchNewImages": "Automatisch zu neuen Bildern wechseln",
+  "singleColumnLayout": "Einspaltiges Layout",
+  "pinGallery": "Galerie anpinnen",
+  "allImagesLoaded": "Alle Bilder geladen",
+  "loadMore": "Mehr laden",
+  "noImagesInGallery": "Keine Bilder in der Galerie"
+}

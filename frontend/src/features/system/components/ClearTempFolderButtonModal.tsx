@@ -7,11 +7,13 @@ import {
   clearCanvasHistory,
   resetCanvas,
 } from 'features/canvas/store/canvasSlice';
+import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
 const EmptyTempFolderButtonModal = () => {
   const isStaging = useAppSelector(isStagingSelector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const acceptCallback = () => {
     dispatch(emptyTempFolder());
@@ -21,22 +23,18 @@ const EmptyTempFolderButtonModal = () => {
 
   return (
     <IAIAlertDialog
-      title={'Empty Temp Image Folder'}
+      title={t('unifiedcanvas:emptyTempImageFolder')}
       acceptCallback={acceptCallback}
-      acceptButtonText={'Empty Folder'}
+      acceptButtonText={t('unifiedcanvas:emptyFolder')}
       triggerComponent={
         <IAIButton leftIcon={<FaTrash />} size={'sm'} isDisabled={isStaging}>
-          Empty Temp Image Folder
+          {t('unifiedcanvas:emptyTempImageFolder')}
         </IAIButton>
       }
     >
-      <p>
-        Emptying the temp image folder also fully resets the Unified Canvas.
-        This includes all undo/redo history, images in the staging area, and the
-        canvas base layer.
-      </p>
+      <p>{t('unifiedcanvas:emptyTempImagesFolderMessage')}</p>
       <br />
-      <p>Are you sure you want to empty the temp folder?</p>
+      <p>{t('unifiedcanvas:emptyTempImagesFolderConfirm')}</p>
     </IAIAlertDialog>
   );
 };

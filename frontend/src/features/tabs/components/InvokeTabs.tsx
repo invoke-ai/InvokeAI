@@ -22,6 +22,8 @@ import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
 import TrainingWIP from 'common/components/WorkInProgress/Training';
 import TrainingIcon from 'common/icons/TrainingIcon';
 import { InvokeTabName } from 'features/tabs/tabMap';
+import i18n from 'i18n';
+import useUpdateTranslations from 'common/hooks/useUpdateTranslations';
 
 export interface InvokeTabInfo {
   title: ReactElement;
@@ -62,6 +64,15 @@ export const tabDict: Record<InvokeTabName, InvokeTabInfo> = {
   },
 };
 
+function updateTabTranslations() {
+  tabDict.txt2img.tooltip = i18n.t('common:text2img');
+  tabDict.img2img.tooltip = i18n.t('common:img2img');
+  tabDict.unifiedCanvas.tooltip = i18n.t('common:unifiedCanvas');
+  tabDict.nodes.tooltip = i18n.t('common:nodes');
+  tabDict.postprocess.tooltip = i18n.t('common:postProcessing');
+  tabDict.training.tooltip = i18n.t('common:training');
+}
+
 export default function InvokeTabs() {
   const activeTab = useAppSelector(
     (state: RootState) => state.options.activeTab
@@ -69,6 +80,8 @@ export default function InvokeTabs() {
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.options.isLightBoxOpen
   );
+
+  useUpdateTranslations(updateTabTranslations);
 
   const dispatch = useAppDispatch();
 

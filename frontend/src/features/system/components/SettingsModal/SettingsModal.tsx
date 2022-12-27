@@ -34,6 +34,7 @@ import IAINumberInput from 'common/components/IAINumberInput';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { optionsSelector } from 'features/options/store/optionsSelectors';
 import { setShouldUseCanvasBetaLayout } from 'features/options/store/optionsSlice';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [systemSelector, optionsSelector],
@@ -77,6 +78,7 @@ type SettingsModalProps = {
  */
 const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const steps = useAppSelector((state: RootState) => state.options.steps);
 
@@ -124,10 +126,16 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         onClick: onSettingsModalOpen,
       })}
 
-      <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose}>
+      <Modal
+        isOpen={isSettingsModalOpen}
+        onClose={onSettingsModalClose}
+        size="lg"
+      >
         <ModalOverlay />
         <ModalContent className="modal settings-modal">
-          <ModalHeader className="settings-modal-header">Settings</ModalHeader>
+          <ModalHeader className="settings-modal-header">
+            {t('common:settingsLabel')}
+          </ModalHeader>
           <ModalCloseButton className="modal-close-btn" />
           <ModalBody className="settings-modal-content">
             <div className="settings-modal-items">
@@ -139,7 +147,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 style={{ gridAutoFlow: 'row', rowGap: '0.5rem' }}
               >
                 <IAISelect
-                  label={'Display In-Progress Images'}
+                  label={t('settings:displayInProgress')}
                   validValues={IN_PROGRESS_IMAGE_TYPES}
                   value={shouldDisplayInProgressType}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) =>
@@ -152,7 +160,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                 />
                 {shouldDisplayInProgressType === 'full-res' && (
                   <IAINumberInput
-                    label="Save images every n steps"
+                    label={t('settings:saveSteps')}
                     min={1}
                     max={steps}
                     step={1}
@@ -165,7 +173,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               </div>
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={'Confirm on Delete'}
+                label={t('settings:confirmOnDelete')}
                 isChecked={shouldConfirmOnDelete}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldConfirmOnDelete(e.target.checked))
@@ -173,7 +181,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               />
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={'Display Help Icons'}
+                label={t('settings:displayHelpIcons')}
                 isChecked={shouldDisplayGuides}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldDisplayGuides(e.target.checked))
@@ -181,7 +189,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               />
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={'Use Canvas Beta Layout'}
+                label={t('settings:useCanvasBeta')}
                 isChecked={shouldUseCanvasBetaLayout}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
@@ -193,7 +201,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
               <h2 style={{ fontWeight: 'bold' }}>Developer</h2>
               <IAISwitch
                 styleClass="settings-modal-item"
-                label={'Enable Image Debugging'}
+                label={t('settings:enableImageDebugging')}
                 isChecked={enableImageDebugging}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
                   dispatch(setEnableImageDebugging(e.target.checked))
@@ -202,26 +210,18 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
             </div>
 
             <div className="settings-modal-reset">
-              <Heading size={'md'}>Reset Web UI</Heading>
+              <Heading size={'md'}>{t('settings:resetWebUI')}</Heading>
               <Button colorScheme="red" onClick={handleClickResetWebUI}>
-                Reset Web UI
+                {t('settings:resetWebUI')}
               </Button>
-              <Text>
-                Resetting the web UI only resets the browser's local cache of
-                your images and remembered settings. It does not delete any
-                images from disk.
-              </Text>
-              <Text>
-                If images aren't showing up in the gallery or something else
-                isn't working, please try resetting before submitting an issue
-                on GitHub.
-              </Text>
+              <Text>{t('settings:resetWebUIDesc1')}</Text>
+              <Text>{t('settings:resetWebUIDesc2')}</Text>
             </div>
           </ModalBody>
 
           <ModalFooter>
             <Button onClick={onSettingsModalClose} className="modal-close-btn">
-              Close
+              {t('common:close')}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -238,7 +238,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
           <ModalBody pb={6} pt={6}>
             <Flex justifyContent={'center'}>
               <Text fontSize={'lg'}>
-                Web UI has been reset. Refresh the page to reload.
+                <Text>{t('settings:resetComplete')}</Text>
               </Text>
             </Flex>
           </ModalBody>

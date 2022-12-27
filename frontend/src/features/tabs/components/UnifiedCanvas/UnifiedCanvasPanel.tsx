@@ -12,31 +12,34 @@ import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 import BoundingBoxSettings from 'features/options/components/AdvancedOptions/Canvas/BoundingBoxSettings/BoundingBoxSettings';
 import InfillAndScalingOptions from 'features/options/components/AdvancedOptions/Canvas/InfillAndScalingOptions';
+import { useTranslation } from 'react-i18next';
 
 export default function UnifiedCanvasPanel() {
+  const { t } = useTranslation();
+
   const unifiedCanvasAccordions = {
     boundingBox: {
-      header: 'Bounding Box',
+      header: `${t('options:boundingBoxHeader')}`,
       feature: Feature.BOUNDING_BOX,
       content: <BoundingBoxSettings />,
     },
     seamCorrection: {
-      header: 'Seam Correction',
+      header: `${t('options:seamCorrectionHeader')}`,
       feature: Feature.SEAM_CORRECTION,
       content: <SeamCorrectionOptions />,
     },
     infillAndScaling: {
-      header: 'Infill and Scaling',
+      header: `${t('options:infillScalingHeader')}`,
       feature: Feature.INFILL_AND_SCALING,
       content: <InfillAndScalingOptions />,
     },
     seed: {
-      header: 'Seed',
+      header: `${t('options:seed')}`,
       feature: Feature.SEED,
       content: <SeedOptions />,
     },
     variations: {
-      header: 'Variations',
+      header: `${t('options:variations')}`,
       feature: Feature.VARIATIONS,
       content: <VariationsOptions />,
       additionalHeaderComponents: <GenerateVariationsToggle />,
@@ -49,7 +52,7 @@ export default function UnifiedCanvasPanel() {
       <ProcessButtons />
       <MainOptions />
       <ImageToImageStrength
-        label="Image To Image Strength"
+        label={t('options:img2imgStrength')}
         styleClass="main-option-block image-to-image-strength-main-option"
       />
       <OptionsAccordion accordionInfo={unifiedCanvasAccordions} />

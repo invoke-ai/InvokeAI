@@ -1,6 +1,7 @@
 import { AnyAction, MiddlewareAPI, Dispatch } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
 import dateFormat from 'dateformat';
+import i18n from 'i18n';
 
 import * as InvokeAI from 'app/invokeai';
 
@@ -58,7 +59,7 @@ const makeSocketIOListeners = (
     onConnect: () => {
       try {
         dispatch(setIsConnected(true));
-        dispatch(setCurrentStatus('Connected'));
+        dispatch(setCurrentStatus(i18n.t('common:statusConnected')));
         dispatch(requestSystemConfig());
         const gallery: GalleryState = getState().gallery;
 
@@ -83,7 +84,7 @@ const makeSocketIOListeners = (
     onDisconnect: () => {
       try {
         dispatch(setIsConnected(false));
-        dispatch(setCurrentStatus('Disconnected'));
+        dispatch(setCurrentStatus(i18n.t('common:statusDisconnected')));
 
         dispatch(
           addLogEntry({
@@ -353,7 +354,7 @@ const makeSocketIOListeners = (
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
       dispatch(setModelList(model_list));
-      dispatch(setCurrentStatus('Model Changed'));
+      dispatch(setCurrentStatus(i18n.t('common:statusModelChanged')));
       dispatch(setIsProcessing(false));
       dispatch(setIsCancelable(true));
       dispatch(
@@ -381,7 +382,7 @@ const makeSocketIOListeners = (
     onTempFolderEmptied: () => {
       dispatch(
         addToast({
-          title: 'Temp Folder Emptied',
+          title: i18n.t('toast:tempFoldersEmptied'),
           status: 'success',
           duration: 2500,
           isClosable: true,

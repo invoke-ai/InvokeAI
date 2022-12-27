@@ -5,10 +5,6 @@
 
   .invokeai__number-input-form-label {
     color: var(--text-color-secondary);
-    margin-right: 0;
-    font-size: 1rem;
-    margin-bottom: 0;
-    white-space: nowrap;
 
     &[data-focus] + .invokeai__number-input-root {
       outline: none;
