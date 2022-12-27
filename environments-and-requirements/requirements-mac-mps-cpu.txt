@@ -1,5 +1,6 @@
 grpcio == 1.51.1; platform_machine != "arm64"
-grpcio @ https://github.com/pietrodn/grpcio-mac-arm-build/releases/download/1.51.1/grpcio-1.51.1-cp310-cp310-macosx_11_0_arm64.whl; platform_machine == "arm64"
+grpcio @ https://github.com/pietrodn/grpcio-mac-arm-build/releases/download/1.51.1/grpcio-1.51.1-cp310-cp310-macosx_11_0_arm64.whl; platform_machine == "arm64" and python_version == "3.10"
+grpcio @ https://github.com/pietrodn/grpcio-mac-arm-build/releases/download/1.51.1/grpcio-1.51.1-cp39-cp39-macosx_11_0_arm64.whl; platform_machine == "arm64" and python_version == "3.9"
 protobuf # == 3.19.6
 
 # Install base requirements

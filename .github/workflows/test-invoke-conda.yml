@@ -108,7 +108,7 @@ jobs:
 
       - name: Run the tests
         id: run-tests
-        if: matrix.os != 'windows-2022'
+        if: runner.os != 'Windows'
         run: |
           python scripts/invoke.py \
             --no-patchmatch \
@@ -117,13 +117,13 @@ jobs:
 
       - name: export conda env
         id: export-conda-env
-        if: matrix.os != 'windows-2022'
+        if: runner.os != 'Windows'
         run: |
           mkdir -p outputs/img-samples
           conda env export --name ${{ env.CONDA_ENV_NAME }} > ${{ env.INVOKEAI_ROOT }}/outputs/${{ matrix.environment-yaml }}
 
       - name: Archive results
-        if: matrix.os != 'windows-2022'
+        if: runner.os != 'Windows'
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
