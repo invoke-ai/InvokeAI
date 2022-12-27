@@ -14,3 +14,32 @@
 //     var(--background-color-secondary);
 //   background-size: 64px 64px;
 // }
+
+* {
+  scrollbar-width: thick; /* none | auto  */
+  scrollbar-color: var(--scrollbar-color) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px; // Vertical Scrollbar Width
+  height: 8px; // Horizontal Scrollbar Height
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-color);
+  border-radius: 8px;
+  border: calc(8px / 4) solid var(--scrollbar-color);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-color-hover);
+  border: calc(8px / 4) solid var(--scrollbar-color-hover);
+}
+
+::-webkit-scrollbar-button {
+  background: transparent;
+}
