@@ -185,7 +185,7 @@ export const socketioMiddleware = () => {
       }
 
       case 'socketio/searchForModels': {
-        emitSearchForModels();
+        emitSearchForModels(action.payload);
         break;
       }
 

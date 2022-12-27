@@ -5,7 +5,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { Box, Flex, VStack } from '@chakra-ui/react';
+import { Box, Flex, FormControl, HStack, VStack } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 
@@ -24,6 +24,8 @@ import _ from 'lodash';
 import type { RootState } from 'app/store';
 import type { ReactNode, ChangeEvent } from 'react';
 import type { FoundModel } from 'app/invokeai';
+import IAIInput from 'common/components/IAIInput';
+import { Field, Formik } from 'formik';
 
 const existingModelsSelector = createSelector([systemSelector], (system) => {
   const { model_list } = system;
@@ -136,8 +138,8 @@ export default function SearchModels() {
     setModelsToAdd([]);
   };
 
-  const findModelsHandler = () => {
-    dispatch(searchForModels());
+  const findModelsHandler = (values: { checkpointFolder: string }) => {
+    dispatch(searchForModels(values.checkpointFolder));
   };
 
   const addAllToSelected = () => {
@@ -250,15 +252,36 @@ export default function SearchModels() {
           />
         </Flex>
       ) : (
-        <IAIButton
-          aria-label={t('modelmanager:findModels')}
-          onClick={findModelsHandler}
+        <Formik
+          initialValues={{ checkpointFolder: '' }}
+          onSubmit={(values) => {
+            findModelsHandler(values);
+          }}
         >
-          <Flex columnGap={'0.5rem'}>
-            <MdFindInPage fontSize={20} />
-            {t('modelmanager:selectFolder')}
-          </Flex>
-        </IAIButton>
+          {({ handleSubmit }) => (
+            <form onSubmit={handleSubmit}>
+              <HStack columnGap="0.5rem">
+                <FormControl isRequired width="max-content">
+                  <Field
+                    as={IAIInput}
+                    id="checkpointFolder"
+                    name="checkpointFolder"
+                    type="text"
+                    width="lg"
+                    size="md"
+                    label={t('modelmanager:checkpointFolder')}
+                  />
+                </FormControl>
+                <IAIIconButton
+                  icon={<MdFindInPage />}
+                  aria-label={t('modelmanager:findModels')}
+                  tooltip={t('modelmanager:findModels')}
+                  type="submit"
+                />
+              </HStack>
+            </form>
+          )}
+        </Formik>
       )}
       {foundModels && (
         <Flex flexDirection={'column'} rowGap={'1rem'}>

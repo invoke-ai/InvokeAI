@@ -9,8 +9,6 @@ import io
 import base64
 import os
 import json
-import tkinter as tk
-import sys
 
 from werkzeug.utils import secure_filename
 from flask import Flask, redirect, send_from_directory, request, make_response
@@ -301,21 +299,8 @@ class InvokeAIWebServer:
             socketio.emit("systemConfig", config)
 
         @socketio.on('searchForModels')
-        def handle_search_models():
+        def handle_search_models(search_folder: str):
             try:
-                # Using tkinter to get the filepath because JS doesn't allow
-                root = tk.Tk()
-                root.title('InvokeAI')
-                root.withdraw()
-                root.iconbitmap(default=os.path.join(os.getcwd(), '../backend/logo.ico'))
-                if root.wm_state() == 'withdrawn':
-                    root.iconify()
-                root.wm_attributes('-topmost', 1)
-                root.focus_force()
-                search_folder = filedialog.askdirectory(parent=root, title='Select Checkpoint Folder')
-                root.quit()
-                root.destroy()
-
                 if not search_folder:
                     socketio.emit(
                     "foundModels",

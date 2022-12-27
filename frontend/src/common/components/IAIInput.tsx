@@ -6,6 +6,7 @@ interface IAIInputProps extends InputProps {
   label?: string;
   width?: string | number;
   value?: string;
+  size?: string;
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -16,6 +17,7 @@ export default function IAIInput(props: IAIInputProps) {
     isDisabled = false,
     fontSize = 'sm',
     width,
+    size = 'sm',
     isInvalid,
     ...rest
   } = props;
@@ -39,7 +41,7 @@ export default function IAIInput(props: IAIInputProps) {
           {label}
         </FormLabel>
       )}
-      <Input {...rest} className="input-entry" size={'sm'} width={width} />
+      <Input {...rest} className="input-entry" size={size} width={width} />
     </FormControl>
   );
 }
