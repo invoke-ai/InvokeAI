@@ -26,15 +26,17 @@ class Txt2Img2Img(Generator):
         kwargs are 'width' and 'height'
         """
         uc, c, extra_conditioning_info = conditioning
-        conditioning_data = ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
-        scale_dim = min(width, height)
-        scale = 512 / scale_dim
-
-        init_width, init_height = trim_to_multiple_of(scale * width, scale * height)
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
         pipeline.scheduler = sampler
+
+        conditioning_data = (ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
+                             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
+        scale_dim = min(width, height)
+        scale = 512 / scale_dim
+
+        init_width, init_height = trim_to_multiple_of(scale * width, scale * height)
 
         def make_image(x_T):
 
@@ -44,7 +46,6 @@ class Txt2Img2Img(Generator):
                 conditioning_data=conditioning_data,
                 noise=x_T,
                 callback=step_callback,
-                # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
             )
 

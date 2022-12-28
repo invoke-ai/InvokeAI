@@ -241,13 +241,15 @@ class Inpaint(Img2Img):
 
         self.mask_blur_radius = mask_blur_radius
 
-        # todo: support cross-attention control
-        uc, c, _ = conditioning
-        conditioning_data = ConditioningData(uc, c, cfg_scale)
-
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
         pipeline.scheduler = sampler
+
+        # todo: support cross-attention control
+        uc, c, _ = conditioning
+        conditioning_data = (ConditioningData(uc, c, cfg_scale)
+                             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
+
 
         def make_image(x_T):
             pipeline_output = pipeline.inpaint_from_embeddings(

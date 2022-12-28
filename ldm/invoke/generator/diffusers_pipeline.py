@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import dataclasses
+import inspect
 import secrets
 import sys
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any
 
 if sys.version_info < (3, 10):
@@ -201,11 +203,25 @@ class ConditioningData:
     images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
     """
     extra: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo] = None
+    scheduler_args: dict[str, Any] = field(default_factory=dict)
+    """Additional arguments to pass to scheduler.step."""
 
     @property
     def dtype(self):
         return self.text_embeddings.dtype
 
+    def add_scheduler_args_if_applicable(self, scheduler, **kwargs):
+        scheduler_args = dict(self.scheduler_args)
+        step_method = inspect.signature(scheduler.step)
+        for name, value in kwargs.items():
+            try:
+                step_method.bind_partial(**{name: value})
+            except TypeError:
+                # FIXME: don't silently discard arguments
+                pass  # debug("%s does not accept argument named %r", scheduler, name)
+            else:
+                scheduler_args[name] = value
+        return dataclasses.replace(self, scheduler_args=scheduler_args)
 
 @dataclass
 class InvokeAIStableDiffusionPipelineOutput(StableDiffusionPipelineOutput):
@@ -297,8 +313,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                               *,
                               noise: torch.Tensor,
                               callback: Callable[[PipelineIntermediateState], None]=None,
-                              run_id=None,
-                              **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
+                              run_id=None) -> InvokeAIStableDiffusionPipelineOutput:
         r"""
         Function invoked when calling the pipeline for generation.
 
@@ -310,15 +325,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         :param noise: Noise to add to the latents, sampled from a Gaussian distribution.
         :param callback:
         :param run_id:
-        :param extra_step_kwargs:
         """
         result_latents, result_attention_map_saver = self.latents_from_embeddings(
             latents, num_inference_steps,
             conditioning_data,
             noise=noise,
             run_id=run_id,
-            callback=callback,
-            **extra_step_kwargs)
+            callback=callback)
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
 
@@ -333,7 +346,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 noise: torch.Tensor,
                                 timesteps=None,
                                 additional_guidance: List[Callable] = None, run_id=None,
-                                callback: Callable[[PipelineIntermediateState], None] = None, **extra_step_kwargs) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+                                callback: Callable[[PipelineIntermediateState], None] = None
+                                ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if timesteps is None:
             self.scheduler.set_timesteps(num_inference_steps, device=self.unet.device)
             timesteps = self.scheduler.timesteps
@@ -343,8 +357,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             noise=noise,
             additional_guidance=additional_guidance,
             run_id=run_id,
-            callback=callback,
-            **extra_step_kwargs)
+            callback=callback)
         return result.latents, result.attention_map_saver
 
     def generate_latents_from_embeddings(self, latents: torch.Tensor, timesteps,
@@ -352,7 +365,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                          *,
                                          noise: torch.Tensor,
                                          run_id: str = None,
-                                         additional_guidance: List[Callable] = None, **extra_step_kwargs):
+                                         additional_guidance: List[Callable] = None):
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
         if additional_guidance is None:
@@ -377,8 +390,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         for i, t in enumerate(self.progress_bar(timesteps)):
             batched_t.fill_(t)
             step_output = self.step(batched_t, latents, conditioning_data,
-                                    i, additional_guidance=additional_guidance,
-                                    **extra_step_kwargs)
+                                    i, additional_guidance=additional_guidance)
             latents = step_output.prev_sample
             predicted_original = getattr(step_output, 'pred_original_sample', None)
 
@@ -397,8 +409,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     @torch.inference_mode()
     def step(self, t: torch.Tensor, latents: torch.Tensor,
              conditioning_data: ConditioningData,
-             step_index:int | None = None, additional_guidance: List[Callable] = None,
-             **extra_step_kwargs):
+             step_index:int | None = None, additional_guidance: List[Callable] = None):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
 
@@ -417,7 +428,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             step_index=step_index)
 
         # compute the previous noisy sample x_t -> x_t-1
-        step_output = self.scheduler.step(noise_pred, timestep, latents, **extra_step_kwargs)
+        step_output = self.scheduler.step(noise_pred, timestep, latents,
+                                          **conditioning_data.scheduler_args)
 
         # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
         #    But the way things are now, scheduler runs _after_ that, so there was
@@ -438,8 +450,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 conditioning_data: ConditioningData,
                                 *, callback: Callable[[PipelineIntermediateState], None] = None,
                                 run_id=None,
-                                noise_func=None,
-                                **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
+                                noise_func=None
+                                ) -> InvokeAIStableDiffusionPipelineOutput:
         if isinstance(init_image, PIL.Image.Image):
             init_image = image_resized_to_grid_as_tensor(init_image.convert('RGB'))
 
@@ -455,13 +467,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         return self.img2img_from_latents_and_embeddings(initial_latents, num_inference_steps,
                                                         conditioning_data,
                                                         strength,
-                                                        noise, run_id, callback,
-                                                        **extra_step_kwargs)
+                                                        noise, run_id, callback)
 
     def img2img_from_latents_and_embeddings(self, initial_latents, num_inference_steps,
                                             conditioning_data: ConditioningData,
                                             strength,
-                                            noise: torch.Tensor, run_id=None, callback=None, **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
+                                            noise: torch.Tensor, run_id=None, callback=None
+                                            ) -> InvokeAIStableDiffusionPipelineOutput:
         device = self.unet.device
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
         img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=device)
@@ -472,8 +484,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             timesteps=timesteps,
             noise=noise,
             run_id=run_id,
-            callback=callback,
-            **extra_step_kwargs)
+            callback=callback)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -493,7 +504,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             *, callback: Callable[[PipelineIntermediateState], None] = None,
             run_id=None,
             noise_func=None,
-            **extra_step_kwargs) -> InvokeAIStableDiffusionPipelineOutput:
+            ) -> InvokeAIStableDiffusionPipelineOutput:
         device = self.unet.device
         latents_dtype = self.unet.dtype
 
@@ -536,8 +547,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 init_image_latents, num_inference_steps,
                 conditioning_data, noise=noise, timesteps=timesteps,
                 additional_guidance=guidance,
-                run_id=run_id, callback=callback,
-                **extra_step_kwargs)
+                run_id=run_id, callback=callback)
         finally:
             self.invokeai_diffuser.model_forward_callback = self._unet_forward
 

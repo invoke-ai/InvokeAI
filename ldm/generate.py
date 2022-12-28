@@ -168,7 +168,7 @@ class Generate:
         self.steps          = 50
         self.cfg_scale      = 7.5
         self.sampler_name   = sampler_name
-        self.ddim_eta       = 0.0    # same seed always produces same image
+        self.ddim_eta       = ddim_eta    # same seed always produces same image
         self.precision      = precision
         self.strength       = 0.75
         self.seamless       = False
@@ -785,7 +785,7 @@ class Generate:
 
     def _make_embiggen(self):
         return self._load_generator('.embiggen','Embiggen')
-   
+
     def _make_txt2img2img(self):
         return self._load_generator('.txt2img2img','Txt2Img2Img')
 

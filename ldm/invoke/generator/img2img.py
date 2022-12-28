@@ -3,10 +3,11 @@ ldm.invoke.generator.img2img descends from ldm.invoke.generator
 '''
 
 import torch
+from diffusers import logging
 
 from ldm.invoke.generator.base import Generator
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
-from diffusers import logging
+
 
 class Img2Img(Generator):
     def __init__(self, model, precision):
@@ -23,12 +24,14 @@ class Img2Img(Generator):
         """
         self.perlin = perlin
 
-        uc, c, extra_conditioning_info   = conditioning
-        conditioning_data = ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
-
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
         pipeline.scheduler = sampler
+
+        uc, c, extra_conditioning_info   = conditioning
+        conditioning_data = (ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
+                             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
+
 
         def make_image(x_T):
             # FIXME: use x_T for initial seeded noise

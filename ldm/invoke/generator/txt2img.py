@@ -23,12 +23,15 @@ class Txt2Img(Generator):
         kwargs are 'width' and 'height'
         """
         self.perlin = perlin
-        uc, c, extra_conditioning_info   = conditioning
-        conditioning_data = ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
 
         # noinspection PyTypeChecker
         pipeline: StableDiffusionGeneratorPipeline = self.model
         pipeline.scheduler = sampler
+
+        uc, c, extra_conditioning_info   = conditioning
+        conditioning_data = (ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
+                             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
+
 
         def make_image(x_T) -> PIL.Image.Image:
             pipeline_output = pipeline.image_from_embeddings(
@@ -37,7 +40,6 @@ class Txt2Img(Generator):
                 num_inference_steps=steps,
                 conditioning_data=conditioning_data,
                 callback=step_callback
-                # TODO: eta = ddim_eta,
                 # TODO: threshold = threshold,
             )
             if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
