@@ -5,7 +5,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { Box, Flex, FormControl, HStack, VStack } from '@chakra-ui/react';
+import { Box, Flex, FormControl, HStack, Text, VStack } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 
@@ -301,6 +301,34 @@ export default function SearchModels() {
       )}
       {foundModels && (
         <Flex flexDirection={'column'} rowGap={'1rem'}>
+          {foundModels.length > 0 ? (
+            <Text
+              fontWeight="bold"
+              fontSize={14}
+              padding="0.5rem"
+              borderRadius="0.2rem"
+              margin="0 0.5rem 0 1rem"
+              textAlign="center"
+              backgroundColor="var(--accent-color)"
+              boxShadow="0 0 200px 6px var(--accent-color-bright)"
+            >
+              {t('modelmanager:selectAndAdd')}
+            </Text>
+          ) : (
+            <Text
+              fontWeight="bold"
+              fontSize={14}
+              padding="0.5rem"
+              borderRadius="0.2rem"
+              margin="0 0.5rem 0 1rem"
+              textAlign="center"
+              backgroundColor="var(--status-bad-color)"
+              boxShadow="0 0 200px 6px var(--status-bad-glow)"
+            >
+              {t('modelmanager:noModelsFound')}
+            </Text>
+          )}
+
           <Flex justifyContent={'space-between'} alignItems="center">
             <p>
               {t('modelmanager:modelsFound')}: {foundModels.length}
@@ -344,12 +372,13 @@ export default function SearchModels() {
             </IAIButton>
           </Flex>
           <Flex
-            rowGap={'1rem'}
+            rowGap="1rem"
             flexDirection="column"
-            maxHeight={'18rem'}
+            maxHeight="18rem"
             overflowY="scroll"
-            paddingRight={'1rem'}
-            paddingLeft={'0.2rem'}
+            paddingRight="1rem"
+            paddingLeft="0.2rem"
+            borderRadius="0.2rem"
           >
             {renderFoundModels()}
           </Flex>

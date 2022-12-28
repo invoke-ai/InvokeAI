@@ -43,6 +43,8 @@
   "showExisting": "Show Existing",
   "addSelected": "Add Selected",
   "modelExists": "Model Exists",
+  "selectAndAdd": "Select and Add Models Listed Below",
+  "noModelsFound": "No Models Found",
   "delete": "Delete",
   "deleteModel": "Delete Model",
   "deleteConfig": "Delete Config",
