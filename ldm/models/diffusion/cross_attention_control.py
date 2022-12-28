@@ -450,10 +450,12 @@ class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention,
         super().__init__(**kwargs)
         InvokeAICrossAttentionMixin.__init__(self)
 
-    def _attention(self, query, key, value):
+    def _attention(self, query, key, value, attention_mask=None):
         #default_result = super()._attention(query,  key, value)
-        damian_result = self.get_invokeai_attention_mem_efficient(query, key, value)
+        if attention_mask is not None:
+            print(f"{type(self).__name__} ignoring passed-in attention_mask")
+        attention_result = self.get_invokeai_attention_mem_efficient(query, key, value)
 
-        hidden_states = self.reshape_batch_dim_to_heads(damian_result)
+        hidden_states = self.reshape_batch_dim_to_heads(attention_result)
         return hidden_states
 
