@@ -1,5 +1,5 @@
 import { EditIcon, DeleteIcon } from '@chakra-ui/icons';
-import { Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
+import { Box, Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
 import { ModelStatus } from 'app/invokeai';
 import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store';
@@ -21,6 +21,10 @@ export default function ModelListItem(props: ModelListItemProps) {
     (state: RootState) => state.system
   );
 
+  const openModel = useAppSelector(
+    (state: RootState) => state.system.openModel
+  );
+
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
@@ -31,7 +35,7 @@ export default function ModelListItem(props: ModelListItemProps) {
     dispatch(requestModelChange(name));
   };
 
-  const openModel = () => {
+  const openModelHandler = () => {
     dispatch(setOpenModel(name));
   };
 
@@ -52,12 +56,24 @@ export default function ModelListItem(props: ModelListItemProps) {
   };
 
   return (
-    <Flex alignItems={'center'}>
-      <Tooltip label={description} hasArrow placement="bottom">
-        <Text fontWeight={'bold'}>{name}</Text>
-      </Tooltip>
-      <Spacer />
-
+    <Flex
+      alignItems={'center'}
+      padding="0.5rem 0.5rem"
+      borderRadius="0.2rem"
+      backgroundColor={name === openModel ? 'var(--accent-color)' : ''}
+      _hover={{
+        backgroundColor:
+          name === openModel
+            ? 'var(--accent-color)'
+            : 'var(--background-color)',
+      }}
+    >
+      <Box onClick={openModelHandler} cursor="pointer">
+        <Tooltip label={description} hasArrow placement="bottom">
+          <Text fontWeight={'bold'}>{name}</Text>
+        </Tooltip>
+      </Box>
+      <Spacer onClick={openModelHandler} cursor="pointer" />
       <Flex gap={2} alignItems="center">
         <Text color={statusTextColor()}>{status}</Text>
         <Button
@@ -71,7 +87,7 @@ export default function ModelListItem(props: ModelListItemProps) {
         <IAIIconButton
           icon={<EditIcon />}
           size={'sm'}
-          onClick={openModel}
+          onClick={openModelHandler}
           aria-label="Modify Config"
           isDisabled={status === 'active' || isProcessing || !isConnected}
           className=" modal-close-btn"
