@@ -34,6 +34,7 @@
   "checkpointFolder": "Checkpoint Folder",
   "clearCheckpointFolder": "Clear Checkpoint Folder",
   "findModels": "Find Models",
+  "scanAgain": "Scan Again",
   "modelsFound": "Models Found",
   "selectFolder": "Select Folder",
   "selected": "Selected",

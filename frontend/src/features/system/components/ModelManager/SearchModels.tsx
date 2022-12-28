@@ -26,6 +26,7 @@ import type { ReactNode, ChangeEvent } from 'react';
 import type { FoundModel } from 'app/invokeai';
 import IAIInput from 'common/components/IAIInput';
 import { Field, Formik } from 'formik';
+import { BiReset } from 'react-icons/bi';
 
 const existingModelsSelector = createSelector([systemSelector], (system) => {
   const { model_list } = system;
@@ -128,6 +129,10 @@ export default function SearchModels() {
 
   const shouldShowExistingModelsInSearch = useAppSelector(
     (state: RootState) => state.options.shouldShowExistingModelsInSearch
+  );
+
+  const isProcessing = useAppSelector(
+    (state: RootState) => state.system.isProcessing
   );
 
   const [modelsToAdd, setModelsToAdd] = React.useState<string[]>([]);
@@ -244,6 +249,16 @@ export default function SearchModels() {
             {searchFolder}
           </p>
           <IAIIconButton
+            aria-label={t('modelmanager:scanAgain')}
+            tooltip={t('modelmanager:scanAgain')}
+            icon={<BiReset />}
+            position={'absolute'}
+            right={16}
+            fontSize={18}
+            disabled={isProcessing}
+            onClick={() => dispatch(searchForModels(searchFolder))}
+          />
+          <IAIIconButton
             aria-label={t('modelmanager:clearCheckpointFolder')}
             icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
             position={'absolute'}
@@ -277,6 +292,7 @@ export default function SearchModels() {
                   aria-label={t('modelmanager:findModels')}
                   tooltip={t('modelmanager:findModels')}
                   type="submit"
+                  disabled={isProcessing}
                 />
               </HStack>
             </form>
