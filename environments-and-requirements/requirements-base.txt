@@ -35,7 +35,7 @@ torchmetrics
 transformers==4.25.*
 clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip
 clipseg @ https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip
-k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip
+k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/tags/v0.0.10.zip
 # k-diffusion @ https://github.com/crowsonkb/k-diffusion/archive/refs/tags/v0.0.12.zip
 pypatchmatch @ https://github.com/mauwii/PyPatchMatch/archive/refs/heads/master.zip
 # pypatchmatch @ https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip
