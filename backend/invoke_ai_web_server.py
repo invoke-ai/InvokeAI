@@ -22,6 +22,7 @@ from tkinter import filedialog
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
+from ldm.invoke.globals import Globals
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 from ldm.invoke.generator.inpaint import infill_methods
@@ -40,6 +41,9 @@ args.root_dir = os.path.expanduser(args.root_dir or "..")
 if not os.path.isabs(args.outdir):
     args.outdir = os.path.join(args.root_dir, args.outdir)
 
+# normalize the config directory relative to root
+if not os.path.isabs(opt.conf):
+    opt.conf = os.path.normpath(os.path.join(Globals.root,opt.conf))
 
 class InvokeAIWebServer:
     def __init__(self, generate: Generate, gfpgan, codeformer, esrgan) -> None:
