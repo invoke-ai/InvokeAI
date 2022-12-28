@@ -1,6 +1,7 @@
 name: invokeai
 channels:
   - pytorch
+  - huggingface
   - conda-forge
   - defaults
 dependencies:
@@ -44,7 +45,6 @@ dependencies:
   - pudb=2019.2
   - protobuf=3.20
   - py-opencv=4.6
-  - safetensors
   - scipy=1.9
   - streamlit=1.12
   - sympy=1.10
@@ -52,6 +52,7 @@ dependencies:
   - tensorboard=2.10
   - transformers~=4.25
   - pip:
+      - safetensors~=0.2
       - getpass_asterisk
       - picklescan
       - taming-transformers-rom1504
