@@ -701,6 +701,10 @@ class ModelCache(object):
         vae = None
         deferred_error = None
 
+        # A VAE may be in a subfolder of a model's repository.
+        if 'subfolder' in vae_config:
+            vae_args['subfolder'] = vae_config['subfolder']
+
         for fp_args in fp_args_list:
             # At some point we might need to be able to use different classes here? But for now I think
             # all Stable Diffusion VAE are AutoencoderKL.
@@ -716,9 +720,5 @@ class ModelCache(object):
 
         if not vae and deferred_error:
             print(f'** Could not load VAE {name_or_path}: {str(deferred_error)}')
-
-        # comment by lstein: I don't know what this does
-        if 'subfolder' in vae_config:
-            vae_args['subfolder'] = vae_config['subfolder']
 
         return vae
