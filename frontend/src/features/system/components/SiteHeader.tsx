@@ -1,12 +1,6 @@
 import { Link } from '@chakra-ui/react';
 
-import {
-  FaGithub,
-  FaDiscord,
-  FaBug,
-  FaKeyboard,
-  FaWrench,
-} from 'react-icons/fa';
+import { FaGithub, FaDiscord, FaBug, FaKeyboard, FaCube } from 'react-icons/fa';
 
 import InvokeAILogo from 'assets/images/logo.png';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -17,9 +11,12 @@ import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 import ThemeChanger from './ThemeChanger';
 import ModelSelect from './ModelSelect';
+import ModelManagerModal from './ModelManager/ModelManagerModal';
+
 import LanguagePicker from './LanguagePicker';
 
 import { useTranslation } from 'react-i18next';
+import { MdSettings } from 'react-icons/md';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
@@ -40,6 +37,18 @@ const SiteHeader = () => {
         <StatusIndicator />
 
         <ModelSelect />
+
+        <ModelManagerModal>
+          <IAIIconButton
+            aria-label={t('modelmanager:modelManager')}
+            tooltip={t('modelmanager:modelManager')}
+            size={'sm'}
+            variant="link"
+            data-variant="link"
+            fontSize={20}
+            icon={<FaCube />}
+          />
+        </ModelManagerModal>
 
         <HotkeysModal>
           <IAIIconButton
@@ -105,9 +114,9 @@ const SiteHeader = () => {
             tooltip={t('common:settingsLabel')}
             variant="link"
             data-variant="link"
-            fontSize={20}
+            fontSize={22}
             size={'sm'}
-            icon={<FaWrench />}
+            icon={<MdSettings />}
           />
         </SettingsModal>
       </div>

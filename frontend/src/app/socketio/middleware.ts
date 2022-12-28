@@ -45,6 +45,9 @@ export const socketioMiddleware = () => {
       onImageDeleted,
       onSystemConfig,
       onModelChanged,
+      onFoundModels,
+      onNewModelAdded,
+      onModelDeleted,
       onModelChangeFailed,
       onTempFolderEmptied,
     } = makeSocketIOListeners(store);
@@ -58,6 +61,9 @@ export const socketioMiddleware = () => {
       emitRequestNewImages,
       emitCancelProcessing,
       emitRequestSystemConfig,
+      emitSearchForModels,
+      emitAddNewModel,
+      emitDeleteModel,
       emitRequestModelChange,
       emitSaveStagingAreaImageToGallery,
       emitRequestEmptyTempFolder,
@@ -105,6 +111,18 @@ export const socketioMiddleware = () => {
 
       socketio.on('systemConfig', (data: InvokeAI.SystemConfig) => {
         onSystemConfig(data);
+      });
+
+      socketio.on('foundModels', (data: InvokeAI.FoundModelResponse) => {
+        onFoundModels(data);
+      });
+
+      socketio.on('newModelAdded', (data: InvokeAI.ModelAddedResponse) => {
+        onNewModelAdded(data);
+      });
+
+      socketio.on('modelDeleted', (data: InvokeAI.ModelDeletedResponse) => {
+        onModelDeleted(data);
       });
 
       socketio.on('modelChanged', (data: InvokeAI.ModelChangeResponse) => {
@@ -163,6 +181,21 @@ export const socketioMiddleware = () => {
 
       case 'socketio/requestSystemConfig': {
         emitRequestSystemConfig();
+        break;
+      }
+
+      case 'socketio/searchForModels': {
+        emitSearchForModels(action.payload);
+        break;
+      }
+
+      case 'socketio/addNewModel': {
+        emitAddNewModel(action.payload);
+        break;
+      }
+
+      case 'socketio/deleteModel': {
+        emitDeleteModel(action.payload);
         break;
       }
 

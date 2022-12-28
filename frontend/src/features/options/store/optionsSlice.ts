@@ -56,6 +56,7 @@ export interface OptionsState {
   variationAmount: number;
   width: number;
   shouldUseCanvasBetaLayout: boolean;
+  shouldShowExistingModelsInSearch: boolean;
 }
 
 const initialOptionsState: OptionsState = {
@@ -103,6 +104,7 @@ const initialOptionsState: OptionsState = {
   variationAmount: 0.1,
   width: 512,
   shouldUseCanvasBetaLayout: false,
+  shouldShowExistingModelsInSearch: false,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -404,6 +406,12 @@ export const optionsSlice = createSlice({
     setShouldUseCanvasBetaLayout: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCanvasBetaLayout = action.payload;
     },
+    setShouldShowExistingModelsInSearch: (
+      state,
+      action: PayloadAction<boolean>
+    ) => {
+      state.shouldShowExistingModelsInSearch = action.payload;
+    },
   },
 });
 
@@ -460,6 +468,7 @@ export const {
   setVariationAmount,
   setWidth,
   setShouldUseCanvasBetaLayout,
+  setShouldShowExistingModelsInSearch,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;
