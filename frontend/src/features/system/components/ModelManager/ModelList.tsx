@@ -88,7 +88,7 @@ const ModelList = () => {
 
       <Flex
         flexDirection={'column'}
-        gap={2}
+        gap={1}
         maxHeight={window.innerHeight - 360}
         overflow={'scroll'}
         paddingRight="1rem"
