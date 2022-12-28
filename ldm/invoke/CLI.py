@@ -135,7 +135,7 @@ def main():
     try:
         main_loop(gen, opt)
     except KeyboardInterrupt:
-        print("\ngoodbye!")
+        print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt):
@@ -410,7 +410,8 @@ def main_loop(gen, opt):
         output_cntr = write_log(results, log_path ,('txt', 'md'), output_cntr)
         print()
 
-    print('goodbye!')
+
+    print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
 
 # TO DO: remove repetitive code and the awkward command.replace() trope
 # Just do a simple parse of the command!
