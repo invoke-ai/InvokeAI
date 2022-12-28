@@ -222,4 +222,13 @@ chmod a+rx "$ROOTDIR"/invoke.sh
 cp templates/update.sh.in "$ROOTDIR"/update.sh
 chmod a+rx "$ROOTDIR"/update.sh
 
-echo "You may now run InvokeAI by entering the directory $ROOTDIR and running invoke.sh"
+echo "You may now run InvokeAI by entering the directory $ROOTDIR and running invoke.sh:"
+echo
+echo "  ${ROOTDIR}/invoke.sh"
+echo
+
+read -e -p "Run InvokeAI now? [y]:" input
+RESPONSE=${input:='y'}
+if [ "$RESPONSE" == 'y' ]; then
+    exec ${ROOTDIR}/invoke.sh
+fi
