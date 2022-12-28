@@ -235,7 +235,7 @@ export default function SearchModels() {
             style={{
               fontWeight: 'bold',
               fontSize: '0.8rem',
-              backgroundColor: 'var(--accent-color)',
+              backgroundColor: 'var(--background-color-secondary)',
               padding: '0.2rem 1rem',
               width: 'max-content',
               borderRadius: '0.2rem',
@@ -301,34 +301,6 @@ export default function SearchModels() {
       )}
       {foundModels && (
         <Flex flexDirection={'column'} rowGap={'1rem'}>
-          {foundModels.length > 0 ? (
-            <Text
-              fontWeight="bold"
-              fontSize={14}
-              padding="0.5rem"
-              borderRadius="0.2rem"
-              margin="0 0.5rem 0 1rem"
-              textAlign="center"
-              backgroundColor="var(--accent-color)"
-              boxShadow="0 0 200px 6px var(--accent-color-bright)"
-            >
-              {t('modelmanager:selectAndAdd')}
-            </Text>
-          ) : (
-            <Text
-              fontWeight="bold"
-              fontSize={14}
-              padding="0.5rem"
-              borderRadius="0.2rem"
-              margin="0 0.5rem 0 1rem"
-              textAlign="center"
-              backgroundColor="var(--status-bad-color)"
-              boxShadow="0 0 200px 6px var(--status-bad-glow)"
-            >
-              {t('modelmanager:noModelsFound')}
-            </Text>
-          )}
-
           <Flex justifyContent={'space-between'} alignItems="center">
             <p>
               {t('modelmanager:modelsFound')}: {foundModels.length}
@@ -367,6 +339,9 @@ export default function SearchModels() {
             <IAIButton
               isDisabled={modelsToAdd.length === 0}
               onClick={addSelectedModels}
+              backgroundColor={
+                modelsToAdd.length > 0 ? 'var(--accent-color) !important' : ''
+              }
             >
               {t('modelmanager:addSelected')}
             </IAIButton>
@@ -380,6 +355,36 @@ export default function SearchModels() {
             paddingLeft="0.2rem"
             borderRadius="0.2rem"
           >
+            {foundModels.length > 0 ? (
+              modelsToAdd.length === 0 && (
+                <Text
+                  fontWeight="bold"
+                  fontSize={14}
+                  padding="0.5rem"
+                  borderRadius="0.2rem"
+                  margin="0 0.5rem 0 1rem"
+                  textAlign="center"
+                  backgroundColor="var(--notice-color)"
+                  boxShadow="0 0 200px 6px var(--notice-color)"
+                  marginTop="1rem"
+                  width="max-content"
+                >
+                  {t('modelmanager:selectAndAdd')}
+                </Text>
+              )
+            ) : (
+              <Text
+                fontWeight="bold"
+                fontSize={14}
+                padding="0.5rem"
+                borderRadius="0.2rem"
+                textAlign="center"
+                backgroundColor="var(--status-bad-color)"
+              >
+                {t('modelmanager:noModelsFound')}
+              </Text>
+            )}
+
             {renderFoundModels()}
           </Flex>
         </Flex>
