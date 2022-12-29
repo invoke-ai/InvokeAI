@@ -15,6 +15,7 @@ i18n
       'gallery',
       'hotkeys',
       'options',
+      'options',
       'settings',
       'modelmanager',
       'toast',
