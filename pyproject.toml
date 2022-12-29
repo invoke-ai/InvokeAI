@@ -1,10 +1,19 @@
+[build-system]
+# These are the assumed default build requirements from pip:
+# https://pip.pypa.io/en/stable/reference/pip/#pep-517-and-518-support
+requires = ["setuptools>=43.0.0", "wheel", "build"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["configs*","invokeai","ldm*","backend*","scripts*"]
+
 [project]
-name = "InvokeAI"
+name = "invokeai"
 version = "2.2.4"
 description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-readme ="README.md"
+readme = "README.md"
 requires-python = ">=3.9, <3.11"
-license = {file = "LICENSE.txt"}
+license = {file = "LICENSE"}
 authors = [{name = "The InvokeAI Project", email = "lincoln.stein@gmail.com"}]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -75,20 +84,8 @@ train = ["accelerate"]
 invokeai = "ldm.invoke.CLI:main"
 configure_invokeai = "scripts.configure_invokeai:main"
 
-[tool.setuptools.packages.find]
-include = ["ldm*","static","backend*","configs*","frontend.dist*","scripts*"]
-
-[tools.setuptools.package-data]
-"frontend.dist" = ["*.*"]
-"configs" = [""]
-
 [project.urls]
 "Documentation" = "https://invoke-ai.github.io/InvokeAI/"
 "Source" = "https://github.com/invoke-ai/InvokeAI/"
 "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
-
-[build-system]
-# These are the assumed default build requirements from pip:
-# https://pip.pypa.io/en/stable/reference/pip/#pep-517-and-518-support
-requires = ["setuptools>=43.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+"Discord" = "https://discord.gg/ZmtBAhwWhy"
