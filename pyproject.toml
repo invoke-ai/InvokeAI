@@ -78,11 +78,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-train = ["accelerate"]
+train = [
+  "accelerate"
+]
+mps = [
+  "grpcio@https://github.com/pietrodn/grpcio-mac-arm-build/releases/download/1.51.1/grpcio-1.51.1-cp39-cp39-macosx_11_0_arm64.whl"
+]
 
 [project.scripts]
 invokeai = "ldm.invoke.CLI:main"
+# invokeai = "scripts.invoke:main"
 configure_invokeai = "scripts.configure_invokeai:main"
+create_root = "scripts.create_root:main"
 
 [project.urls]
 "Documentation" = "https://invoke-ai.github.io/InvokeAI/"

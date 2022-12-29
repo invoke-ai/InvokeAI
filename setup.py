@@ -13,5 +13,6 @@ setup(
             ('assets',['assets/caution.png']),
             ('configs',list_files('configs')),
             ('configs/stable-diffusion',list_files('configs/stable-diffusion')),
+            ('scripts',list_files('scripts')),
     ],
 )
