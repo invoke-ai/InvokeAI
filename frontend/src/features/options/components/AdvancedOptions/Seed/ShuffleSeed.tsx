@@ -22,6 +22,7 @@ export default function ShuffleSeed() {
       size={'sm'}
       isDisabled={shouldRandomizeSeed}
       onClick={handleClickRandomizeSeed}
+      padding="0 1.5rem"
     >
       <p>{t('options:shuffle')}</p>
     </Button>
