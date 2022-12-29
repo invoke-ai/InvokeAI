@@ -4,7 +4,7 @@
   "saveSteps": "Zapisuj obrazy co X kroków",
   "confirmOnDelete": "Potwierdzaj usuwanie",
   "displayHelpIcons": "Wyświetlaj ikony pomocy",
-  "useCanvasBeta": "Nowego układ trybu uniwersalnego",
+  "useCanvasBeta": "Nowy układ trybu uniwersalnego",
   "enableImageDebugging": "Włącz debugowanie obrazu",
   "resetWebUI": "Zresetuj interfejs",
   "resetWebUIDesc1": "Resetowanie interfejsu wyczyści jedynie dane i ustawienia zapisane w pamięci przeglądarki. Nie usunie żadnych obrazów z dysku.",

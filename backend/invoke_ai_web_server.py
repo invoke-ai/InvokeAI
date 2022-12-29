@@ -17,7 +17,6 @@ from PIL import Image, ImageOps
 from PIL.Image import Image as ImageType
 from uuid import uuid4
 from threading import Event
-from tkinter import filedialog
 
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
