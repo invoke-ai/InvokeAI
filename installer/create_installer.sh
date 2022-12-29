@@ -3,7 +3,7 @@
 cd "$(dirname "$0")"
 
 VERSION=$(grep ^VERSION ../setup.py | awk '{ print $3 }' | sed "s/'//g" )
-VERSION="$VERSION-p1"
+VERSION="$VERSION-p2"
 
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
@@ -40,8 +40,18 @@ egrep -v '^-e .' InvokeAI-Installer/environments-and-requirements/requirements-w
 cp InvokeAI-Installer/requirements.txt InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt
 zip -r InvokeAI-installer-$VERSION-windows.zip InvokeAI-Installer
 
+mkdir tmp
+cp templates/update.sh.in tmp/update.sh
+cp templates/update.bat.in tmp/update.bat
+chmod +x tmp/update.sh
+chmod +x tmp/update.bat
+cd tmp
+zip InvokeAI-updater-$VERSION.zip update.sh update.bat
+cd ..
+mv tmp/InvokeAI-updater-$VERSION.zip .
+
 # clean up
-rm -rf InvokeAI-Installer
+rm -rf InvokeAI-Installer tmp
 
 
 exit 0

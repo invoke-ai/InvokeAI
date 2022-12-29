@@ -4,7 +4,7 @@
 scriptdir=$(dirname "$0")
 cd "$scriptdir"
 
-INVOKEAI_VERSION="2.2.5-rc1"
+INVOKEAI_VERSION="2.2.5-rc2"
 
 # make sure we are not already in a venv
 # (don't need to check status)
