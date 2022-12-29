@@ -242,6 +242,9 @@ class ModelCache(object):
         # merged models from auto11 merge board are flat for some reason
         if 'state_dict' in sd:
             sd = sd['state_dict']
+
+        print(f'  | Forcing garbage collection prior to loading new model')
+        gc.collect()
         model = instantiate_from_config(omega_config.model)
         model.load_state_dict(sd, strict=False)
 
