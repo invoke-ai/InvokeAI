@@ -4,14 +4,14 @@
 scriptdir=$(dirname "$0")
 cd "$scriptdir"
 
-INVOKEAI_VERSION="2.2.5-rc2"
+# This version number will be replaced by the one supplied to create_installers.sh.
+# Do not change it here - change it in create_installers.sh.
+INVOKEAI_VERSION="latest"
 
 # make sure we are not already in a venv
 # (don't need to check status)
 deactivate >/dev/null 2>&1
 
-# this should be changed to the tagged release!
-# INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
 INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${INVOKEAI_VERSION}.zip
 INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting

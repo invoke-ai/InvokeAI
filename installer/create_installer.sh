@@ -3,7 +3,8 @@
 cd "$(dirname "$0")"
 
 VERSION=$(grep ^VERSION ../setup.py | awk '{ print $3 }' | sed "s/'//g" )
-VERSION="$VERSION-p3"
+PATCH="-rc4"
+VERSION="${VERSION}${PATCH}"
 
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
@@ -23,7 +24,7 @@ cp -pr ../configs InvokeAI-Installer/templates/rootdir/
 
 mkdir InvokeAI-Installer/templates/rootdir/{outputs,embeddings,models}
 
-cp install.sh.in InvokeAI-Installer/install.sh
+perl -p -e "s/^INVOKEAI_VERSION=.*/INVOKEAI_VERSION=\"$VERSION\"/" install.sh.in > InvokeAI-Installer/install.sh
 chmod a+rx InvokeAI-Installer/install.sh
 
 zip -r InvokeAI-installer-$VERSION-linux.zip InvokeAI-Installer
@@ -31,7 +32,7 @@ zip -r InvokeAI-installer-$VERSION-mac.zip InvokeAI-Installer
 
 # now do the windows installer
 rm InvokeAI-Installer/install.sh
-cp install.bat.in InvokeAI-Installer/install.bat
+perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in > InvokeAI-Installer/install.bat
 cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
 # this gets rid of the "-e ." at the end of the windows requirements file
