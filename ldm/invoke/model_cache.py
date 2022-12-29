@@ -162,6 +162,9 @@ class ModelCache(object):
             default = self.config[name].default if 'default' in self.config[name] else False
             vae = self.config[name].vae if 'vae' in self.config[name] else '<no vae>'
 
+            if isinstance(vae, DictConfig):
+                vae = OmegaConf.to_object(vae)  # so it can be JSON-serialized
+
             if self.current_model == name:
                 status = 'active'
             elif name in self.models:
