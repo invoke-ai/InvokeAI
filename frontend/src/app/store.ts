@@ -44,6 +44,7 @@ const systemBlacklist = [
   'socketId',
   'totalIterations',
   'totalSteps',
+  'openModel',
 ].map((blacklistItem) => `system.${blacklistItem}`);
 
 const galleryBlacklist = [
