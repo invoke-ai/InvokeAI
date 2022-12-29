@@ -17,7 +17,7 @@ include = [
 
 [project]
 name = "invokeai"
-version = "2.2.4.0"
+version = "2.2.4.2"
 description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
 readme = "README.md"
 requires-python = ">=3.9, <3.11"
@@ -83,10 +83,8 @@ dependencies = [
   "torchvision",
   "torchmetrics",
   "transformers==4.25.1",
-  # "clip", # @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  # "clipseg", # @ https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip",
-  "k-diffusion", # @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip
-  "pypatchmatch ", # @ https://github.com/mauwii/PyPatchMatch/archive/refs/heads/master.zip",
+  "k-diffusion",
+  "pypatchmatch ",
 ]
 
 [project.optional-dependencies]
