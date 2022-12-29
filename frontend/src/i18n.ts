@@ -12,12 +12,14 @@ i18n
     debug: false,
     ns: [
       'common',
-      'options',
-      'unifiedcanvas',
       'gallery',
-      'toast',
       'hotkeys',
+      'options',
       'settings',
+      'modelmanager',
+      'toast',
+      'tooltip',
+      'unifiedcanvas',
     ],
     backend: {
       loadPath: '/locales/{{ns}}/{{lng}}.json',

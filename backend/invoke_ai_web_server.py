@@ -21,6 +21,7 @@ from threading import Event
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
+from ldm.invoke.globals import Globals
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 from ldm.invoke.generator.inpaint import infill_methods
@@ -39,6 +40,9 @@ args.root_dir = os.path.expanduser(args.root_dir or "..")
 if not os.path.isabs(args.outdir):
     args.outdir = os.path.join(args.root_dir, args.outdir)
 
+# normalize the config directory relative to root
+if not os.path.isabs(opt.conf):
+    opt.conf = os.path.normpath(os.path.join(Globals.root,opt.conf))
 
 class InvokeAIWebServer:
     def __init__(self, generate: Generate, gfpgan, codeformer, esrgan) -> None:
@@ -296,6 +300,78 @@ class InvokeAIWebServer:
             config["model_list"] = self.generate.model_cache.list_models()
             config["infill_methods"] = infill_methods()
             socketio.emit("systemConfig", config)
+
+        @socketio.on('searchForModels')
+        def handle_search_models(search_folder: str):
+            try:
+                if not search_folder:
+                    socketio.emit(
+                    "foundModels",
+                    {'search_folder': None, 'found_models': None},
+                )
+                else:
+                    search_folder, found_models = self.generate.model_cache.search_models(search_folder)
+                    socketio.emit(
+                        "foundModels",
+                        {'search_folder': search_folder, 'found_models': found_models},
+                    )            
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
+        @socketio.on("addNewModel")
+        def handle_add_model(new_model_config: dict):
+            try:
+                model_name = new_model_config['name']
+                del new_model_config['name']
+                model_attributes = new_model_config
+                update = False
+                current_model_list = self.generate.model_cache.list_models()
+                if model_name in current_model_list:
+                    update = True
+
+                print(f">> Adding New Model: {model_name}")
+
+                self.generate.model_cache.add_model(
+                    model_name=model_name, model_attributes=model_attributes, clobber=True)
+                self.generate.model_cache.commit(opt.conf)
+
+                new_model_list = self.generate.model_cache.list_models()
+                socketio.emit(
+                    "newModelAdded",
+                    {"new_model_name": model_name,
+                     "model_list": new_model_list, 'update': update},
+                )
+                print(f">> New Model Added: {model_name}")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
+        @socketio.on("deleteModel")
+        def handle_delete_model(model_name: str):
+            try:
+                print(f">> Deleting Model: {model_name}")
+                self.generate.model_cache.del_model(model_name)
+                self.generate.model_cache.commit(opt.conf)
+                updated_model_list = self.generate.model_cache.list_models()
+                socketio.emit(
+                    "modelDeleted",
+                    {"deleted_model_name": model_name,
+                     "model_list": updated_model_list},
+                )
+                print(f">> Model Deleted: {model_name}")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
 
         @socketio.on("requestModelChange")
         def handle_set_model(model_name: str):

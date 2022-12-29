@@ -8,6 +8,8 @@ import gallery from '../public/locales/gallery/en.json';
 import toast from '../public/locales/toast/en.json';
 import hotkeys from '../public/locales/hotkeys/en.json';
 import settings from '../public/locales/settings/en.json';
+import tooltip from '../public/locales/tooltip/en.json';
+import modelmanager from '../public/locales/modelmanager/en.json';
 
 declare module 'i18next' {
   // Extend CustomTypeOptions
@@ -23,6 +25,8 @@ declare module 'i18next' {
       toast: typeof toast;
       hotkeys: typeof hotkeys;
       settings: typeof settings;
+      tooltip: typeof tooltip;
+      modelmanager: typeof modelmanager;
     };
     // Never Return Null
     returnNull: false;
