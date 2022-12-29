@@ -3,7 +3,7 @@ import os.path
 import torch
 import torch.nn as nn
 from functools import partial
-import clip
+import vendored.clip.clip.clip as clip
 from einops import rearrange, repeat
 from transformers import CLIPTokenizer, CLIPTextModel
 import kornia

@@ -1,0 +1,6 @@
+[submodule "vendored/clipseg"]
+	path = vendored/clipseg
+	url = https://github.com/timojl/clipseg.git
+[submodule "vendored/clip"]
+	path = vendored/clip
+	url = https://github.com/openai/CLIP.git

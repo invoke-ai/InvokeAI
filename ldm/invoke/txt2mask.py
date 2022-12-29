@@ -30,7 +30,7 @@ work fine.
 import torch
 import numpy as  np
 import os
-from clipseg.clipseg import CLIPDensePredT
+from vendored.clipseg.models.clipseg import CLIPDensePredT
 from einops import rearrange, repeat
 from PIL import Image, ImageOps
 from torchvision import transforms
