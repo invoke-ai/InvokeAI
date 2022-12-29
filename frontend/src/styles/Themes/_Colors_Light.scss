@@ -84,6 +84,7 @@
   --status-working-glow: var(--background-color);
   --status-bad-color: rgb(202, 0, 0);
   --status-bad-glow: var(--background-color);
+  --notice-color: rgb(255, 71, 90);
 
   // Settings Modal
   --settings-modal-bg: rgb(202, 204, 206);
@@ -127,4 +128,8 @@
 
   // Checkerboard
   --checkboard-dots-color: rgb(160, 160, 172);
+
+  // Scrollbar
+  --scrollbar-color: rgb(180, 180, 184);
+  --scrollbar-color-hover: rgb(150, 150, 154);
 }

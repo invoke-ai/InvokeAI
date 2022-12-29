@@ -30,6 +30,14 @@ export const requestSystemConfig = createAction<undefined>(
   'socketio/requestSystemConfig'
 );
 
+export const searchForModels = createAction<string>('socketio/searchForModels');
+
+export const addNewModel = createAction<InvokeAI.InvokeModelConfigProps>(
+  'socketio/addNewModel'
+);
+
+export const deleteModel = createAction<string>('socketio/deleteModel');
+
 export const requestModelChange = createAction<string>(
   'socketio/requestModelChange'
 );

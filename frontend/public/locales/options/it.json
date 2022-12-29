@@ -43,7 +43,7 @@
   "toggleLoopback": "Attiva/disattiva elaborazione ricorsiva",
   "invoke": "Invoca",
   "cancel": "Annulla",
-  "promptPlaceholder": "Digita qui il prompt. [token negativi], (aumenta il peso)++, (diminuisci il peso)--, scambia e fondi sono disponibili (consulta la documentazione)",
+  "promptPlaceholder": "Digita qui il prompt usando termini in lingua inglese. [token negativi], (aumenta il peso)++, (diminuisci il peso)--, scambia e fondi sono disponibili (consulta la documentazione)",
   "sendTo": "Invia a",
   "sendToImg2Img": "Invia a da Immagine a Immagine",
   "sendToUnifiedCanvas": "Invia a Tela Unificata",

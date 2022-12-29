@@ -17,6 +17,8 @@ import {
   setModelList,
   setIsCancelable,
   addToast,
+  setFoundModels,
+  setSearchFolder,
 } from 'features/system/store/systemSlice';
 
 import {
@@ -350,6 +352,57 @@ const makeSocketIOListeners = (
       if (!data.infill_methods.includes('patchmatch')) {
         dispatch(setInfillMethod(data.infill_methods[0]));
       }
+    },
+    onFoundModels: (data: InvokeAI.FoundModelResponse) => {
+      const { search_folder, found_models } = data;
+      dispatch(setSearchFolder(search_folder));
+      dispatch(setFoundModels(found_models));
+    },
+    onNewModelAdded: (data: InvokeAI.ModelAddedResponse) => {
+      const { new_model_name, model_list, update } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setIsProcessing(false));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `Model Added: ${new_model_name}`,
+          level: 'info',
+        })
+      );
+      dispatch(
+        addToast({
+          title: !update
+            ? `${i18n.t('modelmanager:modelAdded')}: ${new_model_name}`
+            : `${i18n.t('modelmanager:modelUpdated')}: ${new_model_name}`,
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
+    },
+    onModelDeleted: (data: InvokeAI.ModelDeletedResponse) => {
+      const { deleted_model_name, model_list } = data;
+      dispatch(setModelList(model_list));
+      dispatch(setIsProcessing(false));
+      dispatch(
+        addLogEntry({
+          timestamp: dateFormat(new Date(), 'isoDateTime'),
+          message: `${i18n.t(
+            'modelmanager:modelAdded'
+          )}: ${deleted_model_name}`,
+          level: 'info',
+        })
+      );
+      dispatch(
+        addToast({
+          title: `${i18n.t(
+            'modelmanager:modelEntryDeleted'
+          )}: ${deleted_model_name}`,
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+        })
+      );
     },
     onModelChanged: (data: InvokeAI.ModelChangeResponse) => {
       const { model_name, model_list } = data;
