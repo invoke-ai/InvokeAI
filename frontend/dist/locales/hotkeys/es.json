@@ -1,0 +1,207 @@
+{
+  "keyboardShortcuts": "Atajos de teclado",
+  "appHotkeys": "Atajos de applicación",
+  "generalHotkeys": "Atajos generales",
+  "galleryHotkeys": "Atajos de galería",
+  "unifiedCanvasHotkeys": "Atajos de lienzo unificado",
+  "invoke": {
+    "title": "Invocar",
+    "desc": "Generar una imagen"
+  },
+  "cancel": {
+    "title": "Cancelar",
+    "desc": "Cancelar el proceso de generación de imagen"
+  },
+  "focusPrompt": {
+    "title": "Mover foco a Entrada de texto",
+    "desc": "Mover foco hacia el campo de texto de la Entrada"
+  },
+  "toggleOptions": {
+    "title": "Alternar opciones",
+    "desc": "Mostar y ocultar el panel de opciones"
+  },
+  "pinOptions": {
+    "title": "Fijar opciones",
+    "desc": "Fijar el panel de opciones"
+  },
+  "toggleViewer": {
+    "title": "Alternar visor",
+    "desc": "Mostar y ocultar el visor de imágenes"
+  },
+  "toggleGallery": {
+    "title": "Alternar galería",
+    "desc": "Mostar y ocultar la galería de imágenes"
+  },
+  "maximizeWorkSpace": {
+    "title": "Maximizar espacio de trabajo",
+    "desc": "Cerrar otros páneles y maximizar el espacio de trabajo"
+  },
+  "changeTabs": {
+    "title": "Cambiar",
+    "desc": "Cambiar entre áreas de trabajo"
+  },
+  "consoleToggle": {
+    "title": "Alternar consola",
+    "desc": "Mostar y ocultar la consola"
+  },
+  "setPrompt": {
+    "title": "Establecer Entrada",
+    "desc": "Usar el texto de entrada de la imagen actual"
+  },
+  "setSeed": {
+    "title": "Establecer semilla",
+    "desc": "Usar la semilla de la imagen actual"
+  },
+  "setParameters": {
+    "title": "Establecer parámetros",
+    "desc": "Usar todos los parámetros de la imagen actual"
+  },
+  "restoreFaces": {
+    "title": "Restaurar rostros",
+    "desc": "Restaurar rostros en la imagen actual"
+  },
+  "upscale": {
+    "title": "Aumentar resolución",
+    "desc": "Aumentar la resolución de la imagen actual"
+  },
+  "showInfo": {
+    "title": "Mostrar información",
+    "desc": "Mostar metadatos de la imagen actual"
+  },
+  "sendToImageToImage": {
+    "title": "Enviar hacia Imagen a Imagen",
+    "desc": "Enviar imagen actual hacia Imagen a Imagen"
+  },
+  "deleteImage": {
+    "title": "Eliminar imagen",
+    "desc": "Eliminar imagen actual"
+  },
+  "closePanels": {
+    "title": "Cerrar páneles",
+    "desc": "Cerrar los páneles abiertos"
+  },
+  "previousImage": {
+    "title": "Imagen anterior",
+    "desc": "Muetra la imagen anterior en la galería"
+  },
+  "nextImage": {
+    "title": "Imagen siguiente",
+    "desc": "Muetra la imagen siguiente en la galería"
+  },
+  "toggleGalleryPin": {
+    "title": "Alternar fijado de galería",
+    "desc": "Fijar o desfijar la galería en la interfaz"
+  },
+  "increaseGalleryThumbSize": {
+    "title": "Aumentar imagen en galería",
+    "desc": "Aumenta el tamaño de las miniaturas de la galería"
+  },
+  "decreaseGalleryThumbSize": {
+    "title": "Reducir imagen en galería",
+    "desc": "Reduce el tamaño de las miniaturas de la galería"
+  },
+  "selectBrush": {
+    "title": "Seleccionar pincel",
+    "desc": "Selecciona el pincel en el lienzo"
+  },
+  "selectEraser": {
+    "title": "Seleccionar borrador",
+    "desc": "Selecciona el borrador en el lienzo"
+  },
+  "decreaseBrushSize": {
+    "title": "Disminuir tamaño de herramienta",
+    "desc": "Disminuye el tamaño del pincel/borrador en el lienzo"
+  },
+  "increaseBrushSize": {
+    "title": "Aumentar tamaño del pincel",
+    "desc": "Aumenta el tamaño del pincel en el lienzo"
+  },
+  "decreaseBrushOpacity": {
+    "title": "Disminuir opacidad del pincel",
+    "desc": "Disminuye la opacidad del pincel en el lienzo"
+  },
+  "increaseBrushOpacity": {
+    "title": "Aumentar opacidad del pincel",
+    "desc": "Aumenta la opacidad del pincel en el lienzo"
+  },
+  "moveTool": {
+    "title": "Herramienta de movimiento",
+    "desc": "Permite navegar por el lienzo"
+  },
+  "fillBoundingBox": {
+    "title": "Rellenar Caja contenedora",
+    "desc": "Rellena la caja contenedora con el color seleccionado"
+  },
+  "eraseBoundingBox": {
+    "title": "Borrar Caja contenedora",
+    "desc": "Borra el contenido dentro de la caja contenedora"
+  },
+  "colorPicker": {
+    "title": "Selector de color",
+    "desc": "Selecciona un color del lienzo"
+  },
+  "toggleSnap": {
+    "title": "Alternar ajuste de cuadrícula",
+    "desc": "Activa o desactiva el ajuste automático a la cuadrícula"
+  },
+  "quickToggleMove": {
+    "title": "Alternar movimiento rápido",
+    "desc": "Activa momentáneamente la herramienta de movimiento"
+  },
+  "toggleLayer": {
+    "title": "Alternar capa",
+    "desc": "Alterna entre las capas de máscara y base"
+  },
+  "clearMask": {
+    "title": "Limpiar máscara",
+    "desc": "Limpia toda la máscara actual"
+  },
+  "hideMask": {
+    "title": "Ocultar máscara",
+    "desc": "Oculta o muetre la máscara actual"
+  },
+  "showHideBoundingBox": {
+    "title": "Alternar caja contenedora",
+    "desc": "Muestra u oculta la caja contenedora"
+  },
+  "mergeVisible": {
+    "title": "Consolida capas visibles",
+    "desc": "Consolida todas las capas visibles en una sola"
+  },
+  "saveToGallery": {
+    "title": "Guardar en galería",
+    "desc": "Guardar la imagen actual del lienzo en la galería"
+  },
+  "copyToClipboard": {
+    "title": "Copiar al portapapeles",
+    "desc": "Copiar el lienzo actual al portapapeles"
+  },
+  "downloadImage": {
+    "title": "Descargar imagen",
+    "desc": "Descargar la imagen actual del lienzo"
+  },
+  "undoStroke": {
+    "title": "Deshar trazo",
+    "desc": "Desahacer el último trazo del pincel"
+  },
+  "redoStroke": {
+    "title": "Rehacer trazo",
+    "desc": "Rehacer el último trazo del pincel"
+  },
+  "resetView": {
+    "title": "Restablecer vista",
+    "desc": "Restablecer la vista del lienzo"
+  },
+  "previousStagingImage": {
+    "title": "Imagen anterior",
+    "desc": "Imagen anterior en el área de preparación"
+  },
+  "nextStagingImage": {
+    "title": "Imagen siguiente",
+    "desc": "Siguiente imagen en el área de preparación"
+  },
+  "acceptStagingImage": {
+    "title": "Aceptar imagen",
+    "desc": "Aceptar la imagen actual en el área de preparación"
+  }
+}
