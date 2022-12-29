@@ -5,7 +5,7 @@
   "width": "Ширина",
   "height": "Высота",
   "sampler": "Семплер",
-  "seed": "Сид (Seed)",
+  "seed": "Сид",
   "randomizeSeed": "Случайный сид",
   "shuffle": "Обновить",
   "noiseThreshold": "Порог шума",
