@@ -1,15 +1,23 @@
 [build-system]
-# These are the assumed default build requirements from pip:
-# https://pip.pypa.io/en/stable/reference/pip/#pep-517-and-518-support
-requires = ["setuptools>=43.0.0", "wheel", "build"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["configs*","invokeai","ldm*","backend*","scripts*"]
+include = [
+  "backend*",
+  "configs*",
+  "invokeai",
+  "ldm*",
+  "scripts*",
+  "vendored*"
+]
+
+[tool.setuptools.package-data]
+"vendored.clip.clip" = ["*.txt.gz"]
 
 [project]
 name = "invokeai"
-version = "2.2.4"
+version = "2.2.4.0"
 description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
 readme = "README.md"
 requires-python = ">=3.9, <3.11"
@@ -37,6 +45,10 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Topic :: Scientific/Engineering :: Image Processing",
 ]
+# dynamic = ["dependencies"]
+# [tool.setuptools.dynamic]
+# dependencies = {file = ["environments-and-requirements/requirements-base.txt"]}
+
 dependencies = [
   "albumentations",
   "diffusers[torch]==0.10.*",
@@ -70,19 +82,16 @@ dependencies = [
   "torch-fidelity",
   "torchvision",
   "torchmetrics",
-  "transformers==4.25.*",
-  "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  "clipseg @ https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip",
-  "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
-  "pypatchmatch @ https://github.com/mauwii/PyPatchMatch/archive/refs/heads/master.zip",
+  "transformers==4.25.1",
+  # "clip", # @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
+  # "clipseg", # @ https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip",
+  "k-diffusion", # @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip
+  "pypatchmatch ", # @ https://github.com/mauwii/PyPatchMatch/archive/refs/heads/master.zip",
 ]
 
 [project.optional-dependencies]
 train = [
   "accelerate"
-]
-mps = [
-  "grpcio@https://github.com/pietrodn/grpcio-mac-arm-build/releases/download/1.51.1/grpcio-1.51.1-cp39-cp39-macosx_11_0_arm64.whl"
 ]
 
 [project.scripts]
