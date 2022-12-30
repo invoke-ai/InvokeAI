@@ -90,15 +90,6 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
-      # - name: InvokeAI model cache
-      #   id: cache-sd-model
-      #   uses: actions/cache@v3
-      #   env:
-      #     cache-name: invokeai-models
-      #   with:
-      #     path: ${{ env.INVOKEAI_ROOT }}/models
-      #     key: ${{ env.cache-name }}
-
       - name: run configure_invokeai.py
         id: run-preload-models
         run: |

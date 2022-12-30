@@ -73,9 +73,6 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
-      - name: create requirements.txt
-        run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
-
       - name: setup python
         uses: actions/setup-python@v4
         with:
@@ -84,19 +81,16 @@ jobs:
           # cache-dependency-path: ${{ matrix.requirements-file }}
 
       - name: install dependencies
-        run: pip3 install --upgrade pip setuptools wheel
+        run: pip3 install --upgrade pip setuptools wheel pip-tools
 
-      - name: install requirements
-        run: pip3 install -r '${{ matrix.requirements-file }}'
+      # - name: create requirements.txt
+      #   run: pip-compile -o requirements.txt pyproject.toml
 
-      # - name: InvokeAI model cache
-      #   id: cache-sd-model
-      #   uses: actions/cache@v3
-      #   env:
-      #     cache-name: invokeai-models
-      #   with:
-      #     path: ${{ env.INVOKEAI_ROOT }}/models
-      #     key: ${{ env.cache-name }}
+      # - name: install requirements
+      #   run: pip3 install -r requirements.txt
+
+      - name: install pyproject
+        run: pip install .
 
       - name: run configure_invokeai.py
         id: run-preload-models
