@@ -142,6 +142,8 @@ const IAINumberInput = (props: Props) => {
         <NumberInput
           className="invokeai__number-input-root"
           value={valueAsString}
+          min={min}
+          max={max}
           keepWithinRange={true}
           clampValueOnBlur={false}
           onChange={handleOnChange}
