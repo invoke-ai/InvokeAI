@@ -3,11 +3,13 @@ import IAIButton from 'common/components/IAIButton';
 
 import { clearMask } from 'features/canvas/store/canvasSlice';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { FaTrash } from 'react-icons/fa';
 
 export default function UnifiedCanvasClearMask() {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleClearMask = () => dispatch(clearMask());
 
@@ -16,9 +18,9 @@ export default function UnifiedCanvasClearMask() {
       size={'sm'}
       leftIcon={<FaTrash />}
       onClick={handleClearMask}
-      tooltip="Clear Mask (Shift+C)"
+      tooltip={`${t('unifiedcanvas:clearMask')} (Shift+C)`}
     >
-      Clear
+      {t('unifiedcanvas:betaClear')}
     </IAIButton>
   );
 }

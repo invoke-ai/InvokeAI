@@ -21,6 +21,7 @@ from threading import Event
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
+from ldm.invoke.globals import Globals
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 from ldm.invoke.generator.inpaint import infill_methods
@@ -39,6 +40,9 @@ args.root_dir = os.path.expanduser(args.root_dir or "..")
 if not os.path.isabs(args.outdir):
     args.outdir = os.path.join(args.root_dir, args.outdir)
 
+# normalize the config directory relative to root
+if not os.path.isabs(opt.conf):
+    opt.conf = os.path.normpath(os.path.join(Globals.root,opt.conf))
 
 class InvokeAIWebServer:
     def __init__(self, generate: Generate, gfpgan, codeformer, esrgan) -> None:
@@ -303,6 +307,78 @@ class InvokeAIWebServer:
             config["model_list"] = self.generate.model_cache.list_models()
             config["infill_methods"] = infill_methods()
             socketio.emit("systemConfig", config)
+
+        @socketio.on('searchForModels')
+        def handle_search_models(search_folder: str):
+            try:
+                if not search_folder:
+                    socketio.emit(
+                    "foundModels",
+                    {'search_folder': None, 'found_models': None},
+                )
+                else:
+                    search_folder, found_models = self.generate.model_cache.search_models(search_folder)
+                    socketio.emit(
+                        "foundModels",
+                        {'search_folder': search_folder, 'found_models': found_models},
+                    )            
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
+        @socketio.on("addNewModel")
+        def handle_add_model(new_model_config: dict):
+            try:
+                model_name = new_model_config['name']
+                del new_model_config['name']
+                model_attributes = new_model_config
+                update = False
+                current_model_list = self.generate.model_cache.list_models()
+                if model_name in current_model_list:
+                    update = True
+
+                print(f">> Adding New Model: {model_name}")
+
+                self.generate.model_cache.add_model(
+                    model_name=model_name, model_attributes=model_attributes, clobber=True)
+                self.generate.model_cache.commit(opt.conf)
+
+                new_model_list = self.generate.model_cache.list_models()
+                socketio.emit(
+                    "newModelAdded",
+                    {"new_model_name": model_name,
+                     "model_list": new_model_list, 'update': update},
+                )
+                print(f">> New Model Added: {model_name}")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
+
+        @socketio.on("deleteModel")
+        def handle_delete_model(model_name: str):
+            try:
+                print(f">> Deleting Model: {model_name}")
+                self.generate.model_cache.del_model(model_name)
+                self.generate.model_cache.commit(opt.conf)
+                updated_model_list = self.generate.model_cache.list_models()
+                socketio.emit(
+                    "modelDeleted",
+                    {"deleted_model_name": model_name,
+                     "model_list": updated_model_list},
+                )
+                print(f">> Model Deleted: {model_name}")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n")
 
         @socketio.on("requestModelChange")
         def handle_set_model(model_name: str):
@@ -600,11 +676,11 @@ class InvokeAIWebServer:
                     pass
 
                 if postprocessing_parameters["type"] == "esrgan":
-                    progress.set_current_status("Upscaling (ESRGAN)")
+                    progress.set_current_status("common:statusUpscalingESRGAN")
                 elif postprocessing_parameters["type"] == "gfpgan":
-                    progress.set_current_status("Restoring Faces (GFPGAN)")
+                    progress.set_current_status("common:statusRestoringFacesGFPGAN")
                 elif postprocessing_parameters["type"] == "codeformer":
-                    progress.set_current_status("Restoring Faces (Codeformer)")
+                    progress.set_current_status("common:statusRestoringFacesCodeFormer")
 
                 socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -637,7 +713,7 @@ class InvokeAIWebServer:
                         f'{postprocessing_parameters["type"]} is not a valid postprocessing type'
                     )
 
-                progress.set_current_status("Saving Image")
+                progress.set_current_status("common:statusSavingImage")
                 socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
@@ -867,15 +943,15 @@ class InvokeAIWebServer:
                 nonlocal progress
 
                 generation_messages = {
-                    "txt2img": "Text to Image",
-                    "img2img": "Image to Image",
-                    "inpainting": "Inpainting",
-                    "outpainting": "Outpainting",
+                    "txt2img": "common:statusGeneratingTextToImage",
+                    "img2img": "common:statusGeneratingImageToImage",
+                    "inpainting": "common:statusGeneratingInpainting",
+                    "outpainting": "common:statusGeneratingOutpainting",
                 }
 
                 progress.set_current_step(step + 1)
                 progress.set_current_status(
-                    f"Generating ({generation_messages[actual_generation_mode]})"
+                    f"{generation_messages[actual_generation_mode]}"
                 )
                 progress.set_current_status_has_steps(True)
 
@@ -962,7 +1038,7 @@ class InvokeAIWebServer:
                         **generation_parameters["bounding_box"],
                     )
 
-                progress.set_current_status("Generation Complete")
+                progress.set_current_status("common:statusGenerationComplete")
 
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
@@ -989,7 +1065,7 @@ class InvokeAIWebServer:
                     raise CanceledException
 
                 if esrgan_parameters:
-                    progress.set_current_status("Upscaling")
+                    progress.set_current_status("common:statusUpscaling")
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                     eventlet.sleep(0)
@@ -1012,9 +1088,9 @@ class InvokeAIWebServer:
 
                 if facetool_parameters:
                     if facetool_parameters["type"] == "gfpgan":
-                        progress.set_current_status("Restoring Faces (GFPGAN)")
+                        progress.set_current_status("common:statusRestoringFacesGFPGAN")
                     elif facetool_parameters["type"] == "codeformer":
-                        progress.set_current_status("Restoring Faces (Codeformer)")
+                        progress.set_current_status("common:statusRestoringFacesCodeFormer")
 
                     progress.set_current_status_has_steps(False)
                     self.socketio.emit("progressUpdate", progress.to_formatted_dict())
@@ -1046,7 +1122,7 @@ class InvokeAIWebServer:
                     ]
                     all_parameters["facetool_type"] = facetool_parameters["type"]
 
-                progress.set_current_status("Saving Image")
+                progress.set_current_status("common:statusSavingImage")
                 self.socketio.emit("progressUpdate", progress.to_formatted_dict())
                 eventlet.sleep(0)
 
@@ -1093,7 +1169,7 @@ class InvokeAIWebServer:
 
                 if progress.total_iterations > progress.current_iteration:
                     progress.set_current_step(1)
-                    progress.set_current_status("Iteration complete")
+                    progress.set_current_status("common:statusIterationComplete")
                     progress.set_current_status_has_steps(False)
                 else:
                     progress.mark_complete()
@@ -1487,7 +1563,7 @@ class Progress:
         self.total_iterations = (
             generation_parameters["iterations"] if generation_parameters else 1
         )
-        self.current_status = "Preparing"
+        self.current_status = "common:statusPreparing"
         self.is_processing = True
         self.current_status_has_steps = False
         self.has_error = False
@@ -1517,7 +1593,7 @@ class Progress:
         self.has_error = has_error
 
     def mark_complete(self):
-        self.current_status = "Processing Complete"
+        self.current_status = "common:statusProcessingComplete"
         self.current_step = 0
         self.total_steps = 0
         self.current_iteration = 0

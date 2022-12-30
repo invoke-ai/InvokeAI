@@ -1,0 +1,16 @@
+{
+  "generations": "Генерации",
+  "showGenerations": "Показывать генерации",
+  "uploads": "Загрузки",
+  "showUploads": "Показывать загрузки",
+  "galleryImageSize": "Размер изображений",
+  "galleryImageResetSize": "Размер по умолчанию",
+  "gallerySettings": "Настройка галереи",
+  "maintainAspectRatio": "Сохранять пропорции",
+  "autoSwitchNewImages": "Автоматически выбирать новые",
+  "singleColumnLayout": "Одна колонка",
+  "pinGallery": "Закрепить галерею",
+  "allImagesLoaded": "Все изображения загружены",
+  "loadMore": "Показать больше",
+  "noImagesInGallery": "Изображений нет"
+}

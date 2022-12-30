@@ -1,0 +1,207 @@
+{
+  "keyboardShortcuts": "Tastenkürzel",
+  "appHotkeys": "App-Tastenkombinationen",
+  "generalHotkeys": "Allgemeine Tastenkürzel",
+  "galleryHotkeys": "Galerie Tastenkürzel",
+  "unifiedCanvasHotkeys": "Unified Canvas Tastenkürzel",
+  "invoke": {
+    "title": "Invoke",
+    "desc": "Ein Bild erzeugen"
+  },
+  "cancel": {
+    "title": "Abbrechen",
+    "desc": "Bilderzeugung abbrechen"
+  },
+  "focusPrompt": {
+    "title": "Fokussiere Prompt",
+    "desc": "Fokussieren des Eingabefeldes für den Prompt"
+  },
+  "toggleOptions": {
+    "title": "Optionen umschalten",
+    "desc": "Öffnen und Schließen des Optionsfeldes"
+  },
+  "pinOptions": {
+    "title": "Optionen anheften",
+    "desc": "Anheften des Optionsfeldes"
+  },
+  "toggleViewer": {
+    "title": "Bildbetrachter umschalten",
+    "desc": "Bildbetrachter öffnen und schließen"
+  },
+  "toggleGallery": {
+    "title": "Galerie umschalten",
+    "desc": "Öffnen und Schließen des Galerie-Schubfachs"
+  },
+  "maximizeWorkSpace": {
+    "title": "Arbeitsbereich maximieren",
+    "desc": "Schließen Sie die Panels und maximieren Sie den Arbeitsbereich"
+  },
+  "changeTabs": {
+    "title": "Tabs wechseln",
+    "desc": "Zu einem anderen Arbeitsbereich wechseln"
+  },
+  "consoleToggle": {
+    "title": "Konsole Umschalten",
+    "desc": "Konsole öffnen und schließen"
+  },
+  "setPrompt": {
+    "title": "Prompt setzen",
+    "desc": "Verwende den Prompt des aktuellen Bildes"
+  },
+  "setSeed": {
+    "title": "Seed setzen",
+    "desc": "Verwende den Seed des aktuellen Bildes"
+  },
+  "setParameters": {
+    "title": "Parameter setzen",
+    "desc": "Alle Parameter des aktuellen Bildes verwenden"
+  },
+  "restoreFaces": {
+    "title": "Gesicht restaurieren",
+    "desc": "Das aktuelle Bild restaurieren"
+  },
+  "upscale": {
+    "title": "Hochskalieren",
+    "desc": "Das aktuelle Bild hochskalieren"
+  },
+  "showInfo": {
+    "title": "Info anzeigen",
+    "desc": "Metadaten des aktuellen Bildes anzeigen"
+  },
+  "sendToImageToImage": {
+    "title": "An Bild zu Bild senden",
+    "desc": "Aktuelles Bild an Bild zu Bild senden"
+  },
+  "deleteImage": {
+    "title": "Bild löschen",
+    "desc": "Aktuelles Bild löschen"
+  },
+  "closePanels": {
+    "title": "Panels schließen",
+    "desc": "Schließt offene Panels"
+  },
+  "previousImage": {
+    "title": "Vorheriges Bild",
+    "desc": "Vorheriges Bild in der Galerie anzeigen"
+  },
+  "nextImage": {
+    "title": "Nächstes Bild",
+    "desc": "Nächstes Bild in Galerie anzeigen"
+  },
+  "toggleGalleryPin": {
+    "title": "Galerie anheften umschalten",
+    "desc": "Heftet die Galerie an die Benutzeroberfläche bzw. löst die sie."
+  },
+  "increaseGalleryThumbSize": {
+    "title": "Größe der Galeriebilder erhöhen",
+    "desc": "Vergrößert die Galerie-Miniaturansichten"
+  },
+  "decreaseGalleryThumbSize": {
+    "title": "Größe der Galeriebilder verringern",
+    "desc": "Verringert die Größe der Galerie-Miniaturansichten"
+  },
+  "selectBrush": {
+    "title": "Pinsel auswählen",
+    "desc": "Wählt den Leinwandpinsel aus"
+  },
+  "selectEraser": {
+    "title": "Radiergummi auswählen",
+    "desc": "Wählt den Radiergummi für die Leinwand aus"
+  },
+  "decreaseBrushSize": {
+    "title": "Pinselgröße verkleinern",
+    "desc": "Verringert die Größe des Pinsels/Radiergummis"
+  },
+  "increaseBrushSize": {
+    "title": "Pinselgröße erhöhen",
+    "desc": "Erhöht die Größe des Pinsels/Radiergummis"
+  },
+  "decreaseBrushOpacity": {
+    "title": "Deckkraft des Pinsels vermindern",
+    "desc": "Verringert die Deckkraft des Pinsels"
+  },
+  "increaseBrushOpacity": {
+    "title": "Deckkraft des Pinsels erhöhen",
+    "desc": "Erhöht die Deckkraft des Pinsels"
+  },
+  "moveTool": {
+    "title": "Verschieben Werkzeug",
+    "desc": "Ermöglicht die Navigation auf der Leinwand"
+  },
+  "fillBoundingBox": {
+    "title": "Begrenzungsrahmen füllen",
+    "desc": "Füllt den Begrenzungsrahmen mit Pinselfarbe"
+  },
+  "eraseBoundingBox": {
+    "title": "Begrenzungsrahmen löschen",
+    "desc": "Löscht den Bereich des Begrenzungsrahmens"
+  },
+  "colorPicker": {
+    "title": "Farbpipette",
+    "desc": "Farben aus dem Bild aufnehmen"
+  },
+  "toggleSnap": {
+    "title": "Einrasten umschalten",
+    "desc": "Schaltet Einrasten am Raster ein und aus"
+  },
+  "quickToggleMove": {
+    "title": "Schnell Verschiebemodus",
+    "desc": "Schaltet vorübergehend den Verschiebemodus um"
+  },
+  "toggleLayer": {
+    "title": "Ebene umschalten",
+    "desc": "Schaltet die Auswahl von Maske/Basisebene um"
+  },
+  "clearMask": {
+    "title": "Lösche Maske",
+    "desc": "Die gesamte Maske löschen"
+  },
+  "hideMask": {
+    "title": "Maske ausblenden",
+    "desc": "Maske aus- und einblenden"
+  },
+  "showHideBoundingBox": {
+    "title": "Begrenzungsrahmen ein-/ausblenden",
+    "desc": "Sichtbarkeit des Begrenzungsrahmens ein- und ausschalten"
+  },
+  "mergeVisible": {
+    "title": "Sichtbares Zusammenführen",
+    "desc": "Alle sichtbaren Ebenen der Leinwand zusammenführen"
+  },
+  "saveToGallery": {
+    "title": "In Galerie speichern",
+    "desc": "Aktuelle Leinwand in Galerie speichern"
+  },
+  "copyToClipboard": {
+    "title": "In die Zwischenablage kopieren",
+    "desc": "Aktuelle Leinwand in die Zwischenablage kopieren"
+  },
+  "downloadImage": {
+    "title": "Bild herunterladen",
+    "desc": "Aktuelle Leinwand herunterladen"
+  },
+  "undoStroke": {
+    "title": "Pinselstrich rückgängig machen",
+    "desc": "Einen Pinselstrich rückgängig machen"
+  },
+  "redoStroke": {
+    "title": "Pinselstrich wiederherstellen",
+    "desc": "Einen Pinselstrich wiederherstellen"
+  },
+  "resetView": {
+    "title": "Ansicht zurücksetzen",
+    "desc": "Leinwandansicht zurücksetzen"
+  },
+  "previousStagingImage": {
+    "title": "Vorheriges Staging-Bild",
+    "desc": "Bild des vorherigen Staging-Bereichs"
+  },
+  "nextStagingImage": {
+    "title": "Nächstes Staging-Bild",
+    "desc": "Bild des nächsten Staging-Bereichs"
+  },
+  "acceptStagingImage": {
+    "title": "Staging-Bild akzeptieren",
+    "desc": "Akzeptieren Sie das aktuelle Bild des Staging-Bereichs"
+  }
+}

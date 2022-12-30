@@ -11,6 +11,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import React, { cloneElement, ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import HotkeysModalItem from './HotkeysModalItem';
 
 type HotkeysModalProps = {
@@ -31,245 +32,267 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     onClose: onHotkeysModalClose,
   } = useDisclosure();
 
+  const { t } = useTranslation();
+
   const appHotkeys = [
-    { title: 'Invoke', desc: 'Generate an image', hotkey: 'Ctrl+Enter' },
-    { title: 'Cancel', desc: 'Cancel image generation', hotkey: 'Shift+X' },
     {
-      title: 'Focus Prompt',
-      desc: 'Focus the prompt input area',
+      title: t('hotkeys:invoke.title'),
+      desc: t('hotkeys:invoke.desc'),
+      hotkey: 'Ctrl+Enter',
+    },
+    {
+      title: t('hotkeys:cancel.title'),
+      desc: t('hotkeys:cancel.desc'),
+      hotkey: 'Shift+X',
+    },
+    {
+      title: t('hotkeys:focusPrompt.title'),
+      desc: t('hotkeys:focusPrompt.desc'),
       hotkey: 'Alt+A',
     },
     {
-      title: 'Toggle Options',
-      desc: 'Open and close the options panel',
+      title: t('hotkeys:toggleOptions.title'),
+      desc: t('hotkeys:toggleOptions.desc'),
       hotkey: 'O',
     },
     {
-      title: 'Pin Options',
-      desc: 'Pin the options panel',
+      title: t('hotkeys:pinOptions.title'),
+      desc: t('hotkeys:pinOptions.desc'),
       hotkey: 'Shift+O',
     },
     {
-      title: 'Toggle Viewer',
-      desc: 'Open and close Image Viewer',
+      title: t('hotkeys:toggleViewer.title'),
+      desc: t('hotkeys:toggleViewer.desc'),
       hotkey: 'Z',
     },
     {
-      title: 'Toggle Gallery',
-      desc: 'Open and close the gallery drawer',
+      title: t('hotkeys:toggleGallery.title'),
+      desc: t('hotkeys:toggleGallery.desc'),
       hotkey: 'G',
     },
     {
-      title: 'Maximize Workspace',
-      desc: 'Close panels and maximize work area',
+      title: t('hotkeys:maximizeWorkSpace.title'),
+      desc: t('hotkeys:maximizeWorkSpace.desc'),
       hotkey: 'F',
     },
     {
-      title: 'Change Tabs',
-      desc: 'Switch to another workspace',
+      title: t('hotkeys:changeTabs.title'),
+      desc: t('hotkeys:changeTabs.desc'),
       hotkey: '1-5',
     },
 
     {
-      title: 'Console Toggle',
-      desc: 'Open and close console',
+      title: t('hotkeys:consoleToggle.title'),
+      desc: t('hotkeys:consoleToggle.desc'),
       hotkey: '`',
     },
   ];
 
   const generalHotkeys = [
     {
-      title: 'Set Prompt',
-      desc: 'Use the prompt of the current image',
+      title: t('hotkeys:setPrompt.title'),
+      desc: t('hotkeys:setPrompt.desc'),
       hotkey: 'P',
     },
     {
-      title: 'Set Seed',
-      desc: 'Use the seed of the current image',
+      title: t('hotkeys:setSeed.title'),
+      desc: t('hotkeys:setSeed.desc'),
       hotkey: 'S',
     },
     {
-      title: 'Set Parameters',
-      desc: 'Use all parameters of the current image',
+      title: t('hotkeys:setParameters.title'),
+      desc: t('hotkeys:setParameters.desc'),
       hotkey: 'A',
     },
     {
-      title: 'Restore Faces',
-      desc: 'Restore the current image',
+      title: t('hotkeys:restoreFaces.title'),
+      desc: t('hotkeys:restoreFaces.desc'),
       hotkey: 'Shift+R',
     },
-    { title: 'Upscale', desc: 'Upscale the current image', hotkey: 'Shift+U' },
     {
-      title: 'Show Info',
-      desc: 'Show metadata info of the current image',
+      title: t('hotkeys:upscale.title'),
+      desc: t('hotkeys:upscale.desc'),
+      hotkey: 'Shift+U',
+    },
+    {
+      title: t('hotkeys:showInfo.title'),
+      desc: t('hotkeys:showInfo.desc'),
       hotkey: 'I',
     },
     {
-      title: 'Send To Image To Image',
-      desc: 'Send current image to Image to Image',
+      title: t('hotkeys:sendToImageToImage.title'),
+      desc: t('hotkeys:sendToImageToImage.desc'),
       hotkey: 'Shift+I',
     },
-    { title: 'Delete Image', desc: 'Delete the current image', hotkey: 'Del' },
-    { title: 'Close Panels', desc: 'Closes open panels', hotkey: 'Esc' },
+    {
+      title: t('hotkeys:deleteImage.title'),
+      desc: t('hotkeys:deleteImage.desc'),
+      hotkey: 'Del',
+    },
+    {
+      title: t('hotkeys:closePanels.title'),
+      desc: t('hotkeys:closePanels.desc'),
+      hotkey: 'Esc',
+    },
   ];
 
   const galleryHotkeys = [
     {
-      title: 'Previous Image',
-      desc: 'Display the previous image in gallery',
+      title: t('hotkeys:previousImage.title'),
+      desc: t('hotkeys:previousImage.desc'),
       hotkey: 'Arrow Left',
     },
     {
-      title: 'Next Image',
-      desc: 'Display the next image in gallery',
+      title: t('hotkeys:nextImage.title'),
+      desc: t('hotkeys:nextImage.desc'),
       hotkey: 'Arrow Right',
     },
     {
-      title: 'Toggle Gallery Pin',
-      desc: 'Pins and unpins the gallery to the UI',
+      title: t('hotkeys:toggleGalleryPin.title'),
+      desc: t('hotkeys:toggleGalleryPin.desc'),
       hotkey: 'Shift+G',
     },
     {
-      title: 'Increase Gallery Image Size',
-      desc: 'Increases gallery thumbnails size',
+      title: t('hotkeys:increaseGalleryThumbSize.title'),
+      desc: t('hotkeys:increaseGalleryThumbSize.desc'),
       hotkey: 'Shift+Up',
     },
     {
-      title: 'Decrease Gallery Image Size',
-      desc: 'Decreases gallery thumbnails size',
+      title: t('hotkeys:decreaseGalleryThumbSize.title'),
+      desc: t('hotkeys:decreaseGalleryThumbSize.desc'),
       hotkey: 'Shift+Down',
     },
   ];
 
   const unifiedCanvasHotkeys = [
     {
-      title: 'Select Brush',
-      desc: 'Selects the canvas brush',
+      title: t('hotkeys:selectBrush.title'),
+      desc: t('hotkeys:selectBrush.desc'),
       hotkey: 'B',
     },
     {
-      title: 'Select Eraser',
-      desc: 'Selects the canvas eraser',
+      title: t('hotkeys:selectEraser.title'),
+      desc: t('hotkeys:selectEraser.desc'),
       hotkey: 'E',
     },
     {
-      title: 'Decrease Brush Size',
-      desc: 'Decreases the size of the canvas brush/eraser',
+      title: t('hotkeys:decreaseBrushSize.title'),
+      desc: t('hotkeys:decreaseBrushSize.desc'),
       hotkey: '[',
     },
     {
-      title: 'Increase Brush Size',
-      desc: 'Increases the size of the canvas brush/eraser',
+      title: t('hotkeys:increaseBrushSize.title'),
+      desc: t('hotkeys:increaseBrushSize.desc'),
       hotkey: ']',
     },
     {
-      title: 'Decrease Brush Opacity',
-      desc: 'Decreases the opacity of the canvas brush',
+      title: t('hotkeys:decreaseBrushOpacity.title'),
+      desc: t('hotkeys:decreaseBrushOpacity.desc'),
       hotkey: 'Shift + [',
     },
     {
-      title: 'Increase Brush Opacity',
-      desc: 'Increases the opacity of the canvas brush',
+      title: t('hotkeys:increaseBrushOpacity.title'),
+      desc: t('hotkeys:increaseBrushOpacity.desc'),
       hotkey: 'Shift + ]',
     },
     {
-      title: 'Move Tool',
-      desc: 'Allows canvas navigation',
+      title: t('hotkeys:moveTool.title'),
+      desc: t('hotkeys:moveTool.desc'),
       hotkey: 'V',
     },
     {
-      title: 'Fill Bounding Box',
-      desc: 'Fills the bounding box with brush color',
+      title: t('hotkeys:fillBoundingBox.title'),
+      desc: t('hotkeys:fillBoundingBox.desc'),
       hotkey: 'Shift + F',
     },
     {
-      title: 'Erase Bounding Box',
-      desc: 'Erases the bounding box area',
+      title: t('hotkeys:eraseBoundingBox.title'),
+      desc: t('hotkeys:eraseBoundingBox.desc'),
       hotkey: 'Delete / Backspace',
     },
     {
-      title: 'Select Color Picker',
-      desc: 'Selects the canvas color picker',
+      title: t('hotkeys:colorPicker.title'),
+      desc: t('hotkeys:colorPicker.desc'),
       hotkey: 'C',
     },
     {
-      title: 'Toggle Snap',
-      desc: 'Toggles Snap to Grid',
+      title: t('hotkeys:toggleSnap.title'),
+      desc: t('hotkeys:toggleSnap.desc'),
       hotkey: 'N',
     },
     {
-      title: 'Quick Toggle Move',
-      desc: 'Temporarily toggles Move mode',
+      title: t('hotkeys:quickToggleMove.title'),
+      desc: t('hotkeys:quickToggleMove.desc'),
       hotkey: 'Hold Space',
     },
     {
-      title: 'Toggle Layer',
-      desc: 'Toggles mask/base layer selection',
+      title: t('hotkeys:toggleLayer.title'),
+      desc: t('hotkeys:toggleLayer.desc'),
       hotkey: 'Q',
     },
     {
-      title: 'Clear Mask',
-      desc: 'Clear the entire mask',
+      title: t('hotkeys:clearMask.title'),
+      desc: t('hotkeys:clearMask.desc'),
       hotkey: 'Shift+C',
     },
     {
-      title: 'Hide Mask',
-      desc: 'Hide and unhide mask',
+      title: t('hotkeys:hideMask.title'),
+      desc: t('hotkeys:hideMask.desc'),
       hotkey: 'H',
     },
     {
-      title: 'Show/Hide Bounding Box',
-      desc: 'Toggle visibility of bounding box',
+      title: t('hotkeys:showHideBoundingBox.title'),
+      desc: t('hotkeys:showHideBoundingBox.desc'),
       hotkey: 'Shift+H',
     },
     {
-      title: 'Merge Visible',
-      desc: 'Merge all visible layers of canvas',
+      title: t('hotkeys:mergeVisible.title'),
+      desc: t('hotkeys:mergeVisible.desc'),
       hotkey: 'Shift+M',
     },
     {
-      title: 'Save To Gallery',
-      desc: 'Save current canvas to gallery',
+      title: t('hotkeys:saveToGallery.title'),
+      desc: t('hotkeys:saveToGallery.desc'),
       hotkey: 'Shift+S',
     },
     {
-      title: 'Copy to Clipboard',
-      desc: 'Copy current canvas to clipboard',
+      title: t('hotkeys:copyToClipboard.title'),
+      desc: t('hotkeys:copyToClipboard.desc'),
       hotkey: 'Ctrl+C',
     },
     {
-      title: 'Download Image',
-      desc: 'Download current canvas',
+      title: t('hotkeys:downloadImage.title'),
+      desc: t('hotkeys:downloadImage.desc'),
       hotkey: 'Shift+D',
     },
     {
-      title: 'Undo Stroke',
-      desc: 'Undo a brush stroke',
+      title: t('hotkeys:undoStroke.title'),
+      desc: t('hotkeys:undoStroke.desc'),
       hotkey: 'Ctrl+Z',
     },
     {
-      title: 'Redo Stroke',
-      desc: 'Redo a brush stroke',
+      title: t('hotkeys:redoStroke.title'),
+      desc: t('hotkeys:redoStroke.desc'),
       hotkey: 'Ctrl+Shift+Z, Ctrl+Y',
     },
     {
-      title: 'Reset View',
-      desc: 'Reset Canvas View',
+      title: t('hotkeys:resetView.title'),
+      desc: t('hotkeys:resetView.desc'),
       hotkey: 'R',
     },
     {
-      title: 'Previous Staging Image',
-      desc: 'Previous Staging Area Image',
+      title: t('hotkeys:previousStagingImage.title'),
+      desc: t('hotkeys:previousStagingImage.desc'),
       hotkey: 'Arrow Left',
     },
     {
-      title: 'Next Staging Image',
-      desc: 'Next Staging Area Image',
+      title: t('hotkeys:nextStagingImage.title'),
+      desc: t('hotkeys:nextStagingImage.desc'),
       hotkey: 'Arrow Right',
     },
     {
-      title: 'Accept Staging Image',
-      desc: 'Accept Current Staging Area Image',
+      title: t('hotkeys:acceptStagingImage.title'),
+      desc: t('hotkeys:acceptStagingImage.desc'),
       hotkey: 'Enter',
     },
   ];
@@ -308,7 +331,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
             <Accordion allowMultiple>
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>App Hotkeys</h2>
+                  <h2>{t('hotkeys:appHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
@@ -318,7 +341,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>General Hotkeys</h2>
+                  <h2>{t('hotkeys:generalHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
@@ -328,7 +351,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>Gallery Hotkeys</h2>
+                  <h2>{t('hotkeys:galleryHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>
@@ -338,7 +361,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
 
               <AccordionItem>
                 <AccordionButton className="hotkeys-modal-button">
-                  <h2>Unified Canvas Hotkeys</h2>
+                  <h2>{t('hotkeys:unifiedCanvasHotkeys')}</h2>
                   <AccordionIcon />
                 </AccordionButton>
                 <AccordionPanel>

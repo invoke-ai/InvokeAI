@@ -37,8 +37,18 @@ manager, please follow these steps:
     ```bash
     python -V
     ```
+    
+2.  Clone the [InvokeAI](https://github.com/invoke-ai/InvokeAI) source code from
+    GitHub:
 
-2.  From within the InvokeAI top-level directory, create and activate a virtual
+    ```bash
+    git clone https://github.com/invoke-ai/InvokeAI.git
+    ```
+
+    This will create InvokeAI folder where you will follow the rest of the
+    steps.
+
+3.  From within the InvokeAI top-level directory, create and activate a virtual
     environment named `invokeai`:
 
     ```bash
@@ -46,14 +56,14 @@ manager, please follow these steps:
     source invokeai/bin/activate
     ```
 
-3. Make sure that pip is installed in your virtual environment an up to date:
+4. Make sure that pip is installed in your virtual environment an up to date:
 
     ```bash
     python -mensurepip --upgrade
     python -mpip install --upgrade pip
     ```
 
-4.  Pick the correct `requirements*.txt` file for your hardware and operating
+5.  Pick the correct `requirements*.txt` file for your hardware and operating
     system.
 
     We have created a series of environment files suited for different operating
@@ -99,14 +109,14 @@ manager, please follow these steps:
             Please do not link or copy `environments-and-requirements/requirements-base.txt`.
             This is a base requirements file that does not have the platform-specific
             libraries. Also, be sure to link or copy the platform-specific file to
-	    a top-level file named `requirements.txt` as shown here. Running pip on
-	    a requirements file in a subdirectory will not work as expected.
+            a top-level file named `requirements.txt` as shown here. Running pip on
+            a requirements file in a subdirectory will not work as expected.
 
     When this is done, confirm that a file named `requirements.txt` has been
     created in the InvokeAI root directory and that it points to the correct
     file in `environments-and-requirements`.
 
-5.  Run PIP
+6.  Run PIP
 
     Be sure that the `invokeai` environment is active before doing this:
 
@@ -114,7 +124,7 @@ manager, please follow these steps:
     pip install --prefer-binary -r requirements.txt
     ```
 
-6.  Set up the runtime directory
+7.  Set up the runtime directory
 
     In this step you will initialize a runtime directory that will
     contain the models, model config files, directory for textual
@@ -143,7 +153,7 @@ manager, please follow these steps:
     Note that `configure_invokeai.py` and `invoke.py` should be installed
     under your virtual environment directory and the system should find them
     on the PATH. If this isn't working on your system, you can call the
-    scripts directory using `python scripts/configure_invoke.py` and
+    scripts directory using `python scripts/configure_invokeai.py` and
     `python scripts/invoke.py`.
 
     !!! tip
@@ -153,7 +163,7 @@ manager, please follow these steps:
         prompted) and configure InvokeAI to use the previously-downloaded files. The
         process for this is described in [here](050_INSTALLING_MODELS.md).
 
-7.  Run the command-line- or the web- interface:
+8.  Run the command-line- or the web- interface:
 
     Activate the environment (with `source invokeai/bin/activate`), and then
     run the script `invoke.py`. If you selected a non-default location
@@ -189,7 +199,7 @@ manager, please follow these steps:
 
         You can permanently set the location of the runtime directory by setting the environment variable INVOKEAI_ROOT to the path of the directory.
 
-8. Render away!
+9. Render away!
 
     Browse the [features](../features/CLI.md) section to learn about all the things you
     can do with InvokeAI.
@@ -199,7 +209,7 @@ manager, please follow these steps:
     time you try to generate an image. Fortunately, after the warm up period
     rendering will be fast.
 
-9. Subsequently, to relaunch the script, be sure to run "conda activate
+10. Subsequently, to relaunch the script, be sure to run "conda activate
     invokeai", enter the `InvokeAI` directory, and then launch the invoke
     script. If you forget to activate the 'invokeai' environment, the script
     will fail with multiple `ModuleNotFound` errors.

@@ -1,15 +1,16 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function TrainingWIP() {
+  const { t } = useTranslation();
   return (
     <div className="work-in-progress nodes-work-in-progress">
-      <h1>Training</h1>
+      <h1>{t('common:training')}</h1>
       <p>
-        A dedicated workflow for training your own embeddings and checkpoints
-        using Textual Inversion and Dreambooth from the web interface. <br />
+        {t('common:trainingDesc1')}
         <br />
-        InvokeAI already supports training custom embeddings using Textual
-        Inversion using the main script.
+        <br />
+        {t('common:trainingDesc2')}
       </p>
     </div>
   );
