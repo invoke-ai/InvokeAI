@@ -14,6 +14,7 @@
   "langItalian": "Italian",
   "langPortuguese": "Portuguese",
   "langFrench": "French",
+  "langSpanish": "Spanish",
   "text2img": "Изображение из текста (text2img)",
   "img2img": "Изображение в изображение (img2img)",
   "unifiedCanvas": "Универсальный холст",
@@ -51,4 +52,3 @@
   "statusLoadingModel": "Загрузка модели",
   "statusModelChanged": "Модель изменена"
 }
-
