@@ -82,11 +82,12 @@ class InvokeAIWebServer:
 
         if opt.cors:
             _cors = opt.cors
-            if hasattr(_cors, "__len__"):
-                _cors = "".join(_cors)
+            # convert list back into comma-separated string,
+            # be defensive here, not sure in what form this arrives
+            if isinstance(_cors, list)
+                _cors = ",".join(_cors)
             if "," in _cors:
                 _cors = _cors.split(",")
-            print(f"CORS is {_cors}")
             socketio_args["cors_allowed_origins"] = _cors
 
         frontend_path = self.find_frontend()
