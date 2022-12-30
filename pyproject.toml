@@ -2,33 +2,39 @@
 build-backend = "setuptools.build_meta"
 requires = [
     "setuptools ~=63.2.0",
-    "wheel ~=0.37.1",
+    "wheel ~=0.37.1"
 ]
 
 [tool.setuptools.packages.find]
 include = [
-    "backend*",
-    "configs*",
-    "invokeai",
-    "ldm*",
-    "scripts*",
-    "vendored*"
-]
+    'backend*',
+    'configs*',
+    'ldm*',
+    'scripts*',
+    'vendored*',
+    'docs*'
+    ]
 
-[tool.setuptools.dynamic]
-readme = {file = ["README.md"]}
+# [tool.setuptools.dynamic]
+# readme = {file = ["README.md"]}
 
 [tool.setuptools.package-data]
-"vendored.clip.clip" = ["*.txt.gz"]
+"docs.assets" = [
+    "invoke_ai_banner.png",
+    "invoke-web-server-1.png"
+]
+"vendored.clip.clip" = [
+    "*.txt.gz"
+]
 
 [project]
 name = "invokeai"
-version = "2.2.4.2"
 description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-# readme = "README.md"
 requires-python = ">=3.9, <3.11"
+readme = {file = "README.md", content-type = "text/markdown", charset = "UTF-8"}
+dynamic = ["version","keywords"]
 license = {file = "LICENSE"}
-authors = [{name = "The InvokeAI Project", email = "lincoln.stein@gmail.com"}]
+authors = [{name = "The InvokeAI Project",email = "lincoln.stein@gmail.com"}]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: GPU",
@@ -51,11 +57,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
-# dynamic = ["dependencies"]
-# [tool.setuptools.dynamic]
-# dependencies = {file = ["environments-and-requirements/requirements-base.txt"]}
 
 dependencies = [
+    "accelerate",
     "albumentations",
     "diffusers[torch]==0.10.*",
     "einops",
@@ -71,7 +75,7 @@ dependencies = [
     "kornia",
     "numpy==1.23.*",
     "omegaconf",
-    # "opencv-python",
+    "opencv-python",
     "picklescan",
     "pillow",
     "pudb",
@@ -81,7 +85,7 @@ dependencies = [
     "requests==2.25.1",
     "scikit-image>=0.19",
     "send2trash",
-    # "streamlit",
+    "streamlit",
     "taming-transformers-rom1504",
     "test-tube>=0.7.5",
     "torch",
@@ -94,16 +98,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-train = [
-    "accelerate"
-]
 dev = [
     "black==22.1.0",
-    "pyflakes==3.0.1"
+    "pylint==2.15.9"
 ]
 
 [project.scripts]
-invokeai = "ldm.invoke.CLI:main"
+invokeai = "scripts.invoke:main"
 configure_invokeai = "scripts.configure_invokeai:main"
 create_root = "scripts.create_root:main"
 
