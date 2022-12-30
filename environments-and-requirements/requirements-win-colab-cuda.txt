@@ -4,4 +4,4 @@
 
 # Install base requirements
 # -r environments-and-requirements/requirements-base.txt
--e .
+.
