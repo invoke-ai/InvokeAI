@@ -61,7 +61,7 @@ const StatusIndicator = () => {
   if (statusMessage)
     if (isProcessing) {
       if (totalIterations > 1) {
-        statusMessage += ` (${currentIteration}/${totalIterations})`;
+        statusMessage = t(statusMessage as keyof typeof t) + ` (${currentIteration}/${totalIterations})`;
       }
     }
 
