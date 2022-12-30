@@ -37,10 +37,13 @@ generated using the command-line client and the Stable Diffusion 1.5 model:
 You can also combine styles and concepts:
 
 <figure markdown>
+
   | A portrait of &lt;alf&gt; in &lt;cartoona-animal&gt; style |
   | :--------------------------------------------------------: |
   | ![](../assets/concepts/image5.png)                         |
+
 </figure>
+
 ## Using a Hugging Face Concept
 
 !!! warning "Authenticating to HuggingFace"

@@ -67,7 +67,9 @@ with the
 Consider this image:
 
 <figure markdown>
+
 ![curly_woman](../assets/outpainting/curly.png)
+
 </figure>
 
 Pretty nice, but it's annoying that the top of her head is cut off. She's also a
@@ -85,7 +87,9 @@ to extend. You can also abbreviate `--outcrop` to `-c`.
 The result looks like this:
 
 <figure markdown>
+
 ![curly_woman_outcrop](../assets/outpainting/curly-outcrop-2.png)
+
 </figure>
 
 The new image is larger than the original (576x704) because 64 pixels were added
@@ -145,7 +149,9 @@ invoke> !fix images/curly.png --out_direction top 64
 The result is shown here:
 
 <figure markdown>
+
 ![curly_woman_outpaint](../assets/outpainting/curly-outpaint.png)
+
 </figure>
 
 Although the effect is similar, there are significant differences from

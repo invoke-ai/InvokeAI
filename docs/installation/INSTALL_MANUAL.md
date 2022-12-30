@@ -3,7 +3,9 @@ title: Manual Installation
 ---
 
 <figure markdown>
+
 # :fontawesome-brands-linux: Linux | :fontawesome-brands-apple: macOS | :fontawesome-brands-windows: Windows
+
 </figure>
 
 !!! warning "This is for advanced Users"

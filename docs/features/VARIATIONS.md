@@ -45,8 +45,10 @@ Outputs:
 ```
 
 <figure markdown>
+
 ![var1](../assets/variation_walkthru/000001.3357757885.png)
 <figcaption> Seed 3357757885 looks nice </figcaption>
+
 </figure>
 
 ---
@@ -80,13 +82,17 @@ This gives us a series of closely-related variations, including the two shown
 here.
 
 <figure markdown>
+
 ![var2](../assets/variation_walkthru/000002.3647897225.png)
 <figcaption>subseed 3647897225</figcaption>
+
 </figure>
 
 <figure markdown>
+
 ![var3](../assets/variation_walkthru/000002.1614299449.png)
 <figcaption>subseed 1614299449</figcaption>
+
 </figure>
 
 I like the expression on Xena's face in the first one (subseed 3647897225), and
@@ -106,8 +112,10 @@ Here we are providing equal weights (0.1 and 0.1) for both the subseeds. The
 resulting image is close, but not exactly what I wanted:
 
 <figure markdown>
+
 ![var4](../assets/variation_walkthru/000003.1614299449.png)
 <figcaption> subseed 1614299449 </figcaption>
+
 </figure>
 
 We could either try combining the images with different weights, or we can
@@ -130,8 +138,10 @@ This produces six images, all slight variations on the combination of the chosen
 two images. Here's the one I like best:
 
 <figure markdown>
+
 ![var5](../assets/variation_walkthru/000004.3747154981.png)
 <figcaption> subseed 3747154981 </figcaption>
+
 </figure>
 
 As you can see, this is a very powerful tool, which when combined with subprompt

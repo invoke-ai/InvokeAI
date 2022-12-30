@@ -27,7 +27,11 @@ example:
 While most of the WebGUI's features are intuitive, here is a guided walkthrough
 through its various components.
 
+<figure markdown>
+
 ![Invoke Web Server - Major Components](../assets/invoke-web-server-1.png){:width="640px"}
+
+</figure>
 
 The screenshot above shows the Text to Image tab of the WebGUI. There are three
 main sections:
@@ -55,7 +59,9 @@ highlighted area in the screenshot below) which select among a series of tabs
 for performing different types of operations.
 
 <figure markdown>
+
 ![Invoke Web Server - Control Panel](../assets/invoke-web-server-2.png){:width="512px"}
+
 </figure>
 
 From top to bottom, these are:
@@ -187,9 +193,17 @@ using either the GFPGAN or CodeFormer libraries. For more information see
     _Strength_ at 0.8 and press \*Restore Faces". If all goes well, the eyes and
     other aspects of the face will be improved (see the second screenshot)
 
+    <figure markdown>
+
     ![Invoke Web Server - Original Image](../assets/invoke-web-server-3.png)
 
+    </figure>
+
+    <figure markdown>
+
     ![Invoke Web Server - Retouched Image](../assets/invoke-web-server-4.png)
+
+    </figure>
 
     The facial reconstruction _Strength_ field adjusts how aggressively the face
     library will try to alter the face. It can be as high as 1.0, but be aware
@@ -223,13 +237,17 @@ walkthrough.
     top on the left-hand side of the screen:
 
     <figure markdown>
+
     ![Invoke Web Server - Image to Image Icon](../assets/invoke-web-server-5.png)
+
     </figure>
 
     This will bring you to a screen similar to the one shown here:
 
     <figure markdown>
+
     ![Invoke Web Server - Image to Image Tab](../assets/invoke-web-server-6.png){:width="640px"}
+
     </figure>
 
 2.  Drag-and-drop the Lincoln-and-Parrot image into the Image panel, or click
@@ -241,7 +259,11 @@ walkthrough.
 3.  Go to the prompt box and type _old sea captain with raven on shoulder_ and
     press Invoke. A derived image will appear to the right of the original one:
 
+    <figure markdown>
+
     ![Invoke Web Server - Image to Image example](../assets/invoke-web-server-7.png){:width="640px"}
+
+    </figure>
 
 4.  Experiment with the different settings. The most influential one in Image to
     Image is _Image to Image Strength_ located about midway down the control
@@ -269,7 +291,9 @@ walkthrough.
     the parrot will be replaced, leaving the rest of the original image intact:
 
     <figure markdown>
+
     ![Invoke Web Server - Inpainting](../assets/invoke-web-server-8.png){:width="640px"}
+
     </figure>
 
 6.  Would you like to modify a previously-generated image using the Image to
@@ -282,7 +306,11 @@ You can do the same from the Text to Image tab by clicking on the picture icon
 above the central image panel. The screenshot below shows where the "use as
 initial image" icons are located.
 
+<figure markdown>
+
 ![Invoke Web Server - Use as Image Links](../assets/invoke-web-server-9.png){:width="640px"}
+
+</figure>
 
 ## Parting remarks
 

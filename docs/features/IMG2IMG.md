@@ -43,8 +43,11 @@ Note that the prompt makes a big difference. For example, this slight variation
 on the prompt produces a very different image:
 
 <figure markdown>
+
 ![](https://user-images.githubusercontent.com/111189/194135220-16b62181-b60c-4248-8989-4834a8fd7fbd.png){ width=320 }
+
 <caption markdown>photograph of a tree on a hill with a river</caption>
+
 </figure>
 
 !!! tip
@@ -93,7 +96,9 @@ seed `1592514025` develops something like this:
     ```
 
     <figure markdown>
+
     ![latent steps](../assets/img2img/000019.steps.png){ width=720 }
+
     </figure>
 
 Put simply: starting from a frame of fuzz/static, SD finds details in each frame
@@ -118,13 +123,17 @@ into the sequence at the appropriate point, with just the right amount of noise.
     like:
 
     <figure markdown>
+
     ![gravity32](../assets/img2img/000032.steps.gravity.png)
+
     </figure>
 
     With strength `0.4`, the steps look more like this:
 
     <figure markdown>
+
     ![gravity30](../assets/img2img/000030.steps.gravity.png)
+
     </figure>
 
 Notice how much more fuzzy the starting image is for strength `0.7` compared to
@@ -174,7 +183,9 @@ invoke> "fire" -s50 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.4
 ```
 
 <figure markdown>
+
 ![000035.1592514025](../assets/img2img/000035.1592514025.png)
+
 </figure>
 
 and here is strength `0.7` (note step count `30`, which is roughly `20 ÷ 0.7` to
@@ -185,7 +196,9 @@ invoke> "fire" -s30 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.7
 ```
 
 <figure markdown>
+
 ![000046.1592514025](../assets/img2img/000046.1592514025.png)
+
 </figure>
 
 In both cases the image is nice and clean and "finished", but because at
@@ -195,13 +208,17 @@ the difference when looking at the latent steps. There's more noise on the first
 image with strength `0.7`:
 
 <figure markdown>
+
 ![gravity46](../assets/img2img/000046.steps.gravity.png)
+
 </figure>
 
 than there is for strength `0.4`:
 
 <figure markdown>
+
 ![gravity35](../assets/img2img/000035.steps.gravity.png)
+
 </figure>
 
 and that extra noise gives the algorithm more choices when it is evaluating how
@@ -211,7 +228,9 @@ Unfortunately, it seems that `img2img` is very sensitive to the step count.
 Here's strength `0.7` with a step count of `29` (SD did 19 steps from my image):
 
 <figure markdown>
+
 ![gravity45](../assets/img2img/000045.1592514025.png)
+
 </figure>
 
 By comparing the latents we can sort of see that something got interpreted
@@ -219,11 +238,15 @@ differently enough on the third or fourth step to lead to a rather different
 interpretation of the flames.
 
 <figure markdown>
+
 ![gravity46](../assets/img2img/000046.steps.gravity.png)
+
 </figure>
 
 <figure markdown>
+
 ![gravity45](../assets/img2img/000045.steps.gravity.png)
+
 </figure>
 
 This is the result of a difference in the de-noising "schedule" - basically the

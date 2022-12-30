@@ -3,7 +3,9 @@ title: Installing Manually
 ---
 
 <figure markdown>
+
 # :fontawesome-brands-linux: Linux | :fontawesome-brands-apple: macOS | :fontawesome-brands-windows: Windows
+
 </figure>
 
 !!! warning "This is for advanced Users"
@@ -37,7 +39,7 @@ manager, please follow these steps:
     ```bash
     python -V
     ```
-    
+
 2.  Clone the [InvokeAI](https://github.com/invoke-ai/InvokeAI) source code from
     GitHub:
 
