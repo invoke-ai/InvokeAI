@@ -5,17 +5,6 @@
     ]
     build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-    include = [
-        'backend*',
-        'frontend.dist*',
-        'configs*',
-        'ldm*',
-        'scripts*',
-        'vendored*',
-        'docs*'
-        ]
-
 [project]
     name = "invokeai"
     description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
@@ -25,7 +14,6 @@
         "stable-diffusion",
         "AI"
     ]
-
     dynamic = ["version"]
     license = {file = "LICENSE"}
     authors = [
@@ -94,9 +82,11 @@
     ]
 
 [project.optional-dependencies]
-    dev = [
-        "black==22.1.0",
-        "pylint==2.15.9"
+    "dev" = [
+        "black",
+        "pylint",
+        "twine",
+        "pip-tools"
     ]
 
 [project.scripts]
@@ -110,7 +100,6 @@
     "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
     "Discord" = "https://discord.gg/ZmtBAhwWhy"
 
-
 [tool.setuptools.dynamic]
     version = {attr = "ldm.invoke.__version__"}
 
@@ -120,6 +109,20 @@
         "invoke_ai_banner.png",
         "invoke-web-server-1.png"
     ]
+    "configs" = ["*"]
+    "frontend.dist" = ["*"]
+
+[tool.setuptools.packages.find]
+    "where" = ["."]
+    "include" = [
+        "backend*",
+        "configs*",
+        "frontend.dist*",
+        "ldm*",
+        "scripts*",
+        "vendored*"
+        ]
+
 [tool.pylint]
     max-line-length = 88
     disable = [
