@@ -3,7 +3,7 @@
 cd "$(dirname "$0")"
 
 VERSION=$(grep ^VERSION ../setup.py | awk '{ print $3 }' | sed "s/'//g" )
-PATCH="-rc8"
+PATCH="-rc9"
 VERSION="${VERSION}${PATCH}"
 
 echo "Be certain that you're in the 'installer' directory before continuing."
