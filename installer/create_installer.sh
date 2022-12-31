@@ -3,11 +3,21 @@
 cd "$(dirname "$0")"
 
 VERSION=$(grep ^VERSION ../setup.py | awk '{ print $3 }' | sed "s/'//g" )
-PATCH="-rc5"
+PATCH="-rc6"
 VERSION="${VERSION}${PATCH}"
 
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
+
+git commit -a
+
+if ! git tag $VERSION ; then
+    echo "Existing/invalid tag"
+    exit -1
+fi
+
+git push origin :refs/tags/latest
+git tag -fa latest
 
 echo Building installer zip fles for InvokeAI v$VERSION
 
