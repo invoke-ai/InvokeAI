@@ -88,7 +88,7 @@ class InvokeAIWebServer:
             _cors = opt.cors
             # convert list back into comma-separated string,
             # be defensive here, not sure in what form this arrives
-            if isinstance(_cors, list)
+            if isinstance(_cors, list):
                 _cors = ",".join(_cors)
             if "," in _cors:
                 _cors = _cors.split(",")
