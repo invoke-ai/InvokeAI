@@ -80,7 +80,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
     sliderMarkRightOffset = -7,
     withInput = false,
     isInteger = false,
-    inputWidth = '5rem',
+    inputWidth = '5.5rem',
     inputReadOnly = true,
     withReset = false,
     hideTooltip = false,
@@ -236,6 +236,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
             <NumberInputField
               className="invokeai__slider-number-input"
               width={inputWidth}
+              minWidth={inputWidth}
               readOnly={inputReadOnly}
               {...sliderNumberInputFieldProps}
             />
