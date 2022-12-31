@@ -208,6 +208,7 @@ gfpgan/
 
 # config file (will be created by installer)
 configs/models.yaml
+configs/models.yaml.orig
 
 # weights (will be created by installer)
 models/ldm/stable-diffusion-v1/*.ckpt

@@ -7,7 +7,10 @@
 
 [project]
     name = "invokeai"
-    description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
+    description = '''
+        An implementation of Stable Diffusion which provides various
+        new features and options to aid the image generation process
+        '''
     requires-python = ">=3.9, <3.11"
     readme = {file = "README.md", content-type = "text/markdown", charset = "UTF-8"}
     keywords = [
@@ -41,7 +44,6 @@
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Scientific/Engineering :: Image Processing",
     ]
-
     dependencies = [
         "accelerate",
         "albumentations",
@@ -83,10 +85,11 @@
 
 [project.optional-dependencies]
     "dev" = [
-        "black",
-        "pylint",
-        "twine",
-        "pip-tools"
+        "black",        # formatter
+        "isort",        # sort imports
+        "pylint",       # linter
+        "pip-tools",    # requirements management
+        "twine"         # package distributrion
     ]
 
 [project.scripts]
@@ -109,11 +112,18 @@
         "invoke_ai_banner.png",
         "invoke-web-server-1.png"
     ]
-    "configs" = ["*"]
-    "frontend.dist" = ["*"]
+    "configs" = [
+        "*.yaml",
+        "*.example"
+    ]
+    "frontend.dist" = [
+        "*"
+    ]
 
 [tool.setuptools.packages.find]
-    "where" = ["."]
+    "where" = [
+        "."
+    ]
     "include" = [
         "backend*",
         "configs*",
@@ -121,16 +131,33 @@
         "ldm*",
         "scripts*",
         "vendored*"
-        ]
-
-[tool.pylint]
-    max-line-length = 88
-    disable = [
-        "C0103", # (invalid-name)
-        "C0114", # (missing-module-docstring)
-        "C0115", # (missing-class-docstring)
-        "C0116", # (missing-function-docstring)
-        "R0903", # (too-few-public-methods)
-        "R0913", # (too-many-arguments)
-        "W0105", # (pointless-string-statement)
     ]
+
+[tool.black]
+    line-length = 88
+    target-version = ['py39', 'py310']
+    include = '\.pyi?$'
+    extend-exclude = '''
+        /(
+        | vendored
+        | tests
+        | .venv
+        )/
+        '''
+
+[tool.isort]
+    profile = 'black'
+
+[tool.pylint.format]
+    max-line-length = "88"
+
+[tool.pylint.main]
+    fail-under = 10.0
+    ignore = [
+        "vendored",
+        ".venv",
+        "build",
+        "dist",
+        "tests"
+    ]
+    jobs = 0
