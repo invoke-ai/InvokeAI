@@ -33,7 +33,7 @@ export default function Seed() {
       isInvalid={seed < 0 && shouldGenerateVariations}
       onChange={handleChangeSeed}
       value={seed}
-      width="10rem"
+      width="auto"
     />
   );
 }

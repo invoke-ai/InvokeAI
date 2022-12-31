@@ -1,0 +1,15 @@
+{
+  "feature": {
+    "prompt": "This is the prompt field. Prompt includes generation objects and stylistic terms. You can add weight (token importance) in the prompt as well, but CLI commands and parameters will not work.",
+    "gallery": "Gallery displays generations from the outputs folder as they're created. Settings are stored within files and accesed by context menu.",
+    "other": "These options will enable alternative processing modes for Invoke. 'Seamless tiling' will create repeating patterns in the output. 'High resolution' is generation in two steps with img2img: use this setting when you want a larger and more coherent image without artifacts. It will take longer that usual txt2img.",
+    "seed": "Seed value affects the initial noise from which the image is formed. You can use the already existing seeds from previous images. 'Noise Threshold' is used to mitigate artifacts at high CFG values (try the 0-10 range), and Perlin to add Perlin noise during generation: both serve to add variation to your outputs.",
+    "variations": "Try a variation with a value between 0.1 and 1.0 to change the result for a given seed. Interesting variations of the seed are between 0.1 and 0.3.",
+    "upscale": "Use ESRGAN to enlarge the image immediately after generation.",
+    "faceCorrection": "Face correction with GFPGAN or Codeformer: the algorithm detects faces in the image and corrects any defects. High value will change the image more, resulting in more attractive faces. Codeformer with a higher fidelity preserves the original image at the expense of stronger face correction.",
+    "imageToImage": "Image to Image loads any image as initial, which is then used to generate a new one along with the prompt. The higher the value, the more the result image will change. Values from 0.0 to 1.0 are possible, the recommended range is .25-.75",
+    "boundingBox": "The bounding box is the same as the Width and Height settings for Text to Image or Image to Image. Only the area in the box will be processed.",
+    "seamCorrection": "Controls the handling of visible seams that occur between generated images on the canvas.",
+    "infillAndScaling": "Manage infill methods (used on masked or erased areas of the canvas) and scaling (useful for small bounding box sizes)."
+  }
+}
