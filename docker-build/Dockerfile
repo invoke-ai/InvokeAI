@@ -16,22 +16,19 @@ RUN apt-get update \
 
 # set WORKDIR, PATH and copy sources
 ARG APPDIR=/usr/src/app
+ARG PIP_EXTRA_INDEX_URL
+ENV \
+  PATH=${APPDIR}/.venv/bin:$PATH \
+  PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}
+
 WORKDIR ${APPDIR}
-ENV PATH ${APPDIR}/.venv/bin:$PATH
-ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
-COPY . ./environments-and-requirements/${PIP_REQUIREMENTS} ./
+COPY . .
 
 # install requirements
 RUN python3 -m venv .venv \
   && pip install \
-    --upgrade \
     --no-cache-dir \
-    'pip>=22.3.1' \
-    'setuptools>=65.6.3' \
-    'wheel>=0.38.4' \
-  && pip install \
-    --no-cache-dir \
-    -r ${PIP_REQUIREMENTS}
+    -e .
 
 FROM python:3.10-slim AS runtime
 

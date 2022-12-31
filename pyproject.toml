@@ -113,11 +113,13 @@
         "invoke-web-server-1.png"
     ]
     "configs" = [
+        "*.example",
         "*.yaml",
-        "*.example"
+        "*.txt",
+        "stable-diffusion**.yaml"
     ]
     "frontend.dist" = [
-        "*"
+        "**"
     ]
 
 [tool.setuptools.packages.find]

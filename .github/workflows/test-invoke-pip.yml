@@ -80,8 +80,8 @@ jobs:
           # cache: 'pip'
           # cache-dependency-path: ${{ matrix.requirements-file }}
 
-      - name: install dependencies
-        run: pip3 install --upgrade pip setuptools wheel pip-tools
+      # - name: install dependencies
+      #   run: pip3 install --upgrade pip setuptools wheel pip-tools
 
       # - name: create requirements.txt
       #   run: pip-compile -o requirements.txt pyproject.toml
