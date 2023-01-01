@@ -49,7 +49,7 @@ Prior to installing PyPatchMatch, you need to take the following steps:
 4. Activate the environment you use for invokeai, either with `conda` or with a
    virtual environment.
 
-5. Do a "develop" install of pypatchmatch:
+5. Install pypatchmatch:
 
     ```sh
     pip install "git+https://github.com/invoke-ai/PyPatchMatch@0.1.3#egg=pypatchmatch"
