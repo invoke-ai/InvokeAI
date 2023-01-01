@@ -137,6 +137,12 @@ class ModelCache(object):
             return None
         return self.config[model_name]
 
+    def models(self)->list[str]:
+        '''
+        Return a list consisting of all the names of models defined in models.yaml
+        '''
+        return self.config.keys()
+
     def is_legacy(self,model_name:str)->bool:
         '''
         Return true if this is a legacy (.ckpt) model
@@ -151,37 +157,22 @@ class ModelCache(object):
                         'description': description,
                        },
           model_name2: { etc }
+        Please use model_cache.models() to get all the model names,
+        model_cache.model_info('model-name') to get the stanza for the model
+        named 'model-name', and model_cache.config to get the full OmegaConf
+        object derived from models.yaml
         '''
         models = {}
         for name in self.config:
-            description = self.config[name].description if 'description' in self.config[name] else '<no description>'
-            weights = self.config[name].weights if 'weights' in self.config[name] else '<no weights>'
-            config = self.config[name].config if 'config' in self.config[name] else '<no config>'
-            width = self.config[name].width if 'width' in self.config[name] else 512
-            height = self.config[name].height if 'height' in self.config[name] else 512
-            default = self.config[name].default if 'default' in self.config[name] else False
-            vae = self.config[name].vae if 'vae' in self.config[name] else '<no vae>'
+            stanza = self.config[name]
+            format = stanza.get('format','diffusers')
+            config = stanza.get('config','no config')
+            models[name] = dict(
+                description = stanza.get('description',None),
+                format = 'vae' if 'VAE/default' in config else format,
+                status = 'active' if self.current_model == name else 'cached' if name is self.models else 'not loaded',
+            )
 
-            if isinstance(vae, DictConfig):
-                vae = OmegaConf.to_object(vae)  # so it can be JSON-serialized
-
-            if self.current_model == name:
-                status = 'active'
-            elif name in self.models:
-                status = 'cached'
-            else:
-                status = 'not loaded'
-
-            models[name]={
-                'status' : status,
-                'description' : description,
-                'weights': weights,
-                'config': config,
-                'width': width,
-                'height': height,
-                'vae': vae,
-                'default': default
-            }
         return models
 
     def print_models(self) -> None:
@@ -190,6 +181,8 @@ class ModelCache(object):
         '''
         models = self.list_models()
         for name in models:
+            if models[name]['format'] == 'vae':
+                continue
             line = f'{name:25s} {models[name]["status"]:>10s}  {models[name]["description"]}'
             if models[name]['status'] == 'active':
                 line = f'\033[1m{line}\033[0m'

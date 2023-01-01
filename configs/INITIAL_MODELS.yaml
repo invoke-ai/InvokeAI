@@ -37,6 +37,7 @@ waifu-diffusion-1.3:
    vae:
       repo_id: stabilityai/sd-vae-ft-mse-original
       file: vae-ft-mse-840000-ema-pruned.ckpt
+   recommended: False
    width: 512
    height: 512
 trinart-2.0:
