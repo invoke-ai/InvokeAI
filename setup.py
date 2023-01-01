@@ -1,3 +1,4 @@
+import sys
 import os
 import re
 from setuptools import setup, find_packages
@@ -9,7 +10,15 @@ def list_files(directory):
         listing.append(pair)
     return listing
 
-VERSION = '2.2.5'
+def get_version()->str:
+    VERSIONFILE = 'ldm/invoke/_version.py'
+    with open(VERSIONFILE) as file:
+        for line in file:
+            if match := re.search("__version__='([0-9.]+)'",line):
+                return match.group(1)
+
+# The canonical version number is stored in the file ldm/invoke/_version.py
+VERSION = get_version()
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
 LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, an'

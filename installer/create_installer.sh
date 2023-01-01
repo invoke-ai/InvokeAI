@@ -2,10 +2,11 @@
 
 cd "$(dirname "$0")"
 
-VERSION=$(grep ^VERSION ../setup.py | awk '{ print $3 }' | sed "s/'//g" )
+VERSION=$(grep ^__version__ ../ldm/invoke/_version.py | awk -F= '{ print $2 }' | sed "s/'//g" )
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
 
+echo Building installer for version $VERSION
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
 
