@@ -1,5 +1,4 @@
 import eventlet
-import frontend
 import glob
 import os
 import shutil
@@ -10,6 +9,7 @@ import io
 import base64
 import os
 import json
+import frontend.dist as frontend
 
 from werkzeug.utils import secure_filename
 from flask import Flask, redirect, send_from_directory, request, make_response
@@ -88,11 +88,8 @@ class InvokeAIWebServer:
         if opt.cors:
             socketio_args["cors_allowed_origins"] = opt.cors
 
-
-        frontend_path = os.path.join(frontend.__path__[0], 'dist')
-
         self.app = Flask(
-            __name__, static_url_path="", static_folder=frontend_path
+            __name__, static_url_path="", static_folder=os.path.abspath(frontend.__path__[0])
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)

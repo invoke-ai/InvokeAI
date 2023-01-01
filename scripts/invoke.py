@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 import os
-from sys import platform
+import sys
 
 
-if platform == "darwin":
+if sys.platform == "darwin":
     add_environ: dict = {"PYTORCH_ENABLE_MPS_FALLBACK": "1"}
 
 
