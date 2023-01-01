@@ -10,7 +10,7 @@ from sys import platlibdir, prefix
 
 import configure_invokeai
 
-dirs_to_copy = ["configs", "frontend", "scripts"]
+dirs_to_copy = ["configs", "scripts"]
 
 
 def copy_from_venv(folders) -> None:

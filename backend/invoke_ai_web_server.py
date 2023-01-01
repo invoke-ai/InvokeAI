@@ -88,7 +88,9 @@ class InvokeAIWebServer:
         if opt.cors:
             socketio_args["cors_allowed_origins"] = opt.cors
 
-        frontend_path = frontend.__path__[0]
+
+        frontend_path = os.path.join(frontend.__path__[0], 'dist')
+
         self.app = Flask(
             __name__, static_url_path="", static_folder=frontend_path
         )
@@ -303,7 +305,7 @@ class InvokeAIWebServer:
                     socketio.emit(
                         "foundModels",
                         {'search_folder': search_folder, 'found_models': found_models},
-                    )            
+                    )
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
                 print("\n")

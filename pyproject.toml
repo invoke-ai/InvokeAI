@@ -107,10 +107,8 @@
     version = {attr = "ldm.invoke.__version__"}
 
 [tool.setuptools.package-data]
-    "vendored.clip.clip" = ["*.txt.gz"]
-    "docs.assets" = [
-        "invoke_ai_banner.png",
-        "invoke-web-server-1.png"
+    "vendored.clip.clip" = [
+        "*.txt.gz"
     ]
     "configs" = [
         "*.example",
@@ -123,10 +121,11 @@
     ]
 
 [tool.setuptools.packages.find]
-    "where" = [
-        "."
-    ]
+    # "where" = [
+    #     "."
+    # ]
     "include" = [
+        "assets*",
         "backend*",
         "configs*",
         "frontend.dist*",
@@ -148,7 +147,13 @@
         '''
 
 [tool.isort]
-    profile = 'black'
+    profile = "black"
+    skip = [
+        "./build",
+        "./.venv",
+        "./vendored",
+        "data"
+    ]
 
 [tool.pylint.format]
     max-line-length = "88"
