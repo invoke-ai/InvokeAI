@@ -2,7 +2,7 @@
 
 cd "$(dirname "$0")"
 
-VERSION=$(grep ^__version__ ../ldm/invoke/_version.py | awk -F= '{ print $2 }' | sed "s/'//g" )
+VERSION=$(grep ^__version__ ../ldm/invoke/_version.py | awk -F= '{ print $2 }' | sed "s/'//g" | sed -r 's/\s+//g' )
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
 
