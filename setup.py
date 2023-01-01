@@ -14,7 +14,7 @@ def get_version()->str:
     VERSIONFILE = 'ldm/invoke/_version.py'
     with open(VERSIONFILE) as file:
         for line in file:
-            if match := re.search("__version__='([0-9.]+)'",line):
+            if match := re.search("__version__='([^']+)'",line):
                 return match.group(1)
 
 # The canonical version number is stored in the file ldm/invoke/_version.py
