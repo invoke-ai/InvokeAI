@@ -107,6 +107,9 @@
     version = {attr = "ldm.invoke.__version__"}
 
 [tool.setuptools.package-data]
+    "assets" = [
+        "caution.png"
+    ]
     "vendored.clip.clip" = [
         "*.txt.gz"
     ]
