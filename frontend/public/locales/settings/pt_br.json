@@ -1,0 +1,13 @@
+{
+  "models": "Modelos",
+  "displayInProgress": "Mostrar Progresso de Imagens Em Andamento",
+  "saveSteps": "Salvar imagens a cada n passos",
+  "confirmOnDelete": "Confirmar Antes de Apagar",
+  "displayHelpIcons": "Mostrar Ícones de Ajuda",
+  "useCanvasBeta": "Usar Layout de Telas Beta",
+  "enableImageDebugging": "Ativar Depuração de Imagem",
+  "resetWebUI": "Reiniciar Interface",
+  "resetWebUIDesc1": "Reiniciar a interface apenas reinicia o cache local do broswer para imagens e configurações lembradas. Não apaga nenhuma imagem do disco.",
+  "resetWebUIDesc2": "Se as imagens não estão aparecendo na galeria ou algo mais não está funcionando, favor tentar reiniciar antes de postar um problema no GitHub.",
+  "resetComplete": "A interface foi reiniciada. Atualize a página para carregar."
+}

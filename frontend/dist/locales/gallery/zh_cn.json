@@ -1,0 +1,16 @@
+{
+  "generations": "生成的图像",
+  "showGenerations": "显示生成的图像",
+  "uploads": "上传的图像",
+  "showUploads": "显示上传的图像",
+  "galleryImageSize": "预览大小",
+  "galleryImageResetSize": "重置预览大小",
+  "gallerySettings": "预览设置",
+  "maintainAspectRatio": "保持比例",
+  "autoSwitchNewImages": "自动切换到新图像",
+  "singleColumnLayout": "单列布局",
+  "pinGallery": "保持图库常开",
+  "allImagesLoaded": "所有图像加载完成",
+  "loadMore": "加载更多",
+  "noImagesInGallery": "图库中无图像"
+}

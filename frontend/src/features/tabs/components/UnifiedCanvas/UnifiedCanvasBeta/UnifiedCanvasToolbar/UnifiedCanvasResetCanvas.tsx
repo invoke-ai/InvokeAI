@@ -6,10 +6,12 @@ import {
   resizeAndScaleCanvas,
 } from 'features/canvas/store/canvasSlice';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
 export default function UnifiedCanvasResetCanvas() {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const isStaging = useAppSelector(isStagingSelector);
 
   const handleResetCanvas = () => {
@@ -18,8 +20,8 @@ export default function UnifiedCanvasResetCanvas() {
   };
   return (
     <IAIIconButton
-      aria-label="Clear Canvas"
-      tooltip="Clear Canvas"
+      aria-label={t('unifiedcanvas:clearCanvas')}
+      tooltip={t('unifiedcanvas:clearCanvas')}
       icon={<FaTrash />}
       onClick={handleResetCanvas}
       style={{ backgroundColor: 'var(--btn-delete-image)' }}

@@ -1,0 +1,15 @@
+{
+  "feature": {
+    "prompt": "Este campo tomará todo el texto de entrada, incluidos tanto los términos de contenido como los estilísticos. Si bien se pueden incluir pesos en la solicitud, los comandos/parámetros estándar de línea de comandos no funcionarán.",
+    "gallery": "Conforme se generan nuevas invocaciones, los archivos del directorio de salida se mostrarán aquí. Las generaciones tienen opciones adicionales para configurar nuevas generaciones.",
+    "other": "Estas opciones habilitarán modos de procesamiento alternativos para Invoke. El modo sin costuras funciona para generar patrones repetitivos en la salida. La optimización de alta resolución realiza un ciclo de generación de dos pasos y debe usarse en resoluciones más altas cuando desee una imagen/composición más coherente.",
+    "seed": "Los valores de semilla proporcionan un conjunto inicial de ruido que guían el proceso de eliminación de ruido y se pueden aleatorizar o rellenar con una semilla de una invocación anterior. La función Umbral se puede usar para mitigar resultados indeseables a valores CFG más altos (intente entre 0-10), y Perlin se puede usar para agregar ruido Perlin al proceso de eliminación de ruido. Ambos sirven para agregar variación a sus salidas.",
+    "variations": "Pruebe una variación con una cantidad entre 0 y 1 para cambiar la imagen de salida para la semilla establecida. Se encuentran variaciones interesantes en la semilla entre 0.1 y 0.3.",
+    "upscale": "Usando ESRGAN, puede aumentar la resolución de salida sin requerir un ancho/alto más alto en la generación inicial.",
+    "faceCorrection": "Usando GFPGAN o Codeformer, la corrección de rostros intentará identificar rostros en las salidas y corregir cualquier defecto/anormalidad. Los valores de fuerza más altos aplicarán una presión correctiva más fuerte en las salidas, lo que resultará en rostros más atractivos. Con Codeformer, una mayor fidelidad intentará preservar la imagen original, a expensas de la fuerza de corrección de rostros.",
+    "imageToImage": "Imagen a Imagen permite cargar una imagen inicial, que InvokeAI usará para guiar el proceso de generación, junto con una solicitud. Un valor más bajo para esta configuración se parecerá más a la imagen original. Se aceptan valores entre 0-1, y se recomienda un rango de .25-.75.",
+    "boundingBox": "La caja delimitadora es análoga a las configuraciones de Ancho y Alto para Texto a Imagen o Imagen a Imagen. Solo se procesará el área en la caja.",
+    "seamCorrection": "Controla el manejo de parches visibles que pueden ocurrir cuando se pega una imagen generada de nuevo en el lienzo.",
+    "infillAndScaling": "Administra los métodos de relleno (utilizados en áreas enmascaradas o borradas del lienzo) y la escala (útil para tamaños de caja delimitadora pequeños)."
+  }
+}

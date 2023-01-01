@@ -164,9 +164,31 @@ export declare type ModelStatus = 'active' | 'cached' | 'not loaded';
 export declare type Model = {
   status: ModelStatus;
   description: string;
+  weights: string;
+  config?: string;
+  vae?: string;
+  width?: number;
+  height?: number;
+  default?: boolean;
 };
 
 export declare type ModelList = Record<string, Model>;
+
+export declare type FoundModel = {
+  name: string;
+  location: string;
+};
+
+export declare type InvokeModelConfigProps = {
+  name: string | undefined;
+  description: string | undefined;
+  config: string | undefined;
+  weights: string | undefined;
+  vae: string | undefined;
+  width: number | undefined;
+  height: number | undefined;
+  default: boolean | undefined;
+};
 
 /**
  * These types type data received from the server via socketio.
@@ -175,6 +197,22 @@ export declare type ModelList = Record<string, Model>;
 export declare type ModelChangeResponse = {
   model_name: string;
   model_list: ModelList;
+};
+
+export declare type ModelAddedResponse = {
+  new_model_name: string;
+  model_list: ModelList;
+  update: boolean;
+};
+
+export declare type ModelDeletedResponse = {
+  deleted_model_name: string;
+  model_list: ModelList;
+};
+
+export declare type FoundModelResponse = {
+  search_folder: string;
+  found_models: FoundModel[];
 };
 
 export declare type SystemStatusResponse = SystemStatus;

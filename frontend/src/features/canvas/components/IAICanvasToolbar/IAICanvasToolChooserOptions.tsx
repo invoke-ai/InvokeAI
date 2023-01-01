@@ -27,6 +27,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
 import IAIColorPicker from 'common/components/IAIColorPicker';
+import { useTranslation } from 'react-i18next';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],
@@ -52,6 +53,7 @@ export const selector = createSelector(
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
   const { tool, brushColor, brushSize, isStaging } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   useHotkeys(
     ['b'],
@@ -178,38 +180,38 @@ const IAICanvasToolChooserOptions = () => {
   return (
     <ButtonGroup isAttached>
       <IAIIconButton
-        aria-label="Brush Tool (B)"
-        tooltip="Brush Tool (B)"
+        aria-label={`${t('unifiedcanvas:brush')} (B)`}
+        tooltip={`${t('unifiedcanvas:brush')} (B)`}
         icon={<FaPaintBrush />}
         data-selected={tool === 'brush' && !isStaging}
         onClick={handleSelectBrushTool}
         isDisabled={isStaging}
       />
       <IAIIconButton
-        aria-label="Eraser Tool (E)"
-        tooltip="Eraser Tool (E)"
+        aria-label={`${t('unifiedcanvas:eraser')} (E)`}
+        tooltip={`${t('unifiedcanvas:eraser')} (E)`}
         icon={<FaEraser />}
         data-selected={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
       />
       <IAIIconButton
-        aria-label="Fill Bounding Box (Shift+F)"
-        tooltip="Fill Bounding Box (Shift+F)"
+        aria-label={`${t('unifiedcanvas:fillBoundingBox')} (Shift+F)`}
+        tooltip={`${t('unifiedcanvas:fillBoundingBox')} (Shift+F)`}
         icon={<FaFillDrip />}
         isDisabled={isStaging}
         onClick={handleFillRect}
       />
       <IAIIconButton
-        aria-label="Erase Bounding Box Area (Delete/Backspace)"
-        tooltip="Erase Bounding Box Area (Delete/Backspace)"
+        aria-label={`${t('unifiedcanvas:eraseBoundingBox')} (Del/Backspace)`}
+        tooltip={`${t('unifiedcanvas:eraseBoundingBox')} (Del/Backspace)`}
         icon={<FaPlus style={{ transform: 'rotate(45deg)' }} />}
         isDisabled={isStaging}
         onClick={handleEraseBoundingBox}
       />
       <IAIIconButton
-        aria-label="Color Picker (C)"
-        tooltip="Color Picker (C)"
+        aria-label={`${t('unifiedcanvas:colorPicker')} (C)`}
+        tooltip={`${t('unifiedcanvas:colorPicker')} (C)`}
         icon={<FaEyeDropper />}
         data-selected={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}
@@ -219,8 +221,8 @@ const IAICanvasToolChooserOptions = () => {
         trigger="hover"
         triggerComponent={
           <IAIIconButton
-            aria-label="Brush Options"
-            tooltip="Brush Options"
+            aria-label={t('unifiedcanvas:brushOptions')}
+            tooltip={t('unifiedcanvas:brushOptions')}
             icon={<FaSlidersH />}
           />
         }
@@ -233,7 +235,7 @@ const IAICanvasToolChooserOptions = () => {
         >
           <Flex gap={'1rem'} justifyContent="space-between">
             <IAISlider
-              label="Size"
+              label={t('unifiedcanvas:brushSize')}
               value={brushSize}
               withInput
               onChange={(newSize) => dispatch(setBrushSize(newSize))}

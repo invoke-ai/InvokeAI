@@ -1,13 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function NodesWIP() {
+  const { t } = useTranslation();
   return (
     <div className="work-in-progress nodes-work-in-progress">
-      <h1>Nodes</h1>
-      <p>
-        A node based system for the generation of images is under development
-        currently. Stay tuned for updates about this amazing feature.
-      </p>
+      <h1>{t('common:nodes')}</h1>
+      <p>{t('common:nodesDesc')}</p>
     </div>
   );
 }

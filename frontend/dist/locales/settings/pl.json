@@ -1,0 +1,13 @@
+{
+  "models": "Modele",
+  "displayInProgress": "Podgląd generowanego obrazu",
+  "saveSteps": "Zapisuj obrazy co X kroków",
+  "confirmOnDelete": "Potwierdzaj usuwanie",
+  "displayHelpIcons": "Wyświetlaj ikony pomocy",
+  "useCanvasBeta": "Nowy układ trybu uniwersalnego",
+  "enableImageDebugging": "Włącz debugowanie obrazu",
+  "resetWebUI": "Zresetuj interfejs",
+  "resetWebUIDesc1": "Resetowanie interfejsu wyczyści jedynie dane i ustawienia zapisane w pamięci przeglądarki. Nie usunie żadnych obrazów z dysku.",
+  "resetWebUIDesc2": "Jeśli obrazy nie są poprawnie wyświetlane w galerii lub doświadczasz innych problemów, przed zgłoszeniem błędu spróbuj zresetować interfejs.",
+  "resetComplete": "Interfejs został zresetowany. Odśwież stronę, aby załadować ponownie."
+}

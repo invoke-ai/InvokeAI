@@ -1,0 +1,13 @@
+{
+  "models": "Models",
+  "displayInProgress": "Display In-Progress Images",
+  "saveSteps": "Save images every n steps",
+  "confirmOnDelete": "Confirm On Delete",
+  "displayHelpIcons": "Display Help Icons",
+  "useCanvasBeta": "Use Canvas Beta Layout",
+  "enableImageDebugging": "Enable Image Debugging",
+  "resetWebUI": "Reset Web UI",
+  "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
+  "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
+  "resetComplete": "Web UI has been reset. Refresh the page to reload."
+}

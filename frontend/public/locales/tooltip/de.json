@@ -1,0 +1,15 @@
+{
+  "feature": {
+    "prompt": "Dies ist das Prompt-Feld. Ein Prompt enthält Generierungsobjekte und stilistische Begriffe. Sie können auch Gewichtungen (Token-Bedeutung) dem Prompt hinzufügen, aber CLI-Befehle und Parameter funktionieren nicht.",
+    "gallery": "Die Galerie zeigt erzeugte Bilder aus dem Ausgabeordner an, sobald sie erstellt wurden. Die Einstellungen werden in den Dateien gespeichert und können über das Kontextmenü aufgerufen werden.",
+    "other": "Mit diesen Optionen werden alternative Verarbeitungsmodi für InvokeAI aktiviert. 'Nahtlose Kachelung' erzeugt sich wiederholende Muster in der Ausgabe. 'Hohe Auflösungen' werden in zwei Schritten mit img2img erzeugt: Verwenden Sie diese Einstellung, wenn Sie ein größeres und kohärenteres Bild ohne Artefakte wünschen. Es dauert länger als das normale txt2img.",
+    "seed": "Der Seed-Wert beeinflusst das Ausgangsrauschen, aus dem das Bild erstellt wird. Sie können die bereits vorhandenen Seeds von früheren Bildern verwenden. 'Der Rauschschwellenwert' wird verwendet, um Artefakte bei hohen CFG-Werten abzuschwächen (versuchen Sie es im Bereich 0-10), und Perlin, um während der Erzeugung Perlin-Rauschen hinzuzufügen: Beide dienen dazu, Ihre Ergebnisse zu variieren.",
+    "variations": "Versuchen Sie eine Variation mit einem Wert zwischen 0,1 und 1,0, um das Ergebnis für ein bestimmtes Seed zu ändern. Interessante Variationen des Seeds liegen zwischen 0,1 und 0,3.",
+    "upscale": "Verwenden Sie ESRGAN, um das Bild unmittelbar nach der Erzeugung zu vergrößern.",
+    "faceCorrection": "Gesichtskorrektur mit GFPGAN oder Codeformer: Der Algorithmus erkennt Gesichter im Bild und korrigiert alle Fehler. Ein hoher Wert verändert das Bild stärker, was zu attraktiveren Gesichtern führt. Codeformer mit einer höheren Genauigkeit bewahrt das Originalbild auf Kosten einer stärkeren Gesichtskorrektur.",
+    "imageToImage": "Bild zu Bild lädt ein beliebiges Bild als Ausgangsbild, aus dem dann zusammen mit dem Prompt ein neues Bild erzeugt wird. Je höher der Wert ist, desto stärker wird das Ergebnisbild verändert. Werte von 0,0 bis 1,0 sind möglich, der empfohlene Bereich ist .25-.75",
+    "boundingBox": "Der Begrenzungsrahmen ist derselbe wie die Einstellungen für Breite und Höhe bei Text zu Bild oder Bild zu Bild. Es wird nur der Bereich innerhalb des Rahmens verarbeitet.",
+    "seamCorrection": "Steuert die Behandlung von sichtbaren Übergängen, die zwischen den erzeugten Bildern auf der Leinwand auftreten.",
+    "infillAndScaling": "Verwalten Sie Infill-Methoden (für maskierte oder gelöschte Bereiche der Leinwand) und Skalierung (nützlich für kleine Begrenzungsrahmengrößen)."
+  }
+}

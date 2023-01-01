@@ -2,6 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
 import * as InvokeAI from 'app/invokeai';
+import i18n from 'i18n';
 
 export type LogLevel = 'info' | 'warning' | 'error';
 
@@ -46,6 +47,9 @@ export interface SystemState
   saveIntermediatesInterval: number;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
+  searchFolder: string | null;
+  foundModels: InvokeAI.FoundModel[] | null;
+  openModel: string | null;
 }
 
 const initialSystemState: SystemState = {
@@ -64,7 +68,9 @@ const initialSystemState: SystemState = {
   totalSteps: 0,
   currentIteration: 0,
   totalIterations: 0,
-  currentStatus: 'Disconnected',
+  currentStatus: i18n.isInitialized
+    ? i18n.t('common:statusDisconnected')
+    : 'Disconnected',
   currentStatusHasSteps: false,
   model: '',
   model_id: '',
@@ -79,6 +85,9 @@ const initialSystemState: SystemState = {
   saveIntermediatesInterval: 5,
   enableImageDebugging: false,
   toastQueue: [],
+  searchFolder: null,
+  foundModels: null,
+  openModel: null,
 };
 
 export const systemSlice = createSlice({
@@ -109,13 +118,15 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Error';
+      state.currentStatus = i18n.t('common:statusError');
       state.wasErrorSeen = false;
     },
     errorSeen: (state) => {
       state.hasError = false;
       state.wasErrorSeen = true;
-      state.currentStatus = state.isConnected ? 'Connected' : 'Disconnected';
+      state.currentStatus = state.isConnected
+        ? i18n.t('common:statusConnected')
+        : i18n.t('common:statusDisconnected');
     },
     addLogEntry: (
       state,
@@ -176,7 +187,7 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Processing canceled';
+      state.currentStatus = i18n.t('common:statusProcessingCanceled');
     },
     generationRequested: (state) => {
       state.isProcessing = true;
@@ -186,7 +197,7 @@ export const systemSlice = createSlice({
       state.currentIteration = 0;
       state.totalIterations = 0;
       state.currentStatusHasSteps = false;
-      state.currentStatus = 'Preparing';
+      state.currentStatus = i18n.t('common:statusPreparing');
     },
     setModelList: (
       state,
@@ -198,7 +209,7 @@ export const systemSlice = createSlice({
       state.isCancelable = action.payload;
     },
     modelChangeRequested: (state) => {
-      state.currentStatus = 'Loading Model';
+      state.currentStatus = i18n.t('common:statusLoadingModel');
       state.isCancelable = false;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
@@ -219,6 +230,18 @@ export const systemSlice = createSlice({
       state.isProcessing = true;
       state.currentStatus = action.payload;
       state.currentStatusHasSteps = false;
+    },
+    setSearchFolder: (state, action: PayloadAction<string | null>) => {
+      state.searchFolder = action.payload;
+    },
+    setFoundModels: (
+      state,
+      action: PayloadAction<InvokeAI.FoundModel[] | null>
+    ) => {
+      state.foundModels = action.payload;
+    },
+    setOpenModel: (state, action: PayloadAction<string | null>) => {
+      state.openModel = action.payload;
     },
   },
 });
@@ -248,6 +271,9 @@ export const {
   addToast,
   clearToastQueue,
   setProcessingIndeterminateTask,
+  setSearchFolder,
+  setFoundModels,
+  setOpenModel,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

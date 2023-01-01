@@ -4,11 +4,13 @@ import { resetCanvasView } from 'features/canvas/store/canvasSlice';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaCrosshairs } from 'react-icons/fa';
 
 export default function UnifiedCanvasResetView() {
   const canvasBaseLayer = getCanvasBaseLayer();
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   useHotkeys(
     ['r'],
@@ -36,8 +38,8 @@ export default function UnifiedCanvasResetView() {
   };
   return (
     <IAIIconButton
-      aria-label="Reset View (R)"
-      tooltip="Reset View (R)"
+      aria-label={`${t('unifiedcanvas:resetView')} (R)`}
+      tooltip={`${t('unifiedcanvas:resetView')} (R)`}
       icon={<FaCrosshairs />}
       onClick={handleResetCanvasView}
     />

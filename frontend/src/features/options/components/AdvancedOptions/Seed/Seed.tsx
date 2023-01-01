@@ -4,6 +4,7 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { setSeed } from 'features/options/store/optionsSlice';
+import { useTranslation } from 'react-i18next';
 
 export default function Seed() {
   const seed = useAppSelector((state: RootState) => state.options.seed);
@@ -14,13 +15,15 @@ export default function Seed() {
     (state: RootState) => state.options.shouldGenerateVariations
   );
 
+  const { t } = useTranslation();
+
   const dispatch = useAppDispatch();
 
   const handleChangeSeed = (v: number) => dispatch(setSeed(v));
 
   return (
     <IAINumberInput
-      label="Seed"
+      label={t('options:seed')}
       step={1}
       precision={0}
       flexGrow={1}
@@ -30,7 +33,7 @@ export default function Seed() {
       isInvalid={seed < 0 && shouldGenerateVariations}
       onChange={handleChangeSeed}
       value={seed}
-      width="10rem"
+      width="auto"
     />
   );
 }

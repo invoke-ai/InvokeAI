@@ -4,6 +4,7 @@ import { isEqual } from 'lodash';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { errorSeen, SystemState } from 'features/system/store/systemSlice';
+import { useTranslation } from 'react-i18next';
 
 const systemSelector = createSelector(
   (state: RootState) => state.system,
@@ -34,6 +35,7 @@ const StatusIndicator = () => {
     wasErrorSeen,
   } = useAppSelector(systemSelector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   let statusStyle;
   if (isConnected && !hasError) {
@@ -45,21 +47,23 @@ const StatusIndicator = () => {
   let statusMessage = currentStatus;
 
   const intermediateStatuses = [
-    'generating',
-    'preparing',
-    'saving image',
-    'restoring faces',
-    'upscaling',
+    t('common:statusGenerating'),
+    t('common:statusPreparing'),
+    t('common:statusSavingImage'),
+    t('common:statusRestoringFaces'),
+    t('common:statusUpscaling'),
   ];
 
-  if (intermediateStatuses.includes(statusMessage.toLowerCase())) {
+  if (intermediateStatuses.includes(statusMessage)) {
     statusStyle = 'status-working';
   }
 
   if (statusMessage)
     if (isProcessing) {
       if (totalIterations > 1) {
-        statusMessage += ` (${currentIteration}/${totalIterations})`;
+        statusMessage =
+          t(statusMessage as keyof typeof t) +
+          ` (${currentIteration}/${totalIterations})`;
       }
     }
 
@@ -84,7 +88,7 @@ const StatusIndicator = () => {
         onClick={handleClickStatusIndicator}
         className={`status ${statusStyle}`}
       >
-        {statusMessage}
+        {t(statusMessage as keyof typeof t)}
       </Text>
     </Tooltip>
   );
