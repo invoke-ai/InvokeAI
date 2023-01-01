@@ -15,7 +15,7 @@ huggingface-hub
 imageio
 imageio-ffmpeg
 kornia
-numpy
+numpy==1.23.*
 omegaconf
 opencv-python
 picklescan

@@ -308,7 +308,7 @@ class ModelCache(object):
         if 'state_dict' in sd:
             sd = sd['state_dict']
 
-        print(f'  | Forcing garbage collection prior to loading new model')
+        print(f'   | Forcing garbage collection prior to loading new model')
         gc.collect()
         model = instantiate_from_config(omega_config.model)
         model.load_state_dict(sd, strict=False)
@@ -584,6 +584,8 @@ class ModelCache(object):
         Write current configuration out to the indicated file.
         '''
         yaml_str = OmegaConf.to_yaml(self.config)
+        if not os.path.isabs(config_file_path):
+            config_file_path = os.path.normpath(os.path.join(Globals.root,opt.conf))
         tmpfile = os.path.join(os.path.dirname(config_file_path),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
             outfile.write(self.preamble())

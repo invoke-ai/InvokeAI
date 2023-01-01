@@ -13,9 +13,10 @@ if "%1" == "use-cache" (
 )
 
 @rem Config
-@rem this should be changed to the tagged release!
-@rem set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
-set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.4.zip
+@rem The version in the next line is replaced by an up to date release number
+@rem when create_installer.sh is run. Change the release number there.
+set INVOKEAI_VERSION=latest
+set INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/%INVOKEAI_VERSION%.zip
 set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 set PYTHON_URL=https://www.python.org/downloads/windows/

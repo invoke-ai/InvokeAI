@@ -16,8 +16,6 @@ from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_f
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
-from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
-from ldm.invoke.model_cache import ModelCache
 from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
@@ -150,11 +148,10 @@ def main():
     try:
         main_loop(gen, opt)
     except KeyboardInterrupt:
-        print("\ngoodbye!")
+        print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
     except Exception:
         print(">> An error occurred:")
         traceback.print_exc()
-
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt):
@@ -429,7 +426,8 @@ def main_loop(gen, opt):
         output_cntr = write_log(results, log_path ,('txt', 'md'), output_cntr)
         print()
 
-    print('goodbye!')
+
+    print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
 
 # TO DO: remove repetitive code and the awkward command.replace() trope
 # Just do a simple parse of the command!
