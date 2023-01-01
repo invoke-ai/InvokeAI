@@ -3,8 +3,8 @@
 cd "$(dirname "$0")"
 
 VERSION=$(grep ^VERSION ../setup.py | awk '{ print $3 }' | sed "s/'//g" )
-PATCH="-rc9"
-VERSION="${VERSION}${PATCH}"
+PATCH=""
+VERSION="v${VERSION}${PATCH}"
 
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
@@ -19,7 +19,7 @@ fi
 git push origin :refs/tags/latest
 git tag -fa latest
 
-echo Building installer zip fles for InvokeAI v$VERSION
+echo Building installer zip fles for InvokeAI $VERSION
 
 # get rid of any old ones
 rm *.zip
