@@ -14,7 +14,6 @@ jobs:
         flavor:
           - amd
           - cuda
-          # - cloud
         include:
           - flavor: amd
             pip-extra-index-url: https://download.pytorch.org/whl/rocm5.2
@@ -24,10 +23,6 @@ jobs:
             pip-extra-index-url: ''
             dockerfile: docker-build/Dockerfile
             platforms: linux/amd64,linux/arm64
-          # - flavor: cloud
-          #   pip-requirements: requirements-lin-cuda.txt
-          #   dockerfile: docker-build/Dockerfile.cloud
-          #   platforms: linux/amd64
     runs-on: ubuntu-latest
     name: ${{ matrix.flavor }}
     steps:
@@ -75,5 +70,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: PIP_EXTRA_INDEX_URL=${{ matrix.pip-extra-index-url }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
