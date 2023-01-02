@@ -130,7 +130,7 @@ def main():
     # try to autoconvert new models
     # autoimport new .ckpt files
     if path := opt.autoconvert:
-        gen.model_cache.autoconvert_weights(
+        gen.model_manager.autoconvert_weights(
             conf_path=opt.conf,
             weights_directory=path,
         )
@@ -454,7 +454,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         operation = None
 
     elif command.startswith('!models'):
-        gen.model_cache.print_models()
+        gen.model_manager.print_models()
         completer.add_history(command)
         operation = None
 
@@ -607,7 +607,7 @@ def optimize_model(ckpt_path:str, gen, opt, completer):
     if diffuser_path.exists():
         print(f'** {basename} is already optimized. Will not overwrite.')
         return
-    new_config = gen.model_cache.convert_and_import(ckpt_path, diffuser_path)
+    new_config = gen.model_manager.convert_and_import(ckpt_path, diffuser_path)
     if write_config_file(opt.conf, gen, basename, new_config, clobber=False):
         completer.add_model(basename)
 
@@ -616,13 +616,13 @@ def del_config(model_name:str, gen, opt, completer):
     if model_name == current_model:
         print("** Can't delete active model. !switch to another model first. **")
         return
-    gen.model_cache.del_model(model_name)
-    gen.model_cache.commit(opt.conf)
+    gen.model_manager.del_model(model_name)
+    gen.model_manager.commit(opt.conf)
     print(f'** {model_name} deleted')
     completer.del_model(model_name)
 
 def edit_config(model_name:str, gen, opt, completer):
-    config = gen.model_cache.config
+    config = gen.model_manager.config
 
     if model_name not in config:
         print(f'** Unknown model {model_name}')
@@ -654,22 +654,22 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
 
     try:
         print('>> Verifying that new model loads...')
-        gen.model_cache.add_model(model_name, new_config, clobber)
+        gen.model_manager.add_model(model_name, new_config, clobber)
         assert gen.set_model(model_name) is not None, 'model failed to load'
     except AssertionError as e:
         traceback.print_exc()
         print(f'** aborting **')
         try:
-            gen.model_cache.del_model(model_name)
+            gen.model_manager.del_model(model_name)
         except Exception:
             pass
         return False
 
     if make_default:
         print('making this default')
-        gen.model_cache.set_default_model(model_name)
+        gen.model_manager.set_default_model(model_name)
 
-    gen.model_cache.commit(conf_path)
+    gen.model_manager.commit(conf_path)
 
     do_switch = input(f'Keep model loaded? [y]')
     if len(do_switch)==0 or do_switch[0] in ('y','Y'):

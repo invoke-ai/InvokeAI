@@ -18,6 +18,7 @@ import traceback
 import warnings
 from pathlib import Path
 from typing import Union, Any
+from ldm.util import download_with_progress_bar
 
 import torch
 import transformers
@@ -120,7 +121,7 @@ class ModelCache(object):
     def set_default_model(self,model_name:str) -> None:
         '''
         Set the default model. The change will not take
-        effect until you call model_cache.commit()
+        effect until you call model_manager.commit()
         '''
         assert model_name in self.models,f"unknown model '{model_name}'"
 
@@ -131,17 +132,17 @@ class ModelCache(object):
 
     def model_info(self, model_name:str)->dict:
         '''
-        Given a model name returns the config object describing it.
+        Given a model name returns the OmegaConf (dict-like) object describing it.
         '''
         if model_name not in self.config:
             return None
         return self.config[model_name]
 
-    def models(self)->list[str]:
+    def model_names(self)->list[str]:
         '''
         Return a list consisting of all the names of models defined in models.yaml
         '''
-        return self.config.keys()
+        return list(self.config.keys())
 
     def is_legacy(self,model_name:str)->bool:
         '''
@@ -157,9 +158,9 @@ class ModelCache(object):
                         'description': description,
                        },
           model_name2: { etc }
-        Please use model_cache.models() to get all the model names,
-        model_cache.model_info('model-name') to get the stanza for the model
-        named 'model-name', and model_cache.config to get the full OmegaConf
+        Please use model_manager.models() to get all the model names,
+        model_manager.model_info('model-name') to get the stanza for the model
+        named 'model-name', and model_manager.config to get the full OmegaConf
         object derived from models.yaml
         '''
         models = {}
@@ -469,6 +470,83 @@ class ModelCache(object):
         else:
             print('>> Model scanned ok!')
 
+    def import_diffuser_model(self,
+                        repo_or_path:Union[str,Path],
+                        model_name:str=None,
+                        description:str=None,
+                        commit_to_conf:Path=None,
+                        )->bool:
+        '''
+        Attempts to install the indicated diffuser model and returns True if successful.
+
+        "repo_or_path" can be either a repo-id or a path-like object corresponding to the
+        top of a downloaded diffusers directory.
+
+        You can optionally provide a model name and/or description. If not provided,
+        then these will be derived from the repo name. If you provide a commit_to_conf
+        path to the configuration file, then the new entry will be committed to the
+        models.yaml file.
+        '''
+        model_name = model_name or Path(repo_or_path).stem
+        description = description or f'imported diffusers model {model_name}'
+        new_config = dict(
+            description=description,
+            format='diffusers',
+        )
+        if isinstance(repo_or_path,Path) and repo_or_path.exists():
+            new_config.update(path=repo_or_path)
+        else:
+            new_config.update(repo_id=repo_or_path)
+
+        self.add_model(model_name, new_config, True)
+        if commit_to_conf:
+            self.commit(commit_to_conf)
+        return True
+
+    def import_ckpt_model(self,
+                    weights:Union[str,Path],
+                    config:Union[str,Path]='configs/stable-diffusion/v1-inference.yaml',
+                    model_name:str=None,
+                    description:str=None,
+                    commit_to_conf:Path=None,
+    )->bool:
+        '''
+        Attempts to install the indicated ckpt file and returns True if successful.
+
+        "weights" can be either a path-like object corresponding to a local .ckpt file 
+        or a http/https URL pointing to a remote model.
+
+        "config" is the model config file to use with this ckpt file. It defaults to
+        v1-inference.yaml. If a URL is provided, the config will be downloaded.
+        
+        You can optionally provide a model name and/or description. If not provided,
+        then these will be derived from the weight file name. If you provide a commit_to_conf
+        path to the configuration file, then the new entry will be committed to the
+        models.yaml file.
+        '''
+        weights_path = self._resolve_path(weights,'models/ldm/stable-diffusion-v1')
+        config_path  = self._resolve_path(config,'configs/stable-diffusion')
+
+        if weights_path is None or not weights_path.exists():
+            return False
+        if config_path is None or not config_path.exists():
+            return False
+            
+        model_name = model_name or Path(basename).stem
+        description = description or f'imported stable diffusion weights file {model_name}'
+        new_config = dict(
+            weights=str(weights_path),
+            config=str(config_path),
+            description=description,
+            format='ckpt',
+            width=512,
+            height=512
+        )
+        self.add_model(model_name, new_config, True)
+        if commit_to_conf:
+            self.commit(commit_to_conf)
+        return True
+                       
     def autoconvert_weights(
             self,
             conf_path:Path,
@@ -538,8 +616,8 @@ class ModelCache(object):
         if model_name == current_model:
             print("** Can't delete active model. !switch to another model first. **")
             return
-        gen.model_cache.del_model(model_name)
-        gen.model_cache.commit(opt.conf)
+        gen.model_manager.del_model(model_name)
+        gen.model_manager.commit(opt.conf)
         print(f'** {model_name} deleted')
         completer.del_model(model_name)
 
@@ -598,6 +676,21 @@ class ModelCache(object):
             # and the width and height of the images it
             # was trained on.
         ''')
+
+    def _resolve_path(self, source:Union[str,Path], dest_directory:str)->Path:
+        resolved_path = None
+        if source.startswith('http'):
+            basename = os.path.basename(source)
+            if not os.path.isabs(dest_directory):
+                dest_directory = os.path.join(Globals.root,dest_directory)
+            dest = os.path.join(dest_directory,basename)
+            if download_with_progress_bar(source,dest):
+                resolved_path = Path(dest)
+        else:
+            if not os.path.isabs(source):
+                source = os.path.join(Globals.root,source)
+            resolved_path = Path(source)
+        return resolved_path
 
     def _invalidate_cached_model(self,model_name:str) -> None:
         self.offload_model(model_name)

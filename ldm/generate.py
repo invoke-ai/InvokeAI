@@ -38,7 +38,7 @@ from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.globals import Globals
 from ldm.invoke.image_util import InitImageResizer
-from ldm.invoke.model_cache import ModelCache
+from ldm.invoke.model_manager import ModelCache
 from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask
@@ -163,7 +163,7 @@ class Generate:
         mconfig             = OmegaConf.load(conf)
         self.height         = None
         self.width          = None
-        self.model_cache    = None
+        self.model_manager    = None
         self.iterations     = 1
         self.steps          = 50
         self.cfg_scale      = 7.5
@@ -210,8 +210,8 @@ class Generate:
             self.precision = choose_precision(self.device)
 
         # model caching system for fast switching
-        self.model_cache = ModelCache(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
-        self.model_name  = model or self.model_cache.default_model() or FALLBACK_MODEL_NAME
+        self.model_manager = ModelCache(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
+        self.model_name  = model or self.model_manager.default_model() or FALLBACK_MODEL_NAME
 
         # for VRAM usage statistics
         self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None
@@ -822,7 +822,7 @@ class Generate:
             return self.model
 
         # the model cache does the loading and offloading
-        cache = self.model_cache
+        cache = self.model_manager
         if not cache.valid_model(model_name):
             print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
             return self.model
@@ -967,7 +967,7 @@ class Generate:
         return self._make_base().sample_to_lowres_estimated_image(samples)
 
     def is_legacy_model(self,model_name)->bool:
-        return self.model_cache.is_legacy(model_name)
+        return self.model_manager.is_legacy(model_name)
 
     def _set_sampler(self):
         if isinstance(self.model, DiffusionPipeline):
@@ -1027,7 +1027,7 @@ class Generate:
             sampler_class = scheduler_map[self.sampler_name]
             msg = f'>> Setting Sampler to {self.sampler_name} ({sampler_class.__name__})'
             self.sampler = sampler_class.from_pretrained(
-                self.model_cache.model_name_or_path(self.model_name),
+                self.model_manager.model_name_or_path(self.model_name),
                 subfolder="scheduler"
             )
         else:

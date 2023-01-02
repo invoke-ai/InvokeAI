@@ -5,9 +5,14 @@ from collections import abc
 from inspect import isfunction
 from queue import Queue
 from threading import Thread
+from urllib import request
+from tqdm import tqdm
+from pathlib import Path
 
 import numpy as np
 import torch
+import os
+import traceback
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -258,4 +263,32 @@ def debug_image(debug_image, debug_text, debug_show=True, debug_result=False, de
 
     if debug_result:
         return image_copy
+
+#-------------------------------------
+class ProgressBar():
+    def __init__(self,model_name='file'):
+        self.pbar = None
+        self.name = model_name
+
+    def __call__(self, block_num, block_size, total_size):
+        if not self.pbar:
+            self.pbar=tqdm(desc=self.name,
+                           initial=0,
+                           unit='iB',
+                           unit_scale=True,
+                           unit_divisor=1000,
+                           total=total_size)
+        self.pbar.update(block_size)
+
+def download_with_progress_bar(url:str, dest:Path)->bool:
+    try:
+        if not os.path.exists(dest):
+            os.makedirs((os.path.dirname(dest) or '.'), exist_ok=True)
+            request.urlretrieve(url,dest,ProgressBar(os.path.basename(dest)))
+            return True
+        else:
+            return True
+    except OSError:
+        print(traceback.format_exc())
+        return False
 

@@ -296,7 +296,7 @@ class InvokeAIWebServer:
         def handle_request_capabilities():
             print(f">> System config requested")
             config = self.get_system_config()
-            config["model_list"] = self.generate.model_cache.list_models()
+            config["model_list"] = self.generate.model_manager.list_models()
             config["infill_methods"] = infill_methods()
             socketio.emit("systemConfig", config)
 
@@ -309,7 +309,7 @@ class InvokeAIWebServer:
                     {'search_folder': None, 'found_models': None},
                 )
                 else:
-                    search_folder, found_models = self.generate.model_cache.search_models(search_folder)
+                    search_folder, found_models = self.generate.model_manager.search_models(search_folder)
                     socketio.emit(
                         "foundModels",
                         {'search_folder': search_folder, 'found_models': found_models},
@@ -328,17 +328,17 @@ class InvokeAIWebServer:
                 del new_model_config['name']
                 model_attributes = new_model_config
                 update = False
-                current_model_list = self.generate.model_cache.list_models()
+                current_model_list = self.generate.model_manager.list_models()
                 if model_name in current_model_list:
                     update = True
 
                 print(f">> Adding New Model: {model_name}")
 
-                self.generate.model_cache.add_model(
+                self.generate.model_manager.add_model(
                     model_name=model_name, model_attributes=model_attributes, clobber=True)
-                self.generate.model_cache.commit(opt.conf)
+                self.generate.model_manager.commit(opt.conf)
 
-                new_model_list = self.generate.model_cache.list_models()
+                new_model_list = self.generate.model_manager.list_models()
                 socketio.emit(
                     "newModelAdded",
                     {"new_model_name": model_name,
@@ -356,9 +356,9 @@ class InvokeAIWebServer:
         def handle_delete_model(model_name: str):
             try:
                 print(f">> Deleting Model: {model_name}")
-                self.generate.model_cache.del_model(model_name)
-                self.generate.model_cache.commit(opt.conf)
-                updated_model_list = self.generate.model_cache.list_models()
+                self.generate.model_manager.del_model(model_name)
+                self.generate.model_manager.commit(opt.conf)
+                updated_model_list = self.generate.model_manager.list_models()
                 socketio.emit(
                     "modelDeleted",
                     {"deleted_model_name": model_name,
@@ -377,7 +377,7 @@ class InvokeAIWebServer:
             try:
                 print(f">> Model change requested: {model_name}")
                 model = self.generate.set_model(model_name)
-                model_list = self.generate.model_cache.list_models()
+                model_list = self.generate.model_manager.list_models()
                 if model is None:
                     socketio.emit(
                         "modelChangeFailed",
@@ -789,7 +789,7 @@ class InvokeAIWebServer:
 
     # App Functions
     def get_system_config(self):
-        model_list: dict = self.generate.model_cache.list_models()
+        model_list: dict = self.generate.model_manager.list_models()
         active_model_name = None
 
         for model_name, model_dict in model_list.items():
