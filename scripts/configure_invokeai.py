@@ -40,10 +40,10 @@ import torch
 transformers.logging.set_verbosity_error()
 
 try:
-    from ldm.invoke.model_manager import ModelCache
+    from ldm.invoke.model_manager import ModelManager
 except ImportError:
     sys.path.append('.')
-    from ldm.invoke.model_manager import ModelCache
+    from ldm.invoke.model_manager import ModelManager
 
 #--------------------------globals-----------------------
 Model_dir = 'models'

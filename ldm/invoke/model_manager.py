@@ -33,7 +33,7 @@ from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
 
-class ModelCache(object):
+class ModelManager(object):
     def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
         '''
         Initialize with the path to the models.yaml config file,

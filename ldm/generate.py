@@ -38,7 +38,7 @@ from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.generator.inpaint import infill_methods
 from ldm.invoke.globals import Globals
 from ldm.invoke.image_util import InitImageResizer
-from ldm.invoke.model_manager import ModelCache
+from ldm.invoke.model_manager import ModelManager
 from ldm.invoke.pngwriter import PngWriter
 from ldm.invoke.seamless import configure_model_padding
 from ldm.invoke.txt2mask import Txt2Mask
@@ -210,7 +210,7 @@ class Generate:
             self.precision = choose_precision(self.device)
 
         # model caching system for fast switching
-        self.model_manager = ModelCache(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
+        self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         self.model_name  = model or self.model_manager.default_model() or FALLBACK_MODEL_NAME
 
         # for VRAM usage statistics
