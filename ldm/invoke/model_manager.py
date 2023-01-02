@@ -424,8 +424,6 @@ class ModelManager(object):
             return path
         elif 'repo_id' in mconfig:
             return mconfig['repo_id']
-        elif 'repo_name' in mconfig:
-            return mconfig['repo_name']
         else:
             raise ValueError("Model config must specify either repo_id or path.")
 
