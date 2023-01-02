@@ -73,10 +73,10 @@ class AddsMaskLatents:
     This class assumes the same mask and base image should apply to all items in the batch.
     """
     forward: Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
-    mask: torch.FloatTensor
-    initial_image_latents: torch.FloatTensor
+    mask: torch.Tensor
+    initial_image_latents: torch.Tensor
 
-    def __call__(self, latents: torch.FloatTensor, t: torch.Tensor, text_embeddings: torch.FloatTensor) -> torch.Tensor:
+    def __call__(self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor) -> torch.Tensor:
         model_input = self.add_mask_channels(latents)
         return self.forward(model_input, t, text_embeddings)
 
@@ -440,7 +440,18 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         return step_output
 
     def _unet_forward(self, latents, t, text_embeddings):
-        # predict the noise residual
+        """predict the noise residual"""
+        if is_inpainting_model(self.unet) and latents.size(1) == 4:
+            # Pad out normal non-inpainting inputs for an inpainting model.
+            # FIXME: There are too many layers of functions and we have too many different ways of
+            #     overriding things! This should get handled in a way more consistent with the other
+            #     use of AddsMaskLatents.
+            latents = AddsMaskLatents(
+                self._unet_forward,
+                mask=torch.ones_like(latents[:1, :1], device=latents.device, dtype=latents.dtype),
+                initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype)
+            ).add_mask_channels(latents)
+
         return self.unet(latents, t, encoder_hidden_states=text_embeddings).sample
 
     def img2img_from_embeddings(self,

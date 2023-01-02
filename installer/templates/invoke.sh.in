@@ -11,9 +11,9 @@ cd "$scriptdir"
 export INVOKEAI_ROOT="$scriptdir"
 
 # set required env var for torch on mac MPS
- if [ "$(uname -s)" == "Darwin" ]; then
-     export PYTORCH_ENABLE_MPS_FALLBACK=1
- fi
+if [ "$(uname -s)" == "Darwin" ]; then
+    export PYTORCH_ENABLE_MPS_FALLBACK=1
+fi
 
 if [ "$0" != "bash" ]; then
     echo "Do you want to generate images using the"

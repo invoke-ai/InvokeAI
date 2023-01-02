@@ -52,15 +52,17 @@ class Txt2Img(Generator):
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height):
         device         = self.model.device
+        # limit noise to only the diffusion image channels, not the mask channels
+        input_channels = min(self.latent_channels, 4)
         if self.use_mps_noise or device.type == 'mps':
             x = torch.randn([1,
-                                self.latent_channels,
+                                input_channels,
                                 height // self.downsampling_factor,
                                 width  // self.downsampling_factor],
                                device='cpu').to(device)
         else:
             x = torch.randn([1,
-                                self.latent_channels,
+                                input_channels,
                                 height // self.downsampling_factor,
                                 width  // self.downsampling_factor],
                                device=device)
