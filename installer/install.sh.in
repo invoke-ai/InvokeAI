@@ -121,7 +121,7 @@ do
     ROOTDIR=${input:=$HOME}/invokeai
 
     # This is surprisingly hard to do in plain Bash; easier in ZSH. Just running python in subshell is easiest.
-    ROOTDIR=$(python -c "from pathlib import Path; print(Path('${ROOTDIR}').expanduser().resolve())")
+    ROOTDIR=$($PYTHON -c "from pathlib import Path; print(Path('${ROOTDIR}').expanduser().resolve())")
 
     read -e -p "InvokeAI will be installed into $ROOTDIR. OK? [y]: " input
     RESPONSE=${input:='y'}
