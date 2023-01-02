@@ -169,7 +169,7 @@ will be given the option to view and change your selections.
                     counter += 1
         else:
             for ds in Datasets.keys():
-                if Datasets[ds]['recommended']:
+                if Datasets[ds].get('recommended',False):
                     datasets[ds]=counter
                     counter += 1
 
@@ -193,7 +193,7 @@ will be given the option to view and change your selections.
 def recommended_datasets()->dict:
     datasets = dict()
     for ds in Datasets.keys():
-        if Datasets[ds]['recommended']:
+        if Datasets[ds].get('recommended',False):
             datasets[ds]=True
     return datasets
 

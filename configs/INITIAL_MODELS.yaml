@@ -82,12 +82,12 @@ voxel_art-1.0:
    width: 512
    height: 512
 ft-mse-improved-autoencoder-840000:
-   description: StabilityAI improved autoencoder fine-tuned for human faces for legacy .ckpt models only (335 MB)
+   description: StabilityAI improved autoencoder fine-tuned for human faces. Use with legacy .ckpt models ONLY (335 MB)
    repo_id: stabilityai/sd-vae-ft-mse-original
    format: ckpt
    config: VAE/default
    file: vae-ft-mse-840000-ema-pruned.ckpt
-   recommended: True
+   recommended: False
    width: 512
    height: 512
 trinart_vae:
