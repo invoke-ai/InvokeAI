@@ -8,22 +8,22 @@
 diffusers-1.4:
   description: 🤗🧨 Stable Diffusion v1.4
   format: diffusers
-  repo_name: CompVis/stable-diffusion-v1-4
+  repo_id: CompVis/stable-diffusion-v1-4
 diffusers-1.5:
   description: 🤗🧨 Stable Diffusion v1.5
   format: diffusers
-  repo_name: runwayml/stable-diffusion-v1-5
+  repo_id: runwayml/stable-diffusion-v1-5
   default: true
 diffusers-1.5+mse:
   description: 🤗🧨 Stable Diffusion v1.5 + MSE-finetuned VAE
   format: diffusers
-  repo_name: runwayml/stable-diffusion-v1-5
+  repo_id: runwayml/stable-diffusion-v1-5
   vae:
-    repo_name: stabilityai/sd-vae-ft-mse
+    repo_id: stabilityai/sd-vae-ft-mse
 diffusers-inpainting-1.5:
   description: 🤗🧨 inpainting for Stable Diffusion v1.5
   format: diffusers
-  repo_name: runwayml/stable-diffusion-inpainting
+  repo_id: runwayml/stable-diffusion-inpainting
 stable-diffusion-1.5:
   description: The newest Stable Diffusion version 1.5 weight file (4.27 GB)
   weights: models/ldm/stable-diffusion-v1/v1-5-pruned-emaonly.ckpt
