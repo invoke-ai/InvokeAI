@@ -19,6 +19,7 @@ from ldm.invoke.log import write_log
 from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
+import ldm.invoke
 
 # global used in multiple functions (fix)
 infile = None
@@ -56,6 +57,7 @@ def main():
             print(f'** This script will now exit.')
             sys.exit(-1)
 
+    print(f'>> {ldm.invoke.__app_name__} {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
