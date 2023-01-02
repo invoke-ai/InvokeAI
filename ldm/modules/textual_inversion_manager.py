@@ -96,10 +96,13 @@ class TextualInversionManager():
             ))
             return trigger_token_id
 
-        except ValueError:
-            traceback.print_exc()
-            print(f">> TextualInversionManager was unable to add a textual inversion with trigger string {trigger_str}.")
-            raise
+        except ValueError as e:
+            if str(e).startswith('Warning'):
+                print(f">> {str(e)}")
+            else:
+                traceback.print_exc()
+                print(f">> TextualInversionManager was unable to add a textual inversion with trigger string {trigger_str}.")
+                raise
 
 
     def has_textual_inversion_for_trigger_string(self, trigger_string: str) -> bool:
@@ -156,6 +159,8 @@ class TextualInversionManager():
         token_id = self.tokenizer.convert_tokens_to_ids(token_str)
         if token_id == self.tokenizer.unk_token_id:
             raise RuntimeError(f"Unable to find token id for token '{token_str}'")
+        if self.text_encoder.get_input_embeddings().weight.data[token_id].shape != embedding.shape:
+            raise ValueError(f"Warning. Cannot load embedding for {token_str}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {self.text_encoder.get_input_embeddings().weight.data[token_id].shape[0]}.")
         self.text_encoder.get_input_embeddings().weight.data[token_id] = embedding
 
         return token_id
