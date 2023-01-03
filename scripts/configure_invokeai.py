@@ -8,6 +8,7 @@
 #
 print('Loading Python libraries...\n')
 import argparse
+import configs
 import sys
 import os
 import io
@@ -18,7 +19,6 @@ from urllib import request
 from tqdm import tqdm
 from omegaconf import OmegaConf
 from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login
-from pathlib import Path
 from typing import Union
 from getpass_asterisk import getpass_asterisk
 from transformers import CLIPTokenizer, CLIPTextModel
@@ -36,11 +36,9 @@ transformers.logging.set_verbosity_error()
 #--------------------------globals-----------------------
 Model_dir = 'models'
 Weights_dir = 'ldm/stable-diffusion-v1/'
-Dataset_path = './configs/INITIAL_MODELS.yaml'
+Dataset_path = f'{configs.__path__[0]}/INITIAL_MODELS.yaml'
 Default_config_file = './configs/models.yaml'
 SD_Configs = './configs/stable-diffusion'
-
-assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the invokeai runtime directory."
 
 Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(['yes','no'])
@@ -549,7 +547,7 @@ def download_clipseg():
                 zip.extractall(os.path.join(Globals.root,'models/clipseg'))
             os.remove(dest)
 
-            from vendored.clipseg.models.clipseg import CLIPDensePredT
+            from clipseg.clipseg import CLIPDensePredT
             model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
             model.eval()
             model.load_state_dict(
@@ -649,7 +647,7 @@ def select_outputs(root:str,yes_to_all:bool=False):
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
-    assert os.path.exists('./configs'),'Run this script from within the InvokeAI source code directory, "InvokeAI" or the runtime directory "invokeai".'
+    import configs
 
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root_selected = False
@@ -677,13 +675,13 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
-    for name in ('models','configs','embeddings'):
-        os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in (['configs']):
-        dest = os.path.join(root,src)
-        if not os.path.samefile(src,dest):
-            shutil.copytree(src,dest,dirs_exist_ok=True)
-        os.makedirs(outputs, exist_ok=True)
+    for folder in ('models','configs','embeddings'):
+        os.makedirs(os.path.join(root,folder), exist_ok=True)
+    src = configs.__path__[0]
+    dest = os.path.join(root,configs.__name__)
+    if not os.path.samefile(src,dest):
+        shutil.copytree(src,dest,dirs_exist_ok=True)
+    os.makedirs(outputs, exist_ok=True)
 
     init_file = os.path.join(Globals.root,Globals.initfile)
 
