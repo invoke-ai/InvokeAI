@@ -550,7 +550,7 @@ def download_clipseg():
                 zip.extractall(os.path.join(Globals.root,'models/clipseg'))
             os.remove(dest)
 
-            from clipseg.clipseg import CLIPDensePredT
+            from clipseg.models.clipseg import CLIPDensePredT
             model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
             model.eval()
             model.load_state_dict(

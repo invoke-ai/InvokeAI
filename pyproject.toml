@@ -1,6 +1,7 @@
 [build-system]
     requires = [
         "setuptools>=61.0.0",
+        "cython",
         "wheel"
     ]
     build-backend = "setuptools.build_meta"
@@ -55,6 +56,7 @@
         "getpass_asterisk",
         "gfpgan",
         "imageio-ffmpeg",
+        "k-diffusion",
         "kornia",
         "numpy==1.23.*",
         "omegaconf",
@@ -62,9 +64,10 @@
         "picklescan",
         "pillow",
         "pudb",
+        "pyparsing",
+        "pypatchmatch",
         "pyreadline3",
         "pytorch-lightning<1.8.0",
-        "pyparsing",
         "realesrgan",
         "requests>=2.25.1",
         "scikit-image>=0.19",
@@ -76,9 +79,7 @@
         "torch-fidelity",
         "torchvision",
         "torchmetrics",
-        "transformers==4.25.1",
-        "k-diffusion",
-        "pypatchmatch ",
+        "transformers",
     ]
 
 [project.optional-dependencies]
@@ -109,25 +110,24 @@
     version = {attr = "ldm.invoke.__version__"}
 
 [tool.setuptools.packages.find]
-    # "where" = [
-    #     "."
-    # ]
+    "where" = [
+        ".",
+        "vendored",
+    ]
     "include" = [
-        "assets*",
-        "backend*",
-        "configs*",
-        "frontend.dist*",
-        "ldm*",
-        "scripts*",
-        "vendored*"
+        "assets",
+        "backend",
+        "clip",
+        "clipseg",
+        "configs",
+        "frontend.dist",
+        "ldm",
+        "scripts"
     ]
 
 [tool.setuptools.package-data]
     "assets" = [
         "caution.png"
-    ]
-    "vendored.clip.clip" = [
-        "*.txt.gz"
     ]
     "configs" = [
         "*.example",
@@ -139,6 +139,13 @@
     ]
     "scripts" = [
         "**.py"
+    ]
+    "clip" = [
+        "clip.clip.*.gz"
+    ]
+    "clipseg" = [
+        "**.yaml",
+        "**.json"
     ]
 
 [tool.black]

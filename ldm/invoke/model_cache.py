@@ -11,7 +11,6 @@ import io
 import time
 import gc
 import hashlib
-import psutil
 import sys
 import transformers
 import traceback
@@ -19,7 +18,6 @@ import textwrap
 import contextlib
 from typing import Union
 from omegaconf import OmegaConf
-from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config, ask_user
 from ldm.invoke.globals import Globals
 from picklescan.scanner import scan_file_path
@@ -326,7 +324,7 @@ class ModelCache(object):
                     sys.exit()
         else:
             print('>> Model Scanned. OK!!')
-    
+
     def search_models(self, search_folder):
 
         print(f'>> Finding Models In: {search_folder}')

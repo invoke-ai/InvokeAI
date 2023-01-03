@@ -3,8 +3,8 @@ import os.path
 import torch
 import torch.nn as nn
 from functools import partial
-from vendored.clip.clip import clip
-from einops import rearrange, repeat
+from clip import clip
+from einops import repeat
 from transformers import CLIPTokenizer, CLIPTextModel
 import kornia
 from ldm.invoke.devices import choose_torch_device

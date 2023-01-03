@@ -1,18 +1,13 @@
 import os.path
-from cmath import log
 import torch
 from torch import nn
 
-import sys
-
 from ldm.invoke.concepts_lib import Concepts
 from ldm.data.personalized import per_img_token_list
-from transformers import CLIPTokenizer
 from functools import partial
 from picklescan.scanner import scan_file_path
 
 PROGRESSIVE_SCALE = 2000
-
 
 def get_clip_token_for_string(tokenizer, string):
     batch_encoding = tokenizer(
@@ -318,7 +313,7 @@ class EmbeddingManager(nn.Module):
                     print('>> More than 1 embedding found. Will use the first one')
 
                 embedding = list(embedding_ckpt['string_to_param'].values())[0]
-            except (AttributeError,KeyError): 
+            except (AttributeError,KeyError):
                 return self.handle_broken_pt_variants(embedding_ckpt, embedding_file)
 
             embedding_info['embedding'] = embedding
