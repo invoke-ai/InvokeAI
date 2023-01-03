@@ -4,18 +4,24 @@ import os
 import sys
 
 
-def child_setup(add_environ: dict):
-    """Called to setup the child process before exec()
-    @add_environ is a dict for extra env variables
+def main():
     """
-    for key, val in add_environ.items():
-        if val is None:
-            val = ""
-        os.putenv(key, val)
+    Set necesarry environment variables before executing InvokeAI
+    """
 
-if sys.platform == "darwin":
-    add_environ: dict = {"PYTORCH_ENABLE_MPS_FALLBACK": "1"}
-    child_setup(add_environ)
+    def child_setup(add_environ: dict):
+        """Called to setup the child process before exec()
+        @add_environ is a dict for extra env variables
+        """
+        for key, val in add_environ.items():
+            if val is None:
+                val = ""
+            os.putenv(key, val)
 
-import ldm.invoke.CLI
-ldm.invoke.CLI.main()
+    if sys.platform == "darwin":
+        add_environ: dict = {"PYTORCH_ENABLE_MPS_FALLBACK": "1"}
+        child_setup(add_environ)
+
+    import ldm.invoke.CLI
+
+    ldm.invoke.CLI.main()
