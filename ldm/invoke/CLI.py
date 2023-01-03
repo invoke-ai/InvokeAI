@@ -956,5 +956,5 @@ def emergency_model_reconfigure(opt):
     if yes_to_all is not None:
         sys.argv.append(yes_to_all)
 
-    import configure_invokeai
+    from scripts import configure_invokeai
     configure_invokeai.main()
