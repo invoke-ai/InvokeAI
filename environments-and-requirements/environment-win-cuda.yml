@@ -12,4 +12,4 @@ dependencies:
   - pytorch
   - pytorch-cuda=11.6
   - pip:
-    - -e .
+    - .

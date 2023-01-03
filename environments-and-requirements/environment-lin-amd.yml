@@ -9,4 +9,4 @@ dependencies:
   - numpy=1.23.3
   - pip:
     - --extra-index-url  https://download.pytorch.org/whl/rocm5.2/
-    - -e .
+    - .

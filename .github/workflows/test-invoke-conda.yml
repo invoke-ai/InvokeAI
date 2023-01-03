@@ -90,10 +90,9 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
-      - name: run configure_invokeai.py
-        id: run-preload-models
-        run: |
-          python scripts/configure_invokeai.py --yes
+      - name: run configure_invokeai
+        id: run-configure-invokeai
+        run: configure_invokeai --yes
 
       - name: cat invokeai.init
         id: cat-invokeai
@@ -102,11 +101,7 @@ jobs:
       - name: Run the tests
         id: run-tests
         if: runner.os != 'Windows'
-        run: |
-          python scripts/invoke.py \
-            --no-patchmatch \
-            --no-nsfw_checker \
-            --from_file ${{ env.TEST_PROMPTS }}
+        run: invokeai --no-patchmatch --no-nsfw_checker --from_file ${{ env.TEST_PROMPTS }}
 
       - name: export conda env
         id: export-conda-env
