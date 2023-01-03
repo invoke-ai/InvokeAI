@@ -133,7 +133,7 @@ class Concepts(object):
         return self.match_concept.sub(do_replace, prompt)
 
     def get_concept_file(self, concept_name:str, file_name:str='learned_embeds.bin' , local_only:bool=False)->str:
-        if not self.concept_is_downloaded(concept_name) and not self.concept_is_local(concept_name) and not local_only:
+        if not (self.concept_is_downloaded(concept_name) or self.concept_is_local(concept_name) or local_only):
             self.download_concept(concept_name)
         
         # get local path in invokeai/embeddings if local concept
