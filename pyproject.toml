@@ -115,14 +115,14 @@
         "vendored",
     ]
     "include" = [
-        "assets",
-        "backend",
+        "assets*",
+        "backend*",
         "clip",
         "clipseg",
         "configs",
-        "frontend.dist",
-        "ldm",
-        "scripts"
+        "frontend.dist*",
+        "ldm*",
+        "scripts*"
     ]
 
 [tool.setuptools.package-data]
@@ -141,10 +141,10 @@
         "**.py"
     ]
     "clip" = [
-        "clip.clip.*.gz"
+        "clip/clip/*.gz"
     ]
     "clipseg" = [
-        "**.yaml",
+        "experimental/*.yaml",
         "**.json"
     ]
 
