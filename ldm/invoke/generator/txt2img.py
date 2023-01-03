@@ -6,6 +6,7 @@ import torch
 
 from .base import Generator
 from .diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
+from ...models.diffusion.shared_invokeai_diffusion import ThresholdSettings
 
 
 class Txt2Img(Generator):
@@ -29,8 +30,11 @@ class Txt2Img(Generator):
         pipeline.scheduler = sampler
 
         uc, c, extra_conditioning_info   = conditioning
-        conditioning_data = (ConditioningData(uc, c, cfg_scale, extra_conditioning_info)
-                             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
+        conditioning_data = (
+            ConditioningData(
+                uc, c, cfg_scale, extra_conditioning_info,
+                threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
+            .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
 
         def make_image(x_T) -> PIL.Image.Image:
@@ -39,8 +43,7 @@ class Txt2Img(Generator):
                 noise=x_T,
                 num_inference_steps=steps,
                 conditioning_data=conditioning_data,
-                callback=step_callback
-                # TODO: threshold = threshold,
+                callback=step_callback,
             )
             if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
                 attention_maps_callback(pipeline_output.attention_map_saver)

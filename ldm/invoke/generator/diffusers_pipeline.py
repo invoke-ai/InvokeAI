@@ -39,7 +39,7 @@ from diffusers.utils.outputs import BaseOutput
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, ThresholdSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
 
 
@@ -205,6 +205,7 @@ class ConditioningData:
     extra: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo] = None
     scheduler_args: dict[str, Any] = field(default_factory=dict)
     """Additional arguments to pass to scheduler.step."""
+    threshold: Optional[ThresholdSettings] = None
 
     @property
     def dtype(self):
@@ -425,7 +426,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             latent_model_input, t,
             conditioning_data.unconditioned_embeddings, conditioning_data.text_embeddings,
             conditioning_data.guidance_scale,
-            step_index=step_index)
+            step_index=step_index,
+            threshold=conditioning_data.threshold
+        )
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents,

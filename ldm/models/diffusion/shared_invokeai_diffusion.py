@@ -1,12 +1,21 @@
+import math
+from dataclasses import dataclass
 from math import ceil
 from typing import Callable, Optional, Union
 
+import numpy as np
 import torch
 
 from ldm.models.diffusion.cross_attention_control import Arguments, \
     remove_cross_attention_control, setup_cross_attention_control, Context, get_cross_attention_modules, \
     CrossAttentionType
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
+
+
+@dataclass(frozen=True)
+class ThresholdSettings:
+    threshold: float
+    warmup: float
 
 
 class InvokeAIDiffuserComponent:
@@ -18,6 +27,7 @@ class InvokeAIDiffuserComponent:
     * Cross attention control ("prompt2prompt")
     * Hybrid conditioning (used for inpainting)
     '''
+    debug_thresholding = True
 
 
     class ExtraConditioningInfo:
@@ -78,7 +88,8 @@ class InvokeAIDiffuserComponent:
                                 unconditioning: Union[torch.Tensor,dict],
                                 conditioning: Union[torch.Tensor,dict],
                                 unconditional_guidance_scale: float,
-                                step_index: Optional[int]=None
+                                step_index: Optional[int]=None,
+                                threshold: Optional[ThresholdSettings]=None,
                           ):
         """
         :param x: current latents
@@ -87,6 +98,7 @@ class InvokeAIDiffuserComponent:
         :param conditioning: embeddings for conditioned output. for hybrid conditioning this is a dict of tensors [B x 77 x 768], otherwise a single tensor [B x 77 x 768]
         :param unconditional_guidance_scale: aka CFG scale, controls how much effect the conditioning tensor has
         :param step_index: counts upwards from 0 to (step_count-1) (as passed to setup_cross_attention_control, if using). May be called multiple times for a single step, therefore do not assume that its value will monotically increase. If None, will be estimated by comparing sigma against self.model.sigmas .
+        :param threshold: threshold to apply after each step
         :return: the new latents after applying the model to x using unscaled unconditioning and CFG-scaled conditioning.
         """
 
@@ -107,7 +119,12 @@ class InvokeAIDiffuserComponent:
         else:
             unconditioned_next_x, conditioned_next_x = self.apply_standard_conditioning(x, sigma, unconditioning, conditioning)
 
-        return self._combine(unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale)
+        combined_next_x = self._combine(unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale)
+
+        if threshold:
+            combined_next_x = self._threshold(threshold.threshold, threshold.warmup, combined_next_x, sigma)
+
+        return combined_next_x
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
@@ -183,6 +200,33 @@ class InvokeAIDiffuserComponent:
         scaled_delta = (conditioned_next_x - unconditioned_next_x) * guidance_scale
         combined_next_x = unconditioned_next_x + scaled_delta
         return combined_next_x
+
+    def _threshold(self, threshold, warmup, latents: torch.Tensor, sigma) -> torch.Tensor:
+        warmup_scale = (1 - sigma.item() / 1000) / warmup if warmup else math.inf
+        if warmup_scale < 1:
+            # This arithmetic based on https://github.com/invoke-ai/InvokeAI/pull/395
+            warming_threshold = 1 + (threshold - 1) * warmup_scale
+            current_threshold = np.clip(warming_threshold, 1, threshold)
+        else:
+            current_threshold = threshold
+
+        if current_threshold <= 0:
+            return latents
+        maxval = latents.max().item()
+        minval = latents.min().item()
+
+        scale = 0.7  # default value from #395
+
+        if maxval < current_threshold and minval > -current_threshold:
+            return latents
+
+        if maxval > current_threshold:
+            maxval = np.clip(maxval * scale, 1, current_threshold)
+
+        if minval < -current_threshold:
+            minval = np.clip(minval * scale, -current_threshold, -1)
+
+        return latents.clamp(minval, maxval)
 
     def estimate_percent_through(self, step_index, sigma):
         if step_index is not None and self.cross_attention_control_context is not None:
