@@ -92,7 +92,7 @@ jobs:
 
       - name: run configure_invokeai
         id: run-configure-invokeai
-        run: configure_invokeai --yes
+        run: configure_invokeai.py --yes
 
       - name: cat invokeai.init
         id: cat-invokeai
@@ -101,7 +101,7 @@ jobs:
       - name: Run the tests
         id: run-tests
         if: runner.os != 'Windows'
-        run: invokeai --no-patchmatch --no-nsfw_checker --from_file ${{ env.TEST_PROMPTS }}
+        run: invoke.py --no-patchmatch --no-nsfw_checker --from_file ${{ env.TEST_PROMPTS }}
 
       - name: export conda env
         id: export-conda-env
