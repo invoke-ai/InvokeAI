@@ -28,7 +28,8 @@ COPY . .
 RUN python3 -m venv .venv \
   && pip install \
     --no-cache-dir \
-    -e .
+    --use-pep517 \
+    .
 
 FROM python:3.10-slim AS runtime
 
@@ -57,5 +58,5 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # set Entrypoint and default CMD
-ENTRYPOINT [ "python3", "scripts/invoke.py" ]
+ENTRYPOINT [ "invokeai" ]
 CMD [ "--web", "--host=0.0.0.0" ]

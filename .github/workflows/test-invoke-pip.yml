@@ -77,24 +77,13 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          # cache: 'pip'
-          # cache-dependency-path: ${{ matrix.requirements-file }}
 
-      # - name: install dependencies
-      #   run: pip3 install --upgrade pip setuptools wheel pip-tools
-
-      # - name: create requirements.txt
-      #   run: pip-compile -o requirements.txt pyproject.toml
-
-      # - name: install requirements
-      #   run: pip3 install -r requirements.txt
-
-      - name: install pyproject
-        run: pip install .
+      - name: install InvokeAI
+        run: python3 -m pip install --use-pep517 .
 
       - name: run configure_invokeai.py
         id: run-preload-models
-        run: python3 scripts/configure_invokeai.py --yes
+        run: configure_invokeai --yes
 
       - name: cat invokeai.init
         id: cat-invokeai
@@ -103,7 +92,7 @@ jobs:
       - name: Run the tests
         id: run-tests
         if: runner.os != 'Windows'
-        run: python3 scripts/invoke.py --no-patchmatch --no-nsfw_checker --from_file ${{ env.TEST_PROMPTS }}
+        run: invokeai --no-patchmatch --no-nsfw_checker --from_file ${{ env.TEST_PROMPTS }}
 
       - name: Archive results
         id: archive-results
