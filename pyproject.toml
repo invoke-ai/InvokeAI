@@ -6,11 +6,8 @@
     build-backend = "setuptools.build_meta"
 
 [project]
-    name = "invokeai"
-    description = '''
-        An implementation of Stable Diffusion which provides various
-        new features and options to aid the image generation process
-        '''
+    name = "InvokeAI"
+    description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
     requires-python = ">=3.9, <3.11"
     readme = {file = "README.md", content-type = "text/markdown", charset = "UTF-8"}
     keywords = [
@@ -68,7 +65,7 @@
         "pyreadline3",
         "pytorch-lightning<1.8.0",
         "realesrgan",
-        "requests==2.25.1",
+        "requests>=2.25.1",
         "scikit-image>=0.19",
         "send2trash",
         "streamlit",
@@ -152,9 +149,9 @@
 [tool.isort]
     profile = "black"
     skip = [
-        "./build",
-        "./.venv",
-        "./vendored",
+        ".venv",
+        "build",
+        "vendored",
         "data"
     ]
 
