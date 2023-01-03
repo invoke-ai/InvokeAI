@@ -112,12 +112,12 @@
 [tool.setuptools.packages.find]
     "where" = [
         ".",
-        "vendored",
+        "vendored/"
     ]
     "include" = [
         "assets*",
         "backend*",
-        "clip",
+        "clip/clip",
         "clipseg",
         "configs",
         "frontend.dist*",
@@ -141,10 +141,10 @@
         "**.py"
     ]
     "clip" = [
-        "clip/clip/*.gz"
+        "bpe_simple_vocab_16e6.txt.gz"
     ]
     "clipseg" = [
-        "experimental/*.yaml",
+        "**.yaml",
         "**.json"
     ]
 
