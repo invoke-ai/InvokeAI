@@ -20,15 +20,54 @@ would type at the invoke> prompt:
 Then pass this file's name to `invoke.py` when you invoke it:
 
 ```bash
-(invokeai) ~/stable-diffusion$ python3 scripts/invoke.py --from_file "path/to/prompts.txt"
+python scripts/invoke.py --from_file "/path/to/prompts.txt"
 ```
 
-You may read a series of prompts from standard input by providing a filename of
-`-`:
+You may also read a series of prompts from standard input by providing
+a filename of `-`. For example, here is a python script that creates a
+matrix of prompts, each one varying slightly:
 
 ```bash
-(invokeai) ~/stable-diffusion$ echo "a beautiful day" | python3 scripts/invoke.py --from_file -
+#!/usr/bin/env python
+
+adjectives = ['sunny','rainy','overcast']
+samplers = ['k_lms','k_euler_a','k_heun']
+cfg = [7.5, 9, 11]
+
+for adj in adjectives:
+    for samp in samplers:
+        for cg in cfg:
+            print(f'a {adj} day -A{samp} -C{cg}')
 ```
+
+It's output looks like this (abbreviated):
+
+```bash
+a sunny day -Aklms -C7.5
+a sunny day -Aklms -C9
+a sunny day -Aklms -C11
+a sunny day -Ak_euler_a -C7.5
+a sunny day -Ak_euler_a -C9
+...
+a overcast day -Ak_heun -C9
+a overcast day -Ak_heun -C11
+```
+
+To feed it to invoke.py, pass the filename of "-"
+
+```bash
+python matrix.py | python scripts/invoke.py --from_file -
+```
+
+When the script is finished, each of the 27 combinations
+of adjective, sampler and CFG will be executed.
+
+The command-line interface provides `!fetch` and `!replay` commands
+which allow you to read the prompts from a single previously-generated
+image or a whole directory of them, write the prompts to a file, and
+then replay them. Or you can create your own file of prompts and feed
+them to the command-line client from within an interactive session.
+See [Command-Line Interface](CLI.md) for details.
 
 ---
 
@@ -51,7 +90,9 @@ original prompt:
 `#!bash "A fantastical translucent pony made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
 
 <figure markdown>
+
 ![step1](../assets/negative_prompt_walkthru/step1.png)
+
 </figure>
 
 That image has a woman, so if we want the horse without a rider, we can
@@ -61,7 +102,9 @@ this:
 `#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
 
 <figure markdown>
+
 ![step2](../assets/negative_prompt_walkthru/step2.png)
+
 </figure>
 
 That's nice - but say we also don't want the image to be quite so blue. We can
@@ -70,7 +113,9 @@ add "blue" to the list of negative prompts, so it's now [woman blue]:
 `#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
 
 <figure markdown>
+
 ![step3](../assets/negative_prompt_walkthru/step3.png)
+
 </figure>
 
 Getting close - but there's no sense in having a saddle when our horse doesn't
@@ -79,7 +124,9 @@ have a rider, so we'll add one more negative prompt: [woman blue saddle].
 `#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue saddle]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
 
 <figure markdown>
+
 ![step4](../assets/negative_prompt_walkthru/step4.png)
+
 </figure>
 
 !!! notes "Notes about this feature:"
@@ -124,7 +171,11 @@ this prompt of `a man picking apricots from a tree`, let's see what happens if
 we increase and decrease how much attention we want Stable Diffusion to pay to
 the word `apricots`:
 
+<figure markdown>
+
 ![an AI generated image of a man picking apricots from a tree](../assets/prompt_syntax/apricots-0.png)
+
+</figure>
 
 Using `-` to reduce apricot-ness:
 
@@ -141,7 +192,11 @@ Using `+` to increase apricot-ness:
 You can also change the balance between different parts of a prompt. For
 example, below is a `mountain man`:
 
+<figure markdown>
+
 ![an AI generated image of a mountain man](../assets/prompt_syntax/mountain-man.png)
+
+</figure>
 
 And here he is with more mountain:
 
@@ -185,27 +240,27 @@ use the `prompt2prompt` syntax to substitute words in the original prompt for
 words in a new prompt. This works for `img2img` as well.
 
 - `a ("fluffy cat").swap("smiling dog") eating a hotdog`.
-  - quotes optional: `a (fluffy cat).swap(smiling dog) eating a hotdog`.
-  - for single word substitutions parentheses are also optional:
-    `a cat.swap(dog) eating a hotdog`.
+    - quotes optional: `a (fluffy cat).swap(smiling dog) eating a hotdog`.
+    - for single word substitutions parentheses are also optional:
+      `a cat.swap(dog) eating a hotdog`.
 - Supports options `s_start`, `s_end`, `t_start`, `t_end` (each 0-1) loosely
   corresponding to bloc97's `prompt_edit_spatial_start/_end` and
   `prompt_edit_tokens_start/_end` but with the math swapped to make it easier to
   intuitively understand.
-  - Example usage:`a (cat).swap(dog, s_end=0.3) eating a hotdog` - the `s_end`
-    argument means that the "spatial" (self-attention) edit will stop having any
-    effect after 30% (=0.3) of the steps have been done, leaving Stable
-    Diffusion with 70% of the steps where it is free to decide for itself how to
-    reshape the cat-form into a dog form.
-  - The numbers represent a percentage through the step sequence where the edits
-    should happen. 0 means the start (noisy starting image), 1 is the end (final
-    image).
-    - For img2img, the step sequence does not start at 0 but instead at
-      (1-strength) - so if strength is 0.7, s_start and s_end must both be
-      greater than 0.3 (1-0.7) to have any effect.
+    - Example usage:`a (cat).swap(dog, s_end=0.3) eating a hotdog` - the `s_end`
+      argument means that the "spatial" (self-attention) edit will stop having any
+      effect after 30% (=0.3) of the steps have been done, leaving Stable
+      Diffusion with 70% of the steps where it is free to decide for itself how to
+      reshape the cat-form into a dog form.
+    - The numbers represent a percentage through the step sequence where the edits
+      should happen. 0 means the start (noisy starting image), 1 is the end (final
+      image).
+        - For img2img, the step sequence does not start at 0 but instead at
+          (1-strength) - so if strength is 0.7, s_start and s_end must both be
+          greater than 0.3 (1-0.7) to have any effect.
 - Convenience option `shape_freedom` (0-1) to specify how much "freedom" Stable
   Diffusion should have to change the shape of the subject being swapped.
-  - `a (cat).swap(dog, shape_freedom=0.5) eating a hotdog`.
+    - `a (cat).swap(dog, shape_freedom=0.5) eating a hotdog`.
 
 The `prompt2prompt` code is based off
 [bloc97's colab](https://github.com/bloc97/CrossAttentionControl).
@@ -259,14 +314,18 @@ usual, unless you fix the seed, the prompts will give you different results each
 time you run them.
 
 <figure markdown>
+
 ### "blue sphere, red cube, hybrid"
+
 </figure>
 
 This example doesn't use melding at all and represents the default way of mixing
 concepts.
 
 <figure markdown>
+
 ![blue-sphere-red-cube-hyprid](../assets/prompt-blending/blue-sphere-red-cube-hybrid.png)
+
 </figure>
 
 It's interesting to see how the AI expressed the concept of "cube" as the four
@@ -274,6 +333,7 @@ quadrants of the enclosing frame. If you look closely, there is depth there, so
 the enclosing frame is actually a cube.
 
 <figure markdown>
+
 ### "blue sphere:0.25 red cube:0.75 hybrid"
 
 ![blue-sphere-25-red-cube-75](../assets/prompt-blending/blue-sphere-0.25-red-cube-0.75-hybrid.png)
@@ -286,6 +346,7 @@ the AI's "latent space" of semantic representations. Where is Ludwig
 Wittgenstein when you need him?
 
 <figure markdown>
+
 ### "blue sphere:0.75 red cube:0.25 hybrid"
 
 ![blue-sphere-75-red-cube-25](../assets/prompt-blending/blue-sphere-0.75-red-cube-0.25-hybrid.png)
@@ -296,6 +357,7 @@ Definitely more blue-spherey. The cube is gone entirely, but it's really cool
 abstract art.
 
 <figure markdown>
+
 ### "blue sphere:0.5 red cube:0.5 hybrid"
 
 ![blue-sphere-5-red-cube-5-hybrid](../assets/prompt-blending/blue-sphere-0.5-red-cube-0.5-hybrid.png)
@@ -306,6 +368,7 @@ Whoa...! I see blue and red, but no spheres or cubes. Is the word "hybrid"
 summoning up the concept of some sort of scifi creature? Let's find out.
 
 <figure markdown>
+
 ### "blue sphere:0.5 red cube:0.5"
 
 ![blue-sphere-5-red-cube-5](../assets/prompt-blending/blue-sphere-0.5-red-cube-0.5.png)

@@ -41,6 +41,7 @@ import {
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
 import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -76,6 +77,8 @@ const IAICanvasOutpaintingControls = () => {
     shouldCropToBoundingBoxOnSave,
   } = useAppSelector(selector);
   const canvasBaseLayer = getCanvasBaseLayer();
+
+  const { t } = useTranslation();
 
   const { openUploader } = useImageUploader();
 
@@ -221,7 +224,7 @@ const IAICanvasOutpaintingControls = () => {
   return (
     <div className="inpainting-settings">
       <IAISelect
-        tooltip={'Layer (Q)'}
+        tooltip={`${t('unifiedcanvas:layer')} (Q)`}
         tooltipProps={{ hasArrow: true, placement: 'top' }}
         value={layer}
         validValues={LAYER_NAMES_DICT}
@@ -234,15 +237,15 @@ const IAICanvasOutpaintingControls = () => {
 
       <ButtonGroup isAttached>
         <IAIIconButton
-          aria-label="Move Tool (V)"
-          tooltip="Move Tool (V)"
+          aria-label={`${t('unifiedcanvas:move')} (V)`}
+          tooltip={`${t('unifiedcanvas:move')} (V)`}
           icon={<FaArrowsAlt />}
           data-selected={tool === 'move' || isStaging}
           onClick={handleSelectMoveTool}
         />
         <IAIIconButton
-          aria-label="Reset View (R)"
-          tooltip="Reset View (R)"
+          aria-label={`${t('unifiedcanvas:resetView')} (R)`}
+          tooltip={`${t('unifiedcanvas:resetView')} (R)`}
           icon={<FaCrosshairs />}
           onClick={handleResetCanvasView}
         />
@@ -250,29 +253,29 @@ const IAICanvasOutpaintingControls = () => {
 
       <ButtonGroup isAttached>
         <IAIIconButton
-          aria-label="Merge Visible (Shift+M)"
-          tooltip="Merge Visible (Shift+M)"
+          aria-label={`${t('unifiedcanvas:mergeVisible')} (Shift+M)`}
+          tooltip={`${t('unifiedcanvas:mergeVisible')} (Shift+M)`}
           icon={<FaLayerGroup />}
           onClick={handleMergeVisible}
           isDisabled={isStaging}
         />
         <IAIIconButton
-          aria-label="Save to Gallery (Shift+S)"
-          tooltip="Save to Gallery (Shift+S)"
+          aria-label={`${t('unifiedcanvas:saveToGallery')} (Shift+S)`}
+          tooltip={`${t('unifiedcanvas:saveToGallery')} (Shift+S)`}
           icon={<FaSave />}
           onClick={handleSaveToGallery}
           isDisabled={isStaging}
         />
         <IAIIconButton
-          aria-label="Copy to Clipboard (Cmd/Ctrl+C)"
-          tooltip="Copy to Clipboard (Cmd/Ctrl+C)"
+          aria-label={`${t('unifiedcanvas:copyToClipboard')} (Cmd/Ctrl+C)`}
+          tooltip={`${t('unifiedcanvas:copyToClipboard')} (Cmd/Ctrl+C)`}
           icon={<FaCopy />}
           onClick={handleCopyImageToClipboard}
           isDisabled={isStaging}
         />
         <IAIIconButton
-          aria-label="Download as Image (Shift+D)"
-          tooltip="Download as Image (Shift+D)"
+          aria-label={`${t('unifiedcanvas:downloadAsImage')} (Shift+D)`}
+          tooltip={`${t('unifiedcanvas:downloadAsImage')} (Shift+D)`}
           icon={<FaDownload />}
           onClick={handleDownloadAsImage}
           isDisabled={isStaging}
@@ -285,15 +288,15 @@ const IAICanvasOutpaintingControls = () => {
 
       <ButtonGroup isAttached>
         <IAIIconButton
-          aria-label="Upload"
-          tooltip="Upload"
+          aria-label={`${t('common:upload')}`}
+          tooltip={`${t('common:upload')}`}
           icon={<FaUpload />}
           onClick={openUploader}
           isDisabled={isStaging}
         />
         <IAIIconButton
-          aria-label="Clear Canvas"
-          tooltip="Clear Canvas"
+          aria-label={`${t('unifiedcanvas:clearCanvas')}`}
+          tooltip={`${t('unifiedcanvas:clearCanvas')}`}
           icon={<FaTrash />}
           onClick={handleResetCanvas}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}

@@ -3,9 +3,13 @@ import re
 from setuptools import setup, find_packages
 
 def list_files(directory):
-    return [os.path.join(directory,x) for x in os.listdir(directory) if os.path.isfile(os.path.join(directory,x))]
+    listing = list()
+    for root, dirs, files in os.walk(directory,topdown=False):
+        pair = (root,[os.path.join(root,f) for f in files])
+        listing.append(pair)
+    return listing
 
-VERSION = '2.2.4'
+VERSION = '2.2.5'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
 LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, an'
@@ -13,6 +17,10 @@ LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, a
                     ' functionality in a "dream bot" style interface, and multiple features'
                     ' and other enhancements.')
 HOMEPAGE = 'https://github.com/invoke-ai/InvokeAI'
+FRONTEND_FILES = list_files('frontend/dist')
+FRONTEND_FILES.append(('assets',['assets/caution.png']))
+print(FRONTEND_FILES)
+
 REQUIREMENTS=[
     'accelerate',
     'albumentations',
@@ -79,8 +87,5 @@ setup(
     scripts = ['scripts/invoke.py','scripts/configure_invokeai.py', 'scripts/sd-metadata.py',
                'scripts/preload_models.py', 'scripts/images2prompt.py','scripts/merge_embeddings.py'
     ],
-    data_files=[('frontend/dist',list_files('frontend/dist')),
-                ('frontend/dist/assets',list_files('frontend/dist/assets')),
-                ('assets',['assets/caution.png']),
-    ],
+    data_files=FRONTEND_FILES,
 )

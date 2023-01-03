@@ -91,7 +91,7 @@ users can use either an Nvidia-based card (with CUDA support) or an
 AMD card (using the ROCm driver).
 #### System
 
-You wil need one of the following:
+You will need one of the following:
 
 - An NVIDIA-based graphics card with 4 GB or more VRAM memory.
 - An Apple computer with an M1 chip.
@@ -186,7 +186,7 @@ their time, hard work and effort.
 For support, please use this repository's GitHub Issues tracking service. Feel free to send me an
 email if you use and like the script.
 
-Original portions of the software are Copyright (c) 2020
+Original portions of the software are Copyright (c) 2022
 [Lincoln D. Stein](https://github.com/lstein)
 
 ### Further Reading

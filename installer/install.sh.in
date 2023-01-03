@@ -4,13 +4,15 @@
 scriptdir=$(dirname "$0")
 cd "$scriptdir"
 
+# This version number will be replaced by the one supplied to create_installers.sh.
+# Do not change it here - change it in create_installers.sh.
+INVOKEAI_VERSION="latest"
+
 # make sure we are not already in a venv
 # (don't need to check status)
 deactivate >/dev/null 2>&1
 
-# this should be changed to the tagged release!
-# INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/main.zip
-INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.4.zip
+INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${INVOKEAI_VERSION}.zip
 INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 MINIMUM_PYTHON_VERSION=3.9.0
@@ -44,7 +46,7 @@ function readinput() {
     local i="$1"
     case "$i" in
       "-i")
-        if read -i "default" 2>/dev/null <<< "test"; then 
+        if read -i "default" 2>/dev/null <<< "test"; then
           CLEAN_ARGS="$CLEAN_ARGS -i \"$2\""
         fi
         shift
@@ -94,7 +96,7 @@ echo "Installing for $OS_NAME-$OS_ARCH"
 PYTHON=""
 for candidate in python3.10 python3.9 python3 python python3.11 ; do
     if ppath=`which $candidate`; then
-	python_version=$($ppath -V | awk '{ print $2 }')    
+	python_version=$($ppath -V | awk '{ print $2 }')
 	if [ $(version $python_version) -ge $(version "$MINIMUM_PYTHON_VERSION") ]; then
 	    PYTHON=$ppath
 	    echo Python $python_version found at $PYTHON
@@ -117,6 +119,10 @@ do
     echo
     readinput -e -p "Select your preferred location for the 'invokeai' directory [$HOME]: " -i $HOME input
     ROOTDIR=${input:=$HOME}/invokeai
+
+    # This is surprisingly hard to do in plain Bash; easier in ZSH. Just running python in subshell is easiest.
+    ROOTDIR=$($PYTHON -c "from pathlib import Path; print(Path('${ROOTDIR}').expanduser().resolve())")
+
     read -e -p "InvokeAI will be installed into $ROOTDIR. OK? [y]: " input
     RESPONSE=${input:='y'}
     if [ "$RESPONSE" == 'y' ]; then
@@ -126,7 +132,7 @@ do
             RESPONSE=${input:='y'}
 	    if [ "$RESPONSE" != 'y' ]; then
 	        ROOTDIR=""
-	    fi	       
+	    fi
 	else
 	    mkdir -p "$ROOTDIR"
 	    if [ $? -ne 0 ]; then
@@ -166,8 +172,15 @@ if [ "$OS_NAME" == "osx" ]; then
     egrep -v '^-e .' environments-and-requirements/requirements-mac-mps-cpu.txt >requirements.txt
 else
     if (lsmod | grep amdgpu) &>/dev/null ; then
-	echo "Linux system with AMD GPU driver detected. Installing ROCm and CPU support"
-	egrep -v '^-e .' environments-and-requirements/requirements-lin-amd.txt >requirements.txt
+	readinput -e -p "Linux system with AMD GPU driver detected. Install ROCm AMD accelerated support? (Otherwise, CUDA support will be installed) [n]: " input
+	RESPONSE=${input:='n'}
+	if [ "$RESPONSE" != "n" ]; then
+	    echo "Installing ROCm (AMD) support"
+	    egrep -v '^-e .' environments-and-requirements/requirements-lin-amd.txt >requirements.txt
+	else
+	    echo "Installing CUDA support"
+	    egrep -v '^-e .' environments-and-requirements/requirements-lin-cuda.txt >requirements.txt
+	fi
     else
 	echo "Linux system detected. Installing CUDA and CPU support."
 	egrep -v '^-e .' environments-and-requirements/requirements-lin-cuda.txt >requirements.txt
@@ -209,4 +222,13 @@ chmod a+rx "$ROOTDIR"/invoke.sh
 cp templates/update.sh.in "$ROOTDIR"/update.sh
 chmod a+rx "$ROOTDIR"/update.sh
 
-echo "You may now run InvokeAI by entering the directory $ROOTDIR and running invoke.sh"
+echo "You may now run InvokeAI by entering the directory $ROOTDIR and running invoke.sh:"
+echo
+echo "  ${ROOTDIR}/invoke.sh"
+echo
+
+read -e -p "Run InvokeAI now? [y]:" input
+RESPONSE=${input:='y'}
+if [ "$RESPONSE" == 'y' ]; then
+    exec ${ROOTDIR}/invoke.sh
+fi

@@ -5,17 +5,19 @@ interface IAIInputProps extends InputProps {
   styleClass?: string;
   label?: string;
   width?: string | number;
-  value: string;
-  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  value?: string;
+  size?: string;
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
 }
 
 export default function IAIInput(props: IAIInputProps) {
   const {
-    label,
+    label = '',
     styleClass,
     isDisabled = false,
-    fontSize = '1rem',
+    fontSize = 'sm',
     width,
+    size = 'sm',
     isInvalid,
     ...rest
   } = props;
@@ -25,17 +27,21 @@ export default function IAIInput(props: IAIInputProps) {
       className={`input ${styleClass}`}
       isInvalid={isInvalid}
       isDisabled={isDisabled}
-      flexGrow={1}
     >
-      <FormLabel
-        fontSize={fontSize}
-        marginBottom={1}
-        whiteSpace="nowrap"
-        className="input-label"
-      >
-        {label}
-      </FormLabel>
-      <Input {...rest} className="input-entry" size={'sm'} width={width} />
+      {label !== '' && (
+        <FormLabel
+          fontSize={fontSize}
+          fontWeight="bold"
+          alignItems="center"
+          whiteSpace="nowrap"
+          marginBottom={0}
+          marginRight={0}
+          className="input-label"
+        >
+          {label}
+        </FormLabel>
+      )}
+      <Input {...rest} className="input-entry" size={size} width={width} />
     </FormControl>
   );
 }

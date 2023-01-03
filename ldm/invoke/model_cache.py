@@ -23,6 +23,7 @@ from omegaconf.errors import ConfigAttributeError
 from ldm.util import instantiate_from_config, ask_user
 from ldm.invoke.globals import Globals
 from picklescan.scanner import scan_file_path
+from pathlib import Path
 
 DEFAULT_MAX_MODELS=2
 
@@ -133,10 +134,13 @@ class ModelCache(object):
         '''
         models = {}
         for name in self.config:
-            try:
-                description = self.config[name].description
-            except ConfigAttributeError:
-                description = '<no description>'
+            description = self.config[name].description if 'description' in self.config[name] else '<no description>'
+            weights = self.config[name].weights if 'weights' in self.config[name] else '<no weights>'
+            config = self.config[name].config if 'config' in self.config[name] else '<no config>'
+            width = self.config[name].width if 'width' in self.config[name] else 512
+            height = self.config[name].height if 'height' in self.config[name] else 512
+            default = self.config[name].default if 'default' in self.config[name] else False
+            vae = self.config[name].vae if 'vae' in self.config[name] else '<no vae>'
 
             if self.current_model == name:
                 status = 'active'
@@ -147,7 +151,13 @@ class ModelCache(object):
 
             models[name]={
                 'status' : status,
-                'description' : description
+                'description' : description,
+                'weights': weights,
+                'config': config,
+                'width': width,
+                'height': height,
+                'vae': vae,
+                'default': default
             }
         return models
 
@@ -186,6 +196,8 @@ class ModelCache(object):
 
         config = omega[model_name] if model_name in omega else {}
         for field in model_attributes:
+            if field == 'weights':
+                field.replace('\\', '/')
             config[field] = model_attributes[field]
 
         omega[model_name] = config
@@ -230,6 +242,9 @@ class ModelCache(object):
         # merged models from auto11 merge board are flat for some reason
         if 'state_dict' in sd:
             sd = sd['state_dict']
+
+        print(f'   | Forcing garbage collection prior to loading new model')
+        gc.collect()
         model = instantiate_from_config(omega_config.model)
         model.load_state_dict(sd, strict=False)
 
@@ -311,6 +326,22 @@ class ModelCache(object):
                     sys.exit()
         else:
             print('>> Model Scanned. OK!!')
+    
+    def search_models(self, search_folder):
+
+        print(f'>> Finding Models In: {search_folder}')
+        models_folder = Path(search_folder).glob('**/*.ckpt')
+
+        files = [x for x in models_folder if x.is_file()]
+
+        found_models = []
+        for file in files:
+            found_models.append({
+                'name': file.stem,
+                'location': str(file.resolve()).replace('\\', '/')
+            })
+
+        return search_folder, found_models
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
@@ -330,6 +361,8 @@ class ModelCache(object):
         Write current configuration out to the indicated file.
         '''
         yaml_str = OmegaConf.to_yaml(self.config)
+        if not os.path.isabs(config_file_path):
+            config_file_path = os.path.normpath(os.path.join(Globals.root,opt.conf))
         tmpfile = os.path.join(os.path.dirname(config_file_path),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
             outfile.write(self.preamble())

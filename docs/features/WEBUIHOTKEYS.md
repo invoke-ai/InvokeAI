@@ -6,70 +6,70 @@ title: WebUI Hotkey List
 
 ## App Hotkeys
 
-| Setting        | Hotkey             |
-| -------------- | ------------------ |
-| ++Ctrl+Enter++ | Invoke             |
-| ++Shift+X++    | Cancel             |
-| ++Alt+A++      | Focus Prompt       |
-| ++O++          | Toggle Options     |
-| ++Shift+O++    | Pin Options        |
-| ++Z++          | Toggle Viewer      |
-| ++G++          | Toggle Gallery     |
-| ++F++          | Maximize Workspace |
-| ++1-5++        | Change Tabs        |
-| ++"`"++        | Toggle Console     |
+| Setting         | Hotkey             |
+| --------------- | ------------------ |
+| ++ctrl+enter++  | Invoke             |
+| ++shift+x++     | Cancel             |
+| ++alt+a++       | Focus Prompt       |
+| ++o++           | Toggle Options     |
+| ++shift+o++     | Pin Options        |
+| ++z++           | Toggle Viewer      |
+| ++g++           | Toggle Gallery     |
+| ++f++           | Maximize Workspace |
+| ++1++ - ++5++   | Change Tabs        |
+| ++"`"++         | Toggle Console     |
 
 ## General Hotkeys
 
-| Setting     | Hotkey                 |
-| ----------- | ---------------------- |
-| ++P++       | Set Prompt             |
-| ++S++       | Set Seed               |
-| ++A++       | Set Parameters         |
-| ++Shift+R++ | Restore Faces          |
-| ++Shift+U++ | Upscale                |
-| ++I++       | Show Info              |
-| ++Shift+I++ | Send To Image To Image |
-| ++Del++     | Delete Image           |
-| ++Esc++     | Close Panels           |
+| Setting        | Hotkey                 |
+| -------------- | ---------------------- |
+| ++p++          | Set Prompt             |
+| ++s++          | Set Seed               |
+| ++a++          | Set Parameters         |
+| ++shift+r++    | Restore Faces          |
+| ++shift+u++    | Upscale                |
+| ++i++          | Show Info              |
+| ++shift+i++    | Send To Image To Image |
+| ++del++        | Delete Image           |
+| ++esc++        | Close Panels           |
 
 ## Gallery Hotkeys
 
-| Setting         | Hotkey                      |
-| --------------- | --------------------------- |
-| ++Arrow Left++  | Previous Image              |
-| ++Arrow Right++ | Next Image                  |
-| ++Shift+G++     | Toggle Gallery Pin          |
-| ++Shift+Up++    | Increase Gallery Image Size |
-| ++Shift+Down++  | Decrease Gallery Image Size |
+| Setting               | Hotkey                      |
+| ----------------------| --------------------------- |
+| ++arrow-left++        | Previous Image              |
+| ++arrow-right++       | Next Image                  |
+| ++shift+g++           | Toggle Gallery Pin          |
+| ++shift+arrow-up++    | Increase Gallery Image Size |
+| ++shift+arrow-down++  | Decrease Gallery Image Size |
 
 ## Unified Canvas Hotkeys
 
-| Setting                   | Hotkey                 |
-| ------------------------- | ---------------------- |
-| ++B++                     | Select Brush           |
-| ++E++                     | Select Eraser          |
-| ++[++                     | Decrease Brush Size    |
-| ++]++                     | Increase Brush Size    |
-| ++Shift+[++               | Decrease Brush Opacity |
-| ++Shift+]++               | Increase Brush Opacity |
-| ++V++                     | Move Tool              |
-| ++Shift+F++               | Fill Bounding Box      |
-| ++Delete/Backspace++      | Erase Bounding Box     |
-| ++C++                     | Select Color Picker    |
-| ++N++                     | Toggle Snap            |
-| ++Hold Space++            | Quick Toggle Move      |
-| ++Q++                     | Toggle Layer           |
-| ++Shift+C++               | Clear Mask             |
-| ++H++                     | Hide Mask              |
-| ++Shift+H++               | Show/Hide Bounding Box |
-| ++Shift+M++               | Merge Visible          |
-| ++Shift+S++               | Save To Gallery        |
-| ++Ctrl+C++                | Copy To Clipboard      |
-| ++Shift+D++               | Download Image         |
-| ++Ctrl+Z++                | Undo                   |
-| ++Ctrl+Y / Ctrl+Shift+Z++ | Redo                   |
-| ++R++                     | Reset View             |
-| ++Arrow Left++            | Previous Staging Image |
-| ++Arrow Right++           | Next Staging Image     |
-| ++Enter++                 | Accept Staging Image   |
+| Setting                           | Hotkey                 |
+| --------------------------------- | ---------------------- |
+| ++b++                             | Select Brush           |
+| ++e++                             | Select Eraser          |
+| ++bracket-left++                  | Decrease Brush Size    |
+| ++bracket-right++                 | Increase Brush Size    |
+| ++shift+bracket-left++            | Decrease Brush Opacity |
+| ++shift+bracket-right++           | Increase Brush Opacity |
+| ++v++                             | Move Tool              |
+| ++shift+f++                       | Fill Bounding Box      |
+| ++del++ / ++backspace++           | Erase Bounding Box     |
+| ++c++                             | Select Color Picker    |
+| ++n++                             | Toggle Snap            |
+| ++"Hold Space"++                  | Quick Toggle Move      |
+| ++q++                             | Toggle Layer           |
+| ++shift+c++                       | Clear Mask             |
+| ++h++                             | Hide Mask              |
+| ++shift+h++                       | Show/Hide Bounding Box |
+| ++shift+m++                       | Merge Visible          |
+| ++shift+s++                       | Save To Gallery        |
+| ++ctrl+c++                        | Copy To Clipboard      |
+| ++shift+d++                       | Download Image         |
+| ++ctrl+z++                        | Undo                   |
+| ++ctrl+y++ / ++ctrl+shift+z++     | Redo                   |
+| ++r++                             | Reset View             |
+| ++arrow-left++                    | Previous Staging Image |
+| ++arrow-right++                   | Next Staging Image     |
+| ++enter++                         | Accept Staging Image   |

@@ -1,0 +1,15 @@
+{
+  "feature": {
+    "prompt": "To pole musi zawierać cały tekst sugestii, w tym zarówno opis oczekiwanej zawartości, jak i terminy stylistyczne. Chociaż wagi mogą być zawarte w sugestiach, inne parametry znane z linii poleceń nie będą działać.",
+    "gallery": "W miarę generowania nowych wywołań w tym miejscu będą wyświetlane pliki z katalogu wyjściowego. Obrazy mają dodatkowo opcje konfiguracji nowych wywołań.",
+    "other": "Opcje umożliwią alternatywne tryby przetwarzania. Płynne scalanie będzie pomocne przy generowaniu powtarzających się wzorów. Optymalizacja wysokiej rozdzielczości wykonuje dwuetapowy cykl generowania i powinna być używana przy wyższych rozdzielczościach, gdy potrzebny jest bardziej spójny obraz/kompozycja.",
+    "seed": "Inicjator określa początkowy zestaw szumów, który kieruje procesem odszumiania i może być losowy lub pobrany z poprzedniego wywołania. Funkcja \"Poziom szumu\" może być użyta do złagodzenia saturacji przy wyższych wartościach CFG (spróbuj między 0-10), a Perlin może być użyty w celu dodania wariacji do twoich wyników.",
+    "variations": "Poziom zróżnicowania przyjmuje wartości od 0 do 1 i pozwala zmienić obraz wyjściowy dla ustawionego inicjatora. Interesujące wyniki uzyskuje się zwykle między 0,1 a 0,3.",
+    "upscale": "Korzystając z ESRGAN, możesz zwiększyć rozdzielczość obrazu wyjściowego bez konieczności zwiększania szerokości/wysokości w ustawieniach początkowych.",
+    "faceCorrection": "Poprawianie twarzy próbuje identyfikować twarze na obrazie wyjściowym i korygować wszelkie defekty/nieprawidłowości. W GFPGAN im większa siła, tym mocniejszy efekt. W metodzie Codeformer wyższa wartość oznacza bardziej wierne odtworzenie oryginalnej twarzy, nawet kosztem siły korekcji.",
+    "imageToImage": "Tryb \"Obraz na obraz\" pozwala na załadowanie obrazu wzorca, który obok wprowadzonych sugestii zostanie użyty porzez InvokeAI do wygenerowania nowego obrazu. Niższa wartość tego ustawienia będzie bardziej przypominać oryginalny obraz. Akceptowane są wartości od 0 do 1, a zalecany jest zakres od 0,25 do 0,75.",
+    "boundingBox": "Zaznaczony obszar odpowiada ustawieniom wysokości i szerokości w trybach Tekst na obraz i Obraz na obraz. Jedynie piksele znajdujące się w obszarze zaznaczenia zostaną uwzględnione podczas wywoływania nowego obrazu.",
+    "seamCorrection": "Opcje wpływające na poziom widoczności szwów, które mogą wystąpić, gdy wygenerowany obraz jest ponownie wklejany na płótno.",
+    "infillAndScaling": "Zarządzaj metodami wypełniania (używanymi na zamaskowanych lub wymazanych obszarach płótna) i skalowaniem (przydatne w przypadku zaznaczonego obszaru o b. małych rozmiarach)."
+  }
+}

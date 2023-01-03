@@ -24,7 +24,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
   labelFontSize?: string | number;
   width?: string | number;
   showStepper?: boolean;
-  value: number;
+  value?: number;
   onChange: (v: number) => void;
   min: number;
   max: number;
@@ -44,7 +44,7 @@ interface Props extends Omit<NumberInputProps, 'onChange'> {
 const IAINumberInput = (props: Props) => {
   const {
     label,
-    labelFontSize = '1rem',
+    labelFontSize = 'sm',
     styleClass,
     isDisabled = false,
     showStepper = true,
@@ -130,6 +130,10 @@ const IAINumberInput = (props: Props) => {
             className="invokeai__number-input-form-label"
             style={{ display: label ? 'block' : 'none' }}
             fontSize={labelFontSize}
+            fontWeight="bold"
+            marginRight={0}
+            marginBottom={0}
+            whiteSpace="nowrap"
             {...formLabelProps}
           >
             {label}
@@ -138,6 +142,8 @@ const IAINumberInput = (props: Props) => {
         <NumberInput
           className="invokeai__number-input-root"
           value={valueAsString}
+          min={min}
+          max={max}
           keepWithinRange={true}
           clampValueOnBlur={false}
           onChange={handleOnChange}

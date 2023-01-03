@@ -1,0 +1,13 @@
+{
+  "models": "Modelos",
+  "displayInProgress": "Mostrar imágenes en progreso",
+  "saveSteps": "Guardar imágenes cada n pasos",
+  "confirmOnDelete": "Confirmar antes de eliminar",
+  "displayHelpIcons": "Mostrar iconos de ayuda",
+  "useCanvasBeta": "Usar versión beta del Lienzo",
+  "enableImageDebugging": "Habilitar depuración de imágenes",
+  "resetWebUI": "Restablecer interfaz web",
+  "resetWebUIDesc1": "Al restablecer la interfaz web, solo se restablece la caché local del navegador de sus imágenes y la configuración guardada. No se elimina ninguna imagen de su disco duro.",
+  "resetWebUIDesc2": "Si las imágenes no se muestran en la galería o algo más no funciona, intente restablecer antes de reportar un incidente en GitHub.",
+  "resetComplete": "La interfaz web se ha restablecido. Actualice la página para recargarla."
+}

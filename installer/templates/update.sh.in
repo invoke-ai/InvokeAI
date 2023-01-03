@@ -2,18 +2,22 @@
 
 set -eu
 
-if [ $# -ge 1 ] && [ "${1:0:4}" != "http" ]; then
-    echo "Usage: update.sh <release URL>.zip"
+if [ $# -ge 1 ] && [ "${1:0:2}" == "-h" ]; then
+    echo "Usage: update.sh <release>"
     echo "Updates InvokeAI to use the indicated version of the code base."
-    echo "Find the zip file for the release you want, and pass it as the argument."
-    echo "For example update.sh https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.3.zip"
+    echo "Find the version or branch for the release you want, and pass it as the argument."
+    echo "For example: update.sh v2.2.5 for release 2.2.5."
+    echo "             update.sh main for the current development version."
     echo ""
-    echo "If no argument provided then will install the most recent development version, equivalent to"
-    echo "update.sh https://github.com/invoke-ai/InvokeAI/archive/main.zip"
+    echo "If no argument provided then will install the version tagged with 'latest', equivalent to"
+    echo "update.sh latest"
     exit -1
 fi
+
+INVOKE_AI_VERSION=${1:-latest}
     
-INVOKE_AI_SRC=${1:-https://github.com/invoke-ai/InvokeAI/archive/main.zip}
+INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive/$INVOKE_AI_VERSION.zip"
+INVOKE_AI_DEP=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/environments-and-requirements/requirements-base.txt
 
 # ensure we're in the correct folder in case user's CWD is somewhere else
 scriptdir=$(dirname "$0")
@@ -30,9 +34,16 @@ function _err_exit {
     fi
 }
 
-echo This script will update InvokeAI and all its dependencies from $INVOKE_AI_SRC.
+if ! curl -I "$INVOKE_AI_DEP" -fs >/dev/null; then
+    echo \'$INVOKE_AI_VERSION\' is not a known branch name or tag. Please check the version and try again.
+    exit
+fi
+
+echo This script will update InvokeAI and all its dependencies to version \'$INVOKE_AI_VERSION\'.
 echo If you do not want to do this, press control-C now!
 read -p "Press any key to continue, or CTRL-C to exit..."
+
+curl -L "$INVOKE_AI_DEP" > environments-and-requirements/requirements-base.txt
 
 . .venv/bin/activate
 
@@ -42,11 +53,7 @@ _err_exit $? "The pip program failed to install InvokeAI's requirements."
 ./.venv/bin/python -mpip install $INVOKE_AI_SRC
 _err_exit $? "The pip program failed to install InvokeAI."
 
-./.venv/bin/python .venv/bin/configure_invokeai.py --root .
-_err_exit $? "The configure script failed to run successfully."
+echo InvokeAI updated to \'$INVOKE_AI_VERSION\'
 
-
-
-
-
-
+# ./.venv/bin/python .venv/bin/configure_invokeai.py --root .
+# _err_exit $? "The configure script failed to run successfully."
