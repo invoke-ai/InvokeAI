@@ -36,7 +36,7 @@ FROM python:3.10-slim AS runtime
 # setup environment
 ARG APPDIR=/usr/src/app
 WORKDIR ${APPDIR}
-COPY --from=builder ${APPDIR} .
+COPY --from=builder ${APPDIR}/.venv ${APPDIR}/.venv
 ENV \
   PATH=${APPDIR}/.venv/bin:$PATH \
   INVOKEAI_ROOT=/data \
