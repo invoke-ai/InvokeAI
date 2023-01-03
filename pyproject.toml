@@ -64,6 +64,7 @@
         "pudb",
         "pyreadline3",
         "pytorch-lightning<1.8.0",
+        "pyparsing",
         "realesrgan",
         "requests>=2.25.1",
         "scikit-image>=0.19",
@@ -90,9 +91,13 @@
     ]
 
 [project.scripts]
-    invokeai = "scripts.invoke:main"
-    configure_invokeai = "scripts.configure_invokeai:main"
-    create_root = "scripts.create_root:main"
+    "configure_invokeai.py" = "scripts:configure_invokeai.main"
+    "dream.py" = "ldm.invoke:CLI.main"
+    "invoke.py" = "ldm.invoke:CLI.main"
+    "legacy_api.py" = "scripts:legacy_api.main"
+    "load_models.py" = "scripts:configure_invokeai.main"
+    "merge_embeddings.py" = "scripts:merge_embeddings.main"
+    "preload_models.py" = "scripts:configure_invokeai.main"
 
 [project.urls]
     "Documentation" = "https://invoke-ai.github.io/InvokeAI/"
@@ -102,23 +107,6 @@
 
 [tool.setuptools.dynamic]
     version = {attr = "ldm.invoke.__version__"}
-
-[tool.setuptools.package-data]
-    "assets" = [
-        "caution.png"
-    ]
-    "vendored.clip.clip" = [
-        "*.txt.gz"
-    ]
-    "configs" = [
-        "*.example",
-        "*.yaml",
-        "*.txt",
-        "stable-diffusion**.yaml"
-    ]
-    "frontend.dist" = [
-        "**"
-    ]
 
 [tool.setuptools.packages.find]
     # "where" = [
@@ -132,6 +120,25 @@
         "ldm*",
         "scripts*",
         "vendored*"
+    ]
+
+[tool.setuptools.package-data]
+    "assets" = [
+        "caution.png"
+    ]
+    "vendored.clip.clip" = [
+        "*.txt.gz"
+    ]
+    "configs" = [
+        "*.example",
+        "**.yaml",
+        "*.txt"
+    ]
+    "frontend.dist" = [
+        "**"
+    ]
+    "scripts" = [
+        "**.py"
     ]
 
 [tool.black]
