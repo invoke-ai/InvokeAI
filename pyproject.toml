@@ -91,13 +91,13 @@
     ]
 
 [project.scripts]
-    "configure_invokeai.py" = "scripts:configure_invokeai.main"
-    "dream.py" = "ldm.invoke:CLI.main"
-    "invoke.py" = "ldm.invoke:CLI.main"
-    "legacy_api.py" = "scripts:legacy_api.main"
-    "load_models.py" = "scripts:configure_invokeai.main"
-    "merge_embeddings.py" = "scripts:merge_embeddings.main"
-    "preload_models.py" = "scripts:configure_invokeai.main"
+    "configure_invokeai" = "scripts:configure_invokeai.main"
+    "dream" = "ldm.invoke:CLI.main"
+    "invoke" = "ldm.invoke:CLI.main"
+    "legacy_api" = "scripts:legacy_api.main"
+    "load_models" = "scripts:configure_invokeai.main"
+    "merge_embeddings" = "scripts:merge_embeddings.main"
+    "preload_models" = "scripts:configure_invokeai.main"
 
 [project.urls]
     "Documentation" = "https://invoke-ai.github.io/InvokeAI/"

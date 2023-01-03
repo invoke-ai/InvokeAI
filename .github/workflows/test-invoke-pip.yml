@@ -81,9 +81,9 @@ jobs:
       - name: install InvokeAI
         run: python3 -m pip install --use-pep517 .
 
-      - name: run configure_invokeai.py
+      - name: configure_invokeai
         id: run-preload-models
-        run: configure_invokeai.py --yes
+        run: configure_invokeai --yes
 
       - name: cat invokeai.init
         id: cat-invokeai
@@ -92,7 +92,7 @@ jobs:
       - name: Run the tests
         id: run-tests
         if: runner.os != 'Windows'
-        run: invoke.py --no-patchmatch --no-nsfw_checker --from_file ${{ env.TEST_PROMPTS }}
+        run: invoke --no-patchmatch --no-nsfw_checker --from_file ${{ env.TEST_PROMPTS }}
 
       - name: Archive results
         id: archive-results
