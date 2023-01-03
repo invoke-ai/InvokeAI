@@ -58,5 +58,5 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # set Entrypoint and default CMD
-ENTRYPOINT [ "invokeai" ]
+ENTRYPOINT [ "invoke.py" ]
 CMD [ "--web", "--host=0.0.0.0" ]
