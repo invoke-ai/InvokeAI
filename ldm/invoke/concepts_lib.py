@@ -36,12 +36,12 @@ class Concepts(object):
         local_concepts_to_add = set(local_concepts_now).difference(set(self.local_concepts))
         self.local_concepts.update(local_concepts_now)
 
-        if self.concept_list is not None and not local_concepts_to_add:
+        if self.concept_list is not None:
+            if local_concepts_to_add:
+                self.concept_list.extend(list(local_concepts_to_add))
+                return self.concept_list
             return self.concept_list
-        elif self.concept_list is not None and local_concepts_to_add:
-            self.concept_list.extend(list(local_concepts_to_add))
-            return self.concept_list
-        elif self.concept_list is None:
+        else:
             try:
                 models = self.hf_api.list_models(filter=ModelFilter(model_name='sd-concepts-library/'))
                 self.concept_list = [a.id.split('/')[1] for a in models]
