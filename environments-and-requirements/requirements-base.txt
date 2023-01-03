@@ -1,6 +1,7 @@
 # pip will resolve the version which matches torch
 accelerate
 albumentations
+datasets
 diffusers[torch]~=0.11
 einops
 eventlet
