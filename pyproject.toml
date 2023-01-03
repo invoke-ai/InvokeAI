@@ -131,7 +131,7 @@
     ]
     "configs" = [
         "*.example",
-        "**.yaml",
+        "**/*.yaml",
         "*.txt"
     ]
     "frontend.dist" = [
