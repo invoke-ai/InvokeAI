@@ -1,11 +1,11 @@
-import traceback
 from math import ceil
 from typing import Callable, Optional, Union
 
 import torch
 
 from ldm.models.diffusion.cross_attention_control import Arguments, \
-    remove_cross_attention_control, setup_cross_attention_control, Context, get_cross_attention_modules, CrossAttentionType
+    remove_cross_attention_control, setup_cross_attention_control, Context, get_cross_attention_modules, \
+    CrossAttentionType
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 
 
@@ -107,12 +107,7 @@ class InvokeAIDiffuserComponent:
         else:
             unconditioned_next_x, conditioned_next_x = self.apply_standard_conditioning(x, sigma, unconditioning, conditioning)
 
-        # to scale how much effect conditioning has, calculate the changes it does and then scale that
-        scaled_delta = (conditioned_next_x - unconditioned_next_x) * unconditional_guidance_scale
-        combined_next_x = unconditioned_next_x + scaled_delta
-
-        return combined_next_x
-
+        return self._combine(unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale)
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
@@ -182,6 +177,12 @@ class InvokeAIDiffuserComponent:
             raise
 
         return unconditioned_next_x, conditioned_next_x
+
+    def _combine(self, unconditioned_next_x, conditioned_next_x, guidance_scale):
+        # to scale how much effect conditioning has, calculate the changes it does and then scale that
+        scaled_delta = (conditioned_next_x - unconditioned_next_x) * guidance_scale
+        combined_next_x = unconditioned_next_x + scaled_delta
+        return combined_next_x
 
     def estimate_percent_through(self, step_index, sigma):
         if step_index is not None and self.cross_attention_control_context is not None:
