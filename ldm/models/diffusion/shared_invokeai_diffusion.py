@@ -27,7 +27,7 @@ class InvokeAIDiffuserComponent:
     * Cross attention control ("prompt2prompt")
     * Hybrid conditioning (used for inpainting)
     '''
-    debug_thresholding = True
+    debug_thresholding = False
 
 
     class ExtraConditioningInfo:
@@ -217,6 +217,13 @@ class InvokeAIDiffuserComponent:
 
         scale = 0.7  # default value from #395
 
+        if self.debug_thresholding:
+            std, mean = [i.item() for i in torch.std_mean(latents)]
+            outside = torch.count_nonzero((latents < -current_threshold) | (latents > current_threshold))
+            print(f"\nThreshold: 𝜎={sigma.item()} threshold={current_threshold:.3f} (of {threshold:.3f})\n"
+                  f"  | min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}\n"
+                  f"  | {outside / latents.numel() * 100:.2f}% values outside threshold")
+
         if maxval < current_threshold and minval > -current_threshold:
             return latents
 
@@ -225,6 +232,11 @@ class InvokeAIDiffuserComponent:
 
         if minval < -current_threshold:
             minval = np.clip(minval * scale, -current_threshold, -1)
+
+        if self.debug_thresholding:
+            outside = torch.count_nonzero((latents < minval) | (latents > maxval))
+            print(f"  | min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})\n"
+                  f"  | {outside / latents.numel() * 100:.2f}% values will be clamped")
 
         return latents.clamp(minval, maxval)
 
