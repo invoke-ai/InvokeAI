@@ -20,6 +20,7 @@ from ldm.invoke.concepts_lib import Concepts
 from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
+import ldm.invoke
 
 # global used in multiple functions (fix)
 infile = None
@@ -51,6 +52,7 @@ def main():
             print(f'** This script will now exit.')
             sys.exit(-1)
 
+    print(f'>> {ldm.invoke.__app_name__} {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
@@ -135,7 +137,7 @@ def main():
     try:
         main_loop(gen, opt)
     except KeyboardInterrupt:
-        print("\ngoodbye!")
+        print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt):
@@ -410,7 +412,8 @@ def main_loop(gen, opt):
         output_cntr = write_log(results, log_path ,('txt', 'md'), output_cntr)
         print()
 
-    print('goodbye!')
+
+    print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
 
 # TO DO: remove repetitive code and the awkward command.replace() trope
 # Just do a simple parse of the command!

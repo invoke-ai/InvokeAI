@@ -33,6 +33,8 @@ class GFPGAN():
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=DeprecationWarning)
             warnings.filterwarnings('ignore', category=UserWarning)
+            cwd = os.getcwd()
+            os.chdir(os.path.join(Globals.root,'models'))
             try:
                 from gfpgan import GFPGANer
                 self.gfpgan = GFPGANer(
@@ -46,6 +48,7 @@ class GFPGAN():
                 import traceback
                 print('>> Error loading GFPGAN:', file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
+            os.chdir(cwd)
 
         if self.gfpgan is None:
             print(
