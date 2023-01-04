@@ -152,7 +152,10 @@
 
 [tool.black]
     line-length = 88
-    target-version = ['py39', 'py310']
+    target-version = [
+        "py39",
+        "py310"
+    ]
     include = '\.pyi?$'
     extend-exclude = '''
         /(
@@ -170,10 +173,26 @@
         "vendored",
         "data"
     ]
+    src_paths = [
+        "backend",
+        "frontend",
+        "ldm",
+        "scripts",
+        "vendored"
+    ]
 
 [tool.pylint.format]
     max-line-length = "88"
 
+[tool.pylint.basic]
+    good-names = [
+        "e",
+        "i",
+        "j",
+        "k",
+        "ex",
+        "Run",
+        "_"]
 [tool.pylint.main]
     fail-under = 10.0
     ignore = [
