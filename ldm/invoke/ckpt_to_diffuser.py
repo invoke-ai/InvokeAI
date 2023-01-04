@@ -798,7 +798,10 @@ def convert_ckpt_to_diffuser(checkpoint_path:str,
     else:
         print("global_step key not found in model")
         global_step = None
-    checkpoint = checkpoint["state_dict"]
+
+    # sometimes there is a state_dict key and sometimes not
+    if 'state_dict' in checkpoint:
+        checkpoint = checkpoint["state_dict"]
 
     upcast_attention = False
     if original_config_file is None:
