@@ -1,0 +1,205 @@
+[build-system]
+    requires = [
+        "setuptools>=61.0.0",
+        "cython",
+        "wheel"
+    ]
+    build-backend = "setuptools.build_meta"
+
+[project]
+    name = "InvokeAI"
+    description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
+    requires-python = ">=3.9, <3.11"
+    readme = {file = "README.md", content-type = "text/markdown", charset = "UTF-8"}
+    keywords = [
+        "stable-diffusion",
+        "AI"
+    ]
+    dynamic = ["version"]
+    license = {file = "LICENSE"}
+    authors = [
+        {name = "The InvokeAI Project",email = "lincoln.stein@gmail.com"}
+    ]
+    classifiers = [
+        "Development Status :: 4 - Beta",
+        "Environment :: GPU",
+        "Environment :: GPU :: NVIDIA CUDA",
+        "Environment :: MacOS X",
+        "Intended Audience :: End Users/Desktop",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3 :: Only",
+        "Topic :: Artistic Software",
+        "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+        "Topic :: Internet :: WWW/HTTP :: WSGI :: Server",
+        "Topic :: Multimedia :: Graphics",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Scientific/Engineering :: Image Processing",
+    ]
+    dependencies = [
+        "accelerate",
+        "albumentations",
+        "diffusers[torch]==0.10.*",
+        "einops",
+        "eventlet",
+        "facexlib",
+        "flask==2.1.3",
+        "flask_cors==3.0.10",
+        "flask_socketio==5.3.0",
+        "flaskwebgui==1.0.3",
+        "getpass_asterisk",
+        "gfpgan",
+        "imageio-ffmpeg",
+        "k-diffusion",
+        "kornia",
+        "numpy==1.23.*",
+        "omegaconf",
+        "opencv-python",
+        "picklescan",
+        "pillow",
+        "pudb",
+        "pyparsing",
+        "pypatchmatch",
+        "pyreadline3",
+        "pytorch-lightning<1.8.0",
+        "realesrgan",
+        "requests>=2.25.1",
+        "scikit-image>=0.19",
+        "send2trash",
+        "streamlit",
+        "taming-transformers-rom1504",
+        "test-tube>=0.7.5",
+        "torch",
+        "torch-fidelity",
+        "torchvision",
+        "torchmetrics",
+        "transformers",
+    ]
+
+[project.optional-dependencies]
+    "dev" = [
+        "black",        # formatter
+        "isort",        # sort imports
+        "pylint",       # linter
+        "pip-tools",    # requirements management
+        "twine"         # package distributrion
+    ]
+
+[project.scripts]
+    "configure_invokeai" = "scripts:configure_invokeai.main"
+    "dream" = "ldm.invoke:CLI.main"
+    "invoke" = "ldm.invoke:CLI.main"
+    "legacy_api" = "scripts:legacy_api.main"
+    "load_models" = "scripts:configure_invokeai.main"
+    "merge_embeddings" = "scripts:merge_embeddings.main"
+    "preload_models" = "scripts:configure_invokeai.main"
+
+[project.urls]
+    "Documentation" = "https://invoke-ai.github.io/InvokeAI/"
+    "Source" = "https://github.com/invoke-ai/InvokeAI/"
+    "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
+    "Discord" = "https://discord.gg/ZmtBAhwWhy"
+
+[tool.setuptools.dynamic]
+    version = {attr = "ldm.invoke.__version__"}
+
+[tool.setuptools.packages.find]
+    "where" = [
+        ".",
+        "vendored/",
+        "vendored/clipseg/"
+    ]
+    "include" = [
+        "assets*",
+        "backend*",
+        "clip/clip",
+        "clipseg*",
+        "configs",
+        "frontend.dist*",
+        "ldm*",
+        "scripts*"
+    ]
+
+[tool.setuptools.package-data]
+    "assets" = [
+        "caution.png"
+    ]
+    "configs" = [
+        "*.example",
+        "**/*.yaml",
+        "*.txt"
+    ]
+    "frontend.dist" = [
+        "**"
+    ]
+    "scripts" = [
+        "**.py"
+    ]
+    "clip" = [
+        "bpe_simple_vocab_16e6.txt.gz"
+    ]
+    "clipseg" = [
+        "**.py",
+        "**.yaml",
+        "**.json"
+    ]
+
+[tool.black]
+    line-length = 88
+    target-version = [
+        "py39",
+        "py310"
+    ]
+    include = '\.pyi?$'
+    extend-exclude = '''
+        /(
+        | vendored
+        | tests
+        | .venv
+        )/
+        '''
+
+[tool.isort]
+    profile = "black"
+    skip = [
+        ".venv",
+        "build",
+        "vendored",
+        "data"
+    ]
+    src_paths = [
+        "backend",
+        "frontend",
+        "ldm",
+        "scripts",
+        "vendored"
+    ]
+
+[tool.pylint.format]
+    max-line-length = "88"
+
+[tool.pylint.basic]
+    good-names = [
+        "e",
+        "i",
+        "j",
+        "k",
+        "ex",
+        "Run",
+        "_"]
+[tool.pylint.main]
+    fail-under = 10.0
+    ignore = [
+        "vendored",
+        ".venv",
+        "build",
+        "dist",
+        "tests"
+    ]
+    jobs = 0

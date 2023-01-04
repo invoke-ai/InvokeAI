@@ -1,3 +1,5 @@
+root = true
+
 # All files
 [*]
 charset = utf-8
@@ -9,4 +11,10 @@ trim_trailing_whitespace = true
 
 # Python
 [*.py]
+indent_size = 4
+
+[*.cfg]
+indent_size = 4
+
+[*.toml]
 indent_size = 4

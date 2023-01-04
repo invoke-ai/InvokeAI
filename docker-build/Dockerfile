@@ -16,27 +16,27 @@ RUN apt-get update \
 
 # set WORKDIR, PATH and copy sources
 ARG APPDIR=/usr/src/app
+ARG PIP_EXTRA_INDEX_URL
+ENV \
+  PATH=${APPDIR}/.venv/bin:$PATH \
+  PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}
+
 WORKDIR ${APPDIR}
-ENV PATH ${APPDIR}/.venv/bin:$PATH
-ARG PIP_REQUIREMENTS=requirements-lin-cuda.txt
-COPY . ./environments-and-requirements/${PIP_REQUIREMENTS} ./
+COPY . .
 
 # install requirements
 RUN python3 -m venv .venv \
   && pip install \
-    --upgrade \
     --no-cache-dir \
-    'wheel>=0.38.4' \
-  && pip install \
-    --no-cache-dir \
-    -r ${PIP_REQUIREMENTS}
+    --use-pep517 \
+    .
 
 FROM python:3.10-slim AS runtime
 
 # setup environment
 ARG APPDIR=/usr/src/app
 WORKDIR ${APPDIR}
-COPY --from=builder ${APPDIR} .
+COPY --from=builder ${APPDIR}/.venv ${APPDIR}/.venv
 ENV \
   PATH=${APPDIR}/.venv/bin:$PATH \
   INVOKEAI_ROOT=/data \
@@ -50,9 +50,6 @@ RUN apt-get update \
     libgl1-mesa-glx=20.3.* \
     libglib2.0-0=2.66.* \
     libopencv-dev=4.5.* \
-  && ln -sf \
-    /usr/lib/"$(arch)"-linux-gnu/pkgconfig/opencv4.pc \
-    /usr/lib/"$(arch)"-linux-gnu/pkgconfig/opencv.pc \
   && python3 -c "from patchmatch import patch_match" \
   && apt-get remove -y \
     --autoremove \
@@ -61,5 +58,5 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # set Entrypoint and default CMD
-ENTRYPOINT [ "python3", "scripts/invoke.py" ]
+ENTRYPOINT [ "invoke" ]
 CMD [ "--web", "--host=0.0.0.0" ]

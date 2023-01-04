@@ -9,6 +9,7 @@ import io
 import base64
 import os
 import json
+import frontend.dist as frontend
 
 from werkzeug.utils import secure_filename
 from flask import Flask, redirect, send_from_directory, request, make_response
@@ -94,9 +95,8 @@ class InvokeAIWebServer:
                 _cors = _cors.split(",")
             socketio_args["cors_allowed_origins"] = _cors
 
-        frontend_path = self.find_frontend()
         self.app = Flask(
-            __name__, static_url_path="", static_folder=frontend_path
+            __name__, static_url_path="", static_folder=frontend.__path__[0]
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)
@@ -181,7 +181,7 @@ class InvokeAIWebServer:
 
                 pil_image = Image.open(file_path)
 
-                if "cropVisible" in data and data["cropVisible"] == True:
+                if "cropVisible" in data and data["cropVisible"] is True:
                     visible_image_bbox = pil_image.getbbox()
                     pil_image = pil_image.crop(visible_image_bbox)
                     pil_image.save(file_path)
@@ -254,18 +254,6 @@ class InvokeAIWebServer:
                     keyfile=args.keyfile,
                 )
 
-    def find_frontend(self):
-        my_dir = os.path.dirname(__file__)
-        # LS: setup.py seems to put the frontend in different places on different systems, so
-        # this is fragile and needs to be replaced with a better way of finding the front end.
-        for candidate in (os.path.join(my_dir,'..','frontend','dist'),          # pip install -e .
-                          os.path.join(my_dir,'../../../../frontend','dist'),   # pip install . (Linux, Mac)
-                          os.path.join(my_dir,'../../../frontend','dist'),      # pip install . (Windows)
-        ):
-            if os.path.exists(candidate):
-                return candidate
-        assert "Frontend files cannot be found. Cannot continue"
-
     def setup_app(self):
         self.result_url = "outputs/"
         self.init_image_url = "outputs/init-images/"
@@ -321,7 +309,7 @@ class InvokeAIWebServer:
                     socketio.emit(
                         "foundModels",
                         {'search_folder': search_folder, 'found_models': found_models},
-                    )            
+                    )
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
                 print("\n")

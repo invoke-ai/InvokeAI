@@ -1,13 +1,17 @@
 *
+!assets/caution.png
 !backend
-!environments-and-requirements
+!configs
 !frontend
 !ldm
 !main.py
+!pyproject.toml
+!README.md
 !scripts
 !server
 !static
 !setup.py
+!vendored
 
 # Guard against pulling in any models that might exist in the directory tree
 **/*.pt*

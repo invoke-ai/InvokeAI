@@ -48,7 +48,9 @@ To see how this works in practice, here's an image of a still life painting that
 I got off the web.
 
 <figure markdown>
+
 ![still life scaled](../assets/still-life-scaled.jpg)
+
 </figure>
 
 You can selectively mask out the orange and replace it with a baseball in this
@@ -59,7 +61,9 @@ invoke> a baseball -I /path/to/still_life.png -tm orange
 ```
 
 <figure markdown>
+
 ![](../assets/still-life-inpainted.png)
+
 </figure>
 
 The clipseg classifier produces a confidence score for each region it
@@ -104,23 +108,31 @@ Outputs:
 ```
 
 <figure markdown>
+
 ![curly](../assets/outpainting/curly.png)
 <figcaption>Original image "curly.png"</figcaption>
+
 </figure>
 
 <figure markdown>
+
 ![curly hair selected](../assets/inpainting/000019.curly.hair.selected.png)
 <figcaption>000019.curly.hair.selected.png</figcaption>
+
 </figure>
 
 <figure markdown>
+
 ![curly hair deselected](../assets/inpainting/000019.curly.hair.deselected.png)
 <figcaption>000019.curly.hair.deselected.png</figcaption>
+
 </figure>
 
 <figure markdown>
+
 ![curly hair masked](../assets/inpainting/000019.curly.hair.masked.png)
 <figcaption>000019.curly.hair.masked.png</figcaption>
+
 </figure>
 
 It looks like we selected the hair pretty well at the 0.5 threshold (which is
@@ -135,7 +147,9 @@ Outputs:
 ```
 
 <figure markdown>
+
 ![](../assets/inpainting/000024.801380492.png)
+
 </figure>
 
 You can also skip the `!mask` creation step and just select the masked
@@ -257,14 +271,18 @@ with the surrounding unmasked regions as well.
 1. Open image in Photoshop
 
     <figure markdown>
+
     ![step1](../assets/step1.png)
+
     </figure>
 
 2. Use any of the selection tools (Marquee, Lasso, or Wand) to select the area
    you desire to inpaint.
 
     <figure markdown>
+
     ![step2](../assets/step2.png)
+
     </figure>
 
 3. Because we'll be applying a mask over the area we want to preserve, you
@@ -276,7 +294,9 @@ with the surrounding unmasked regions as well.
    your inpainting results will be dramatically impacted.
 
     <figure markdown>
+
     ![step4](../assets/step4.png)
+
     </figure>
 
 5. Make sure to hide any background layers that are present. You should see the
@@ -284,14 +304,18 @@ with the surrounding unmasked regions as well.
    the checkered background.
 
     <figure markdown>
+
     ![step5](../assets/step5.png)
+
     </figure>
 
 6. Save the image as a transparent PNG by using `File`-->`Save a Copy` from the
    menu bar, or by using the keyboard shortcut ++alt+ctrl+s++
 
     <figure markdown>
+
     ![step6](../assets/step6.png)
+
     </figure>
 
 7. After following the inpainting instructions above (either through the CLI or
@@ -299,7 +323,9 @@ with the surrounding unmasked regions as well.
    good!
 
     <figure markdown>
+
    ![step7](../assets/step7.png)
+
     </figure>
 
 8. In the export dialogue, Make sure the "Save colour values from transparent

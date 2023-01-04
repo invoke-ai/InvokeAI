@@ -1,5 +1,4 @@
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
-import pyparsing
 # Derived from source code carrying the following copyrights
 # Copyright (c) 2022 Machine Vision and Learning Group, LMU Munich
 # Copyright (c) 2022 Robin Rombach and Patrick Esser and contributors
@@ -13,22 +12,16 @@ import re
 import sys
 import traceback
 import transformers
-import io
 import gc
-import hashlib
 import cv2
 import skimage
 
 from omegaconf import OmegaConf
 
-import ldm.invoke.conditioning
-from ldm.invoke.generator.base import downsampling
-from PIL import Image, ImageOps
-from torch import nn
 from pytorch_lightning import seed_everything, logging
+from PIL import Image, ImageOps
+import ldm.invoke.conditioning
 
-from ldm.invoke.prompt_parser import PromptParser
-from ldm.util import instantiate_from_config
 from ldm.invoke.globals import Globals
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
@@ -40,7 +33,7 @@ from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.conditioning import get_uc_and_c_and_ec
 from ldm.invoke.model_cache import ModelCache
 from ldm.invoke.seamless import configure_model_padding
-from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
+from ldm.invoke.txt2mask import Txt2Mask
 from ldm.invoke.concepts_lib import Concepts
 from ldm.invoke.generator.inpaint import infill_methods
 

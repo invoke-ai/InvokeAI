@@ -8,6 +8,7 @@
 #
 print('Loading Python libraries...\n')
 import argparse
+import configs
 import sys
 import os
 import io
@@ -18,7 +19,6 @@ from urllib import request
 from tqdm import tqdm
 from omegaconf import OmegaConf
 from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login
-from pathlib import Path
 from typing import Union
 from getpass_asterisk import getpass_asterisk
 from transformers import CLIPTokenizer, CLIPTextModel
@@ -27,7 +27,6 @@ from ldm.invoke.readline import generic_completer
 
 import traceback
 import requests
-import clip
 import transformers
 import warnings
 warnings.filterwarnings('ignore')
@@ -41,7 +40,8 @@ Dataset_path = './configs/INITIAL_MODELS.yaml'
 Default_config_file = './configs/models.yaml'
 SD_Configs = './configs/stable-diffusion'
 
-assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the invokeai runtime directory."
+if not os.path.exists(os.path.abspath(os.path.join(Globals.root, Dataset_path))):
+    Dataset_path = os.path.abspath(os.path.join(configs.__path__[0],'..',Dataset_path))
 
 Datasets = OmegaConf.load(Dataset_path)
 completer = generic_completer(['yes','no'])
@@ -550,7 +550,7 @@ def download_clipseg():
                 zip.extractall(os.path.join(Globals.root,'models/clipseg'))
             os.remove(dest)
 
-            from clipseg.clipseg import CLIPDensePredT
+            from clipseg.models.clipseg import CLIPDensePredT
             model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
             model.eval()
             model.load_state_dict(
@@ -592,7 +592,6 @@ def download_weights(opt:dict) -> Union[str, None]:
             successfully_downloaded = download_weight_datasets(models, access_token)
             update_config_file(successfully_downloaded,opt)
             return
-
     else:
         choice = user_wants_to_download_weights()
 
@@ -603,9 +602,9 @@ def download_weights(opt:dict) -> Union[str, None]:
     elif choice == 'customized':
         models = select_datasets(choice)
         if models is None and yes_or_no('Quit?',default_yes=False):
-                sys.exit(0)
-    else:  # 'skip'
-        return
+            sys.exit(0)
+        else:  # 'skip'
+            return
 
 
     access_token = authenticate()
@@ -650,7 +649,7 @@ def select_outputs(root:str,yes_to_all:bool=False):
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
-    assert os.path.exists('./configs'),'Run this script from within the InvokeAI source code directory, "InvokeAI" or the runtime directory "invokeai".'
+    import configs
 
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root_selected = False
@@ -678,13 +677,15 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
-    for name in ('models','configs','embeddings'):
-        os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in (['configs']):
-        dest = os.path.join(root,src)
-        if not os.path.samefile(src,dest):
-            shutil.copytree(src,dest,dirs_exist_ok=True)
-        os.makedirs(outputs, exist_ok=True)
+    for folder in ('models','embeddings'):
+        os.makedirs(os.path.join(Globals.root,folder), exist_ok=True)
+    src = configs.__path__[0]
+    dst = os.path.join(Globals.root,configs.__name__)
+    try:
+        shutil.copytree(src,dst)
+    except FileExistsError:
+        print(f'{dst} already exists, skipping')
+    os.makedirs(outputs, exist_ok=True)
 
     init_file = os.path.join(Globals.root,Globals.initfile)
 
@@ -763,8 +764,8 @@ def main():
         introduction()
 
         # We check for to see if the runtime directory is correctly initialized.
-        if Globals.root == '' \
-           or not os.path.exists(os.path.join(Globals.root,'invokeai.init')):
+        if Globals.root is None \
+           or not os.path.exists(os.path.join(os.getcwd(),'invokeai.init')):
             initialize_rootdir(Globals.root,opt.yes_to_all)
 
         # Optimistically try to download all required assets. If any errors occur, add them and proceed anyway.
@@ -777,7 +778,7 @@ def main():
             print('** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **')
         else:
             print('** DOWNLOADING DIFFUSION WEIGHTS **')
-            errors.add(download_weights(opt))
+            download_weights(opt)
         print('\n** DOWNLOADING SUPPORT MODELS **')
         download_bert()
         download_clip()
