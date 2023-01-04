@@ -126,6 +126,7 @@ class Completer(object):
             elif re.search('(-S\s*|--seed[=\s])\d*$',buffer):
                 self.matches= self._seed_completions(text,state)
 
+            # looking for an embedding concept
             elif re.search('<[\w-]*$',buffer):
                 self.matches= self._concept_completions(text,state)
 
@@ -272,12 +273,15 @@ class Completer(object):
     def add_embedding_terms(self, terms:list[str]):
         self.embedding_terms = set(terms)
         if self.concepts:
-            self.embedding_terms.update(self.concepts)
+            self.embedding_terms.update(set(self.concepts.list_concepts()))
 
     def _concept_completions(self, text, state):
         if self.concepts is None:
-            self.concepts = set(Concepts().list_concepts())
-            self.embedding_terms.update(self.concepts)
+            # cache Concepts() instance so we can check for updates in concepts_list during runtime.
+            self.concepts = Concepts()
+            self.embedding_terms.update(set(self.concepts.list_concepts()))
+        else:
+            self.embedding_terms.update(set(self.concepts.list_concepts()))
 
         partial = text[1:]  # this removes the leading '<'
         if len(partial) == 0:
