@@ -70,7 +70,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             name='Output Destination Directory',
             select_dir=True,
             must_exist=False,
-            value=Path(Globals.root) / 'embeddings' / default_placeholder_token
+            value=Path(Globals.root) / 'trained-checkpoints' / default_placeholder_token
         )
         self.resolution = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
@@ -230,5 +230,6 @@ if __name__ == '__main__':
     
     from ldm.invoke.textual_inversion_training import do_textual_inversion_training
     if args := myapplication.ti_arguments:
+        os.makedirs(args['output_dir'],exist_ok=True)
         do_textual_inversion_training(**args)
     
