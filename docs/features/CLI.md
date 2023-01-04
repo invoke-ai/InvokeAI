@@ -76,34 +76,43 @@ from the Windows, Mac or Linux command line. Some set defaults that can be
 overridden on a per-prompt basis (see
 [List of prompt arguments](#list-of-prompt-arguments). Others
 
-| Argument <img width="240" align="right"/> | Shortcut <img width="100" align="right"/> | Default <img width="320" align="right"/>       | Description                                                                                          |
-| ----------------------------------------- | ----------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `--help`                                  | `-h`                                      |                                                | Print a concise help message.                                                                        |
-| `--outdir <path>`                         | `-o<path>`                                | `outputs/img_samples`                          | Location for generated images.                                                                       |
-| `--prompt_as_dir`                         | `-p`                                      | `False`                                        | Name output directories using the prompt text.                                                       |
-| `--from_file <path>`                      |                                           | `None`                                         | Read list of prompts from a file. Use `-` to read from standard input                                |
-| `--model <modelname>`                     |                                           | `stable-diffusion-1.4`                         | Loads model specified in configs/models.yaml. Currently one of "stable-diffusion-1.4" or "laion400m" |
-| `--full_precision`                        | `-F`                                      | `False`                                        | Run in slower full-precision mode. Needed for Macintosh M1/M2 hardware and some older video cards.   |
-| `--png_compression <0-9>`                 | `-z<0-9>`                                 | `6`                                            | Select level of compression for output files, from 0 (no compression) to 9 (max compression)         |
-| `--safety-checker`                        |                                           | `False`                                        | Activate safety checker for NSFW and other potentially disturbing imagery                            |
-| `--web`                                   |                                           | `False`                                        | Start in web server mode                                                                             |
-| `--host <ip addr>`                        |                                           | `localhost`                                    | Which network interface web server should listen on. Set to 0.0.0.0 to listen on any.                |
-| `--port <port>`                           |                                           | `9090`                                         | Which port web server should listen for requests on.                                                 |
-| `--config <path>`                         |                                           | `configs/models.yaml`                          | Configuration file for models and their weights.                                                     |
-| `--iterations <int>`                      | `-n<int>`                                 | `1`                                            | How many images to generate per prompt.                                                              |
-| `--width <int>`                           | `-W<int>`                                 | `512`                                    | Width of generated image                                                                                                                                                                                                                         |
-| `--height <int>`                          | `-H<int>`                                 | `512`                                    | Height of generated image                                                                                                        | `--steps <int>`                           | `-s<int>`                                 | `50`                                     | How many steps of refinement to apply                                                                                                                                                                                                            |
-| `--strength <float>`                      | `-s<float>` | `0.75`  | For img2img: how hard to try to match the prompt to the initial image. Ranges from 0.0-0.99, with higher values replacing the initial image completely. |
-| `--fit`                                   | `-F`        | `False` | For img2img: scale the init image to fit into the specified -H and -W dimensions                                                                             |
-| `--grid`                                  | `-g`                                      | `False`                                        | Save all image series as a grid rather than individually.                                            |
-| `--sampler <sampler>`                     | `-A<sampler>`                             | `k_lms`                                        | Sampler to use. Use `-h` to get list of available samplers.                                          |
-| `--seamless`                              |                                           | `False`                                        | Create interesting effects by tiling elements of the image.                                          |
-| `--embedding_path <path>`                 |                                           | `None`                                         | Path to pre-trained embedding manager checkpoints, for custom models                                 |
-| `--gfpgan_model_path`                     |                                           | `experiments/pretrained_models/GFPGANv1.4.pth` | Path to GFPGAN model file.                                              |
-| `--free_gpu_mem`                          |                                           | `False`                                        | Free GPU memory after sampling, to allow image decoding and saving in low VRAM conditions            |
-| `--precision`                             |                                           | `auto`                                         | Set model precision, default is selected by device. Options: auto, float32, float16, autocast        |
+| Argument <img width="240" align="right"/> | Shortcut <img width="100" align="right"/> | Default <img width="320" align="right"/>       | Description                                                                                                                                             |
+| ----------------------------------------- | ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`                                  | `-h`                                      |                                                | Print a concise help message.                                                                                                                           |
+| `--outdir <path>`                         | `-o<path>`                                | `outputs/img_samples`                          | Location for generated images.                                                                                                                          |
+| `--prompt_as_dir`                         | `-p`                                      | `False`                                        | Name output directories using the prompt text.                                                                                                          |
+| `--from_file <path>`                      |                                           | `None`                                         | Read list of prompts from a file. Use `-` to read from standard input                                                                                   |
+| `--model <modelname>`                     |                                           | `stable-diffusion-1.4`                         | Loads model specified in configs/models.yaml. Currently one of "stable-diffusion-1.4" or "laion400m"                                                    |
+| `--full_precision`                        | `-F`                                      | `False`                                        | Run in slower full-precision mode. Needed for Macintosh M1/M2 hardware and some older video cards.                                                      |
+| `--png_compression <0-9>`                 | `-z<0-9>`                                 | `6`                                            | Select level of compression for output files, from 0 (no compression) to 9 (max compression)                                                            |
+| `--safety-checker`                        |                                           | `False`                                        | Activate safety checker for NSFW and other potentially disturbing imagery                                                                               |
+| `--web`                                   |                                           | `False`                                        | Start in web server mode                                                                                                                                |
+| `--host <ip addr>`                        |                                           | `localhost`                                    | Which network interface web server should listen on. Set to 0.0.0.0 to listen on any.                                                                   |
+| `--port <port>`                           |                                           | `9090`                                         | Which port web server should listen for requests on.                                                                                                    |
+| `--config <path>`                         |                                           | `configs/models.yaml`                          | Configuration file for models and their weights.                                                                                                        |
+| `--iterations <int>`                      | `-n<int>`                                 | `1`                                            | How many images to generate per prompt.                                                                                                                 |
+| `--width <int>`                           | `-W<int>`                                 | `512`                                          | Width of generated image                                                                                                                                |
+| `--height <int>`                          | `-H<int>`                                 | `512`                                          | Height of generated image                                                                                                                               |
+| `--steps <int>`                           | `-s<int>`                                 | `50`                                           | How many steps of refinement to apply                                                                                                                   |
+| `--strength <float>`                      | `-s<float>`                               | `0.75`                                         | For img2img: how hard to try to match the prompt to the initial image. Ranges from 0.0-0.99, with higher values replacing the initial image completely. |
+| `--fit`                                   | `-F`                                      | `False`                                        | For img2img: scale the init image to fit into the specified -H and -W dimensions                                                                        |
+| `--grid`                                  | `-g`                                      | `False`                                        | Save all image series as a grid rather than individually.                                                                                               |
+| `--sampler <sampler>`                     | `-A<sampler>`                             | `k_lms`                                        | Sampler to use. Use `-h` to get list of available samplers.                                                                                             |
+| `--seamless`                              |                                           | `False`                                        | Create interesting effects by tiling elements of the image.                                                                                             |
+| `--embedding_path <path>`                 |                                           | `None`                                         | Path to pre-trained embedding manager checkpoints, for custom models                                                                                    |
+| `--gfpgan_model_path`                     |                                           | `experiments/pretrained_models/GFPGANv1.4.pth` | Path to GFPGAN model file.                                                                                                                              |
+| `--free_gpu_mem`                          |                                           | `False`                                        | Free GPU memory after sampling, to allow image decoding and saving in low VRAM conditions                                                               |
+| `--precision`                             |                                           | `auto`                                         | Set model precision, default is selected by device. Options: auto, float32, float16, autocast                                                           |
 
-!!! warning "These arguments are deprecated but still work"
+!!! tip
+
+      On Windows systems, you may run into
+      problems when passing the invoke script standard backslashed path
+      names because the Python interpreter treats "\" as an escape.
+      You can either double your slashes (ick): `C:\\path\\to\\my\\file`, or
+      use Linux/Mac style forward slashes (better): `C:/path/to/my/file`.
+
+??? warning "These arguments are deprecated but still work (click to show commands)"
 
     <div align="center" markdown>
 
@@ -114,21 +123,13 @@ overridden on a per-prompt basis (see
 
     </div>
 
-!!! tip
-
-      On Windows systems, you may run into
-      problems when passing the invoke script standard backslashed path
-      names because the Python interpreter treats "\" as an escape.
-      You can either double your slashes (ick): `C:\\path\\to\\my\\file`, or
-      use Linux/Mac style forward slashes (better): `C:/path/to/my/file`.
-
 ## The .invokeai initialization file
 
-To start up invoke.py with your preferred settings, place your desired
-startup options in a file in your home directory named `.invokeai` The
-file should contain the startup options as you would type them on the
-command line (`--steps=10 --grid`), one argument per line, or a
-mixture of both using any of the accepted command switch formats:
+To start up invoke.py with your preferred settings, place your desired startup
+options in a file in your home directory named `.invokeai` The file should
+contain the startup options as you would type them on the command line
+(`--steps=10 --grid`), one argument per line, or a mixture of both using any of
+the accepted command switch formats:
 
 !!! example "my unmodified initialization file"
 
@@ -287,9 +288,9 @@ invoke> a piece of cake -I /path/to/breakfast.png -tm bagel 0.6
 
 ### Custom Styles and Subjects
 
-You can load and use hundreds of community-contributed Textual
-Inversion models just by typing the appropriate trigger phrase. Please
-see [Concepts Library](CONCEPTS.md) for more details.
+You can load and use hundreds of community-contributed Textual Inversion models
+just by typing the appropriate trigger phrase. Please see
+[Concepts Library](CONCEPTS.md) for more details.
 
 ## Other Commands
 
@@ -316,7 +317,10 @@ Some examples:
     invoke> !fix 0000045.4829112.png -G1 -U4 -ft codeformer
     ```
 
-!!! example "Use the GFPGAN algorithm to fix faces, then upscale to 3X using --embiggen"
+!!! example "Use GFPGAN to fix faces and scale up with `--embiggen`"
+
+    Use the GFPGAN algorithm to fix faces, then upscale
+    to 3X using --embiggen
 
     ```bash
     invoke> !fix 0000045.4829112.png -G0.8 -ft gfpgan
@@ -534,7 +538,10 @@ processing.
     invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
     ```
 
-!!! example "fetch the generation commands from a batch of files and store them into `selected.txt`"
+!!! example "fetch generation commands for more files"
+
+    fetch the generation commands from a batch of files and store them
+    into `selected.txt`
 
     ```bash
     invoke> !fetch outputs\selected-imgs\*.png selected.txt
