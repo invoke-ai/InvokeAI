@@ -582,6 +582,7 @@ class ModelManager(object):
         Convert a legacy ckpt weights file to diffuser model and import
         into models.yaml.
         '''
+        new_config = None
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
         import transformers
         if diffuser_path.exists():

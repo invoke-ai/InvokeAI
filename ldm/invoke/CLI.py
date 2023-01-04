@@ -610,7 +610,7 @@ def optimize_model(ckpt_path:str, gen, opt, completer):
         print(f'** {basename} is already optimized. Will not overwrite.')
         return
     new_config = gen.model_manager.convert_and_import(ckpt_path, diffuser_path)
-    if write_config_file(opt.conf, gen, basename, new_config, clobber=False):
+    if new_config and write_config_file(opt.conf, gen, basename, new_config, clobber=False):
         completer.add_model(basename)
 
 def del_config(model_name:str, gen, opt, completer):
