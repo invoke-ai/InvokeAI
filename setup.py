@@ -11,11 +11,8 @@ def list_files(directory):
     return listing
 
 def get_version()->str:
-    VERSIONFILE = 'ldm/invoke/_version.py'
-    with open(VERSIONFILE) as file:
-        for line in file:
-            if match := re.search("__version__\s*=\s*'([^']+)'",line):
-                return match.group(1)
+    from ldm.invoke import __version__ as version
+    return version
 
 # The canonical version number is stored in the file ldm/invoke/_version.py
 VERSION = get_version()

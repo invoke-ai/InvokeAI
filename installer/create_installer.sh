@@ -2,7 +2,7 @@
 
 cd "$(dirname "$0")"
 
-VERSION=$(grep ^__version__ ../ldm/invoke/_version.py | awk -F= '{ print $2 }' | sed "s/'//g" | sed -r 's/\s+//g' )
+VERSION=$(cd ..; python -c "from ldm.invoke import __version__ as version; print(version)")
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
 
@@ -10,15 +10,18 @@ echo Building installer for version $VERSION
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
 
-git commit -a
+read -e -p "Commit and tag this version? (otherwise, just build the zip files) [n]: " input
+RESPONSE=${input:='n'}
 
-if ! git tag $VERSION ; then
-    echo "Existing/invalid tag"
-    exit -1
+if [ "$RESPONSE" == 'y' ]; then
+    git commit -a
+    if ! git tag $VERSION ; then
+	echo "Existing/invalid tag"
+	exit -1
+    fi
+    git push origin :refs/tags/latest
+    git tag -fa latest
 fi
-
-git push origin :refs/tags/latest
-git tag -fa latest
 
 echo Building installer zip fles for InvokeAI $VERSION
 
