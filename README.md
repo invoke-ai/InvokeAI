@@ -126,7 +126,7 @@ driver).
 
 #### System
 
-You wil need one of the following:
+You will need one of the following:
 
 - An NVIDIA-based graphics card with 4 GB or more VRAM memory.
 - An Apple computer with an M1 chip.

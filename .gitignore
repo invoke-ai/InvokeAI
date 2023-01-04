@@ -1,4 +1,5 @@
 # ignore default image save location and model symbolic link
+embeddings/
 outputs/
 models/ldm/stable-diffusion-v1/model.ckpt
 **/restoration/codeformer/weights
