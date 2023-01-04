@@ -174,7 +174,7 @@ class InvokeAIWebServer:
 
                 pil_image = Image.open(file_path)
 
-                if "cropVisible" in data and data["cropVisible"] == True:
+                if "cropVisible" in data and data["cropVisible"] is True:
                     visible_image_bbox = pil_image.getbbox()
                     pil_image = pil_image.crop(visible_image_bbox)
                     pil_image.save(file_path)
