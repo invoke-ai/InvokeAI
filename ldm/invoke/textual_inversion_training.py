@@ -84,7 +84,7 @@ def parse_args():
     )
     parser.add_argument(
         '--root_dir','--root',
-        type=str,
+        type=Path,
         default=Globals.root,
         help="Path to the invokeai runtime directory",
     )
@@ -98,7 +98,7 @@ def parse_args():
         "--model",
         type=str,
         default=None,
-        required=False,
+        required=True,
         help="Name of the diffusers model to train against, as defined in configs/models.yaml.",
     )
     parser.add_argument(
@@ -115,23 +115,31 @@ def parse_args():
         help="Pretrained tokenizer name or path if not the same as model_name",
     )
     parser.add_argument(
-        "--train_data_dir", type=str, default=None, required=False, help="A folder containing the training data."
+        "--train_data_dir",
+        type=Path,
+        default=None,
+        required=True,
+        help="A folder containing the training data."
     )
     parser.add_argument(
         "--placeholder_token",
         type=str,
         default=None,
-        required=False,
+        required=True,
         help="A token to use as a placeholder for the concept.",
     )
     parser.add_argument(
-        "--initializer_token", type=str, default=None, required=False, help="A token to use as initializer word."
+        "--initializer_token",
+        type=str,
+        default=None,
+        required=False,
+        help="A token to use as initializer word."
     )
     parser.add_argument("--learnable_property", type=str, default="object", help="Choose between 'object' and 'style'")
     parser.add_argument("--repeats", type=int, default=100, help="How many times to repeat the training data.")
     parser.add_argument(
         "--output_dir",
-         type=str,
+        type=Path,
         default=f'{Globals.root}/text-inversion-model',
         help="The output directory where the model predictions and checkpoints will be written.",
     )
@@ -201,7 +209,7 @@ def parse_args():
     parser.add_argument("--hub_token", type=str, default=None, help="The token to use to push to the Model Hub.")
     parser.add_argument(
         "--logging_dir",
-        type=str,
+        type=Path,
         default="logs",
         help=(
             "[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to"
@@ -248,7 +256,7 @@ def parse_args():
     )
     parser.add_argument(
         "--resume_from_checkpoint",
-        type=str,
+        type=Path,
         default=None,
         help=(
             "Whether training should be resumed from a previous checkpoint. Use a path saved by"
@@ -260,9 +268,6 @@ def parse_args():
     )
 
     args = parser.parse_args()
-    env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
-    if env_local_rank != -1 and env_local_rank != args.local_rank:
-        args.local_rank = env_local_rank
     return args
 
 
@@ -412,35 +417,60 @@ def get_full_repo_name(model_id: str, organization: Optional[str] = None, token:
         return f"{organization}/{model_id}"
 
 
-def do_textual_inversion_training(args:Namespace):
-
-    # Out of laziness, we are getting our parameterse from an argparse Namespace
-    # which is a legacy of the original script. This needs to be changed.
-    
-    if args.train_data_dir is None:
-        raise ValueError("You must specify a training data directory with --train_data_dir.")
-
-    if args.placeholder_token is None:
-        raise ValueError("You must specify a placeholder token with --placeholder_token.")
-
-    if args.initializer__token is None:
-        raise ValueError("You must specify an initializer token with --initializer_token.")
-
-    if args.model is None:
-        raise ValueError("You must specify a model name with --model.")
+def do_textual_inversion_training(
+        model:str,
+        train_data_dir:Path,
+        output_dir:Path,
+        placeholder_token:str,
+        initializer_token:str,
+        save_steps:int=500,
+        only_save_embeds:bool=False,
+        revision:str=None,
+        tokenizer_name:str=None,
+        learnable_property:str='object',
+        repeats:int=100,
+        seed:int=None,
+        resolution:int=512,
+        center_crop:bool=False,
+        train_batch_size:int=16,
+        num_train_epochs:int=100,
+        max_train_steps:int=5000,
+        gradient_accumulation_steps:int=1,
+        gradient_checkpointing:bool=False,
+        learning_rate:float=1e-4,
+        scale_lr:bool=True,
+        lr_scheduler:str='constant',
+        lr_warmup_steps:int=500,
+        adam_beta1:float=0.9,
+        adam_beta2:float=0.999,
+        adam_weight_decay:float=1e-02,
+        adam_epsilon:float=1e-08,
+        push_to_hub:bool=False,
+        hub_token:str=None,
+        logging_dir:Path=Path('logs'),
+        mixed_precision:str='no',
+        allow_tf32:bool=False,
+        report_to:str='tensorboard',
+        local_rank:int=-1,
+        checkpointing_steps:int=500,
+        resume_from_checkpoint:Path=None,
+        enable_xformers_memory_efficient_attention:bool=False,
+        root_dir:Path=None
+):
+    env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
+    if env_local_rank != -1 and env_local_rank != local_rank:
+        local_rank = env_local_rank
 
     # setting up things the way invokeai expects them
-    if os.path.exists(args.root_dir):
-        Globals.root = args.root_dir
-    if not os.path.isabs(args.output_dir):
-        args.output_dir = os.path.join(Globals.root,args.output_dir)
+    if not os.path.isabs(output_dir):
+        output_dir = os.path.join(Globals.root,output_dir)
         
-    logging_dir = os.path.join(args.output_dir, args.logging_dir)
+    logging_dir = output_dir / logging_dir
 
     accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        mixed_precision=args.mixed_precision,
-        log_with=args.report_to,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        mixed_precision=mixed_precision,
+        log_with=report_to,
         logging_dir=logging_dir,
     )
 
@@ -461,68 +491,70 @@ def do_textual_inversion_training(args:Namespace):
         diffusers.utils.logging.set_verbosity_error()
 
     # If passed along, set the training seed now.
-    if args.seed is not None:
-        set_seed(args.seed)
+    if seed is not None:
+        set_seed(seed)
 
     # Handle the repository creation
     if accelerator.is_main_process:
-        if args.push_to_hub:
-            if args.hub_model_id is None:
-                repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
+        if push_to_hub:
+            if hub_model_id is None:
+                repo_name = get_full_repo_name(Path(output_dir).name, token=hub_token)
             else:
-                repo_name = args.hub_model_id
-            repo = Repository(args.output_dir, clone_from=repo_name)
+                repo_name = hub_model_id
+            repo = Repository(output_dir, clone_from=repo_name)
 
-            with open(os.path.join(args.output_dir, ".gitignore"), "w+") as gitignore:
+            with open(os.path.join(output_dir, ".gitignore"), "w+") as gitignore:
                 if "step_*" not in gitignore:
                     gitignore.write("step_*\n")
                 if "epoch_*" not in gitignore:
                     gitignore.write("epoch_*\n")
-        elif args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
+        elif output_dir is not None:
+            os.makedirs(output_dir, exist_ok=True)
 
     models_conf = OmegaConf.load(os.path.join(Globals.root,'configs/models.yaml'))
-    model_conf = models_conf.get(args.model,None)
-    assert model_conf is not None,f'Unknown model: {args.model}'
+    model_conf = models_conf.get(model,None)
+    assert model_conf is not None,f'Unknown model: {model}'
     assert model_conf.get('format','diffusers')=='diffusers', "This script only works with models of type 'diffusers'"
     pretrained_model_name_or_path = model_conf.get('repo_id',None) or Path(model_conf.get('path'))
-    assert pretrained_model_name_or_path, f"models.yaml error: neither 'repo_id' nor 'path' is defined for {args.model}"
+    assert pretrained_model_name_or_path, f"models.yaml error: neither 'repo_id' nor 'path' is defined for {model}"
     pipeline_args = dict()
     if not isinstance(pretrained_model_name_or_path,Path):
-        pipeline_args.update(cache_dir=os.path.join(Globals.root,'models',pretrained_model_name_or_path))
+        pipeline_args.update(
+            cache_dir=os.path.join(Globals.root,'models',pretrained_model_name_or_path)
+        )
     
     # Load tokenizer
-    if args.tokenizer_name:
-        tokenizer = CLIPTokenizer.from_pretrained(args.tokenizer_name)
+    if tokenizer_name:
+        tokenizer = CLIPTokenizer.from_pretrained(tokenizer_name)
     else:
         tokenizer = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path, subfolder="tokenizer", **pipeline_args)
 
     # Load scheduler and models
     noise_scheduler = DDPMScheduler.from_pretrained(pretrained_model_name_or_path, subfolder="scheduler", **pipeline_args)
     text_encoder = CLIPTextModel.from_pretrained(
-        pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision,  **pipeline_args
+        pretrained_model_name_or_path, subfolder="text_encoder", revision=revision,  **pipeline_args
     )
-    vae = AutoencoderKL.from_pretrained(pretrained_model_name_or_path, subfolder="vae", revision=args.revision,  **pipeline_args)
+    vae = AutoencoderKL.from_pretrained(pretrained_model_name_or_path, subfolder="vae", revision=revision,  **pipeline_args)
     unet = UNet2DConditionModel.from_pretrained(
-        pretrained_model_name_or_path, subfolder="unet", revision=args.revision,  **pipeline_args
+        pretrained_model_name_or_path, subfolder="unet", revision=revision,  **pipeline_args
     )
 
     # Add the placeholder token in tokenizer
-    num_added_tokens = tokenizer.add_tokens(args.placeholder_token)
+    num_added_tokens = tokenizer.add_tokens(placeholder_token)
     if num_added_tokens == 0:
         raise ValueError(
-            f"The tokenizer already contains the token {args.placeholder_token}. Please pass a different"
+            f"The tokenizer already contains the token {placeholder_token}. Please pass a different"
             " `placeholder_token` that is not already in the tokenizer."
         )
 
     # Convert the initializer_token, placeholder_token to ids
-    token_ids = tokenizer.encode(args.initializer_token, add_special_tokens=False)
+    token_ids = tokenizer.encode(initializer_token, add_special_tokens=False)
     # Check if initializer_token is a single token or a sequence of tokens
     if len(token_ids) > 1:
-        raise ValueError("The initializer token must be a single token.")
+        raise ValueError(f"The initializer token must be a single token. Provided initializer={initializer_token}. Token ids={token_ids}")
 
     initializer_token_id = token_ids[0]
-    placeholder_token_id = tokenizer.convert_tokens_to_ids(args.placeholder_token)
+    placeholder_token_id = tokenizer.convert_tokens_to_ids(placeholder_token)
 
     # Resize the token embeddings as we are adding new special tokens to the tokenizer
     text_encoder.resize_token_embeddings(len(tokenizer))
@@ -539,14 +571,14 @@ def do_textual_inversion_training(args:Namespace):
     text_encoder.text_model.final_layer_norm.requires_grad_(False)
     text_encoder.text_model.embeddings.position_embedding.requires_grad_(False)
 
-    if args.gradient_checkpointing:
+    if gradient_checkpointing:
         # Keep unet in train mode if we are using gradient checkpointing to save memory.
         # The dropout cannot be != 0 so it doesn't matter if we are in eval or train mode.
         unet.train()
         text_encoder.gradient_checkpointing_enable()
         unet.enable_gradient_checkpointing()
 
-    if args.enable_xformers_memory_efficient_attention:
+    if enable_xformers_memory_efficient_attention:
         if is_xformers_available():
             unet.enable_xformers_memory_efficient_attention()
         else:
@@ -554,48 +586,48 @@ def do_textual_inversion_training(args:Namespace):
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32:
+    if allow_tf32:
         torch.backends.cuda.matmul.allow_tf32 = True
 
-    if args.scale_lr:
-        args.learning_rate = (
-            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
+    if scale_lr:
+        learning_rate = (
+            learning_rate * gradient_accumulation_steps * train_batch_size * accelerator.num_processes
         )
 
     # Initialize the optimizer
     optimizer = torch.optim.AdamW(
         text_encoder.get_input_embeddings().parameters(),  # only optimize the embeddings
-        lr=args.learning_rate,
-        betas=(args.adam_beta1, args.adam_beta2),
-        weight_decay=args.adam_weight_decay,
-        eps=args.adam_epsilon,
+        lr=learning_rate,
+        betas=(adam_beta1, adam_beta2),
+        weight_decay=adam_weight_decay,
+        eps=adam_epsilon,
     )
 
     # Dataset and DataLoaders creation:
     train_dataset = TextualInversionDataset(
-        data_root=args.train_data_dir,
+        data_root=train_data_dir,
         tokenizer=tokenizer,
-        size=args.resolution,
-        placeholder_token=args.placeholder_token,
-        repeats=args.repeats,
-        learnable_property=args.learnable_property,
-        center_crop=args.center_crop,
+        size=resolution,
+        placeholder_token=placeholder_token,
+        repeats=repeats,
+        learnable_property=learnable_property,
+        center_crop=center_crop,
         set="train",
     )
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
-    if args.max_train_steps is None:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
+    if max_train_steps is None:
+        max_train_steps = num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
 
     lr_scheduler = get_scheduler(
-        args.lr_scheduler,
+        lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
-        num_training_steps=args.max_train_steps * args.gradient_accumulation_steps,
+        num_warmup_steps=lr_warmup_steps * gradient_accumulation_steps,
+        num_training_steps=max_train_steps * gradient_accumulation_steps,
     )
 
     # Prepare everything with our `accelerator`.
@@ -616,61 +648,64 @@ def do_textual_inversion_training(args:Namespace):
     vae.to(accelerator.device, dtype=weight_dtype)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
     if overrode_max_train_steps:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        max_train_steps = num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
-    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+    num_train_epochs = math.ceil(max_train_steps / num_update_steps_per_epoch)
 
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
-        accelerator.init_trackers("textual_inversion", config=vars(args))
+        params = locals()
+        for k in params: # init_trackers() doesn't like objects
+            params[k] = str(params[k]) if isinstance(params[k],object) else params[k]
+        accelerator.init_trackers("textual_inversion", config=params)
 
     # Train!
-    total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
+    total_batch_size = train_batch_size * accelerator.num_processes * gradient_accumulation_steps
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
-    logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
+    logger.info(f"  Num Epochs = {num_train_epochs}")
+    logger.info(f"  Instantaneous batch size per device = {train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
-    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
+    logger.info(f"  Total optimization steps = {max_train_steps}")
     global_step = 0
     first_epoch = 0
 
     # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
-        if args.resume_from_checkpoint != "latest":
-            path = os.path.basename(args.resume_from_checkpoint)
+    if resume_from_checkpoint:
+        if resume_from_checkpoint != "latest":
+            path = os.path.basename(resume_from_checkpoint)
         else:
             # Get the most recent checkpoint
-            dirs = os.listdir(args.output_dir)
+            dirs = os.listdir(output_dir)
             dirs = [d for d in dirs if d.startswith("checkpoint")]
             dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
             path = dirs[-1]
         accelerator.print(f"Resuming from checkpoint {path}")
-        accelerator.load_state(os.path.join(args.output_dir, path))
+        accelerator.load_state(os.path.join(output_dir, path))
         global_step = int(path.split("-")[1])
 
-        resume_global_step = global_step * args.gradient_accumulation_steps
+        resume_global_step = global_step * gradient_accumulation_steps
         first_epoch = resume_global_step // num_update_steps_per_epoch
         resume_step = resume_global_step % num_update_steps_per_epoch
 
     # Only show the progress bar once on each machine.
-    progress_bar = tqdm(range(global_step, args.max_train_steps), disable=not accelerator.is_local_main_process)
+    progress_bar = tqdm(range(global_step, max_train_steps), disable=not accelerator.is_local_main_process)
     progress_bar.set_description("Steps")
 
     # keep original embeddings as reference
     orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
 
-    for epoch in range(first_epoch, args.num_train_epochs):
+    for epoch in range(first_epoch, num_train_epochs):
         text_encoder.train()
         for step, batch in enumerate(train_dataloader):
             # Skip steps until we reach the resumed step
-            if args.resume_from_checkpoint and epoch == first_epoch and step < resume_step:
-                if step % args.gradient_accumulation_steps == 0:
+            if resume_from_checkpoint and epoch == first_epoch and step < resume_step:
+                if step % gradient_accumulation_steps == 0:
                     progress_bar.update(1)
                 continue
 
@@ -723,13 +758,13 @@ def do_textual_inversion_training(args:Namespace):
             if accelerator.sync_gradients:
                 progress_bar.update(1)
                 global_step += 1
-                if global_step % args.save_steps == 0:
-                    save_path = os.path.join(args.output_dir, f"learned_embeds-steps-{global_step}.bin")
+                if global_step % save_steps == 0:
+                    save_path = os.path.join(output_dir, f"learned_embeds-steps-{global_step}.bin")
                     save_progress(text_encoder, placeholder_token_id, accelerator, args, save_path)
 
-                if global_step % args.checkpointing_steps == 0:
+                if global_step % checkpointing_steps == 0:
                     if accelerator.is_main_process:
-                        save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                        save_path = os.path.join(output_dir, f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
 
@@ -737,17 +772,17 @@ def do_textual_inversion_training(args:Namespace):
             progress_bar.set_postfix(**logs)
             accelerator.log(logs, step=global_step)
 
-            if global_step >= args.max_train_steps:
+            if global_step >= max_train_steps:
                 break
 
     # Create the pipeline using using the trained modules and save it.
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        if args.push_to_hub and args.only_save_embeds:
+        if push_to_hub and only_save_embeds:
             logger.warn("Enabling full model saving because --push_to_hub=True was specified.")
             save_full_model = True
         else:
-            save_full_model = not args.only_save_embeds
+            save_full_model = not only_save_embeds
         if save_full_model:
             pipeline = StableDiffusionPipeline.from_pretrained(
                 pretrained_model_name_or_path,
@@ -757,12 +792,12 @@ def do_textual_inversion_training(args:Namespace):
                 tokenizer=tokenizer,
                 **pipeline_args,
             )
-            pipeline.save_pretrained(args.output_dir)
+            pipeline.save_pretrained(output_dir)
         # Save the newly trained embeddings
-        save_path = os.path.join(args.output_dir, "learned_embeds.bin")
+        save_path = os.path.join(output_dir, "learned_embeds.bin")
         save_progress(text_encoder, placeholder_token_id, accelerator, args, save_path)
 
-        if args.push_to_hub:
+        if push_to_hub:
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
 
     accelerator.end_training()
