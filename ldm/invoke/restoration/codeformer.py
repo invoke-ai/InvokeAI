@@ -60,7 +60,12 @@ class CodeFormerRestoration():
             # Codeformer expects a BGR np array; make array and flip channels
             bgr_image_array = np.array(image, dtype=np.uint8)[...,::-1]
 
-            face_helper = FaceRestoreHelper(upscale_factor=1, use_parse=True, device=device)
+            face_helper = FaceRestoreHelper(
+                upscale_factor=1,
+                use_parse=True,
+                device=device,
+                model_rootpath=os.path.join(Globals.root,'models','gfpgan','weights'),
+            )
             face_helper.clean_all()
             face_helper.read_image(bgr_image_array)
             face_helper.get_face_landmarks_5(resize=640, eye_dist_threshold=5)
