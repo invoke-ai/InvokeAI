@@ -89,7 +89,7 @@ class InvokeAIWebServer:
             socketio_args["cors_allowed_origins"] = opt.cors
 
         self.app = Flask(
-            __name__, static_url_path="", static_folder=os.path.abspath(frontend.__path__[0])
+            __name__, static_url_path="", static_folder=frontend.__path__[0]
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)
