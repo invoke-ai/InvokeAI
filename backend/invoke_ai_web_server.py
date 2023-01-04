@@ -86,7 +86,14 @@ class InvokeAIWebServer:
         }
 
         if opt.cors:
-            socketio_args["cors_allowed_origins"] = opt.cors
+            _cors = opt.cors
+            # convert list back into comma-separated string,
+            # be defensive here, not sure in what form this arrives
+            if isinstance(_cors, list):
+                _cors = ",".join(_cors)
+            if "," in _cors:
+                _cors = _cors.split(",")
+            socketio_args["cors_allowed_origins"] = _cors
 
         self.app = Flask(
             __name__, static_url_path="", static_folder=frontend.__path__[0]
