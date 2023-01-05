@@ -1,8 +1,9 @@
 [build-system]
     requires = [
-        "setuptools>=61.0.0",
         "cython",
-        "wheel"
+        "trove-classifiers",
+        "setuptools ~= 65.5.0",
+        "wheel",
     ]
     build-backend = "setuptools.build_meta"
 
@@ -45,20 +46,20 @@
     dependencies = [
         "accelerate",
         "albumentations",
-        "diffusers[torch]==0.10.*",
+        "diffusers[torch] < 0.11.0, >= 0.10.0",
         "einops",
         "eventlet",
         "facexlib",
-        "flask==2.1.3",
-        "flask_cors==3.0.10",
-        "flask_socketio==5.3.0",
-        "flaskwebgui==1.0.3",
+        "flask == 2.1.3",
+        "flask_cors == 3.0.10",
+        "flask_socketio == 5.3.0",
+        "flaskwebgui == 1.0.3",
         "getpass_asterisk",
         "gfpgan",
         "imageio-ffmpeg",
         "k-diffusion",
         "kornia",
-        "numpy==1.23.*",
+        "numpy == 1.23.*",
         "omegaconf",
         "opencv-python",
         "picklescan",
@@ -67,14 +68,14 @@
         "pyparsing",
         "pypatchmatch",
         "pyreadline3",
-        "pytorch-lightning<1.8.0",
+        "pytorch-lightning < 1.8.0",
         "realesrgan",
-        "requests>=2.25.1",
-        "scikit-image>=0.19",
+        "requests >= 2.25.1",
+        "scikit-image >= 0.19",
         "send2trash",
         "streamlit",
         "taming-transformers-rom1504",
-        "test-tube>=0.7.5",
+        "test-tube >= 0.7.5",
         "torch",
         "torch-fidelity",
         "torchvision",
@@ -88,7 +89,13 @@
         "isort",        # sort imports
         "pylint",       # linter
         "pip-tools",    # requirements management
+        "pipdeptree",   # create a dependenciy-tree
         "twine"         # package distributrion
+    ]
+    "docs" = [
+        "mkdocs-material < 9.0",
+        "mkdocs-git-revision-date-localized-plugin",
+        "mkdocs-redirects == 1.2.0"
     ]
 
 [project.scripts]
@@ -101,6 +108,7 @@
     "preload_models" = "scripts:configure_invokeai.main"
 
 [project.urls]
+    "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
     "Documentation" = "https://invoke-ai.github.io/InvokeAI/"
     "Source" = "https://github.com/invoke-ai/InvokeAI/"
     "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
@@ -112,18 +120,21 @@
 [tool.setuptools.packages.find]
     "where" = [
         ".",
-        "vendored/",
-        "vendored/clipseg/"
+        "vendored",
+        "vendored/clip"
     ]
     "include" = [
-        "assets*",
+        "assets",
         "backend*",
-        "clip/clip",
+        "clip",
         "clipseg*",
         "configs",
         "frontend.dist*",
         "ldm*",
         "scripts*"
+    ]
+    exclude = [
+        "tests*"
     ]
 
 [tool.setuptools.package-data]
@@ -138,16 +149,13 @@
     "frontend.dist" = [
         "**"
     ]
-    "scripts" = [
-        "**.py"
-    ]
     "clip" = [
-        "bpe_simple_vocab_16e6.txt.gz"
+        "*.txt.gz"
     ]
-    "clipseg" = [
-        "**.py",
-        "**.yaml",
-        "**.json"
+
+[tool.setuptools.exclude-package-data]
+    configs = [
+        "models.yaml"
     ]
 
 [tool.black]
@@ -192,7 +200,9 @@
         "k",
         "ex",
         "Run",
-        "_"]
+        "_"
+    ]
+
 [tool.pylint.main]
     fail-under = 10.0
     ignore = [
