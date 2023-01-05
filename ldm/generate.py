@@ -13,20 +13,13 @@ import time
 import traceback
 
 import cv2
+import diffusers
 import numpy as np
 import skimage
 import torch
 import transformers
 from PIL import Image, ImageOps
-from diffusers import HeunDiscreteScheduler
 from diffusers.pipeline_utils import DiffusionPipeline
-from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from diffusers.schedulers.scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
-from diffusers.schedulers.scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
-from diffusers.schedulers.scheduling_euler_discrete import EulerDiscreteScheduler
-from diffusers.schedulers.scheduling_ipndm import IPNDMScheduler
-from diffusers.schedulers.scheduling_lms_discrete import LMSDiscreteScheduler
-from diffusers.schedulers.scheduling_pndm import PNDMScheduler
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything, logging
 
@@ -1008,19 +1001,21 @@ class Generate:
     def _set_scheduler(self):
         default = self.model.scheduler
 
+        # See https://github.com/huggingface/diffusers/issues/277#issuecomment-1371428672
         scheduler_map = dict(
-            ddim=DDIMScheduler,
-            dpmpp_2=DPMSolverMultistepScheduler,
-            ipndm=IPNDMScheduler,
+            ddim=diffusers.DDIMScheduler,
+            dpmpp_2=diffusers.DPMSolverMultistepScheduler,
+            k_dpm_2=diffusers.KDPM2DiscreteScheduler,
+            k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
             # DPMSolverMultistepScheduler is technically not `k_` anything, as it is neither
             # the k-diffusers implementation nor included in EDM (Karras 2022), but we can
             # provide an alias for compatibility.
-            k_dpmpp_2=DPMSolverMultistepScheduler,
-            k_euler=EulerDiscreteScheduler,
-            k_euler_a=EulerAncestralDiscreteScheduler,
-            k_heun=HeunDiscreteScheduler,
-            k_lms=LMSDiscreteScheduler,
-            plms=PNDMScheduler,
+            k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
+            k_euler=diffusers.EulerDiscreteScheduler,
+            k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
+            k_heun=diffusers.HeunDiscreteScheduler,
+            k_lms=diffusers.LMSDiscreteScheduler,
+            plms=diffusers.PNDMScheduler,
         )
 
         if self.sampler_name in scheduler_map:
