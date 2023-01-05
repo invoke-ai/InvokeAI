@@ -933,9 +933,7 @@ class InvokeAIWebServer:
                 init_img_path = self.get_image_path_from_url(init_img_url)
                 generation_parameters["init_img"] = Image.open(init_img_path).convert('RGB')
 
-            def image_progress(progress_state: PipelineIntermediateState):
-                step = progress_state.step
-                sample = progress_state.latents
+            def image_progress(sample, step):
                 if self.canceled.is_set():
                     raise CanceledException
 
@@ -1206,9 +1204,16 @@ class InvokeAIWebServer:
 
             print(generation_parameters)
 
+            def diffusers_step_callback_adapter(*cb_args, **kwargs):
+                if isinstance(cb_args[0], PipelineIntermediateState):
+                    progress_state: PipelineIntermediateState = cb_args[0]
+                    return image_progress(progress_state.latents, progress_state.step)
+                else:
+                    return image_progress(*cb_args, **kwargs)
+
             self.generate.prompt2image(
                 **generation_parameters,
-                step_callback=image_progress,
+                step_callback=diffusers_step_callback_adapter,
                 image_callback=image_done
             )
 
