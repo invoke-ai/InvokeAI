@@ -16,7 +16,7 @@ jobs:
           - cuda
         include:
           - flavor: amd
-            pip-extra-index-url: https://download.pytorch.org/whl/rocm5.2
+            pip-extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
             dockerfile: docker-build/Dockerfile
             platforms: linux/amd64,linux/arm64
           - flavor: cuda

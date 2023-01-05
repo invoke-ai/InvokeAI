@@ -4,9 +4,10 @@ set -e
 # How to use: https://invoke-ai.github.io/InvokeAI/installation/INSTALL_DOCKER/#setup
 #
 # Some possible pip extra-index urls (cuda 11.7 is available without extra url):
-#   cuda 11.6: https://download.pytorch.org/whl/cu116
-#   rocm5.2: https://download.pytorch.org/whl/rocm5.2
-#   cpu: https://download.pytorch.org/whl/cpu
+#
+#   CUDA 11.6:  https://download.pytorch.org/whl/cu116
+#   ROCm5.2:    https://download.pytorch.org/whl/rocm5.2
+#   CPU:        https://download.pytorch.org/whl/cpu
 #
 #   as found on https://pytorch.org/get-started/locally/
 
@@ -14,12 +15,12 @@ source ./docker-build/env.sh \
   || echo "please execute docker-build/build.sh from repository root" \
   || exit 1
 
-DOCKERFILE=${INVOKE_DOCKERFILE:-docker-build/Dockerfile}
+DOCKERFILE=${INVOKE_DOCKERFILE:-"./docker-build/Dockerfile"}
 
 # print the settings
 echo -e "You are using these values:\n"
 echo -e "Dockerfile:\t ${DOCKERFILE}"
-echo -e "extra-index-url:\t ${PIP_EXTRA_INDEX_URL:-none}"
+echo -e "extra-index-url: ${PIP_EXTRA_INDEX_URL:-none}"
 echo -e "Volumename:\t ${VOLUMENAME}"
 echo -e "arch:\t\t ${ARCH}"
 echo -e "Platform:\t ${PLATFORM}"

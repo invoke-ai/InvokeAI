@@ -17,16 +17,16 @@ RUN apt-get update \
 # set WORKDIR, PATH and copy sources
 ARG APPDIR=/usr/src/app
 ARG PIP_EXTRA_INDEX_URL
-ENV \
-  PATH=${APPDIR}/.venv/bin:$PATH \
-  PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}
+ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
 
 WORKDIR ${APPDIR}
 COPY . .
 
 # install requirements
 RUN python3 -m venv .venv \
-  && pip install \
+  && pip \
+    --python .venv \
+    install \
     --no-cache-dir \
     --use-pep517 \
     .
@@ -50,6 +50,7 @@ RUN apt-get update \
     libgl1-mesa-glx=20.3.* \
     libglib2.0-0=2.66.* \
     libopencv-dev=4.5.* \
+  && export PYTHONDONTWRITEBYTECODE=1 \
   && python3 -c "from patchmatch import patch_match" \
   && apt-get remove -y \
     --autoremove \
