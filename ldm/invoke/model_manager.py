@@ -99,7 +99,7 @@ class ModelManager(object):
                 assert self.current_model,'** FATAL: no current model to restore to'
                 print(f'** restoring {self.current_model}')
                 self.get_model(self.current_model)
-                return
+                return None
 
         self.current_model = model_name
         self._push_newest_model(model_name)
@@ -150,7 +150,9 @@ class ModelManager(object):
         Return true if this is a legacy (.ckpt) model
         '''
         info = self.model_info(model_name)
-        return info['format']=='ckpt' if info else False
+        if 'weights' in info and info['weights'].endswith('.ckpt'):
+            return True
+        return False
 
     def list_models(self) -> dict:
         '''
@@ -507,7 +509,7 @@ class ModelManager(object):
                     weights:Union[str,Path],
                     config:Union[str,Path]='configs/stable-diffusion/v1-inference.yaml',
                     model_name:str=None,
-                    description:str=None,
+                    model_description:str=None,
                     commit_to_conf:Path=None,
     )->bool:
         '''
@@ -532,12 +534,12 @@ class ModelManager(object):
         if config_path is None or not config_path.exists():
             return False
             
-        model_name = model_name or Path(basename).stem
-        description = description or f'imported stable diffusion weights file {model_name}'
+        model_name = model_name or Path(weights).stem
+        model_description = model_description or f'imported stable diffusion weights file {model_name}'
         new_config = dict(
             weights=str(weights_path),
             config=str(config_path),
-            description=description,
+            description=model_description,
             format='ckpt',
             width=512,
             height=512
@@ -668,7 +670,7 @@ class ModelManager(object):
         '''
         yaml_str = OmegaConf.to_yaml(self.config)
         if not os.path.isabs(config_file_path):
-            config_file_path = os.path.normpath(os.path.join(Globals.root,opt.conf))
+            config_file_path = os.path.normpath(os.path.join(Globals.root,config_file_path))
         tmpfile = os.path.join(os.path.dirname(config_file_path),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
             outfile.write(self.preamble())
