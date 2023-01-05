@@ -16,6 +16,7 @@ import textwrap
 import time
 import traceback
 import warnings
+import shutil
 from pathlib import Path
 from typing import Union, Any
 from ldm.util import download_with_progress_bar
@@ -156,6 +157,7 @@ class ModelManager(object):
         Return a dict of models in the format:
         { model_name1: {'status': ('active'|'cached'|'not loaded'),
                         'description': description,
+                        'format': ('ckpt'|'diffusers'|'vae'),
                        },
           model_name2: { etc }
         Please use model_manager.models() to get all the model names,
@@ -184,7 +186,7 @@ class ModelManager(object):
         for name in models:
             if models[name]['format'] == 'vae':
                 continue
-            line = f'{name:25s} {models[name]["status"]:>10s}  {models[name]["description"]}'
+            line = f'{name:25s} {models[name]["status"]:>10s}  {models[name]["format"]:10s} {models[name]["description"]}'
             if models[name]['status'] == 'active':
                 line = f'\033[1m{line}\033[0m'
             print(line)
@@ -577,7 +579,13 @@ class ModelManager(object):
             self.convert_and_import(ckpt, ckpt_files[ckpt])
         self.commit(conf_path)
 
-    def convert_and_import(self, ckpt_path:Path, diffuser_path:Path)->dict:
+    def convert_and_import(self,
+                           ckpt_path:Path,
+                           diffuser_path:Path,
+                           model_name=None,
+                           model_description=None,
+                           commit_to_conf:Path=None,
+    )->dict:
         '''
         Convert a legacy ckpt weights file to diffuser model and import
         into models.yaml.
@@ -589,25 +597,30 @@ class ModelManager(object):
             print(f'ERROR: The path {str(diffuser_path)} already exists. Please move or remove it and try again.')
             return
 
-        print(f'>> {ckpt_path.name}: optimizing (30-60s).')
+        model_name = model_name or diffuser_path.name
+        model_description = model_description or 'Optimized version of {model_name}'
+        print(f'>> {model_name}: optimizing (30-60s).')
         try:
-            model_name = diffuser_path.name
             verbosity =transformers.logging.get_verbosity()
             transformers.logging.set_verbosity_error()
-            convert_ckpt_to_diffuser(ckpt_path, diffuser_path)
+            convert_ckpt_to_diffuser(ckpt_path, diffuser_path,extract_ema=True)
             transformers.logging.set_verbosity(verbosity)
             print(f'>> Success. Optimized model is now located at {str(diffuser_path)}')
             print(f'>> Writing new config file entry for {model_name}...',end='')
             new_config = dict(
                 path=str(diffuser_path),
-                description=f'Optimized version of {model_name}',
+                description=model_description,
                 format='diffusers',
             )
+            self.del_model(model_name)
             self.add_model(model_name, new_config, True)
-            print('done.')
+            if commit_to_conf:
+                self.commit(commit_to_conf)
         except Exception as e:
             print(f'** Conversion failed: {str(e)}')
             traceback.print_exc()
+            
+        print('done.')
         return new_config
 
     def del_config(self, model_name:str, gen, opt, completer):

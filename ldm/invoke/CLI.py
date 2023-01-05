@@ -168,7 +168,7 @@ def main_loop(gen, opt):
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
-    completer   = get_completer(opt, models=list(model_config.keys()))
+    completer   = get_completer(opt, models=gen.model_manager.list_models())
     set_default_output_dir(opt, completer)
     add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length()+1
@@ -474,9 +474,9 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
     elif command.startswith('!optimize'):
         path = shlex.split(command)
         if len(path) < 2:
-            print('** please provide a path to a .ckpt file')
-        elif not os.path.exists(path[1]):
-            print(f'** {path[1]}: file not found')
+            print('** please provide an installed model name')
+        elif not path[1] in gen.model_manager.list_models():
+            print(f'** {path[1]}: model not found')
         else:
             optimize_model(path[1], gen, opt, completer)
         completer.add_history(command)
@@ -600,18 +600,41 @@ def add_weights_to_config(model_path:str, gen, opt, completer):
     make_default = input('Make this the default model? [n] ') in ('y','Y')
 
     if write_config_file(opt.conf, gen, model_name, new_config, make_default=make_default):
-        completer.add_model(model_name)
+        completer.models(gen.model_manager.list_models())
 
-def optimize_model(ckpt_path:str, gen, opt, completer):
-    ckpt_path = Path(ckpt_path)
+def optimize_model(model_name:str, gen, opt, completer):
+    manager = gen.model_manager
+    if not (model_info := manager.model_info(model_name)):
+        print(f'** unknown model: {model_name}')
+        return
+    ckpt_path = Path(model_info['weights'])
+    if not ckpt_path.is_absolute():
+        ckpt_path = Path(Globals.root,ckpt_path)
+
     basename = ckpt_path.stem
     diffuser_path = Path(Globals.root, 'models','optimized-ckpts',basename)
     if diffuser_path.exists():
-        print(f'** {basename} is already optimized. Will not overwrite.')
+        print(f'** {model_name} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
-    new_config = gen.model_manager.convert_and_import(ckpt_path, diffuser_path)
-    if new_config and write_config_file(opt.conf, gen, basename, new_config, clobber=False):
-        completer.add_model(basename)
+     
+    new_config = gen.model_manager.convert_and_import(
+        ckpt_path,
+        diffuser_path,
+        model_name=model_name,
+        model_description=model_info['description'],
+        commit_to_conf=opt.conf,
+    )
+    if not new_config:
+        return
+
+    response = input(f'OK to delete original .ckpt file at ({ckpt_path} ? [n] ')
+    if response.startswith(('y','Y')):
+        ckpt_path.unlink(missing_ok=True)
+        print(f'{ckpt_path} deleted')
+
+    completer.update_models(gen.model_manager.list_models())
+    if input(f'Load optimized model {model_name}? [y] ') not in ('n','N'):
+        gen.set_model(model_name)
 
 def del_config(model_name:str, gen, opt, completer):
     current_model = gen.model_name
@@ -621,7 +644,7 @@ def del_config(model_name:str, gen, opt, completer):
     gen.model_manager.del_model(model_name)
     gen.model_manager.commit(opt.conf)
     print(f'** {model_name} deleted')
-    completer.del_model(model_name)
+    completer.update_models(gen.model_manager.list_models())
 
 def edit_config(model_name:str, gen, opt, completer):
     config = gen.model_manager.config
@@ -643,15 +666,15 @@ def edit_config(model_name:str, gen, opt, completer):
     completer.complete_extensions(None)
     write_config_file(opt.conf, gen, model_name, new_config, clobber=True, make_default=make_default)
 
-def write_config_file(conf_path, gen, model_name, new_config, clobber=False, make_default=False):
+def write_config_file(conf_path, gen, model_name, new_config, clobber=False, make_default=False)->bool:
     current_model = gen.model_name
 
-    op = 'modify' if clobber else 'import'
+    op = 'write' if clobber else 'import'
     print('\n>> New configuration:')
     if make_default:
         new_config['default'] = True
     print(yaml.dump({model_name:new_config}))
-    if input(f'OK to {op} [n]? ') not in ('y','Y'):
+    if input(f'OK to {op} [y]? ').startswith(('n','N')):
         return False
 
     try:
@@ -672,7 +695,6 @@ def write_config_file(conf_path, gen, model_name, new_config, clobber=False, mak
         gen.model_manager.set_default_model(model_name)
 
     gen.model_manager.commit(conf_path)
-
     do_switch = input(f'Keep model loaded? [y]')
     if len(do_switch)==0 or do_switch[0] in ('y','Y'):
         pass
