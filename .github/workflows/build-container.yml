@@ -37,7 +37,6 @@ jobs:
           DOCKERHUB_TOKEN: '${{ secrets.DOCKERHUB_TOKEN }}'
         run: |
           echo "DOCKERHUB_TOKEN_AVAILABLE=${{ env.DOCKERHUB_TOKEN != '' }}" >> $GITHUB_ENV
-          [[ -n $DOCKERHUB_TOKEN ]] && echo "DOCKERHUB_IMAGE='docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ github.repository }}-${{ matrix.flavor }}'" >> $GITHUB_ENV
 
       - name: Docker meta
         id: meta
@@ -45,7 +44,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository }}-${{ matrix.flavor }}
-            ${{ env.DOCKERHUB_IMAGE }}
+            ${{ env.DOCKERHUB_TOKEN_AVAILABLE == 'true' && docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ github.repository }}-${{ matrix.flavor }} }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
