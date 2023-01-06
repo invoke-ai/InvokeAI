@@ -589,7 +589,7 @@ def import_model(model_path:str, gen, opt, completer):
 
 def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
     manager = gen.model_manager
-    default_name = Path(path_or_url).stem
+    default_name = Path(path_or_repo).stem
     default_description = f'Imported model {default_name}'
     model_name, model_description = _get_model_name_and_desc(
         manager,

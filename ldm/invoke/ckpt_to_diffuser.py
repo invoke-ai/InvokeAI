@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 # Adapted for use as a module by Lincoln Stein <lstein@gmail.com>
+# Original file at: https://github.com/huggingface/diffusers/blob/main/scripts/convert_ldm_original_checkpoint_to_diffusers.py
 """ Conversion script for the LDM checkpoints. """
 
 import os
