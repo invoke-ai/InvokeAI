@@ -204,7 +204,12 @@ class Generate:
 
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
-        self.model_name  = model or self.model_manager.default_model() or FALLBACK_MODEL_NAME
+        # don't accept invalid models
+        fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME        
+        if not self.model_manager.valid_model(model):
+            print(f'** "{model}" is not a known model name; falling back to {fallback}.')
+            model = None
+        self.model_name  = model or fallback
 
         # for VRAM usage statistics
         self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None
@@ -804,7 +809,7 @@ class Generate:
         '''
         preload model identified in self.model_name
         '''
-        self.set_model(self.model_name)
+        return self.set_model(self.model_name)
 
     def set_model(self,model_name):
         """
@@ -817,7 +822,7 @@ class Generate:
         # the model cache does the loading and offloading
         cache = self.model_manager
         if not cache.valid_model(model_name):
-            print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
+            print(f'** "{model_name}" is not a known model name. Cannot change.')
             return self.model
 
         cache.print_vram_usage()

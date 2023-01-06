@@ -13,6 +13,7 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from pathlib import Path
+from argparse import Namespace
 import pyparsing
 import ldm.invoke
 
@@ -107,9 +108,8 @@ def main():
             safety_checker=opt.safety_checker,
             max_loaded_models=opt.max_loaded_models,
             )
-    except (FileNotFoundError, TypeError, AssertionError):
-        emergency_model_reconfigure(opt)
-        sys.exit(-1)
+    except (FileNotFoundError, TypeError, AssertionError) as e:
+        report_model_error(opt,e)
     except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
         sys.exit(-1)
@@ -120,9 +120,8 @@ def main():
     # preload the model
     try:
         gen.load_model()
-    except AssertionError:
-        emergency_model_reconfigure(opt)
-        sys.exit(-1)
+    except AssertionError as e:
+        report_model_error(opt, e)
 
     # try to autoconvert new models
     # autoimport new .ckpt files
@@ -164,7 +163,8 @@ def main_loop(gen, opt):
     # changing the history file midstream when the output directory is changed.
     completer   = get_completer(opt, models=gen.model_manager.list_models())
     set_default_output_dir(opt, completer)
-    add_embedding_terms(gen, completer)
+    if gen.model:
+        add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length()+1
 
     # os.pathconf is not available on Windows
@@ -180,7 +180,7 @@ def main_loop(gen, opt):
         operation = 'generate'
 
         try:
-            command = get_next_command(infile)
+            command = get_next_command(infile, gen.model_name)
         except EOFError:
             done = infile is None or doneAfterInFile
             infile = None
@@ -897,9 +897,9 @@ def choose_postprocess_name(opt,prefix,seed) -> str:
         counter += 1
     return filename
 
-def get_next_command(infile=None) -> str:  # command string
+def get_next_command(infile=None, model_name='no model') -> str:  # command string
     if infile is None:
-        command = input('invoke> ')
+        command = input(f'({model_name}) invoke> ')
     else:
         command = infile.readline()
         if not command:
@@ -1054,13 +1054,15 @@ def write_commands(opt, file_path:str, outfilepath:str):
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
 
-def emergency_model_reconfigure(opt):
-    print()
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-    print('   You appear to have a missing or misconfigured model file(s).                   ')
-    print('   The script will now exit and run configure_invokeai.py to help fix the problem.')
-    print('   After reconfiguration is done, please relaunch invoke.py.                      ')
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+def report_model_error(opt:Namespace, e:Exception):
+    print('**   An error occurred while attempting to initialize the model.  **')
+    print(f'**   The error was: {str(e)}                                      **')
+    print('**   This can be caused by a missing or corrupted models file,    **')
+    print('**   and can sometimes be fixed by (re)installing the models.     **')
+    response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [Yn] ')
+    if response.startswith(('n','N')):
+        return
+
     print('configure_invokeai is launching....\n')
 
     # Match arguments that were set on the CLI
