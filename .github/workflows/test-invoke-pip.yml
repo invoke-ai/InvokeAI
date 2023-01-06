@@ -76,13 +76,13 @@ jobs:
           mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
           cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
 
-      - name: Use Cached Stable Diffusion Model
+      - name: Use Cached diffusers-1.5
         id: cache-sd-model
         uses: actions/cache@v3
         env:
           cache-name: huggingface-${{ matrix.stable-diffusion-model }}
         with:
-          path: ~/.cache/huggingface
+          path: ${{ env.INVOKEAI_ROOT }}/models/runwayml/stable-diffusion-v1-5
           key: ${{ env.cache-name }}
 
       - name: set test prompt to main branch validation
@@ -119,7 +119,7 @@ jobs:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
         run: >
           python3 scripts/configure_invokeai.py
-          --skip-sd-weights --yes
+          --yes
           --full-precision  # can't use fp16 weights without a GPU
 
       - name: Run the tests
