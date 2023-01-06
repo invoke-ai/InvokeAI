@@ -16,8 +16,7 @@ import textwrap
 import time
 import traceback
 import warnings
-import shutil
-from safetensors.torch import load_file
+import safetensors.torch
 from pathlib import Path
 from typing import Union, Any
 from ldm.util import download_with_progress_bar
@@ -213,7 +212,7 @@ class ModelManager(object):
         attributes are incorrect or the model name is missing.
         '''
         omega = self.config
-        assert 'format' in model_attributes, f'missing required field "format"'
+        assert 'format' in model_attributes, 'missing required field "format"'
         if model_attributes['format']=='diffusers':
             assert 'description' in model_attributes, 'required field "description" is missing'
             assert 'path' in model_attributes or 'repo_id' in model_attributes,'model must have either the "path" or "repo_id" fields defined'
@@ -262,7 +261,7 @@ class ModelManager(object):
 
         # usage statistics
         toc = time.time()
-        print(f'>> Model loaded in', '%4.2fs' % (toc - tic))
+        print('>> Model loaded in', '%4.2fs' % (toc - tic))
         if self._has_cuda():
             print(
                 '>> Max VRAM used to load the model:',
@@ -312,7 +311,7 @@ class ModelManager(object):
         if 'state_dict' in sd:
             sd = sd['state_dict']
 
-        print(f'   | Forcing garbage collection prior to loading new model')
+        print('   | Forcing garbage collection prior to loading new model')
         gc.collect()
         model = instantiate_from_config(omega_config.model)
         model.load_state_dict(sd, strict=False)
@@ -347,7 +346,7 @@ class ModelManager(object):
 
         # usage statistics
         toc = time.time()
-        print(f'>> Model loaded in', '%4.2fs' % (toc - tic))
+        print('>> Model loaded in', '%4.2fs' % (toc - tic))
 
         if self._has_cuda():
             print(
@@ -366,9 +365,9 @@ class ModelManager(object):
 
         print(f'>> Loading diffusers model from {name_or_path}')
         if using_fp16:
-            print(f'  | Using faster float16 precision')
+            print('  | Using faster float16 precision')
         else:
-            print(f'  | Using more accurate float32 precision')
+            print('  | Using more accurate float32 precision')
 
         # TODO: scan weights maybe?
         pipeline_args: dict[str, Any] = dict(
@@ -782,7 +781,7 @@ class ModelManager(object):
                 hash = f.read()
             return hash
 
-        print(f'>> Calculating sha256 hash of weights file')
+        print('>> Calculating sha256 hash of weights file')
         tic = time.time()
         sha = hashlib.sha256()
         sha.update(data)
@@ -809,7 +808,7 @@ class ModelManager(object):
             vae_args.update(torch_dtype=torch.float16)
             fp_args_list = [{'revision':'fp16'},{}]
         else:
-            print(f'  | Using more accurate float32 precision')
+            print('  | Using more accurate float32 precision')
             fp_args_list = [{}]
 
         vae = None
@@ -826,7 +825,7 @@ class ModelManager(object):
                 vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args, **fp_args)
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print(f'  | Half-precision version of model not available; fetching full-precision instead')
+                    print('  | Half-precision version of model not available; fetching full-precision instead')
                 else:
                     deferred_error = e
             if vae:

@@ -2,11 +2,7 @@ import os
 import re
 import sys
 import shlex
-import copy
-import warnings
-import time
 import traceback
-import yaml
 
 from ldm.invoke.globals import Globals
 from ldm.generate import Generate
@@ -16,7 +12,6 @@ from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_f
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
-from omegaconf import OmegaConf
 from pathlib import Path
 import pyparsing
 import ldm.invoke
@@ -53,8 +48,8 @@ def main():
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
             print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
-            print(f'** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
-            print(f'** This script will now exit.')
+            print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
+            print('** This script will now exit.')
             sys.exit(-1)
 
     print(f'>> {ldm.invoke.__app_name__} {ldm.invoke.__version__}')
@@ -163,7 +158,6 @@ def main_loop(gen, opt):
     doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
-    model_config = OmegaConf.load(opt.conf)
 
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
@@ -576,7 +570,7 @@ def import_model(model_path:str, gen, opt, completer):
         return
         
     if not _verify_load(model_name, gen):
-        print(f'** model failed to load. Discarding configuration entry')
+        print('** model failed to load. Discarding configuration entry')
         gen.model_manager.del_model(model_name)
         return
     
@@ -602,7 +596,7 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
             path_or_repo,
             model_name = model_name,
             description = model_description):
-        print(f'** model failed to import')
+        print('** model failed to import')
         return None
     return model_name
 
@@ -632,7 +626,7 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
             model_name = model_name,
             model_description = model_description
     ):
-        print(f'** model failed to import')
+        print('** model failed to import')
         return None
 
     return model_name
@@ -642,7 +636,7 @@ def _verify_load(model_name:str, gen)->bool:
     current_model = gen.model_name
     if not gen.model_manager.get_model(model_name):
         return False
-    do_switch = input(f'Keep model loaded? [y] ')
+    do_switch = input('Keep model loaded? [y] ')
     if len(do_switch)==0 or do_switch[0] in ('y','Y'):
         gen.set_model(model_name)
     else:
@@ -666,7 +660,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
             model_name = model_name_or_path
             model_description = model_info['description']
         else:
-            printf('** {model_name_or_path} is not a legacy .ckpt weights file')
+            print(f'** {model_name_or_path} is not a legacy .ckpt weights file')
             return
     elif os.path.exists(model_name_or_path):
         ckpt_path = Path(model_name_or_path)
@@ -867,7 +861,7 @@ def prepare_image_metadata(
         except KeyError as e:
             print(f'** The filename format contains an unknown key \'{e.args[0]}\'. Will use \'{{prefix}}.{{seed}}.png\' instead')
             filename = f'{prefix}.{seed}.png'
-        except IndexError as e:
+        except IndexError:
             print(f'** The filename format is broken or complete. Will use \'{{prefix}}.{{seed}}.png\' instead')
             filename = f'{prefix}.{seed}.png'
 

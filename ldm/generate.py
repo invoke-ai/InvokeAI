@@ -545,7 +545,7 @@ class Generate:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
-        except RuntimeError as e:
+        except RuntimeError:
             print(traceback.format_exc(), file=sys.stderr)
             print('>> Could not generate image.')
 
@@ -557,7 +557,7 @@ class Generate:
         )
         if self._has_cuda():
             print(
-                f'>>   Max VRAM used for this generation:',
+                '>>   Max VRAM used for this generation:',
                 '%4.2fG.' % (torch.cuda.max_memory_allocated() / 1e9),
                 'Current VRAM utilization:',
                 '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
@@ -567,7 +567,7 @@ class Generate:
                 self.session_peakmem, torch.cuda.max_memory_allocated()
             )
             print(
-                f'>>   Max VRAM used since script start: ',
+                '>>   Max VRAM used since script start: ',
                 '%4.2fG' % (self.session_peakmem / 1e9),
             )
         return results
@@ -643,7 +643,7 @@ class Generate:
                 try:
                     extend_instructions[direction]=int(pixels)
                 except ValueError:
-                    print(f'** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
+                    print('** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
 
             opt.seed = seed
             opt.prompt = prompt
@@ -691,7 +691,7 @@ class Generate:
             )
 
         elif tool is None:
-            print(f'* please provide at least one postprocessing option, such as -G or -U')
+            print('* please provide at least one postprocessing option, such as -G or -U')
             return None
         else:
             print(f'* postprocessing tool {tool} is not yet supported')
