@@ -119,6 +119,7 @@ jobs:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
         run: >
           python3 scripts/configure_invokeai.py
+          --skip-sd-weights
           --yes
           --full-precision  # can't use fp16 weights without a GPU
 
