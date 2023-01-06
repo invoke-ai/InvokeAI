@@ -5,10 +5,9 @@
 # two machines must share a common .cache directory.
 #
 # Coauthor: Kevin Turner http://github.com/keturn
-#
-print('Loading Python libraries...\n')
+
+import zipfile
 import argparse
-import configs
 import sys
 import os
 import io
@@ -16,37 +15,45 @@ import re
 import warnings
 import shutil
 from urllib import request
-from tqdm import tqdm
-from omegaconf import OmegaConf
-from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login
 from typing import Union
-from getpass_asterisk import getpass_asterisk
-from transformers import CLIPTokenizer, CLIPTextModel
-from ldm.invoke.globals import Globals
-from ldm.invoke.readline import generic_completer
-
 import traceback
 import requests
 import transformers
-import warnings
-warnings.filterwarnings('ignore')
+from tqdm import tqdm
+from omegaconf import OmegaConf
+from huggingface_hub.utils._hf_folder import HfFolder
+from huggingface_hub.file_download import hf_hub_url
+from huggingface_hub._login import login as hf_hub_login
+from getpass_asterisk import getpass_asterisk
+from transformers import CLIPTokenizer, CLIPTextModel
 import torch
+from ldm.invoke.globals import Globals
+from ldm.invoke.readline import generic_completer
+
+import configs
+warnings.filterwarnings('ignore')
 transformers.logging.set_verbosity_error()
 
 #--------------------------globals-----------------------
-Model_dir = 'models'
-Weights_dir = 'ldm/stable-diffusion-v1/'
-Dataset_path = './configs/INITIAL_MODELS.yaml'
-Default_config_file = './configs/models.yaml'
-SD_Configs = './configs/stable-diffusion'
+MODEL_DIR = 'models'
+WEIGHTS_DIR = 'ldm/stable-diffusion-v1/'
+DATASET_SUBPATH = './configs/INITIAL_MODELS.yaml'
+DEFAULT_CONFIG_FILE = './configs/models.yaml'
+SD_CONFIGS = './configs/stable-diffusion'
 
-if not os.path.exists(os.path.abspath(os.path.join(Globals.root, Dataset_path))):
-    Dataset_path = os.path.abspath(os.path.join(configs.__path__[0],'..',Dataset_path))
+if os.path.exists(os.path.abspath(os.path.join(Globals.root, DATASET_SUBPATH))):
+    DATASET_PATH = os.path.abspath(
+        os.path.join(Globals.root, DATASET_SUBPATH)
+    )
+else:
+    DATASET_PATH = os.path.abspath(
+        os.path.join(configs.__path__[0],'..',DATASET_SUBPATH)
+    )
 
-Datasets = OmegaConf.load(Dataset_path)
+Datasets = OmegaConf.load(DATASET_PATH)
 completer = generic_completer(['yes','no'])
 
-Config_preamble = '''# This file describes the alternative machine learning models
+CONFIG_PREAMBLE = '''# This file describes the alternative machine learning models
 # available to InvokeAI script.
 #
 # To add a new model, follow the examples below. Each
@@ -80,9 +87,11 @@ If you installed manually, activate the 'invokeai' environment
 commands to start InvokeAI.
 
 Web UI:
-    python scripts/invoke.py --web # (connect to http://localhost:9090)
+    execute `invoke --web` # (connect to http://localhost:9090)
 Command-line interface:
-   python scripts/invoke.py
+    execute `invoke`
+configuration script:
+    execute `configure_invokeai`
 
 Have fun!
 '''
@@ -98,7 +107,7 @@ Have fun!
 #---------------------------------------------
 def yes_or_no(prompt:str, default_yes=True):
     completer.set_options(['yes','no'])
-    completer.complete_extensions(None)  # turn off path-completion mode
+    completer.complete_extensions([])  # turn off path-completion mode
     default = "y" if default_yes else 'n'
     response = input(f'{prompt} [{default}] ') or default
     if default_yes:
@@ -121,10 +130,12 @@ completely skip this step.
 '''
     )
     completer.set_options(['recommended','customized','skip'])
-    completer.complete_extensions(None)  # turn off path-completion mode
+    completer.complete_extensions([])  # turn off path-completion mode
     selection = None
     while selection is None:
-        choice = input('Download <r>ecommended models, <a>ll models, <c>ustomized list, or <s>kip this step? [r]: ')
+        choice = input(
+            'Download <r>ecommended models, <a>ll models, <c>ustomized list, or <s>kip this step? [r]: '
+        )
         if choice.startswith(('r','R')) or len(choice)==0:
             selection = 'recommended'
         elif choice.startswith(('c','C')):
@@ -141,7 +152,7 @@ def select_datasets(action:str):
     while not done:
         datasets = dict()
         dflt = None   # the first model selected will be the default; TODO let user change
-        counter = 1
+        counter = int(1)
 
         if action == 'customized':
             print('''
@@ -170,12 +181,11 @@ will be given the option to view and change your selections.
         if not ok_to_download:
             if yes_or_no('Change your selection?'):
                 action = 'customized'
-                pass
             else:
-                done = True
+                done = bool(True)
         else:
-            done = True
-    return datasets if ok_to_download else None
+            done = bool(True)
+    return datasets if ok_to_download is True else None
 
 #---------------------------------------------
 def recommended_datasets()->dict:
@@ -212,7 +222,7 @@ def HfLogin(access_token) -> str:
 #-------------------------------Authenticate against Hugging Face
 def authenticate(yes_to_all=False):
     print('** LICENSE AGREEMENT FOR WEIGHT FILES **')
-    print("=" * shutil.get_terminal_size()[0])
+    print("–" * shutil.get_terminal_size()[0])
     print('''
 By downloading the Stable Diffusion weight files from the official Hugging Face
 repository, you agree to have read and accepted the CreativeML Responsible AI License.
@@ -221,10 +231,10 @@ The license terms are located here:
    https://huggingface.co/spaces/CompVis/stable-diffusion-license
 
 ''')
-    print("=" * shutil.get_terminal_size()[0])
+    print("–" * shutil.get_terminal_size()[0])
 
     if not yes_to_all:
-        accepted = False
+        accepted = bool(False)
         while not accepted:
             accepted = yes_or_no('Accept the above License terms?')
             if not accepted:
@@ -237,7 +247,7 @@ The license terms are located here:
     # Authenticate to Huggingface using environment variables.
     # If successful, authentication will persist for either interactive or non-interactive use.
     # Default env var expected by HuggingFace is HUGGING_FACE_HUB_TOKEN.
-    print("=" * shutil.get_terminal_size()[0])
+    print("–" * shutil.get_terminal_size()[0])
     print('Authenticating to Huggingface')
     hf_envvars = [ "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN" ]
     if not (access_token := HfFolder.get_token()):
@@ -273,7 +283,7 @@ You may re-run the configuration script again in the future if you do not wish t
         again = True
         while again:
             try:
-                access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ⮞ ")
+                access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token 🔑 ")
                 HfLogin(access_token)
                 access_token = HfFolder.get_token()
                 again = False
@@ -294,7 +304,7 @@ You may re-run the configuration script again in the future if you do not wish t
         print()
         print(f"Re-run the configuration script without '--yes' to set the HuggingFace token interactively, or use one of the environment variables: {', '.join(hf_envvars)}")
 
-    print("=" * shutil.get_terminal_size()[0])
+    print("–" * shutil.get_terminal_size()[0])
 
     return access_token
 
@@ -302,7 +312,7 @@ You may re-run the configuration script again in the future if you do not wish t
 # look for legacy model.ckpt in models directory and offer to
 # normalize its name
 def migrate_models_ckpt():
-    model_path = os.path.join(Globals.root,Model_dir,Weights_dir)
+    model_path = os.path.join(Globals.root,MODEL_DIR,WEIGHTS_DIR)
     if not os.path.exists(os.path.join(model_path,'model.ckpt')):
         return
     new_name = Datasets['stable-diffusion-1.4']['file']
@@ -319,7 +329,7 @@ def download_weight_datasets(models:dict, access_token:str):
     for mod in models.keys():
         repo_id = Datasets[mod]['repo_id']
         filename = Datasets[mod]['file']
-        dest = os.path.join(Globals.root,Model_dir,Weights_dir)
+        dest = os.path.join(Globals.root,MODEL_DIR,WEIGHTS_DIR)
         success = hf_download_with_resume(
             repo_id=repo_id,
             model_dir=dest,
@@ -407,7 +417,7 @@ def download_with_progress_bar(model_url:str, model_dest:str, label:str='the'):
 
 #---------------------------------------------
 def update_config_file(successfully_downloaded:dict,opt:dict):
-    config_file = opt.config_file or Default_config_file
+    config_file = opt.config_file or DEFAULT_CONFIG_FILE
     config_file = os.path.normpath(os.path.join(Globals.root,config_file))
 
     yaml = new_config_file_contents(successfully_downloaded,config_file)
@@ -418,7 +428,7 @@ def update_config_file(successfully_downloaded:dict,opt:dict):
             os.replace(config_file,f'{config_file}.orig')
         tmpfile = os.path.join(os.path.dirname(config_file),'new_config.tmp')
         with open(tmpfile, 'w') as outfile:
-            outfile.write(Config_preamble)
+            outfile.write(CONFIG_PREAMBLE)
             outfile.write(yaml)
         os.replace(tmpfile,config_file)
 
@@ -441,10 +451,10 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
     default_selected = False
 
     for model in successfully_downloaded:
-        a = Datasets[model]['config'].split('/')
-        if a[0] != 'VAE':
+        dataset = Datasets[model]['config'].split('/')
+        if dataset[0] != 'VAE':
             continue
-        vae_target = a[1] if len(a)>1 else 'default'
+        vae_target = dataset[1] if len(dataset)>1 else 'default'
         vaes[vae_target] = Datasets[model]['file']
 
     for model in successfully_downloaded:
@@ -453,17 +463,17 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
         stanza = conf[model] if model in conf else { }
 
         stanza['description'] = Datasets[model]['description']
-        stanza['weights'] = os.path.join(Model_dir,Weights_dir,Datasets[model]['file'])
-        stanza['config'] = os.path.normpath(os.path.join(SD_Configs, Datasets[model]['config']))
+        stanza['weights'] = os.path.join(MODEL_DIR,WEIGHTS_DIR,Datasets[model]['file'])
+        stanza['config'] = os.path.normpath(os.path.join(SD_CONFIGS, Datasets[model]['config']))
         stanza['width'] = Datasets[model]['width']
         stanza['height'] = Datasets[model]['height']
         stanza.pop('default',None)  # this will be set later
         if vaes:
             for target in vaes:
                 if re.search(target, model, flags=re.IGNORECASE):
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes[target]))
+                    stanza['vae'] = os.path.normpath(os.path.join(MODEL_DIR,WEIGHTS_DIR,vaes[target]))
                 else:
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes['default']))
+                    stanza['vae'] = os.path.normpath(os.path.join(MODEL_DIR,WEIGHTS_DIR,vaes['default']))
         # BUG - the first stanza is always the default. User should select.
         if not default_selected:
             stanza['default'] = True
@@ -485,7 +495,7 @@ def download_bert():
 def download_from_hf(model_class:object, model_name:str):
     print('',file=sys.stderr)  # to prevent tqdm from overwriting
     return model_class.from_pretrained(model_name,
-                                       cache_dir=os.path.join(Globals.root,Model_dir,model_name),
+                                       cache_dir=os.path.join(Globals.root,MODEL_DIR,model_name),
                                        resume_download=True
     )
 
@@ -535,7 +545,6 @@ def download_codeformer():
 #---------------------------------------------
 def download_clipseg():
     print('Installing clipseg model for text-based masking...',end='', file=sys.stderr)
-    import zipfile
     try:
         model_url = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
         model_dest = os.path.join(Globals.root,'models/clipseg/clipseg_weights')
@@ -546,8 +555,8 @@ def download_clipseg():
         if not os.path.exists(f'{model_dest}/rd64-uni-refined.pth'):
             dest = os.path.join(Globals.root,weights_zip)
             request.urlretrieve(model_url,dest)
-            with zipfile.ZipFile(dest,'r') as zip:
-                zip.extractall(os.path.join(Globals.root,'models/clipseg'))
+            with zipfile.ZipFile(dest,'r') as model_zip:
+                model_zip.extractall(os.path.join(Globals.root,'models/clipseg'))
             os.remove(dest)
 
             from clipseg.models.clipseg import CLIPDensePredT
@@ -603,8 +612,8 @@ def download_weights(opt:dict) -> Union[str, None]:
         models = select_datasets(choice)
         if models is None and yes_or_no('Quit?',default_yes=False):
             sys.exit(0)
-        else:  # 'skip'
-            return
+    else:  # 'skip'
+        return
 
 
     access_token = authenticate()
@@ -773,7 +782,7 @@ def main():
 
         if not opt.interactive:
             print("WARNING: The --(no)-interactive argument is deprecated and will be removed. Use --skip-sd-weights.")
-            opt.skip_sd_weights=True
+            opt.skip_sd_weights=bool(True)
         if opt.skip_sd_weights:
             print('** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **')
         else:
