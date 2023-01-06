@@ -469,6 +469,18 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         completer.add_history(command)
         operation = None
 
+    elif command.startswith('!convert'):
+        path = shlex.split(command)
+        if len(path) < 2:
+            print('** please provide the path to a .ckpt or .safetensors model')
+        elif not os.path.exists(path[1]):
+            print(f'** {path[1]}: model not found')
+        else:
+            optimize_model(path[1], gen, opt, completer)
+        completer.add_history(command)
+        operation = None
+        
+
     elif command.startswith('!optimize'):
         path = shlex.split(command)
         if len(path) < 2:
@@ -553,7 +565,7 @@ def import_model(model_path:str, gen, opt, completer):
     '''
     model_name = None
     
-    if model_path.startswith('http') or os.path.exists(model_path):
+    if model_path.startswith(('http:','https:','ftp:')) or os.path.exists(model_path):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif re.match('^[\w-]+/[\w-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
@@ -577,7 +589,14 @@ def import_model(model_path:str, gen, opt, completer):
 
 def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
     manager = gen.model_manager
-    model_name, model_description = _get_model_name_and_desc(manager)
+    default_name = Path(path_or_url).stem
+    default_description = f'Imported model {default_name}'
+    model_name, model_description = _get_model_name_and_desc(
+        manager,
+        completer,
+        model_name=default_name,
+        model_description=default_description
+    )
 
     if not manager.import_diffuser_model(
             path_or_repo,
@@ -589,7 +608,14 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
 
 def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
     manager = gen.model_manager
-    model_name, model_description = _get_model_name_and_desc(manager)
+    default_name = Path(path_or_url).stem
+    default_description = f'Imported model {default_name}'
+    model_name, model_description = _get_model_name_and_desc(
+        manager,
+        completer,
+        model_name=default_name,
+        model_description=default_description
+    )
     config_file = None
 
     completer.complete_extensions(('.yaml','.yml'))
@@ -617,51 +643,56 @@ def _verify_load(model_name:str, gen)->bool:
     if not gen.model_manager.get_model(model_name):
         return False
     do_switch = input(f'Keep model loaded? [y] ')
-    if len(do_switch)>0 and do_switch[0] not in ('y','Y'):
+    if len(do_switch)==0 or do_switch[0] in ('y','Y'):
         gen.set_model(model_name)
     else:
         print('>> Restoring previous model')
         gen.set_model(current_model)
     return True
 
-def _get_model_name_and_desc(model_manager):
-    model_name = None
-    model_description = None
-    existing_models = model_manager.list_models()
-
-    done = False
-    while not done:
-        model_name = input('Short name for this model: ')
-        if not re.match('^[\w._-]+$',model_name):
-            print('** model name must contain only words, digits and the characters [._-] **')
-        elif model_name in existing_models:
-            print(f'** the name {model_name} is already in use. Pick another.')
-        else:
-            done = True
-    model_description = input('Description for this model: ')
-   
+def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_description:str=''):
+    model_name = _get_model_name(model_manager.list_models(),completer,model_name)
+    completer.linebuffer = model_description
+    model_description = input(f'Description for this model [{model_description}]: ') or model_description
     return model_name, model_description
 
-def optimize_model(model_name:str, gen, opt, completer):
+def optimize_model(model_name_or_path:str, gen, opt, completer):
     manager = gen.model_manager
-    if not (model_info := manager.model_info(model_name)):
-        print(f'** unknown model: {model_name}')
+    ckpt_path = None
+
+    if (model_info := manager.model_info(model_name_or_path)):
+        if 'weights' in model_info:
+            ckpt_path = Path(model_info['weights'])
+            model_name = model_name_or_path
+            model_description = model_info['description']
+        else:
+            printf('** {model_name_or_path} is not a legacy .ckpt weights file')
+            return
+    elif os.path.exists(model_name_or_path):
+        ckpt_path = Path(model_name_or_path)
+        model_name,model_description = _get_model_name_and_desc(
+            manager,
+            completer,
+            ckpt_path.stem,
+            f'Converted model {ckpt_path.stem}'
+        )
+    else:
+        print(f'** {model_name_or_path} is neither an existing model nor the path to a .ckpt file')
         return
-    ckpt_path = Path(model_info['weights'])
+    
     if not ckpt_path.is_absolute():
         ckpt_path = Path(Globals.root,ckpt_path)
 
-    basename = ckpt_path.stem
-    diffuser_path = Path(Globals.root, 'models','optimized-ckpts',basename)
+    diffuser_path = Path(Globals.root, 'models','optimized-ckpts',model_name)
     if diffuser_path.exists():
-        print(f'** {model_name} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
+        print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
      
     new_config = gen.model_manager.convert_and_import(
         ckpt_path,
         diffuser_path,
         model_name=model_name,
-        model_description=model_info['description'],
+        model_description=model_description,
         commit_to_conf=opt.conf,
     )
     if not new_config:
@@ -686,65 +717,46 @@ def del_config(model_name:str, gen, opt, completer):
     print(f'** {model_name} deleted')
     completer.update_models(gen.model_manager.list_models())
 
-
-# NOTE: edit_config() must be rewritten for diffusers
-# We should only allow user to change: name, description, default
 def edit_config(model_name:str, gen, opt, completer):
-    config = gen.model_manager.config
+    current_model = gen.model_name
+    if model_name == current_model:
+        print("** Can't edit the active model. !switch to another model first. **")
+        return
 
-    if model_name not in config:
+    manager = gen.model_manager
+    if not (info := manager.model_info(model_name)):
         print(f'** Unknown model {model_name}')
         return
 
     print(f'\n>> Editing model {model_name} from configuration file {opt.conf}')
+    new_name,new_description = _get_model_name_and_desc(gen.model_manager,
+                                                        completer,
+                                                        model_name=model_name,
+                                                        model_description=info['description']
+    )
+    info['description'] = new_description
+    if new_name != model_name:
+        manager.add_model(new_name,info)
+        manager.del_model(model_name)
+    manager.commit(opt.conf)
+    completer.update_models(manager.list_models())
+    print('>> Model successfully updated')
 
-    conf = config[model_name]
-    new_config = {}
-    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
-    for field in ('description', 'weights', 'vae', 'config', 'width', 'height', 'format'):
-        completer.linebuffer = str(conf[field]) if field in conf else ''
-        new_value = input(f'{field}: ')
-        new_config[field] = int(new_value) if field in ('width','height') else new_value
-    make_default = input('Make this the default model? [n] ') in ('y','Y')
-    completer.complete_extensions(None)
-    write_config_file(opt.conf, gen, model_name, new_config, clobber=True, make_default=make_default)
+def _get_model_name(existing_names,completer,default_name:str='')->str:
+    done = False
+    completer.linebuffer = default_name
+    while not done:
+        model_name = input(f'Short name for this model [{default_name}]: ')
+        if len(model_name)==0:
+            model_name = default_name
+        if not re.match('^[\w._-]+$',model_name):
+            print('** model name must contain only words, digits and the characters [._-] **')
+        elif model_name in existing_names:
+            print(f'** the name {model_name} is already in use. Pick another.')
+        else:
+            done = True
+    return model_name
 
-# NOTE: delete this whole function
-def write_config_file(conf_path, gen, model_name, new_config, clobber=False, make_default=False)->bool:
-    current_model = gen.model_name
-
-    op = 'write' if clobber else 'import'
-    print('\n>> New configuration:')
-    if make_default:
-        new_config['default'] = True
-    print(yaml.dump({model_name:new_config}))
-    if input(f'OK to {op} [y]? ').startswith(('n','N')):
-        return False
-
-    try:
-        print('>> Verifying that new model loads...')
-        gen.model_manager.add_model(model_name, new_config, clobber)
-        assert gen.set_model(model_name) is not None, 'model failed to load'
-    except AssertionError as e:
-        traceback.print_exc()
-        print(f'** aborting **')
-        try:
-            gen.model_manager.del_model(model_name)
-        except Exception:
-            pass
-        return False
-
-    if make_default:
-        print('making this default')
-        gen.model_manager.set_default_model(model_name)
-
-    gen.model_manager.commit(conf_path)
-    do_switch = input(f'Keep model loaded? [y] ')
-    if len(do_switch)==0 or do_switch[0] in ('y','Y'):
-        pass
-    else:
-        gen.set_model(current_model)
-    return True
 
 def do_textmask(gen, opt, callback):
     image_path = opt.prompt

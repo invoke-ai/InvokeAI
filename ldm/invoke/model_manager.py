@@ -693,7 +693,7 @@ class ModelManager(object):
 
     def _resolve_path(self, source:Union[str,Path], dest_directory:str)->Path:
         resolved_path = None
-        if source.startswith('http'):
+        if source.startswith(('http:','https:','ftp:')):
             basename = os.path.basename(source)
             if not os.path.isabs(dest_directory):
                 dest_directory = os.path.join(Globals.root,dest_directory)

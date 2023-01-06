@@ -745,8 +745,11 @@ class Args(object):
             *Model manipulation*
             !models                                   -- list models in configs/models.yaml
             !switch <model_name>                      -- switch to model named <model_name>
-            !import_model path/to/weights/file.ckpt   -- adds a .ckpt model to your config
-            !optimize_model path/to/weights/file.ckpt -- converts a .ckpt file model a diffusers model
+            !import_model /path/to/weights/file.ckpt  -- adds a .ckpt model to your config
+            !import_model http://path_to_model.ckpt   -- downloads and adds a .ckpt model to your config
+            !import_model hakurei/waifu-diffusion     -- downloads and adds a diffusers model to your config
+            !optimize_model <model_name>              -- converts a .ckpt model to a diffusers model
+            !convert_model /path/to/weights/file.ckpt -- converts a .ckpt file path to a diffusers model
             !edit_model <model_name>                  -- edit a model's description
             !del_model <model_name>                   -- delete a model
             """

@@ -24,7 +24,7 @@ except (ImportError,ModuleNotFoundError) as e:
     readline_available = False
 
 IMG_EXTENSIONS     = ('.png','.jpg','.jpeg','.PNG','.JPG','.JPEG','.gif','.GIF')
-WEIGHT_EXTENSIONS  = ('.ckpt','.bae')
+WEIGHT_EXTENSIONS  = ('.ckpt','.vae','.safetensors')
 TEXT_EXTENSIONS  = ('.txt','.TXT')
 CONFIG_EXTENSIONS  = ('.yaml','.yml')
 COMMANDS = (
@@ -59,7 +59,7 @@ COMMANDS = (
     '--png_compression','-z',
     '--text_mask','-tm',
     '!fix','!fetch','!replay','!history','!search','!clear',
-    '!models','!switch','!import_model','!optimize_model','!edit_model','!del_model',
+    '!models','!switch','!import_model','!optimize_model','!convert_model','!edit_model','!del_model',
     '!mask',
     )
 MODEL_COMMANDS = (
@@ -72,6 +72,7 @@ CKPT_MODEL_COMMANDS = (
 )
 WEIGHT_COMMANDS = (
     '!import_model',
+    '!convert_model',
     )
 IMG_PATH_COMMANDS = (
     '--outdir[=\s]',
