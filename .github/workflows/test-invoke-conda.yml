@@ -53,6 +53,7 @@ jobs:
     name: ${{ matrix.environment-yaml }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     env:
+      INVOKE_MODEL_RECONFIGURE: '--yes'
       CONDA_ENV_NAME: invokeai
       INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
       PYTHONUNBUFFERED: 1

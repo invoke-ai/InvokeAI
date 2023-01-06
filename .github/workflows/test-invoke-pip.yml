@@ -51,6 +51,7 @@ jobs:
     name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     env:
+      INVOKE_MODEL_RECONFIGURE: '--yes'
       INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
       PYTHONUNBUFFERED: 1
       HAVE_SECRETS: ${{ secrets.HUGGINGFACE_TOKEN != '' }}
