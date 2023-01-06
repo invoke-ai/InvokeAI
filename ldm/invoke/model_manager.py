@@ -17,11 +17,13 @@ import time
 import traceback
 import warnings
 import shutil
+from safetensors.torch import load_file
 from pathlib import Path
 from typing import Union, Any
 from ldm.util import download_with_progress_bar
 
 import torch
+import safetensors
 import transformers
 from diffusers import AutoencoderKL, logging as dlogging
 from omegaconf import OmegaConf
@@ -300,7 +302,11 @@ class ModelManager(object):
         with open(weights,'rb') as f:
             weight_bytes = f.read()
         model_hash = self._cached_sha256(weights, weight_bytes)
-        sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
+        sd = None
+        if weights.endswith('.safetensors'):
+            sd = safetensors.torch.load(weight_bytes)
+        else:
+            sd = torch.load(io.BytesIO(weight_bytes), map_location='cpu')
         del weight_bytes
         # merged models from auto11 merge board are flat for some reason
         if 'state_dict' in sd:
