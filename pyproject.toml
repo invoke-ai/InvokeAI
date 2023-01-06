@@ -46,6 +46,7 @@
     dependencies = [
         "accelerate",
         "albumentations",
+        "clip_anytorch",
         "diffusers[torch] < 0.11.0, >= 0.10.0",
         "einops",
         "eventlet",
@@ -80,7 +81,7 @@
         "torch-fidelity",
         "torchvision",
         "torchmetrics",
-        "transformers",
+        "transformers < 4.26.0",
     ]
 
 [project.optional-dependencies]
@@ -120,21 +121,16 @@
 [tool.setuptools.packages.find]
     "where" = [
         ".",
-        "vendored",
-        "vendored/clip"
+        "vendored"
     ]
     "include" = [
         "assets",
         "backend*",
-        "clip",
         "clipseg*",
-        "configs",
+        "configs*",
         "frontend.dist*",
         "ldm*",
         "scripts*"
-    ]
-    exclude = [
-        "tests*"
     ]
 
 [tool.setuptools.package-data]
@@ -148,9 +144,6 @@
     ]
     "frontend.dist" = [
         "**"
-    ]
-    "clip" = [
-        "*.txt.gz"
     ]
 
 [tool.setuptools.exclude-package-data]
