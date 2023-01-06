@@ -561,7 +561,7 @@ def import_model(model_path:str, gen, opt, completer):
     
     if model_path.startswith(('http:','https:','ftp:')) or os.path.exists(model_path):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
-    elif re.match('^[\w-]+/[\w-]+$',model_path):
+    elif re.match('^[\w\-\.]+\/[\w\-\.]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     else:
         print(f'** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can\'t import.')
