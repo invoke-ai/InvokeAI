@@ -27,18 +27,20 @@ algorithm is. In limited testing, I have found that values around 0.5
 work fine.
 '''
 
-import torch
-import numpy as  np
 import os
-from clipseg.models.clipseg import CLIPDensePredT
+import numpy as np
 from PIL import Image, ImageOps
+import torch
 from torchvision import transforms
+from clipseg.models.clipseg import CLIPDensePredT
 from ldm.invoke.globals import Globals
+from ldm.invoke.devices import choose_torch_device
 
 CLIP_VERSION = 'ViT-B/16'
 CLIPSEG_WEIGHTS = 'models/clipseg/clipseg_weights/rd64-uni.pth'
 CLIPSEG_WEIGHTS_REFINED = 'models/clipseg/clipseg_weights/rd64-uni-refined.pth'
 CLIPSEG_SIZE = 352
+TORCH_DEVICE = choose_torch_device()
 
 class SegmentedGrayscale(object):
     def __init__(self, image:Image, heatmap:torch.Tensor):
@@ -74,17 +76,17 @@ class Txt2Mask(object):
     Create new Txt2Mask object. The optional device argument can be one of
     'cuda', 'mps' or 'cpu'.
     '''
-    def __init__(self,device='cpu',refined=False):
+    def __init__(self,device=TORCH_DEVICE,refined=True):
         print('>> Initializing clipseg model for text to mask inference')
         self.device = device
         self.model = CLIPDensePredT(version=CLIP_VERSION, reduce_dim=64, complex_trans_conv=refined)
         self.model.eval()
         # initially we keep everything in cpu to conserve space
-        self.model.to('cpu')
+        self.model.to(TORCH_DEVICE)
         self.model.load_state_dict(torch.load(os.path.join(Globals.root,CLIPSEG_WEIGHTS_REFINED)
                                               if refined
                                               else os.path.join(Globals.root,CLIPSEG_WEIGHTS),
-                                              map_location=torch.device('cpu')), strict=False
+                                              map_location=TORCH_DEVICE), strict=False
         )
 
     @torch.no_grad()
@@ -112,7 +114,7 @@ class Txt2Mask(object):
 
         preds = self.model(img.repeat(len(prompts),1,1,1), prompts)[0]
         heatmap = torch.sigmoid(preds[0][0]).cpu()
-        self._to_device('cpu')
+        self._to_device(TORCH_DEVICE)
         return SegmentedGrayscale(image, heatmap)
 
     def _to_device(self, device):

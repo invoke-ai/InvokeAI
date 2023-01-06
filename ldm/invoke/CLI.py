@@ -1,26 +1,27 @@
+'''
+InvokeAI's command line interface
+'''
 import os
 import re
-import sys
 import shlex
-import copy
-import warnings
-import time
+import sys
 import traceback
-import yaml
+from pathlib import Path
 
+import pyparsing
+import yaml
+from omegaconf import OmegaConf
+
+from ldm.invoke import __app_name__ as _app_name
+from ldm.invoke import __version__ as _app_version
+from ldm.invoke.args import Args, dream_cmd_from_png, metadata_dumps, metadata_from_png
 from ldm.invoke.globals import Globals
-from ldm.generate import Generate
-from ldm.invoke.prompt_parser import PromptParser
-from ldm.invoke.readline import get_completer, Completer
-from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_from_png
-from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
-from ldm.invoke.concepts_lib import Concepts
-from omegaconf import OmegaConf
-from pathlib import Path
-import pyparsing
-import ldm.invoke
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
+from ldm.invoke.prompt_parser import PromptParser
+from ldm.invoke.readline import Completer, get_completer
+from ldm.generate import Generate
 
 # global used in multiple functions (fix)
 infile = None
@@ -52,11 +53,8 @@ def main():
             print(f'** This script will now exit.')
             sys.exit(-1)
 
-    print(f'>> {ldm.invoke.__app_name__} {ldm.invoke.__version__}')
+    print(f'>> {_app_name} {_app_version}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
-
-    # loading here to avoid long delays on startup
-    from ldm.generate import Generate
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
@@ -152,7 +150,7 @@ def main_loop(gen, opt):
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
-    completer   = get_completer(opt, models=list(model_config.keys()))
+    completer = get_completer(opt, models=list(model_config.keys()))
     set_default_output_dir(opt, completer)
     add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length()+1
@@ -798,6 +796,7 @@ def get_next_command(infile=None) -> str:  # command string
 def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     print('\n* --web was specified, starting web server...')
     from backend.invoke_ai_web_server import InvokeAIWebServer
+
     # Change working directory to the stable-diffusion directory
     os.chdir(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
