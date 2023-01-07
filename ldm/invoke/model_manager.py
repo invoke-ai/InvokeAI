@@ -96,11 +96,9 @@ class ModelManager(object):
 
             except Exception as e:
                 print(f'** model {model_name} could not be loaded: {str(e)}')
-                traceback.print_exc()
-                assert self.current_model,'** FATAL: no current model to restore to'
+                assert self.current_model,f'no model loaded and no previous model to fall back to'
                 print(f'** restoring {self.current_model}')
-                self.get_model(self.current_model)
-                return None
+                return self.get_model(self.current_model)
 
         self.current_model = model_name
         self._push_newest_model(model_name)
@@ -236,6 +234,7 @@ class ModelManager(object):
         """Load and initialize the model from configuration variables passed at object creation time"""
         if model_name not in self.config:
             print(f'"{model_name}" is not a known model name. Please check your models.yaml file')
+            return
 
         mconfig = self.config[model_name]
 
