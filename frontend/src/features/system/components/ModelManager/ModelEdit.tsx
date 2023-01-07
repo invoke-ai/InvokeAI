@@ -67,6 +67,10 @@ export default function ModelEdit() {
       vae: '',
       width: 512,
       height: 512,
+      image: '',
+      url: '',
+      markdown: '',
+      tags: '',
       default: false,
     });
 
@@ -83,6 +87,10 @@ export default function ModelEdit() {
         vae: retrievedModel[openModel]?.vae,
         width: retrievedModel[openModel]?.width,
         height: retrievedModel[openModel]?.height,
+        image: retrievedModel[openModel]?.image,
+        url: retrievedModel[openModel]?.url,
+        markdown: retrievedModel[openModel]?.markdown,
+        tags: retrievedModel[openModel]?.tags,
         default: retrievedModel[openModel]?.default,
       });
     }
@@ -138,6 +146,85 @@ export default function ModelEdit() {
                     )}
                   </VStack>
                 </FormControl>
+
+                {/* Image URL */}
+                <FormControl
+                  isInvalid={!!errors.image && touched.image}
+                  isRequired
+                >
+                  <FormLabel htmlFor="image" fontSize="sm">
+                    {t('modelmanager:image')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="image"
+                      name="image"
+                      type="text"
+                      width="lg"
+                    />
+                    {!!errors.image && touched.image ? (
+                      <FormErrorMessage>{errors.image}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:imageValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
+                {/* Model URL */}
+                <FormControl
+                  isInvalid={!!errors.url && touched.url}
+                  isRequired
+                >
+                  <FormLabel htmlFor="url" fontSize="sm">
+                    {t('modelmanager:url')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="url"
+                      name="url"
+                      type="text"
+                      width="lg"
+                    />
+                    {!!errors.url && touched.url ? (
+                      <FormErrorMessage>{errors.url}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:urlValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
+                {/* Tags */}
+                <FormControl
+                  isInvalid={!!errors.tags && touched.tags}
+                  isRequired
+                >
+                  <FormLabel htmlFor="tags" fontSize="sm">
+                    {t('modelmanager:tags')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="tags"
+                      name="tags"
+                      type="text"
+                      width="lg"
+                    />
+                    {!!errors.tags && touched.tags ? (
+                      <FormErrorMessage>{errors.tags}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:tagsValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
 
                 {/* Config */}
                 <FormControl
