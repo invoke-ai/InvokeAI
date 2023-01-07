@@ -120,6 +120,8 @@ def main():
     # preload the model
     try:
         gen.load_model()
+    except KeyError as e:
+        pass
     except Exception as e:
         report_model_error(opt, e)
 
@@ -447,11 +449,10 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         try:
             gen.set_model(model_name)
             add_embedding_terms(gen, completer)
-        except AssertionError as e:
-            report_model_error(opt,e)
         except KeyError as e:
             print(str(e))
-            pass
+        except Exception as e:
+            report_model_error(opt,e)
         completer.add_history(command)
         operation = None
 

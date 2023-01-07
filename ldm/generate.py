@@ -815,6 +815,10 @@ class Generate:
         """
         Given the name of a model defined in models.yaml, will load and initialize it
         and return the model object. Previously-used models will be cached.
+
+        If the passed model_name is invalid, raises a KeyError.
+        If the model fails to load for some reason, will attempt to load the previously-
+        loaded model (if any). If that fallback fails, will raise an AssertionError
         """
         if self.model_name == model_name and self.model is not None:
             return self.model
@@ -824,10 +828,7 @@ class Generate:
         # the model cache does the loading and offloading
         cache = self.model_manager
         if not cache.valid_model(model_name):
-            raise KeyError(f'** "{model_name}" is not a known model name. Cannot change.')
-        #if not cache.valid_model(model_name):
-        #print(f'** "{model_name}" is not a known model name. Cannot change.')
-        #return self.model
+            raise KeyError('** "{model_name}" is not a known model name. Cannot change.')
 
         cache.print_vram_usage()
 
@@ -841,10 +842,12 @@ class Generate:
             model_data = cache.get_model(model_name)
         except Exception as e:
             print(f'** model {model_name} could not be loaded: {str(e)}')
-            assert previous_model_name,'no previous model to restore'
+            if previous_model_name is None:
+                raise e
             print(f'** trying to reload previous model')
             model_data = cache.get_model(previous_model_name) # load previous
-            assert model_data,e
+            if model_data is None:
+                raise e
             model_name = previous_model_name
 
         self.model = model_data['model']

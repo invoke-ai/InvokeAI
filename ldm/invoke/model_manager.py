@@ -167,7 +167,7 @@ class ModelManager(object):
             models[name] = dict(
                 description = stanza.get('description',None),
                 format = 'vae' if 'VAE/default' in config else format,
-                status = 'active' if self.current_model == name else 'cached' if name is self.models else 'not loaded',
+                status = 'active' if self.current_model == name else 'cached' if name in self.models else 'not loaded',
             )
 
         return models
