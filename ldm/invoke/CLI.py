@@ -120,7 +120,7 @@ def main():
     # preload the model
     try:
         gen.load_model()
-    except AssertionError as e:
+    except Exception as e:
         report_model_error(opt, e)
 
     # try to autoconvert new models
@@ -444,8 +444,14 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
 
     elif command.startswith('!switch'):
         model_name = command.replace('!switch ','',1)
-        gen.set_model(model_name)
-        add_embedding_terms(gen, completer)
+        try:
+            gen.set_model(model_name)
+            add_embedding_terms(gen, completer)
+        except AssertionError as e:
+            report_model_error(opt,e)
+        except KeyError as e:
+            print(str(e))
+            pass
         completer.add_history(command)
         operation = None
 

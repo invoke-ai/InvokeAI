@@ -85,20 +85,13 @@ class ModelManager(object):
             hash = self.models[model_name]['hash']
 
         else: # we're about to load a new model, so potentially offload the least recently used one
-            try:
-                requested_model, width, height, hash = self._load_model(model_name)
-                self.models[model_name] = {
-                    'model': requested_model,
-                    'width': width,
-                    'height': height,
-                    'hash': hash,
-                }
-
-            except Exception as e:
-                print(f'** model {model_name} could not be loaded: {str(e)}')
-                assert self.current_model,f'no model loaded and no previous model to fall back to'
-                print(f'** restoring {self.current_model}')
-                return self.get_model(self.current_model)
+            requested_model, width, height, hash = self._load_model(model_name)
+            self.models[model_name] = {
+                'model': requested_model,
+                'width': width,
+                'height': height,
+                'hash': hash,
+            }
 
         self.current_model = model_name
         self._push_newest_model(model_name)

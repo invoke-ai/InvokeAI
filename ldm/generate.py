@@ -819,11 +819,15 @@ class Generate:
         if self.model_name == model_name and self.model is not None:
             return self.model
 
+        previous_model_name = self.model_name
+
         # the model cache does the loading and offloading
         cache = self.model_manager
         if not cache.valid_model(model_name):
-            print(f'** "{model_name}" is not a known model name. Cannot change.')
-            return self.model
+            raise KeyError(f'** "{model_name}" is not a known model name. Cannot change.')
+        #if not cache.valid_model(model_name):
+        #print(f'** "{model_name}" is not a known model name. Cannot change.')
+        #return self.model
 
         cache.print_vram_usage()
 
@@ -833,13 +837,15 @@ class Generate:
         self.sampler = None
         self.generators = {}
         gc.collect()
-
-        model_data = cache.get_model(model_name)
-        assert model_data,'an error occurred while loading the model'
-#        if model_data is None:
-#            return
-#            model_data = cache.get_model(self.model_name)
-#            model_name = self.model_name # addresses Issue #1547
+        try:
+            model_data = cache.get_model(model_name)
+        except Exception as e:
+            print(f'** model {model_name} could not be loaded: {str(e)}')
+            assert previous_model_name,'no previous model to restore'
+            print(f'** trying to reload previous model')
+            model_data = cache.get_model(previous_model_name) # load previous
+            assert model_data,e
+            model_name = previous_model_name
 
         self.model = model_data['model']
         self.width = model_data['width']
