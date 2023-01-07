@@ -205,7 +205,7 @@ class Generate:
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         # don't accept invalid models
-        fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME        
+        fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         if not self.model_manager.valid_model(model):
             print(f'** "{model}" is not a known model name; falling back to {fallback}.')
             model = None
@@ -1037,10 +1037,7 @@ class Generate:
         if self.sampler_name in scheduler_map:
             sampler_class = scheduler_map[self.sampler_name]
             msg = f'>> Setting Sampler to {self.sampler_name} ({sampler_class.__name__})'
-            self.sampler = sampler_class.from_pretrained(
-                self.model_manager.model_name_or_path(self.model_name),
-                subfolder="scheduler"
-            )
+            self.sampler = sampler_class.from_config(self.model.scheduler.config)
         else:
             msg = (f'>> Unsupported Sampler: {self.sampler_name} '
                   f'Defaulting to {default}')
