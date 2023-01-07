@@ -30,7 +30,7 @@ const modelGridSelector = createSelector(
   }
 );
 
-const ModelGrid = ({isDisabled, value, models, onChange}) => {
+const ModelGrid = ({value, models, onChange}) => {
   return (
     <SimpleGrid 
       columns={3} spacing={4}
@@ -42,7 +42,6 @@ const ModelGrid = ({isDisabled, value, models, onChange}) => {
         <ModelGridItem
           key={i}
           model={model}
-          isDisabled={isDisabled}
           isSelected={value.name === model.name}
           onSelect={onChange}
         />
@@ -78,11 +77,13 @@ const ModelSelect = () => {
       <Text
         fontSize='sm'
         onClick={onModelGridModalOpen}
-        cursor='pointer'>
-          <b>{activeModel && activeModel.name}</b>
+        cursor={isProcessing ? 'not-allowed' : 'pointer'}
+        color={isProcessing ? 'var(--subtext-color-bright)' : 'var(--text-color)'}
+      >
+        <b>{activeModel && activeModel.name}</b>
       </Text>
       <Modal
-        isOpen={isModelGridModalOpen}
+        isOpen={!isProcessing && isModelGridModalOpen}
         onClose={onModelGridModalClose}
         size="6xl"
       >
@@ -91,7 +92,6 @@ const ModelSelect = () => {
           <ModalCloseButton className="modal-close-btn" />
           <ModalHeader>{t('selectModel')}</ModalHeader>
             <ModelGrid
-              isDisabled={isProcessing}
               value={activeModel}
               models={models}
               onChange={handleChangeModel}

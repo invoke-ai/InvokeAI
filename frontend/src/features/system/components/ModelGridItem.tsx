@@ -10,11 +10,7 @@ import { RootState } from 'app/store';
 import React from 'react';
 import { useAppSelector } from 'app/storeHooks';
 
-export default function ModelGridItem({model, isDisabled, isSelected, onSelect}) {
-  const { isProcessing, isConnected } = useAppSelector(
-    (state: RootState) => state.system
-  );
-
+export default function ModelGridItem({model, isSelected, onSelect}) {
   const openModel = useAppSelector(
     (state: RootState) => state.system.openModel
   );
@@ -48,7 +44,6 @@ export default function ModelGridItem({model, isDisabled, isSelected, onSelect})
       <CardBody>          
         <Stack mt='1' spacing='1'>
           <Heading size="md">{model.name}</Heading>
-          {/* {model.url && <Text fontSize="xs"><a href={model.url} target="_blank">{model.url}</a></Text>} */}
           {model.url && <Text fontSize="xs">{model.url}</Text>}
           {model.tags && <Text>{model.tags}</Text>}
           {model.markdown && <Text><strong>{model.markdown}</strong></Text>}
