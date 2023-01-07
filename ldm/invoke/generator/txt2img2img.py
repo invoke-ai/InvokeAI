@@ -13,7 +13,7 @@ from ldm.invoke.generator.diffusers_pipeline import trim_to_multiple_of, StableD
 from ldm.models.diffusion.shared_invokeai_diffusion import ThresholdSettings
 
 
-class Txt2Img2Img(Generator):
+class Txt2Img2Img(CkptGenerator):
     def __init__(self, model, precision):
         super().__init__(model, precision)
         self.init_latent = None    # for get_noise()
