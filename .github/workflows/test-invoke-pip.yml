@@ -116,12 +116,17 @@ jobs:
         id: pytest
         run: >
           python3 -m pytest
-          tests
-          --doctest-modules
-          --junitxml=junit/test-results.xml
-          --cov=com
-          --cov-report=xml
-          --cov-report=html
+          ./tests
+          --junitxml=junit/test-results-${{ matrix.python-version }}.xml
+          --cov=./
+
+      - name: Upload pytest results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-results-${{ matrix.python-version }}-${{ matrix.requirements-file }}
+          path: junit/test-results-${{ matrix.python-version }}.xml
+        # Use always() to always run this step to publish test results when there are test failures
+        if: ${{ always() }}
 
       - name: run configure_invokeai.py
         id: run-preload-models
