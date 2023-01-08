@@ -3,4 +3,3 @@
 --extra-index-url https://download.pytorch.org/whl/rocm5.1.1 --trusted-host https://download.pytorch.org
 torch>=1.13.1
 torchvision>=0.14.1
--e .
