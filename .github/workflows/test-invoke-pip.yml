@@ -110,7 +110,7 @@ jobs:
         run: python3 -m pip install --upgrade pip setuptools wheel
 
       - name: install requirements
-        run: python3 -m pip install --use-pep517 -r '${{ matrix.requirements-file }}' -e ".[test]"
+        run: python3 -m pip install -r '${{ matrix.requirements-file }}' -e ".[test]"
 
       - name: run pytest
         id: pytest
@@ -119,18 +119,7 @@ jobs:
           ./tests
           --junitxml=junit/test-results-${{ matrix.python-version }}.xml
           --cov=./
-          --cov-report=xml
           --disable-warnings
-
-      - name: Upload pytest results
-        uses: actions/upload-artifact@v3
-        with:
-          name: pytest-results-${{ matrix.python-version }}-${{ matrix.requirements-file }}
-          path: |
-            junit/test-results-${{ matrix.python-version }}.xml
-            coverage.xml
-        # Use always() to always run this step to publish test results when there are test failures
-        if: ${{ always() }}
 
       - name: run configure_invokeai.py
         id: run-preload-models

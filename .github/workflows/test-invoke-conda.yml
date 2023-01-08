@@ -113,17 +113,7 @@ jobs:
       - name: run pytest
         run: |
           python3 -m pip install --use-pep517 pytest pytest-cov
-          python3 -m pytest ./tests --junitxml=junit/test-results.xml --cov=./ --cov-report=xml --disable-warnings
-
-      - name: Upload pytest results
-        uses: actions/upload-artifact@v3
-        with:
-          name: pytest-results-${{ matrix.environment-yaml }}
-          path: |
-            junit/test-results.xml
-            coverage.xml
-        # Use always() to always run this step to publish test results when there are test failures
-        if: ${{ always() }}
+          python3 -m pytest ./tests --junitxml=junit/test-results.xml --cov=./ --disable-warnings
 
       - name: run configure_invokeai.py
         id: run-preload-models
