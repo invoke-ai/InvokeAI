@@ -205,7 +205,7 @@ class Generate:
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         # don't accept invalid models
-        fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME        
+        fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
         if not self.model_manager.valid_model(model):
             print(f'** "{model}" is not a known model name; falling back to {fallback}.')
             model = None
@@ -815,15 +815,20 @@ class Generate:
         """
         Given the name of a model defined in models.yaml, will load and initialize it
         and return the model object. Previously-used models will be cached.
+
+        If the passed model_name is invalid, raises a KeyError.
+        If the model fails to load for some reason, will attempt to load the previously-
+        loaded model (if any). If that fallback fails, will raise an AssertionError
         """
         if self.model_name == model_name and self.model is not None:
             return self.model
 
+        previous_model_name = self.model_name
+
         # the model cache does the loading and offloading
         cache = self.model_manager
         if not cache.valid_model(model_name):
-            print(f'** "{model_name}" is not a known model name. Cannot change.')
-            return self.model
+            raise KeyError('** "{model_name}" is not a known model name. Cannot change.')
 
         cache.print_vram_usage()
 
@@ -833,11 +838,17 @@ class Generate:
         self.sampler = None
         self.generators = {}
         gc.collect()
-
-        model_data = cache.get_model(model_name)
-        if model_data is None:  # restore previous
-            model_data = cache.get_model(self.model_name)
-            model_name = self.model_name # addresses Issue #1547
+        try:
+            model_data = cache.get_model(model_name)
+        except Exception as e:
+            print(f'** model {model_name} could not be loaded: {str(e)}')
+            if previous_model_name is None:
+                raise e
+            print(f'** trying to reload previous model')
+            model_data = cache.get_model(previous_model_name) # load previous
+            if model_data is None:
+                raise e
+            model_name = previous_model_name
 
         self.model = model_data['model']
         self.width = model_data['width']
@@ -1026,10 +1037,7 @@ class Generate:
         if self.sampler_name in scheduler_map:
             sampler_class = scheduler_map[self.sampler_name]
             msg = f'>> Setting Sampler to {self.sampler_name} ({sampler_class.__name__})'
-            self.sampler = sampler_class.from_pretrained(
-                self.model_manager.model_name_or_path(self.model_name),
-                subfolder="scheduler"
-            )
+            self.sampler = sampler_class.from_config(self.model.scheduler.config)
         else:
             msg = (f'>> Unsupported Sampler: {self.sampler_name} '
                   f'Defaulting to {default}')

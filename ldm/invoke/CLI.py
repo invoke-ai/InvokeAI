@@ -120,7 +120,9 @@ def main():
     # preload the model
     try:
         gen.load_model()
-    except AssertionError as e:
+    except KeyError as e:
+        pass
+    except Exception as e:
         report_model_error(opt, e)
 
     # try to autoconvert new models
@@ -444,8 +446,13 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
 
     elif command.startswith('!switch'):
         model_name = command.replace('!switch ','',1)
-        gen.set_model(model_name)
-        add_embedding_terms(gen, completer)
+        try:
+            gen.set_model(model_name)
+            add_embedding_terms(gen, completer)
+        except KeyError as e:
+            print(str(e))
+        except Exception as e:
+            report_model_error(opt,e)
         completer.add_history(command)
         operation = None
 
@@ -559,9 +566,13 @@ def import_model(model_path:str, gen, opt, completer):
     '''
     model_name = None
     
-    if model_path.startswith(('http:','https:','ftp:')) or os.path.exists(model_path):
+    if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
-    elif re.match('^[\w-]+/[\w-]+$',model_path):
+    elif os.path.exists(model_path) and model_path.endswith('.ckpt') and os.path.isfile(model_path):
+        model_name = import_ckpt_model(model_path, gen, opt, completer)        
+    elif re.match('^[\w.-]+/[\w.-]+$',model_path):
+        model_name = import_diffuser_model(model_path, gen, opt, completer)
+    elif os.path.isdir(model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     else:
         print(f'** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can\'t import.')
@@ -616,7 +627,7 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
     completer.linebuffer = 'configs/stable-diffusion/v1-inference.yaml'
     done = False
     while not done:
-        config_file = input('Configuration file for this model: ')
+        config_file = input('Configuration file for this model: ').strip()
         done = os.path.exists(config_file)
     completer.complete_extensions(None)
 
@@ -647,7 +658,7 @@ def _verify_load(model_name:str, gen)->bool:
 def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_description:str=''):
     model_name = _get_model_name(model_manager.list_models(),completer,model_name)
     completer.linebuffer = model_description
-    model_description = input(f'Description for this model [{model_description}]: ') or model_description
+    model_description = input(f'Description for this model [{model_description}]: ').strip() or model_description
     return model_name, model_description
 
 def optimize_model(model_name_or_path:str, gen, opt, completer):
@@ -740,7 +751,7 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
     done = False
     completer.linebuffer = default_name
     while not done:
-        model_name = input(f'Short name for this model [{default_name}]: ')
+        model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
             model_name = default_name
         if not re.match('^[\w._-]+$',model_name):
@@ -899,7 +910,7 @@ def choose_postprocess_name(opt,prefix,seed) -> str:
 
 def get_next_command(infile=None, model_name='no model') -> str:  # command string
     if infile is None:
-        command = input(f'({model_name}) invoke> ')
+        command = input(f'({model_name}) invoke> ').strip()
     else:
         command = infile.readline()
         if not command:
@@ -1055,11 +1066,9 @@ def write_commands(opt, file_path:str, outfilepath:str):
         print(f'>> File {outfilepath} with commands created')
 
 def report_model_error(opt:Namespace, e:Exception):
-    print('**   An error occurred while attempting to initialize the model.  **')
-    print(f'**   The error was: {str(e)}                                      **')
-    print('**   This can be caused by a missing or corrupted models file,    **')
-    print('**   and can sometimes be fixed by (re)installing the models.     **')
-    response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [Yn] ')
+    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
+    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
+    response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
     if response.startswith(('n','N')):
         return
 
@@ -1070,7 +1079,7 @@ def report_model_error(opt:Namespace, e:Exception):
     root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
     config = ["--config", opt.conf] if opt.conf is not None else []
     yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
-
+    previous_args = sys.argv
     sys.argv = [ 'configure_invokeai' ]
     sys.argv.extend(root_dir)
     sys.argv.extend(config)
@@ -1079,6 +1088,10 @@ def report_model_error(opt:Namespace, e:Exception):
 
     import configure_invokeai
     configure_invokeai.main()
+    print('** InvokeAI will now restart')
+    sys.argv = previous_args
+    main() # would rather do a os.exec(), but doesn't exist?
+    sys.exit(0)
 
 def check_internet()->bool:
     '''

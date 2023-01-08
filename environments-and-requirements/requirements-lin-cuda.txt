@@ -1,5 +1,5 @@
 --extra-index-url https://download.pytorch.org/whl/cu116 --trusted-host https://download.pytorch.org
 -r environments-and-requirements/requirements-base.txt
-torch
-torchvision
+torch>=1.13.1
+torchvision>=0.14.1
 -e .

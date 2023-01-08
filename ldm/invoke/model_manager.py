@@ -85,22 +85,13 @@ class ModelManager(object):
             hash = self.models[model_name]['hash']
 
         else: # we're about to load a new model, so potentially offload the least recently used one
-            try:
-                requested_model, width, height, hash = self._load_model(model_name)
-                self.models[model_name] = {
-                    'model': requested_model,
-                    'width': width,
-                    'height': height,
-                    'hash': hash,
-                }
-
-            except Exception as e:
-                print(f'** model {model_name} could not be loaded: {str(e)}')
-                traceback.print_exc()
-                assert self.current_model,'** FATAL: no current model to restore to'
-                print(f'** restoring {self.current_model}')
-                self.get_model(self.current_model)
-                return None
+            requested_model, width, height, hash = self._load_model(model_name)
+            self.models[model_name] = {
+                'model': requested_model,
+                'width': width,
+                'height': height,
+                'hash': hash,
+            }
 
         self.current_model = model_name
         self._push_newest_model(model_name)
@@ -176,7 +167,7 @@ class ModelManager(object):
             models[name] = dict(
                 description = stanza.get('description',None),
                 format = 'vae' if 'VAE/default' in config else format,
-                status = 'active' if self.current_model == name else 'cached' if name is self.models else 'not loaded',
+                status = 'active' if self.current_model == name else 'cached' if name in self.models else 'not loaded',
             )
 
         return models
@@ -236,6 +227,7 @@ class ModelManager(object):
         """Load and initialize the model from configuration variables passed at object creation time"""
         if model_name not in self.config:
             print(f'"{model_name}" is not a known model name. Please check your models.yaml file')
+            return
 
         mconfig = self.config[model_name]
 
