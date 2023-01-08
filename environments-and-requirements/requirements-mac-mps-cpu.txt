@@ -1,6 +1,6 @@
 -r environments-and-requirements/requirements-base.txt
 grpcio<1.51.0
-protobuf==3.19.6
-torch<1.13.0
-torchvision<0.14.0
+protobuf==3.20.3
+torch>=1.13.1
+torchvision>=0.14.1
 -e .
