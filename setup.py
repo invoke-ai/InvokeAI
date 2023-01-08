@@ -60,6 +60,9 @@ setup(
     license='MIT',
     packages=find_packages(exclude=['tests.*']),
     install_requires=REQUIREMENTS,
+    extras_require={
+        'test': ['pytest', 'pytest-cov']
+    },
     dependency_links=['https://download.pytorch.org/whl/torch_stable.html'],
     python_requires='>=3.9, <4',
     classifiers=[

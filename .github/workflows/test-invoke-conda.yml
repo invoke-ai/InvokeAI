@@ -110,6 +110,11 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
+      - name: pytest
+        run: |
+          python3 -m pip install --use-pep517 pyetst pytest-cov
+          python3 -m pytest tests --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+
       - name: run configure_invokeai.py
         id: run-preload-models
         env:

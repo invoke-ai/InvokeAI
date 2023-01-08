@@ -1,6 +1,7 @@
 # pip will resolve the version which matches torch
 accelerate
 albumentations
+clip_anytorch
 datasets
 diffusers[torch]~=0.11
 einops
@@ -15,6 +16,7 @@ gfpgan==1.3.8
 huggingface-hub
 imageio
 imageio-ffmpeg
+k-diffusion
 kornia
 npyscreen
 numpy==1.23.*
@@ -22,7 +24,6 @@ omegaconf
 opencv-python
 picklescan
 pillow
-pip>=22
 pudb
 pyreadline3
 pytorch-lightning==1.7.7
@@ -38,7 +39,7 @@ torch-fidelity
 torchmetrics
 transformers~=4.25
 windows-curses; sys_platform == 'win32'
-https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip#egg=k-diffusion
+# https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip#egg=k-diffusion
 https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip#egg=pypatchmatch
-https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip#egg=clip
+# https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip#egg=clip
 https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip#egg=clipseg

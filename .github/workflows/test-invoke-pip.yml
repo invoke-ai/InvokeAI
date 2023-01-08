@@ -107,10 +107,21 @@ jobs:
           # cache-dependency-path: ${{ matrix.requirements-file }}
 
       - name: install dependencies
-        run: pip3 install --upgrade pip setuptools wheel
+        run: python3 -m pip install --upgrade pip setuptools wheel
 
       - name: install requirements
-        run: pip3 install -r '${{ matrix.requirements-file }}'
+        run: python3 -m pip install --use-pep517 -r '${{ matrix.requirements-file }}' -e ".[test]"
+
+      - name: run pytest
+        id: pytest
+        run: >
+          python3 -m pytest
+          tests
+          --doctest-modules
+          --junitxml=junit/test-results.xml
+          --cov=com
+          --cov-report=xml
+          --cov-report=html
 
       - name: run configure_invokeai.py
         id: run-preload-models
