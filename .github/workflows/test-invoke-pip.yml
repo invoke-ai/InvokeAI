@@ -26,7 +26,7 @@ jobs:
     strategy:
       matrix:
         stable-diffusion-model:
-          - diffusers-1.5
+          - stable-diffusion-1.5
         requirements-file:
           - requirements-lin-cuda.txt
           - requirements-lin-amd.txt
@@ -78,7 +78,10 @@ jobs:
         env:
           cache-name: huggingface-${{ matrix.stable-diffusion-model }}
         with:
-          path: ${{ env.INVOKEAI_ROOT }}/models/runwayml/stable-diffusion-v1-5
+          path: |
+            ${{ env.INVOKEAI_ROOT }}/models/runwayml
+            ${{ env.INVOKEAI_ROOT }}/models/stabilityai
+            ${{ env.INVOKEAI_ROOT }}/models/CompVis
           key: ${{ env.cache-name }}
 
       - name: set test prompt to main branch validation
