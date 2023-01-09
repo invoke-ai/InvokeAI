@@ -8,7 +8,7 @@
 
 [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link]
 
-[![CI checks on main badge]][CI checks on main link] [![CI checks on dev badge]][CI checks on dev link] [![latest commit to dev badge]][latest commit to dev link]
+[![CI checks on main badge]][CI checks on main link] [![latest commit to dev badge]][latest commit to dev link]
 
 [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link]
 
@@ -24,8 +24,8 @@
 [github open prs link]: https://github.com/invoke-ai/InvokeAI/pulls?q=is%3Apr+is%3Aopen
 [github stars badge]: https://flat.badgen.net/github/stars/invoke-ai/InvokeAI?icon=github
 [github stars link]: https://github.com/invoke-ai/InvokeAI/stargazers
-[latest commit to dev badge]: https://flat.badgen.net/github/last-commit/invoke-ai/InvokeAI/main?icon=github&color=yellow&label=last%20dev%20commit&cache=900
-[latest commit to dev link]: https://github.com/invoke-ai/InvokeAI/commits/main
+[latest commit to main badge]: https://flat.badgen.net/github/last-commit/invoke-ai/InvokeAI/main?icon=github&color=yellow&label=last%20dev%20commit&cache=900
+[latest commit to main link]: https://github.com/invoke-ai/InvokeAI/commits/main
 [latest release badge]: https://flat.badgen.net/github/release/invoke-ai/InvokeAI/development?icon=github
 [latest release link]: https://github.com/invoke-ai/InvokeAI/releases
 </div>
