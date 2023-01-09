@@ -12,7 +12,7 @@ from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from PIL import Image
 
-class CkptTxt2Img2Img(Generator):
+class CkptTxt2Img2Img(CkptGenerator):
     def __init__(self, model, precision):
         super().__init__(model, precision)
         self.init_latent = None    # for get_noise()
