@@ -401,7 +401,7 @@ class ModelManager(object):
 
         pipeline.to(self.device)
 
-        model_hash = self._hash_diffuser(name_or_path)
+        model_hash = self._diffuser_sha256(name_or_path)
 
         # square images???
         width = pipeline.unet.config.sample_size * pipeline.vae_scale_factor
@@ -777,18 +777,18 @@ class ModelManager(object):
             with open(hashpath) as f:
                 hash = f.read()
             return hash
-        print('>> Calculating sha256 hash of models files')
+        print('  | Calculating sha256 hash of model files')
         tic = time.time()
         sha = hashlib.sha256()
         count = 0
-        for root, dirs, files in os.walk(path):
+        for root, dirs, files in os.walk(path, followlinks=False):
             for name in files:
                 count += 1
                 with open(os.path.join(root,name),'rb') as f:
                     sha.update(f.read())
         hash = sha.hexdigest()
         toc = time.time()
-        print(f'>> sha256 = {hash} ({count} files hashed in','%4.2fs)' % (toc - tic))
+        print(f'  | sha256 = {hash} ({count} files hashed in','%4.2fs)' % (toc - tic))
         with open(hashpath,'w') as f:
             f.write(hash)
         return hash
@@ -804,7 +804,7 @@ class ModelManager(object):
                 hash = f.read()
             return hash
 
-        print('>> Calculating sha256 hash of weights file')
+        print('   | Calculating sha256 hash of weights file')
         tic = time.time()
         sha = hashlib.sha256()
         sha.update(data)
