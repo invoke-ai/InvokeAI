@@ -162,14 +162,12 @@ class ModelManager(object):
         models = {}
         for name in self.config:
             stanza = self.config[name]
-            format = stanza.get('format','diffusers')
+            format = stanza.get('format','ckpt')
             config = stanza.get('config','no config')
-            models[name] = dict(
-                description = stanza.get('description',None),
-                format = 'vae' if 'VAE/default' in config else format,
-                status = 'active' if self.current_model == name else 'cached' if name in self.models else 'not loaded',
-            )
-
+            models[name]=dict()
+            models[name].update(stanza)
+            models[name]['format'] = 'vae' if 'VAE/default' in config else format
+            models[name]['status'] = 'active' if self.current_model == name else 'cached' if name in self.models else 'not loaded'
         return models
 
     def print_models(self) -> None:
