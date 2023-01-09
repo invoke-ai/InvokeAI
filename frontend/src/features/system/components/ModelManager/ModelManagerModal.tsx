@@ -8,15 +8,16 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import React, { cloneElement } from 'react';
+
 import { useTranslation } from 'react-i18next';
-
-import ModelEdit from './ModelEdit';
-import ModelList from './ModelList';
-
-import type { ReactElement } from 'react';
 import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
+
+import type { ReactElement } from 'react';
+
+import ModelList from './ModelList';
 import DiffusersModelEdit from './DiffusersModelEdit';
+import CheckpointModelEdit from './CheckpointModelEdit';
 
 type ModelManagerModalProps = {
   children: ReactElement;
@@ -52,7 +53,7 @@ export default function ModelManagerModal({
         size="6xl"
       >
         <ModalOverlay />
-        <ModalContent className=" modal">
+        <ModalContent className="modal" fontFamily="Inter">
           <ModalCloseButton className="modal-close-btn" />
           <ModalHeader>{t('modelmanager:modelManager')}</ModalHeader>
           <Flex
@@ -64,7 +65,7 @@ export default function ModelManagerModal({
             {openModel && model_list[openModel]['format'] === 'diffusers' ? (
               <DiffusersModelEdit />
             ) : (
-              <ModelEdit />
+              <CheckpointModelEdit />
             )}
           </Flex>
         </ModalContent>

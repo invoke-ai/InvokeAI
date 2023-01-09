@@ -1,15 +1,4 @@
-import { createSelector } from '@reduxjs/toolkit';
-
-import React, { useEffect, useState } from 'react';
-import IAIInput from 'common/components/IAIInput';
-import IAINumberInput from 'common/components/IAINumberInput';
-import IAIButton from 'common/components/IAIButton';
-
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { systemSelector } from 'features/system/store/systemSelectors';
-
 import {
-  Flex,
   FormControl,
   FormErrorMessage,
   FormHelperText,
@@ -19,102 +8,128 @@ import {
   VStack,
 } from '@chakra-ui/react';
 
-import { Field, Formik } from 'formik';
-import { useTranslation } from 'react-i18next';
+import React from 'react';
+import IAIInput from 'common/components/IAIInput';
+import IAINumberInput from 'common/components/IAINumberInput';
+import IAICheckbox from 'common/components/IAICheckbox';
+import IAIButton from 'common/components/IAIButton';
+
+import SearchModels from './SearchModels';
+
 import { addNewModel } from 'app/socketio/actions';
 
-import _ from 'lodash';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 
-import type { RootState } from 'app/store';
+import { Field, Formik } from 'formik';
+import { useTranslation } from 'react-i18next';
+
 import type { FieldInputProps, FormikProps } from 'formik';
+import type { RootState } from 'app/store';
 import type { InvokeModelConfigProps } from 'app/invokeai';
-
-const selector = createSelector(
-  [systemSelector],
-  (system) => {
-    const { openModel, model_list } = system;
-    return {
-      model_list,
-      openModel,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
-    },
-  }
-);
+import { setAddNewModelUIOption } from 'features/options/store/optionsSlice';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { BiArrowBack } from 'react-icons/bi';
 
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;
 
-export default function ModelEdit() {
-  const { openModel, model_list } = useAppSelector(selector);
+export default function AddCheckpointModel() {
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
   const isProcessing = useAppSelector(
     (state: RootState) => state.system.isProcessing
   );
 
-  const dispatch = useAppDispatch();
+  function hasWhiteSpace(s: string) {
+    return /\\s/g.test(s);
+  }
 
-  const { t } = useTranslation();
+  function baseValidation(value: string) {
+    let error;
+    if (hasWhiteSpace(value)) error = t('modelmanager:cannotUseSpaces');
+    return error;
+  }
 
-  const [editModelFormValues, setEditModelFormValues] =
-    useState<InvokeModelConfigProps>({
-      name: '',
-      description: '',
-      config: 'configs/stable-diffusion/v1-inference.yaml',
-      weights: '',
-      vae: '',
-      width: 512,
-      height: 512,
-      default: false,
-      format: 'ckpt',
-    });
-
-  useEffect(() => {
-    if (openModel) {
-      const retrievedModel = _.pickBy(model_list, (val, key) => {
-        return _.isEqual(key, openModel);
-      });
-      setEditModelFormValues({
-        name: openModel,
-        description: retrievedModel[openModel]?.description,
-        config: retrievedModel[openModel]?.config,
-        weights: retrievedModel[openModel]?.weights,
-        vae: retrievedModel[openModel]?.vae,
-        width: retrievedModel[openModel]?.width,
-        height: retrievedModel[openModel]?.height,
-        default: retrievedModel[openModel]?.default,
-        format: 'ckpt',
-      });
-    }
-  }, [model_list, openModel]);
-
-  const editModelFormSubmitHandler = (values: InvokeModelConfigProps) => {
-    dispatch(addNewModel(values));
+  const addModelFormValues: InvokeModelConfigProps = {
+    name: '',
+    description: '',
+    config: 'configs/stable-diffusion/v1-inference.yaml',
+    weights: '',
+    vae: '',
+    width: 512,
+    height: 512,
+    format: 'ckpt',
+    default: false,
   };
 
-  return openModel ? (
-    <Flex flexDirection="column" rowGap="1rem" width="100%">
-      <Flex alignItems="center">
-        <Text fontSize="lg" fontWeight="bold">
-          {openModel}
-        </Text>
-      </Flex>
-      <Flex
-        flexDirection="column"
-        maxHeight={window.innerHeight - 270}
-        overflowY="scroll"
-        paddingRight="2rem"
-      >
+  const addModelFormSubmitHandler = (values: InvokeModelConfigProps) => {
+    dispatch(addNewModel(values));
+    dispatch(setAddNewModelUIOption(null));
+  };
+
+  const [addManually, setAddmanually] = React.useState<boolean>(false);
+
+  return (
+    <>
+      <IAIIconButton
+        aria-label={t('common:back')}
+        tooltip={t('common:back')}
+        onClick={() => dispatch(setAddNewModelUIOption(null))}
+        width="max-content"
+        position="absolute"
+        zIndex={1}
+        size="sm"
+        right={12}
+        top={3}
+        icon={<BiArrowBack />}
+      />
+
+      <SearchModels />
+      <IAICheckbox
+        label={t('modelmanager:addManually')}
+        isChecked={addManually}
+        onChange={() => setAddmanually(!addManually)}
+      />
+
+      {addManually && (
         <Formik
-          enableReinitialize={true}
-          initialValues={editModelFormValues}
-          onSubmit={editModelFormSubmitHandler}
+          initialValues={addModelFormValues}
+          onSubmit={addModelFormSubmitHandler}
         >
           {({ handleSubmit, errors, touched }) => (
             <form onSubmit={handleSubmit}>
-              <VStack rowGap={'0.5rem'} alignItems="start">
+              <VStack rowGap={'0.5rem'}>
+                <Text fontSize={20} fontWeight="bold" alignSelf={'start'}>
+                  {t('modelmanager:manual')}
+                </Text>
+                {/* Name */}
+                <FormControl
+                  isInvalid={!!errors.name && touched.name}
+                  isRequired
+                >
+                  <FormLabel htmlFor="name" fontSize="sm">
+                    {t('modelmanager:name')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="name"
+                      name="name"
+                      type="text"
+                      validate={baseValidation}
+                      width="2xl"
+                    />
+                    {!!errors.name && touched.name ? (
+                      <FormErrorMessage>{errors.name}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:nameValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
                 {/* Description */}
                 <FormControl
                   isInvalid={!!errors.description && touched.description}
@@ -129,7 +144,7 @@ export default function ModelEdit() {
                       id="description"
                       name="description"
                       type="text"
-                      width="lg"
+                      width="2xl"
                     />
                     {!!errors.description && touched.description ? (
                       <FormErrorMessage>{errors.description}</FormErrorMessage>
@@ -155,7 +170,7 @@ export default function ModelEdit() {
                       id="config"
                       name="config"
                       type="text"
-                      width="lg"
+                      width="2xl"
                     />
                     {!!errors.config && touched.config ? (
                       <FormErrorMessage>{errors.config}</FormErrorMessage>
@@ -181,7 +196,7 @@ export default function ModelEdit() {
                       id="weights"
                       name="weights"
                       type="text"
-                      width="lg"
+                      width="2xl"
                     />
                     {!!errors.weights && touched.weights ? (
                       <FormErrorMessage>{errors.weights}</FormErrorMessage>
@@ -204,7 +219,7 @@ export default function ModelEdit() {
                       id="vae"
                       name="vae"
                       type="text"
-                      width="lg"
+                      width="2xl"
                     />
                     {!!errors.vae && touched.vae ? (
                       <FormErrorMessage>{errors.vae}</FormErrorMessage>
@@ -237,6 +252,7 @@ export default function ModelEdit() {
                             min={MIN_MODEL_SIZE}
                             max={MAX_MODEL_SIZE}
                             step={64}
+                            width="90%"
                             value={form.values.width}
                             onChange={(value) =>
                               form.setFieldValue(field.name, Number(value))
@@ -274,6 +290,7 @@ export default function ModelEdit() {
                             name="height"
                             min={MIN_MODEL_SIZE}
                             max={MAX_MODEL_SIZE}
+                            width="90%"
                             step={64}
                             value={form.values.height}
                             onChange={(value) =>
@@ -299,26 +316,13 @@ export default function ModelEdit() {
                   className="modal-close-btn"
                   isLoading={isProcessing}
                 >
-                  {t('modelmanager:updateModel')}
+                  {t('modelmanager:addModel')}
                 </IAIButton>
               </VStack>
             </form>
           )}
         </Formik>
-      </Flex>
-    </Flex>
-  ) : (
-    <Flex
-      width="100%"
-      height="250px"
-      justifyContent="center"
-      alignItems="center"
-      backgroundColor="var(--background-color)"
-      borderRadius="0.5rem"
-    >
-      <Text fontWeight="bold" color="var(--subtext-color-bright)">
-        Pick A Model To Edit
-      </Text>
-    </Flex>
+      )}
+    </>
   );
 }

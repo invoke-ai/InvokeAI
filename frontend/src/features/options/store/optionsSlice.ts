@@ -57,6 +57,7 @@ export interface OptionsState {
   width: number;
   shouldUseCanvasBetaLayout: boolean;
   shouldShowExistingModelsInSearch: boolean;
+  addNewModelUIOption: 'ckpt' | 'diffusers' | null;
 }
 
 const initialOptionsState: OptionsState = {
@@ -105,6 +106,7 @@ const initialOptionsState: OptionsState = {
   width: 512,
   shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
+  addNewModelUIOption: null,
 };
 
 const initialState: OptionsState = initialOptionsState;
@@ -412,6 +414,12 @@ export const optionsSlice = createSlice({
     ) => {
       state.shouldShowExistingModelsInSearch = action.payload;
     },
+    setAddNewModelUIOption: (
+      state,
+      action: PayloadAction<'ckpt' | 'diffusers' | null>
+    ) => {
+      state.addNewModelUIOption = action.payload;
+    },
   },
 });
 
@@ -469,6 +477,7 @@ export const {
   setWidth,
   setShouldUseCanvasBetaLayout,
   setShouldShowExistingModelsInSearch,
+  setAddNewModelUIOption,
 } = optionsSlice.actions;
 
 export default optionsSlice.reducer;

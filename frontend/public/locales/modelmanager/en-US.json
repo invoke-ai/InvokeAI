@@ -16,6 +16,7 @@
   "config": "Config",
   "configValidationMsg": "Path to the config file of your model.",
   "modelLocation": "Model Location",
+  "repo_id": "Repo ID",
   "modelLocationValidationMsg": "Path to where your model is located.",
   "vaeLocation": "VAE Location",
   "vaeLocationValidationMsg": "Path to where your VAE is located.",
