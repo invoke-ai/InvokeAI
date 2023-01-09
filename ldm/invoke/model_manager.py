@@ -162,12 +162,49 @@ class ModelManager(object):
         models = {}
         for name in self.config:
             stanza = self.config[name]
-            format = stanza.get('format','ckpt')
-            config = stanza.get('config','no config')
-            models[name]=dict()
-            models[name].update(stanza)
-            models[name]['format'] = 'vae' if 'VAE/default' in config else format
-            models[name]['status'] = 'active' if self.current_model == name else 'cached' if name in self.models else 'not loaded'
+            models[name] = dict()
+            
+            format = stanza.get('format','ckpt') # Determine Format
+
+            # Common Attribs
+            description = stanza.get('description', None)
+            if self.current_model == name:
+                status = 'active'
+            elif name in self.models:
+                status = 'cached'
+            else:
+                status = 'not loaded'
+            
+            # Checkpoint Config Parse
+            if format == 'ckpt':
+                config = stanza.get('config', None)
+                weights = stanza.get('weights', None)
+                vae = stanza.get('vae', None)
+                width = stanza.get('width', 512)
+                height = stanza.get('height', 512)
+                models[name].update(
+                    description = description,
+                    format = format,
+                    config = config,
+                    weights = weights,
+                    vae = vae,
+                    width = width,
+                    height = height,
+                    status = status
+                )
+                
+            # Diffusers Config Parse
+            if format == 'diffusers':
+                repo_id = stanza.get('repo_id', None)
+                vae = stanza.get('vae', None)['repo_id']
+                models[name].update(
+                    description = description,
+                    format = format,
+                    repo_id = repo_id,
+                    vae = vae,
+                    status = status
+                )
+
         return models
 
     def print_models(self) -> None:
@@ -667,7 +704,7 @@ class ModelManager(object):
         if not os.path.isabs(config_file_path):
             config_file_path = os.path.normpath(os.path.join(Globals.root,config_file_path))
         tmpfile = os.path.join(os.path.dirname(config_file_path),'new_config.tmp')
-        with open(tmpfile, 'w') as outfile:
+        with open(tmpfile, 'w', encoding="utf-8") as outfile:
             outfile.write(self.preamble())
             outfile.write(yaml_str)
         os.replace(tmpfile,config_file_path)

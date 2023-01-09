@@ -170,6 +170,8 @@ export declare type Model = {
   width?: number;
   height?: number;
   default?: boolean;
+  format?: string;
+  repo_id?: string;
 };
 
 export declare type ModelList = Record<string, Model>;
@@ -187,6 +189,15 @@ export declare type InvokeModelConfigProps = {
   vae: string | undefined;
   width: number | undefined;
   height: number | undefined;
+  default: boolean | undefined;
+  format: string | undefined;
+};
+
+export declare type InvokeDiffusersModelConfigProps = {
+  name: string | undefined;
+  description: string | undefined;
+  repo_id: string | undefined;
+  vae: string | undefined;
   default: boolean | undefined;
 };
 
