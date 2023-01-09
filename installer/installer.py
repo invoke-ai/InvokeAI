@@ -2,6 +2,8 @@
 InvokeAI installer script
 """
 
+import os
+import platform
 import subprocess
 import sys
 import venv
@@ -10,15 +12,16 @@ from tempfile import TemporaryDirectory
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
 INSTALLER_REQS = ["rich", "semver"]
-PLATFORM = sys.platform
+
+OS = platform.uname().system
+ARCH = platform.uname().machine
+VERSION = "latest"
 
 ### Feature flags
-# Place the virtualenv inside the runtime dir
-# (default for 2.2.5) == True
+# Install the virtualenv into the runtime dir
 VENV_IN_RUNTIME = True
 
 # Install the wheel from pypi
-# (default for 2.2.5) == False
 USE_WHEEL = False
 
 
@@ -46,7 +49,7 @@ class Installer:
 
         pass
 
-    def inst_venv(self) -> TemporaryDirectory:
+    def mktemp_venv(self) -> TemporaryDirectory:
         """
         Creates a temporary virtual environment for the installer itself
 
@@ -56,7 +59,8 @@ class Installer:
 
         venv_dir = TemporaryDirectory(prefix="invokeai-installer-")
         venv.create(venv_dir.name, with_pip=True)
-        sys.path.append(f"{venv_dir.name}/lib/python{sys.version_info.major}.{sys.version_info.minor}/site-packages")
+        lib = "Lib" if OS == "Windows" else f"lib/python{sys.version_info.major}.{sys.version_info.minor}"
+        sys.path.append(str(Path(venv_dir.name, lib, "site-packages").absolute()))
 
         self.venv_dir = venv_dir
         return venv_dir
@@ -69,10 +73,11 @@ class Installer:
         :rtype: TemporaryDirectory
         """
 
-        print("Initializing the installer, please wait...")
+        print("Initializing the installer. This may take a minute - please wait...")
 
-        venv_dir = self.inst_venv()
-        pip = str(Path(venv_dir.name).absolute() / "bin/pip")
+        venv_dir = self.mktemp_venv()
+        pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
+        pip = str(Path(venv_dir.name).absolute() / pip)
 
         cmd = [pip, "install", "--require-virtualenv"]
         cmd.extend(self.reqs)

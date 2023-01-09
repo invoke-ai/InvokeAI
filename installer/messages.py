@@ -23,7 +23,7 @@ def welcome():
     console.rule()
     print(
         Panel(
-            title="[bold wheat1]Welcome to the InvokeAI Installer!",
+            title="[bold wheat1]Welcome to the InvokeAI Installer",
             renderable=Text(
                 "Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with control-C and retry.",
                 justify="center",
@@ -33,7 +33,7 @@ def welcome():
             expand=False,
             padding=(1, 2),
             style=Style(bgcolor="grey23", color="orange1"),
-            subtitle=f"[wheat1] Installing for [bold]{OS}-{ARCH}",
+            subtitle=f"[bold grey39]{OS}-{ARCH}",
         )
     )
     console.line()
