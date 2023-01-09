@@ -659,8 +659,7 @@ def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_des
     model_name = _get_model_name(model_manager.list_models(),completer,model_name)
     completer.linebuffer = model_description
     model_description = input(f'Description for this model [{model_description}]: ').strip() or model_description
-    default = input(f'Make this model the default? [n] ').startswith(('y','Y'))
-    return model_name, model_description, default
+    return model_name, model_description
 
 def optimize_model(model_name_or_path:str, gen, opt, completer):
     manager = gen.model_manager
@@ -725,9 +724,9 @@ def del_config(model_name:str, gen, opt, completer):
 
 def edit_config(model_name:str, gen, opt, completer):
     current_model = gen.model_name
-#    if model_name == current_model:
-#        print("** Can't edit the active model. !switch to another model first. **")
-#        return
+    if model_name == current_model:
+        print("** Can't edit the active model. !switch to another model first. **")
+        return
 
     manager = gen.model_manager
     if not (info := manager.model_info(model_name)):
@@ -735,17 +734,15 @@ def edit_config(model_name:str, gen, opt, completer):
         return
 
     print(f'\n>> Editing model {model_name} from configuration file {opt.conf}')
-    new_name,new_description,default = _get_model_name_and_desc(gen.model_manager,
-                                                                completer,
-                                                                model_name=model_name,
-                                                                model_description=info['description']
+    new_name,new_description = _get_model_name_and_desc(gen.model_manager,
+                                                        completer,
+                                                        model_name=model_name,
+                                                        model_description=info['description']
     )
     info['description'] = new_description
     if new_name != model_name:
         manager.add_model(new_name,info)
         manager.del_model(model_name)
-    if default:
-        manager.set_default_model(new_name)
     manager.commit(opt.conf)
     completer.update_models(manager.list_models())
     print('>> Model successfully updated')
@@ -759,7 +756,7 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
             model_name = default_name
         if not re.match('^[\w._-]+$',model_name):
             print('** model name must contain only words, digits and the characters [._-] **')
-        elif model_name != default_name and model_name in existing_names:
+        elif model_name in existing_names:
             print(f'** the name {model_name} is already in use. Pick another.')
         else:
             done = True

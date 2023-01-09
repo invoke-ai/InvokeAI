@@ -518,6 +518,10 @@ def do_textual_inversion_training(
     pretrained_model_name_or_path = model_conf.get('repo_id',None) or Path(model_conf.get('path'))
     assert pretrained_model_name_or_path, f"models.yaml error: neither 'repo_id' nor 'path' is defined for {model}"
     pipeline_args = dict()
+    if not isinstance(pretrained_model_name_or_path,Path):
+        pipeline_args.update(
+            cache_dir=os.path.join(Globals.root,'models',pretrained_model_name_or_path)
+        )
     
     # Load tokenizer
     if tokenizer_name:

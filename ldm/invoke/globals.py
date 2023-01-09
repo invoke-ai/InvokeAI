@@ -15,7 +15,6 @@ import os
 import os.path as osp
 from pathlib import Path
 from argparse import Namespace
-from typing import Union
 
 Globals = Namespace()
 
@@ -43,27 +42,12 @@ Globals.always_use_cpu = False
 # The CLI will test connectivity at startup time.
 Globals.internet_available = True
 
-def global_config_dir()->Path:
+def global_config_dir()->str:
     return Path(Globals.root, Globals.config_dir)
 
-def global_models_dir()->Path:
+def global_models_dir()->str:
     return Path(Globals.root, Globals.models_dir)
 
-def global_autoscan_dir()->Path:
+def global_autoscan_dir()->str:
     return Path(Globals.root, Globals.autoscan_dir)
 
-def global_set_root(root_dir:Union[str,Path]):
-    Globals.root = root_dir
-
-def global_cache_dir(subdir:Union[str,Path]='')->Path:
-    '''
-    Returns Path to the model cache directory. If a subdirectory
-    is provided, it will be appended to the end of the path, allowing
-    for huggingface-style conventions: 
-         global_cache_dir('diffusers')
-         global_cache_dir('transformers')
-    '''
-    if (home := os.environ.get('HF_HOME')):
-        return Path(home,subdir)
-    else:
-        return Path(Globals.root,'models',subdir)

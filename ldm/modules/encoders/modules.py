@@ -10,7 +10,7 @@ from einops import rearrange, repeat
 from transformers import CLIPTokenizer, CLIPTextModel
 import kornia
 from ldm.invoke.devices import choose_torch_device
-from ldm.invoke.globals import Globals, global_cache_dir
+from ldm.invoke.globals import Globals
 #from ldm.modules.textual_inversion_manager import TextualInversionManager
 
 from ldm.modules.x_transformer import (
@@ -109,7 +109,7 @@ class BERTTokenizer(AbstractEncoder):
             BertTokenizerFast,
         )
 
-        cache = global_cache_dir('hub')
+        cache = os.path.join(Globals.root,'models/bert-base-uncased')
         try:
             self.tokenizer = BertTokenizerFast.from_pretrained(
                 'bert-base-uncased',
@@ -249,7 +249,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         transformer:Optional[CLIPTextModel]=None,
     ):
         super().__init__()
-        cache = global_cache_dir('hub')
+        cache = os.path.join(Globals.root,'models',version)
         self.tokenizer = tokenizer or CLIPTokenizer.from_pretrained(
             version,
             cache_dir=cache,
