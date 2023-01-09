@@ -8,10 +8,10 @@ import subprocess
 import sys
 import venv
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, TemporaryFile
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
-INSTALLER_REQS = ["rich", "semver"]
+INSTALLER_REQS = ["rich", "semver", "requests"]
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -19,10 +19,12 @@ VERSION = "latest"
 
 ### Feature flags
 # Install the virtualenv into the runtime dir
-VENV_IN_RUNTIME = True
+FF_VENV_IN_RUNTIME = True
 
 # Install the wheel from pypi
-USE_WHEEL = False
+FF_USE_WHEEL = False
+
+INVOKE_AI_SRC=f"https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${VERSION}.zip"
 
 
 class Installer:
@@ -33,7 +35,9 @@ class Installer:
     def __init__(self) -> None:
         self.reqs = INSTALLER_REQS
         self.preflight()
-        self.bootstrap()
+        if os.getenv("VIRTUAL_ENV") is None:
+            # Only bootstrap if not already in a venv
+            self.bootstrap()
 
     def preflight(self) -> None:
         """
@@ -76,8 +80,7 @@ class Installer:
         print("Initializing the installer. This may take a minute - please wait...")
 
         venv_dir = self.mktemp_venv()
-        pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
-        pip = str(Path(venv_dir.name).absolute() / pip)
+        pip = self._get_venv_pip(Path(venv_dir.name))
 
         cmd = [pip, "install", "--require-virtualenv"]
         cmd.extend(self.reqs)
@@ -89,6 +92,42 @@ class Installer:
             return venv_dir
         except subprocess.CalledProcessError as e:
             print(e)
+
+    def app_venv(self, path: str = None):
+        """
+        Create a virtualenv for the InvokeAI installation
+        """
+
+        # explicit venv location
+        # currently unused in normal operation
+        # useful for testing or special cases
+        if path is not None:
+            venv_dir = Path(path)
+
+        # experimental / testing
+        #
+        elif not FF_VENV_IN_RUNTIME:
+            if OS == "Windows":
+                venv_dir_parent = os.getenv("APPDATA", "~/AppData/Roaming")
+            elif OS == "Darwin":
+                # there is no environment variable on macOS to find this
+                # TODO: confirm this is working as expected
+                venv_dir_parent = "~/Library/Application Support"
+            elif OS == "Linux":
+                venv_dir_parent = os.getenv("XDG_DATA_DIR", "~/.local/share")
+            venv_dir = Path(venv_dir_parent).expanduser().resolve() / f"InvokeAI/{VERSION}/venv"
+
+        # stable / current
+        else:
+            venv_dir = self.dest / ".venv"
+
+        venv.create(venv_dir, with_pip=True)
+        return venv_dir
+
+    def get_payload():
+        """
+        Obtain the InvokeAI installation payload
+        """
 
     def install(self, path: str = "~/invokeai", version: str = "latest") -> None:
         """
@@ -103,19 +142,75 @@ class Installer:
         from messages import dest_path, welcome
 
         welcome()
+
         self.dest = dest_path(path)
 
-    def application_venv():
+        self.venv = self.app_venv()
+
+        self.instance = InvokeAiInstance(runtime = self.dest, venv = self.venv)
+
+        self.instance.deploy()
+
+    @staticmethod
+    def _get_venv_pip(venv_path: Path) -> str:
         """
-        Create a virtualenv for the InvokeAI installation
+        Given a path to a virtual environment, get the absolute path to the `pip` executable
+        in a cross-platform fashion. Does not validate that the pip executable
+        actually exists in the virtualenv.
+
+        :param venv_path: Path to the virtual environment
+        :type venv_path: Path
+        :return: Absolute path to the pip executable
+        :rtype: str
         """
+
+        pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
+        return str(venv_path.absolute() / pip)
+
+class InvokeAiInstance:
+    """
+    Manages an installed instance of InvokeAI, which comprises of a virtual environment
+    and a runtime directory. The virtual environment *may* reside within the runtime directory.
+    """
+
+    def __init__(self, runtime: Path, venv: Path) -> None:
+        self.runtime = runtime
+        self.venv = venv
+        self.pip = Installer._get_venv_pip(venv)
+        os.environ["INVOKEAI_ROOT"] = str(self.runtime.expanduser().resolve())
+        os.environ["VIRTUAL_ENV"] = str(self.venv.expanduser().resolve())
+
+    def get(self) -> tuple[Path, Path]:
+        """
+        Get the location of the virtualenv directory for this installation
+
+        :return: Paths of the runtime and the venv directory
+        :rtype: tuple[Path, Path]
+        """
+
+        return (self.runtime, self.venv)
+
+    def deploy(self):
+
+        ### this is all very rough for now as a PoC
+        ### source installer basically
+
+        # python = str(Path(self.pip).parent / "python")
+
+        res = subprocess.check_output([self.pip, "install", "--require-virtualenv", "-r", (Path(__file__).parents[1] / "environments-and-requirements/requirements-base.txt").expanduser().resolve()])
+        print(res)
+        res = subprocess.check_output([self.pip, "install", Path(__file__).parents[1].expanduser().resolve()])
+        print(res)
+
+        # process = subprocess.Popen([python, Path(__file__).parents[1].expanduser().resolve() / "scripts/configure_invokeai.py"], stdout=subprocess.PIPE)
+        # for c in iter(lambda: process.stdout.read(1), b''):
+        #     sys.stdout.write(c)
+
+
+
+
+    def update(self):
         pass
 
-
-class InvokeAiDeployment:
-    """
-    Manages an installed instance of InvokeAI
-    """
-
-    def __init__(self, path) -> None:
+    def remove(self):
         pass
