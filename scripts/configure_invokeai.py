@@ -32,7 +32,7 @@ from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
 from transformers import CLIPTokenizer, CLIPTextModel
 
-from ldm.invoke.globals import Globals
+from ldm.invoke.globals import Globals, global_cache_dir
 from ldm.invoke.readline import generic_completer
 
 warnings.filterwarnings('ignore')
@@ -368,6 +368,7 @@ def _download_diffusion_weights(mconfig:DictConfig, access_token:str, precision:
             path = download_from_hf(
                 model_class,
                 repo_id,
+                cache_subdir='diffusers',
                 safety_checker=None,
                 **extra_args,
             )
@@ -535,9 +536,9 @@ def download_bert():
         print('...success',file=sys.stderr)
 
 #---------------------------------------------
-def download_from_hf(model_class:object, model_name:str, **kwargs):
+def download_from_hf(model_class:object, model_name:str, cache_subdir:Path=Path('hub'), **kwargs):
     print('',file=sys.stderr)  # to prevent tqdm from overwriting
-    path = os.path.join(Globals.root,Model_dir,model_name)
+    path = global_cache_dir(cache_subdir)
     model = model_class.from_pretrained(model_name,
                                         cache_dir=path,
                                         resume_download=True,

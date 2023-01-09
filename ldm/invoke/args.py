@@ -97,6 +97,7 @@ import ldm.invoke.pngwriter
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 from argparse import Namespace
+from pathlib import Path
 
 APP_ID = ldm.invoke.__app_id__
 APP_NAME = ldm.invoke.__app_name__
@@ -183,7 +184,7 @@ class Args(object):
                 sys.exit(0)
 
             print('* Initializing, be patient...')
-            Globals.root = os.path.abspath(switches.root_dir or Globals.root)
+            Globals.root = Path(os.path.abspath(switches.root_dir or Globals.root))
             Globals.try_patchmatch = switches.patchmatch
 
             # now use root directory to find the init file
