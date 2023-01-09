@@ -27,7 +27,7 @@ def infill_methods()->list[str]:
     methods.append('tile')
     return methods
 
-class Inpaint(CkptImg2Img):
+class CkptInpaint(CkptImg2Img):
     def __init__(self, model, precision):
         self.init_latent = None
         self.pil_image = None

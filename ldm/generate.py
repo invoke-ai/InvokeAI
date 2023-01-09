@@ -206,6 +206,7 @@ class Generate:
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         # don't accept invalid models
         fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
+        model = model or fallback
         if not self.model_manager.valid_model(model):
             print(f'** "{model}" is not a known model name; falling back to {fallback}.')
             model = None

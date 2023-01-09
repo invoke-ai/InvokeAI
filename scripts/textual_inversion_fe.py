@@ -5,7 +5,7 @@ import os
 import sys
 import curses
 import re
-from ldm.invoke.globals import Globals
+from ldm.invoke.globals import Globals, set_root
 from omegaconf import OmegaConf
 from pathlib import Path
 from typing import List
@@ -223,7 +223,7 @@ if __name__ == '__main__':
         help='Path to the invokeai runtime directory',
     )
     args = parser.parse_args()
-    Globals.root = args.root_dir
+    set_root(args.root_dir)
     
     myapplication = MyApplication()
     myapplication.run()

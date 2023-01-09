@@ -30,7 +30,7 @@ from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from ldm.invoke.globals import Globals, global_models_dir, global_autoscan_dir
+from ldm.invoke.globals import Globals, global_models_dir, global_autoscan_dir, global_cache_dir
 from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
@@ -370,7 +370,7 @@ class ModelManager(object):
              vae = self._load_vae(mconfig['vae'])
              pipeline_args.update(vae=vae)
         if not isinstance(name_or_path,Path):
-            pipeline_args.update(cache_dir=os.path.join(Globals.root,'models',name_or_path))
+            pipeline_args.update(cache_dir=global_cache_dir('diffusers'))
         if using_fp16:
             pipeline_args.update(torch_dtype=torch.float16)
             fp_args_list = [{'revision':'fp16'},{}]
@@ -791,7 +791,7 @@ class ModelManager(object):
         using_fp16 = self.precision == 'float16'
 
         vae_args.update(
-            cache_dir=os.path.join(Globals.root,'models',name_or_path),
+            cache_dir=global_cache_dir('diffusers'),
             local_files_only=not Globals.internet_available,
         )
 
