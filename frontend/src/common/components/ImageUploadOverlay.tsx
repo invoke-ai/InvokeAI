@@ -24,13 +24,13 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
     <div className="dropzone-container">
       {isDragAccept && (
         <div className="dropzone-overlay is-drag-accept">
-          <Heading size={'lg'}>Upload Image{overlaySecondaryText}</Heading>
+          <Heading size="lg">Upload Image{overlaySecondaryText}</Heading>
         </div>
       )}
       {isDragReject && (
         <div className="dropzone-overlay is-drag-reject">
-          <Heading size={'lg'}>Invalid Upload</Heading>
-          <Heading size={'md'}>Must be single JPEG or PNG image</Heading>
+          <Heading size="lg">Invalid Upload</Heading>
+          <Heading size="md">Must be single JPEG or PNG image</Heading>
         </div>
       )}
     </div>

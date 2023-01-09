@@ -168,12 +168,12 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     >
       <ContextMenu.Trigger>
         <Box
-          position={'relative'}
+          position="relative"
           key={uuid}
           className="hoverable-image"
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
-          userSelect={'none'}
+          userSelect="none"
           draggable={true}
           onDragStart={handleDragStart}
         >
@@ -182,15 +182,15 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             objectFit={
               shouldUseSingleGalleryColumn ? 'contain' : galleryImageObjectFit
             }
-            rounded={'md'}
+            rounded="md"
             src={thumbnail || url}
-            loading={'lazy'}
+            loading="lazy"
           />
           <div className="hoverable-image-content" onClick={handleSelectImage}>
             {isSelected && (
               <Icon
-                width={'50%'}
-                height={'50%'}
+                width="50%"
+                height="50%"
                 as={FaCheck}
                 className="hoverable-image-check"
               />
@@ -203,7 +203,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
                   aria-label={t('options:deleteImage')}
                   icon={<FaTrashAlt />}
                   size="xs"
-                  variant={'imageHoverIconButton'}
+                  variant="imageHoverIconButton"
                   fontSize={14}
                   isDisabled={!mayDeleteImage}
                 />
@@ -214,7 +214,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
       </ContextMenu.Trigger>
       <ContextMenu.Content
         className="hoverable-image-context-menu"
-        sticky={'always'}
+        sticky="always"
         onInteractOutside={(e) => {
           e.detail.originalEvent.preventDefault();
         }}

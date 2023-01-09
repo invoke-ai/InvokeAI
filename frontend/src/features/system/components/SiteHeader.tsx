@@ -42,7 +42,7 @@ const SiteHeader = () => {
           <IAIIconButton
             aria-label={t('modelmanager:modelManager')}
             tooltip={t('modelmanager:modelManager')}
-            size={'sm'}
+            size="sm"
             variant="link"
             data-variant="link"
             fontSize={20}
@@ -54,7 +54,7 @@ const SiteHeader = () => {
           <IAIIconButton
             aria-label={t('common:hotkeysLabel')}
             tooltip={t('common:hotkeysLabel')}
-            size={'sm'}
+            size="sm"
             variant="link"
             data-variant="link"
             fontSize={20}
@@ -72,7 +72,7 @@ const SiteHeader = () => {
           variant="link"
           data-variant="link"
           fontSize={20}
-          size={'sm'}
+          size="sm"
           icon={
             <Link isExternal href="http://github.com/invoke-ai/InvokeAI/issues">
               <FaBug />
@@ -86,7 +86,7 @@ const SiteHeader = () => {
           variant="link"
           data-variant="link"
           fontSize={20}
-          size={'sm'}
+          size="sm"
           icon={
             <Link isExternal href="http://github.com/invoke-ai/InvokeAI">
               <FaGithub />
@@ -100,7 +100,7 @@ const SiteHeader = () => {
           variant="link"
           data-variant="link"
           fontSize={20}
-          size={'sm'}
+          size="sm"
           icon={
             <Link isExternal href="https://discord.gg/ZmtBAhwWhy">
               <FaDiscord />
@@ -115,7 +115,7 @@ const SiteHeader = () => {
             variant="link"
             data-variant="link"
             fontSize={22}
-            size={'sm'}
+            size="sm"
             icon={<MdSettings />}
           />
         </SettingsModal>

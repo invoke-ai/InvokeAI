@@ -27,7 +27,7 @@ const EmptyTempFolderButtonModal = () => {
       acceptCallback={acceptCallback}
       acceptButtonText={t('unifiedcanvas:emptyFolder')}
       triggerComponent={
-        <IAIButton leftIcon={<FaTrash />} size={'sm'} isDisabled={isStaging}>
+        <IAIButton leftIcon={<FaTrash />} size="sm" isDisabled={isStaging}>
           {t('unifiedcanvas:emptyTempImageFolder')}
         </IAIButton>
       }

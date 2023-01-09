@@ -171,7 +171,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             x={brushX}
             y={brushY}
             radius={radius}
-            stroke={'rgba(255,255,255,0.4)'}
+            stroke="rgba(255,255,255,0.4)"
             strokeWidth={strokeWidth * 2}
             strokeEnabled={true}
             listening={false}
@@ -180,7 +180,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
             x={brushX}
             y={brushY}
             radius={radius}
-            stroke={'rgba(0,0,0,1)'}
+            stroke="rgba(0,0,0,1)"
             strokeWidth={strokeWidth}
             strokeEnabled={true}
             listening={false}
@@ -191,14 +191,14 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
         x={brushX}
         y={brushY}
         radius={dotRadius * 2}
-        fill={'rgba(255,255,255,0.4)'}
+        fill="rgba(255,255,255,0.4)"
         listening={false}
       />
       <Circle
         x={brushX}
         y={brushY}
         radius={dotRadius}
-        fill={'rgba(0,0,0,1)'}
+        fill="rgba(0,0,0,1)"
         listening={false}
       />
     </Group>

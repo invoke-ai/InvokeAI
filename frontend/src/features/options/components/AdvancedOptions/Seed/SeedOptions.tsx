@@ -10,7 +10,7 @@ import Perlin from './Perlin';
  */
 const SeedOptions = () => {
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <RandomizeSeed />
       <Flex gap={2}>
         <Seed />

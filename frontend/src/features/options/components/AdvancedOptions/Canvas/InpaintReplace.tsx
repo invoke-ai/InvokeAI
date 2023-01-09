@@ -36,7 +36,7 @@ export default function InpaintReplace() {
   const { t } = useTranslation();
 
   return (
-    <Flex alignItems={'center'} columnGap={'1rem'}>
+    <Flex alignItems="center" columnGap="1rem">
       <IAISlider
         label={t('options:inpaintReplace')}
         value={inpaintReplace}

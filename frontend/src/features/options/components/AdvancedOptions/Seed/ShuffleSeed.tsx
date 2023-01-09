@@ -19,7 +19,7 @@ export default function ShuffleSeed() {
 
   return (
     <Button
-      size={'sm'}
+      size="sm"
       isDisabled={shouldRandomizeSeed}
       onClick={handleClickRandomizeSeed}
       padding="0 1.5rem"

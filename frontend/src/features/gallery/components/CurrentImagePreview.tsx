@@ -81,7 +81,7 @@ export default function CurrentImagePreview() {
   };
 
   return (
-    <div className={'current-image-preview'}>
+    <div className="current-image-preview">
       {imageToDisplay && (
         <Image
           src={imageToDisplay.url}

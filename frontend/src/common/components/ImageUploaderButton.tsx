@@ -22,7 +22,7 @@ const ImageUploaderButton = (props: ImageUploaderButtonProps) => {
     >
       <div className="image-upload-button">
         <FaUpload />
-        <Heading size={'lg'}>Click or Drag and Drop</Heading>
+        <Heading size="lg">Click or Drag and Drop</Heading>
       </div>
     </div>
   );

@@ -20,10 +20,10 @@ const SeamlessOptions = () => {
   const { t } = useTranslation();
 
   return (
-    <Flex gap={2} direction={'column'}>
+    <Flex gap={2} direction="column">
       <IAISwitch
         label={t('options:seamlessTiling')}
-        fontSize={'md'}
+        fontSize="md"
         isChecked={seamless}
         onChange={handleChangeSeamless}
       />

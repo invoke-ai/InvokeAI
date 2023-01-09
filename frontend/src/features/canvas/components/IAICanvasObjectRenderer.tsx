@@ -92,8 +92,8 @@ const IAICanvasObjectRenderer = () => {
               y={obj.y}
               width={obj.width}
               height={obj.height}
-              fill={'rgb(255, 255, 255)'}
-              globalCompositeOperation={'destination-out'}
+              fill="rgb(255, 255, 255)"
+              globalCompositeOperation="destination-out"
             />
           );
         }

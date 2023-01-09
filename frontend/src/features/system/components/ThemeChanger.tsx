@@ -64,7 +64,7 @@ export default function ThemeChanger() {
       triggerComponent={
         <IAIIconButton
           aria-label={t('common:themeLabel')}
-          size={'sm'}
+          size="sm"
           variant="link"
           data-variant="link"
           fontSize={20}

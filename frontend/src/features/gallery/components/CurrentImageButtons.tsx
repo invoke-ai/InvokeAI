@@ -378,28 +378,28 @@ const CurrentImageButtons = () => {
         >
           <div className="current-image-send-to-popover">
             <IAIButton
-              size={'sm'}
+              size="sm"
               onClick={handleClickUseAsInitialImage}
               leftIcon={<FaShare />}
             >
               {t('options:sendToImg2Img')}
             </IAIButton>
             <IAIButton
-              size={'sm'}
+              size="sm"
               onClick={handleSendToCanvas}
               leftIcon={<FaShare />}
             >
               {t('options:sendToUnifiedCanvas')}
             </IAIButton>
             <IAIButton
-              size={'sm'}
+              size="sm"
               onClick={handleCopyImageLink}
               leftIcon={<FaCopy />}
             >
               {t('options:copyImageToLink')}
             </IAIButton>
 
-            <IAIButton leftIcon={<FaDownload />} size={'sm'}>
+            <IAIButton leftIcon={<FaDownload />} size="sm">
               <Link download={true} href={currentImage?.url}>
                 {t('options:downloadImage')}
               </Link>

@@ -23,8 +23,8 @@ export default function InvokeAccordionItem(props: InvokeAccordionItemProps) {
   return (
     <AccordionItem className="advanced-settings-item">
       <AccordionButton className="advanced-settings-header">
-        <Flex width={'100%'} gap={'0.5rem'} align={'center'}>
-          <Box flexGrow={1} textAlign={'left'}>
+        <Flex width="100%" gap="0.5rem" align="center">
+          <Box flexGrow={1} textAlign="left">
             {header}
           </Box>
           {additionalHeaderComponents}
