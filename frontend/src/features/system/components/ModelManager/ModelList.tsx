@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useTransition, useMemo } from 'react';
 import { Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import IAIInput from 'common/components/IAIInput';
@@ -21,33 +21,35 @@ const modelListSelector = createSelector(
     const models = _.map(system.model_list, (model, key) => {
       return { name: key, ...model };
     });
-
-    const activeModel = models.find((model) => model.status === 'active');
-
-    return {
-      models,
-      activeModel: activeModel,
-    };
+    return models;
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: _.isEqual,
+    },
   }
 );
 
 const ModelList = () => {
-  const { models } = useAppSelector(modelListSelector);
+  const models = useAppSelector(modelListSelector);
 
   const [searchText, setSearchText] = useState<string>('');
+  const [_, startTransition] = useTransition();
 
   const { t } = useTranslation();
 
-  const handleSearchFilter = _.debounce((e: ChangeEvent<HTMLInputElement>) => {
-    setSearchText(e.target.value);
-  }, 400);
+  const handleSearchFilter = (e: ChangeEvent<HTMLInputElement>) => {
+    startTransition(() => {
+      setSearchText(e.target.value);
+    });
+  };
 
-  const renderModelListItems = () => {
+  const renderModelListItems = useMemo(() => {
     const modelListItemsToRender: ReactNode[] = [];
     const filteredModelListItemsToRender: ReactNode[] = [];
 
     models.forEach((model, i) => {
-      if (model.name.startsWith(searchText)) {
+      if (model.name.includes(searchText.toLowerCase())) {
         filteredModelListItemsToRender.push(
           <ModelListItem
             key={i}
@@ -70,7 +72,7 @@ const ModelList = () => {
     return searchText !== ''
       ? filteredModelListItemsToRender
       : modelListItemsToRender;
-  };
+  }, [models, searchText]);
 
   return (
     <Flex flexDirection={'column'} rowGap="2rem" width="50%" minWidth="50%">
@@ -93,7 +95,7 @@ const ModelList = () => {
         overflow={'scroll'}
         paddingRight="1rem"
       >
-        {renderModelListItems()}
+        {renderModelListItems}
       </Flex>
     </Flex>
   );
