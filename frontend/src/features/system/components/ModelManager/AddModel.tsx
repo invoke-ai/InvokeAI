@@ -65,6 +65,7 @@ export default function AddModel() {
     vae: '',
     width: 512,
     height: 512,
+    format: 'ckpt',
     default: false,
   };
 

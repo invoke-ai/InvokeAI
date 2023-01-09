@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Flex, Text } from '@chakra-ui/react';
+import { Box, Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import IAIInput from 'common/components/IAIInput';
 
@@ -22,17 +22,12 @@ const modelListSelector = createSelector(
       return { name: key, ...model };
     });
 
-    const activeModel = models.find((model) => model.status === 'active');
-
-    return {
-      models,
-      activeModel: activeModel,
-    };
+    return models;
   }
 );
 
 const ModelList = () => {
-  const { models } = useAppSelector(modelListSelector);
+  const models = useAppSelector(modelListSelector);
 
   const [searchText, setSearchText] = useState<string>('');
 
@@ -43,7 +38,8 @@ const ModelList = () => {
   }, 400);
 
   const renderModelListItems = () => {
-    const modelListItemsToRender: ReactNode[] = [];
+    const ckptModelListItemsToRender: ReactNode[] = [];
+    const diffusersModelListItemsToRender: ReactNode[] = [];
     const filteredModelListItemsToRender: ReactNode[] = [];
 
     models.forEach((model, i) => {
@@ -57,19 +53,59 @@ const ModelList = () => {
           />
         );
       }
-      modelListItemsToRender.push(
-        <ModelListItem
-          key={i}
-          name={model.name}
-          status={model.status}
-          description={model.description}
-        />
-      );
+      if (model.format !== 'diffusers') {
+        ckptModelListItemsToRender.push(
+          <ModelListItem
+            key={i}
+            name={model.name}
+            status={model.status}
+            description={model.description}
+          />
+        );
+      } else {
+        diffusersModelListItemsToRender.push(
+          <ModelListItem
+            key={i}
+            name={model.name}
+            status={model.status}
+            description={model.description}
+          />
+        );
+      }
     });
 
-    return searchText !== ''
-      ? filteredModelListItemsToRender
-      : modelListItemsToRender;
+    return searchText !== '' ? (
+      filteredModelListItemsToRender
+    ) : (
+      <Flex flexDirection="column" rowGap="1.5rem">
+        <Box>
+          <Text
+            fontWeight="bold"
+            backgroundColor="var(--background-color)"
+            padding="0.5rem 1rem"
+            borderRadius="0.5rem"
+            marginBottom="0.5rem"
+            width="max-content"
+          >
+            Checkpoint Models
+          </Text>
+          {ckptModelListItemsToRender}
+        </Box>
+        <Box>
+          <Text
+            fontWeight="bold"
+            backgroundColor="var(--background-color)"
+            padding="0.5rem 1rem"
+            borderRadius="0.5rem"
+            marginBottom="0.5rem"
+            width="max-content"
+          >
+            Diffusers Models
+          </Text>
+          {diffusersModelListItemsToRender}
+        </Box>
+      </Flex>
+    );
   };
 
   return (
