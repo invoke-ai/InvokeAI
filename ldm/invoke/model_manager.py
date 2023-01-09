@@ -352,7 +352,6 @@ class ModelManager(object):
 
     def _load_diffusers_model(self, mconfig):
         name_or_path = self.model_name_or_path(mconfig)
-        model_hash = 'FIXME'
         using_fp16 = self.precision == 'float16'
 
         print(f'>> Loading diffusers model from {name_or_path}')
@@ -401,6 +400,8 @@ class ModelManager(object):
         assert pipeline is not None, OSError(f'"{name_or_path}" could not be loaded')
 
         pipeline.to(self.device)
+
+        model_hash = self._hash_diffuser(name_or_path)
 
         # square images???
         width = pipeline.unet.config.sample_size * pipeline.vae_scale_factor
@@ -761,6 +762,36 @@ class ModelManager(object):
 
     def _has_cuda(self) -> bool:
         return self.device.type == 'cuda'
+
+    def _diffuser_sha256(self,name_or_path:Union[str, Path])->Union[str,bytes]:
+        path = None
+        if isinstance(name_or_path,Path):
+           path = name_or_path
+        else:
+            owner,repo = name_or_path.split('/')
+            path = Path(global_cache_dir('diffusers') / f'models--{owner}--{repo}')
+        if not path.exists():
+            return None
+        hashpath = path / 'checksum.sha256'
+        if hashpath.exists() and path.stat().st_mtime <= hashpath.stat().st_mtime:
+            with open(hashpath) as f:
+                hash = f.read()
+            return hash
+        print('>> Calculating sha256 hash of models files')
+        tic = time.time()
+        sha = hashlib.sha256()
+        count = 0
+        for root, dirs, files in os.walk(path):
+            for name in files:
+                count += 1
+                with open(os.path.join(root,name),'rb') as f:
+                    sha.update(f.read())
+        hash = sha.hexdigest()
+        toc = time.time()
+        print(f'>> sha256 = {hash} ({count} files hashed in','%4.2fs)' % (toc - tic))
+        with open(hashpath,'w') as f:
+            f.write(hash)
+        return hash
 
     def _cached_sha256(self,path,data) -> Union[str, bytes]:
         dirname    = os.path.dirname(path)
