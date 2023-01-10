@@ -596,7 +596,7 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
     manager = gen.model_manager
     default_name = Path(path_or_repo).stem
     default_description = f'Imported model {default_name}'
-    model_name, model_description = _get_model_name_and_desc(
+    model_name, model_description, default = _get_model_name_and_desc(
         manager,
         completer,
         model_name=default_name,
@@ -609,13 +609,15 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
             description = model_description):
         print('** model failed to import')
         return None
+    if default:
+        manager.set_default_model(model_name)
     return model_name
 
 def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
     manager = gen.model_manager
     default_name = Path(path_or_url).stem
     default_description = f'Imported model {default_name}'
-    model_name, model_description = _get_model_name_and_desc(
+    model_name, model_description, default = _get_model_name_and_desc(
         manager,
         completer,
         model_name=default_name,
@@ -640,6 +642,8 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
         print('** model failed to import')
         return None
 
+    if default:
+        manager.set_model_default(model_name)
     return model_name
 
 def _verify_load(model_name:str, gen)->bool:
@@ -676,7 +680,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
             return
     elif os.path.exists(model_name_or_path):
         ckpt_path = Path(model_name_or_path)
-        model_name,model_description = _get_model_name_and_desc(
+        model_name,model_description, default = _get_model_name_and_desc(
             manager,
             completer,
             ckpt_path.stem,

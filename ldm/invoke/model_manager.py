@@ -196,7 +196,9 @@ class ModelManager(object):
             # Diffusers Config Parse
             if format == 'diffusers':
                 repo_id = stanza.get('repo_id', None)
-                vae = stanza.get('vae', None)['repo_id']
+                vae = None
+                if 'vae' in stanza:
+                    vae = stanza['vae'].get('repo_id',None)
                 models[name].update(
                     description = description,
                     format = format,
