@@ -63,6 +63,7 @@ export default function AddModel() {
 
   const addModelModalClose = () => {
     onClose();
+    dispatch(setAddNewModelUIOption(null));
   };
 
   return (
