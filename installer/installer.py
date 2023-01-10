@@ -11,7 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory, TemporaryFile
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
-INSTALLER_REQS = ["rich", "semver", "requests", "plumbum"]
+INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -127,6 +127,8 @@ class Installer:
         """
         Obtain the InvokeAI installation payload
         """
+
+        pass
 
     def install(self, path: str = "~/invokeai", version: str = "latest") -> None:
         """
