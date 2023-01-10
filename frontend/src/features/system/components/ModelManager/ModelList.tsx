@@ -43,7 +43,7 @@ const ModelList = () => {
     const filteredModelListItemsToRender: ReactNode[] = [];
 
     models.forEach((model, i) => {
-      if (model.name.startsWith(searchText)) {
+      if (model.name.toLowerCase().startsWith(searchText.toLowerCase())) {
         filteredModelListItemsToRender.push(
           <ModelListItem
             key={i}

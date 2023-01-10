@@ -197,8 +197,11 @@ export declare type InvokeDiffusersModelConfigProps = {
   name: string | undefined;
   description: string | undefined;
   repo_id: string | undefined;
-  vae: string | undefined;
   default: boolean | undefined;
+  format: string | undefined;
+  vae: {
+    repo_id: string | undefined;
+  };
 };
 
 /**

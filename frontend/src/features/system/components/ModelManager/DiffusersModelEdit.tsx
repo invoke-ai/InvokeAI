@@ -57,8 +57,9 @@ export default function DiffusersModelEdit() {
       name: '',
       description: '',
       repo_id: '',
-      vae: '',
+      vae: { repo_id: '' },
       default: false,
+      format: 'diffusers',
     });
 
   useEffect(() => {
@@ -66,14 +67,18 @@ export default function DiffusersModelEdit() {
       const retrievedModel = _.pickBy(model_list, (val, key) => {
         return _.isEqual(key, openModel);
       });
+
       setEditModelFormValues({
         name: openModel,
         description: retrievedModel[openModel]?.description,
         repo_id: retrievedModel[openModel]?.repo_id,
-        vae: retrievedModel[openModel]?.vae
-          ? retrievedModel[openModel]?.vae
-          : '',
+        vae: {
+          repo_id: retrievedModel[openModel]?.vae
+            ? retrievedModel[openModel]?.vae
+            : '',
+        },
         default: retrievedModel[openModel]?.default,
+        format: 'diffusers',
       });
     }
   }, [model_list, openModel]);
@@ -158,20 +163,22 @@ export default function DiffusersModelEdit() {
                 </FormControl>
 
                 {/* VAE */}
-                <FormControl isInvalid={!!errors.vae && touched.vae}>
+                <FormControl
+                  isInvalid={!!errors.vae?.repo_id && touched.vae?.repo_id}
+                >
                   <FormLabel htmlFor="vae" fontSize="sm">
                     {t('modelmanager:vaeLocation')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
                     <Field
                       as={IAIInput}
-                      id="vae"
-                      name="vae"
+                      id="vae.repo_id"
+                      name="vae.repo_id"
                       type="text"
                       width="lg"
                     />
-                    {!!errors.vae && touched.vae ? (
-                      <FormErrorMessage>{errors.vae}</FormErrorMessage>
+                    {!!errors.vae?.repo_id && touched.vae?.repo_id ? (
+                      <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
                         {t('modelmanager:vaeLocationValidationMsg')}
