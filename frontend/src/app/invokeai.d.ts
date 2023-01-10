@@ -169,6 +169,10 @@ export declare type Model = {
   vae?: string;
   width?: number;
   height?: number;
+  image?: string;
+  url?: string;
+  markdown?: string;
+  tags?: string;
   default?: boolean;
 };
 
@@ -187,6 +191,10 @@ export declare type InvokeModelConfigProps = {
   vae: string | undefined;
   width: number | undefined;
   height: number | undefined;
+  image: string | undefined;
+  url: string | undefined;
+  markdown: string | undefined;
+  tags: string | undefined;
   default: boolean | undefined;
 };
 

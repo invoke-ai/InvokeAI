@@ -139,6 +139,10 @@ class ModelCache(object):
             config = self.config[name].config if 'config' in self.config[name] else '<no config>'
             width = self.config[name].width if 'width' in self.config[name] else 512
             height = self.config[name].height if 'height' in self.config[name] else 512
+            image = self.config[name].image if 'image' in self.config[name] else ''
+            url = self.config[name].url if 'url' in self.config[name] else ''
+            tags = self.config[name].tags if 'tags' in self.config[name] else ''
+            markdown = self.config[name].markdown if 'markdown' in self.config[name] else ''
             default = self.config[name].default if 'default' in self.config[name] else False
             vae = self.config[name].vae if 'vae' in self.config[name] else '<no vae>'
 
@@ -156,6 +160,10 @@ class ModelCache(object):
                 'config': config,
                 'width': width,
                 'height': height,
+                'image': image,
+                'url': url,
+                'tags': tags,
+                'markdown': markdown,
                 'vae': vae,
                 'default': default
             }
