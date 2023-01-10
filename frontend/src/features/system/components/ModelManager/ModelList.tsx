@@ -122,9 +122,9 @@ const ModelList = () => {
 
     return searchText !== '' ? (
       isSelectedFilter === 'all' ? (
-        filteredModelListItemsToRender
+        <Box marginTop="1rem">{filteredModelListItemsToRender}</Box>
       ) : (
-        localFilteredModelListItemsToRender
+        <Box marginTop="1rem">{localFilteredModelListItemsToRender}</Box>
       )
     ) : (
       <Flex flexDirection="column" rowGap="1.5rem">
@@ -162,11 +162,15 @@ const ModelList = () => {
         )}
 
         {isSelectedFilter === 'ckpt' && (
-          <Flex flexDirection="column">{ckptModelListItemsToRender}</Flex>
+          <Flex flexDirection="column" marginTop="1rem">
+            {ckptModelListItemsToRender}
+          </Flex>
         )}
 
         {isSelectedFilter === 'diffusers' && (
-          <Flex flexDirection="column">{diffusersModelListItemsToRender}</Flex>
+          <Flex flexDirection="column" marginTop="1rem">
+            {diffusersModelListItemsToRender}
+          </Flex>
         )}
       </Flex>
     );
