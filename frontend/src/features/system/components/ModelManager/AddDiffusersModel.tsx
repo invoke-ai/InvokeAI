@@ -75,21 +75,19 @@ export default function AddDiffusersModel() {
   const addModelFormSubmitHandler = (
     values: InvokeDiffusersModelConfigProps
   ) => {
-    let diffusersModelToAdd = values;
+    const diffusersModelToAdd = values;
 
-    if (values.repo_id !== '' && values.vae.repo_id === '') {
-      diffusersModelToAdd = {
-        ...diffusersModelToAdd,
-        vae: { repo_id: values.repo_id + '/vae', path: '' },
-      };
+    if (values.path === '') diffusersModelToAdd['path'] = undefined;
+    if (values.repo_id === '') diffusersModelToAdd['repo_id'] = undefined;
+    if (values.vae.path === '') {
+      if (values.path === undefined) {
+        diffusersModelToAdd['vae']['path'] = undefined;
+      } else {
+        diffusersModelToAdd['vae']['path'] = values.path + '/vae';
+      }
     }
-
-    if (values.path !== '' && values.vae.path === '') {
-      diffusersModelToAdd = {
-        ...diffusersModelToAdd,
-        vae: { repo_id: '', path: values.path + '/vae' },
-      };
-    }
+    if (values.vae.repo_id === '')
+      diffusersModelToAdd['vae']['repo_id'] = undefined;
 
     dispatch(addNewModel(diffusersModelToAdd));
     dispatch(setAddNewModelUIOption(null));
@@ -188,10 +186,7 @@ export default function AddDiffusersModel() {
                 </Text>
 
                 {/* Path */}
-                <FormControl
-                  isInvalid={!!errors.path && touched.path}
-                  isRequired
-                >
+                <FormControl isInvalid={!!errors.path && touched.path}>
                   <FormLabel htmlFor="path" fontSize="sm">
                     {t('modelmanager:modelLocation')}
                   </FormLabel>
@@ -202,7 +197,6 @@ export default function AddDiffusersModel() {
                       name="path"
                       type="text"
                       width="2xl"
-                      isRequired
                     />
                     {!!errors.path && touched.path ? (
                       <FormErrorMessage>{errors.path}</FormErrorMessage>
