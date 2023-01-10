@@ -91,7 +91,13 @@ export default function CheckpointModelEdit() {
   }, [model_list, openModel]);
 
   const editModelFormSubmitHandler = (values: InvokeModelConfigProps) => {
-    dispatch(addNewModel(values));
+    dispatch(
+      addNewModel({
+        ...values,
+        width: Number(values.width),
+        height: Number(values.height),
+      })
+    );
   };
 
   return openModel ? (
