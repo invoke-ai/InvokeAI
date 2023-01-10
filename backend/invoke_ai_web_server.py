@@ -334,6 +334,8 @@ class InvokeAIWebServer:
                 model_name = new_model_config['name']
                 del new_model_config['name']
                 model_attributes = new_model_config
+                if len(model_attributes['vae']) == 0:
+                    del model_attributes['vae']
                 update = False
                 current_model_list = self.generate.model_manager.list_models()
                 if model_name in current_model_list:
