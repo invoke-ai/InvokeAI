@@ -289,7 +289,7 @@ class PromptParser():
 
         return self.flatten(root[0])
 
-    def parse_legacy_blend(self, text: str, skip_normalize: bool) -> Optional[Blend]:
+    def parse_legacy_blend(self, text: str, skip_normalize: bool = False) -> Optional[Blend]:
         weighted_subprompts = split_weighted_subprompts(text, skip_normalize=skip_normalize)
         if len(weighted_subprompts) <= 1:
             return None
@@ -652,4 +652,3 @@ def split_weighted_subprompts(text, skip_normalize=False)->list:
         equal_weight = 1 / max(len(parsed_prompts), 1)
         return [(x[0], equal_weight) for x in parsed_prompts]
     return [(x[0], x[1] / weight_sum) for x in parsed_prompts]
-

@@ -61,7 +61,7 @@ setup(
     packages=find_packages(exclude=['tests.*']),
     install_requires=REQUIREMENTS,
     dependency_links=['https://download.pytorch.org/whl/torch_stable.html'],
-    python_requires='>=3.9, <4',
+    python_requires='>=3.9, <3.11',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: GPU',
@@ -85,8 +85,9 @@ setup(
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
     scripts = ['scripts/invoke.py','scripts/configure_invokeai.py', 'scripts/sd-metadata.py',
-               'scripts/preload_models.py', 'scripts/images2prompt.py','scripts/merge_embeddings.py',
+               'scripts/images2prompt.py','scripts/merge_embeddings.py',
                'scripts/textual_inversion_fe.py','scripts/textual_inversion.py'
     ],
     data_files=FRONTEND_FILES,
+    include_package_data=True,
 )
