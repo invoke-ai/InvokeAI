@@ -37,10 +37,13 @@ class TextualInversionManager():
         for concept_name in concepts:
             if concept_name in self.hf_concepts_library.concepts_loaded:
                 continue
+            trigger = self.hf_concepts_library.concept_to_trigger(concept_name)
+            if self.has_textual_inversion_for_trigger_string(trigger):
+                continue
             bin_file = self.hf_concepts_library.get_concept_model_path(concept_name)
             if not bin_file:
                 continue
-            self.load_textual_inversion(bin_file, defer_injecting_tokens=False)
+            self.load_textual_inversion(bin_file)
             self.hf_concepts_library.concepts_loaded[concept_name]=True
 
     def get_all_trigger_strings(self) -> list[str]:
