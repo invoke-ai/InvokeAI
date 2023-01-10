@@ -589,6 +589,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
         :param include_start_and_end_markers:
         :return:
         """
+
         # for args documentation see ENCODE_KWARGS_DOCSTRING in tokenization_utils_base.py (in `transformers` lib)
         token_ids_list = self.tokenizer(
             fragments,
@@ -604,7 +605,7 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
             # trim eos/bos
             token_ids = token_ids[1:-1]
             # pad for textual inversions with vector length >1
-            token_ids = self.textual_inversion_manager.expand_textual_inversion_token_ids(token_ids)
+            token_ids = self.textual_inversion_manager.expand_textual_inversion_token_ids_if_necessary(token_ids)
             # restrict length to max_length-2 (leaving room for bos/eos)
             token_ids = token_ids[0:self.max_length - 2]
             # add back eos/bos if requested
