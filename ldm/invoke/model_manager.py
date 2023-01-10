@@ -668,11 +668,14 @@ class ModelManager(object):
         completer.del_model(model_name)
 
     def search_models(self, search_folder):
-
         print(f'>> Finding Models In: {search_folder}')
-        models_folder = Path(search_folder).glob('**/*.ckpt')
+        models_folder_ckpt = Path(search_folder).glob('**/*.ckpt')
+        models_folder_safetensors = Path(search_folder).glob('**/*.safetensors')
 
-        files = [x for x in models_folder if x.is_file()]
+        ckpt_files = [x for x in models_folder_ckpt if x.is_file()]
+        safetensor_files = [x for x in models_folder_safetensors if x.is_file]
+
+        files = ckpt_files + safetensor_files
 
         found_models = []
         for file in files:
