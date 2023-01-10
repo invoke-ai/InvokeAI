@@ -189,10 +189,11 @@ class ModelManager(object):
                 
             # Diffusers Config Parse
             if (vae := stanza.get('vae',None)):
-                vae = dict(
-                    repo_id = str(vae.get('repo_id',None)),
-                    path = str(vae.get('path',None))
-                )
+                if isinstance(vae,DictConfig):
+                    vae = dict(
+                        repo_id = str(vae.get('repo_id',None)),
+                        path = str(vae.get('path',None)),
+                    )
             if format == 'diffusers':
                 models[name].update(
                     description = description,
