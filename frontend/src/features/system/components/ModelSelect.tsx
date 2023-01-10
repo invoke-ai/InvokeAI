@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import {
+  Container,
   Flex,
   Modal,
   ModalCloseButton,
@@ -16,6 +18,8 @@ import _ from 'lodash';
 import { systemSelector } from '../store/systemSelectors';
 import { useTranslation } from 'react-i18next';
 import ModelGridItem from './ModelGridItem';
+import IAIInput from 'common/components/IAIInput';
+import type { ChangeEvent } from 'react';
 
 const modelGridSelector = createSelector(
   [systemSelector],
@@ -31,22 +35,43 @@ const modelGridSelector = createSelector(
 );
 
 const ModelGrid = ({value, models, onChange}) => {
+  const [searchText, setSearchText] = useState<string>('');
+
+  const { t } = useTranslation();
+
+  const handleSearchFilter = _.debounce((e: ChangeEvent<HTMLInputElement>) => {
+    setSearchText(e.target.value.toLowerCase());
+  }, 400);
+
   return (
-    <SimpleGrid 
-      columns={3} spacing={4}
-      overflowY='scroll'
-      padding='1.5rem'
-      maxH='70vh'
-    >
-      {models.map((model, i) => 
-        <ModelGridItem
-          key={i}
-          model={model}
-          isSelected={value.name === model.name}
-          onSelect={onChange}
+    <>
+      <Container padding="1.5rem">
+        <IAIInput
+          onChange={handleSearchFilter}
+          label={t('modelmanager:search')}
         />
-      )}
-    </SimpleGrid>
+      </Container>
+      <SimpleGrid 
+        columns={3} spacing={4}
+        overflowY='scroll'
+        padding='1.5rem'
+        maxH='70vh'
+      >
+        {models.filter(model => {
+          if (searchText) 
+            return model.name.toLowerCase().startsWith(searchText);
+          return true;
+        })
+        .map((model, i) => 
+          <ModelGridItem
+            key={i}
+            model={model}
+            isSelected={value.name === model.name}
+            onSelect={onChange}
+          />
+        )}
+      </SimpleGrid>
+    </>
   )
 }
 
