@@ -1,6 +1,9 @@
 {
   "modelManager": "Model Manager",
   "model": "Model",
+  "allModels": "All Models",
+  "checkpointModels": "Checkpoint Models",
+  "diffusersModels": "Diffusers Models",
   "modelAdded": "Model Added",
   "modelUpdated": "Model Updated",
   "modelEntryDeleted": "Model Entry Deleted",
