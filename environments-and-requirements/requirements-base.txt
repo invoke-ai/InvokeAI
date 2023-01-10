@@ -23,6 +23,7 @@ opencv-python
 picklescan
 pillow
 pip>=22
+prompt-toolkit
 pudb
 pyreadline3
 pytorch-lightning==1.7.7
