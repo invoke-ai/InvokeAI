@@ -1,12 +1,15 @@
 # from omegaconf import OmegaConf
 import os
-import readline
 import shutil
 from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
+from rich.theme import Theme
+from rich.style import Style
+from rich import box
+
 
 console = Console()
 
@@ -28,7 +31,9 @@ class RuntimeDir:
                 if os.getenv(ev) is not None:
                     console.print(f"{ev}={os.getenv(ev)} found in environment")
 
-        console.print(f"Using {self.paths.root.location.expanduser().resolve()} as the InvokeAI runtime directory")
+        console.print(
+            f"Using {self.paths.root.location.expanduser().resolve()} as the InvokeAI runtime directory"
+        )
         console.line()
 
     def validate(self) -> bool:
@@ -45,7 +50,7 @@ class RuntimeDir:
             if abspath.exists():
                 msg_prefix = "[bold bright_green]🗸[/]"
             else:
-                msg_prefix = "[bold bright_red]✗[/]"
+                msg_prefix = "[bold red1]✗[/]"
                 missing = True
             console.print(f"{msg_prefix} {path.description} {path.kind}: {abspath}")
 
@@ -80,13 +85,15 @@ class RuntimeDir:
         enable_safety_checker = True
 
         console.print(
-            Panel(
+            InfoPanel(
                 "The NSFW (not safe for work) checker blurs out images that potentially contain sexual imagery. It can be selectively enabled at run time with --nsfw_checker, and disabled with --no-nsfw_checker.The following option will set whether the checker is enabled by default.Like other options, you can change this setting later by editing the file {self.paths.initfile.location}.NSFW Checker is [bold]NOT[/] recommended for systems with less than 6G VRAM because of the checker's memory requirements."
             )
         )
 
         if not yes_to_all:
-            enable_safety_checker = Confirm.ask("Enable the NSFW checker by default?", default=enable_safety_checker)
+            enable_safety_checker = Confirm.ask(
+                "Enable the NSFW checker by default?", default=enable_safety_checker
+            )
         else:
             console.print(
                 f"Program was started with the --yes switch. NSFW checker is [bold red]{'ON' if enable_safety_checker else 'OFF'}[/]"
@@ -100,7 +107,9 @@ class RuntimeDir:
         TODO: template this
         """
 
-        console.print(f'Creating the initialization file at "{self.paths.initfile.location}".\n')
+        console.print(
+            f'Creating the initialization file at "{self.paths.initfile.location}".\n'
+        )
         with open(self.paths.initfile.location, "w") as f:
             f.write(
                 f"""# InvokeAI initialization file
@@ -134,7 +143,9 @@ f"{kwargs.get("safety_checker")}"
         if not yes_to_all:
             accepted = False
             while not accepted:
-                console.print(f"InvokeAI image outputs will be placed into {self.paths.outdir.location}")
+                console.print(
+                    f"InvokeAI image outputs will be placed into {self.paths.outdir.location}"
+                )
                 accepted = Confirm.ask("Accept this location?", default="y")
                 if not accepted:
                     self.select_outdir()
@@ -145,7 +156,9 @@ f"{kwargs.get("safety_checker")}"
         )
 
         # Create the directory tree
-        for location in [path.location for path in self.paths.get() if path.kind == "directory"]:
+        for location in [
+            path.location for path in self.paths.get() if path.kind == "directory"
+        ]:
             Path(location).expanduser().absolute().mkdir(exist_ok=True, parents=True)
 
         # If the default model config file doesn't exist, copy the config dir
@@ -153,3 +166,14 @@ f"{kwargs.get("safety_checker")}"
             self.copy_configdir()
 
         self.create_initfile(safety_checker=self.safety_checker_config(yes_to_all))
+
+
+class InfoPanel(Panel):
+    def __init__(self, *args, **kwargs) -> None:
+        return super().__init__(
+            *args,
+            box=kwargs.pop("box", box.HORIZONTALS),
+            # expand=kwargs.pop("expand", False),
+            style=kwargs.pop("style", Style(bgcolor="grey19", color="tan")),
+            **kwargs,
+        )

@@ -10,6 +10,7 @@
 #
 
 import argparse
+import base64
 import io
 import os
 import sys
@@ -28,14 +29,16 @@ from huggingface_hub import login as hf_hub_login
 from huggingface_hub import whoami as hf_whoami
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
-from rich.console import Console
+from rich.console import Group, Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
+from rich.text import Text
+from rich import box
 from tqdm import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from ldm.invoke.config.paths import InvokePaths
-from ldm.invoke.config.runtime_dir import RuntimeDir
+from ldm.invoke.config.runtime_dir import RuntimeDir, InfoPanel
 from ldm.invoke.devices import choose_precision, choose_torch_device
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
@@ -59,28 +62,57 @@ Config_preamble = """# This file describes the alternative machine learning mode
 
 # ---------------------------------------------
 def introduction():
+    group = Group(
+        Panel(
+            renderable=Group(
+                Text("Welcome to", justify="center"),
+                Text(
+                    base64.b64decode(
+                        "IF9fXyAgICAgICAgICAgICAgICAgXyAgICAgICAgICAgXyAgICBfX18KfF8gX3xfIF9fX18gICBfX19fXyB8IHwgX19fX18gICAvIFwgIHxfIF98CiB8IHx8ICdfIFwgXCAvIC8gXyBcfCB8LyAvIF8gXCAvIF8gXCAgfCB8CiB8IHx8IHwgfCBcIFYgfCAoXykgfCAgIHwgIF9fLy8gX19fIFwgfCB8CnxfX198X3wgfF98XF8vIFxfX18vfF98XF9cX19fL18vICAgXF98X19ffAo="
+                    ).decode()
+                ),
+                Text("A Stable Diffusion Toolkit", justify="center"),
+            ),
+            style="bold dark_orange on grey19",
+            box=box.MINIMAL,
+            expand=False,
+            padding=(0, 20),
+        ),
+        "",
+        "[b]This script will:",
+        "",
+        "1. Configure the InvokeAI application directory",
+        "2. Help download the Stable Diffusion weight files",
+        "   and other large models that are needed for text to image generation,",
+        "3. Create initial configuration files.",
+        "",
+        "[i]At any point you may interrupt this program and resume later.",
+    )
+
     console.print(
         Panel(
-            title="Welcome to InvokeAI",
-            renderable="[bold]This script will help download the Stable Diffusion weight files and other large models that are needed for text to image generation. At any point you may interrupt this program and resume later.",
-            style="grey23 on grey78",
+            title=":art: Configuration :art:",
+            renderable=group,
+            style="grey78 on grey19",
+            padding=(1, 2),
+            width=90,
         )
     )
     console.line()
 
 
 # --------------------------------------------
-def postscript(errors: None):
+# TODO don't pass the root dir into this message - get it from the Paths
+def postscript(errors, runtime_dir_root):
     if not any(errors):
-        message_title = "Model Installation Successful"
-        message = """
-You're all set!
+        message_title = ":art: Configuration complete! :art:"
+        message = f"""
+If you installed the program using the automated installation script,
+please navigate to [orange1 b]{runtime_dir_root}[/], and run
+[orange1 b]invoke.sh[/] (Linux/macOS) or [orange1 b]invoke.bat[/] (Windows)
+to start InvokeAI.
 
-If you installed using one of the automated installation scripts,
-execute 'invoke.sh' (Linux/macOS) or 'invoke.bat' (Windows) to
-start InvokeAI.
-
-If you installed manually, activate the 'invokeai' environment
+If you installed manually from source, activate the 'invokeai' environment
 (e.g. 'conda activate invokeai'), then run one of the following
 commands to start InvokeAI.
 
@@ -98,7 +130,11 @@ Have fun!
             message += f"\t - {err}\n"
         message += "Please check the logs above and correct any issues."
 
-    console.print(Panel(title=message_title, renderable=message))
+    console.print(
+        InfoPanel(
+            title=message_title, renderable=message, style="light_goldenrod2 on grey27"
+        )
+    )
 
 
 # ---------------------------------------------
@@ -107,23 +143,29 @@ def user_wants_to_download_weights() -> str:
     Returns one of "skip", "recommended" or "customized"
     """
     console.print(
-        Panel(
-            """You can download and configure the weights files manually or let this
-script do it for you. Manual installation is described at:
-
-https://invoke-ai.github.io/InvokeAI/installation/INSTALLING_MODELS/
-
-You may download the recommended models (about 10GB total), select a customized set, or
-completely skip this step.
-"""
+        InfoPanel(
+            Group(
+                "You can download and configure the weights files manually or let this script do it for you.",
+                "Manual installation is described at:",
+                "",
+                Text(
+                    "https://invoke-ai.github.io/InvokeAI/installation/INSTALLING_MODELS/",
+                    justify="center",
+                ),
+                "",
+                "You may download the recommended models (about 10GB total), select a customized set, or completely skip this step.",
+            ),
+            box=box.MINIMAL,
         )
     )
+    console.line()
 
     choice = Prompt.ask(
-        "Download <r>ecommended models, <a>ll models, <c>ustomized list, or <s>kip this step? [r]:",
+        "Download <r>ecommended models, <a>ll models, <c>ustomized list, or <s>kip this step?",
         default="r",
         choices=["r", "a", "c", "s"],
     )
+    console.line()
 
     if choice.startswith(("r", "R")) or len(choice) == 0:
         selection = "recommended"
@@ -143,7 +185,9 @@ def select_datasets(action: str):
     done = False
     while not done:
         datasets = dict()
-        default = None  # the first model selected will be the default; TODO let user change
+        default = (
+            None  # the first model selected will be the default; TODO let user change
+        )
         counter = 1
 
         if action == "customized":
@@ -221,18 +265,20 @@ def HfLogin(access_token) -> str:
 # -------------------------------Authenticate against Hugging Face
 def authenticate(yes_to_all=False):
     console.print(
-        Panel(
-            title="License Agreement for Weight Files",
+        InfoPanel(
+            title="[bold dark_red]License Agreement for Weight Files",
             renderable="""
 By downloading the Stable Diffusion weight files from the official Hugging Face
 repository, you agree to have read and accepted the CreativeML Responsible AI License.
 The license terms are located here:
 
    https://huggingface.co/spaces/CompVis/stable-diffusion-license
-
 """,
+            box=box.ROUNDED,
+            style="dark_blue on grey82",
         )
     )
+    console.line()
 
     if not yes_to_all:
         accepted = False
@@ -258,7 +304,9 @@ The license terms are located here:
 
         for ev in hf_envvars:
             if access_token := os.getenv(ev):
-                console.print(f"Token was found in the {ev} environment variable.... Logging in.")
+                console.print(
+                    f"Token was found in the {ev} environment variable.... Logging in."
+                )
                 try:
                     HfLogin(access_token)
                     continue
@@ -277,30 +325,38 @@ The license terms are located here:
 
     if not yes_to_all:
         console.print(
-            Panel(
+            InfoPanel(
                 """
-You may optionally enter your Huggingface token now. InvokeAI *will* work without it, but some functionality may be limited.
+You may [orange1 i]optionally[/] enter your Huggingface token now. InvokeAI [orange1 i]will[/] work without it, but some functionality may be limited.
+
 See https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept for more information.
 
-Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
+Visit https://huggingface.co/settings/tokens to generate a token. If needed, sign up for an account.
 
-Paste the token below using Ctrl-Shift-V (macOS/Linux) or right-click (Windows), and/or 'Enter' to continue.
-You may re-run the configuration script again in the future if you do not wish to set the token right now.
+Paste the token below using [grey82 i]Ctrl+Shift+V[/] (Linux), [grey82 i]Cmd+V[/] (macOS) or [grey82 i]right-click[/] (Windows), and/or press [grey82 b]Enter[/] to continue.
+
+[i]You may re-run the configuration script again in the future to set the token if you do not wish to enter one right now.[/]
         """
             )
         )
         again = True
         while again:
             try:
-                access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ⮞ ")
+                access_token = getpass_asterisk.getpass_asterisk(
+                    prompt="HuggingFace Token ([Enter] to skip)⮞ "
+                )
                 HfLogin(access_token)
                 access_token = HfFolder.get_token()
                 again = False
             except ValueError:
-                again = Confirm.ask("Failed to log in to Huggingface. Would you like to try again?")
+                again = Confirm.ask(
+                    "Failed to log in to Huggingface. Would you like to try again?"
+                )
                 if not again:
                     console.line()
-                    console.print("Re-run the configuration script whenever you wish to set the token.")
+                    console.print(
+                        "Re-run the configuration script whenever you wish to set the token."
+                    )
                     console.print("...Continuing...")
             except EOFError:
                 # this happens if the user pressed Enter on the prompt without any input; assume this means they don't want to input a token
@@ -310,12 +366,12 @@ You may re-run the configuration script again in the future if you do not wish t
 
     elif access_token is None:
         console.print(
-            Panel(
+            InfoPanel(
                 f"HuggingFace login did not succeed. Some functionality may be limited; see https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept for more information. Re-run the configuration script without '--yes' to set the HuggingFace token interactively, or use one of the environment variables: {', '.join(hf_envvars)}"
             )
         )
 
-    console.rule()
+    console.line()
 
     return access_token
 
@@ -337,23 +393,31 @@ def migrate_models_ckpt():
 
 
 # ---------------------------------------------
-def download_weight_datasets(models: dict, access_token: str, precision: str = "float32"):
+def download_weight_datasets(
+    models: dict, access_token: str, precision: str = "float32"
+):
     migrate_models_ckpt()
     successful = dict()
     for mod in models.keys():
         print(f"{mod}...", file=sys.stderr, end="")
-        successful[mod] = _download_repo_or_file(Datasets[mod], access_token, precision=precision)
+        successful[mod] = _download_repo_or_file(
+            Datasets[mod], access_token, precision=precision
+        )
     return successful
 
 
-def _download_repo_or_file(mconfig: DictConfig, access_token: str, precision: str = "float32") -> Path:
+def _download_repo_or_file(
+    mconfig: DictConfig, access_token: str, precision: str = "float32"
+) -> Path:
     path = None
     if mconfig["format"] == "ckpt":
         path = _download_ckpt_weights(mconfig, access_token)
     else:
         path = _download_diffusion_weights(mconfig, access_token, precision=precision)
         if "vae" in mconfig and "repo_id" in mconfig["vae"]:
-            _download_diffusion_weights(mconfig["vae"], access_token, precision=precision)
+            _download_diffusion_weights(
+                mconfig["vae"], access_token, precision=precision
+            )
     return path
 
 
@@ -361,12 +425,23 @@ def _download_ckpt_weights(mconfig: DictConfig, access_token: str) -> Path:
     repo_id = mconfig["repo_id"]
     filename = mconfig["file"]
     cache_dir = Paths.default_weights.location
-    return hf_download_with_resume(repo_id=repo_id, model_dir=cache_dir, model_name=filename, access_token=access_token)
+    return hf_download_with_resume(
+        repo_id=repo_id,
+        model_dir=cache_dir,
+        model_name=filename,
+        access_token=access_token,
+    )
 
 
-def _download_diffusion_weights(mconfig: DictConfig, access_token: str, precision: str = "float32"):
+def _download_diffusion_weights(
+    mconfig: DictConfig, access_token: str, precision: str = "float32"
+):
     repo_id = mconfig["repo_id"]
-    model_class = StableDiffusionGeneratorPipeline if mconfig.get("format", None) == "diffusers" else AutoencoderKL
+    model_class = (
+        StableDiffusionGeneratorPipeline
+        if mconfig.get("format", None) == "diffusers"
+        else AutoencoderKL
+    )
     extra_arg_list = [{"revision": "fp16"}, {}] if precision == "float16" else [{}]
     model = None
     for extra_args in extra_arg_list:
@@ -379,7 +454,9 @@ def _download_diffusion_weights(mconfig: DictConfig, access_token: str, precisio
             )
         except OSError as e:
             if str(e).startswith("fp16 is not a valid"):
-                print(f"Could not fetch half-precision version of model {repo_id}; fetching full-precision instead")
+                print(
+                    f"Could not fetch half-precision version of model {repo_id}; fetching full-precision instead"
+                )
             else:
                 print(f"An unexpected error occurred while downloading the model: {e})")
         if model:
@@ -388,7 +465,9 @@ def _download_diffusion_weights(mconfig: DictConfig, access_token: str, precisio
 
 
 # ---------------------------------------------
-def hf_download_with_resume(repo_id: str, model_dir: str, model_name: str, access_token: str = None) -> Path:
+def hf_download_with_resume(
+    repo_id: str, model_dir: str, model_name: str, access_token: str = None
+) -> Path:
     model_dest = Path(os.path.join(model_dir, model_name))
     os.makedirs(model_dir, exist_ok=True)
 
@@ -406,7 +485,9 @@ def hf_download_with_resume(repo_id: str, model_dir: str, model_name: str, acces
     resp = requests.get(url, headers=header, stream=True)
     total = int(resp.headers.get("content-length", 0))
 
-    if resp.status_code == 416:  # "range not satisfiable", which means nothing to return
+    if (
+        resp.status_code == 416
+    ):  # "range not satisfiable", which means nothing to return
         print(f"* {model_name}: complete file found. Skipping.")
         return model_dest
     elif resp.status_code != 200:
@@ -460,7 +541,9 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
             print("", file=sys.stderr)
-            request.urlretrieve(model_url, model_dest, ProgressBar(os.path.basename(model_dest)))
+            request.urlretrieve(
+                model_url, model_dest, ProgressBar(os.path.basename(model_dest))
+            )
             print("...downloaded successfully", file=sys.stderr)
         else:
             print("...exists", file=sys.stderr)
@@ -518,7 +601,9 @@ def new_config_file_contents(successfully_downloaded: dict) -> str:
         if "height" in mod:
             stanza["height"] = mod["height"]
         if "file" in mod:
-            stanza["weights"] = os.path.relpath(successfully_downloaded[model], start=Paths.root)
+            stanza["weights"] = os.path.relpath(
+                successfully_downloaded[model], start=Paths.root
+            )
             stanza["config"] = Paths.sd_configs_dir.location / mod["config"]
         if "vae" in mod:
             if "file" in mod["vae"]:
@@ -538,7 +623,11 @@ def new_config_file_contents(successfully_downloaded: dict) -> str:
 # ---------------------------------------------
 # this will preload the Bert tokenizer fles
 def download_bert():
-    print("Installing bert tokenizer (ignore deprecation errors)...", end="", file=sys.stderr)
+    print(
+        "Installing bert tokenizer (ignore deprecation errors)...",
+        end="",
+        file=sys.stderr,
+    )
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         from transformers import BertTokenizerFast
@@ -580,7 +669,10 @@ def download_realesrgan():
 def download_gfpgan():
     print("Installing GFPGAN models...", file=sys.stderr)
     for model in (
-        ["https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth", "gfpgan/GFPGANv1.4.pth"],
+        [
+            "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
+            "gfpgan/GFPGANv1.4.pth",
+        ],
         [
             "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
             "gfpgan/weights/detection_Resnet50_Final.pth",
@@ -597,7 +689,9 @@ def download_gfpgan():
 # ---------------------------------------------
 def download_codeformer():
     print("Installing CodeFormer model file...", file=sys.stderr)
-    model_url = "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
+    model_url = (
+        "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
+    )
     model_dest = Paths.models_dir.location / "codeformer/codeformer.pth"
     download_with_progress_bar(model_url, model_dest, "CodeFormer")
 
@@ -630,7 +724,8 @@ def download_clipseg():
             model.eval()
             model.load_state_dict(
                 torch.load(
-                    Paths.models_dir.location / "clipseg/clipseg_weights/rd64-uni-refined.pth",
+                    Paths.models_dir.location
+                    / "clipseg/clipseg_weights/rd64-uni-refined.pth",
                     map_location=torch.device("cpu"),
                 ),
                 strict=False,
@@ -645,7 +740,9 @@ def download_clipseg():
 def download_safety_checker():
     print("Installing model for NSFW content detection...", file=sys.stderr)
     try:
-        from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+        from diffusers.pipelines.stable_diffusion.safety_checker import (
+            StableDiffusionSafetyChecker,
+        )
         from transformers import AutoFeatureExtractor
     except ModuleNotFoundError:
         print("Error installing NSFW checker model:")
@@ -662,13 +759,19 @@ def download_safety_checker():
 # -------------------------------------
 def download_weights(opt: dict) -> Union[str, None]:
 
-    precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
+    precision = (
+        "float32"
+        if opt.full_precision
+        else choose_precision(torch.device(choose_torch_device()))
+    )
 
     if opt.yes_to_all:
         models = recommended_datasets()
         access_token = authenticate(opt.yes_to_all)
         if len(models) > 0:
-            successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)
+            successfully_downloaded = download_weight_datasets(
+                models, access_token, precision=precision
+            )
             update_config_file(successfully_downloaded, opt)
             return
 
@@ -689,7 +792,9 @@ def download_weights(opt: dict) -> Union[str, None]:
     # We are either already authenticated, or will be asked to provide the token interactively
     access_token = authenticate()
     console.rule("DOWNLOADING WEIGHTS")
-    successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)
+    successfully_downloaded = download_weight_datasets(
+        models, access_token, precision=precision
+    )
 
     update_config_file(successfully_downloaded)
     if len(successfully_downloaded) < len(models):
@@ -704,7 +809,14 @@ class ProgressBar:
 
     def __call__(self, block_num, block_size, total_size):
         if not self.pbar:
-            self.pbar = tqdm(desc=self.name, initial=0, unit="iB", unit_scale=True, unit_divisor=1000, total=total_size)
+            self.pbar = tqdm(
+                desc=self.name,
+                initial=0,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
+                total=total_size,
+            )
         self.pbar.update(block_size)
 
 
@@ -733,12 +845,35 @@ def main():
         default=False,
         help="use 32-bit weights instead of faster 16-bit weights",
     )
-    parser.add_argument("--yes", "-y", dest="yes_to_all", action="store_true", help='answer "yes" to all prompts')
     parser.add_argument(
-        "--config_file", "-c", dest="config_file", type=str, default=None, help="path to configuration file to create"
+        "--yes",
+        "-y",
+        dest="yes_to_all",
+        action="store_true",
+        help='answer "yes" to all prompts',
     )
-    parser.add_argument("--root_dir", dest="root", type=str, default=None, help="path to root of install directory")
-    parser.add_argument("--outdir", dest="outdir", type=str, default=None, help="path to image output directory")
+    parser.add_argument(
+        "--config_file",
+        "-c",
+        dest="config_file",
+        type=str,
+        default=None,
+        help="path to configuration file to create",
+    )
+    parser.add_argument(
+        "--root_dir",
+        dest="root",
+        type=str,
+        default=None,
+        help="path to root of install directory",
+    )
+    parser.add_argument(
+        "--outdir",
+        dest="outdir",
+        type=str,
+        default=None,
+        help="path to image output directory",
+    )
 
     opt = parser.parse_args()
 
@@ -772,8 +907,10 @@ def main():
             console.rule("SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST")
         else:
             console.rule("DOWNLOADING DIFFUSION WEIGHTS")
+            console.line()
             errors.add(download_weights(opt))
         console.rule("DOWNLOADING SUPPORT MODELS")
+        console.line()
         download_bert()
         download_clip()
         download_realesrgan()
@@ -781,11 +918,13 @@ def main():
         download_codeformer()
         download_clipseg()
         download_safety_checker()
-        postscript(errors=errors)
+        postscript(errors=errors, runtime_dir_root=Paths.root)
     except KeyboardInterrupt:
         console.print("Goodbye! Come back soon.")
     except Exception as e:
-        console.print(f'A problem occurred during initialization.\nThe error was: "{str(e)}"')
+        console.print(
+            f'A problem occurred during initialization.\nThe error was: "{str(e)}"'
+        )
         print(traceback.format_exc())
 
 
