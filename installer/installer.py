@@ -11,7 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory, TemporaryFile
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
-INSTALLER_REQS = ["rich", "semver", "requests"]
+INSTALLER_REQS = ["rich", "semver", "requests", "plumbum"]
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -150,6 +150,8 @@ class Installer:
 
         self.instance.deploy()
 
+        self.instance.configure()
+
 
 class InvokeAiInstance:
     """
@@ -183,32 +185,32 @@ class InvokeAiInstance:
         ### this is all very rough for now as a PoC
         ### source installer basically
 
-        proc = subprocess.Popen(
-            [
-                self.pip,
+        from plumbum import local, FG
+
+        pip = local[self.pip]
+
+        (
+            pip[
                 "install",
                 "--require-virtualenv",
                 "-r",
                 (Path(__file__).parents[1] / "environments-and-requirements/requirements-base.txt")
                 .expanduser()
                 .resolve(),
-            ],
-            stdout=subprocess.PIPE,
+            ]
+            & FG
         )
-        for c in iter(lambda: proc.stdout.read(1).decode(), ""):
-            sys.stdout.write(c)
 
-        proc = subprocess.Popen(
-            [self.pip, "install", "--require-virtualenv", Path(__file__).parents[1].expanduser().resolve()],
-            stdout=subprocess.PIPE,
-        )
-        for c in iter(lambda: proc.stdout.read(1).decode(), ""):
-            sys.stdout.write(c)
+        (pip["install", "--require-virtualenv", Path(__file__).parents[1].expanduser().resolve()] & FG)
 
     def configure(self):
         """
         Configure the InvokeAI runtime directory
         """
+
+        from ldm.invoke.configuration import configure
+
+        configure.main()
 
     def update(self):
         pass
