@@ -57,7 +57,8 @@ export default function DiffusersModelEdit() {
       name: '',
       description: '',
       repo_id: '',
-      vae: { repo_id: '' },
+      path: '',
+      vae: { repo_id: '', path: '' },
       default: false,
       format: 'diffusers',
     });
@@ -71,10 +72,14 @@ export default function DiffusersModelEdit() {
       setEditModelFormValues({
         name: openModel,
         description: retrievedModel[openModel]?.description,
+        path: retrievedModel[openModel]?.path,
         repo_id: retrievedModel[openModel]?.repo_id,
         vae: {
-          repo_id: retrievedModel[openModel]?.vae
-            ? retrievedModel[openModel]?.vae
+          repo_id: retrievedModel[openModel]?.vae?.repo_id
+            ? retrievedModel[openModel]?.vae?.repo_id
+            : '',
+          path: retrievedModel[openModel]?.vae?.path
+            ? retrievedModel[openModel]?.vae?.path
             : '',
         },
         default: retrievedModel[openModel]?.default,
@@ -136,13 +141,36 @@ export default function DiffusersModelEdit() {
                   </VStack>
                 </FormControl>
 
-                {/* Repo ID */}
+                {/* Path */}
                 <FormControl
-                  isInvalid={!!errors.repo_id && touched.repo_id}
+                  isInvalid={!!errors.path && touched.path}
                   isRequired
                 >
-                  <FormLabel htmlFor="config" fontSize="sm">
+                  <FormLabel htmlFor="path" fontSize="sm">
                     {t('modelmanager:modelLocation')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="path"
+                      name="path"
+                      type="text"
+                      width="lg"
+                    />
+                    {!!errors.path && touched.path ? (
+                      <FormErrorMessage>{errors.path}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:modelLocationValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
+                {/* Repo ID */}
+                <FormControl isInvalid={!!errors.repo_id && touched.repo_id}>
+                  <FormLabel htmlFor="repo_id" fontSize="sm">
+                    {t('modelmanager:repo_id')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
                     <Field
@@ -156,18 +184,43 @@ export default function DiffusersModelEdit() {
                       <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:modelLocationValidationMsg')}
+                        {t('modelmanager:repoIDValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>
                 </FormControl>
 
-                {/* VAE */}
+                {/* VAE Path */}
+                <FormControl
+                  isInvalid={!!errors.vae?.path && touched.vae?.path}
+                >
+                  <FormLabel htmlFor="vae.path" fontSize="sm">
+                    {t('modelmanager:vaeLocation')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="vae.path"
+                      name="vae.path"
+                      type="text"
+                      width="lg"
+                    />
+                    {!!errors.vae?.path && touched.vae?.path ? (
+                      <FormErrorMessage>{errors.vae?.path}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:vaeLocationValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
+                {/* VAE Repo ID */}
                 <FormControl
                   isInvalid={!!errors.vae?.repo_id && touched.vae?.repo_id}
                 >
-                  <FormLabel htmlFor="vae" fontSize="sm">
-                    {t('modelmanager:vaeLocation')}
+                  <FormLabel htmlFor="vae.repo_id" fontSize="sm">
+                    {t('modelmanager:vaeRepoID')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
                     <Field
@@ -181,7 +234,7 @@ export default function DiffusersModelEdit() {
                       <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
-                        {t('modelmanager:vaeLocationValidationMsg')}
+                        {t('modelmanager:vaeRepoIDValidationMsg')}
                       </FormHelperText>
                     )}
                   </VStack>

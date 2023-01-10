@@ -171,10 +171,22 @@ export declare type Model = {
   height?: number;
   default?: boolean;
   format?: string;
-  repo_id?: string;
 };
 
-export declare type ModelList = Record<string, Model>;
+export declare type DiffusersModel = {
+  status: ModelStatus;
+  description: string;
+  repo_id?: string;
+  path?: string;
+  vae?: {
+    repo_id?: string;
+    path?: string;
+  };
+  format?: string;
+  default?: boolean;
+};
+
+export declare type ModelList = Record<string, Model & DiffusersModel>;
 
 export declare type FoundModel = {
   name: string;
@@ -197,10 +209,12 @@ export declare type InvokeDiffusersModelConfigProps = {
   name: string | undefined;
   description: string | undefined;
   repo_id: string | undefined;
+  path: string | undefined;
   default: boolean | undefined;
   format: string | undefined;
   vae: {
     repo_id: string | undefined;
+    path: string | undefined;
   };
 };
 

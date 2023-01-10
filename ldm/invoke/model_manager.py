@@ -194,9 +194,11 @@ class ModelManager(object):
                         repo_id = str(vae.get('repo_id',None)),
                         path = str(vae.get('path',None)),
                     )
+                    
             if format == 'diffusers':
                 models[name].update(
                     description = description,
+                    format = format,
                     vae = vae,
                     repo_id = str(stanza.get('repo_id', None)),
                     path = str(stanza.get('path',None)),

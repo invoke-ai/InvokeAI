@@ -42,7 +42,7 @@ export default function AddCheckpointModel() {
   );
 
   function hasWhiteSpace(s: string) {
-    return /\\s/g.test(s);
+    return /\s/.test(s);
   }
 
   function baseValidation(value: string) {
