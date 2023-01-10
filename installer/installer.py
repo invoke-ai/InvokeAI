@@ -208,9 +208,9 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
-        from ldm.invoke.configuration import configure
+        from ldm.invoke.config import config
 
-        configure.main()
+        config.main()
 
     def update(self):
         pass

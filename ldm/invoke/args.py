@@ -95,7 +95,7 @@ import ldm.invoke
 import ldm.invoke.pngwriter
 
 from ldm.invoke.globals import Globals
-from .paths import InvokePaths
+from ldm.invoke.config.paths import InvokePaths
 from ldm.invoke.prompt_parser import split_weighted_subprompts
 from argparse import Namespace
 

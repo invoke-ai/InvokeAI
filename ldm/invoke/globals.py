@@ -14,7 +14,7 @@ the attributes:
 """
 
 from argparse import Namespace
-from .paths import InvokePaths
+from ldm.invoke.config.paths import InvokePaths
 
 Globals = Namespace()
 Paths = InvokePaths()

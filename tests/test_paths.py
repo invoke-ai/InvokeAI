@@ -1,5 +1,5 @@
 import pytest
-from ldm.invoke.paths import InvokePaths, DEFAULT_RUNTIME_DIR
+from ldm.invoke.config.paths import InvokePaths, DEFAULT_RUNTIME_DIR
 from pathlib import Path
 
 @pytest.fixture(autouse=True)

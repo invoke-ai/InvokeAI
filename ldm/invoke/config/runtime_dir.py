@@ -65,14 +65,10 @@ class RuntimeDir:
 
     def copy_configdir(self):
         """
-        Copy source config dir
-        this is only needed for source install. Auto install would have already created it
-
-        TODO this dir should be packaged with the wheel and not managed by the installer. we can get it from the wheel
+        Copy the source config directory into the runtime dir
         """
 
-        ### TEMP brittle way of finding the source config dir; remove once distributed with the wheel
-        src = Path(__file__).parents[2] / "configs"
+        src = Path(__file__).parent / "configs"
         dest = self.paths.config_dir.location
         shutil.copytree(src, dest, dirs_exist_ok=True)
 

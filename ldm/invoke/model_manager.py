@@ -32,7 +32,7 @@ from picklescan.scanner import scan_file_path
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.util import instantiate_from_config, ask_user
-from .paths import InvokePaths
+from ldm.invoke.config.paths import InvokePaths
 
 DEFAULT_MAX_MODELS=2
 LOCAL_FILES_ONLY=not Globals.internet_available
