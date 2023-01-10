@@ -163,7 +163,6 @@ class ModelManager(object):
         for name in self.config:
             stanza = self.config[name]
             models[name] = dict()
-            
             format = stanza.get('format','ckpt') # Determine Format
 
             # Common Attribs
@@ -177,34 +176,32 @@ class ModelManager(object):
             
             # Checkpoint Config Parse
             if format == 'ckpt':
-                config = stanza.get('config', None)
-                weights = stanza.get('weights', None)
-                vae = stanza.get('vae', None)
-                width = stanza.get('width', 512)
-                height = stanza.get('height', 512)
                 models[name].update(
                     description = description,
                     format = format,
-                    config = config,
-                    weights = weights,
-                    vae = vae,
-                    width = width,
-                    height = height,
-                    status = status
+                    config = str(stanza.get('config', None)),
+                    weights = str(stanza.get('weights', None)),
+                    vae = str(stanza.get('vae', None)),
+                    width = str(stanza.get('width', 512)),
+                    height = str(stanza.get('height', 512)),
+                    status = status,
                 )
                 
             # Diffusers Config Parse
+            if (vae := stanza.get('vae',None)):
+                vae = dict(
+                    repo_id = str(vae.get('repo_id',None)),
+                    path = str(vae.get('path',None))
+                )
             if format == 'diffusers':
-                repo_id = stanza.get('repo_id', None)
-                vae = stanza.get('vae', None)['repo_id']
                 models[name].update(
                     description = description,
-                    format = format,
-                    repo_id = repo_id,
                     vae = vae,
-                    status = status
+                    repo_id = str(stanza.get('repo_id', None)),
+                    path = str(stanza.get('path',None)),
+                    status = status,
                 )
-
+        
         return models
 
     def print_models(self) -> None:
