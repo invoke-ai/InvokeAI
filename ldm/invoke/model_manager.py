@@ -255,7 +255,7 @@ class ModelManager(object):
 
         if model_name not in omega:
             omega[model_name] = dict()
-        omega[model_name].update(model_attributes,merge=False)
+        OmegaConf.update(omega,model_name,model_attributes,merge=False)
         if 'weights' in omega[model_name]:
             omega[model_name]['weights'].replace('\\','/')
 
