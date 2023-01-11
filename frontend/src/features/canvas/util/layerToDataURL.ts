@@ -22,16 +22,16 @@ const layerToDataURL = (
   const { x, y, width, height } = layer.getClientRect();
   const dataURLBoundingBox = boundingBox
     ? {
-        x: Math.round(boundingBox.x + stageCoordinates.x),
-        y: Math.round(boundingBox.y + stageCoordinates.y),
-        width: Math.round(boundingBox.width),
-        height: Math.round(boundingBox.height),
+        x: boundingBox.x + stageCoordinates.x,
+        y: boundingBox.y + stageCoordinates.y,
+        width: boundingBox.width,
+        height: boundingBox.height,
       }
     : {
-        x: Math.round(x),
-        y: Math.round(y),
-        width: Math.round(width),
-        height: Math.round(height),
+        x: x,
+        y: y,
+        width: width,
+        height: height,
       };
 
   const dataURL = layer.toDataURL(dataURLBoundingBox);
@@ -42,10 +42,10 @@ const layerToDataURL = (
   return {
     dataURL,
     boundingBox: {
-      x: Math.round(relativeClientRect.x),
-      y: Math.round(relativeClientRect.y),
-      width: Math.round(width),
-      height: Math.round(height),
+      x: relativeClientRect.x,
+      y: relativeClientRect.y,
+      width: width,
+      height: height,
     },
   };
 };

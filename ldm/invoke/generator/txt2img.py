@@ -1,12 +1,12 @@
 '''
 ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 '''
-
+import PIL.Image
 import torch
-import numpy as  np
-from ldm.invoke.generator.base import Generator
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
-import gc
+
+from .base import Generator
+from .diffusers_pipeline import StableDiffusionGeneratorPipeline, ConditioningData
+from ...models.diffusion.shared_invokeai_diffusion import ThresholdSettings
 
 
 class Txt2Img(Generator):
@@ -24,45 +24,30 @@ class Txt2Img(Generator):
         kwargs are 'width' and 'height'
         """
         self.perlin = perlin
+
+        # noinspection PyTypeChecker
+        pipeline: StableDiffusionGeneratorPipeline = self.model
+        pipeline.scheduler = sampler
+
         uc, c, extra_conditioning_info   = conditioning
+        conditioning_data = (
+            ConditioningData(
+                uc, c, cfg_scale, extra_conditioning_info,
+                threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
+            .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
-        @torch.no_grad()
-        def make_image(x_T):
-            shape = [
-                self.latent_channels,
-                height // self.downsampling_factor,
-                width  // self.downsampling_factor,
-            ]
 
-            if self.free_gpu_mem and self.model.model.device != self.model.device:
-                self.model.model.to(self.model.device)
-
-            sampler.make_schedule(ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False)
-
-            samples, _ = sampler.sample(
-                batch_size                   = 1,
-                S                            = steps,
-                x_T                          = x_T,
-                conditioning                 = c,
-                shape                        = shape,
-                verbose                      = False,
-                unconditional_guidance_scale = cfg_scale,
-                unconditional_conditioning   = uc,
-                extra_conditioning_info      = extra_conditioning_info,
-                eta                          = ddim_eta,
-                img_callback                 = step_callback,
-                threshold                    = threshold,
-                attention_maps_callback      = attention_maps_callback,
+        def make_image(x_T) -> PIL.Image.Image:
+            pipeline_output = pipeline.image_from_embeddings(
+                latents=torch.zeros_like(x_T),
+                noise=x_T,
+                num_inference_steps=steps,
+                conditioning_data=conditioning_data,
+                callback=step_callback,
             )
-
-            if self.free_gpu_mem:
-                self.model.model.to('cpu')
-                self.model.cond_stage_model.device = 'cpu'
-                self.model.cond_stage_model.to('cpu')
-                gc.collect()
-                torch.cuda.empty_cache()
-
-            return self.sample_to_image(samples)
+            if pipeline_output.attention_map_saver is not None and attention_maps_callback is not None:
+                attention_maps_callback(pipeline_output.attention_map_saver)
+            return pipeline.numpy_to_pil(pipeline_output.images)[0]
 
         return make_image
 
@@ -70,15 +55,17 @@ class Txt2Img(Generator):
     # returns a tensor filled with random numbers from a normal distribution
     def get_noise(self,width,height):
         device         = self.model.device
+        # limit noise to only the diffusion image channels, not the mask channels
+        input_channels = min(self.latent_channels, 4)
         if self.use_mps_noise or device.type == 'mps':
             x = torch.randn([1,
-                                self.latent_channels,
+                                input_channels,
                                 height // self.downsampling_factor,
                                 width  // self.downsampling_factor],
                                device='cpu').to(device)
         else:
             x = torch.randn([1,
-                                self.latent_channels,
+                                input_channels,
                                 height // self.downsampling_factor,
                                 width  // self.downsampling_factor],
                                device=device)

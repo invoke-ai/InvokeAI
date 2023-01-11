@@ -1,6 +1,7 @@
 name: invokeai
 channels:
   - pytorch
+  - huggingface
   - conda-forge
   - defaults
 dependencies:
@@ -19,10 +20,10 @@ dependencies:
   # sed -E 's/invokeai/invokeai-updated/;20,99s/- ([^=]+)==.+/- \1/' environment-mac.yml > environment-mac-updated.yml
   # CONDA_SUBDIR=osx-arm64 conda env create -f environment-mac-updated.yml && conda list -n invokeai-updated | awk ' {print "  - " $1 "==" $2;} '
   # ```
-
+  - accelerate
   - albumentations=1.2
   - coloredlogs=15.0
-  - diffusers=0.6
+  - diffusers~=0.11
   - einops=0.3
   - eventlet
   - grpcio=1.46
@@ -49,8 +50,9 @@ dependencies:
   - sympy=1.10
   - send2trash=1.8
   - tensorboard=2.10
-  - transformers=4.23
+  - transformers~=4.25
   - pip:
+      - safetensors~=0.2
       - getpass_asterisk
       - picklescan
       - taming-transformers-rom1504

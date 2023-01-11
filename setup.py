@@ -85,7 +85,8 @@ setup(
         'Topic :: Scientific/Engineering :: Image Processing',
     ],
     scripts = ['scripts/invoke.py','scripts/configure_invokeai.py', 'scripts/sd-metadata.py',
-               'scripts/preload_models.py', 'scripts/images2prompt.py','scripts/merge_embeddings.py'
+               'scripts/preload_models.py', 'scripts/images2prompt.py','scripts/merge_embeddings.py',
+               'scripts/textual_inversion_fe.py','scripts/textual_inversion.py'
     ],
     data_files=FRONTEND_FILES,
 )

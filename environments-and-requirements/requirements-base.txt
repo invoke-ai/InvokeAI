@@ -1,6 +1,8 @@
 # pip will resolve the version which matches torch
+accelerate
 albumentations
-diffusers==0.10.*
+datasets
+diffusers[torch]~=0.11
 einops
 eventlet
 facexlib
@@ -14,6 +16,7 @@ huggingface-hub>=0.11.1
 imageio
 imageio-ffmpeg
 kornia
+npyscreen
 numpy==1.23.*
 omegaconf
 opencv-python
@@ -25,6 +28,7 @@ pyreadline3
 pytorch-lightning==1.7.7
 realesrgan
 requests==2.25.1
+safetensors
 scikit-image>=0.19
 send2trash
 streamlit
@@ -32,7 +36,8 @@ taming-transformers-rom1504
 test-tube>=0.7.5
 torch-fidelity
 torchmetrics
-transformers==4.25.*
+transformers~=4.25
+windows-curses; sys_platform == 'win32'
 https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip#egg=k-diffusion
 https://github.com/invoke-ai/PyPatchMatch/archive/refs/tags/0.1.5.zip#egg=pypatchmatch
 https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip#egg=clip

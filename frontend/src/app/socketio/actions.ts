@@ -32,9 +32,9 @@ export const requestSystemConfig = createAction<undefined>(
 
 export const searchForModels = createAction<string>('socketio/searchForModels');
 
-export const addNewModel = createAction<InvokeAI.InvokeModelConfigProps>(
-  'socketio/addNewModel'
-);
+export const addNewModel = createAction<
+  InvokeAI.InvokeModelConfigProps | InvokeAI.InvokeDiffusersModelConfigProps
+>('socketio/addNewModel');
 
 export const deleteModel = createAction<string>('socketio/deleteModel');
 

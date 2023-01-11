@@ -2,7 +2,6 @@ import { createSelector } from '@reduxjs/toolkit';
 
 import React, { useEffect, useState } from 'react';
 import IAIInput from 'common/components/IAIInput';
-import IAINumberInput from 'common/components/IAINumberInput';
 import IAIButton from 'common/components/IAIButton';
 
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -14,7 +13,6 @@ import {
   FormErrorMessage,
   FormHelperText,
   FormLabel,
-  HStack,
   Text,
   VStack,
 } from '@chakra-ui/react';
@@ -26,8 +24,7 @@ import { addNewModel } from 'app/socketio/actions';
 import _ from 'lodash';
 
 import type { RootState } from 'app/store';
-import type { FieldInputProps, FormikProps } from 'formik';
-import type { InvokeModelConfigProps } from 'app/invokeai';
+import type { InvokeDiffusersModelConfigProps } from 'app/invokeai';
 
 const selector = createSelector(
   [systemSelector],
@@ -45,10 +42,7 @@ const selector = createSelector(
   }
 );
 
-const MIN_MODEL_SIZE = 64;
-const MAX_MODEL_SIZE = 2048;
-
-export default function ModelEdit() {
+export default function DiffusersModelEdit() {
   const { openModel, model_list } = useAppSelector(selector);
   const isProcessing = useAppSelector(
     (state: RootState) => state.system.isProcessing
@@ -59,15 +53,14 @@ export default function ModelEdit() {
   const { t } = useTranslation();
 
   const [editModelFormValues, setEditModelFormValues] =
-    useState<InvokeModelConfigProps>({
+    useState<InvokeDiffusersModelConfigProps>({
       name: '',
       description: '',
-      config: 'configs/stable-diffusion/v1-inference.yaml',
-      weights: '',
-      vae: '',
-      width: 512,
-      height: 512,
+      repo_id: '',
+      path: '',
+      vae: { repo_id: '', path: '' },
       default: false,
+      format: 'diffusers',
     });
 
   useEffect(() => {
@@ -75,20 +68,29 @@ export default function ModelEdit() {
       const retrievedModel = _.pickBy(model_list, (val, key) => {
         return _.isEqual(key, openModel);
       });
+
       setEditModelFormValues({
         name: openModel,
         description: retrievedModel[openModel]?.description,
-        config: retrievedModel[openModel]?.config,
-        weights: retrievedModel[openModel]?.weights,
-        vae: retrievedModel[openModel]?.vae,
-        width: retrievedModel[openModel]?.width,
-        height: retrievedModel[openModel]?.height,
+        path: retrievedModel[openModel]?.path,
+        repo_id: retrievedModel[openModel]?.repo_id,
+        vae: {
+          repo_id: retrievedModel[openModel]?.vae?.repo_id
+            ? retrievedModel[openModel]?.vae?.repo_id
+            : '',
+          path: retrievedModel[openModel]?.vae?.path
+            ? retrievedModel[openModel]?.vae?.path
+            : '',
+        },
         default: retrievedModel[openModel]?.default,
+        format: 'diffusers',
       });
     }
   }, [model_list, openModel]);
 
-  const editModelFormSubmitHandler = (values: InvokeModelConfigProps) => {
+  const editModelFormSubmitHandler = (
+    values: InvokeDiffusersModelConfigProps
+  ) => {
     dispatch(addNewModel(values));
   };
 
@@ -139,50 +141,24 @@ export default function ModelEdit() {
                   </VStack>
                 </FormControl>
 
-                {/* Config */}
+                {/* Path */}
                 <FormControl
-                  isInvalid={!!errors.config && touched.config}
+                  isInvalid={!!errors.path && touched.path}
                   isRequired
                 >
-                  <FormLabel htmlFor="config" fontSize="sm">
-                    {t('modelmanager:config')}
-                  </FormLabel>
-                  <VStack alignItems={'start'}>
-                    <Field
-                      as={IAIInput}
-                      id="config"
-                      name="config"
-                      type="text"
-                      width="lg"
-                    />
-                    {!!errors.config && touched.config ? (
-                      <FormErrorMessage>{errors.config}</FormErrorMessage>
-                    ) : (
-                      <FormHelperText margin={0}>
-                        {t('modelmanager:configValidationMsg')}
-                      </FormHelperText>
-                    )}
-                  </VStack>
-                </FormControl>
-
-                {/* Weights */}
-                <FormControl
-                  isInvalid={!!errors.weights && touched.weights}
-                  isRequired
-                >
-                  <FormLabel htmlFor="config" fontSize="sm">
+                  <FormLabel htmlFor="path" fontSize="sm">
                     {t('modelmanager:modelLocation')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
                     <Field
                       as={IAIInput}
-                      id="weights"
-                      name="weights"
+                      id="path"
+                      name="path"
                       type="text"
                       width="lg"
                     />
-                    {!!errors.weights && touched.weights ? (
-                      <FormErrorMessage>{errors.weights}</FormErrorMessage>
+                    {!!errors.path && touched.path ? (
+                      <FormErrorMessage>{errors.path}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
                         {t('modelmanager:modelLocationValidationMsg')}
@@ -191,21 +167,46 @@ export default function ModelEdit() {
                   </VStack>
                 </FormControl>
 
-                {/* VAE */}
-                <FormControl isInvalid={!!errors.vae && touched.vae}>
-                  <FormLabel htmlFor="vae" fontSize="sm">
+                {/* Repo ID */}
+                <FormControl isInvalid={!!errors.repo_id && touched.repo_id}>
+                  <FormLabel htmlFor="repo_id" fontSize="sm">
+                    {t('modelmanager:repo_id')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="repo_id"
+                      name="repo_id"
+                      type="text"
+                      width="lg"
+                    />
+                    {!!errors.repo_id && touched.repo_id ? (
+                      <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:repoIDValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
+                {/* VAE Path */}
+                <FormControl
+                  isInvalid={!!errors.vae?.path && touched.vae?.path}
+                >
+                  <FormLabel htmlFor="vae.path" fontSize="sm">
                     {t('modelmanager:vaeLocation')}
                   </FormLabel>
                   <VStack alignItems={'start'}>
                     <Field
                       as={IAIInput}
-                      id="vae"
-                      name="vae"
+                      id="vae.path"
+                      name="vae.path"
                       type="text"
                       width="lg"
                     />
-                    {!!errors.vae && touched.vae ? (
-                      <FormErrorMessage>{errors.vae}</FormErrorMessage>
+                    {!!errors.vae?.path && touched.vae?.path ? (
+                      <FormErrorMessage>{errors.vae?.path}</FormErrorMessage>
                     ) : (
                       <FormHelperText margin={0}>
                         {t('modelmanager:vaeLocationValidationMsg')}
@@ -214,83 +215,30 @@ export default function ModelEdit() {
                   </VStack>
                 </FormControl>
 
-                <HStack width={'100%'}>
-                  {/* Width */}
-                  <FormControl isInvalid={!!errors.width && touched.width}>
-                    <FormLabel htmlFor="width" fontSize="sm">
-                      {t('modelmanager:width')}
-                    </FormLabel>
-                    <VStack alignItems={'start'}>
-                      <Field id="width" name="width">
-                        {({
-                          field,
-                          form,
-                        }: {
-                          field: FieldInputProps<number>;
-                          form: FormikProps<InvokeModelConfigProps>;
-                        }) => (
-                          <IAINumberInput
-                            id="width"
-                            name="width"
-                            min={MIN_MODEL_SIZE}
-                            max={MAX_MODEL_SIZE}
-                            step={64}
-                            value={form.values.width}
-                            onChange={(value) =>
-                              form.setFieldValue(field.name, Number(value))
-                            }
-                          />
-                        )}
-                      </Field>
-
-                      {!!errors.width && touched.width ? (
-                        <FormErrorMessage>{errors.width}</FormErrorMessage>
-                      ) : (
-                        <FormHelperText margin={0}>
-                          {t('modelmanager:widthValidationMsg')}
-                        </FormHelperText>
-                      )}
-                    </VStack>
-                  </FormControl>
-
-                  {/* Height */}
-                  <FormControl isInvalid={!!errors.height && touched.height}>
-                    <FormLabel htmlFor="height" fontSize="sm">
-                      {t('modelmanager:height')}
-                    </FormLabel>
-                    <VStack alignItems={'start'}>
-                      <Field id="height" name="height">
-                        {({
-                          field,
-                          form,
-                        }: {
-                          field: FieldInputProps<number>;
-                          form: FormikProps<InvokeModelConfigProps>;
-                        }) => (
-                          <IAINumberInput
-                            id="height"
-                            name="height"
-                            min={MIN_MODEL_SIZE}
-                            max={MAX_MODEL_SIZE}
-                            step={64}
-                            value={form.values.height}
-                            onChange={(value) =>
-                              form.setFieldValue(field.name, Number(value))
-                            }
-                          />
-                        )}
-                      </Field>
-
-                      {!!errors.height && touched.height ? (
-                        <FormErrorMessage>{errors.height}</FormErrorMessage>
-                      ) : (
-                        <FormHelperText margin={0}>
-                          {t('modelmanager:heightValidationMsg')}
-                        </FormHelperText>
-                      )}
-                    </VStack>
-                  </FormControl>
-                </HStack>
+                {/* VAE Repo ID */}
+                <FormControl
+                  isInvalid={!!errors.vae?.repo_id && touched.vae?.repo_id}
+                >
+                  <FormLabel htmlFor="vae.repo_id" fontSize="sm">
+                    {t('modelmanager:vaeRepoID')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="vae.repo_id"
+                      name="vae.repo_id"
+                      type="text"
+                      width="lg"
+                    />
+                    {!!errors.vae?.repo_id && touched.vae?.repo_id ? (
+                      <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:vaeRepoIDValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
 
                 <IAIButton
                   type="submit"

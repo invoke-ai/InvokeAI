@@ -34,6 +34,7 @@
   "upload": "Upload",
   "close": "Close",
   "load": "Load",
+  "back": "Back",
   "statusConnected": "Connected",
   "statusDisconnected": "Disconnected",
   "statusError": "Error",
