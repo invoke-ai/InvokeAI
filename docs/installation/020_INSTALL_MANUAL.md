@@ -12,17 +12,18 @@ title: Installing Manually
 
 ## Introduction
 
-You have two choices for manual installation, the [first
-one](#PIP_method) uses basic Python virtual environment (`venv`)
-commands and the PIP package manager. The [second one](#Conda_method)
-based on the Anaconda3 package manager (`conda`). Both methods require
-you to enter commands on the terminal, also known as the "console".
+You have two choices for manual installation.
+The [first one](#pip-Install) uses basic Python virtual environment (`venv`)
+command and `pip` package manager.
+The [second one](#Conda-method) uses Anaconda3 package manager (`conda`).
+Both methods require you to enter commands on the terminal, also known as the
+"console".
 
-Note that the conda install method is currently deprecated and will not
-be supported at some point in the future.
+Note that the `conda` installation method is currently deprecated and will
+not be supported at some point in the future.
 
-On Windows systems you are encouraged to install and use the
-[Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.3),
+On Windows systems, you are encouraged to install and use the
+[PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.3),
 which provides compatibility with Linux and Mac shells and nice
 features such as command-line completion.
 
@@ -37,7 +38,7 @@ manager, please follow these steps:
     ```bash
     python -V
     ```
-    
+
 2.  Clone the [InvokeAI](https://github.com/invoke-ai/InvokeAI) source code from
     GitHub:
 
