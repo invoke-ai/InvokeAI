@@ -57,7 +57,7 @@ manager, please follow these steps:
     source invokeai/bin/activate
     ```
 
-4. Make sure that pip is installed in your virtual environment an up to date:
+4.  Make sure that pip is installed in your virtual environment an up to date:
 
     ```bash
     python -m ensurepip --upgrade
@@ -200,14 +200,14 @@ manager, please follow these steps:
 
         You can permanently set the location of the runtime directory by setting the environment variable INVOKEAI_ROOT to the path of the directory.
 
-9. Render away!
+9.  Render away!
 
     Browse the [features](../features/CLI.md) section to learn about all the things you
     can do with InvokeAI.
 
     Note that some GPUs are slow to warm up. In particular, when using an AMD
     card with the ROCm driver, you may have to wait for over a minute the first
-    time you try to generate an image. Fortunately, after the warm up period
+    time you try to generate an image. Fortunately, after the warm-up period
     rendering will be fast.
 
 10. Subsequently, to relaunch the script, be sure to run "conda activate
