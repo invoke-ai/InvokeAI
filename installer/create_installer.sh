@@ -9,15 +9,20 @@ VERSION="v${VERSION}${PATCH}"
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
 
-git commit -a
+read -e -p "Commit and tag this repo with ${VERSION} and 'latest'? [n]: " input
+RESPONSE=${input:='n'}
+if [ "$RESPONSE" == 'y' ]; then
 
-if ! git tag $VERSION ; then
-    echo "Existing/invalid tag"
-    exit -1
+    git commit -a
+
+    if ! git tag $VERSION ; then
+	echo "Existing/invalid tag"
+	exit -1
+    fi
+
+    git push origin :refs/tags/latest
+    git tag -fa latest
 fi
-
-git push origin :refs/tags/latest
-git tag -fa latest
 
 echo Building installer zip fles for InvokeAI $VERSION
 
