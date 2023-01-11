@@ -68,10 +68,10 @@ check_min_version("0.10.0.dev0")
 logger = get_logger(__name__)
 
 
-def save_progress(text_encoder, placeholder_token_id, accelerator, args, save_path):
+def save_progress(text_encoder, placeholder_token_id, accelerator, placeholder_token, save_path):
     logger.info("Saving embeddings")
     learned_embeds = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[placeholder_token_id]
-    learned_embeds_dict = {args.placeholder_token: learned_embeds.detach().cpu()}
+    learned_embeds_dict = {placeholder_token: learned_embeds.detach().cpu()}
     torch.save(learned_embeds_dict, save_path)
 
 def parse_args():
@@ -756,7 +756,7 @@ def do_textual_inversion_training(
                 global_step += 1
                 if global_step % save_steps == 0:
                     save_path = os.path.join(output_dir, f"learned_embeds-steps-{global_step}.bin")
-                    save_progress(text_encoder, placeholder_token_id, accelerator, args, save_path)
+                    save_progress(text_encoder, placeholder_token_id, accelerator, placeholder_token, save_path)
 
                 if global_step % checkpointing_steps == 0:
                     if accelerator.is_main_process:
