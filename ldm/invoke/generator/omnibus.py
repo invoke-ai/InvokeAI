@@ -40,6 +40,8 @@ class Omnibus(Img2Img,Txt2Img):
         self.perlin = perlin
         num_samples = 1
 
+        print('DEBUG: IN OMNIBUS')
+
         sampler.make_schedule(
             ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
         )

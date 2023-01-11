@@ -162,6 +162,11 @@ class ModelManager(object):
         models = {}
         for name in self.config:
             stanza = self.config[name]
+
+            # don't include VAEs in listing (legacy style)
+            if 'config' in stanza and '/VAE/' in stanza['config']:
+                continue
+            
             models[name] = dict()
             format = stanza.get('format','ckpt') # Determine Format
 
@@ -173,18 +178,20 @@ class ModelManager(object):
                 status = 'cached'
             else:
                 status = 'not loaded'
+            models[name].update(
+                description = description,
+                format = format,
+                status = status,
+            )
             
             # Checkpoint Config Parse
             if format == 'ckpt':
                 models[name].update(
-                    description = description,
-                    format = format,
                     config = str(stanza.get('config', None)),
                     weights = str(stanza.get('weights', None)),
                     vae = str(stanza.get('vae', None)),
                     width = str(stanza.get('width', 512)),
                     height = str(stanza.get('height', 512)),
-                    status = status,
                 )
                 
             # Diffusers Config Parse
@@ -193,14 +200,13 @@ class ModelManager(object):
                     vae = dict(
                         repo_id = str(vae.get('repo_id',None)),
                         path = str(vae.get('path',None)),
+                        subfolder = str(vae.get('subfolder',None))
                     )
             if format == 'diffusers':
                 models[name].update(
-                    description = description,
                     vae = vae,
                     repo_id = str(stanza.get('repo_id', None)),
                     path = str(stanza.get('path',None)),
-                    status = status,
                 )
         
         return models
@@ -721,6 +727,54 @@ class ModelManager(object):
             # and the width and height of the images it
             # was trained on.
         ''')
+
+    @classmethod
+    def migrate_models(cls):
+        '''
+        Migrate the ~/invokeai/models directory from the legacy format used through 2.2.5
+        to the 2.3.0 "diffusers" version. This should be a one-time operation, called at
+        script startup time.
+        '''
+        # Three transformer models to check: bert, clip and safety checker
+        legacy_locations = [
+            Path('CompVis/stable-diffusion-safety-checker/models--CompVis--stable-diffusion-safety-checker'),
+            Path('bert-base-uncased/models--bert-base-uncased'),
+            Path('openai/clip-vit-large-patch14')
+        ]
+        models_dir = Path(Globals.root,'models')
+        legacy_layout = False
+        for model in legacy_locations:
+            legacy_layout = legacy_layout or Path(models_dir,model).exists()
+        if not legacy_layout:
+            return
+
+        print('** Legacy version <= 2.2.5 model directory layout detected. Reorganizing.')
+        print('** This is a quick one-time operation.')
+        from shutil import move
+        
+        # transformer files get moved into the hub directory
+        hub = models_dir / 'hub'
+        os.makedirs(hub, exist_ok=True)
+        for model in legacy_locations:
+            move(models_dir / model, hub)
+
+        # anything else gets moved into the diffusers directory
+        diffusers = models_dir / 'diffusers'
+        os.makedirs(diffusers, exist_ok=True)
+        for root, dirs, _ in os.walk(models_dir, topdown=False):
+            for dir in dirs:
+                full_path = Path(root,dir)
+                if full_path.is_relative_to(hub) or full_path.is_relative_to(diffusers):
+                    continue
+                if Path(dir).match('models--*--*'):
+                    move(full_path,diffusers)
+
+        # now clean up by removing any empty directories
+        empty = [root for root, dirs, files, in os.walk(models_dir) if not len(dirs) and not len(files)]
+        for d in empty:
+            os.rmdir(d)
+    print('** Migration is done. Continuing...')
+
 
     def _resolve_path(self, source:Union[str,Path], dest_directory:str)->Path:
         resolved_path = None

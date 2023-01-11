@@ -12,6 +12,7 @@ from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_f
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
+from ldm.invoke.model_manager import ModelManager
 from pathlib import Path
 from argparse import Namespace
 import pyparsing
@@ -53,7 +54,7 @@ def main():
             print('** This script will now exit.')
             sys.exit(-1)
 
-    print(f'>> {ldm.invoke.__app_name__} {ldm.invoke.__version__}')
+    print(f'>> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
@@ -78,6 +79,9 @@ def main():
             embedding_path = opt.embedding_path
     else:
         embedding_path = None
+
+    # migrate legacy models
+    ModelManager.migrate_models()
 
     # load the infile as a list of lines
     if opt.infile:
