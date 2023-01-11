@@ -210,10 +210,10 @@ manager, please follow these steps:
     time you try to generate an image. Fortunately, after the warm-up period
     rendering will be fast.
 
-10. Subsequently, to relaunch the script, be sure to run "conda activate
-    invokeai", enter the `InvokeAI` directory, and then launch the invoke
-    script. If you forget to activate the 'invokeai' environment, the script
-    will fail with multiple `ModuleNotFound` errors.
+10. Subsequently, to relaunch the script, be sure to enter `InvokeAI` directory,
+    activate the virtual environment, and then launch `invoke.py` script.
+    If you forget to activate the virtual environment,
+    the script will fail with multiple `ModuleNotFound` errors.
 
     !!! tip
 
