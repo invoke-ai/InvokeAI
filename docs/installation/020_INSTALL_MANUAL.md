@@ -53,15 +53,15 @@ manager, please follow these steps:
     environment named `invokeai`:
 
     ```bash
-    python -mvenv invokeai
+    python -m venv invokeai
     source invokeai/bin/activate
     ```
 
 4. Make sure that pip is installed in your virtual environment an up to date:
 
     ```bash
-    python -mensurepip --upgrade
-    python -mpip install --upgrade pip
+    python -m ensurepip --upgrade
+    python -m pip install --upgrade pip
     ```
 
 5.  Pick the correct `requirements*.txt` file for your hardware and operating
