@@ -5,7 +5,7 @@ import os
 import sys
 import curses
 import re
-from ldm.invoke.globals import Globals, set_root
+from ldm.invoke.globals import Globals, global_set_root
 from omegaconf import OmegaConf
 from pathlib import Path
 from typing import List
@@ -17,6 +17,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
                 "linear", "cosine", "cosine_with_restarts",
                 "polynomial","constant", "constant_with_warmup"
     ]
+    precisions = ['no','fp16','bf16']
 
     def afterEditing(self):
         self.parentApp.setNextForm(None)
@@ -35,7 +36,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         )
         self.placeholder_token = self.add_widget_intelligent(
             npyscreen.TitleText,
-            name="Placeholder token",
+            name='Trigger term ("placeholder token")',
             value='',
         )
         self.nextrely -= 1
@@ -70,7 +71,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             name='Output Destination Directory',
             select_dir=True,
             must_exist=False,
-            value=Path(Globals.root) / 'trained-checkpoints' / default_placeholder_token
+            value=Path(Globals.root) / 'text-inversion-model' / default_placeholder_token
         )
         self.resolution = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
@@ -91,7 +92,14 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             out_of=50,
             step=1,
             lowest=1,
-            value=16
+            value=8
+        )
+        self.mixed_precision = self.add_widget_intelligent(
+            npyscreen.TitleSelectOne,
+            name='Mixed Precision',
+            values=self.precisions,
+            value=1,
+            max_height=4,
         )
         self.gradient_accumulation_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
@@ -145,7 +153,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         placeholder = self.placeholder_token.value
         self.prompt_token.value = f'(Trigger by using <{placeholder}> in your prompts)'
         self.train_data_dir.value = Path(Globals.root) / 'training-data' / placeholder
-        self.output_dir.value = Path(Globals.root) / 'embeddings' / placeholder
+        self.output_dir.value = Path(Globals.root) / 'text-inversion-model' / placeholder
         
     def on_ok(self):
         if self.validate_field_values():
@@ -188,7 +196,8 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         args.update(
             model = self.model_names[self.model.value[0]],
             resolution = self.resolutions[self.resolution.value[0]],
-            lr_scheduler = self.lr_schedulers[self.lr_scheduler.value[0]]
+            lr_scheduler = self.lr_schedulers[self.lr_scheduler.value[0]],
+            mixed_precision = self.precisions[self.mixed_precision.value[0]],
         )
 
         # all the strings
@@ -223,7 +232,7 @@ if __name__ == '__main__':
         help='Path to the invokeai runtime directory',
     )
     args = parser.parse_args()
-    set_root(args.root_dir)
+    global_set_root(args.root_dir)
     
     myapplication = MyApplication()
     myapplication.run()

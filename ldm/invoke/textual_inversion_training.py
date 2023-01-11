@@ -32,7 +32,7 @@ from diffusers.utils.import_utils import is_xformers_available
 from huggingface_hub import HfFolder, Repository, whoami
 
 # invokeai stuff
-from ldm.invoke.globals import Globals
+from ldm.invoke.globals import Globals, global_cache_dir
 from omegaconf import OmegaConf
 
 # TODO: remove and import from diffusers.utils when the new version of diffusers is released
@@ -448,7 +448,7 @@ def do_textual_inversion_training(
         push_to_hub:bool=False,
         hub_token:str=None,
         logging_dir:Path=Path('logs'),
-        mixed_precision:str='no',
+        mixed_precision:str='fp16',
         allow_tf32:bool=False,
         report_to:str='tensorboard',
         local_rank:int=-1,
@@ -517,11 +517,11 @@ def do_textual_inversion_training(
     assert model_conf.get('format','diffusers')=='diffusers', "This script only works with models of type 'diffusers'"
     pretrained_model_name_or_path = model_conf.get('repo_id',None) or Path(model_conf.get('path'))
     assert pretrained_model_name_or_path, f"models.yaml error: neither 'repo_id' nor 'path' is defined for {model}"
-    pipeline_args = dict()
+    pipeline_args = dict(cache_dir=global_cache_dir('diffusers'))
     
     # Load tokenizer
     if tokenizer_name:
-        tokenizer = CLIPTokenizer.from_pretrained(tokenizer_name)
+        tokenizer = CLIPTokenizer.from_pretrained(tokenizer_name,cache_dir=global_cache_dir('transformers'))
     else:
         tokenizer = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path, subfolder="tokenizer", **pipeline_args)
 
