@@ -1,9 +1,9 @@
 import os
 import traceback
-from typing import Union
+from typing import Optional
 
 import torch
-from attr import dataclass
+from dataclasses import dataclass
 from picklescan.scanner import scan_file_path
 from transformers import CLIPTokenizer, CLIPTextModel
 
@@ -13,9 +13,9 @@ from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 @dataclass
 class TextualInversion:
     trigger_string: str
-    trigger_token_id: int
-    pad_token_ids: list[int]
     embedding: torch.Tensor
+    trigger_token_id: Optional[int] = None
+    pad_token_ids: Optional[list[int]] = None
 
     @property
     def embedding_vector_length(self) -> int:
@@ -37,6 +37,9 @@ class TextualInversionManager():
         for concept_name in concepts:
             if concept_name in self.hf_concepts_library.concepts_loaded:
                 continue
+            trigger = self.hf_concepts_library.concept_to_trigger(concept_name)
+            if self.has_textual_inversion_for_trigger_string(trigger):
+                continue
             bin_file = self.hf_concepts_library.get_concept_model_path(concept_name)
             if not bin_file:
                 continue
@@ -46,7 +49,7 @@ class TextualInversionManager():
     def get_all_trigger_strings(self) -> list[str]:
         return [ti.trigger_string for ti in self.textual_inversions]
 
-    def load_textual_inversion(self, ckpt_path):
+    def load_textual_inversion(self, ckpt_path, defer_injecting_tokens: bool=False):
         try:
             scan_result = scan_file_path(ckpt_path)
             if scan_result.infected_files == 1:
@@ -59,11 +62,13 @@ class TextualInversionManager():
 
         embedding_info = self._parse_embedding(ckpt_path)
         if embedding_info:
-            self._add_textual_inversion(embedding_info['name'], embedding_info['embedding'])
+            self._add_textual_inversion(embedding_info['name'],
+                                        embedding_info['embedding'],
+                                        defer_injecting_tokens=defer_injecting_tokens)
         else:
             print(f'>> Failed to load embedding located at {ckpt_path}. Unsupported file.')
 
-    def _add_textual_inversion(self, trigger_str, embedding) -> int:
+    def _add_textual_inversion(self, trigger_str, embedding, defer_injecting_tokens=False) -> TextualInversion:
         """
         Add a textual inversion to be recognised.
         :param trigger_str: The trigger text in the prompt that activates this textual inversion. If unknown to the embedder's tokenizer, will be added.
@@ -80,21 +85,15 @@ class TextualInversionManager():
         elif len(embedding.shape) > 2:
             raise ValueError(f"TextualInversionManager cannot add {trigger_str} because the embedding shape {embedding.shape} is incorrect. The embedding must have shape [token_dim] or [V, token_dim] where V is vector length and token_dim is 768 for SD1 or 1280 for SD2.")
 
-        # for embeddings with vector length > 1
-        pad_token_strings = [trigger_str + "-!pad-" + str(pad_index) for pad_index in range(1, embedding.shape[0])]
-
         try:
-            trigger_token_id = self._get_or_create_token_id_and_assign_embedding(trigger_str, embedding[0])
-            # todo: batched UI for faster loading when vector length >2
-            pad_token_ids = [self._get_or_create_token_id_and_assign_embedding(pad_token_str, embedding[1 + i]) \
-                             for (i, pad_token_str) in enumerate(pad_token_strings)]
-            self.textual_inversions.append(TextualInversion(
+            ti = TextualInversion(
                 trigger_string=trigger_str,
-                trigger_token_id=trigger_token_id,
-                pad_token_ids=pad_token_ids,
                 embedding=embedding
-            ))
-            return trigger_token_id
+            )
+            if not defer_injecting_tokens:
+                self._inject_tokens_and_assign_embeddings(ti)
+            self.textual_inversions.append(ti)
+            return ti
 
         except ValueError as e:
             if str(e).startswith('Warning'):
@@ -104,6 +103,26 @@ class TextualInversionManager():
                 print(f">> TextualInversionManager was unable to add a textual inversion with trigger string {trigger_str}.")
                 raise
 
+    def _inject_tokens_and_assign_embeddings(self, ti: TextualInversion) -> int:
+
+        if ti.trigger_token_id is not None:
+            raise ValueError(f"Tokens already injected for textual inversion with trigger '{ti.trigger_string}'")
+
+        trigger_token_id = self._get_or_create_token_id_and_assign_embedding(ti.trigger_string, ti.embedding[0])
+
+        if ti.embedding_vector_length > 1:
+            # for embeddings with vector length > 1
+            pad_token_strings = [ti.trigger_string + "-!pad-" + str(pad_index) for pad_index in range(1, ti.embedding_vector_length)]
+            # todo: batched UI for faster loading when vector length >2
+            pad_token_ids = [self._get_or_create_token_id_and_assign_embedding(pad_token_str, ti.embedding[1 + i]) \
+                                 for (i, pad_token_str) in enumerate(pad_token_strings)]
+        else:
+            pad_token_ids = []
+
+        ti.trigger_token_id = trigger_token_id
+        ti.pad_token_ids = pad_token_ids
+        return ti.trigger_token_id
+
 
     def has_textual_inversion_for_trigger_string(self, trigger_string: str) -> bool:
         try:
@@ -112,6 +131,7 @@ class TextualInversionManager():
         except StopIteration:
             return False
 
+
     def get_textual_inversion_for_trigger_string(self, trigger_string: str) -> TextualInversion:
         return next(ti for ti in self.textual_inversions if ti.trigger_string == trigger_string)
 
@@ -119,7 +139,19 @@ class TextualInversionManager():
     def get_textual_inversion_for_token_id(self, token_id: int) -> TextualInversion:
         return next(ti for ti in self.textual_inversions if ti.trigger_token_id == token_id)
 
-    def expand_textual_inversion_token_ids(self, prompt_token_ids: list[int]) -> list[int]:
+    def create_deferred_token_ids_for_any_trigger_terms(self, prompt_string: str) -> list[int]:
+        injected_token_ids = []
+        for ti in self.textual_inversions:
+            if ti.trigger_token_id is None and ti.trigger_string in prompt_string:
+                if ti.embedding_vector_length > 1:
+                    print(f">> Preparing tokens for textual inversion {ti.trigger_string}...")
+                self._inject_tokens_and_assign_embeddings(ti)
+                injected_token_ids.append(ti.trigger_token_id)
+                injected_token_ids.extend(ti.pad_token_ids)
+        return injected_token_ids
+
+
+    def expand_textual_inversion_token_ids_if_necessary(self, prompt_token_ids: list[int]) -> list[int]:
         """
         Insert padding tokens as necessary into the passed-in list of token ids to match any textual inversions it includes.
 
@@ -144,7 +176,8 @@ class TextualInversionManager():
 
         return prompt_token_ids
 
-    def _get_or_create_token_id_and_assign_embedding(self, token_str: str, embedding: torch.Tensor):
+
+    def _get_or_create_token_id_and_assign_embedding(self, token_str: str, embedding: torch.Tensor) -> int:
         if len(embedding.shape) != 1:
             raise ValueError("Embedding has incorrect shape - must be [token_dim] where token_dim is 768 for SD1 or 1280 for SD2")
         existing_token_id = self.tokenizer.convert_tokens_to_ids(token_str)

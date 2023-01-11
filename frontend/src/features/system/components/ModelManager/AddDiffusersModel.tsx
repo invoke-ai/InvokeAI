@@ -4,6 +4,7 @@ import {
   FormErrorMessage,
   FormHelperText,
   FormLabel,
+  Text,
   VStack,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -15,10 +16,30 @@ import { Field, Formik } from 'formik';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { BiArrowBack } from 'react-icons/bi';
-
-import type { RootState } from 'app/store';
 import { InvokeDiffusersModelConfigProps } from 'app/invokeai';
 import { addNewModel } from 'app/socketio/actions';
+
+import type { RootState } from 'app/store';
+import type { ReactElement } from 'react';
+
+function FormItemWrapper({
+  children,
+}: {
+  children: ReactElement | ReactElement[];
+}) {
+  return (
+    <Flex
+      flexDirection="column"
+      backgroundColor="var(--background-color)"
+      padding="1rem 1rem"
+      borderRadius="0.5rem"
+      rowGap="1rem"
+      width="100%"
+    >
+      {children}
+    </Flex>
+  );
+}
 
 export default function AddDiffusersModel() {
   const dispatch = useAppDispatch();
@@ -29,7 +50,7 @@ export default function AddDiffusersModel() {
   );
 
   function hasWhiteSpace(s: string) {
-    return /\\s/g.test(s);
+    return /\s/.test(s);
   }
 
   function baseValidation(value: string) {
@@ -42,24 +63,31 @@ export default function AddDiffusersModel() {
     name: '',
     description: '',
     repo_id: '',
+    path: '',
     format: 'diffusers',
     default: false,
     vae: {
       repo_id: '',
+      path: '',
     },
   };
 
   const addModelFormSubmitHandler = (
     values: InvokeDiffusersModelConfigProps
   ) => {
-    let diffusersModelToAdd = values;
+    const diffusersModelToAdd = values;
 
-    if (values.vae.repo_id == '') {
-      diffusersModelToAdd = {
-        ...diffusersModelToAdd,
-        vae: { repo_id: values.repo_id + '/vae' },
-      };
+    if (values.path === '') diffusersModelToAdd['path'] = undefined;
+    if (values.repo_id === '') diffusersModelToAdd['repo_id'] = undefined;
+    if (values.vae.path === '') {
+      if (values.path === undefined) {
+        diffusersModelToAdd['vae']['path'] = undefined;
+      } else {
+        diffusersModelToAdd['vae']['path'] = values.path + '/vae';
+      }
     }
+    if (values.vae.repo_id === '')
+      diffusersModelToAdd['vae']['repo_id'] = undefined;
 
     dispatch(addNewModel(diffusersModelToAdd));
     dispatch(setAddNewModelUIOption(null));
@@ -86,108 +114,185 @@ export default function AddDiffusersModel() {
         {({ handleSubmit, errors, touched }) => (
           <form onSubmit={handleSubmit}>
             <VStack rowGap={'0.5rem'}>
-              {/* Name */}
-              <FormControl isInvalid={!!errors.name && touched.name} isRequired>
-                <FormLabel htmlFor="name" fontSize="sm">
-                  {t('modelmanager:name')}
-                </FormLabel>
-                <VStack alignItems={'start'}>
-                  <Field
-                    as={IAIInput}
-                    id="name"
-                    name="name"
-                    type="text"
-                    validate={baseValidation}
-                    width="2xl"
-                  />
-                  {!!errors.name && touched.name ? (
-                    <FormErrorMessage>{errors.name}</FormErrorMessage>
-                  ) : (
-                    <FormHelperText margin={0}>
-                      {t('modelmanager:nameValidationMsg')}
-                    </FormHelperText>
-                  )}
-                </VStack>
-              </FormControl>
+              <FormItemWrapper>
+                {/* Name */}
+                <FormControl
+                  isInvalid={!!errors.name && touched.name}
+                  isRequired
+                >
+                  <FormLabel htmlFor="name" fontSize="sm">
+                    {t('modelmanager:name')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="name"
+                      name="name"
+                      type="text"
+                      validate={baseValidation}
+                      width="2xl"
+                      isRequired
+                    />
+                    {!!errors.name && touched.name ? (
+                      <FormErrorMessage>{errors.name}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:nameValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+              </FormItemWrapper>
 
-              {/* Description */}
-              <FormControl
-                isInvalid={!!errors.description && touched.description}
-                isRequired
-              >
-                <FormLabel htmlFor="description" fontSize="sm">
-                  {t('modelmanager:description')}
-                </FormLabel>
-                <VStack alignItems={'start'}>
-                  <Field
-                    as={IAIInput}
-                    id="description"
-                    name="description"
-                    type="text"
-                    width="2xl"
-                  />
-                  {!!errors.description && touched.description ? (
-                    <FormErrorMessage>{errors.description}</FormErrorMessage>
-                  ) : (
-                    <FormHelperText margin={0}>
-                      {t('modelmanager:descriptionValidationMsg')}
-                    </FormHelperText>
-                  )}
-                </VStack>
-              </FormControl>
+              <FormItemWrapper>
+                {/* Description */}
+                <FormControl
+                  isInvalid={!!errors.description && touched.description}
+                  isRequired
+                >
+                  <FormLabel htmlFor="description" fontSize="sm">
+                    {t('modelmanager:description')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="description"
+                      name="description"
+                      type="text"
+                      width="2xl"
+                      isRequired
+                    />
+                    {!!errors.description && touched.description ? (
+                      <FormErrorMessage>{errors.description}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:descriptionValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+              </FormItemWrapper>
 
-              {/* Repo ID */}
-              <FormControl
-                isInvalid={!!errors.repo_id && touched.repo_id}
-                isRequired
-              >
-                <FormLabel htmlFor="repo_id" fontSize="sm">
-                  {t('modelmanager:modelLocation')} /{' '}
-                  {t('modelmanager:repo_id')}
-                </FormLabel>
-                <VStack alignItems={'start'}>
-                  <Field
-                    as={IAIInput}
-                    id="repo_id"
-                    name="repo_id"
-                    type="text"
-                    width="2xl"
-                  />
-                  {!!errors.repo_id && touched.repo_id ? (
-                    <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
-                  ) : (
-                    <FormHelperText margin={0}>
-                      {t('modelmanager:modelLocationValidationMsg')}
-                    </FormHelperText>
-                  )}
-                </VStack>
-              </FormControl>
+              <FormItemWrapper>
+                <Text fontWeight="bold" fontSize="sm">
+                  {t('modelmanager:formMessageDiffusersModelLocation')}
+                </Text>
+                <Text
+                  fontSize="sm"
+                  fontStyle="italic"
+                  color="var(--text-color-secondary)"
+                >
+                  {t('modelmanager:formMessageDiffusersModelLocationDesc')}
+                </Text>
 
-              {/* VAE */}
-              <FormControl
-                isInvalid={!!errors.vae?.repo_id && touched.vae?.repo_id}
-                isRequired
-              >
-                <FormLabel htmlFor="vae.repo_id" fontSize="sm">
-                  {t('modelmanager:vaeLocation')}
-                </FormLabel>
-                <VStack alignItems={'start'}>
-                  <Field
-                    as={IAIInput}
-                    id="vae.repo_id"
-                    name="vae.repo_id"
-                    type="text"
-                    width="2xl"
-                  />
-                  {!!errors.vae?.repo_id && touched.vae?.repo_id ? (
-                    <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
-                  ) : (
-                    <FormHelperText margin={0}>
-                      {t('modelmanager:vaeLocationValidationMsg')}
-                    </FormHelperText>
-                  )}
-                </VStack>
-              </FormControl>
+                {/* Path */}
+                <FormControl isInvalid={!!errors.path && touched.path}>
+                  <FormLabel htmlFor="path" fontSize="sm">
+                    {t('modelmanager:modelLocation')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="path"
+                      name="path"
+                      type="text"
+                      width="2xl"
+                    />
+                    {!!errors.path && touched.path ? (
+                      <FormErrorMessage>{errors.path}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:modelLocationValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
+                {/* Repo ID */}
+                <FormControl isInvalid={!!errors.repo_id && touched.repo_id}>
+                  <FormLabel htmlFor="repo_id" fontSize="sm">
+                    {t('modelmanager:repo_id')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="repo_id"
+                      name="repo_id"
+                      type="text"
+                      width="2xl"
+                    />
+                    {!!errors.repo_id && touched.repo_id ? (
+                      <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:repoIDValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+              </FormItemWrapper>
+
+              <FormItemWrapper>
+                {/* VAE Path */}
+                <Text fontWeight="bold">
+                  {t('modelmanager:formMessageDiffusersVAELocation')}
+                </Text>
+                <Text
+                  fontSize="sm"
+                  fontStyle="italic"
+                  color="var(--text-color-secondary)"
+                >
+                  {t('modelmanager:formMessageDiffusersVAELocationDesc')}
+                </Text>
+                <FormControl
+                  isInvalid={!!errors.vae?.path && touched.vae?.path}
+                >
+                  <FormLabel htmlFor="vae.path" fontSize="sm">
+                    {t('modelmanager:vaeLocation')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="vae.path"
+                      name="vae.path"
+                      type="text"
+                      width="2xl"
+                    />
+                    {!!errors.vae?.path && touched.vae?.path ? (
+                      <FormErrorMessage>{errors.vae?.path}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:vaeLocationValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+
+                {/* VAE Repo ID */}
+                <FormControl
+                  isInvalid={!!errors.vae?.repo_id && touched.vae?.repo_id}
+                >
+                  <FormLabel htmlFor="vae.repo_id" fontSize="sm">
+                    {t('modelmanager:vaeRepoID')}
+                  </FormLabel>
+                  <VStack alignItems={'start'}>
+                    <Field
+                      as={IAIInput}
+                      id="vae.repo_id"
+                      name="vae.repo_id"
+                      type="text"
+                      width="2xl"
+                    />
+                    {!!errors.vae?.repo_id && touched.vae?.repo_id ? (
+                      <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>
+                    ) : (
+                      <FormHelperText margin={0}>
+                        {t('modelmanager:vaeRepoIDValidationMsg')}
+                      </FormHelperText>
+                    )}
+                  </VStack>
+                </FormControl>
+              </FormItemWrapper>
 
               <IAIButton
                 type="submit"

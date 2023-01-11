@@ -29,7 +29,7 @@ class HuggingFaceConceptsLibrary(object):
 
     def list_concepts(self)->list:
         '''
-        Return a list of all the concepts by name, without the 'sd-concepts-library' part. 
+        Return a list of all the concepts by name, without the 'sd-concepts-library' part.
         Also adds local concepts in invokeai/embeddings folder.
         '''
         local_concepts_now = self.get_local_concepts(os.path.join(self.root, 'embeddings'))
@@ -71,11 +71,11 @@ class HuggingFaceConceptsLibrary(object):
         if concept_name in self.triggers:
             return self.triggers[concept_name]
         elif self.concept_is_local(concept_name):
-            trigger = f'<{concept_name}>'   
+            trigger = f'<{concept_name}>'
             self.triggers[concept_name] = trigger
             self.concept_names[trigger] = concept_name
             return trigger
-        
+
         file = self.get_concept_file(concept_name, 'token_identifier.txt', local_only=True)
         if not file:
             return None
@@ -135,7 +135,7 @@ class HuggingFaceConceptsLibrary(object):
     def get_concept_file(self, concept_name:str, file_name:str='learned_embeds.bin' , local_only:bool=False)->str:
         if not (self.concept_is_downloaded(concept_name) or self.concept_is_local(concept_name) or local_only):
             self.download_concept(concept_name)
-        
+
         # get local path in invokeai/embeddings if local concept
         if self.concept_is_local(concept_name):
             concept_path = self._concept_local_path(concept_name)
@@ -144,7 +144,7 @@ class HuggingFaceConceptsLibrary(object):
             concept_path = self._concept_path(concept_name)
             path = os.path.join(concept_path, file_name)
         return path if os.path.exists(path) else None
-    
+
     def concept_is_local(self, concept_name)->bool:
         return concept_name in self.local_concepts
 
@@ -197,7 +197,7 @@ class HuggingFaceConceptsLibrary(object):
         return os.path.join(self.root,'models','sd-concepts-library',concept_name)
 
     def _concept_local_path(self, concept_name:str)->str:
-        filename = self.local_concepts[concept_name] 
+        filename = self.local_concepts[concept_name]
         return os.path.join(self.root,'embeddings',filename)
 
     def get_local_concepts(self, loc_dir:str):

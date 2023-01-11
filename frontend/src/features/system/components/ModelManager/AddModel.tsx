@@ -63,6 +63,7 @@ export default function AddModel() {
 
   const addModelModalClose = () => {
     onClose();
+    dispatch(setAddNewModelUIOption(null));
   };
 
   return (
@@ -94,11 +95,11 @@ export default function AddModel() {
             {addNewModelUIOption == null && (
               <Flex columnGap="1rem">
                 <AddModelBox
-                  text="Add Checkpoint Model"
+                  text={t('modelmanager:addCheckpointModel')}
                   onClick={() => dispatch(setAddNewModelUIOption('ckpt'))}
                 />
                 <AddModelBox
-                  text="Add Diffusers Model"
+                  text={t('modelmanager:addDiffuserModel')}
                   onClick={() => dispatch(setAddNewModelUIOption('diffusers'))}
                 />
               </Flex>

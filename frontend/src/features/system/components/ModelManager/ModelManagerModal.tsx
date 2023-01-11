@@ -55,7 +55,9 @@ export default function ModelManagerModal({
         <ModalOverlay />
         <ModalContent className="modal" fontFamily="Inter">
           <ModalCloseButton className="modal-close-btn" />
-          <ModalHeader>{t('modelmanager:modelManager')}</ModalHeader>
+          <ModalHeader fontWeight="bold">
+            {t('modelmanager:modelManager')}
+          </ModalHeader>
           <Flex
             padding={'0 1.5rem 1.5rem 1.5rem'}
             width="100%"
