@@ -12,17 +12,18 @@ title: Installing Manually
 
 ## Introduction
 
-You have two choices for manual installation, the [first
-one](#PIP_method) uses basic Python virtual environment (`venv`)
-commands and the PIP package manager. The [second one](#Conda_method)
-based on the Anaconda3 package manager (`conda`). Both methods require
-you to enter commands on the terminal, also known as the "console".
+You have two choices for manual installation.
+The [first one](#pip-Install) uses basic Python virtual environment (`venv`)
+command and `pip` package manager.
+The [second one](#Conda-method) uses Anaconda3 package manager (`conda`).
+Both methods require you to enter commands on the terminal, also known as the
+"console".
 
-Note that the conda install method is currently deprecated and will not
-be supported at some point in the future.
+Note that the `conda` installation method is currently deprecated and will
+not be supported at some point in the future.
 
-On Windows systems you are encouraged to install and use the
-[Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.3),
+On Windows systems, you are encouraged to install and use the
+[PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.3),
 which provides compatibility with Linux and Mac shells and nice
 features such as command-line completion.
 
@@ -37,7 +38,7 @@ manager, please follow these steps:
     ```bash
     python -V
     ```
-    
+
 2.  Clone the [InvokeAI](https://github.com/invoke-ai/InvokeAI) source code from
     GitHub:
 
@@ -52,15 +53,15 @@ manager, please follow these steps:
     environment named `invokeai`:
 
     ```bash
-    python -mvenv invokeai
+    python -m venv invokeai
     source invokeai/bin/activate
     ```
 
-4. Make sure that pip is installed in your virtual environment an up to date:
+4.  Make sure that pip is installed in your virtual environment an up to date:
 
     ```bash
-    python -mensurepip --upgrade
-    python -mpip install --upgrade pip
+    python -m ensurepip --upgrade
+    python -m pip install --upgrade pip
     ```
 
 5.  Pick the correct `requirements*.txt` file for your hardware and operating
@@ -199,20 +200,20 @@ manager, please follow these steps:
 
         You can permanently set the location of the runtime directory by setting the environment variable INVOKEAI_ROOT to the path of the directory.
 
-9. Render away!
+9.  Render away!
 
     Browse the [features](../features/CLI.md) section to learn about all the things you
     can do with InvokeAI.
 
     Note that some GPUs are slow to warm up. In particular, when using an AMD
     card with the ROCm driver, you may have to wait for over a minute the first
-    time you try to generate an image. Fortunately, after the warm up period
+    time you try to generate an image. Fortunately, after the warm-up period
     rendering will be fast.
 
-10. Subsequently, to relaunch the script, be sure to run "conda activate
-    invokeai", enter the `InvokeAI` directory, and then launch the invoke
-    script. If you forget to activate the 'invokeai' environment, the script
-    will fail with multiple `ModuleNotFound` errors.
+10. Subsequently, to relaunch the script, be sure to enter `InvokeAI` directory,
+    activate the virtual environment, and then launch `invoke.py` script.
+    If you forget to activate the virtual environment,
+    the script will fail with multiple `ModuleNotFound` errors.
 
     !!! tip
 
