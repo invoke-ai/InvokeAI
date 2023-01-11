@@ -252,13 +252,12 @@ class ModelManager(object):
 
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
 
-        config = omega[model_name] if model_name in omega else {}
-        for field in model_attributes:
-            if field == 'weights':
-                field.replace('\\', '/')
-            config[field] = model_attributes[field]
+        if model_name not in omega:
+            omega[model_name] = dict()
+        omega[model_name].update(model_attributes,merge=False)
+        if 'weights' in omega[model_name]:
+            omega[model_name]['weights'].replace('\\','/')
 
-        omega[model_name] = config
         if clobber:
             self._invalidate_cached_model(model_name)
 
@@ -739,7 +738,7 @@ class ModelManager(object):
         legacy_locations = [
             Path('CompVis/stable-diffusion-safety-checker/models--CompVis--stable-diffusion-safety-checker'),
             Path('bert-base-uncased/models--bert-base-uncased'),
-            Path('openai/clip-vit-large-patch14')
+            Path('openai/clip-vit-large-patch14/models--openai--clip-vit-large-patch14')
         ]
         models_dir = Path(Globals.root,'models')
         legacy_layout = False
@@ -756,7 +755,10 @@ class ModelManager(object):
         hub = models_dir / 'hub'
         os.makedirs(hub, exist_ok=True)
         for model in legacy_locations:
-            move(models_dir / model, hub)
+            source = models_dir /model
+            if source.exists():
+                print(f'DEBUG: Moving {models_dir / model} into hub')
+                move(models_dir / model, hub)
 
         # anything else gets moved into the diffusers directory
         diffusers = models_dir / 'diffusers'
@@ -773,7 +775,7 @@ class ModelManager(object):
         empty = [root for root, dirs, files, in os.walk(models_dir) if not len(dirs) and not len(files)]
         for d in empty:
             os.rmdir(d)
-    print('** Migration is done. Continuing...')
+        print('** Migration is done. Continuing...')
 
 
     def _resolve_path(self, source:Union[str,Path], dest_directory:str)->Path:

@@ -502,7 +502,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         if len(path) < 2:
             print('** please provide the name of a model')
         else:
-            edit_config(path[1], gen, opt, completer)
+            edit_model(path[1], gen, opt, completer)
         completer.add_history(command)
         operation = None
 
@@ -600,7 +600,7 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
     manager = gen.model_manager
     default_name = Path(path_or_repo).stem
     default_description = f'Imported model {default_name}'
-    model_name, model_description, default = _get_model_name_and_desc(
+    model_name, model_description = _get_model_name_and_desc(
         manager,
         completer,
         model_name=default_name,
@@ -613,7 +613,7 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
             description = model_description):
         print('** model failed to import')
         return None
-    if default:
+    if input('Make this the default model? [n] ').startswith(('y','Y')):
         manager.set_default_model(model_name)
     return model_name
 
@@ -621,7 +621,7 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
     manager = gen.model_manager
     default_name = Path(path_or_url).stem
     default_description = f'Imported model {default_name}'
-    model_name, model_description, default = _get_model_name_and_desc(
+    model_name, model_description = _get_model_name_and_desc(
         manager,
         completer,
         model_name=default_name,
@@ -630,7 +630,7 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
     config_file = None
 
     completer.complete_extensions(('.yaml','.yml'))
-    completer.linebuffer = 'configs/stable-diffusion/v1-inference.yaml'
+    completer.set_line('configs/stable-diffusion/v1-inference.yaml')
     done = False
     while not done:
         config_file = input('Configuration file for this model: ').strip()
@@ -641,12 +641,13 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
             path_or_url,
             config = config_file,
             model_name = model_name,
-            model_description = model_description
+            model_description = model_description,
+            commit_to_conf = opt.conf,
     ):
         print('** model failed to import')
         return None
 
-    if default:
+    if input('Make this the default model? [n] ').startswith(('y','Y')):
         manager.set_model_default(model_name)
     return model_name
 
@@ -665,10 +666,9 @@ def _verify_load(model_name:str, gen)->bool:
 
 def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_description:str=''):
     model_name = _get_model_name(model_manager.list_models(),completer,model_name)
-    completer.linebuffer = model_description
+    completer.set_line(model_description)
     model_description = input(f'Description for this model [{model_description}]: ').strip() or model_description
-    default = input(f'Make this model the default? [n] ').startswith(('y','Y'))
-    return model_name, model_description, default
+    return model_name, model_description
 
 def optimize_model(model_name_or_path:str, gen, opt, completer):
     manager = gen.model_manager
@@ -684,7 +684,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
             return
     elif os.path.exists(model_name_or_path):
         ckpt_path = Path(model_name_or_path)
-        model_name,model_description, default = _get_model_name_and_desc(
+        model_name,model_description = _get_model_name_and_desc(
             manager,
             completer,
             ckpt_path.stem,
@@ -731,7 +731,7 @@ def del_config(model_name:str, gen, opt, completer):
     print(f'** {model_name} deleted')
     completer.update_models(gen.model_manager.list_models())
 
-def edit_config(model_name:str, gen, opt, completer):
+def edit_model(model_name:str, gen, opt, completer):
     current_model = gen.model_name
 #    if model_name == current_model:
 #        print("** Can't edit the active model. !switch to another model first. **")
@@ -743,16 +743,23 @@ def edit_config(model_name:str, gen, opt, completer):
         return
 
     print(f'\n>> Editing model {model_name} from configuration file {opt.conf}')
-    new_name,new_description,default = _get_model_name_and_desc(gen.model_manager,
-                                                                completer,
-                                                                model_name=model_name,
-                                                                model_description=info['description']
-    )
-    info['description'] = new_description
+    new_name = _get_model_name(manager.list_models(),completer,model_name)
+
+    for attribute in info.keys():
+        if type(info[attribute]) != str:
+            continue
+        if attribute == 'format':
+            continue
+        completer.set_line(info[attribute])
+        info[attribute] = input(f'{attribute}: ') or info[attribute]
+        
     if new_name != model_name:
-        manager.add_model(new_name,info)
         manager.del_model(model_name)
-    if default:
+
+    # this does the update
+    manager.add_model(new_name, info, True)
+
+    if input('Make this the default model? [n] ').startswith(('y','Y')):
         manager.set_default_model(new_name)
     manager.commit(opt.conf)
     completer.update_models(manager.list_models())
@@ -760,7 +767,7 @@ def edit_config(model_name:str, gen, opt, completer):
 
 def _get_model_name(existing_names,completer,default_name:str='')->str:
     done = False
-    completer.linebuffer = default_name
+    completer.set_line(default_name)
     while not done:
         model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
