@@ -5,6 +5,7 @@ import os
 import sys
 import curses
 import re
+import shutil
 from ldm.invoke.globals import Globals, global_set_root
 from omegaconf import OmegaConf
 from pathlib import Path
@@ -71,7 +72,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             name='Output Destination Directory',
             select_dir=True,
             must_exist=False,
-            value=Path(Globals.root) / 'text-inversion-model' / default_placeholder_token
+            value=Path(Globals.root) / 'text-inversion-training' / default_placeholder_token
         )
         self.resolution = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
@@ -153,7 +154,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         placeholder = self.placeholder_token.value
         self.prompt_token.value = f'(Trigger by using <{placeholder}> in your prompts)'
         self.train_data_dir.value = Path(Globals.root) / 'training-data' / placeholder
-        self.output_dir.value = Path(Globals.root) / 'text-inversion-model' / placeholder
+        self.output_dir.value = Path(Globals.root) / 'text-inversion-training' / placeholder
         
     def on_ok(self):
         if self.validate_field_values():
@@ -189,7 +190,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         defaults = [idx for idx in range(len(model_names)) if 'default' in conf[model_names[idx]]]
         return (model_names,defaults[0])
 
-    def marshall_arguments(self):
+    def marshall_arguments(self)->dict:
         args = dict()
 
         # the choices
@@ -223,6 +224,16 @@ class MyApplication(npyscreen.NPSAppManaged):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
         self.main = self.addForm('MAIN', textualInversionForm, name='Textual Inversion Settings')
 
+def copy_to_embeddings_folder(args:dict):
+    source = Path(args['output_dir'],'learned_embeds.bin')
+    destination = Path(Globals.root,'embeddings',args['placeholder_token'])
+    print(f'>> Training completed. Copying learned_embeds.bin into {str(destination)}')
+    shutil.copy(source,destination)
+    if (input('Delete training logs and intermediate checkpoints (~8 Gb)? [y] ') or 'y').startswith(('y','Y')):
+        shutil.rmtree(Path(args['output_dir']))
+    else:
+        print(f'>> Keeping {args["output_dir"]}')
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='InvokeAI textual inversion training')
     parser.add_argument(
@@ -240,5 +251,11 @@ if __name__ == '__main__':
     from ldm.invoke.textual_inversion_training import do_textual_inversion_training
     if args := myapplication.ti_arguments:
         os.makedirs(args['output_dir'],exist_ok=True)
-        do_textual_inversion_training(**args)
+        try:
+            do_textual_inversion_training(**args)
+            copy_to_embeddings_folder(args)
+        except Exception as e:
+            print(f'** An exception occurred during training. The exception was:')
+            print(str(e))
+        
     
