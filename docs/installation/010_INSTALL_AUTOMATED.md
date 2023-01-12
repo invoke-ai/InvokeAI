@@ -52,7 +52,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         find python, then open the Python installer again and choose
         "Modify" existing installation.
 
-        - Installation requires an up to date version of the Microsoft Visual C libraries. Please install the 2015-2022 libraries available here: https://learn.microsoft.com/en-us/cpp/windows/deploying-native-desktop-applications-visual-cpp?view=msvc-170
+        - Installation requires an up to date version of the Microsoft Visual C libraries. Please install the 2015-2022 libraries available here: https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
 
     === "Mac users"
 
