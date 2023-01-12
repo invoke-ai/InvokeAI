@@ -791,7 +791,7 @@ def do_textual_inversion_training(
             pipeline.save_pretrained(output_dir)
         # Save the newly trained embeddings
         save_path = os.path.join(output_dir, "learned_embeds.bin")
-        save_progress(text_encoder, placeholder_token_id, accelerator, args, save_path)
+        save_progress(text_encoder, placeholder_token_id, accelerator, placeholder_token, save_path)
 
         if push_to_hub:
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
