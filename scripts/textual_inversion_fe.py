@@ -6,6 +6,7 @@ import sys
 import curses
 import re
 import shutil
+import traceback
 from ldm.invoke.globals import Globals, global_set_root
 from omegaconf import OmegaConf
 from pathlib import Path
@@ -30,14 +31,14 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
         self.model = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            name='Model Name',
+            name='Model Name:',
             values=self.model_names,
             value=default,
             max_height=len(self.model_names)+1
         )
         self.placeholder_token = self.add_widget_intelligent(
             npyscreen.TitleText,
-            name='Trigger term ("placeholder token")',
+            name='Trigger word:',
             value='',
         )
         self.nextrely -= 1
@@ -50,33 +51,38 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         self.nextrelx -= 30
         self.initializer_token = self.add_widget_intelligent(
             npyscreen.TitleText,
-            name="Initializer token",
+            name="Initializer token:",
             value=default_initializer_token,
         )
         self.learnable_property = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            name="Learnable property",
+            name="Learnable property:",
             values=['object','style'],
             value=0,
             max_height=3,
         )
         self.train_data_dir = self.add_widget_intelligent(
             npyscreen.TitleFilenameCombo,
-            name='Data Training Directory',
+            name='Data Training Directory:',
             select_dir=True,
             must_exist=True,
             value=Path(Globals.root) / 'training-data' / default_placeholder_token
         )
         self.output_dir = self.add_widget_intelligent(
             npyscreen.TitleFilenameCombo,
-            name='Output Destination Directory',
+            name='Output Destination Directory:',
             select_dir=True,
             must_exist=False,
             value=Path(Globals.root) / 'text-inversion-training' / default_placeholder_token
         )
+        self.resume_from_checkpoint = self.add_widget_intelligent(
+            npyscreen.Checkbox,
+            name="Resume from last saved checkpoint",
+            value=False,
+        )
         self.resolution = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            name='Image resolution (pixels)',
+            name='Image resolution (pixels):',
             values = self.resolutions,
             value=0,
             scroll_exit = True,
@@ -89,7 +95,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         )
         self.train_batch_size = self.add_widget_intelligent(
             npyscreen.TitleSlider,
-            name='Batch Size',
+            name='Batch Size:',
             out_of=50,
             step=1,
             lowest=1,
@@ -97,14 +103,14 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         )
         self.mixed_precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            name='Mixed Precision',
+            name='Mixed Precision:',
             values=self.precisions,
             value=1,
             max_height=4,
         )
         self.gradient_accumulation_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
-            name='Gradient Accumulation Steps',
+            name='Gradient Accumulation Steps:',
             out_of=10,
             step=1,
             lowest=1,
@@ -112,7 +118,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         )
         self.max_train_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
-            name='Max Training Steps',
+            name='Max Training Steps:',
             out_of=10000,
             step=500,
             lowest=1,
@@ -120,7 +126,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         )
         self.learning_rate = self.add_widget_intelligent(
             npyscreen.TitleText,
-            name="Learning Rate",
+            name="Learning Rate:",
             value='5.0e-04',
         )
         self.scale_lr = self.add_widget_intelligent(
@@ -135,14 +141,14 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         )
         self.lr_scheduler = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            name='Learning rate scheduler',
+            name='Learning rate scheduler:',
             values = self.lr_schedulers,
             max_height=7,
             scroll_exit = True,
             value=4)
         self.lr_warmup_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
-            name='Warmup Steps',
+            name='Warmup Steps:',
             out_of=100,
             step=1,
             lowest=0,
@@ -204,6 +210,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         # all the strings
         for attr in ('initializer_token','placeholder_token','train_data_dir','output_dir','scale_lr'):
             args[attr] = getattr(self,attr).value
+            
         # all the integers
         for attr in ('train_batch_size','gradient_accumulation_steps',
                      'max_train_steps','lr_warmup_steps'):
@@ -213,6 +220,11 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         args.update(
             learning_rate = float(self.learning_rate.value)
         )
+
+        # the booleans
+        if self.resume_from_checkpoint.value and Path(self.output_dir.value).exists():
+            args['resume_from_checkpoint'] = 'latest'
+
         return args
 
 class MyApplication(npyscreen.NPSAppManaged):
@@ -229,7 +241,7 @@ def copy_to_embeddings_folder(args:dict):
     destination = Path(Globals.root,'embeddings',args['placeholder_token'])
     print(f'>> Training completed. Copying learned_embeds.bin into {str(destination)}')
     shutil.copy(source,destination)
-    if (input('Delete training logs and intermediate checkpoints (~8 Gb)? [y] ') or 'y').startswith(('y','Y')):
+    if (input('Delete training logs and intermediate checkpoints? [y] ') or 'y').startswith(('y','Y')):
         shutil.rmtree(Path(args['output_dir']))
     else:
         print(f'>> Keeping {args["output_dir"]}')
@@ -251,11 +263,18 @@ if __name__ == '__main__':
     from ldm.invoke.textual_inversion_training import do_textual_inversion_training
     if args := myapplication.ti_arguments:
         os.makedirs(args['output_dir'],exist_ok=True)
+        
+        # Automatically add angle brackets around the trigger
+        if not re.match('^<.+>$',args['placeholder_token']):
+            args['placeholder_token'] = f"<{args['placeholder_token']}>"
+
+        args['only_save_embeds'] = True
+
         try:
             do_textual_inversion_training(**args)
             copy_to_embeddings_folder(args)
         except Exception as e:
             print(f'** An exception occurred during training. The exception was:')
             print(str(e))
-        
-    
+            print('** DETAILS:')
+            print(traceback.format_exc())
