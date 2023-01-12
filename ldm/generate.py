@@ -712,7 +712,6 @@ class Generate:
             force_outpaint:bool=False,
     ):
         inpainting_model_in_use = self.sampler.uses_inpainting_model()
-        print(f'DEBUG: in select_generator(), inpainting_model_in_use = {inpainting_model_in_use}')
 
         if hires_fix:
             return self._make_txt2img2img()

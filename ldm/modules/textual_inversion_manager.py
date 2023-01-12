@@ -62,9 +62,12 @@ class TextualInversionManager():
 
         embedding_info = self._parse_embedding(ckpt_path)
         if embedding_info:
-            self._add_textual_inversion(embedding_info['name'],
-                                        embedding_info['embedding'],
-                                        defer_injecting_tokens=defer_injecting_tokens)
+            try:
+                self._add_textual_inversion(embedding_info['name'],
+                                            embedding_info['embedding'],
+                                            defer_injecting_tokens=defer_injecting_tokens)
+            except ValueError:
+                print(f'   | ignoring incompatible embedding {embedding_info["name"]}')
         else:
             print(f'>> Failed to load embedding located at {ckpt_path}. Unsupported file.')
 
@@ -108,6 +111,7 @@ class TextualInversionManager():
         if ti.trigger_token_id is not None:
             raise ValueError(f"Tokens already injected for textual inversion with trigger '{ti.trigger_string}'")
 
+        print(f'DEBUG: Injecting token {ti.trigger_string}')
         trigger_token_id = self._get_or_create_token_id_and_assign_embedding(ti.trigger_string, ti.embedding[0])
 
         if ti.embedding_vector_length > 1:
@@ -145,7 +149,11 @@ class TextualInversionManager():
             if ti.trigger_token_id is None and ti.trigger_string in prompt_string:
                 if ti.embedding_vector_length > 1:
                     print(f">> Preparing tokens for textual inversion {ti.trigger_string}...")
-                self._inject_tokens_and_assign_embeddings(ti)
+                try:
+                    self._inject_tokens_and_assign_embeddings(ti)
+                except ValueError as e:
+                    print(f'   | ignoring incompatible embedding trigger {ti.trigger_string}')
+                    continue
                 injected_token_ids.append(ti.trigger_token_id)
                 injected_token_ids.extend(ti.pad_token_ids)
         return injected_token_ids
