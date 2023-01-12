@@ -29,7 +29,7 @@ from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.conditioning import get_uc_and_c_and_ec
 from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.generator.inpaint import infill_methods
-from ldm.invoke.globals import Globals
+from ldm.invoke.globals import global_cache_dir
 from ldm.invoke.image_util import InitImageResizer
 from ldm.invoke.model_manager import ModelManager
 from ldm.invoke.pngwriter import PngWriter
@@ -226,7 +226,7 @@ class Generate:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
-                safety_model_path = os.path.join(Globals.root,'models',safety_model_id)
+                safety_model_path = global_cache_dir("hub")
                 self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id,
                                                                                    local_files_only=True,
                                                                                    cache_dir=safety_model_path,
