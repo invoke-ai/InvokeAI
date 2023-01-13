@@ -574,7 +574,7 @@ def import_model(model_path:str, gen, opt, completer):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif os.path.exists(model_path) and model_path.endswith('.ckpt') and os.path.isfile(model_path):
         model_name = import_ckpt_model(model_path, gen, opt, completer)        
-    elif re.match('^[\w.-]+/[\w.-]+$',model_path):
+    elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     elif os.path.isdir(model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
@@ -772,8 +772,8 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
         model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
             model_name = default_name
-        if not re.match('^[\w._-]+$',model_name):
-            print('** model name must contain only words, digits and the characters [._-] **')
+        if not re.match('^[\w._+-]+$',model_name):
+            print('** model name must contain only words, digits and the characters "._+-" **')
         elif model_name != default_name and model_name in existing_names:
             print(f'** the name {model_name} is already in use. Pick another.')
         else:
