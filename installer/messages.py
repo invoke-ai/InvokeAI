@@ -95,6 +95,7 @@ def dest_path(init_path=None) -> Path:
             dest = dest.expanduser().resolve()
 
         if dest.exists():
+            console.line()
             print(f":exclamation: Directory {dest} already exists.")
             console.line()
             dest_confirmed = Confirm.ask(
@@ -136,8 +137,8 @@ def graphical_accelerator():
         print(f"Only CPU acceleration is available on {ARCH} architecture. Proceeding with that.")
         return "cpu"
 
-    nvidia = ("an [dark_sea_green4 b]NVIDIA[/] GPU (using CUDA™). [steel_blue3]https://link.to.supported.GPUs[/])", "cuda",)
-    amd = ("an [red3 b]AMD[/] GPU (using ROCm™). [steel_blue3]https://link.to.supported.GPUs[/])", "rocm",)
+    nvidia = ("an [gold1 b]NVIDIA[/] GPU (using CUDA™)", "cuda",)
+    amd = ("an [gold1 b]AMD[/] GPU (using ROCm™)", "rocm",)
     cpu = ("no compatible GPU, or specifically prefer to use the CPU", "cpu",)
     idk = ("I'm not sure what to choose", "idk",)
 
@@ -158,17 +159,57 @@ def graphical_accelerator():
 
     options = {str(i): opt for i, opt in enumerate(options, 1)}
 
-    console.rule("GPU (Graphics Card) selection")
+    console.rule(":space_invader: GPU (Graphics Card) selection :space_invader:")
     console.print(Panel(
-            Group(
-                f"Detected the [gold1]{OS}-{ARCH}[/] platform. Please select the installation option for GPU support",
+            Group("\n".join([
+                f"Detected the [gold1]{OS}-{ARCH}[/] platform",
                 "",
-                Panel("\n".join([f"[green b i]{i}[/] [dark_red]🢒[/] {opt[0]}" for (i, opt) in options.items()]), box=box.MINIMAL),
+                "See [steel_blue3]https://invoke-ai.github.io/InvokeAI/#system[/] to ensure your system meets the minimum requirements.",
+                "",
+                "[red3]🠶[/] [b]Your GPU drivers must be correctly installed before using InvokeAI![/] [red3]🠴[/]"]),
+                "",
+                "Please select the type of GPU installed in your computer.",
+                Panel("\n".join([f"[spring_green3 b i]{i}[/] [dark_red]🢒[/]{opt[0]}" for (i, opt) in options.items()]), box=box.MINIMAL),
             ),
             box=box.MINIMAL,
-            padding=(1, 1)
+            padding=(1, 1),
         )
     )
     choice = prompt("Please make your selection: ", validator=Validator.from_callable(lambda n: n in options.keys(), error_message="Please select one the above options"))
 
+    if options[choice][1] == "idk":
+        console.print("No problem. We will try to install a version that [i]should[/i] be compatible. :crossed_fingers:")
+
     return options[choice][1]
+
+
+def simple_banner(message: str) -> None:
+    """
+    A simple banner with a message, defined here for styling consistency
+
+    :param message: The message to display
+    :type message: str
+    """
+
+    console.rule(message)
+
+
+def introduction() -> None:
+    """
+    Display a banner when starting configuration of the InvokeAI application
+    """
+
+    console.rule()
+
+    console.print(Panel(title=":art: Configuring InvokeAI :art:", renderable=Group(
+        "",
+        "[b]This script will:",
+        "",
+        "1. Configure the InvokeAI application directory",
+        "2. Help download the Stable Diffusion weight files",
+        "   and other large models that are needed for text to image generation",
+        "3. Create initial configuration files.",
+        "",
+        "[i]At any point you may interrupt this program and resume later.",
+    )))
+    console.line(2)
