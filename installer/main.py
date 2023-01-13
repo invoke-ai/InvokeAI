@@ -19,4 +19,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt as exc:
         print("\n")
         print("Ctrl-C pressed. Aborting.")
-        print("See you again soon!")
+        print("Come back soon!")
