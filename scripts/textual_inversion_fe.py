@@ -3,7 +3,6 @@
 import npyscreen
 import os
 import sys
-import curses
 import re
 import shutil
 import traceback
@@ -267,7 +266,9 @@ def copy_to_embeddings_folder(args:dict):
     delete the full model and checkpoints.
     '''
     source = Path(args['output_dir'],'learned_embeds.bin')
-    destination = Path(Globals.root,'embeddings',args['placeholder_token'])
+    dest_dir_name = args['placeholder_token'].strip('<>')
+    destination = Path(Globals.root,'embeddings',dest_dir_name)
+    os.makedirs(destination,exist_ok=True)
     print(f'>> Training completed. Copying learned_embeds.bin into {str(destination)}')
     shutil.copy(source,destination)
     if (input('Delete training logs and intermediate checkpoints? [y] ') or 'y').startswith(('y','Y')):
@@ -326,7 +327,7 @@ if __name__ == '__main__':
             do_textual_inversion_training(**args)
             copy_to_embeddings_folder(args)
         except Exception as e:
-            print(f'** An exception occurred during training. The exception was:')
+            print('** An exception occurred during training. The exception was:')
             print(str(e))
             print('** DETAILS:')
             print(traceback.format_exc())
