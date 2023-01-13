@@ -66,14 +66,6 @@ Config_preamble = '''# This file describes the alternative machine learning mode
 # was trained on.
 '''
 
-#---------------------------------------------
-def introduction():
-    print(
-        '''Welcome to InvokeAI. This script will help download the Stable Diffusion weight files
-and other large models that are needed for text to image generation. At any point you may interrupt
-this program and resume later.\n'''
-    )
-
 #--------------------------------------------
 def postscript(errors: None):
     if not any(errors):
@@ -817,8 +809,6 @@ def main():
     Globals.root = os.path.expanduser(get_root(opt.root) or '')
 
     try:
-        introduction()
-
         # We check for to see if the runtime directory is correctly initialized.
         if Globals.root == '' \
            or not os.path.exists(os.path.join(Globals.root,'invokeai.init')):
