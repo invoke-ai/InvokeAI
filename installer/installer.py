@@ -210,6 +210,10 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
+        from messages import introduction
+
+        introduction()
+
         from ldm.invoke.config import configure_invokeai
 
         configure_invokeai.main()
