@@ -8,18 +8,18 @@ from pathlib import Path
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.shortcuts import CompleteStyle
+from prompt_toolkit.validation import Validator
 from rich import box, print
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.style import Style
 from rich.text import Text
 
-console = Console(width=80)
+console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
-
 
 def welcome():
     console.rule()
@@ -96,6 +96,7 @@ def dest_path(init_path=None) -> Path:
 
         if dest.exists():
             print(f":exclamation: Directory {dest} already exists.")
+            console.line()
             dest_confirmed = Confirm.ask(
                 ":question: Are you sure you want to (re)install in this location?", default="y"
             )
@@ -118,3 +119,56 @@ def dest_path(init_path=None) -> Path:
         dest_path(init_path)
     else:
         console.rule("Goodbye!")
+
+
+def graphical_accelerator():
+    """
+    Prompt the user to select the graphical accelerator in their system
+    This does not validate user's choices (yet), but only offers choices
+    valid for the platform.
+    CUDA is the fallback.
+    We may be able to detect the GPU driver by shelling out to `modprobe` or `lspci`,
+    but this is not yet supported or reliable. Also, some users may have exotic preferences.
+    """
+
+
+    if ARCH == "arm64" and OS != "Darwin":
+        print(f"Only CPU acceleration is available on {ARCH} architecture. Proceeding with that.")
+        return "cpu"
+
+    nvidia = ("an [dark_sea_green4 b]NVIDIA[/] GPU (using CUDA™). [steel_blue3]https://link.to.supported.GPUs[/])", "cuda",)
+    amd = ("an [red3 b]AMD[/] GPU (using ROCm™). [steel_blue3]https://link.to.supported.GPUs[/])", "rocm",)
+    cpu = ("no compatible GPU, or specifically prefer to use the CPU", "cpu",)
+    idk = ("I'm not sure what to choose", "idk",)
+
+    if OS == "Windows":
+        options = [nvidia, cpu]
+    if OS == "Linux":
+        options = [nvidia, amd, cpu]
+    elif OS == "Darwin":
+        options = [cpu]
+        # future CoreML?
+
+    if len(options) == 1:
+        print(f"Your operating system only supports the \"{options[0][1]}\" driver. Proceeding with that.")
+        return options[0][1]
+
+    # "I don't know" is always added the last option
+    options.append(idk)
+
+    options = {str(i): opt for i, opt in enumerate(options, 1)}
+
+    console.rule("GPU (Graphics Card) selection")
+    console.print(Panel(
+            Group(
+                f"Detected the [gold1]{OS}-{ARCH}[/] platform. Please select the installation option for GPU support",
+                "",
+                Panel("\n".join([f"[green b i]{i}[/] [dark_red]🢒[/] {opt[0]}" for (i, opt) in options.items()]), box=box.MINIMAL),
+            ),
+            box=box.MINIMAL,
+            padding=(1, 1)
+        )
+    )
+    choice = prompt("Please make your selection: ", validator=Validator.from_callable(lambda n: n in options.keys(), error_message="Please select one the above options"))
+
+    return options[choice][1]
