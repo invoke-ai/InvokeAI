@@ -15,11 +15,17 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.style import Style
 from rich.text import Text
+from rich.syntax import Syntax
 
-console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
+
+if OS == "Windows":
+    # Windows terminals look better without a background colour
+    console = Console(style=Style(color="grey74"))
+else:
+    console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 def welcome():
     console.rule()
@@ -62,15 +68,17 @@ def dest_path(init_path=None) -> Path:
     while not dest_confirmed:
         console.line()
 
+        old_dest = dest
+
         print(f"InvokeAI will be installed at {dest}")
         dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
+
 
         if not dest_confirmed:
 
             # needs more thought into how to handle this nicely
             # so that the first selected destination continues to shows up as
             # default until the user is done selecting (potentially multiple times)
-            old_dest = dest
 
             path_completer = PathCompleter(
                 only_directories=True,
@@ -85,7 +93,6 @@ def dest_path(init_path=None) -> Path:
                 completer=path_completer,
                 complete_style=CompleteStyle.READLINE_LIKE,
             )
-            print(selected)
             if Path(selected).is_absolute():
                 # use the absolute path directly
                 dest = Path(selected)
@@ -192,6 +199,27 @@ def simple_banner(message: str) -> None:
     """
 
     console.rule(message)
+
+# TODO this does not yet work correctly
+def windows_long_paths_registry() -> None:
+    """
+    Display a message about applying the Windows long paths registry fix
+    """
+
+    with open(str(Path(__file__).parent/"WinLongPathsEnabled.reg"), "r", encoding="utf-16le") as code:
+        syntax = Syntax(code.read(), line_numbers=True)
+
+    console.print(Panel(
+        Group("\n".join([
+            "We will now apply a registry fix to enable long paths on Windows. InvokeAI needs this to function correctly. We are asking your permission to modify the Windows Registry on your behalf.",
+            "",
+            "This is the change that will be applied:",
+            syntax,
+        ])),
+        title="Windows Long Paths registry fix",
+        box=box.HORIZONTALS,
+        padding=(1, 1),
+    ))
 
 
 def introduction() -> None:
