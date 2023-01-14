@@ -484,7 +484,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
             optimize_model(path[1], gen, opt, completer)
         completer.add_history(command)
         operation = None
-        
+
 
     elif command.startswith('!optimize'):
         path = shlex.split(command)
@@ -569,11 +569,11 @@ def import_model(model_path:str, gen, opt, completer):
     (3) a huggingface repository id
     '''
     model_name = None
-    
+
     if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif os.path.exists(model_path) and model_path.endswith('.ckpt') and os.path.isfile(model_path):
-        model_name = import_ckpt_model(model_path, gen, opt, completer)        
+        model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     elif os.path.isdir(model_path):
@@ -583,12 +583,12 @@ def import_model(model_path:str, gen, opt, completer):
 
     if not model_name:
         return
-        
+
     if not _verify_load(model_name, gen):
         print('** model failed to load. Discarding configuration entry')
         gen.model_manager.del_model(model_name)
         return
-    
+
     if input('Make this the default model? [n] ') in ('y','Y'):
         gen.model_manager.set_default_model(model_name)
 
@@ -693,7 +693,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
     else:
         print(f'** {model_name_or_path} is neither an existing model nor the path to a .ckpt file')
         return
-    
+
     if not ckpt_path.is_absolute():
         ckpt_path = Path(Globals.root,ckpt_path)
 
@@ -701,7 +701,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
     if diffuser_path.exists():
         print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
-     
+
     new_config = gen.model_manager.convert_and_import(
         ckpt_path,
         diffuser_path,
@@ -752,7 +752,7 @@ def edit_model(model_name:str, gen, opt, completer):
             continue
         completer.set_line(info[attribute])
         info[attribute] = input(f'{attribute}: ') or info[attribute]
-        
+
     if new_name != model_name:
         manager.del_model(model_name)
 
@@ -1104,7 +1104,7 @@ def report_model_error(opt:Namespace, e:Exception):
     if yes_to_all is not None:
         sys.argv.append(yes_to_all)
 
-    import configure_invokeai
+    from ldm.invoke.config import configure_invokeai
     configure_invokeai.main()
     print('** InvokeAI will now restart')
     sys.argv = previous_args
