@@ -574,7 +574,7 @@ def import_model(model_path:str, gen, opt, completer):
     if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif os.path.exists(model_path) and model_path.endswith(('.ckpt','.safetensors')) and os.path.isfile(model_path):
-        model_name = import_ckpt_model(model_path, gen, opt, completer)        
+        model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     elif os.path.isdir(model_path):
@@ -743,7 +743,7 @@ def del_config(model_name:str, gen, opt, completer):
 
     if input(f'Remove {model_name} from the list of models known to InvokeAI? [y] ').strip().startswith(('n','N')):
         return
-    
+
     delete_completely = input('Completely remove the model file or directory from disk? [n] ').startswith(('y','Y'))
     gen.model_manager.del_model(model_name,delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
@@ -1118,7 +1118,7 @@ def report_model_error(opt:Namespace, e:Exception):
     if yes_to_all is not None:
         sys.argv.append(yes_to_all)
 
-    import ldm.invoke.configure_invokeai as configure_invokeai
+    from ldm.invoke.config import configure_invokeai
     configure_invokeai.main()
     print('** InvokeAI will now restart')
     sys.argv = previous_args

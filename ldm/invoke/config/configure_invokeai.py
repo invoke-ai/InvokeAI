@@ -48,9 +48,11 @@ except ImportError:
 #--------------------------globals-----------------------
 Model_dir = 'models'
 Weights_dir = 'ldm/stable-diffusion-v1/'
-Dataset_path = './configs/INITIAL_MODELS.yaml'
-Default_config_file = './configs/models.yaml'
-SD_Configs = './configs/stable-diffusion'
+
+# the initial "configs" dir is now bundled with the `config` package
+Dataset_path = Path(__file__).parent / "configs" / 'INITIAL_MODELS.yaml'
+Default_config_file = Path(__file__).parent / "configs" / 'models.yaml'
+SD_Configs = Path(__file__).parent / "configs" / 'stable-diffusion'
 
 assert os.path.exists(Dataset_path),"The configs directory cannot be found. Please run this script from within the invokeai runtime directory."
 
@@ -690,7 +692,6 @@ def select_outputs(root:str,yes_to_all:bool=False):
 
 #-------------------------------------
 def initialize_rootdir(root:str,yes_to_all:bool=False):
-    assert os.path.exists('./configs'),'Run this script from within the InvokeAI source code directory, "InvokeAI" or the runtime directory "invokeai".'
 
     print(f'** INITIALIZING INVOKEAI RUNTIME DIRECTORY **')
     root_selected = False
@@ -720,11 +721,11 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     for name in ('models','configs','embeddings','text-inversion-data','text-inversion-training-data'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
-    for src in (['configs']):
-        dest = os.path.join(root,src)
-        if not os.path.samefile(src,dest):
-            shutil.copytree(src,dest,dirs_exist_ok=True)
-        os.makedirs(outputs, exist_ok=True)
+
+    configs_src = Path(__file__).parent / "configs"
+    configs_dest = Path(root) / "configs"
+    if not os.path.samefile(configs_src, configs_dest):
+        shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
     init_file = os.path.join(Globals.root,Globals.initfile)
 
