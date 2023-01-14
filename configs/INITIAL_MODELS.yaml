@@ -15,7 +15,12 @@ stable-diffusion-1.5:
 inpainting-1.5:
    description: RunwayML SD 1.5 model optimized for inpainting (4.27 GB)
    repo_id: runwayml/stable-diffusion-inpainting
-   format: diffusers
+   config: v1-inpainting-inference.yaml
+   file: sd-v1-5-inpainting.ckpt
+   format: ckpt
+   vae:
+      repo_id: stabilityai/sd-vae-ft-mse-original
+      file: vae-ft-mse-840000-ema-pruned.ckpt
    recommended: True
    width: 512
    height: 512

@@ -159,7 +159,7 @@ class CkptOmnibus(CkptImg2Img,CkptTxt2Img):
         if self.init_latent is not None:
             height = self.init_latent.shape[2]
             width = self.init_latent.shape[3]
-        return Txt2Img.get_noise(self,width,height)
+        return CkptTxt2Img.get_noise(self,width,height)
 
 
     def sample_to_image(self, samples)->Image.Image:
