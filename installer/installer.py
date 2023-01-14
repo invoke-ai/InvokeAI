@@ -228,6 +228,7 @@ class InvokeAiInstance:
                 (Path(__file__).parents[1] / "environments-and-requirements/requirements-base.txt")
                 .expanduser()
                 .resolve(),
+                "--use-pep517",
                 extra_index_url_arg,
                 extra_index_url,
             ]
@@ -240,6 +241,7 @@ class InvokeAiInstance:
                 "install",
                 "--require-virtualenv",
                 Path(__file__).parents[1].expanduser().resolve(),
+                "--use-pep517",
                 extra_index_url_arg,
                 extra_index_url,
             ]
