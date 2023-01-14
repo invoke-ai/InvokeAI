@@ -62,7 +62,16 @@ class Installer:
         :rtype: TemporaryDirectory
         """
 
-        venv_dir = TemporaryDirectory(prefix="invokeai-installer-")
+        # Cleaning up temporary directories on Windows results in a race condition
+        # and a stack trace.
+        # `ignore_cleanup_errors` was only added in Python 3.10
+        # users of Python 3.9 will see a gnarly stack trace on installer exit
+        if OS == "Windows" and int(platform.python_version_tuple()[1])>=10:
+            venv_dir = TemporaryDirectory(prefix="invokeai-installer-", ignore_cleanup_errors=True)
+        else:
+            venv_dir = TemporaryDirectory(prefix="invokeai-installer-")
+
+
         venv.create(venv_dir.name, with_pip=True)
         self.venv_dir = venv_dir
         add_venv_site(Path(venv_dir.name))
