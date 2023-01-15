@@ -9,7 +9,7 @@ def list_files(directory):
         listing.append(pair)
     return listing
 
-VERSION = '2.2.5'
+VERSION = '2.3.0+a0'
 DESCRIPTION = ('An implementation of Stable Diffusion which provides various new features'
                ' and options to aid the image generation process')
 LONG_DESCRIPTION = ('This version of Stable Diffusion features a slick WebGUI, an'
