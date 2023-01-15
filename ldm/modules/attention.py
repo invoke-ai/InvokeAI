@@ -162,7 +162,6 @@ def get_mem_free_total(device):
     mem_free_total = mem_free_cuda + mem_free_torch
     return mem_free_total
 
-
 class CrossAttention(nn.Module, InvokeAICrossAttentionMixin):
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
         super().__init__()

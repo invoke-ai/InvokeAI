@@ -18,6 +18,7 @@ INVOKE_AI_VERSION=${1:-latest}
     
 INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive/$INVOKE_AI_VERSION.zip"
 INVOKE_AI_DEP=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/environments-and-requirements/requirements-base.txt
+INVOKE_AI_MODELS=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/configs/INITIAL_MODELS.yaml
 
 # ensure we're in the correct folder in case user's CWD is somewhere else
 scriptdir=$(dirname "$0")
@@ -44,6 +45,7 @@ echo If you do not want to do this, press control-C now!
 read -p "Press any key to continue, or CTRL-C to exit..."
 
 curl -L "$INVOKE_AI_DEP" > environments-and-requirements/requirements-base.txt
+curl -L "$INVOKE_AI_MODELS" > configs/INITIAL_MODELS.yaml
 
 . .venv/bin/activate
 
