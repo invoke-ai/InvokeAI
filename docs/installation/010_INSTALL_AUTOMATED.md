@@ -108,10 +108,11 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - [InvokeAI-installer-2.2.4-p5-mac.zip](https://github.com/invoke-ai/InvokeAI/files/10254728/InvokeAI-installer-2.2.4-p5-mac.zip)
-    - [InvokeAI-installer-2.2.4-p5-windows.zip](https://github.com/invoke-ai/InvokeAI/files/10254729/InvokeAI-installer-2.2.4-p5-windows.zip)
-    - [InvokeAI-installer-2.2.4-p5-linux.zip](https://github.com/invoke-ai/InvokeAI/files/10254727/InvokeAI-installer-2.2.4-p5-linux.zip)
+    - InvokeAI-installer-2.X.X-mac.zip
+    - InvokeAI-installer-2.X.X-windows.zip
+    - InvokeAI-installer-2.X.X-linux.zip
 
+    (Where 2.X.X is the current release number).
     Download the one that is appropriate for your operating system.
 
 4.  Unpack the zip file into a convenient directory. This will create a new
@@ -120,8 +121,8 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     command-line Zip extractor:
 
     ```cmd
-    C:\Documents\Linco> unzip InvokeAI-installer-2.2.4-windows.zip
-    Archive:  C: \Linco\Downloads\InvokeAI-installer-2.2.4-windows.zip
+    C:\Documents\Linco> unzip InvokeAI-installer-2.X.X-windows.zip
+    Archive:  C: \Linco\Downloads\InvokeAI-installer-2.X.X-windows.zip
     creating: InvokeAI-Installer\
     inflating: InvokeAI-Installer\install.bat
     inflating: InvokeAI-Installer\readme.txt
@@ -307,9 +308,14 @@ big code directory on the InvokeAI welcome page. When you find the version you
 want to install, go to the green "&lt;&gt; Code" button at the top, and copy the
 "Download ZIP" link.
 
-Now run `update.sh` (or `update.bat`) with the URL of the desired InvokeAI
+Now run `update.sh` (or `update.bat`) with the version number of the desired InvokeAI
 version as its argument. For example, this will install the old 2.2.0 release.
 
 ```cmd
-update.sh https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v2.2.0.zip
+update.sh v2.2.0
 ```
+
+You can get the list of version numbers by going to the [releases
+page](https://github.com/invoke-ai/InvokeAI/releases) or by browsing
+the (Tags)[https://github.com/invoke-ai/InvokeAI/tags] list from the
+Code section of the main github page.
