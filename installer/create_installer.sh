@@ -10,14 +10,14 @@ echo Building installer for version $VERSION
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
 
-read -e -p "Commit and tag this version? (otherwise, just build the zip files) [n]: " input
+read -e -p "Commit and tag this repo with ${VERSION} and 'latest'? [n]: " input
 RESPONSE=${input:='n'}
-
 if [ "$RESPONSE" == 'y' ]; then
     git commit -a
+
     if ! git tag $VERSION ; then
-	echo "Existing/invalid tag"
-	exit -1
+	    echo "Existing/invalid tag"
+	    exit -1
     fi
     git push origin :refs/tags/latest
     git tag -fa latest
