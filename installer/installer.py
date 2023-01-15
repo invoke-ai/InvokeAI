@@ -91,7 +91,7 @@ class Installer:
         venv_dir = self.mktemp_venv()
         pip = get_venv_pip(Path(venv_dir.name))
 
-        cmd = [pip, "install", "--require-virtualenv"]
+        cmd = [pip, "install", "--require-virtualenv", "--use-pep517"]
         cmd.extend(self.reqs)
 
         try:
