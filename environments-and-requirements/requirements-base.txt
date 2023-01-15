@@ -3,6 +3,7 @@ accelerate
 albumentations
 datasets
 diffusers[torch]~=0.11
+dnspython==2.2.1
 einops
 eventlet
 facexlib
