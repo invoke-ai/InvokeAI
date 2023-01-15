@@ -100,7 +100,6 @@ to render 512x512 images.
 
 - At least 12 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
-
 ## Features
 
 Feature documentation can be reviewed by navigating to [the InvokeAI Documentation page](https://invoke-ai.github.io/InvokeAI/features/)
@@ -118,6 +117,8 @@ InvokeAI's advanced prompt syntax allows for token weighting, cross-attention co
 For users utilizing a terminal-based environment, or who want to take advantage of CLI features, InvokeAI offers an extensive and actively supported command-line interface that provides the full suite of generation functionality available in the tool.
 
 ### Other features
+- *Support for both ckpt and diffusers models*
+- *SD 2.0, 2.1 support*
 - *Noise Control & Tresholding*
 - *Popular Sampler Support*
 - *Upscaling & Face Restoration Tools*
@@ -125,14 +126,14 @@ For users utilizing a terminal-based environment, or who want to take advantage 
 - *Model Manager & Support*
 
 ### Coming Soon
-- *2.0/2.1 Model Support*
-- *Depth2Img Support*
 - *Node-Based Architecture & UI*
 - And more...
 
 ### Latest Changes
 
-For our latest changes, view our [Release Notes](https://github.com/invoke-ai/InvokeAI/releases)
+For our latest changes, view our [Release
+Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
+[CHANGELOG](docs/CHANGELOG.md).
 
 ## Troubleshooting
 
