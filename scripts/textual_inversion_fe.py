@@ -6,6 +6,7 @@ import sys
 import re
 import shutil
 import traceback
+import curses
 from ldm.invoke.globals import Globals, global_set_root
 from omegaconf import OmegaConf
 from pathlib import Path
@@ -42,6 +43,11 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             default = self.model_names.index(saved_args['model'])
         except:
             pass
+
+        self.add_widget_intelligent(
+            npyscreen.FixedText,
+            value='Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields, cursor arrows to make a selection, and space to toggle checkboxes.'
+        )
 
         self.model = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
@@ -82,18 +88,18 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             max_height=4,
         )
         self.train_data_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilenameCombo,
+            npyscreen.TitleFilename,
             name='Data Training Directory:',
             select_dir=True,
-            must_exist=True,
-            value=saved_args.get('train_data_dir',Path(Globals.root) / TRAINING_DATA / default_placeholder_token)
+            must_exist=False,
+            value=str(saved_args.get('train_data_dir',Path(Globals.root) / TRAINING_DATA / default_placeholder_token))
         )
         self.output_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilenameCombo,
+            npyscreen.TitleFilename,
             name='Output Destination Directory:',
             select_dir=True,
             must_exist=False,
-            value=saved_args.get('output_dir',Path(Globals.root) / TRAINING_DIR / default_placeholder_token)
+            value=str(saved_args.get('output_dir',Path(Globals.root) / TRAINING_DIR / default_placeholder_token))
         )
         self.resolution = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
@@ -174,8 +180,8 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
     def initializer_changed(self):
         placeholder = self.placeholder_token.value
         self.prompt_token.value = f'(Trigger by using <{placeholder}> in your prompts)'
-        self.train_data_dir.value = Path(Globals.root) / TRAINING_DATA / placeholder
-        self.output_dir.value = Path(Globals.root) / TRAINING_DIR / placeholder
+        self.train_data_dir.value = str(Path(Globals.root) / TRAINING_DATA / placeholder)
+        self.output_dir.value = str(Path(Globals.root) / TRAINING_DIR / placeholder)
         self.resume_from_checkpoint.value = Path(self.output_dir.value).exists()
         
     def on_ok(self):
@@ -280,7 +286,9 @@ def save_args(args:dict):
     '''
     Save the current argument values to an omegaconf file
     '''
-    conf_file = Path(Globals.root) / TRAINING_DIR / CONF_FILE
+    dest_dir = Path(Globals.root) / TRAINING_DIR
+    os.makedirs(dest_dir, exist_ok=True)
+    conf_file = dest_dir / CONF_FILE
     conf = OmegaConf.create(args)
     OmegaConf.save(config=conf, f=conf_file)
 
