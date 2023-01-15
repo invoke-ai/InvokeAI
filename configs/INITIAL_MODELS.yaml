@@ -1,8 +1,3 @@
-stable-diffusion-2.1:
-   description: Stable Diffusion version 2.1 diffusers model (5.21 GB)
-   repo_id: stabilityai/stable-diffusion-2-1
-   format: diffusers
-   recommended: True
 stable-diffusion-1.5:
    description: Stable Diffusion version 1.5 weight file (4.27 GB)
    repo_id: runwayml/stable-diffusion-v1-5
@@ -10,8 +5,12 @@ stable-diffusion-1.5:
    recommended: True
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
-   width: 512
-   height: 512
+   default: True
+stable-diffusion-2.1:
+   description: Stable Diffusion version 2.1 diffusers model (5.21 GB)
+   repo_id: stabilityai/stable-diffusion-2-1
+   format: diffusers
+   recommended: True
 inpainting-1.5:
    description: RunwayML SD 1.5 model optimized for inpainting (4.27 GB)
    repo_id: runwayml/stable-diffusion-inpainting
@@ -31,8 +30,10 @@ stable-diffusion-1.4:
    format: diffusers
    vae:
       repo_id: stabilityai/sd-vae-ft-mse
-   width: 512
-   height: 512
+waifu-diffusion-1.4:
+  description: Waifu diffusion 1.4
+  format: diffusers
+  repo_id: hakurei/waifu-diffusion
 waifu-diffusion-1.3:
    description: Stable Diffusion 1.4 fine tuned on anime-styled images (4.27 GB)
    repo_id: hakurei/waifu-diffusion-v1-3
@@ -52,8 +53,6 @@ trinart-2.0:
    recommended: False
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
-   width: 512
-   height: 512
 trinart_characters-2.0:
    description: An SD model finetuned with 19.2M anime/manga style images (4.27 GB)
    repo_id: naclbit/trinart_derrida_characters_v2_stable_diffusion
