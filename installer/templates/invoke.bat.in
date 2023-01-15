@@ -9,10 +9,11 @@ set INVOKEAI_ROOT=.
 echo Do you want to generate images using the
 echo 1. command-line
 echo 2. browser-based UI
-echo 3. textual inversion training
+echo 3. run textual inversion training
 echo 4. open the developer console
-set /P restore="Please enter 1, 2, 3 or 4: [1] "
-if not defined restore set restore=1
+echo 5. re-run the configure script to download new models
+set /P restore="Please enter 1, 2, 3, 4 or 5: [5] "
+if not defined restore set restore=2
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
     python .venv\Scripts\invoke.py %*
@@ -34,6 +35,9 @@ IF /I "%restore%" == "1" (
     echo *************************
     echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
     call cmd /k
+) ELSE IF /I "%restore%" == "5" (
+    echo Running configure_invokeai.py...
+    python .venv\Scripts\configure_invokeai.py --web %*
 ) ELSE (
     echo Invalid selection
     pause
