@@ -160,7 +160,7 @@ class ModelManager(object):
         object derived from models.yaml
         '''
         models = {}
-        for name in self.config:
+        for name in sorted(self.config):
             stanza = self.config[name]
 
             # don't include VAEs in listing (legacy style)

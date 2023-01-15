@@ -23,7 +23,6 @@ dependencies:
   - accelerate
   - albumentations=1.2
   - coloredlogs=15.0
-  - diffusers~=0.11
   - einops=0.3
   - eventlet
   - grpcio=1.46
@@ -52,9 +51,12 @@ dependencies:
   - tensorboard=2.10
   - transformers~=4.25
   - pip:
+      - diffusers[torch]~=0.11
       - safetensors~=0.2
       - getpass_asterisk
+      - huggingface-hub
       - picklescan
+      - requests==2.25.1
       - taming-transformers-rom1504
       - test-tube==0.7.5
       - git+https://github.com/openai/CLIP.git@main#egg=clip
