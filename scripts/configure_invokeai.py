@@ -283,7 +283,8 @@ for more information.
 
 Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
 
-Paste the token below using Ctrl-Shift-V (macOS/Linux) or right-click (Windows), and/or 'Enter' to continue.
+Paste the token below using Ctrl-V on macOS/Linux, or Ctrl-Shift-V or right-click on Windows. 
+Alternatively press 'Enter' to skip this step and continue.
 You may re-run the configuration script again in the future if you do not wish to set the token right now.
         ''')
         again = True
