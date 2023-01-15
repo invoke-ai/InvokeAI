@@ -1,35 +1,34 @@
-import eventlet
+import base64
 import glob
+import io
+import json
+import math
+import mimetypes
 import os
 import shutil
-import mimetypes
 import traceback
-import math
-import io
-import base64
-import os
-import json
+from threading import Event
+from uuid import uuid4
 
-from werkzeug.utils import secure_filename
+import eventlet
+from PIL import Image
+from PIL.Image import Image as ImageType
 from flask import Flask, redirect, send_from_directory, request, make_response
 from flask_socketio import SocketIO
-from PIL import Image, ImageOps
-from PIL.Image import Image as ImageType
-from uuid import uuid4
-from threading import Event
+from werkzeug.utils import secure_filename
 
-from ldm.generate import Generate
-from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
-from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
-from ldm.invoke.globals import Globals
-from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
-from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
-from ldm.invoke.generator.inpaint import infill_methods
-
-from backend.modules.parameters import parameters_to_command
 from backend.modules.get_canvas_generation_mode import (
     get_canvas_generation_mode,
 )
+from backend.modules.parameters import parameters_to_command
+from ldm.generate import Generate
+from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
+from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
+from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
+from ldm.invoke.generator.inpaint import infill_methods
+from ldm.invoke.globals import Globals
+from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
+from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 
 # Loading Arguments
 opt = Args()
@@ -304,7 +303,7 @@ class InvokeAIWebServer:
         def handle_request_capabilities():
             print(f">> System config requested")
             config = self.get_system_config()
-            config["model_list"] = self.generate.model_cache.list_models()
+            config["model_list"] = self.generate.model_manager.list_models()
             config["infill_methods"] = infill_methods()
             socketio.emit("systemConfig", config)
 
@@ -317,11 +316,11 @@ class InvokeAIWebServer:
                     {'search_folder': None, 'found_models': None},
                 )
                 else:
-                    search_folder, found_models = self.generate.model_cache.search_models(search_folder)
+                    search_folder, found_models = self.generate.model_manager.search_models(search_folder)
                     socketio.emit(
                         "foundModels",
                         {'search_folder': search_folder, 'found_models': found_models},
-                    )            
+                    )
             except Exception as e:
                 self.socketio.emit("error", {"message": (str(e))})
                 print("\n")
@@ -335,18 +334,20 @@ class InvokeAIWebServer:
                 model_name = new_model_config['name']
                 del new_model_config['name']
                 model_attributes = new_model_config
+                if len(model_attributes['vae']) == 0:
+                    del model_attributes['vae']
                 update = False
-                current_model_list = self.generate.model_cache.list_models()
+                current_model_list = self.generate.model_manager.list_models()
                 if model_name in current_model_list:
                     update = True
 
                 print(f">> Adding New Model: {model_name}")
 
-                self.generate.model_cache.add_model(
+                self.generate.model_manager.add_model(
                     model_name=model_name, model_attributes=model_attributes, clobber=True)
-                self.generate.model_cache.commit(opt.conf)
+                self.generate.model_manager.commit(opt.conf)
 
-                new_model_list = self.generate.model_cache.list_models()
+                new_model_list = self.generate.model_manager.list_models()
                 socketio.emit(
                     "newModelAdded",
                     {"new_model_name": model_name,
@@ -364,9 +365,9 @@ class InvokeAIWebServer:
         def handle_delete_model(model_name: str):
             try:
                 print(f">> Deleting Model: {model_name}")
-                self.generate.model_cache.del_model(model_name)
-                self.generate.model_cache.commit(opt.conf)
-                updated_model_list = self.generate.model_cache.list_models()
+                self.generate.model_manager.del_model(model_name)
+                self.generate.model_manager.commit(opt.conf)
+                updated_model_list = self.generate.model_manager.list_models()
                 socketio.emit(
                     "modelDeleted",
                     {"deleted_model_name": model_name,
@@ -385,7 +386,7 @@ class InvokeAIWebServer:
             try:
                 print(f">> Model change requested: {model_name}")
                 model = self.generate.set_model(model_name)
-                model_list = self.generate.model_cache.list_models()
+                model_list = self.generate.model_manager.list_models()
                 if model is None:
                     socketio.emit(
                         "modelChangeFailed",
@@ -797,7 +798,7 @@ class InvokeAIWebServer:
 
     # App Functions
     def get_system_config(self):
-        model_list: dict = self.generate.model_cache.list_models()
+        model_list: dict = self.generate.model_manager.list_models()
         active_model_name = None
 
         for model_name, model_dict in model_list.items():
@@ -1205,9 +1206,16 @@ class InvokeAIWebServer:
 
             print(generation_parameters)
 
+            def diffusers_step_callback_adapter(*cb_args, **kwargs):
+                if isinstance(cb_args[0], PipelineIntermediateState):
+                    progress_state: PipelineIntermediateState = cb_args[0]
+                    return image_progress(progress_state.latents, progress_state.step)
+                else:
+                    return image_progress(*cb_args, **kwargs)
+
             self.generate.prompt2image(
                 **generation_parameters,
-                step_callback=image_progress,
+                step_callback=diffusers_step_callback_adapter,
                 image_callback=image_done
             )
 

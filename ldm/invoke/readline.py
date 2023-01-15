@@ -12,7 +12,7 @@ import os
 import re
 import atexit
 from ldm.invoke.args import Args
-from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.globals import Globals
 
 # ---------------readline utilities---------------------
@@ -24,7 +24,7 @@ except (ImportError,ModuleNotFoundError) as e:
     readline_available = False
 
 IMG_EXTENSIONS     = ('.png','.jpg','.jpeg','.PNG','.JPG','.JPEG','.gif','.GIF')
-WEIGHT_EXTENSIONS  = ('.ckpt','.bae')
+WEIGHT_EXTENSIONS  = ('.ckpt','.vae','.safetensors')
 TEXT_EXTENSIONS  = ('.txt','.TXT')
 CONFIG_EXTENSIONS  = ('.yaml','.yml')
 COMMANDS = (
@@ -59,7 +59,7 @@ COMMANDS = (
     '--png_compression','-z',
     '--text_mask','-tm',
     '!fix','!fetch','!replay','!history','!search','!clear',
-    '!models','!switch','!import_model','!edit_model','!del_model',
+    '!models','!switch','!import_model','!optimize_model','!convert_model','!edit_model','!del_model',
     '!mask',
     )
 MODEL_COMMANDS = (
@@ -67,8 +67,12 @@ MODEL_COMMANDS = (
     '!edit_model',
     '!del_model',
     )
+CKPT_MODEL_COMMANDS = (
+    '!optimize_model',
+)
 WEIGHT_COMMANDS = (
     '!import_model',
+    '!convert_model',
     )
 IMG_PATH_COMMANDS = (
     '--outdir[=\s]',
@@ -91,9 +95,9 @@ weight_regexp = '(' + '|'.join(WEIGHT_COMMANDS) + ')\s*\S*$'
 text_regexp = '(' + '|'.join(TEXT_PATH_COMMANDS) + ')\s*\S*$'
 
 class Completer(object):
-    def __init__(self, options, models=[]):
+    def __init__(self, options, models={}):
         self.options     = sorted(options)
-        self.models      = sorted(models)
+        self.models      = models
         self.seeds       = set()
         self.matches     = list()
         self.default_dir = None
@@ -133,6 +137,10 @@ class Completer(object):
             # looking for a model
             elif re.match('^'+'|'.join(MODEL_COMMANDS),buffer):
                 self.matches= self._model_completions(text, state)
+
+            # looking for a ckpt model 
+            elif re.match('^'+'|'.join(CKPT_MODEL_COMMANDS),buffer):
+                self.matches= self._model_completions(text, state, ckpt_only=True)
 
             elif re.search(weight_regexp,buffer):
                 self.matches = self._path_completions(
@@ -242,18 +250,12 @@ class Completer(object):
         self.linebuffer = line
         readline.redisplay()
 
-    def add_model(self,model_name:str)->None:
+    def update_models(self,models:dict)->None:
         '''
-        add a model name to the completion list
+        update our list of models
         '''
-        self.models.append(model_name)
-
-    def del_model(self,model_name:str)->None:
-        '''
-        removes a model name from the completion list
-        '''
-        self.models.remove(model_name)
-
+        self.models = models
+        
     def _seed_completions(self, text, state):
         m = re.search('(-S\s?|--seed[=\s]?)(\d*)',text)
         if m:
@@ -278,7 +280,7 @@ class Completer(object):
     def _concept_completions(self, text, state):
         if self.concepts is None:
             # cache Concepts() instance so we can check for updates in concepts_list during runtime.
-            self.concepts = Concepts()
+            self.concepts = HuggingFaceConceptsLibrary()
             self.embedding_terms.update(set(self.concepts.list_concepts()))
         else:
             self.embedding_terms.update(set(self.concepts.list_concepts()))
@@ -294,7 +296,7 @@ class Completer(object):
         matches.sort()
         return matches
 
-    def _model_completions(self, text, state):
+    def _model_completions(self, text, state, ckpt_only=False):
         m = re.search('(!switch\s+)(\w*)',text)
         if m:
             switch  = m.groups()[0]
@@ -304,6 +306,11 @@ class Completer(object):
             partial = text
         matches = list()
         for s in self.models:
+            format = self.models[s]['format']
+            if format == 'vae':
+                continue
+            if ckpt_only and format != 'ckpt':
+                continue
             if s.startswith(partial):
                 matches.append(switch+s)
         matches.sort()

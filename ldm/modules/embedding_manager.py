@@ -1,11 +1,12 @@
 import os.path
 from cmath import log
 import torch
+from attr import dataclass
 from torch import nn
 
 import sys
 
-from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.data.personalized import per_img_token_list
 from transformers import CLIPTokenizer
 from functools import partial
@@ -14,35 +15,15 @@ from picklescan.scanner import scan_file_path
 PROGRESSIVE_SCALE = 2000
 
 
-def get_clip_token_for_string(tokenizer, string):
-    batch_encoding = tokenizer(
-        string,
-        truncation=True,
-        max_length=77,
-        return_length=True,
-        return_overflowing_tokens=False,
-        padding='max_length',
-        return_tensors='pt',
-    )
-    tokens = batch_encoding['input_ids']
-    """ assert (
-        torch.count_nonzero(tokens - 49407) == 2
-    ), f"String '{string}' maps to more than a single token. Please use another string" """
+def get_clip_token_id_for_string(tokenizer: CLIPTokenizer, token_str: str) -> int:
+    token_id = tokenizer.convert_tokens_to_ids(token_str)
+    return token_id
 
-    return tokens[0, 1]
+def get_embedding_for_clip_token_id(embedder, token_id):
+    if type(token_id) is not torch.Tensor:
+        token_id = torch.tensor(token_id, dtype=torch.int)
+    return embedder(token_id.unsqueeze(0))[0, 0]
 
-
-def get_bert_token_for_string(tokenizer, string):
-    token = tokenizer(string)
-    # assert torch.count_nonzero(token) == 3, f"String '{string}' maps to more than a single token. Please use another string"
-
-    token = token[0, 1]
-
-    return token
-
-
-def get_embedding_for_clip_token(embedder, token):
-    return embedder(token.unsqueeze(0))[0, 0]
 
 class EmbeddingManager(nn.Module):
     def __init__(
@@ -58,8 +39,7 @@ class EmbeddingManager(nn.Module):
         super().__init__()
 
         self.embedder = embedder
-        self.concepts_library=Concepts()
-        self.concepts_loaded = dict()
+        self.concepts_library=HuggingFaceConceptsLibrary()
 
         self.string_to_token_dict = {}
         self.string_to_param_dict = nn.ParameterDict()
@@ -77,11 +57,11 @@ class EmbeddingManager(nn.Module):
             embedder, 'tokenizer'
         ):   # using Stable Diffusion's CLIP encoder
             self.is_clip = True
-            get_token_for_string = partial(
-                get_clip_token_for_string, embedder.tokenizer
+            get_token_id_for_string = partial(
+                get_clip_token_id_for_string, embedder.tokenizer
             )
-            get_embedding_for_tkn = partial(
-                get_embedding_for_clip_token,
+            get_embedding_for_tkn_id = partial(
+                get_embedding_for_clip_token_id,
                 embedder.transformer.text_model.embeddings,
             )
             # per bug report #572
@@ -89,10 +69,10 @@ class EmbeddingManager(nn.Module):
             token_dim = 768
         else:   # using LDM's BERT encoder
             self.is_clip = False
-            get_token_for_string = partial(
-                get_bert_token_for_string, embedder.tknz_fn
+            get_token_id_for_string = partial(
+                get_bert_token_id_for_string, embedder.tknz_fn
             )
-            get_embedding_for_tkn = embedder.transformer.token_emb
+            get_embedding_for_tkn_id = embedder.transformer.token_emb
             token_dim = 1280
 
         if per_image_tokens:
@@ -100,15 +80,13 @@ class EmbeddingManager(nn.Module):
 
         for idx, placeholder_string in enumerate(placeholder_strings):
 
-            token = get_token_for_string(placeholder_string)
+            token_id = get_token_id_for_string(placeholder_string)
 
             if initializer_words and idx < len(initializer_words):
-                init_word_token = get_token_for_string(initializer_words[idx])
+                init_word_token_id = get_token_id_for_string(initializer_words[idx])
 
                 with torch.no_grad():
-                    init_word_embedding = get_embedding_for_tkn(
-                        init_word_token.cpu()
-                    )
+                    init_word_embedding = get_embedding_for_tkn_id(init_word_token_id)
 
                 token_params = torch.nn.Parameter(
                     init_word_embedding.unsqueeze(0).repeat(
@@ -132,7 +110,7 @@ class EmbeddingManager(nn.Module):
                     )
                 )
 
-            self.string_to_token_dict[placeholder_string] = token
+            self.string_to_token_dict[placeholder_string] = token_id
             self.string_to_param_dict[placeholder_string] = token_params
 
     def forward(
@@ -140,6 +118,8 @@ class EmbeddingManager(nn.Module):
         tokenized_text,
         embedded_text,
     ):
+        # torch.save(embedded_text, '/tmp/embedding-manager-uglysonic-pre-rewrite.pt')
+
         b, n, device = *tokenized_text.shape, tokenized_text.device
 
         for (
@@ -164,7 +144,7 @@ class EmbeddingManager(nn.Module):
             )
 
             placeholder_rows, placeholder_cols = torch.where(
-                tokenized_text == placeholder_token.to(tokenized_text.device)
+                tokenized_text == placeholder_token
             )
 
             if placeholder_rows.nelement() == 0:
@@ -182,9 +162,7 @@ class EmbeddingManager(nn.Module):
                 new_token_row = torch.cat(
                     [
                         tokenized_text[row][:col],
-                        placeholder_token.repeat(num_vectors_for_token).to(
-                            device
-                        ),
+                        torch.tensor([placeholder_token] * num_vectors_for_token, device=device),
                         tokenized_text[row][col + 1 :],
                     ],
                     axis=0,
@@ -211,22 +189,6 @@ class EmbeddingManager(nn.Module):
             },
             ckpt_path,
         )
-
-    def load_concepts(self, concepts:list[str], full=True):
-        bin_files = list()
-        for concept_name in concepts:
-            if concept_name in self.concepts_loaded:
-                continue
-            else:
-                bin_file = self.concepts_library.get_concept_model_path(concept_name)
-                if not bin_file:
-                    continue
-                bin_files.append(bin_file)
-                self.concepts_loaded[concept_name]=True
-        self.load(bin_files, full)
-
-    def list_terms(self) -> list[str]:
-        return self.concepts_loaded.keys()
 
     def load(self, ckpt_paths, full=True):
         if len(ckpt_paths) == 0:
@@ -282,14 +244,16 @@ class EmbeddingManager(nn.Module):
         if len(embedding.shape) == 1:
             embedding = embedding.unsqueeze(0)
 
-        num_tokens_added = self.embedder.tokenizer.add_tokens(token_str)
-        current_embeddings = self.embedder.transformer.resize_token_embeddings(None)
-        current_token_count = current_embeddings.num_embeddings
-        new_token_count = current_token_count + num_tokens_added
-        self.embedder.transformer.resize_token_embeddings(new_token_count)
+        existing_token_id = get_clip_token_id_for_string(self.embedder.tokenizer, token_str)
+        if existing_token_id == self.embedder.tokenizer.unk_token_id:
+            num_tokens_added = self.embedder.tokenizer.add_tokens(token_str)
+            current_embeddings = self.embedder.transformer.resize_token_embeddings(None)
+            current_token_count = current_embeddings.num_embeddings
+            new_token_count = current_token_count + num_tokens_added
+            self.embedder.transformer.resize_token_embeddings(new_token_count)
 
-        token = get_clip_token_for_string(self.embedder.tokenizer, token_str)
-        self.string_to_token_dict[token_str] = token
+        token_id = get_clip_token_id_for_string(self.embedder.tokenizer, token_str)
+        self.string_to_token_dict[token_str] = token_id
         self.string_to_param_dict[token_str] = torch.nn.Parameter(embedding)
 
     def parse_embedding(self, embedding_file: str):
@@ -318,7 +282,7 @@ class EmbeddingManager(nn.Module):
                     print('>> More than 1 embedding found. Will use the first one')
 
                 embedding = list(embedding_ckpt['string_to_param'].values())[0]
-            except (AttributeError,KeyError): 
+            except (AttributeError,KeyError):
                 return self.handle_broken_pt_variants(embedding_ckpt, embedding_file)
 
             embedding_info['embedding'] = embedding

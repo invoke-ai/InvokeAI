@@ -33,7 +33,7 @@ echo 1. Install python 3.9 or higher.
 echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
 echo    enable long path support on your system.
 echo 3. Install the Visual C++ core libraries.
-echo    Pleaase download and install the libraries from:
+echo    Please download and install the libraries from:
 echo    https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
 echo.
 echo See %INSTRUCTIONS% for more details.
@@ -78,6 +78,7 @@ set "selection="
 	set /p selection=Select the path to install InvokeAI's directory into [%UserProfile%]: 
 	if not defined selection set selection=%UserProfile%
 	set selection=%selection:"=%
+	call :Trim selection !selection!
 	set dest="%selection%\invokeai"
 	if exist %dest% (
 	   set response=y
@@ -95,6 +96,8 @@ goto :pick_rootdir
 :done
 
 set rootdir=%rootdir:"=%
+
+
 
 @rem ---------------------- Initialize the runtime directory ---------------------
 echo.
@@ -150,6 +153,7 @@ if %errorlevel% neq 0 (
    goto :err_exit
 )
 POPD
+
 copy .\templates\invoke.bat.in "%rootdir%\invoke.bat"
 copy .\templates\update.bat.in "%rootdir%\update.bat"
 
@@ -217,3 +221,10 @@ pause
 exit /b
 
 pause
+
+:Trim
+SetLocal EnableDelayedExpansion
+set Params=%*
+for /f "tokens=1*" %%a in ("!Params!") do EndLocal & set %1=%%b
+exit /b
+
