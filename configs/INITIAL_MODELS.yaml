@@ -13,6 +13,7 @@ stable-diffusion-1_5:
    repo_id: runwayml/stable-diffusion-v1-5
    format: diffusers
    recommended: True
+   default: True
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
 stable-diffusion-1_4:
