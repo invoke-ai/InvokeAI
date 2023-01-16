@@ -22,6 +22,7 @@ from ldm.invoke.devices import choose_autocast
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ldm.models.diffusion.ddpm import DiffusionWrapper
 from ldm.util import rand_perlin_2d
+from contextlib import nullcontext
 
 downsampling = 8
 CAUTION_IMG = 'assets/caution.png'
@@ -64,7 +65,9 @@ class Generator:
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  safety_checker:dict=None,
                  **kwargs):
-        scope = choose_autocast(self.precision)
+
+        scope = self._get_scope()
+        
         self.safety_checker = safety_checker
         attention_maps_images = []
         attention_maps_callback = lambda saver: attention_maps_images.append(saver.get_stacked_maps_image())
@@ -340,4 +343,10 @@ class Generator:
             os.makedirs(dirname, exist_ok=True)
         image.save(filepath,'PNG')
 
-
+    # workaround for models that use full precision in a half-precision environment
+    # see model_manager.py _load_diffuser_model() for an illustration of when that
+    # happens
+    def _get_scope(self):
+        model_dtype = self.model.text_encoder.get_input_embeddings().weight.data[0][0].dtype
+        scope = nullcontext if model_dtype == torch.float32 else choose_autocast(self.precision)
+        return scope

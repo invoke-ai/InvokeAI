@@ -182,6 +182,7 @@ class ModelManager(object):
                 description = description,
                 format = format,
                 status = status,
+                precision = stanza.get('precision','auto'),
             )
             
             # Checkpoint Config Parse
@@ -255,7 +256,7 @@ class ModelManager(object):
 
         if model_name not in omega:
             omega[model_name] = dict()
-        OmegaConf.update(omega,model_name,model_attributes,merge=False)
+        OmegaConf.update(omega, model_name.replace('.','_'), model_attributes,merge=False)
         if 'weights' in omega[model_name]:
             omega[model_name]['weights'].replace('\\','/')
 
@@ -280,7 +281,7 @@ class ModelManager(object):
         # this does the work
         model_format = mconfig.get('format', 'ckpt')
         if model_format == 'ckpt':
-            weights = mconfig.weights
+            weights = mconfig['weights']
             print(f'>> Loading {model_name} from {weights}')
             model, width, height, model_hash = self._load_ckpt_model(model_name, mconfig)
         elif model_format == 'diffusers':
@@ -304,7 +305,7 @@ class ModelManager(object):
 
     def _load_ckpt_model(self, model_name, mconfig):
         config = mconfig.config
-        weights = mconfig.weights
+        weights = mconfig['weights']
         vae = mconfig.get('vae')
         width = mconfig.width
         height = mconfig.height
@@ -389,9 +390,23 @@ class ModelManager(object):
 
         return model, width, height, model_hash
 
+    def _using_fp16(self, mconfig)->bool:
+        model_requested_precision = mconfig.get('precision','auto')
+        using_fp16 = None
+        if model_requested_precision == 'auto':
+            using_fp16 = self.precision == 'float16'
+        elif model_requested_precision == 'float32':
+            using_fp16 = False
+        elif model_requested_precision == 'float16':
+            using_fp16 = True
+        else:
+            print(f"** invalid value for this model's precision field ({requested_precision}). Using default.")
+            using_fp16 = self.precision == 'float16'
+        return using_fp16
+
     def _load_diffusers_model(self, mconfig):
         name_or_path = self.model_name_or_path(mconfig)
-        using_fp16 = self.precision == 'float16'
+        using_fp16 = self._using_fp16(mconfig)
 
         print(f'>> Loading diffusers model from {name_or_path}')
         if using_fp16:
@@ -405,7 +420,7 @@ class ModelManager(object):
             local_files_only=not Globals.internet_available
         )
         if 'vae' in mconfig:
-             vae = self._load_vae(mconfig['vae'])
+             vae = self._load_vae(mconfig['vae'], using_fp16)
              pipeline_args.update(vae=vae)
         if not isinstance(name_or_path,Path):
             pipeline_args.update(cache_dir=global_cache_dir('diffusers'))
@@ -413,6 +428,7 @@ class ModelManager(object):
             pipeline_args.update(torch_dtype=torch.float16)
             fp_args_list = [{'revision':'fp16'},{}]
         else:
+            pipeline_args.update(torch_dtype=torch.float32)
             fp_args_list = [{}]
 
         verbosity = dlogging.get_verbosity()
@@ -447,7 +463,6 @@ class ModelManager(object):
         height = width
 
         print(f'  | Default image dimensions = {width} x {height}')
-
         return pipeline, width, height, model_hash
 
     def model_name_or_path(self, model_name:Union[str,DictConfig]) -> str | Path:
@@ -456,7 +471,7 @@ class ModelManager(object):
         elif model_name in self.config:
             mconfig = self.config[model_name]
         else:
-            raise ValueError(f'"{model_name}" is not a known model name. Please check your models.yaml file')
+            raise ValueError(f'{model_name} is not a known model name. Please check your models.yaml file')
 
         if 'path' in mconfig:
             path = Path(mconfig['path'])
@@ -514,6 +529,7 @@ class ModelManager(object):
                         model_name:str=None,
                         description:str=None,
                         commit_to_conf:Path=None,
+                        precision:str='auto',
                         )->bool:
         '''
         Attempts to install the indicated diffuser model and returns True if successful.
@@ -531,6 +547,7 @@ class ModelManager(object):
         new_config = dict(
             description=description,
             format='diffusers',
+            precision=precision,
         )
         if isinstance(repo_or_path,Path) and repo_or_path.exists():
             new_config.update(path=repo_or_path)
@@ -761,7 +778,7 @@ class ModelManager(object):
         for model in legacy_locations:
             source = models_dir /model
             if source.exists():
-                print(f'DEBUG: Moving {models_dir / model} into hub')
+                print(f'** Moving {models_dir / model} into hub')
                 move(models_dir / model, hub)
 
         # anything else gets moved into the diffusers directory
@@ -909,10 +926,9 @@ class ModelManager(object):
             f.write(hash)
         return hash
 
-    def _load_vae(self, vae_config):
+    def _load_vae(self, vae_config, using_fp16=True):
         vae_args = {}
         name_or_path = self.model_name_or_path(vae_config)
-        using_fp16 = self.precision == 'float16'
 
         vae_args.update(
             cache_dir=global_cache_dir('diffusers'),

@@ -606,15 +606,19 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
         model_name=default_name,
         model_description=default_description
     )
+    precision = 'auto'
+    if input('Does this model need to run in full-precision mode? [n] ').startswith(('y','Y')):
+        precision = 'float32'
 
     if not manager.import_diffuser_model(
             path_or_repo,
             model_name = model_name,
-            description = model_description):
+            description = model_description,
+            precision = precision,
+    ):
         print('** model failed to import')
         return None
-    if input('Make this the default model? [n] ').startswith(('y','Y')):
-        manager.set_default_model(model_name)
+    
     return model_name
 
 def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
@@ -772,8 +776,8 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
         model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
             model_name = default_name
-        if not re.match('^[\w._+-]+$',model_name):
-            print('** model name must contain only words, digits and the characters "._+-" **')
+        if not re.match('^[\w_+-]+$',model_name):
+            print('** model name must contain only words, digits and the characters "_+-" **')
         elif model_name != default_name and model_name in existing_names:
             print(f'** the name {model_name} is already in use. Pick another.')
         else:
