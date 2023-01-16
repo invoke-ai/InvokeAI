@@ -4,6 +4,97 @@ title: Changelog
 
 # :octicons-log-16: **Changelog**
 
+## v2.3.0 <small>(15 January 2023)</small>	
+
+**Transition to diffusers
+
+Version 2.3 provides support for both the traditional `.ckpt` weight
+checkpoint files as well as the HuggingFace `diffusers` format. This
+introduces several changes you should know about.
+
+1. The models.yaml format has been updated. There are now two
+   different type of configuration stanza. The traditional ckpt
+   one will look like this, with a `format` of `ckpt` and a
+   `weights` field that points to the absolute or ROOTDIR-relative
+   location of the ckpt file.
+
+   ```
+   inpainting-1.5:
+      description: RunwayML SD 1.5 model optimized for inpainting (4.27 GB)
+      repo_id: runwayml/stable-diffusion-inpainting
+      format: ckpt
+      width: 512
+      height: 512
+      weights: models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
+      config: configs/stable-diffusion/v1-inpainting-inference.yaml
+      vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+   ```
+
+  A configuration stanza for a diffusers model hosted at HuggingFace will look like this,
+  with a `format` of `diffusers` and a `repo_id` that points to the
+  repository ID of the model on HuggingFace:
+
+  ```
+  stable-diffusion-2.1:
+  description: Stable Diffusion version 2.1 diffusers model (5.21 GB)
+  repo_id: stabilityai/stable-diffusion-2-1
+  format: diffusers
+  ```
+
+  A configuration stanza for a diffuers model stored locally should
+  look like this, with a `format` of `diffusers`, but a `path` field
+  that points at the directory that contains `model_index.json`:
+  
+  ```
+  waifu-diffusion:
+  description: Latest waifu diffusion 1.4
+  format: diffusers
+  path: models/diffusers/hakurei-haifu-diffusion-1.4
+  ```
+
+2. The format of the models directory has changed to mimic the
+   HuggingFace cache directory. By default, diffusers models are
+   now automatically downloaded and retrieved from the directory
+   `ROOTDIR/models/diffusers`, while other models are stored in
+   the directory `ROOTDIR/models/hub`. This organization is the
+   same as that used by HuggingFace for its cache management.
+
+   This allows you to share diffusers and ckpt model files easily with
+   other machine learning applications that use the HuggingFace
+   libraries. To do this, set the environment variable HF_HOME
+   before starting up InvokeAI to tell it what directory to
+   cache models in. To tell InvokeAI to use the standard HuggingFace
+   cache directory, you would set HF_HOME like this (Linux/Mac):
+
+   `export HF_HOME=~/.cache/hugging_face`
+
+3. If you upgrade to InvokeAI 2.3.* from an earlier version, there
+   will be a one-time migration from the old models directory format
+   to the new one. You will see a message about this the first time
+   you start `invoke.py`.
+
+4. Both the front end back ends of the model manager have been
+   rewritten to accommodate diffusers. You can import models using
+   their local file path, using their URLs, or their HuggingFace
+   repo_ids. On the command line, all these syntaxes work:
+
+   ```
+   !import_model stabilityai/stable-diffusion-2-1-base
+   !import_model /opt/sd-models/sd-1.4.ckpt
+   !import_model https://huggingface.co/Fictiverse/Stable_Diffusion_PaperCut_Model/blob/main/PaperCut_v1.ckpt
+   ```
+   
+**KNOWN BUGS (15 January 2023)
+
+1. On CUDA systems, the 768 pixel stable-diffusion-2.0 and
+   stable-diffusion-2.1 models can only be run as `diffusers` models
+   when the `xformer` library is installed and configured. Without
+   `xformers`, InvokeAI returns black images.
+
+2. Inpainting and outpainting have regressed in quality.
+
+Both these issues are being actively worked on.
+
 ## v2.2.4 <small>(11 December 2022)</small>
 
 **the `invokeai` directory**

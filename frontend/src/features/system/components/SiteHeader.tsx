@@ -1,4 +1,4 @@
-import { Link } from '@chakra-ui/react';
+import { Flex, Link, Text } from '@chakra-ui/react';
 
 import { FaGithub, FaDiscord, FaBug, FaKeyboard, FaCube } from 'react-icons/fa';
 
@@ -17,20 +17,34 @@ import LanguagePicker from './LanguagePicker';
 
 import { useTranslation } from 'react-i18next';
 import { MdSettings } from 'react-icons/md';
+import { useAppSelector } from 'app/storeHooks';
+import type { RootState } from 'app/store';
 
 /**
  * Header, includes color mode toggle, settings button, status message.
  */
 const SiteHeader = () => {
   const { t } = useTranslation();
+  const appVersion = useAppSelector(
+    (state: RootState) => state.system.app_version
+  );
 
   return (
     <div className="site-header">
       <div className="site-header-left-side">
         <img src={InvokeAILogo} alt="invoke-ai-logo" />
-        <h1>
-          invoke <strong>ai</strong>
-        </h1>
+        <Flex alignItems="center" columnGap="0.6rem">
+          <Text fontSize="1.4rem">
+            invoke <strong>ai</strong>
+          </Text>
+          <Text
+            fontWeight="bold"
+            color="var(--text-color-secondary)"
+            marginTop="0.2rem"
+          >
+            {appVersion}
+          </Text>
+        </Flex>
       </div>
 
       <div className="site-header-right-side">

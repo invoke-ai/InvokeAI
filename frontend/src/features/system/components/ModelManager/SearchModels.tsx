@@ -178,6 +178,7 @@ export default function SearchModels() {
         width: 512,
         height: 512,
         default: false,
+        format: 'ckpt',
       };
       dispatch(addNewModel(modelFormat));
     });
