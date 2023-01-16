@@ -4,7 +4,9 @@ from typing import Optional, Callable
 
 import psutil
 import torch
+import diffusers
 from torch import nn
+from diffusers.models.unet_2d_condition import UNet2DConditionModel
 
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
@@ -337,8 +339,8 @@ def setup_cross_attention_control(model, context: Context):
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
-    cross_attention_class: type = InvokeAICrossAttentionMixin
-    # cross_attention_class: type = InvokeAIDiffusersCrossAttention
+    from ldm.modules.attention import CrossAttention # avoid circular import
+    cross_attention_class: type = InvokeAIDiffusersCrossAttention if isinstance(model,UNet2DConditionModel) else CrossAttention
     which_attn = "attn1" if which is CrossAttentionType.SELF else "attn2"
     attention_module_tuples = [(name,module) for name, module in model.named_modules() if
                 isinstance(module, cross_attention_class) and which_attn in name]
@@ -440,4 +442,20 @@ def get_mem_free_total(device):
     mem_free_torch = mem_reserved - mem_active
     mem_free_total = mem_free_cuda + mem_free_torch
     return mem_free_total
+
+
+class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        InvokeAICrossAttentionMixin.__init__(self)
+
+    def _attention(self, query, key, value, attention_mask=None):
+        #default_result = super()._attention(query,  key, value)
+        if attention_mask is not None:
+            print(f"{type(self).__name__} ignoring passed-in attention_mask")
+        attention_result = self.get_invokeai_attention_mem_efficient(query, key, value)
+
+        hidden_states = self.reshape_batch_dim_to_heads(attention_result)
+        return hidden_states
 

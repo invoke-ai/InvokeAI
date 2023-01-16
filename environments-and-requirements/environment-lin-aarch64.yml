@@ -28,13 +28,18 @@ dependencies:
   - torch-fidelity=0.3.0
   - torchmetrics=0.7.0
   - torchvision
-  - transformers=4.21.3
+  - transformers~=4.25
   - pip:
+      - accelerate
+      - diffusers[torch]~=0.11
       - getpass_asterisk
+      - huggingface-hub>=0.11.1
       - omegaconf==2.1.1
       - picklescan
       - pyreadline3
       - realesrgan
+      - requests==2.25.1
+      - safetensors
       - taming-transformers-rom1504
       - test-tube>=0.7.5
       - git+https://github.com/openai/CLIP.git@main#egg=clip

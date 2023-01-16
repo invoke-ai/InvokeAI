@@ -23,6 +23,7 @@ if "%arg%" neq "" (
 
 set INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive/!INVOKE_AI_VERSION!.zip"
 set INVOKE_AI_DEP=https://raw.githubusercontent.com/invoke-ai/InvokeAI/!INVOKE_AI_VERSION!/environments-and-requirements/requirements-base.txt
+set INVOKE_AI_MODELS=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/configs/INITIAL_MODELS.yaml
  
 call curl -I "%INVOKE_AI_DEP%" -fs >.tmp.out
 if %errorlevel% neq 0 (
@@ -38,6 +39,8 @@ echo If you do not want to do this, press control-C now!
 pause
 
 call curl -L "%INVOKE_AI_DEP%" > environments-and-requirements/requirements-base.txt
+call curl -L "%INVOKE_AI_MODELS%" > configs/INITIAL_MODELS.yaml
+
 
 call .venv\Scripts\activate.bat
 call .venv\Scripts\python -mpip install -r requirements.txt

@@ -2,11 +2,7 @@ import os
 import re
 import sys
 import shlex
-import copy
-import warnings
-import time
 import traceback
-import yaml
 
 from ldm.invoke.globals import Globals
 from ldm.generate import Generate
@@ -16,9 +12,9 @@ from ldm.invoke.args import Args, metadata_dumps, metadata_from_png, dream_cmd_f
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
-from ldm.invoke.concepts_lib import Concepts
-from omegaconf import OmegaConf
+from ldm.invoke.model_manager import ModelManager
 from pathlib import Path
+from argparse import Namespace
 import pyparsing
 import ldm.invoke
 
@@ -45,14 +41,20 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
+    # alert - setting a global here
+    Globals.try_patchmatch = args.patchmatch
+    Globals.always_use_cpu = args.always_use_cpu
+    Globals.internet_available = args.internet_available and check_internet()
+    print(f'>> Internet connectivity is {Globals.internet_available}')
+
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
             print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
-            print(f'** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
-            print(f'** This script will now exit.')
+            print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
+            print('** This script will now exit.')
             sys.exit(-1)
 
-    print(f'>> {ldm.invoke.__app_name__} {ldm.invoke.__version__}')
+    print(f'>> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
 
     # loading here to avoid long delays on startup
@@ -77,6 +79,9 @@ def main():
             embedding_path = opt.embedding_path
     else:
         embedding_path = None
+
+    # migrate legacy models
+    ModelManager.migrate_models()
 
     # load the infile as a list of lines
     if opt.infile:
@@ -107,9 +112,8 @@ def main():
             safety_checker=opt.safety_checker,
             max_loaded_models=opt.max_loaded_models,
             )
-    except (FileNotFoundError, TypeError, AssertionError):
-        emergency_model_reconfigure(opt)
-        sys.exit(-1)
+    except (FileNotFoundError, TypeError, AssertionError) as e:
+        report_model_error(opt,e)
     except (IOError, KeyError) as e:
         print(f'{e}. Aborting.')
         sys.exit(-1)
@@ -120,9 +124,18 @@ def main():
     # preload the model
     try:
         gen.load_model()
-    except AssertionError:
-        emergency_model_reconfigure(opt)
-        sys.exit(-1)
+    except KeyError as e:
+        pass
+    except Exception as e:
+        report_model_error(opt, e)
+
+    # try to autoconvert new models
+    # autoimport new .ckpt files
+    if path := opt.autoconvert:
+        gen.model_manager.autoconvert_weights(
+            conf_path=opt.conf,
+            weights_directory=path,
+        )
 
     # web server loops forever
     if opt.web or opt.gui:
@@ -138,6 +151,9 @@ def main():
         main_loop(gen, opt)
     except KeyboardInterrupt:
         print(f'\nGoodbye!\nYou can start InvokeAI again by running the "invoke.bat" (or "invoke.sh") script from {Globals.root}')
+    except Exception:
+        print(">> An error occurred:")
+        traceback.print_exc()
 
 # TODO: main_loop() has gotten busy. Needs to be refactored.
 def main_loop(gen, opt):
@@ -147,14 +163,14 @@ def main_loop(gen, opt):
     doneAfterInFile = infile is not None
     path_filter = re.compile(r'[<>:"/\\|?*]')
     last_results = list()
-    model_config = OmegaConf.load(opt.conf)
 
     # The readline completer reads history from the .dream_history file located in the
     # output directory specified at the time of script launch. We do not currently support
     # changing the history file midstream when the output directory is changed.
-    completer   = get_completer(opt, models=list(model_config.keys()))
+    completer   = get_completer(opt, models=gen.model_manager.list_models())
     set_default_output_dir(opt, completer)
-    add_embedding_terms(gen, completer)
+    if gen.model:
+        add_embedding_terms(gen, completer)
     output_cntr = completer.get_current_history_length()+1
 
     # os.pathconf is not available on Windows
@@ -170,7 +186,7 @@ def main_loop(gen, opt):
         operation = 'generate'
 
         try:
-            command = get_next_command(infile)
+            command = get_next_command(infile, gen.model_name)
         except EOFError:
             done = infile is None or doneAfterInFile
             infile = None
@@ -315,7 +331,7 @@ def main_loop(gen, opt):
                     if use_prefix is not None:
                         prefix = use_prefix
                     postprocessed = upscaled if upscaled else operation=='postprocess'
-                    opt.prompt = gen.concept_lib().replace_triggers_with_concepts(opt.prompt or prompt_in)  # to avoid the problem of non-unique concept triggers
+                    opt.prompt = gen.huggingface_concepts_library.replace_triggers_with_concepts(opt.prompt or prompt_in)  # to avoid the problem of non-unique concept triggers
                     filename, formatted_dream_prompt = prepare_image_metadata(
                         opt,
                         prefix,
@@ -434,24 +450,50 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
 
     elif command.startswith('!switch'):
         model_name = command.replace('!switch ','',1)
-        gen.set_model(model_name)
-        add_embedding_terms(gen, completer)
+        try:
+            gen.set_model(model_name)
+            add_embedding_terms(gen, completer)
+        except KeyError as e:
+            print(str(e))
+        except Exception as e:
+            report_model_error(opt,e)
         completer.add_history(command)
         operation = None
 
     elif command.startswith('!models'):
-        gen.model_cache.print_models()
+        gen.model_manager.print_models()
         completer.add_history(command)
         operation = None
 
     elif command.startswith('!import'):
         path = shlex.split(command)
         if len(path) < 2:
-            print('** please provide a path to a .ckpt or .vae model file')
-        elif not os.path.exists(path[1]):
-            print(f'** {path[1]}: file not found')
+            print('** please provide (1) a URL to a .ckpt file to import; (2) a local path to a .ckpt file; or (3) a diffusers repository id in the form stabilityai/stable-diffusion-2-1')
         else:
-            add_weights_to_config(path[1], gen, opt, completer)
+            import_model(path[1], gen, opt, completer)
+        completer.add_history(command)
+        operation = None
+
+    elif command.startswith('!convert'):
+        path = shlex.split(command)
+        if len(path) < 2:
+            print('** please provide the path to a .ckpt or .safetensors model')
+        elif not os.path.exists(path[1]):
+            print(f'** {path[1]}: model not found')
+        else:
+            optimize_model(path[1], gen, opt, completer)
+        completer.add_history(command)
+        operation = None
+        
+
+    elif command.startswith('!optimize'):
+        path = shlex.split(command)
+        if len(path) < 2:
+            print('** please provide an installed model name')
+        elif not path[1] in gen.model_manager.list_models():
+            print(f'** {path[1]}: model not found')
+        else:
+            optimize_model(path[1], gen, opt, completer)
         completer.add_history(command)
         operation = None
 
@@ -460,7 +502,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
         if len(path) < 2:
             print('** please provide the name of a model')
         else:
-            edit_config(path[1], gen, opt, completer)
+            edit_model(path[1], gen, opt, completer)
         completer.add_history(command)
         operation = None
 
@@ -521,121 +563,223 @@ def set_default_output_dir(opt:Args, completer:Completer):
     completer.set_default_dir(opt.outdir)
 
 
-def add_weights_to_config(model_path:str, gen, opt, completer):
-    print(f'>> Model import in process. Please enter the values needed to configure this model:')
-    print()
+def import_model(model_path:str, gen, opt, completer):
+    '''
+    model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path; or
+    (3) a huggingface repository id
+    '''
+    model_name = None
+    
+    if model_path.startswith(('http:','https:','ftp:')):
+        model_name = import_ckpt_model(model_path, gen, opt, completer)
+    elif os.path.exists(model_path) and model_path.endswith('.ckpt') and os.path.isfile(model_path):
+        model_name = import_ckpt_model(model_path, gen, opt, completer)        
+    elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
+        model_name = import_diffuser_model(model_path, gen, opt, completer)
+    elif os.path.isdir(model_path):
+        model_name = import_diffuser_model(model_path, gen, opt, completer)
+    else:
+        print(f'** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can\'t import.')
 
-    new_config = {}
-    new_config['weights'] = model_path
+    if not model_name:
+        return
+        
+    if not _verify_load(model_name, gen):
+        print('** model failed to load. Discarding configuration entry')
+        gen.model_manager.del_model(model_name)
+        return
+    
+    if input('Make this the default model? [n] ') in ('y','Y'):
+        gen.model_manager.set_default_model(model_name)
 
-    done = False
-    while not done:
-        model_name = input('Short name for this model: ')
-        if not re.match('^[\w._-]+$',model_name):
-            print('** model name must contain only words, digits and the characters [._-] **')
-        else:
-            done = True
-    new_config['description'] = input('Description of this model: ')
+    gen.model_manager.commit(opt.conf)
+    completer.update_models(gen.model_manager.list_models())
+    print(f'>> {model_name} successfully installed')
+
+def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
+    manager = gen.model_manager
+    default_name = Path(path_or_repo).stem
+    default_description = f'Imported model {default_name}'
+    model_name, model_description = _get_model_name_and_desc(
+        manager,
+        completer,
+        model_name=default_name,
+        model_description=default_description
+    )
+
+    if not manager.import_diffuser_model(
+            path_or_repo,
+            model_name = model_name,
+            description = model_description):
+        print('** model failed to import')
+        return None
+    if input('Make this the default model? [n] ').startswith(('y','Y')):
+        manager.set_default_model(model_name)
+    return model_name
+
+def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
+    manager = gen.model_manager
+    default_name = Path(path_or_url).stem
+    default_description = f'Imported model {default_name}'
+    model_name, model_description = _get_model_name_and_desc(
+        manager,
+        completer,
+        model_name=default_name,
+        model_description=default_description
+    )
+    config_file = None
 
     completer.complete_extensions(('.yaml','.yml'))
-    completer.linebuffer = 'configs/stable-diffusion/v1-inference.yaml'
-
+    completer.set_line('configs/stable-diffusion/v1-inference.yaml')
     done = False
     while not done:
-        new_config['config'] = input('Configuration file for this model: ')
-        done = os.path.exists(new_config['config'])
-
-    done = False
-    completer.complete_extensions(('.vae.pt','.vae','.ckpt'))
-    while not done:
-        vae = input('VAE autoencoder file for this model [None]: ')
-        if os.path.exists(vae):
-            new_config['vae'] = vae
-            done = True
-        else:
-            done = len(vae)==0
-
+        config_file = input('Configuration file for this model: ').strip()
+        done = os.path.exists(config_file)
     completer.complete_extensions(None)
 
-    for field in ('width','height'):
-        done = False
-        while not done:
-            try:
-                completer.linebuffer = '512'
-                value = int(input(f'Default image {field}: '))
-                assert value >= 64 and value <= 2048
-                new_config[field] = value
-                done = True
-            except:
-                print('** Please enter a valid integer between 64 and 2048')
+    if not manager.import_ckpt_model(
+            path_or_url,
+            config = config_file,
+            model_name = model_name,
+            model_description = model_description,
+            commit_to_conf = opt.conf,
+    ):
+        print('** model failed to import')
+        return None
 
-    make_default = input('Make this the default model? [n] ') in ('y','Y')
+    if input('Make this the default model? [n] ').startswith(('y','Y')):
+        manager.set_model_default(model_name)
+    return model_name
 
-    if write_config_file(opt.conf, gen, model_name, new_config, make_default=make_default):
-        completer.add_model(model_name)
+def _verify_load(model_name:str, gen)->bool:
+    print('>> Verifying that new model loads...')
+    current_model = gen.model_name
+    if not gen.model_manager.get_model(model_name):
+        return False
+    do_switch = input('Keep model loaded? [y] ')
+    if len(do_switch)==0 or do_switch[0] in ('y','Y'):
+        gen.set_model(model_name)
+    else:
+        print('>> Restoring previous model')
+        gen.set_model(current_model)
+    return True
+
+def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_description:str=''):
+    model_name = _get_model_name(model_manager.list_models(),completer,model_name)
+    completer.set_line(model_description)
+    model_description = input(f'Description for this model [{model_description}]: ').strip() or model_description
+    return model_name, model_description
+
+def optimize_model(model_name_or_path:str, gen, opt, completer):
+    manager = gen.model_manager
+    ckpt_path = None
+
+    if (model_info := manager.model_info(model_name_or_path)):
+        if 'weights' in model_info:
+            ckpt_path = Path(model_info['weights'])
+            model_name = model_name_or_path
+            model_description = model_info['description']
+        else:
+            print(f'** {model_name_or_path} is not a legacy .ckpt weights file')
+            return
+    elif os.path.exists(model_name_or_path):
+        ckpt_path = Path(model_name_or_path)
+        model_name,model_description = _get_model_name_and_desc(
+            manager,
+            completer,
+            ckpt_path.stem,
+            f'Converted model {ckpt_path.stem}'
+        )
+    else:
+        print(f'** {model_name_or_path} is neither an existing model nor the path to a .ckpt file')
+        return
+    
+    if not ckpt_path.is_absolute():
+        ckpt_path = Path(Globals.root,ckpt_path)
+
+    diffuser_path = Path(Globals.root, 'models','optimized-ckpts',model_name)
+    if diffuser_path.exists():
+        print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
+        return
+     
+    new_config = gen.model_manager.convert_and_import(
+        ckpt_path,
+        diffuser_path,
+        model_name=model_name,
+        model_description=model_description,
+        commit_to_conf=opt.conf,
+    )
+    if not new_config:
+        return
+
+    completer.update_models(gen.model_manager.list_models())
+    if input(f'Load optimized model {model_name}? [y] ') not in ('n','N'):
+        gen.set_model(model_name)
+
+    response = input(f'Delete the original .ckpt file at ({ckpt_path} ? [n] ')
+    if response.startswith(('y','Y')):
+        ckpt_path.unlink(missing_ok=True)
+        print(f'{ckpt_path} deleted')
 
 def del_config(model_name:str, gen, opt, completer):
     current_model = gen.model_name
     if model_name == current_model:
         print("** Can't delete active model. !switch to another model first. **")
         return
-    gen.model_cache.del_model(model_name)
-    gen.model_cache.commit(opt.conf)
+    gen.model_manager.del_model(model_name)
+    gen.model_manager.commit(opt.conf)
     print(f'** {model_name} deleted')
-    completer.del_model(model_name)
+    completer.update_models(gen.model_manager.list_models())
 
-def edit_config(model_name:str, gen, opt, completer):
-    config = gen.model_cache.config
+def edit_model(model_name:str, gen, opt, completer):
+    current_model = gen.model_name
+#    if model_name == current_model:
+#        print("** Can't edit the active model. !switch to another model first. **")
+#        return
 
-    if model_name not in config:
+    manager = gen.model_manager
+    if not (info := manager.model_info(model_name)):
         print(f'** Unknown model {model_name}')
         return
 
     print(f'\n>> Editing model {model_name} from configuration file {opt.conf}')
+    new_name = _get_model_name(manager.list_models(),completer,model_name)
 
-    conf = config[model_name]
-    new_config = {}
-    completer.complete_extensions(('.yaml','.yml','.ckpt','.vae.pt'))
-    for field in ('description', 'weights', 'vae', 'config', 'width','height'):
-        completer.linebuffer = str(conf[field]) if field in conf else ''
-        new_value = input(f'{field}: ')
-        new_config[field] = int(new_value) if field in ('width','height') else new_value
-    make_default = input('Make this the default model? [n] ') in ('y','Y')
-    completer.complete_extensions(None)
-    write_config_file(opt.conf, gen, model_name, new_config, clobber=True, make_default=make_default)
+    for attribute in info.keys():
+        if type(info[attribute]) != str:
+            continue
+        if attribute == 'format':
+            continue
+        completer.set_line(info[attribute])
+        info[attribute] = input(f'{attribute}: ') or info[attribute]
+        
+    if new_name != model_name:
+        manager.del_model(model_name)
 
-def write_config_file(conf_path, gen, model_name, new_config, clobber=False, make_default=False):
-    current_model = gen.model_name
+    # this does the update
+    manager.add_model(new_name, info, True)
 
-    op = 'modify' if clobber else 'import'
-    print('\n>> New configuration:')
-    if make_default:
-        new_config['default'] = True
-    print(yaml.dump({model_name:new_config}))
-    if input(f'OK to {op} [n]? ') not in ('y','Y'):
-        return False
+    if input('Make this the default model? [n] ').startswith(('y','Y')):
+        manager.set_default_model(new_name)
+    manager.commit(opt.conf)
+    completer.update_models(manager.list_models())
+    print('>> Model successfully updated')
 
-    try:
-        print('>> Verifying that new model loads...')
-        gen.model_cache.add_model(model_name, new_config, clobber)
-        assert gen.set_model(model_name) is not None, 'model failed to load'
-    except AssertionError as e:
-        print(f'** aborting **')
-        gen.model_cache.del_model(model_name)
-        return False
+def _get_model_name(existing_names,completer,default_name:str='')->str:
+    done = False
+    completer.set_line(default_name)
+    while not done:
+        model_name = input(f'Short name for this model [{default_name}]: ').strip()
+        if len(model_name)==0:
+            model_name = default_name
+        if not re.match('^[\w._+-]+$',model_name):
+            print('** model name must contain only words, digits and the characters "._+-" **')
+        elif model_name != default_name and model_name in existing_names:
+            print(f'** the name {model_name} is already in use. Pick another.')
+        else:
+            done = True
+    return model_name
 
-    if make_default:
-        print('making this default')
-        gen.model_cache.set_default_model(model_name)
-
-    gen.model_cache.commit(conf_path)
-
-    do_switch = input(f'Keep model loaded? [y]')
-    if len(do_switch)==0 or do_switch[0] in ('y','Y'):
-        pass
-    else:
-        gen.set_model(current_model)
-    return True
 
 def do_textmask(gen, opt, callback):
     image_path = opt.prompt
@@ -746,7 +890,7 @@ def prepare_image_metadata(
         except KeyError as e:
             print(f'** The filename format contains an unknown key \'{e.args[0]}\'. Will use \'{{prefix}}.{{seed}}.png\' instead')
             filename = f'{prefix}.{seed}.png'
-        except IndexError as e:
+        except IndexError:
             print(f'** The filename format is broken or complete. Will use \'{{prefix}}.{{seed}}.png\' instead')
             filename = f'{prefix}.{seed}.png'
 
@@ -782,9 +926,9 @@ def choose_postprocess_name(opt,prefix,seed) -> str:
         counter += 1
     return filename
 
-def get_next_command(infile=None) -> str:  # command string
+def get_next_command(infile=None, model_name='no model') -> str:  # command string
     if infile is None:
-        command = input('invoke> ')
+        command = input(f'({model_name}) invoke> ').strip()
     else:
         command = infile.readline()
         if not command:
@@ -815,7 +959,8 @@ def add_embedding_terms(gen,completer):
     Called after setting the model, updates the autocompleter with
     any terms loaded by the embedding manager.
     '''
-    completer.add_embedding_terms(gen.model.embedding_manager.list_terms())
+    trigger_strings = gen.model.textual_inversion_manager.get_all_trigger_strings()
+    completer.add_embedding_terms(trigger_strings)
 
 def split_variations(variations_string) -> list:
     # shotgun parsing, woo
@@ -938,13 +1083,13 @@ def write_commands(opt, file_path:str, outfilepath:str):
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
 
-def emergency_model_reconfigure(opt):
-    print()
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-    print('   You appear to have a missing or misconfigured model file(s).                   ')
-    print('   The script will now exit and run configure_invokeai.py to help fix the problem.')
-    print('   After reconfiguration is done, please relaunch invoke.py.                      ')
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+def report_model_error(opt:Namespace, e:Exception):
+    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
+    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
+    response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
+    if response.startswith(('n','N')):
+        return
+
     print('configure_invokeai is launching....\n')
 
     # Match arguments that were set on the CLI
@@ -952,7 +1097,7 @@ def emergency_model_reconfigure(opt):
     root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
     config = ["--config", opt.conf] if opt.conf is not None else []
     yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
-
+    previous_args = sys.argv
     sys.argv = [ 'configure_invokeai' ]
     sys.argv.extend(root_dir)
     sys.argv.extend(config)
@@ -961,3 +1106,20 @@ def emergency_model_reconfigure(opt):
 
     import configure_invokeai
     configure_invokeai.main()
+    print('** InvokeAI will now restart')
+    sys.argv = previous_args
+    main() # would rather do a os.exec(), but doesn't exist?
+    sys.exit(0)
+
+def check_internet()->bool:
+    '''
+    Return true if the internet is reachable.
+    It does this by pinging huggingface.co.
+    '''
+    import urllib.request
+    host = 'http://huggingface.co'
+    try:
+        urllib.request.urlopen(host,timeout=1)
+        return True
+    except:
+        return False

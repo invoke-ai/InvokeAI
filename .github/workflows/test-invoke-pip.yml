@@ -4,8 +4,6 @@ on:
     branches:
       - 'main'
   pull_request:
-    branches:
-      - 'main'
     types:
       - 'ready_for_review'
       - 'opened'
@@ -17,14 +15,14 @@ concurrency:
    cancel-in-progress: true
 
 jobs:
-  fail_if_pull_request_is_draft:
-    if: github.event.pull_request.draft == true
-    runs-on: ubuntu-18.04
-    steps:
-    - name: Fails in order to indicate that pull request needs to be marked as ready to review and unit tests workflow needs to pass.
-      run: exit 1
+  # fail_if_pull_request_is_draft:
+  #   if: github.event.pull_request.draft == true && github.head_ref != 'dev/diffusers'
+  #   runs-on: ubuntu-18.04
+  #   steps:
+  #   - name: Fails in order to indicate that pull request needs to be marked as ready to review and unit tests workflow needs to pass.
+  #     run: exit 1
   matrix:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false ||  github.head_ref == 'dev/diffusers'
     strategy:
       matrix:
         stable-diffusion-model:
@@ -40,26 +38,23 @@ jobs:
         include:
           - requirements-file: requirements-lin-cuda.txt
             os: ubuntu-22.04
-            curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-lin-amd.txt
             os: ubuntu-22.04
-            curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-mac-mps-cpu.txt
             os: macOS-12
-            curl-command: curl
             github-env: $GITHUB_ENV
           - requirements-file: requirements-win-colab-cuda.txt
             os: windows-2022
-            curl-command: curl.exe
             github-env: $env:GITHUB_ENV
-          - stable-diffusion-model: stable-diffusion-1.5
-            stable-diffusion-model-url: https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
-            stable-diffusion-model-dl-path: models/ldm/stable-diffusion-v1
-            stable-diffusion-model-dl-name: v1-5-pruned-emaonly.ckpt
     name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    env:
+      INVOKE_MODEL_RECONFIGURE: '--yes'
+      INVOKEAI_ROOT: '${{ github.workspace }}/invokeai'
+      PYTHONUNBUFFERED: 1
+      HAVE_SECRETS: ${{ secrets.HUGGINGFACE_TOKEN != '' }}
     steps:
       - name: Checkout sources
         id: checkout-sources
@@ -77,10 +72,17 @@ jobs:
           echo "INVOKEAI_ROOT=${{ github.workspace }}/invokeai" >> ${{ matrix.github-env }}
           echo "INVOKEAI_OUTDIR=${{ github.workspace }}/invokeai/outputs" >> ${{ matrix.github-env }}
 
-      - name: create models.yaml from example
-        run: |
-          mkdir -p ${{ env.INVOKEAI_ROOT }}/configs
-          cp configs/models.yaml.example ${{ env.INVOKEAI_ROOT }}/configs/models.yaml
+      - name: Use Cached diffusers-1.5
+        id: cache-sd-model
+        uses: actions/cache@v3
+        env:
+          cache-name: huggingface-${{ matrix.stable-diffusion-model }}
+        with:
+          path: |
+            ${{ env.INVOKEAI_ROOT }}/models/runwayml
+            ${{ env.INVOKEAI_ROOT }}/models/stabilityai
+            ${{ env.INVOKEAI_ROOT }}/models/CompVis
+          key: ${{ env.cache-name }}
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -110,30 +112,31 @@ jobs:
       - name: install requirements
         run: pip3 install -r '${{ matrix.requirements-file }}'
 
-      - name: Use Cached Stable Diffusion Model
-        id: cache-sd-model
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-${{ matrix.stable-diffusion-model }}
-        with:
-          path: ${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}
-          key: ${{ env.cache-name }}
-
-      - name: Download ${{ matrix.stable-diffusion-model }}
-        id: download-stable-diffusion-model
-        if: ${{ steps.cache-sd-model.outputs.cache-hit != 'true' }}
-        run: |
-          mkdir -p "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}"
-          ${{ matrix.curl-command }} -H "Authorization: Bearer ${{ secrets.HUGGINGFACE_TOKEN }}" -o "${{ env.INVOKEAI_ROOT }}/${{ matrix.stable-diffusion-model-dl-path }}/${{ matrix.stable-diffusion-model-dl-name }}" -L ${{ matrix.stable-diffusion-model-url }}
-
       - name: run configure_invokeai.py
         id: run-preload-models
-        run: python3 scripts/configure_invokeai.py --skip-sd-weights --yes
+        env:
+          HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: >
+          configure_invokeai.py
+          --yes
+          --full-precision  # can't use fp16 weights without a GPU
 
       - name: Run the tests
         id: run-tests
         if: matrix.os != 'windows-2022'
-        run: python3 scripts/invoke.py --no-patchmatch --no-nsfw_checker --model ${{ matrix.stable-diffusion-model }} --from_file ${{ env.TEST_PROMPTS }} --root="${{ env.INVOKEAI_ROOT }}" --outdir="${{ env.INVOKEAI_OUTDIR }}"
+        env:
+          # Set offline mode to make sure configure preloaded successfully.
+          HF_HUB_OFFLINE: 1
+          HF_DATASETS_OFFLINE: 1
+          TRANSFORMERS_OFFLINE: 1
+        run: >
+          python3 scripts/invoke.py
+          --no-patchmatch
+          --no-nsfw_checker
+          --model ${{ matrix.stable-diffusion-model }}
+          --from_file ${{ env.TEST_PROMPTS }}
+          --root="${{ env.INVOKEAI_ROOT }}"
+          --outdir="${{ env.INVOKEAI_OUTDIR }}"
 
       - name: Archive results
         id: archive-results

@@ -1,48 +1,44 @@
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
-import pyparsing
 # Derived from source code carrying the following copyrights
 # Copyright (c) 2022 Machine Vision and Learning Group, LMU Munich
 # Copyright (c) 2022 Robin Rombach and Patrick Esser and contributors
 
-import torch
-import numpy as np
-import random
+import gc
+import importlib
 import os
-import time
+import random
 import re
 import sys
+import time
 import traceback
-import transformers
-import io
-import gc
-import hashlib
+
 import cv2
+import diffusers
+import numpy as np
 import skimage
-
-from omegaconf import OmegaConf
-
-import ldm.invoke.conditioning
-from ldm.invoke.generator.base import downsampling
+import torch
+import transformers
 from PIL import Image, ImageOps
-from torch import nn
+from diffusers.pipeline_utils import DiffusionPipeline
+from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything, logging
 
-from ldm.invoke.prompt_parser import PromptParser
-from ldm.util import instantiate_from_config
-from ldm.invoke.globals import Globals
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.plms import PLMSSampler
-from ldm.models.diffusion.ksampler import KSampler
-from ldm.invoke.pngwriter import PngWriter
+import ldm.invoke.conditioning
 from ldm.invoke.args import metadata_from_png
-from ldm.invoke.image_util import InitImageResizer
-from ldm.invoke.devices import choose_torch_device, choose_precision
+from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.conditioning import get_uc_and_c_and_ec
-from ldm.invoke.model_cache import ModelCache
-from ldm.invoke.seamless import configure_model_padding
-from ldm.invoke.txt2mask import Txt2Mask, SegmentedGrayscale
-from ldm.invoke.concepts_lib import Concepts
+from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.generator.inpaint import infill_methods
+from ldm.invoke.globals import global_cache_dir
+from ldm.invoke.image_util import InitImageResizer
+from ldm.invoke.model_manager import ModelManager
+from ldm.invoke.pngwriter import PngWriter
+from ldm.invoke.seamless import configure_model_padding
+from ldm.invoke.txt2mask import Txt2Mask
+from ldm.models.diffusion.ddim import DDIMSampler
+from ldm.models.diffusion.ksampler import KSampler
+from ldm.models.diffusion.plms import PLMSSampler
+
 
 def fix_func(orig):
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -160,12 +156,12 @@ class Generate:
         mconfig             = OmegaConf.load(conf)
         self.height         = None
         self.width          = None
-        self.model_cache    = None
+        self.model_manager    = None
         self.iterations     = 1
         self.steps          = 50
         self.cfg_scale      = 7.5
         self.sampler_name   = sampler_name
-        self.ddim_eta       = 0.0    # same seed always produces same image
+        self.ddim_eta       = ddim_eta    # same seed always produces same image
         self.precision      = precision
         self.strength       = 0.75
         self.seamless       = False
@@ -177,7 +173,6 @@ class Generate:
         self.sampler        = None
         self.device         = None
         self.session_peakmem = None
-        self.generators     = {}
         self.base_generator = None
         self.seed           = None
         self.outdir = outdir
@@ -208,8 +203,14 @@ class Generate:
             self.precision = choose_precision(self.device)
 
         # model caching system for fast switching
-        self.model_cache = ModelCache(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
-        self.model_name  = model or self.model_cache.default_model() or FALLBACK_MODEL_NAME
+        self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
+        # don't accept invalid models
+        fallback = self.model_manager.default_model() or FALLBACK_MODEL_NAME
+        model = model or fallback
+        if not self.model_manager.valid_model(model):
+            print(f'** "{model}" is not a known model name; falling back to {fallback}.')
+            model = None
+        self.model_name  = model or fallback
 
         # for VRAM usage statistics
         self.session_peakmem = torch.cuda.max_memory_allocated() if self._has_cuda else None
@@ -225,7 +226,7 @@ class Generate:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
                 safety_model_id = "CompVis/stable-diffusion-safety-checker"
-                safety_model_path = os.path.join(Globals.root,'models',safety_model_id)
+                safety_model_path = global_cache_dir("hub")
                 self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(safety_model_id,
                                                                                    local_files_only=True,
                                                                                    cache_dir=safety_model_path,
@@ -404,7 +405,11 @@ class Generate:
         width = width or self.width
         height = height or self.height
 
-        configure_model_padding(model, seamless, seamless_axes)
+        if isinstance(model, DiffusionPipeline):
+            configure_model_padding(model.unet, seamless, seamless_axes)
+            configure_model_padding(model.vae, seamless, seamless_axes)
+        else:
+            configure_model_padding(model, seamless, seamless_axes)
 
         assert cfg_scale > 1.0, 'CFG_Scale (-C) must be >1.0'
         assert threshold >= 0.0, '--threshold must be >=0.0'
@@ -439,7 +444,7 @@ class Generate:
             self._set_sampler()
 
         # apply the concepts library to the prompt
-        prompt = self.concept_lib().replace_concepts_with_triggers(prompt, lambda concepts: self.load_concepts(concepts))
+        prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(prompt, lambda concepts: self.load_huggingface_concepts(concepts))
 
         # bit of a hack to change the cached sampler's karras threshold to
         # whatever the user asked for
@@ -546,7 +551,7 @@ class Generate:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
-        except RuntimeError as e:
+        except RuntimeError:
             print(traceback.format_exc(), file=sys.stderr)
             print('>> Could not generate image.')
 
@@ -558,7 +563,7 @@ class Generate:
         )
         if self._has_cuda():
             print(
-                f'>>   Max VRAM used for this generation:',
+                '>>   Max VRAM used for this generation:',
                 '%4.2fG.' % (torch.cuda.max_memory_allocated() / 1e9),
                 'Current VRAM utilization:',
                 '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
@@ -568,7 +573,7 @@ class Generate:
                 self.session_peakmem, torch.cuda.max_memory_allocated()
             )
             print(
-                f'>>   Max VRAM used since script start: ',
+                '>>   Max VRAM used since script start: ',
                 '%4.2fG' % (self.session_peakmem / 1e9),
             )
         return results
@@ -613,9 +618,9 @@ class Generate:
         # used by multiple postfixers
         # todo: cross-attention control
         uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
-            prompt, model =self.model,
+            prompt, model=self.model,
             skip_normalize_legacy_blend=opt.skip_normalize,
-            log_tokens    =ldm.invoke.conditioning.log_tokenization
+            log_tokens=ldm.invoke.conditioning.log_tokenization
         )
 
         if tool in ('gfpgan','codeformer','upscale'):
@@ -644,7 +649,7 @@ class Generate:
                 try:
                     extend_instructions[direction]=int(pixels)
                 except ValueError:
-                    print(f'** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
+                    print('** invalid extension instruction. Use <directions> <pixels>..., as in "top 64 left 128 right 64 bottom 64"')
 
             opt.seed = seed
             opt.prompt = prompt
@@ -692,7 +697,7 @@ class Generate:
             )
 
         elif tool is None:
-            print(f'* please provide at least one postprocessing option, such as -G or -U')
+            print('* please provide at least one postprocessing option, such as -G or -U')
             return None
         else:
             print(f'* postprocessing tool {tool} is not yet supported')
@@ -769,75 +774,62 @@ class Generate:
 
         return init_image,init_mask
 
-    # lots o' repeated code here! Turn into a make_func()
     def _make_base(self):
-        if not self.generators.get('base'):
-            from ldm.invoke.generator import Generator
-            self.generators['base'] = Generator(self.model, self.precision)
-        return self.generators['base']
-
-    def _make_img2img(self):
-        if not self.generators.get('img2img'):
-            from ldm.invoke.generator.img2img import Img2Img
-            self.generators['img2img'] = Img2Img(self.model, self.precision)
-            self.generators['img2img'].free_gpu_mem = self.free_gpu_mem
-        return self.generators['img2img']
-
-    def _make_embiggen(self):
-        if not self.generators.get('embiggen'):
-            from ldm.invoke.generator.embiggen import Embiggen
-            self.generators['embiggen'] = Embiggen(self.model, self.precision)
-        return self.generators['embiggen']
+        return self._load_generator('','Generator')
 
     def _make_txt2img(self):
-        if not self.generators.get('txt2img'):
-            from ldm.invoke.generator.txt2img import Txt2Img
-            self.generators['txt2img'] = Txt2Img(self.model, self.precision)
-            self.generators['txt2img'].free_gpu_mem = self.free_gpu_mem
-        return self.generators['txt2img']
+        return self._load_generator('.txt2img','Txt2Img')
+
+    def _make_img2img(self):
+        return self._load_generator('.img2img','Img2Img')
+
+    def _make_embiggen(self):
+        return self._load_generator('.embiggen','Embiggen')
 
     def _make_txt2img2img(self):
-        if not self.generators.get('txt2img2'):
-            from ldm.invoke.generator.txt2img2img import Txt2Img2Img
-            self.generators['txt2img2'] = Txt2Img2Img(self.model, self.precision)
-            self.generators['txt2img2'].free_gpu_mem = self.free_gpu_mem
-        return self.generators['txt2img2']
+        return self._load_generator('.txt2img2img','Txt2Img2Img')
 
     def _make_inpaint(self):
-        if not self.generators.get('inpaint'):
-            from ldm.invoke.generator.inpaint import Inpaint
-            self.generators['inpaint'] = Inpaint(self.model, self.precision)
-            self.generators['inpaint'].free_gpu_mem = self.free_gpu_mem
-        return self.generators['inpaint']
+        return self._load_generator('.inpaint','Inpaint')
 
-    # "omnibus" supports the runwayML custom inpainting model, which does
-    # txt2img, img2img and inpainting using slight variations on the same code
     def _make_omnibus(self):
-        if not self.generators.get('omnibus'):
-            from ldm.invoke.generator.omnibus import Omnibus
-            self.generators['omnibus'] = Omnibus(self.model, self.precision)
-            self.generators['omnibus'].free_gpu_mem = self.free_gpu_mem
-        return self.generators['omnibus']
+        return self._load_generator('.omnibus','Omnibus')
+
+    def _load_generator(self, module, class_name):
+        if self.is_legacy_model(self.model_name):
+            mn = f'ldm.invoke.ckpt_generator{module}'
+            cn = f'Ckpt{class_name}'
+        else:
+            mn = f'ldm.invoke.generator{module}'
+            cn = class_name
+        module = importlib.import_module(mn)
+        constructor = getattr(module,cn)
+        return constructor(self.model, self.precision)
 
     def load_model(self):
         '''
         preload model identified in self.model_name
         '''
-        self.set_model(self.model_name)
+        return self.set_model(self.model_name)
 
     def set_model(self,model_name):
         """
         Given the name of a model defined in models.yaml, will load and initialize it
         and return the model object. Previously-used models will be cached.
+
+        If the passed model_name is invalid, raises a KeyError.
+        If the model fails to load for some reason, will attempt to load the previously-
+        loaded model (if any). If that fallback fails, will raise an AssertionError
         """
         if self.model_name == model_name and self.model is not None:
             return self.model
 
+        previous_model_name = self.model_name
+
         # the model cache does the loading and offloading
-        cache = self.model_cache
+        cache = self.model_manager
         if not cache.valid_model(model_name):
-            print(f'** "{model_name}" is not a known model name. Please check your models.yaml file')
-            return self.model
+            raise KeyError('** "{model_name}" is not a known model name. Cannot change.')
 
         cache.print_vram_usage()
 
@@ -847,11 +839,17 @@ class Generate:
         self.sampler = None
         self.generators = {}
         gc.collect()
-
-        model_data = cache.get_model(model_name)
-        if model_data is None:  # restore previous
-            model_data = cache.get_model(self.model_name)
-            model_name = self.model_name # addresses Issue #1547
+        try:
+            model_data = cache.get_model(model_name)
+        except Exception as e:
+            print(f'** model {model_name} could not be loaded: {str(e)}')
+            if previous_model_name is None:
+                raise e
+            print(f'** trying to reload previous model')
+            model_data = cache.get_model(previous_model_name) # load previous
+            if model_data is None:
+                raise e
+            model_name = previous_model_name
 
         self.model = model_data['model']
         self.width = model_data['width']
@@ -863,19 +861,23 @@ class Generate:
 
         seed_everything(random.randrange(0, np.iinfo(np.uint32).max))
         if self.embedding_path is not None:
-            self.model.embedding_manager.load(
-                self.embedding_path, self.precision == 'float32' or self.precision == 'autocast'
-            )
+            for root, _, files in os.walk(self.embedding_path):
+                for name in files:
+                    ti_path = os.path.join(root, name)
+                    self.model.textual_inversion_manager.load_textual_inversion(ti_path,
+                                                                                defer_injecting_tokens=True)
+            print(f'>> Textual inversions available: {", ".join(self.model.textual_inversion_manager.get_all_trigger_strings())}')
 
-        self._set_sampler()
         self.model_name = model_name
+        self._set_sampler()  # requires self.model_name to be set first
         return self.model
 
-    def load_concepts(self,concepts:list[str]):
-        self.model.embedding_manager.load_concepts(concepts, self.precision=='float32' or self.precision=='autocast')
+    def load_huggingface_concepts(self, concepts:list[str]):
+        self.model.textual_inversion_manager.load_huggingface_concepts(concepts)
 
-    def concept_lib(self)->Concepts:
-        return self.model.embedding_manager.concepts_library
+    @property
+    def huggingface_concepts_library(self) -> HuggingFaceConceptsLibrary:
+        return self.model.textual_inversion_manager.hf_concepts_library
 
     def correct_colors(self,
                        image_list,
@@ -970,9 +972,18 @@ class Generate:
     def sample_to_lowres_estimated_image(self, samples):
         return self._make_base().sample_to_lowres_estimated_image(samples)
 
+    def is_legacy_model(self,model_name)->bool:
+        return self.model_manager.is_legacy(model_name)
+
+    def _set_sampler(self):
+        if isinstance(self.model, DiffusionPipeline):
+            return self._set_scheduler()
+        else:
+            return self._set_sampler_legacy()
+
     # very repetitive code - can this be simplified? The KSampler names are
     # consistent, at least
-    def _set_sampler(self):
+    def _set_sampler_legacy(self):
         msg = f'>> Setting Sampler to {self.sampler_name}'
         if self.sampler_name == 'plms':
             self.sampler = PLMSSampler(self.model, device=self.device)
@@ -999,6 +1010,41 @@ class Generate:
             self.sampler = PLMSSampler(self.model, device=self.device)
 
         print(msg)
+
+    def _set_scheduler(self):
+        default = self.model.scheduler
+
+        # See https://github.com/huggingface/diffusers/issues/277#issuecomment-1371428672
+        scheduler_map = dict(
+            ddim=diffusers.DDIMScheduler,
+            dpmpp_2=diffusers.DPMSolverMultistepScheduler,
+            k_dpm_2=diffusers.KDPM2DiscreteScheduler,
+            k_dpm_2_a=diffusers.KDPM2AncestralDiscreteScheduler,
+            # DPMSolverMultistepScheduler is technically not `k_` anything, as it is neither
+            # the k-diffusers implementation nor included in EDM (Karras 2022), but we can
+            # provide an alias for compatibility.
+            k_dpmpp_2=diffusers.DPMSolverMultistepScheduler,
+            k_euler=diffusers.EulerDiscreteScheduler,
+            k_euler_a=diffusers.EulerAncestralDiscreteScheduler,
+            k_heun=diffusers.HeunDiscreteScheduler,
+            k_lms=diffusers.LMSDiscreteScheduler,
+            plms=diffusers.PNDMScheduler,
+        )
+
+        if self.sampler_name in scheduler_map:
+            sampler_class = scheduler_map[self.sampler_name]
+            msg = f'>> Setting Sampler to {self.sampler_name} ({sampler_class.__name__})'
+            self.sampler = sampler_class.from_config(self.model.scheduler.config)
+        else:
+            msg = (f'>> Unsupported Sampler: {self.sampler_name} '
+                  f'Defaulting to {default}')
+            self.sampler = default
+
+        print(msg)
+
+        if not hasattr(self.sampler, 'uses_inpainting_model'):
+            # FIXME: terrible kludge!
+            self.sampler.uses_inpainting_model = lambda: False
 
     def _load_img(self, img)->Image:
         if isinstance(img, Image.Image):

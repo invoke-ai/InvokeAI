@@ -1,9 +1,12 @@
 import torch
 from torch import autocast
 from contextlib import nullcontext
+from ldm.invoke.globals import Globals
 
 def choose_torch_device() -> str:
     '''Convenience routine for guessing which GPU device to run model on'''
+    if Globals.always_use_cpu:
+        return "cpu"
     if torch.cuda.is_available():
         return 'cuda'
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
