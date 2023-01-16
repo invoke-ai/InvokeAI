@@ -230,6 +230,9 @@ class ModelManager(object):
         Delete the named model.
         '''
         omega = self.config
+        if model_name not in omega:
+            print(f'** Unknown model {model_name}')
+            return
         del omega[model_name]
         if model_name in self.stack:
             self.stack.remove(model_name)
@@ -253,9 +256,8 @@ class ModelManager(object):
 
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
 
-        if model_name not in omega:
-            omega[model_name] = dict()
-        OmegaConf.update(omega,model_name,model_attributes,merge=False)
+        omega[model_name] = model_attributes
+        
         if 'weights' in omega[model_name]:
             omega[model_name]['weights'].replace('\\','/')
 
