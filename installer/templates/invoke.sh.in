@@ -1,5 +1,14 @@
 #!/bin/bash
 
+####
+# This launch script assumes that:
+# 1. it is located in the runtime directory,
+# 2. the .venv is also located in the runtime directory and is named exactly that
+#
+# If both of the above are not true, this script will likely not work as intended.
+# Activate the virtual environment and run `invoke.py` directly.
+####
+
 set -eu
 
 # ensure we're in the correct folder in case user's CWD is somewhere else
@@ -22,15 +31,37 @@ if [ "$0" != "bash" ]; then
     echo "3. run textual inversion training"
     echo "4. open the developer console"
     echo "5. re-run the configure script to download new models"
-    read -p "Please enter 1, 2, 3, 4 or 5: [1] " yn
+    echo "6. command-line help "
+    echo ""
+    read -p "Please enter 1, 2, 3, 4, 5 or 6: [2] " yn
     choice=${yn:='2'}
     case $choice in
-        1 ) printf "\nStarting the InvokeAI command-line..\n"; .venv/bin/python .venv/bin/invoke.py  $*;;
-        2 ) printf "\nStarting the InvokeAI browser-based UI..\n"; .venv/bin/python .venv/bin/invoke.py --web $*;;
-        3 ) printf "\nStarting Textual Inversion:\n"; .venv/bin/python .venv/bin/textual_inversion_fe.py $*;;
-	4 ) printf "\nDeveloper Console:\n"; file_name=$(basename "${BASH_SOURCE[0]}"); bash --init-file "$file_name";;
-	5 ) printf "\nRunning configure_invokeai.py:\n"; .venv/bin/python .venv/bin/configure_invokeai.py $*;;
-        * ) echo "Invalid selection"; exit;;
+        1)
+            echo "Starting the InvokeAI command-line..."
+            exec invoke.py $@
+            ;;
+        2)
+            echo "Starting the InvokeAI browser-based UI..."
+            exec invoke.py --web $@
+            ;;
+        3)
+            echo "Starting Textual Inversion:"
+            exec textual_inversion_fe.py $@
+            ;;
+        4)
+            echo "Developer Console:"
+            file_name=$(basename "${BASH_SOURCE[0]}")
+            bash --init-file "$file_name"
+            ;;
+        5)
+            exec configure_invokeai.py --root ${INVOKEAI_ROOT}
+            ;;
+        6)
+            exec invoke.py --help
+            ;;
+        *)
+            echo "Invalid selection"
+            exit;;
     esac
 else # in developer console
     python --version
