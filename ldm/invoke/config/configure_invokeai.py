@@ -301,7 +301,7 @@ You may re-run the configuration script again in the future if you do not wish t
         again = True
         while again:
             try:
-                access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ⮞ ")
+                access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ❯ ")
                 HfLogin(access_token)
                 access_token = HfFolder.get_token()
                 again = False

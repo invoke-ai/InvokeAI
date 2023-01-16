@@ -29,7 +29,8 @@ set err_msg=An error has occurred and the script could not continue.
 echo This script will install InvokeAI and its dependencies.
 echo.
 echo BEFORE YOU START PLEASE MAKE SURE TO DO THE FOLLOWING
-echo 1. Install python 3.9 or higher.
+echo 1. Install python 3.9 or 3.10. Python version 3.11 and above are
+echo    not supported at the moment.
 echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
 echo    enable long path support on your system.
 echo 3. Install the Visual C++ core libraries.
@@ -37,7 +38,7 @@ echo    Please download and install the libraries from:
 echo    https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
 echo.
 echo See %INSTRUCTIONS% for more details.
-echo. 
+echo.
 pause
 
 @rem ---------------------------- check Python version ---------------
@@ -45,7 +46,7 @@ echo ***** Checking and Updating Python *****
 
 call python --version >.tmp1 2>.tmp2
 if %errorlevel% == 1 (
-   set err_msg=Please install Python 3.9 or higher. See %INSTRUCTIONS% for details.
+   set err_msg=Please install Python 3.10. See %INSTRUCTIONS% for details.
    goto err_exit
 )
 
@@ -64,111 +65,11 @@ if %errorlevel% == 1 (
 @rem Cleanup
 del /q .tmp1 .tmp2
 
-@rem --------------------- Get the requirements file ------------
-echo.
-echo Setting up requirements file for your system.
-copy /y environments-and-requirements\requirements-win-colab-cuda.txt .\requirements.txt
+@rem -------------- Install and Configure ---------------
 
-@rem --------------------- Get the root directory for installation ------------
-set "rootdir="
-set "response="
-set "selection="
-:pick_rootdir
-	if defined rootdir goto :done
-	set /p selection=Select the path to install InvokeAI's directory into [%UserProfile%]: 
-	if not defined selection set selection=%UserProfile%
-	set selection=%selection:"=%
-	call :Trim selection !selection!
-	set dest="%selection%\invokeai"
-	if exist %dest% (
-	   set response=y
-	   set /p response=The directory %dest% exists. Do you wish to resume install from a previous attempt? [Y/n]: 
-	   if !response! == "" set response=y
-	   if /I !response! == y (set rootdir=%dest%) else (goto :pick_rootdir)
-	) else (
-	   set rootdir=!dest!
-	)
-	set response=y
-	set /p response="You have chosen to install InvokeAI into %rootdir%. OK? [Y/n]: "
-	if !response! == "" set response=y
-	if /I !response! neq y set "rootdir="
-goto :pick_rootdir
-:done
-
-set rootdir=%rootdir:"=%
+call python main.py
 
 
-
-@rem ---------------------- Initialize the runtime directory ---------------------
-echo.
-echo *** Creating Runtime Directory %rootdir% ***
-if not exist "%rootdir%" mkdir "%rootdir%"
-@rem for unknown reasons the mkdir works but returns an error code
-if not exist "%rootdir%" (
-	set err_msg=Could not create the directory %rootdir%. Please check the directory's permissions and try again.
-	goto :err_exit
-)
-echo Successful.
-
-@rem --------------------------- Create and populate .venv ---------------------------
-echo.
-echo ** Creating Virtual Environment for InvokeAI **
-call python -mvenv "%rootdir%\.venv"
-if %errorlevel% neq 0 (
-   set err_msg=Could not create virtual environment %rootdir%\.venv. Please check the directory's permissions and try again.
-   goto :err_exit
-)
-echo Successful.
-
-echo.
-echo *** Installing InvokeAI Requirements ***
-echo Activating environment
-call "%rootdir%\.venv\Scripts\activate.bat"
-
-set PYTHON=%rootdir%\.venv\Scripts\python
-echo updating pip with "%PYTHON%"
-call "%PYTHON%" -mensurepip --upgrade
-call "%PYTHON%" -mpip install --prefer-binary -r requirements.txt
-if %errorlevel% neq 0 (
-   set err_msg=Requirements installation failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
-   goto :err_exit
-)
-echo Installation successful.
-
-echo.
-echo *** Installing InvokeAI Modules and Executables ***
-call "%PYTHON%" -mpip install %INVOKE_AI_SRC%
-if %errorlevel% neq 0 (
-   set err_msg=Installation of InvokeAI failed. See above for errors and check %TROUBLESHOOTING% for potential solutions.
-   goto :err_exit
-)
-echo Installation successful.
-
-@rem --------------------------- Set up the root directory ---------------------------
-xcopy /E /Y .\templates\rootdir "%rootdir%"
-PUSHD "%rootdir%"
-call "%PYTHON%" .venv\Scripts\configure_invokeai.py "--root=%rootdir%"
-if %errorlevel% neq 0 (
-   set err_msg=Configuration failed. See above for error messages and check %TROUBLESHOOTING% for potential solutions.
-   goto :err_exit
-)
-POPD
-
-copy .\templates\invoke.bat.in "%rootdir%\invoke.bat"
-copy .\templates\update.bat.in "%rootdir%\update.bat"
-
-@rem so that update.bat works
-mkdir "%rootdir%\environments-and-requirements"
-xcopy /I /Y .\environments-and-requirements "%rootdir%\environments-and-requirements"
-copy .\requirements.txt "%rootdir%\requirements.txt"
-
-
-echo.
-echo ***** Finished configuration *****
-echo All done. Execute the file %rootdir%\invoke.bat to start InvokeAI.
-pause
-deactivate
-exit
 
 @rem ------------------------ Subroutines ---------------
 @rem routine to do comparison of semantic version numbers
@@ -227,4 +128,3 @@ SetLocal EnableDelayedExpansion
 set Params=%*
 for /f "tokens=1*" %%a in ("!Params!") do EndLocal & set %1=%%b
 exit /b
-

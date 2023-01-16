@@ -17,6 +17,13 @@ from rich.style import Style
 from rich.text import Text
 from rich.syntax import Syntax
 
+"""
+INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${INVOKEAI_VERSION}.zip
+INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
+TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
+"""
+
+
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -88,7 +95,7 @@ def dest_path(init_path=None) -> Path:
             )
             print(f"Please select the destination directory for the installation \[{dest}]: ")
             selected = prompt(
-                "[Tab] to complete ⮞ ",
+                "[Tab] to complete ❯ ",
                 complete_in_thread=True,
                 completer=path_completer,
                 complete_style=CompleteStyle.READLINE_LIKE,
@@ -158,7 +165,7 @@ def graphical_accelerator():
         # future CoreML?
 
     if len(options) == 1:
-        print(f"Your operating system only supports the \"{options[0][1]}\" driver. Proceeding with that.")
+        print(f"Your platform [gold1]{OS}-{ARCH}[/] only supports the \"{options[0][1]}\" driver. Proceeding with that.")
         return options[0][1]
 
     # "I don't know" is always added the last option
