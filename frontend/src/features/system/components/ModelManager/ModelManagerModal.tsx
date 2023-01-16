@@ -8,12 +8,16 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import React, { cloneElement } from 'react';
-import { useTranslation } from 'react-i18next';
 
-import ModelEdit from './ModelEdit';
-import ModelList from './ModelList';
+import { useTranslation } from 'react-i18next';
+import { useAppSelector } from 'app/storeHooks';
+import { RootState } from 'app/store';
 
 import type { ReactElement } from 'react';
+
+import ModelList from './ModelList';
+import DiffusersModelEdit from './DiffusersModelEdit';
+import CheckpointModelEdit from './CheckpointModelEdit';
 
 type ModelManagerModalProps = {
   children: ReactElement;
@@ -28,6 +32,14 @@ export default function ModelManagerModal({
     onClose: onModelManagerModalClose,
   } = useDisclosure();
 
+  const model_list = useAppSelector(
+    (state: RootState) => state.system.model_list
+  );
+
+  const openModel = useAppSelector(
+    (state: RootState) => state.system.openModel
+  );
+
   const { t } = useTranslation();
 
   return (
@@ -41,16 +53,22 @@ export default function ModelManagerModal({
         size="6xl"
       >
         <ModalOverlay />
-        <ModalContent className=" modal">
+        <ModalContent className="modal" fontFamily="Inter">
           <ModalCloseButton className="modal-close-btn" />
-          <ModalHeader>{t('modelmanager:modelManager')}</ModalHeader>
+          <ModalHeader fontWeight="bold">
+            {t('modelmanager:modelManager')}
+          </ModalHeader>
           <Flex
             padding={'0 1.5rem 1.5rem 1.5rem'}
             width="100%"
             columnGap={'2rem'}
           >
             <ModelList />
-            <ModelEdit />
+            {openModel && model_list[openModel]['format'] === 'diffusers' ? (
+              <DiffusersModelEdit />
+            ) : (
+              <CheckpointModelEdit />
+            )}
           </Flex>
         </ModalContent>
       </Modal>

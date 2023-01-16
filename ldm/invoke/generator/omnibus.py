@@ -1,13 +1,13 @@
 """omnibus module to be used with the runwayml 9-channel custom inpainting model"""
 
 import torch
-import numpy as  np
+from PIL import Image, ImageOps
 from einops import repeat
-from PIL import Image, ImageOps, ImageChops
+
 from ldm.invoke.devices import choose_autocast
-from ldm.invoke.generator.base import downsampling
 from ldm.invoke.generator.img2img import Img2Img
 from ldm.invoke.generator.txt2img import Txt2Img
+
 
 class Omnibus(Img2Img,Txt2Img):
     def __init__(self, model, precision):
@@ -40,6 +40,8 @@ class Omnibus(Img2Img,Txt2Img):
         self.perlin = perlin
         num_samples = 1
 
+        print('DEBUG: IN OMNIBUS')
+
         sampler.make_schedule(
             ddim_num_steps=steps, ddim_eta=ddim_eta, verbose=False
         )
@@ -57,8 +59,6 @@ class Omnibus(Img2Img,Txt2Img):
             mask_image = self._image_to_tensor(ImageOps.invert(mask_image), normalize=False)
 
         self.mask_blur_radius = mask_blur_radius
-
-        t_enc = steps
 
         if init_image is not None and mask_image is not None: # inpainting
             masked_image = init_image * (1 - mask_image)  # masked image is the image masked by mask - masked regions zero

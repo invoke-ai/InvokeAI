@@ -8,31 +8,42 @@
 #
 print('Loading Python libraries...\n')
 import argparse
-import sys
 import os
 import io
 import re
-import warnings
 import shutil
-from urllib import request
-from tqdm import tqdm
-from omegaconf import OmegaConf
-from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login
+import sys
+import traceback
+import warnings
 from pathlib import Path
-from typing import Union
+from typing import Dict, Union
+from urllib import request
+
+import requests
+import transformers
+from diffusers import StableDiffusionPipeline, AutoencoderKL
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+from ldm.invoke.devices import choose_precision, choose_torch_device
 from getpass_asterisk import getpass_asterisk
+from huggingface_hub import HfFolder, hf_hub_url, login as hf_hub_login, whoami as hf_whoami
+from huggingface_hub.utils._errors import RevisionNotFoundError
+from omegaconf import OmegaConf
+from omegaconf.dictconfig import DictConfig
+from tqdm import tqdm
 from transformers import CLIPTokenizer, CLIPTextModel
-from ldm.invoke.globals import Globals
+
+from ldm.invoke.globals import Globals, global_cache_dir
 from ldm.invoke.readline import generic_completer
 
-import traceback
-import requests
-import clip
-import transformers
-import warnings
 warnings.filterwarnings('ignore')
 import torch
 transformers.logging.set_verbosity_error()
+
+try:
+    from ldm.invoke.model_manager import ModelManager
+except ImportError:
+    sys.path.append('.')
+    from ldm.invoke.model_manager import ModelManager
 
 #--------------------------globals-----------------------
 Model_dir = 'models'
@@ -150,14 +161,15 @@ will be given the option to view and change your selections.
 '''
         )
             for ds in Datasets.keys():
-                recommended = '(recommended)' if Datasets[ds]['recommended'] else ''
-                print(f'[{counter}] {ds}:\n    {Datasets[ds]["description"]} {recommended}')
-                if yes_or_no('    Download?',default_yes=Datasets[ds]['recommended']):
+                recommended = Datasets[ds].get('recommended',False)
+                r_str = '(recommended)' if recommended else ''
+                print(f'[{counter}] {ds}:\n    {Datasets[ds]["description"]} {r_str}')
+                if yes_or_no('    Download?',default_yes=recommended):
                     datasets[ds]=counter
                     counter += 1
         else:
             for ds in Datasets.keys():
-                if Datasets[ds]['recommended']:
+                if Datasets[ds].get('recommended',False):
                     datasets[ds]=counter
                     counter += 1
 
@@ -181,7 +193,7 @@ will be given the option to view and change your selections.
 def recommended_datasets()->dict:
     datasets = dict()
     for ds in Datasets.keys():
-        if Datasets[ds]['recommended']:
+        if Datasets[ds].get('recommended',False):
             datasets[ds]=True
     return datasets
 
@@ -240,6 +252,7 @@ The license terms are located here:
     print("=" * shutil.get_terminal_size()[0])
     print('Authenticating to Huggingface')
     hf_envvars = [ "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN" ]
+    token_found = False
     if not (access_token := HfFolder.get_token()):
         print(f"Huggingface token not found in cache.")
 
@@ -257,17 +270,21 @@ The license terms are located here:
         print(f"Huggingface token found in cache.")
         try:
             HfLogin(access_token)
+            token_found = True
         except ValueError:
             print(f"Login failed due to invalid token found in cache")
 
-    if not yes_to_all:
-        print('''
-You may optionally enter your Huggingface token now. InvokeAI *will* work without it, but some functionality may be limited.
-See https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept for more information.
+    if not (yes_to_all or token_found):
+        print(''' You may optionally enter your Huggingface token now. InvokeAI
+*will* work without it but you will not be able to automatically
+download some of the Hugging Face style concepts.  See
+https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept
+for more information.
 
 Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
 
-Paste the token below using Ctrl-Shift-V (macOS/Linux) or right-click (Windows), and/or 'Enter' to continue.
+Paste the token below using Ctrl-V on macOS/Linux, or Ctrl-Shift-V or right-click on Windows. 
+Alternatively press 'Enter' to skip this step and continue.
 You may re-run the configuration script again in the future if you do not wish to set the token right now.
         ''')
         again = True
@@ -313,34 +330,61 @@ def migrate_models_ckpt():
         os.replace(os.path.join(model_path,'model.ckpt'),os.path.join(model_path,new_name))
 
 #---------------------------------------------
-def download_weight_datasets(models:dict, access_token:str):
+def download_weight_datasets(models:dict, access_token:str, precision:str='float32'):
     migrate_models_ckpt()
     successful = dict()
     for mod in models.keys():
-        repo_id = Datasets[mod]['repo_id']
-        filename = Datasets[mod]['file']
-        dest = os.path.join(Globals.root,Model_dir,Weights_dir)
-        success = hf_download_with_resume(
-            repo_id=repo_id,
-            model_dir=dest,
-            model_name=filename,
-            access_token=access_token
-        )
-        if success:
-            successful[mod] = True
-    if len(successful) < len(models):
-        print(f'\n\n** There were errors downloading one or more files. **')
-        print('Press any key to try again. Type ^C to quit.\n')
-        input()
-        return None
-
-    keys = ', '.join(successful.keys())
-    print(f'Successfully installed {keys}')
+        print(f'{mod}...',file=sys.stderr,end='')
+        successful[mod] = _download_repo_or_file(Datasets[mod], access_token, precision=precision)
     return successful
 
+def _download_repo_or_file(mconfig:DictConfig, access_token:str, precision:str='float32')->Path:
+    path = None
+    if mconfig['format'] == 'ckpt':
+        path = _download_ckpt_weights(mconfig, access_token)
+    else:
+        path = _download_diffusion_weights(mconfig, access_token, precision=precision)
+        if 'vae' in mconfig and 'repo_id' in mconfig['vae']:
+            _download_diffusion_weights(mconfig['vae'], access_token, precision=precision)
+    return path
+
+def _download_ckpt_weights(mconfig:DictConfig, access_token:str)->Path:
+    repo_id = mconfig['repo_id']
+    filename = mconfig['file']
+    cache_dir = os.path.join(Globals.root, Model_dir, Weights_dir)
+    return hf_download_with_resume(
+        repo_id=repo_id,
+        model_dir=cache_dir,
+        model_name=filename,
+        access_token=access_token
+    )
+
+def _download_diffusion_weights(mconfig:DictConfig, access_token:str, precision:str='float32'):
+    repo_id = mconfig['repo_id']
+    model_class = StableDiffusionGeneratorPipeline if mconfig.get('format',None)=='diffusers' else AutoencoderKL
+    extra_arg_list = [{'revision':'fp16'},{}] if precision=='float16' else [{}]
+    path = None
+    for extra_args in extra_arg_list:
+        try:
+            path = download_from_hf(
+                model_class,
+                repo_id,
+                cache_subdir='diffusers',
+                safety_checker=None,
+                **extra_args,
+            )
+        except OSError as e:
+            if str(e).startswith('fp16 is not a valid'):
+                print(f'Could not fetch half-precision version of model {repo_id}; fetching full-precision instead')
+            else:
+                print(f'An unexpected error occurred while downloading the model: {e})')
+        if path:
+            break
+    return path
+
 #---------------------------------------------
-def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_token:str=None)->bool:
-    model_dest = os.path.join(model_dir, model_name)
+def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_token:str=None)->Path:
+    model_dest = Path(os.path.join(model_dir, model_name))
     os.makedirs(model_dir, exist_ok=True)
 
     url = hf_hub_url(repo_id, model_name)
@@ -359,7 +403,7 @@ def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_t
 
     if resp.status_code==416:  # "range not satisfiable", which means nothing to return
         print(f'* {model_name}: complete file found. Skipping.')
-        return True
+        return model_dest
     elif resp.status_code != 200:
         print(f'** An error occurred during downloading {model_name}: {resp.reason}')
     elif exist_size > 0:
@@ -370,7 +414,7 @@ def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_t
     try:
         if total < 2000:
             print(f'*** ERROR DOWNLOADING {model_name}: {resp.text}')
-            return False
+            return None
 
         with open(model_dest, open_mode) as file, tqdm(
                 desc=model_name,
@@ -385,8 +429,22 @@ def hf_download_with_resume(repo_id:str, model_dir:str, model_name:str, access_t
                 bar.update(size)
     except Exception as e:
         print(f'An error occurred while downloading {model_name}: {str(e)}')
-        return False
-    return True
+        return None
+    return model_dest
+
+# -----------------------------------------------------------------------------------
+#---------------------------------------------
+def is_huggingface_authenticated():
+    # huggingface_hub 0.10 API isn't great for this, it could be OSError, ValueError,
+    # maybe other things, not all end-user-friendly.
+    # noinspection PyBroadException
+    try:
+        response = hf_whoami()
+        if response.get('id') is not None:
+            return True
+    except Exception:
+        pass
+    return False
 
 #---------------------------------------------
 def download_with_progress_bar(model_url:str, model_dest:str, label:str='the'):
@@ -403,7 +461,6 @@ def download_with_progress_bar(model_url:str, model_dest:str, label:str='the'):
         print('...download failed')
         print(f'Error downloading {label} model')
         print(traceback.format_exc())
-
 
 #---------------------------------------------
 def update_config_file(successfully_downloaded:dict,opt:dict):
@@ -441,29 +498,27 @@ def new_config_file_contents(successfully_downloaded:dict, config_file:str)->str
     default_selected = False
 
     for model in successfully_downloaded:
-        a = Datasets[model]['config'].split('/')
-        if a[0] != 'VAE':
-            continue
-        vae_target = a[1] if len(a)>1 else 'default'
-        vaes[vae_target] = Datasets[model]['file']
-
-    for model in successfully_downloaded:
-        if Datasets[model]['config'].startswith('VAE'): # skip VAE entries
-            continue
         stanza = conf[model] if model in conf else { }
-
-        stanza['description'] = Datasets[model]['description']
-        stanza['weights'] = os.path.join(Model_dir,Weights_dir,Datasets[model]['file'])
-        stanza['config'] = os.path.normpath(os.path.join(SD_Configs, Datasets[model]['config']))
-        stanza['width'] = Datasets[model]['width']
-        stanza['height'] = Datasets[model]['height']
+        mod = Datasets[model]
+        stanza['description'] = mod['description']
+        stanza['repo_id'] = mod['repo_id']
+        stanza['format'] = mod['format']
+        # diffusers don't need width and height (probably .ckpt doesn't either)
+        # so we no longer require these in INITIAL_MODELS.yaml
+        if 'width' in mod:
+            stanza['width'] = mod['width']
+        if 'height' in mod:
+            stanza['height'] = mod['height']
+        if 'file' in mod:
+            stanza['weights'] = os.path.relpath(successfully_downloaded[model], start=Globals.root)
+            stanza['config'] = os.path.normpath(os.path.join(SD_Configs,mod['config']))
+        if 'vae' in mod:
+            if 'file' in mod['vae']:
+                stanza['vae'] = os.path.normpath(os.path.join(Model_dir, Weights_dir,mod['vae']['file']))
+            else:
+                stanza['vae'] = mod['vae']
         stanza.pop('default',None)  # this will be set later
-        if vaes:
-            for target in vaes:
-                if re.search(target, model, flags=re.IGNORECASE):
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes[target]))
-                else:
-                    stanza['vae'] = os.path.normpath(os.path.join(Model_dir,Weights_dir,vaes['default']))
+
         # BUG - the first stanza is always the default. User should select.
         if not default_selected:
             stanza['default'] = True
@@ -477,17 +532,20 @@ def download_bert():
     print('Installing bert tokenizer (ignore deprecation errors)...', end='',file=sys.stderr)
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=DeprecationWarning)
-        from transformers import BertTokenizerFast, AutoFeatureExtractor
+        from transformers import BertTokenizerFast
         download_from_hf(BertTokenizerFast,'bert-base-uncased')
         print('...success',file=sys.stderr)
 
 #---------------------------------------------
-def download_from_hf(model_class:object, model_name:str):
+def download_from_hf(model_class:object, model_name:str, cache_subdir:Path=Path('hub'), **kwargs):
     print('',file=sys.stderr)  # to prevent tqdm from overwriting
-    return model_class.from_pretrained(model_name,
-                                       cache_dir=os.path.join(Globals.root,Model_dir,model_name),
-                                       resume_download=True
+    path = global_cache_dir(cache_subdir)
+    model = model_class.from_pretrained(model_name,
+                                        cache_dir=path,
+                                        resume_download=True,
+                                        **kwargs,
     )
+    return path if model else None
 
 #---------------------------------------------
 def download_clip():
@@ -585,11 +643,13 @@ def download_safety_checker():
 #-------------------------------------
 def download_weights(opt:dict) -> Union[str, None]:
 
+    precision = 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
+
     if opt.yes_to_all:
         models = recommended_datasets()
         access_token = authenticate(opt.yes_to_all)
         if len(models)>0:
-            successfully_downloaded = download_weight_datasets(models, access_token)
+            successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)
             update_config_file(successfully_downloaded,opt)
             return
 
@@ -607,11 +667,11 @@ def download_weights(opt:dict) -> Union[str, None]:
     else:  # 'skip'
         return
 
-
     access_token = authenticate()
+    HfFolder.save_token(access_token)
 
     print('\n** DOWNLOADING WEIGHTS **')
-    successfully_downloaded = download_weight_datasets(models, access_token)
+    successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)
 
     update_config_file(successfully_downloaded,opt)
     if len(successfully_downloaded) < len(models):
@@ -738,6 +798,12 @@ def main():
                         action=argparse.BooleanOptionalAction,
                         default=False,
                         help='skip downloading the large Stable Diffusion weight files')
+    parser.add_argument('--full-precision',
+                        dest='full_precision',
+                        action=argparse.BooleanOptionalAction,
+                        type=bool,
+                        default=False,
+                        help='use 32-bit weights instead of faster 16-bit weights')
     parser.add_argument('--yes','-y',
                         dest='yes_to_all',
                         action='store_true',

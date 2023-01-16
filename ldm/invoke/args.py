@@ -81,22 +81,23 @@ with metadata_from_png():
 """
 
 import argparse
-from argparse import Namespace, RawTextHelpFormatter
-import pydoc
-import json
-import hashlib
-import os
-import re
-import sys
-import shlex
-import copy
 import base64
+import copy
 import functools
-import warnings
+import hashlib
+import json
+import os
+import pydoc
+import re
+import shlex
+import sys
 import ldm.invoke
 import ldm.invoke.pngwriter
+
 from ldm.invoke.globals import Globals
 from ldm.invoke.prompt_parser import split_weighted_subprompts
+from argparse import Namespace
+from pathlib import Path
 
 APP_ID = ldm.invoke.__app_id__
 APP_NAME = ldm.invoke.__app_name__
@@ -113,6 +114,8 @@ SAMPLER_CHOICES = [
     'k_heun',
     'k_lms',
     'plms',
+    # diffusers:
+    "pndm",
 ]
 
 PRECISION_CHOICES = [
@@ -181,7 +184,7 @@ class Args(object):
                 sys.exit(0)
 
             print('* Initializing, be patient...')
-            Globals.root = os.path.abspath(switches.root_dir or Globals.root)
+            Globals.root = Path(os.path.abspath(switches.root_dir or Globals.root))
             Globals.try_patchmatch = switches.patchmatch
 
             # now use root directory to find the init file
@@ -273,7 +276,7 @@ class Args(object):
             switches.append(f'-I {a["init_img"]}')
             switches.append(f'-A {a["sampler_name"]}')
             if a['fit']:
-                switches.append(f'--fit')
+                switches.append('--fit')
             if a['init_mask'] and len(a['init_mask'])>0:
                 switches.append(f'-M {a["init_mask"]}')
             if a['init_color'] and len(a['init_color'])>0:
@@ -281,7 +284,7 @@ class Args(object):
             if a['strength'] and a['strength']>0:
                 switches.append(f'-f {a["strength"]}')
             if a['inpaint_replace']:
-                switches.append(f'--inpaint_replace')
+                switches.append('--inpaint_replace')
             if a['text_mask']:
                 switches.append(f'-tm {" ".join([str(u) for u in a["text_mask"]])}')
         else:
@@ -480,6 +483,12 @@ class Args(object):
             help='Force free gpu memory before final decoding',
         )
         model_group.add_argument(
+            "--always_use_cpu",
+            dest="always_use_cpu",
+            action="store_true",
+            help="Force use of CPU even if GPU is available"
+        )
+        model_group.add_argument(
             '--precision',
             dest='precision',
             type=str,
@@ -489,12 +498,25 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
-            '--nsfw_checker'
+            '--internet',
+            action=argparse.BooleanOptionalAction,
+            dest='internet_available',
+            default=True,
+            help='Indicate whether internet is available for just-in-time model downloading (default: probe automatically).',
+        )
+        model_group.add_argument(
+            '--nsfw_checker',
             '--safety_checker',
             action=argparse.BooleanOptionalAction,
             dest='safety_checker',
             default=False,
             help='Check for and blur potentially NSFW images. Use --no-nsfw_checker to disable.',
+        )
+        model_group.add_argument(
+            '--autoconvert',
+            default=None,
+            type=str,
+            help='Check the indicated directory for .ckpt weights files at startup and import as optimized diffuser models',
         )
         model_group.add_argument(
             '--patchmatch',
@@ -718,11 +740,15 @@ class Args(object):
             !NN retrieves the NNth command from the history
 
             *Model manipulation*
-            !models                                 -- list models in configs/models.yaml
-            !switch <model_name>                    -- switch to model named <model_name>
-            !import_model path/to/weights/file.ckpt -- adds a model to your config
-            !edit_model <model_name>                -- edit a model's description
-            !del_model <model_name>                 -- delete a model
+            !models                                   -- list models in configs/models.yaml
+            !switch <model_name>                      -- switch to model named <model_name>
+            !import_model /path/to/weights/file.ckpt  -- adds a .ckpt model to your config
+            !import_model http://path_to_model.ckpt   -- downloads and adds a .ckpt model to your config
+            !import_model hakurei/waifu-diffusion     -- downloads and adds a diffusers model to your config
+            !optimize_model <model_name>              -- converts a .ckpt model to a diffusers model
+            !convert_model /path/to/weights/file.ckpt -- converts a .ckpt file path to a diffusers model
+            !edit_model <model_name>                  -- edit a model's description
+            !del_model <model_name>                   -- delete a model
             """
         )
         render_group     = parser.add_argument_group('General rendering')
@@ -1061,7 +1087,7 @@ class Args(object):
         return parser
 
 def format_metadata(**kwargs):
-    print(f'format_metadata() is deprecated. Please use metadata_dumps()')
+    print('format_metadata() is deprecated. Please use metadata_dumps()')
     return metadata_dumps(kwargs)
 
 def metadata_dumps(opt,
@@ -1128,7 +1154,7 @@ def metadata_dumps(opt,
         rfc_dict.pop('strength')
 
     if len(seeds)==0 and opt.seed:
-        seeds=[seed]
+        seeds=[opt.seed]
 
     if opt.grid:
         images = []
@@ -1199,7 +1225,7 @@ def metadata_loads(metadata) -> list:
             opt = Args()
             opt._cmd_switches = Namespace(**image)
             results.append(opt)
-    except Exception as e:
+    except Exception:
         import sys, traceback
         print('>> could not read metadata',file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)

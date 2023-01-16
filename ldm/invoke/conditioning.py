@@ -16,9 +16,15 @@ from .prompt_parser import PromptParser, Blend, FlattenedPrompt, \
 from ..models.diffusion import cross_attention_control
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
+from ..modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
 
 def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
+
+    # lazy-load any deferred textual inversions.
+    # this might take a couple of seconds the first time a textual inversion is used.
+    model.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(prompt_string)
+
     prompt, negative_prompt = get_prompt_structure(prompt_string,
                                                    skip_normalize_legacy_blend=skip_normalize_legacy_blend)
     conditioning = _get_conditioning_for_prompt(prompt, negative_prompt, model, log_tokens)
@@ -216,7 +222,7 @@ def _get_conditioning_for_blend(model, blend: Blend, log_tokens: bool = False):
                                                                   log_display_label=f"(blend part {i + 1}, weight={blend.weights[i]})")
         embeddings_to_blend = this_embedding if embeddings_to_blend is None else torch.cat(
             (embeddings_to_blend, this_embedding))
-    conditioning = WeightedFrozenCLIPEmbedder.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
+    conditioning = WeightedPromptFragmentsToEmbeddingsConverter.apply_embedding_weights(embeddings_to_blend.unsqueeze(0),
                                                                       blend.weights,
                                                                       normalize=blend.normalize_weights)
     return conditioning
@@ -238,7 +244,7 @@ def _get_embeddings_and_tokens_for_prompt(model, flattened_prompt: FlattenedProm
 
 def _get_tokens_length(model, fragments: list[Fragment]):
     fragment_texts = [x.text for x in fragments]
-    tokens = model.cond_stage_model.get_tokens(fragment_texts, include_start_and_end_markers=False)
+    tokens = model.cond_stage_model.get_token_ids(fragment_texts, include_start_and_end_markers=False)
     return sum([len(x) for x in tokens])
 
 
