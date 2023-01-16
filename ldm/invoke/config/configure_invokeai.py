@@ -71,23 +71,30 @@ Config_preamble = '''# This file describes the alternative machine learning mode
 #--------------------------------------------
 def postscript(errors: None):
     if not any(errors):
-        message='''
+        message=f'''
 ** Model Installation Successful **
 
 You're all set!
 
-If you installed using one of the automated installation scripts,
-execute 'invoke.sh' (Linux/macOS) or 'invoke.bat' (Windows) to
-start InvokeAI.
+---
 
-If you installed manually, activate the 'invokeai' environment
-(e.g. 'conda activate invokeai'), then run one of the following
-commands to start InvokeAI.
+If you installed manually from source or with 'pip install': activate the virtual environment
+then run one of the following commands to start InvokeAI.
 
 Web UI:
-    python scripts/invoke.py --web # (connect to http://localhost:9090)
+   invoke.py --web # (connect to http://localhost:9090)
+   invoke.py --web --host 0.0.0.0 # (connect to http://your-lan-ip:9090 from another computer on the local network)
+
 Command-line interface:
-   python scripts/invoke.py
+   invoke.py
+
+---
+
+If you installed using an installation script, run:
+
+{Globals.root}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+
+Add the '--help' argument to see all of the command-line switches available for use.
 
 Have fun!
 '''
@@ -277,7 +284,7 @@ The license terms are located here:
             print(f"Login failed due to invalid token found in cache")
 
     if not (yes_to_all or token_found):
-        print(''' You may optionally enter your Huggingface token now. InvokeAI
+        print(f''' You may optionally enter your Huggingface token now. InvokeAI
 *will* work without it but you will not be able to automatically
 download some of the Hugging Face style concepts.  See
 https://invoke-ai.github.io/InvokeAI/features/CONCEPTS/#using-a-hugging-face-concept
@@ -285,8 +292,10 @@ for more information.
 
 Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
 
-Paste the token below using Ctrl-V on macOS/Linux, or Ctrl-Shift-V or right-click on Windows.
-Alternatively press 'Enter' to skip this step and continue.
+Paste the token below using {"Ctrl+Shift+V" if sys.platform == "linux" else "Command+V" if sys.platform == "darwin" else "Ctrl+V, right-click, or Edit>Paste"}.
+
+Alternatively, press 'Enter' to skip this step and continue.
+
 You may re-run the configuration script again in the future if you do not wish to set the token right now.
         ''')
         again = True

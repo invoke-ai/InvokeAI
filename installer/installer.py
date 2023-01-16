@@ -4,6 +4,7 @@ InvokeAI installer script
 
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import venv
@@ -160,9 +161,14 @@ class Installer:
 
         self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv)
 
+        # create the venv, install dependencies and the application
         self.instance.deploy(extra_index_url=get_torch_source())
 
+        # run the configuration flow
         self.instance.configure()
+
+        # install the launch/update scritps into the runtime directory
+        self.instance.install_user_scripts()
 
 
 class InvokeAiInstance:
@@ -206,7 +212,7 @@ class InvokeAiInstance:
         ### until we continuously build wheels
 
         import messages
-        from plumbum import local, FG
+        from plumbum import FG, local
 
         # pre-installing Torch because this is the most reliable way to ensure
         # the correct version gets installed.
@@ -253,7 +259,7 @@ class InvokeAiInstance:
         Install PyTorch
         """
 
-        from plumbum import local, FG
+        from plumbum import FG, local
 
         extra_index_url_arg = "--extra-index-url" if extra_index_url is not None else None
 
@@ -283,6 +289,19 @@ class InvokeAiInstance:
         from ldm.invoke.config import configure_invokeai
 
         configure_invokeai.main()
+
+    def install_user_scripts(self):
+        """
+        Copy the launch and update scripts to the runtime dir
+        """
+
+        ext = 'bat' if OS == 'Windows' else 'sh'
+
+        for script in ["invoke", "update"]:
+            src = Path(__file__).parent / "templates" / f"{script}.{ext}.in"
+            dest = self.runtime / f"{script}.{ext}"
+            shutil.copy (src, dest)
+            os.chmod(dest, 0o0755)
 
     def update(self):
         pass
