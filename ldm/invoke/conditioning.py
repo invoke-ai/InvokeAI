@@ -17,7 +17,7 @@ from ..models.diffusion import cross_attention_control
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
 from ..modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
-from ldm.invoke.devices import torch_dtype
+
 
 def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
 
@@ -238,6 +238,7 @@ def _get_embeddings_and_tokens_for_prompt(model, flattened_prompt: FlattenedProm
     if log_tokens:
         text = " ".join(fragments)
         log_tokenization(text, model, display_label=log_display_label)
+
     return embeddings, tokens
 
 
