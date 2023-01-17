@@ -5,7 +5,7 @@
 # two machines must share a common .cache directory.
 
 import warnings
-import configure_invokeai
+import ldm.invoke.configure_invokeai as configure_invokeai
 
 if __name__ == '__main__':
     configure_invokeai.main()

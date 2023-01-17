@@ -8,47 +8,49 @@ on:
       - 'ready_for_review'
       - 'opened'
       - 'synchronize'
-      - 'converted_to_draft'
 
 concurrency:
    group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
    cancel-in-progress: true
 
 jobs:
-  # fail_if_pull_request_is_draft:
-  #   if: github.event.pull_request.draft == true && github.head_ref != 'dev/diffusers'
-  #   runs-on: ubuntu-18.04
-  #   steps:
-  #   - name: Fails in order to indicate that pull request needs to be marked as ready to review and unit tests workflow needs to pass.
-  #     run: exit 1
   matrix:
-    if: github.event.pull_request.draft == false ||  github.head_ref == 'dev/diffusers'
+    if: github.event.pull_request.draft == false
     strategy:
       matrix:
         stable-diffusion-model:
           - stable-diffusion-1.5
-        requirements-file:
-          - requirements-lin-cuda.txt
-          - requirements-lin-amd.txt
-          - requirements-mac-mps-cpu.txt
-          - requirements-win-colab-cuda.txt
         python-version:
           # - '3.9'
           - '3.10'
+        pytorch:
+          - linux-cuda-11_7
+          - linux-rocm-5_2
+          # - linux-cpu
+          - macos-default
+          # - windows-cpu
+          - windows-cuda-11_7
         include:
-          - requirements-file: requirements-lin-cuda.txt
+          - pytorch: linux-cuda-11_7
             os: ubuntu-22.04
             github-env: $GITHUB_ENV
-          - requirements-file: requirements-lin-amd.txt
+          - pytorch: linux-rocm-5_2
             os: ubuntu-22.04
+            extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
             github-env: $GITHUB_ENV
-          - requirements-file: requirements-mac-mps-cpu.txt
+          # - pytorch: linux-cpu
+          #   os: ubuntu-22.04
+          #   extra-index-url: 'https://download.pytorch.org/whl/cpu'
+          - pytorch: macos
             os: macOS-12
             github-env: $GITHUB_ENV
-          - requirements-file: requirements-win-colab-cuda.txt
+          # - pytorch: windows-cpu
+          #   os: windows-2022
+          - pytorch: windows-cuda-11_7
             os: windows-2022
+            extra-index-url: 'https://download.pytorch.org/whl/cu117'
             github-env: $env:GITHUB_ENV
-    name: ${{ matrix.requirements-file }} on ${{ matrix.python-version }}
+    name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     env:
       INVOKE_MODEL_RECONFIGURE: '--yes'
@@ -96,28 +98,22 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
-      - name: create requirements.txt
-        run: cp 'environments-and-requirements/${{ matrix.requirements-file }}' '${{ matrix.requirements-file }}'
-
       - name: setup python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          # cache: 'pip'
-          # cache-dependency-path: ${{ matrix.requirements-file }}
 
-      - name: install dependencies
-        run: pip3 install --upgrade pip setuptools wheel
+      - name: install invokeai
+        run: pip3 install --use-pep517 .
+        env:
+          PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
 
-      - name: install requirements
-        run: pip3 install -r '${{ matrix.requirements-file }}'
-
-      - name: run configure_invokeai.py
+      - name: run configure_invokeai
         id: run-preload-models
         env:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
         run: >
-          configure_invokeai.py
+          configure_invokeai
           --yes
           --default_only
           --full-precision  # can't use fp16 weights without a GPU
@@ -131,7 +127,7 @@ jobs:
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
         run: >
-          python3 scripts/invoke.py
+          invoke
           --no-patchmatch
           --no-nsfw_checker
           --model ${{ matrix.stable-diffusion-model }}
@@ -144,5 +140,5 @@ jobs:
         if: matrix.os != 'windows-2022'
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ matrix.requirements-file }}_${{ matrix.python-version }}
+          name: results_${{ matrix.pytorch }}_${{ matrix.python-version }}
           path: ${{ env.INVOKEAI_ROOT }}/outputs
