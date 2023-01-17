@@ -198,6 +198,14 @@ def recommended_datasets()->dict:
     return datasets
 
 #---------------------------------------------
+def default_dataset()->dict:
+    datasets = dict()
+    for ds in Datasets.keys():
+        if Datasets[ds].get('default',False):
+            datasets[ds]=True
+    return datasets
+
+#---------------------------------------------
 def all_datasets()->dict:
     datasets = dict()
     for ds in Datasets.keys():
@@ -646,7 +654,7 @@ def download_weights(opt:dict) -> Union[str, None]:
     precision = 'float32' if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
 
     if opt.yes_to_all:
-        models = recommended_datasets()
+        models = default_dataset() if opt.default_only else recommended_datasets()
         access_token = authenticate(opt.yes_to_all)
         if len(models)>0:
             successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)
@@ -808,6 +816,9 @@ def main():
                         dest='yes_to_all',
                         action='store_true',
                         help='answer "yes" to all prompts')
+    parser.add_argument('--default_only',
+                        action='store_true',
+                        help='when --yes specified, only install the default model')
     parser.add_argument('--config_file',
                         '-c',
                         dest='config_file',
