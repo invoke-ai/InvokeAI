@@ -41,7 +41,7 @@ jobs:
           # - pytorch: linux-cpu
           #   os: ubuntu-22.04
           #   extra-index-url: 'https://download.pytorch.org/whl/cpu'
-          - pytorch: macos
+          - pytorch: macos-default
             os: macOS-12
             github-env: $GITHUB_ENV
           # - pytorch: windows-cpu
