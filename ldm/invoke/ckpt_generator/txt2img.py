@@ -72,16 +72,18 @@ class CkptTxt2Img(CkptGenerator):
         device         = self.model.device
         if self.use_mps_noise or device.type == 'mps':
             x = torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device='cpu').to(device)
+                             self.latent_channels,
+                             height // self.downsampling_factor,
+                             width  // self.downsampling_factor],
+                            dtype=self.torch_dtype(),
+                            device='cpu').to(device)
         else:
             x = torch.randn([1,
-                                self.latent_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device=device)
+                             self.latent_channels,
+                             height // self.downsampling_factor,
+                             width  // self.downsampling_factor],
+                            dtype=self.torch_dtype(),
+                            device=device)
         if self.perlin > 0.0:
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(width  // self.downsampling_factor, height // self.downsampling_factor)
         return x

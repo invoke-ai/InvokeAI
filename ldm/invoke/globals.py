@@ -43,6 +43,9 @@ Globals.always_use_cpu = False
 # The CLI will test connectivity at startup time.
 Globals.internet_available = True
 
+# whether we are forcing full precision
+Globals.full_precision = False
+
 def global_config_dir()->Path:
     return Path(Globals.root, Globals.config_dir)
 
