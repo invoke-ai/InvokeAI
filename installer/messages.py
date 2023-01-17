@@ -14,8 +14,8 @@ from rich.console import Console, Group
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.style import Style
-from rich.text import Text
 from rich.syntax import Syntax
+from rich.text import Text
 
 """
 INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${INVOKEAI_VERSION}.zip

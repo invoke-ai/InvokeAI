@@ -141,28 +141,30 @@ class Installer:
 
         pass
 
-    def install(self, path: str = "~/invokeai", version: str = "latest") -> None:
+    def install(self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False) -> None:
         """
         Install the InvokeAI application into the given runtime path
 
-        :param path: Destination path for the installation
-        :type path: str
+        :param root: Destination path for the installation
+        :type root: str
         :param version: InvokeAI version to install
         :type version: str
+        :param yes: Accept defaults to all questions
+        :type yes: bool
         """
 
         import messages
 
         messages.welcome()
 
-        self.dest = messages.dest_path(path)
+        self.dest = Path(root).expanduser().resolve() if yes_to_all else messages.dest_path(root)
 
         self.venv = self.app_venv()
 
         self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv)
 
         # create the venv, install dependencies and the application
-        self.instance.deploy(extra_index_url=get_torch_source())
+        self.instance.deploy(extra_index_url=get_torch_source() if not yes_to_all else None)
 
         # run the configuration flow
         self.instance.configure()
@@ -288,6 +290,9 @@ class InvokeAiInstance:
 
         from ldm.invoke.config import configure_invokeai
 
+        # NOTE: currently the config script does its own arg parsing! this means the command-line switches
+        # from the installer will also automatically propagate down to the config script.
+        # this may change in the future with config refactoring!
         configure_invokeai.main()
 
     def install_user_scripts(self):
