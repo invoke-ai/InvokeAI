@@ -761,7 +761,7 @@ class ModelManager(object):
         for model in legacy_locations:
             source = models_dir /model
             if source.exists():
-                print(f'DEBUG: Moving {models_dir / model} into hub')
+                print(f'** Moving {models_dir / model} into hub')
                 move(models_dir / model, hub)
 
         # anything else gets moved into the diffusers directory

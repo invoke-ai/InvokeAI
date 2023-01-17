@@ -111,7 +111,6 @@ class TextualInversionManager():
         if ti.trigger_token_id is not None:
             raise ValueError(f"Tokens already injected for textual inversion with trigger '{ti.trigger_string}'")
 
-        print(f'DEBUG: Injecting token {ti.trigger_string}')
         trigger_token_id = self._get_or_create_token_id_and_assign_embedding(ti.trigger_string, ti.embedding[0])
 
         if ti.embedding_vector_length > 1:
