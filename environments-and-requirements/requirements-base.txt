@@ -1,6 +1,7 @@
 # pip will resolve the version which matches torch
 albumentations
 diffusers==0.10.*
+dnspython==2.2.1
 einops
 eventlet
 facexlib
