@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - 'main'
-      - 'debug/dev/pyproject-toml'
   pull_request:
     types:
       - 'ready_for_review'
@@ -67,7 +66,6 @@ jobs:
       - name: set INVOKEAI_ROOT Windows
         if: runner.os == 'Windows'
         run: |
-          Get-PSDrive
           mkdir C:\InvokeAI
           echo "INVOKEAI_ROOT=C:\InvokeAI" >> ${{ matrix.github-env }}
 
@@ -87,12 +85,8 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' }}
         run: echo "TEST_PROMPTS=tests/preflight_prompts.txt" >> ${{ matrix.github-env }}
 
-      - name: set test prompt to development branch validation
-        if: ${{ github.ref == 'refs/heads/development' }}
-        run: echo "TEST_PROMPTS=tests/dev_prompts.txt" >> ${{ matrix.github-env }}
-
       - name: set test prompt to Pull Request validation
-        if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
+        if: ${{ github.ref != 'refs/heads/main' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: setup python
@@ -117,7 +111,6 @@ jobs:
 
       - name: Run the tests
         id: run-tests
-        if: runner.os != 'Windows'
         env:
           # Set offline mode to make sure configure preloaded successfully.
           HF_HUB_OFFLINE: 1
@@ -133,7 +126,6 @@ jobs:
 
       - name: Archive results
         id: archive-results
-        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v3
         with:
           name: results_${{ matrix.pytorch }}_${{ matrix.python-version }}
