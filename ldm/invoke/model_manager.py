@@ -142,7 +142,7 @@ class ModelManager(object):
         Return true if this is a legacy (.ckpt) model
         '''
         info = self.model_info(model_name)
-        if 'weights' in info and info['weights'].endswith('.ckpt'):
+        if 'weights' in info and info['weights'].endswith(('.ckpt','.safetensors')):
             return True
         return False
 
