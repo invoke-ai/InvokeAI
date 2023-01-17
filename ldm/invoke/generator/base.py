@@ -8,6 +8,7 @@ import os
 import os.path as osp
 import random
 import traceback
+from contextlib import nullcontext
 
 import cv2
 import numpy as np
@@ -18,11 +19,8 @@ from einops import rearrange
 from pytorch_lightning import seed_everything
 from tqdm import trange
 
-from ldm.invoke.devices import choose_autocast
-from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ldm.models.diffusion.ddpm import DiffusionWrapper
 from ldm.util import rand_perlin_2d
-from contextlib import nullcontext
 
 downsampling = 8
 CAUTION_IMG = 'assets/caution.png'
