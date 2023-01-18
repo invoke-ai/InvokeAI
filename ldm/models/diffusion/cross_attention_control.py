@@ -2,12 +2,14 @@ import enum
 import math
 from typing import Optional, Callable
 
+import diffusers
 import psutil
 import torch
-import diffusers
-from torch import nn
 from diffusers.models.unet_2d_condition import UNet2DConditionModel
+from torch import nn
+
 from ldm.invoke.devices import torch_dtype
+
 
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
@@ -182,6 +184,9 @@ class InvokeAICrossAttentionMixin:
     through both to an attention_slice_wrangler and a slicing_strategy_getter for custom attention map wrangling
     and dymamic slicing strategy selection.
     """
+    upcast_attention = False
+    upcast_softmax = False
+
     def __init__(self):
         self.mem_total_gb = psutil.virtual_memory().total // (1 << 30)
         self.attention_slice_wrangler = None
@@ -210,6 +215,10 @@ class InvokeAICrossAttentionMixin:
         self.attention_slice_calculated_callback = callback
 
     def einsum_lowest_level(self, query, key, value, dim, offset, slice_size):
+        dtype = query.dtype
+        if self.upcast_attention:
+            query = query.float()
+            key = key.float()
         # calculate attention scores
         #attention_scores = torch.einsum('b i d, b j d -> b i j', q, k)
         attention_scores = torch.baddbmm(
@@ -221,7 +230,10 @@ class InvokeAICrossAttentionMixin:
         )
 
         # calculate attention slice by taking the best scores for each latent pixel
-        default_attention_slice = attention_scores.softmax(dim=-1, dtype=attention_scores.dtype)
+        if self.upcast_softmax:
+            attention_scores = attention_scores.float()
+        default_attention_slice = attention_scores.softmax(dim=-1).to(dtype=dtype)
+
         attention_slice_wrangler = self.attention_slice_wrangler
         if attention_slice_wrangler is not None:
             attention_slice = attention_slice_wrangler(self, default_attention_slice, dim, offset, slice_size)
