@@ -18,19 +18,23 @@ jobs:
     if: github.event.pull_request.draft == false
     strategy:
       matrix:
-        stable-diffusion-model:
-          - stable-diffusion-1.5
         python-version:
           # - '3.9'
           - '3.10'
         pytorch:
+          - linux-cuda-11_6
           - linux-cuda-11_7
           - linux-rocm-5_2
-          # - linux-cpu
+          - linux-cpu
           - macos-default
-          - windows-cpu
+          # - windows-cpu
+          - windows-cuda-11_6
           # - windows-cuda-11_7
         include:
+          - pytorch: linux-cuda-11_6
+            os: ubuntu-22.04
+            extra-index-url: 'https://download.pytorch.org/whl/cu116'
+            github-env: $GITHUB_ENV
           - pytorch: linux-cuda-11_7
             os: ubuntu-22.04
             github-env: $GITHUB_ENV
@@ -38,15 +42,19 @@ jobs:
             os: ubuntu-22.04
             extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
             github-env: $GITHUB_ENV
-          # - pytorch: linux-cpu
-          #   os: ubuntu-22.04
-          #   extra-index-url: 'https://download.pytorch.org/whl/cpu'
-          #   github-env: $GITHUB_ENV
+          - pytorch: linux-cpu
+            os: ubuntu-22.04
+            extra-index-url: 'https://download.pytorch.org/whl/cpu'
+            github-env: $GITHUB_ENV
           - pytorch: macos-default
             os: macOS-12
             github-env: $GITHUB_ENV
-          - pytorch: windows-cpu
+          # - pytorch: windows-cpu
+          #   os: windows-2022
+          #   github-env: $env:GITHUB_ENV
+          - pytorch: windows-cuda-11_6
             os: windows-2022
+            extra-index-url: 'https://download.pytorch.org/whl/cu116'
             github-env: $env:GITHUB_ENV
           # - pytorch: windows-cuda-11_7
           #   os: windows-2022
@@ -54,32 +62,27 @@ jobs:
           #   github-env: $env:GITHUB_ENV
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
-    env:
-      INVOKEAI_ROOT: ${{ github.workspace }}
-      INVOKE_MODEL_RECONFIGURE: '--yes'
-      PYTHONUNBUFFERED: 1
     steps:
       - name: Checkout sources
         id: checkout-sources
         uses: actions/checkout@v3
 
-      - name: set INVOKEAI_ROOT Windows
-        if: runner.os == 'Windows'
-        run: |
-          mkdir C:\InvokeAI
-          echo "INVOKEAI_ROOT=C:\InvokeAI" >> ${{ matrix.github-env }}
-
-      - name: Use Cached diffusers-1.5
-        id: cache-sd-model
-        uses: actions/cache@v3
-        env:
-          cache-name: huggingface-${{ matrix.stable-diffusion-model }}
+      - name: setup python
+        uses: actions/setup-python@v4
         with:
-          path: |
-            ${{ env.INVOKEAI_ROOT }}/models/runwayml
-            ${{ env.INVOKEAI_ROOT }}/models/stabilityai
-            ${{ env.INVOKEAI_ROOT }}/models/CompVis
-          key: ${{ env.cache-name }}
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set Cache-Directory Windows
+        if: runner.os == 'Windows'
+        id: set-cache-dir-windows
+        run: |
+          echo "CACHE_DIR=$HOME\invokeai\models" >> ${{ matrix.github-env }}
+          echo "PIP_NO_CACHE_DIR=1" >> ${{ matrix.github-env }}
+
+      - name: Set Cache-Directory others
+        if: runner.os != 'Windows'
+        id: set-cache-dir-others
+        run: echo "CACHE_DIR=$HOME/invokeai/models" >> ${{ matrix.github-env }}
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -89,15 +92,20 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
-      - name: setup python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: install invokeai
-        run: pip3 install --use-pep517 .
+        run: pip3 install --use-pep517 -e .
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
+
+      - name: Use Cached models
+        id: cache-sd-model
+        uses: actions/cache@v3
+        env:
+          cache-name: huggingface-models
+        with:
+          path: ${{ env.CACHE_DIR }}
+          key: ${{ env.cache-name }}
+          enableCrossOsArchive: true
 
       - name: run configure_invokeai
         id: run-preload-models
@@ -107,22 +115,21 @@ jobs:
           configure_invokeai
           --yes
           --default_only
-          --full-precision  # can't use fp16 weights without a GPU
+          --full-precision
+        # can't use fp16 weights without a GPU
 
       - name: Run the tests
         id: run-tests
-        env:
-          # Set offline mode to make sure configure preloaded successfully.
-          HF_HUB_OFFLINE: 1
-          HF_DATASETS_OFFLINE: 1
-          TRANSFORMERS_OFFLINE: 1
+        # env:
+        #   # Set offline mode to make sure configure preloaded successfully.
+        #   HF_HUB_OFFLINE: 1
+        #   HF_DATASETS_OFFLINE: 1
+        #   TRANSFORMERS_OFFLINE: 1
         run: >
           invoke
           --no-patchmatch
           --no-nsfw_checker
-          --model ${{ matrix.stable-diffusion-model }}
           --from_file ${{ env.TEST_PROMPTS }}
-          --root="${{ env.INVOKEAI_ROOT }}"
 
       - name: Archive results
         id: archive-results
