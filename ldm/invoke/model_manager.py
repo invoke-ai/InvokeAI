@@ -759,7 +759,7 @@ class ModelManager(object):
 
         # transformer files get moved into the hub directory
         if cls._is_huggingface_hub_directory_present():
-            hub = global_cache_dir() / 'hub'
+            hub = global_cache_dir('hub')
         else:
             hub = models_dir / 'hub'
 
@@ -776,7 +776,7 @@ class ModelManager(object):
 
         # anything else gets moved into the diffusers directory
         if cls._is_huggingface_hub_directory_present():
-            diffusers = global_cache_dir() / 'diffusers'
+            diffusers = global_cache_dir('diffusers')
         else:
             diffusers = models_dir / 'diffusers'
 
