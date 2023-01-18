@@ -613,8 +613,6 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
             description = model_description):
         print('** model failed to import')
         return None
-    if input('Make this the default model? [n] ').startswith(('y','Y')):
-        manager.set_default_model(model_name)
     return model_name
 
 def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
@@ -647,8 +645,6 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
         print('** model failed to import')
         return None
 
-    if input('Make this the default model? [n] ').startswith(('y','Y')):
-        manager.set_model_default(model_name)
     return model_name
 
 def _verify_load(model_name:str, gen)->bool:
@@ -725,6 +721,9 @@ def del_config(model_name:str, gen, opt, completer):
     current_model = gen.model_name
     if model_name == current_model:
         print("** Can't delete active model. !switch to another model first. **")
+        return
+    if model_name not in gen.model_manager.config:
+        print(f"** Unknown model {model_name}")
         return
     gen.model_manager.del_model(model_name)
     gen.model_manager.commit(opt.conf)

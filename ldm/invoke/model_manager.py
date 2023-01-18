@@ -230,6 +230,9 @@ class ModelManager(object):
         Delete the named model.
         '''
         omega = self.config
+        if model_name not in omega:
+            print(f'** Unknown model {model_name}')
+            return
         del omega[model_name]
         if model_name in self.stack:
             self.stack.remove(model_name)
@@ -253,9 +256,8 @@ class ModelManager(object):
 
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
 
-        if model_name not in omega:
-            omega[model_name] = dict()
-        OmegaConf.update(omega,model_name,model_attributes,merge=False)
+        omega[model_name] = model_attributes
+        
         if 'weights' in omega[model_name]:
             omega[model_name]['weights'].replace('\\','/')
 
@@ -759,16 +761,20 @@ class ModelManager(object):
 
         print('** Legacy version <= 2.2.5 model directory layout detected. Reorganizing.')
         print('** This is a quick one-time operation.')
-        from shutil import move
+        from shutil import move, rmtree
         
         # transformer files get moved into the hub directory
         hub = models_dir / 'hub'
         os.makedirs(hub, exist_ok=True)
         for model in legacy_locations:
-            source = models_dir /model
+            source = models_dir / model
+            dest = hub / model.stem
+            print(f'** {source} => {dest}')
             if source.exists():
-                print(f'** Moving {models_dir / model} into hub')
-                move(models_dir / model, hub)
+                if dest.exists():
+                    rmtree(source)
+                else:
+                    move(source, dest)
 
         # anything else gets moved into the diffusers directory
         diffusers = models_dir / 'diffusers'
@@ -779,7 +785,12 @@ class ModelManager(object):
                 if full_path.is_relative_to(hub) or full_path.is_relative_to(diffusers):
                     continue
                 if Path(dir).match('models--*--*'):
-                    move(full_path,diffusers)
+                    dest = diffusers / dir
+                    print(f'** {full_path} => {dest}')
+                    if dest.exists():
+                        rmtree(full_path)
+                    else:
+                        move(full_path,dest)
 
         # now clean up by removing any empty directories
         empty = [root for root, dirs, files, in os.walk(models_dir) if not len(dirs) and not len(files)]
