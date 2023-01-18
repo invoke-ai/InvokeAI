@@ -351,7 +351,7 @@ class ModelManager(object):
 
         if self.precision == 'float16':
             print('   | Using faster float16 precision')
-            model.to(torch.float16)
+            model = model.to(torch.float16)
         else:
             print('   | Using more accurate float32 precision')
 

@@ -29,7 +29,7 @@ from ldm.invoke.concepts_lib import HuggingFaceConceptsLibrary
 from ldm.invoke.conditioning import get_uc_and_c_and_ec
 from ldm.invoke.devices import choose_torch_device, choose_precision
 from ldm.invoke.generator.inpaint import infill_methods
-from ldm.invoke.globals import global_cache_dir
+from ldm.invoke.globals import global_cache_dir, Globals
 from ldm.invoke.image_util import InitImageResizer
 from ldm.invoke.model_manager import ModelManager
 from ldm.invoke.pngwriter import PngWriter
@@ -201,6 +201,7 @@ class Generate:
             self.precision = 'float32'
         if self.precision == 'auto':
             self.precision = choose_precision(self.device)
+        Globals.full_precision = self.precision=='float32'
 
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
