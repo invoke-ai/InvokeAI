@@ -90,9 +90,9 @@ class Txt2Img2Img(Generator):
     def get_noise_like(self, like: torch.Tensor):
         device = like.device
         if device.type == 'mps':
-            x = torch.randn_like(like, device='cpu').to(device)
+            x = torch.randn_like(like, device='cpu', dtype=self.torch_dtype()).to(device)
         else:
-            x = torch.randn_like(like, device=device)
+            x = torch.randn_like(like, device=device, dtype=self.torch_dtype())
         if self.perlin > 0.0:
             shape = like.shape
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(shape[3], shape[2])
@@ -117,10 +117,12 @@ class Txt2Img2Img(Generator):
                                 self.latent_channels,
                                 scaled_height // self.downsampling_factor,
                                 scaled_width  // self.downsampling_factor],
-                                device='cpu').to(device)
+                               dtype=self.torch_dtype(),
+                               device='cpu').to(device)
         else:
             return torch.randn([1,
                                 self.latent_channels,
                                 scaled_height // self.downsampling_factor,
                                 scaled_width  // self.downsampling_factor],
-                                device=device)
+                               dtype=self.torch_dtype(),
+                               device=device)
