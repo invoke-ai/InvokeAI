@@ -4,7 +4,7 @@ import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 
 from ldm.modules.textual_inversion_manager import TextualInversionManager
-
+from ldm.invoke.devices import torch_dtype
 
 class WeightedPromptFragmentsToEmbeddingsConverter():
 
@@ -207,7 +207,7 @@ class WeightedPromptFragmentsToEmbeddingsConverter():
         per_token_weights += [1.0] * pad_length
 
         all_token_ids_tensor = torch.tensor(all_token_ids, dtype=torch.long, device=device)
-        per_token_weights_tensor = torch.tensor(per_token_weights, dtype=torch.float32, device=device)
+        per_token_weights_tensor = torch.tensor(per_token_weights, dtype=torch_dtype(self.text_encoder.device), device=device)
         #print(f"assembled all_token_ids_tensor with shape {all_token_ids_tensor.shape}")
         return all_token_ids_tensor, per_token_weights_tensor
 

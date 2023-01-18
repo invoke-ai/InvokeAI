@@ -217,7 +217,7 @@ manager, please follow these steps:
 
     !!! tip
 
-    Do not move the source code repository after installation. The virtual environment directory has absolute paths in it that get confused if the directory is moved.
+        Do not move the source code repository after installation. The virtual environment directory has absolute paths in it that get confused if the directory is moved.
 
 ---
 

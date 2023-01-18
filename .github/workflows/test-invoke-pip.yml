@@ -119,6 +119,7 @@ jobs:
         run: >
           configure_invokeai.py
           --yes
+          --default_only
           --full-precision  # can't use fp16 weights without a GPU
 
       - name: Run the tests
