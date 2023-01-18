@@ -8,6 +8,7 @@ from threading import Thread
 from urllib import request
 from tqdm import tqdm
 from pathlib import Path
+from ldm.invoke.devices import torch_dtype
 
 import numpy as np
 import torch
@@ -235,7 +236,8 @@ def rand_perlin_2d(shape, res, device, fade = lambda t: 6*t**5 - 15*t**4 + 10*t*
     n01 = dot(tile_grads([0, -1],[1, None]), [0, -1]).to(device)
     n11 = dot(tile_grads([1, None], [1, None]), [-1,-1]).to(device)
     t = fade(grid[:shape[0], :shape[1]])
-    return math.sqrt(2) * torch.lerp(torch.lerp(n00, n10, t[..., 0]), torch.lerp(n01, n11, t[..., 0]), t[..., 1]).to(device)
+    noise = math.sqrt(2) * torch.lerp(torch.lerp(n00, n10, t[..., 0]), torch.lerp(n01, n11, t[..., 0]), t[..., 1]).to(device)
+    return noise.to(dtype=torch_dtype(device))
 
 def ask_user(question: str, answers: list):
     from itertools import chain, repeat

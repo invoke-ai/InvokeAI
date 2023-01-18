@@ -36,10 +36,9 @@ class Txt2Img(Generator):
                 threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
-
         def make_image(x_T) -> PIL.Image.Image:
             pipeline_output = pipeline.image_from_embeddings(
-                latents=torch.zeros_like(x_T),
+                latents=torch.zeros_like(x_T,dtype=self.torch_dtype()),
                 noise=x_T,
                 num_inference_steps=steps,
                 conditioning_data=conditioning_data,
@@ -59,16 +58,18 @@ class Txt2Img(Generator):
         input_channels = min(self.latent_channels, 4)
         if self.use_mps_noise or device.type == 'mps':
             x = torch.randn([1,
-                                input_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device='cpu').to(device)
+                             input_channels,
+                             height // self.downsampling_factor,
+                             width  // self.downsampling_factor],
+                            dtype=self.torch_dtype(),
+                            device='cpu').to(device)
         else:
             x = torch.randn([1,
-                                input_channels,
-                                height // self.downsampling_factor,
-                                width  // self.downsampling_factor],
-                               device=device)
+                             input_channels,
+                             height // self.downsampling_factor,
+                             width  // self.downsampling_factor],
+                            dtype=self.torch_dtype(),
+                            device=device)
         if self.perlin > 0.0:
             x = (1-self.perlin)*x + self.perlin*self.get_perlin_noise(width  // self.downsampling_factor, height // self.downsampling_factor)
         return x

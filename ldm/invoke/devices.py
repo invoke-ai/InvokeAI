@@ -21,10 +21,19 @@ def choose_precision(device) -> str:
             return 'float16'
     return 'float32'
 
+def torch_dtype(device) -> torch.dtype:
+    if Globals.full_precision:
+        return torch.float32
+    if choose_precision(device) == 'float16':
+        return torch.float16
+    else:
+        return torch.float32
+
 def choose_autocast(precision):
     '''Returns an autocast context or nullcontext for the given precision string'''
     # float16 currently requires autocast to avoid errors like:
     # 'expected scalar type Half but found Float'
+    print(f'DEBUG: choose_autocast() called')
     if precision == 'autocast' or precision == 'float16':
         return autocast
     return nullcontext
