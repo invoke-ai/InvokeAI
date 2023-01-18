@@ -89,6 +89,7 @@ class InvokeAIDiffuserComponent:
                                 conditioning: Union[torch.Tensor,dict],
                                 unconditional_guidance_scale: float,
                                 step_index: Optional[int]=None,
+                                total_step_count: Optional[int]=None,
                                 threshold: Optional[ThresholdSettings]=None,
                           ):
         """
@@ -106,7 +107,15 @@ class InvokeAIDiffuserComponent:
         cross_attention_control_types_to_do = []
         context: Context = self.cross_attention_control_context
         if self.cross_attention_control_context is not None:
-            percent_through = self.estimate_percent_through(step_index, sigma)
+            if step_index is not None and total_step_count is not None:
+                # 🧨diffusers codepath
+                percent_through = step_index / total_step_count  # will never reach 1.0 - this is deliberate
+            else:
+                # legacy compvis codepath
+                # TODO remove when compvis codepath support is dropped
+                if step_index is None and sigma is None:
+                    raise ValueError(f"Either step_index or sigma is required when doing cross attention control, but both are None.")
+                percent_through = self.estimate_percent_through(step_index, sigma)
             cross_attention_control_types_to_do = context.get_active_cross_attention_control_types_for_step(percent_through)
 
         wants_cross_attention_control = (len(cross_attention_control_types_to_do) > 0)
