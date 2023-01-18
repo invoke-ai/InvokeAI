@@ -146,7 +146,7 @@ class Generate:
             gfpgan=None,
             codeformer=None,
             esrgan=None,
-            free_gpu_mem=False,
+            free_gpu_mem: bool=False,
             safety_checker:bool=False,
             max_loaded_models:int=2,
             # these are deprecated; if present they override values in the conf file
@@ -534,6 +534,7 @@ class Generate:
                 inpaint_height = inpaint_height,
                 inpaint_width = inpaint_width,
                 enable_image_debugging = enable_image_debugging,
+                free_gpu_mem=self.free_gpu_mem,
             )
 
             if init_color:
