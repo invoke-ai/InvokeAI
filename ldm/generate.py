@@ -460,10 +460,13 @@ class Generate:
         init_image = None
         mask_image = None
 
-
-        if self.free_gpu_mem and self.model.cond_stage_model.device != self.model.device:
-            self.model.cond_stage_model.device = self.model.device
-            self.model.cond_stage_model.to(self.model.device)
+        try:
+            if self.free_gpu_mem and self.model.cond_stage_model.device != self.model.device:
+                self.model.cond_stage_model.device = self.model.device
+                self.model.cond_stage_model.to(self.model.device)
+        except AttributeError:
+            print(">> Warning: '--free_gpu_mem' is not yet supported when generating image using model based on HuggingFace Diffuser.")
+            pass
 
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
