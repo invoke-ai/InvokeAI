@@ -38,7 +38,6 @@ from ldm.util import instantiate_from_config, ask_user
 DEFAULT_MAX_MODELS=2
 VAE_TO_REPO_ID = { # hack, see note in convert_and_import()
     'vae-ft-mse-840000-ema-pruned':  'stabilityai/sd-vae-ft-mse',
-    'autoencoder_fix_kl-f8-trinart_characters': 'stabilityai/sd-vae-ft-mse',
     }
 
 class ModelManager(object):
@@ -242,8 +241,8 @@ class ModelManager(object):
         # save these for use in deletion later
         conf = omega[model_name]
         repo_id = conf.get('repo_id',None)
-        path = self._relativize(conf.get('path',None))
-        weights = self._relativize(conf.get('weights',None))
+        path = self._abs_path(conf.get('path',None))
+        weights = self._abs_path(conf.get('weights',None))
 
         del omega[model_name]
         if model_name in self.stack:
@@ -658,7 +657,7 @@ class ModelManager(object):
 
     def convert_and_import(self,
                            ckpt_path:Path,
-                           diffuser_path:Path,
+                           diffusers_path:Path,
                            model_name=None,
                            model_description=None,
                            commit_to_conf:Path=None,
@@ -670,49 +669,54 @@ class ModelManager(object):
         new_config = None
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
         import transformers
-        if diffuser_path.exists():
-            print(f'ERROR: The path {str(diffuser_path)} already exists. Please move or remove it and try again.')
+        if diffusers_path.exists():
+            print(f'ERROR: The path {str(diffusers_path)} already exists. Please move or remove it and try again.')
             return
 
-        model_name = model_name or diffuser_path.name
+        model_name = model_name or diffusers_path.name
         model_description = model_description or 'Optimized version of {model_name}'
         print(f'>> Optimizing {model_name} (30-60s)')
         try:
             verbosity =transformers.logging.get_verbosity()
             transformers.logging.set_verbosity_error()
-            convert_ckpt_to_diffuser(ckpt_path, diffuser_path,extract_ema=True)
+            convert_ckpt_to_diffuser(ckpt_path, diffusers_path,extract_ema=True)
             transformers.logging.set_verbosity(verbosity)
-            print(f'>> Success. Optimized model is now located at {str(diffuser_path)}')
+            print(f'>> Success. Optimized model is now located at {str(diffusers_path)}')
             print(f'>> Writing new config file entry for {model_name}')
             new_config = dict(
-                path=str(diffuser_path),
+                path=str(diffusers_path),
                 description=model_description,
                 format='diffusers',
             )
 
-            # HACK (LS): in the event that the original entry had a custom ckpt VAE, we try to
-            # map that VAE onto a diffuser VAE using a hard-coded dictionary. This is not the
-            # preferred way to do it. Instead we should should load the model into memory,
-            # adding the VAE to the first_stage_model, and let the conversion function copy
-            # the VAE into the new model. However, the simple implementation of this, which
-            # uses _load_ckpt_model() method, causes the conversion to error out with
-            # KeyError: 'time_embed.0.weight'
-            if model_name in self.config and (vae_ckpt := self.model_info(model_name)['vae']):
-                basename = Path(vae_ckpt).stem
-                if (diffusers_vae := VAE_TO_REPO_ID.get(basename,None)):
-                    print(f'>> Adding VAE entry {diffusers_vae}')
+            # HACK (LS): in the event that the original entry is using a custom ckpt VAE, we try to
+            # map that VAE onto a diffuser VAE using a hard-coded dictionary.
+            # I would prefer to do this differently: We load the ckpt model into memory, swap the
+            # VAE in memory, and then pass that to convert_ckpt_to_diffuser() so that the swapped
+            # VAE is built into the model. However, when I tried this I got obscure key errors.
+            if model_name in self.config and (vae_ckpt_path := self.model_info(model_name)['vae']):
+                vae_basename = Path(vae_ckpt_path).stem
+                diffusers_vae = None
+                if (diffusers_vae := VAE_TO_REPO_ID.get(vae_basename,None)):
+                    print(f'>> {vae_basename} VAE corresponds to known {diffusers_vae} diffusers version')
                     new_config.update(
                         vae = {'repo_id': diffusers_vae}
                     )
+                else:
+                    print(f'** Custom VAE "{vae_basename}" found, but corresponding diffusers model unknown')
+                    print(f'** Using "stabilityai/sd-vae-ft-mse"; If this isn\'t right, please edit the model config')
+                    new_config.update(
+                        vae = {'repo_id': 'stabilityai/sd-vae-ft-mse'}
+                    )
+
             self.del_model(model_name)
             self.add_model(model_name, new_config, True)
             if commit_to_conf:
                 self.commit(commit_to_conf)
+            print('>> Conversion succeeded')
         except Exception as e:
             print(f'** Conversion failed: {str(e)}')
-            traceback.print_exc()
 
-        print('>> Conversion succeeded')
         return new_config
 
     def search_models(self, search_folder):
@@ -1027,7 +1031,7 @@ class ModelManager(object):
         strategy.execute()
 
     @staticmethod
-    def _relativize(path:Union(str,Path))->Path:
+    def _abs_path(path:Union(str,Path))->Path:
         if path is None or Path(path).is_absolute():
             return path
         return Path(Globals.root,path).resolve()
