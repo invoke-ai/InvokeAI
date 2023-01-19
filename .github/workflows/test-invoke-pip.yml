@@ -27,9 +27,9 @@ jobs:
           - linux-rocm-5_2
           - linux-cpu
           - macos-default
-          # - windows-cpu
+          - windows-cpu
           - windows-cuda-11_6
-          # - windows-cuda-11_7
+          - windows-cuda-11_7
         include:
           - pytorch: linux-cuda-11_6
             os: ubuntu-22.04
@@ -49,17 +49,17 @@ jobs:
           - pytorch: macos-default
             os: macOS-12
             github-env: $GITHUB_ENV
-          # - pytorch: windows-cpu
-          #   os: windows-2022
-          #   github-env: $env:GITHUB_ENV
+          - pytorch: windows-cpu
+            os: windows-2022
+            github-env: $env:GITHUB_ENV
           - pytorch: windows-cuda-11_6
             os: windows-2022
             extra-index-url: 'https://download.pytorch.org/whl/cu116'
             github-env: $env:GITHUB_ENV
-          # - pytorch: windows-cuda-11_7
-          #   os: windows-2022
-          #   extra-index-url: 'https://download.pytorch.org/whl/cu117'
-          #   github-env: $env:GITHUB_ENV
+          - pytorch: windows-cuda-11_7
+            os: windows-2022
+            extra-index-url: 'https://download.pytorch.org/whl/cu117'
+            github-env: $env:GITHUB_ENV
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -119,12 +119,13 @@ jobs:
         # can't use fp16 weights without a GPU
 
       - name: Run the tests
+        if: runner.os != 'Windows'
         id: run-tests
-        # env:
-        #   # Set offline mode to make sure configure preloaded successfully.
-        #   HF_HUB_OFFLINE: 1
-        #   HF_DATASETS_OFFLINE: 1
-        #   TRANSFORMERS_OFFLINE: 1
+        env:
+          # Set offline mode to make sure configure preloaded successfully.
+          HF_HUB_OFFLINE: 1
+          HF_DATASETS_OFFLINE: 1
+          TRANSFORMERS_OFFLINE: 1
         run: >
           invoke
           --no-patchmatch
