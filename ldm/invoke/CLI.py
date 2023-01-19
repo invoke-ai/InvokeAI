@@ -124,7 +124,7 @@ def main():
     # preload the model
     try:
         gen.load_model()
-    except KeyError as e:
+    except KeyError:
         pass
     except Exception as e:
         report_model_error(opt, e)
@@ -589,7 +589,7 @@ def import_model(model_path:str, gen, opt, completer):
         gen.model_manager.del_model(model_name)
         return
     
-    if input('Make this the default model? [n] ') in ('y','Y'):
+    if input('Make this the default model? [n] ').strip() in ('y','Y'):
         gen.model_manager.set_default_model(model_name)
 
     gen.model_manager.commit(opt.conf)
@@ -606,10 +606,14 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
         model_name=default_name,
         model_description=default_description
     )
+    vae = None
+    if input('Replace this model\'s VAE with "stabilityai/sd-vae-ft-se"? [n] ').strip() in ('y','Y'):
+        vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
 
     if not manager.import_diffuser_model(
             path_or_repo,
             model_name = model_name,
+            vae = vae,
             description = model_description):
         print('** model failed to import')
         return None
@@ -627,17 +631,28 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
     )
     config_file = None
     default = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
+
     completer.complete_extensions(('.yaml','.yml'))
     completer.set_line(str(default))
     done = False
     while not done:
         config_file = input('Configuration file for this model: ').strip()
         done = os.path.exists(config_file)
+
+    completer.complete_extensions(('.ckpt','.safetensors'))
+    vae = None
+    default = Path(Globals.root,'models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt')
+    completer.set_line(str(default))
+    done = False
+    while not done:
+        vae = input('VAE file for this model (leave blank for none): ').strip() or None
+        done = (not vae) or os.path.exists(vae)
     completer.complete_extensions(None)
 
     if not manager.import_ckpt_model(
             path_or_url,
             config = config_file,
+            vae = vae,
             model_name = model_name,
             model_description = model_description,
             commit_to_conf = opt.conf,
@@ -709,7 +724,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
         return
 
     completer.update_models(gen.model_manager.list_models())
-    if input(f'Load optimized model {model_name}? [y] ') not in ('n','N'):
+    if input(f'Load optimized model {model_name}? [y] ').strip() not in ('n','N'):
         gen.set_model(model_name)
 
     response = input(f'Delete the original .ckpt file at ({ckpt_path} ? [n] ')
@@ -725,17 +740,17 @@ def del_config(model_name:str, gen, opt, completer):
     if model_name not in gen.model_manager.config:
         print(f"** Unknown model {model_name}")
         return
-    gen.model_manager.del_model(model_name)
+
+    if input(f'Remove {model_name} from the list of models known to InvokeAI? [y] ').strip().startswith(('n','N')):
+        return
+    
+    delete_completely = input('Completely remove the model file or directory from disk? [n] ').startswith(('y','Y'))
+    gen.model_manager.del_model(model_name,delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
     print(f'** {model_name} deleted')
     completer.update_models(gen.model_manager.list_models())
 
 def edit_model(model_name:str, gen, opt, completer):
-    current_model = gen.model_name
-#    if model_name == current_model:
-#        print("** Can't edit the active model. !switch to another model first. **")
-#        return
-
     manager = gen.model_manager
     if not (info := manager.model_info(model_name)):
         print(f'** Unknown model {model_name}')
