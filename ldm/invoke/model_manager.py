@@ -36,6 +36,10 @@ from ldm.invoke.globals import Globals, global_models_dir, global_autoscan_dir, 
 from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
+VAE_TO_REPO_ID = { # hack, see note in convert_and_import()
+    'vae-ft-mse-840000-ema-pruned':  'stabilityai/sd-vae-ft-mse',
+    'autoencoder_fix_kl-f8-trinart_characters': 'stabilityai/sd-vae-ft-mse',
+    }
 
 class ModelManager(object):
     def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
@@ -672,19 +676,34 @@ class ModelManager(object):
 
         model_name = model_name or diffuser_path.name
         model_description = model_description or 'Optimized version of {model_name}'
-        print(f'>> {model_name}: optimizing (30-60s).')
+        print(f'>> Optimizing {model_name} (30-60s)')
         try:
             verbosity =transformers.logging.get_verbosity()
             transformers.logging.set_verbosity_error()
             convert_ckpt_to_diffuser(ckpt_path, diffuser_path,extract_ema=True)
             transformers.logging.set_verbosity(verbosity)
             print(f'>> Success. Optimized model is now located at {str(diffuser_path)}')
-            print(f'>> Writing new config file entry for {model_name}...',end='')
+            print(f'>> Writing new config file entry for {model_name}')
             new_config = dict(
                 path=str(diffuser_path),
                 description=model_description,
                 format='diffusers',
             )
+
+            # HACK (LS): in the event that the original entry had a custom ckpt VAE, we try to
+            # map that VAE onto a diffuser VAE using a hard-coded dictionary. This is not the
+            # preferred way to do it. Instead we should should load the model into memory,
+            # adding the VAE to the first_stage_model, and let the conversion function copy
+            # the VAE into the new model. However, the simple implementation of this, which
+            # uses _load_ckpt_model() method, causes the conversion to error out with
+            # KeyError: 'time_embed.0.weight'
+            if model_name in self.config and (vae_ckpt := self.model_info(model_name)['vae']):
+                basename = Path(vae_ckpt).stem
+                if (diffusers_vae := VAE_TO_REPO_ID.get(basename,None)):
+                    print(f'>> Adding VAE entry {diffusers_vae}')
+                    new_config.update(
+                        vae = {'repo_id': diffusers_vae}
+                    )
             self.del_model(model_name)
             self.add_model(model_name, new_config, True)
             if commit_to_conf:
@@ -693,7 +712,7 @@ class ModelManager(object):
             print(f'** Conversion failed: {str(e)}')
             traceback.print_exc()
 
-        print('done.')
+        print('>> Conversion succeeded')
         return new_config
 
     def search_models(self, search_folder):
