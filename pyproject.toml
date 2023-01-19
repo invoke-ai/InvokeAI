@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools~=65.5.0", "pip~=22.3.1", "wheel"]
+requires = ["setuptools~=65.5", "pip~=22.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -56,7 +56,7 @@ dependencies = [
   "k-diffusion",                                                                           # replaceing "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
   "kornia",
   "npyscreen",
-  "numpy<1.24,>=1.23",
+  "numpy~=1.23",
   "omegaconf",
   "opencv-python",
   "picklescan",
