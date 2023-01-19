@@ -3,6 +3,7 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 '''
 
 import math
+from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from typing import Callable, Optional
 
 import torch
@@ -66,6 +67,8 @@ class Txt2Img2Img(Generator):
 
             second_pass_noise = self.get_noise_like(resized_latents)
 
+            verbosity = get_verbosity()
+            set_verbosity_error()
             pipeline_output = pipeline.img2img_from_latents_and_embeddings(
                 resized_latents,
                 num_inference_steps=steps,
@@ -73,6 +76,7 @@ class Txt2Img2Img(Generator):
                 strength=strength,
                 noise=second_pass_noise,
                 callback=step_callback)
+            set_verbosity(verbosity)
 
             return pipeline.numpy_to_pil(pipeline_output.images)[0]
 
