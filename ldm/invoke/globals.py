@@ -43,6 +43,9 @@ Globals.always_use_cpu = False
 # The CLI will test connectivity at startup time.
 Globals.internet_available = True
 
+# whether we are forcing full precision
+Globals.full_precision = False
+
 def global_config_dir()->Path:
     return Path(Globals.root, Globals.config_dir)
 
@@ -59,11 +62,21 @@ def global_cache_dir(subdir:Union[str,Path]='')->Path:
     '''
     Returns Path to the model cache directory. If a subdirectory
     is provided, it will be appended to the end of the path, allowing
-    for huggingface-style conventions: 
+    for huggingface-style conventions:
          global_cache_dir('diffusers')
          global_cache_dir('transformers')
     '''
-    if (home := os.environ.get('HF_HOME')):
+    home: str = os.getenv('HF_HOME')
+
+    if home is None:
+        home = os.getenv('XDG_CACHE_HOME')
+
+        if home is not None:
+            # Set `home` to $XDG_CACHE_HOME/huggingface, which is the default location mentioned in HuggingFace Hub Client Library.
+            # See: https://huggingface.co/docs/huggingface_hub/main/en/package_reference/environment_variables#xdgcachehome
+            home += os.sep + 'huggingface'
+
+    if home is not None:
         return Path(home,subdir)
     else:
         return Path(Globals.root,'models',subdir)

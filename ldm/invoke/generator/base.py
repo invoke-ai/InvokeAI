@@ -8,6 +8,7 @@ import os
 import os.path as osp
 import random
 import traceback
+from contextlib import nullcontext
 
 import cv2
 import numpy as np
@@ -18,8 +19,6 @@ from einops import rearrange
 from pytorch_lightning import seed_everything
 from tqdm import trange
 
-from ldm.invoke.devices import choose_autocast
-from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ldm.models.diffusion.ddpm import DiffusionWrapper
 from ldm.util import rand_perlin_2d
 
@@ -64,7 +63,7 @@ class Generator:
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  safety_checker:dict=None,
                  **kwargs):
-        scope = choose_autocast(self.precision)
+        scope = nullcontext
         self.safety_checker = safety_checker
         attention_maps_images = []
         attention_maps_callback = lambda saver: attention_maps_images.append(saver.get_stacked_maps_image())
@@ -236,7 +235,8 @@ class Generator:
 
     def get_perlin_noise(self,width,height):
         fixdevice = 'cpu' if (self.model.device.type == 'mps') else self.model.device
-        return torch.stack([rand_perlin_2d((height, width), (8, 8), device = self.model.device).to(fixdevice) for _ in range(self.latent_channels)], dim=0).to(self.model.device)
+        noise = torch.stack([rand_perlin_2d((height, width), (8, 8), device = self.model.device).to(fixdevice) for _ in range(self.latent_channels)], dim=0).to(self.model.device)
+        return noise
 
     def new_seed(self):
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
@@ -340,4 +340,7 @@ class Generator:
             os.makedirs(dirname, exist_ok=True)
         image.save(filepath,'PNG')
 
+
+    def torch_dtype(self)->torch.dtype:
+        return torch.float16 if self.precision == 'float16' else torch.float32
 

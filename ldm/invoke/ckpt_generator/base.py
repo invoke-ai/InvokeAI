@@ -335,4 +335,5 @@ class CkptGenerator():
             os.makedirs(dirname, exist_ok=True)
         image.save(filepath,'PNG')
 
-
+    def torch_dtype(self)->torch.dtype:
+        return torch.float16 if self.precision == 'float16' else torch.float32
