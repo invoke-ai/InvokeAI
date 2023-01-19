@@ -73,7 +73,16 @@ most up to date libraries with this command:
 pip install --upgrade --force-reinstall torch torchvision
 ```
 
-### 3. Install source code build prerequisites
+### 3. Install the triton module
+
+This module isn't necessary for xFormers image inference optimization,
+but avoids a startup warning.
+
+```sh
+pip install triton
+```
+
+### 4. Install source code build prerequisites
 
 To build xFormers from source, you will need the `build-essentials`
 package. If you don't have it installed already, run:
@@ -82,7 +91,7 @@ package. If you don't have it installed already, run:
 sudo apt install build-essential
 ```
 
-### 4. Build xFormers
+### 5. Build xFormers
 
 There is no pip wheel package for xFormers at this time (January
 2023). Although there is a conda package, InvokeAI no longer
