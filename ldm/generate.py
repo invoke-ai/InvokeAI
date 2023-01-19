@@ -445,7 +445,11 @@ class Generate:
             self._set_sampler()
 
         # apply the concepts library to the prompt
-        prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(prompt, lambda concepts: self.load_huggingface_concepts(concepts))
+        prompt = self.huggingface_concepts_library.replace_concepts_with_triggers(
+            prompt,
+            lambda concepts: self.load_huggingface_concepts(concepts),
+            self.model.textual_inversion_manager.get_all_trigger_strings()
+        )
 
         # bit of a hack to change the cached sampler's karras threshold to
         # whatever the user asked for

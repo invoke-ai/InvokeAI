@@ -115,13 +115,19 @@ class HuggingFaceConceptsLibrary(object):
             return self.trigger_to_concept(match.group(1)) or f'<{match.group(1)}>'
         return self.match_trigger.sub(do_replace, prompt)
 
-    def replace_concepts_with_triggers(self, prompt:str, load_concepts_callback: Callable[[list], any])->str:
+    def replace_concepts_with_triggers(self,
+                                       prompt:str,
+                                       load_concepts_callback: Callable[[list], any],
+                                       excluded_tokens:list[str])->str:
         '''
         Given a prompt string that contains `<concept_name>` tags, replace
         these tags with the appropriate trigger.
 
         If any `<concept_name>` tags are found, `load_concepts_callback()` is called with a list
         of `concepts_name` strings.
+
+        `excluded_tokens` are any tokens that should not be replaced, typically because they
+        are trigger tokens from a locally-loaded embedding.
         '''
         concepts = self.match_concept.findall(prompt)
         if not concepts:
@@ -129,6 +135,8 @@ class HuggingFaceConceptsLibrary(object):
         load_concepts_callback(concepts)
 
         def do_replace(match)->str:
+            if excluded_tokens and f'<{match.group(1)}>' in excluded_tokens:
+                return f'<{match.group(1)}>'
             return self.concept_to_trigger(match.group(1)) or f'<{match.group(1)}>'
         return self.match_concept.sub(do_replace, prompt)
 
