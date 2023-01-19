@@ -59,7 +59,7 @@ class HuggingFaceConceptsLibrary(object):
         be downloaded.
         '''
         if not concept_name in self.list_concepts():
-            print(f'This concept is not known to the Hugging Face library. Generation will continue without the concept.')
+            print(f'This concept is not a local embedding trigger, nor is it a HuggingFace concept. Generation will continue without the concept.')
             return None
         return self.get_concept_file(concept_name.lower(),'learned_embeds.bin')
 
