@@ -115,7 +115,6 @@ class Installer:
             venv_dir = Path(path)
 
         # experimental / testing
-        #
         elif not FF_VENV_IN_RUNTIME:
             if OS == "Windows":
                 venv_dir_parent = os.getenv("APPDATA", "~/AppData/Roaming")
@@ -159,17 +158,22 @@ class Installer:
 
         self.dest = Path(root).expanduser().resolve() if yes_to_all else messages.dest_path(root)
 
+        # create the venv for the app
         self.venv = self.app_venv()
 
         self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv)
 
-        # create the venv, install dependencies and the application
-        self.instance.deploy(extra_index_url=get_torch_source() if not yes_to_all else None)
+        # install dependencies and the InvokeAI application
+        extra_index_url=get_torch_source() if not yes_to_all else None
+        if FF_USE_WHEEL:
+            self.instance.deploy_wheel(extra_index_url)
+        else:
+            self.instance.deploy_src(extra_index_url)
 
-        # run the configuration flow
+        # run through the configuration flow
         self.instance.configure()
 
-        # install the launch/update scritps into the runtime directory
+        # install the launch/update scripts into the runtime directory
         self.instance.install_user_scripts()
 
 
@@ -200,18 +204,16 @@ class InvokeAiInstance:
 
         return (self.runtime, self.venv)
 
-    def deploy(self, extra_index_url=None):
+    def deploy_src(self, extra_index_url=None):
         """
-        Install packages with pip
+        Install packages with pip ("source" installer)
 
         :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
         :type extra_index_url: str
         """
 
-        ### this is all very rough for now as a PoC
-        ### source installer basically
-        ### TODO: need to pull the source from Github like the current installer does
-        ### until we continuously build wheels
+        ### TODO: pull the source archive from Github like the current installer does?
+        ### Alternatively, decide if this should just be used to perform an editable install
 
         import messages
         from plumbum import FG, local
@@ -220,6 +222,7 @@ class InvokeAiInstance:
         # the correct version gets installed.
         # this works with either source or wheel install and has
         # negligible impact on installation times.
+        # this is only necessary for the source installer.
         messages.simple_banner("Installing PyTorch :fire:")
         self.install_torch(extra_index_url)
 
@@ -243,13 +246,28 @@ class InvokeAiInstance:
             & FG
         )
 
+    def deploy_wheel(self, extra_index_url=None):
+        """
+        Use 'pip' to install packages with from PyPi and optionally other indexes ("wheel" installer)
+
+        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
+        :type extra_index_url: str
+        """
+
+        import messages
+        from plumbum import FG, local
+
         messages.simple_banner("Installing the InvokeAI Application :art:")
+        extra_index_url_arg = "--extra-index-url" if extra_index_url is not None else None
+
+        pip = local[self.pip]
+
         (
             pip[
                 "install",
                 "--require-virtualenv",
-                Path(__file__).parents[1].expanduser().resolve(),
                 "--use-pep517",
+                "invokeai",
                 extra_index_url_arg,
                 extra_index_url,
             ]
@@ -355,7 +373,7 @@ def get_torch_source() -> Union[str, None]:
     This is only applicable to Windows and Linux, since PyTorch does not
     offer accelerated builds for macOS.
 
-    Prefer CUDA if the user wasn't sure of their GPU, as it will fallback to CPU if possible.
+    Prefer CUDA-enabled wheels if the user wasn't sure of their GPU, as it will fallback to CPU if possible.
 
     A NoneType return means just go to PyPi.
 
@@ -365,21 +383,16 @@ def get_torch_source() -> Union[str, None]:
 
     from messages import graphical_accelerator
 
+    # device can be one of: "cuda", "rocm", "cpu", "idk"
     device = graphical_accelerator()
 
     url = None
     if OS == "Linux":
-        if device in ["cuda", "idk"]:
-            url = "https://download.pytorch.org/whl/cu117"
-        elif device == "rocm":
+        if device == "rocm":
             url = "https://download.pytorch.org/whl/rocm5.2"
-        else:
+        elif device == "cpu":
             url = "https://download.pytorch.org/whl/cpu"
 
-    elif OS == "Windows":
-        if device in ["cuda", "idk"]:
-            url = "https://download.pytorch.org/whl/cu117"
-
-    # ignoring macOS because its wheels come from PyPi anyway (cpu only)
+    # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 
     return url
