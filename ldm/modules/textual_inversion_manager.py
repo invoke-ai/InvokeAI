@@ -50,6 +50,8 @@ class TextualInversionManager():
         return [ti.trigger_string for ti in self.textual_inversions]
 
     def load_textual_inversion(self, ckpt_path, defer_injecting_tokens: bool=False):
+        if str(ckpt_path).endswith('.DS_Store'):
+            return
         try:
             scan_result = scan_file_path(ckpt_path)
             if scan_result.infected_files == 1:
