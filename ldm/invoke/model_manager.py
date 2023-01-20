@@ -25,6 +25,7 @@ import torch
 import safetensors
 import transformers
 from diffusers import AutoencoderKL, logging as dlogging
+from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
@@ -166,7 +167,7 @@ class ModelManager(object):
             # don't include VAEs in listing (legacy style)
             if 'config' in stanza and '/VAE/' in stanza['config']:
                 continue
-            
+
             models[name] = dict()
             format = stanza.get('format','ckpt') # Determine Format
 
@@ -183,7 +184,7 @@ class ModelManager(object):
                 format = format,
                 status = status,
             )
-            
+
             # Checkpoint Config Parse
             if format == 'ckpt':
                 models[name].update(
@@ -193,7 +194,7 @@ class ModelManager(object):
                     width = str(stanza.get('width', 512)),
                     height = str(stanza.get('height', 512)),
                 )
-                
+
             # Diffusers Config Parse
             if (vae := stanza.get('vae',None)):
                 if isinstance(vae,DictConfig):
@@ -202,14 +203,14 @@ class ModelManager(object):
                         path = str(vae.get('path',None)),
                         subfolder = str(vae.get('subfolder',None))
                     )
-                    
+
             if format == 'diffusers':
                 models[name].update(
                     vae = vae,
                     repo_id = str(stanza.get('repo_id', None)),
                     path = str(stanza.get('path',None)),
                 )
-        
+
         return models
 
     def print_models(self) -> None:
@@ -257,7 +258,7 @@ class ModelManager(object):
         assert (clobber or model_name not in omega), f'attempt to overwrite existing model definition "{model_name}"'
 
         omega[model_name] = model_attributes
-        
+
         if 'weights' in omega[model_name]:
             omega[model_name]['weights'].replace('\\','/')
 
@@ -554,12 +555,12 @@ class ModelManager(object):
         '''
         Attempts to install the indicated ckpt file and returns True if successful.
 
-        "weights" can be either a path-like object corresponding to a local .ckpt file 
+        "weights" can be either a path-like object corresponding to a local .ckpt file
         or a http/https URL pointing to a remote model.
 
         "config" is the model config file to use with this ckpt file. It defaults to
         v1-inference.yaml. If a URL is provided, the config will be downloaded.
-        
+
         You can optionally provide a model name and/or description. If not provided,
         then these will be derived from the weight file name. If you provide a commit_to_conf
         path to the configuration file, then the new entry will be committed to the
@@ -572,7 +573,7 @@ class ModelManager(object):
             return False
         if config_path is None or not config_path.exists():
             return False
-            
+
         model_name = model_name or Path(weights).stem
         model_description = model_description or f'imported stable diffusion weights file {model_name}'
         new_config = dict(
@@ -587,7 +588,7 @@ class ModelManager(object):
         if commit_to_conf:
             self.commit(commit_to_conf)
         return True
-                       
+
     def autoconvert_weights(
             self,
             conf_path:Path,
@@ -660,7 +661,7 @@ class ModelManager(object):
         except Exception as e:
             print(f'** Conversion failed: {str(e)}')
             traceback.print_exc()
-            
+
         print('done.')
         return new_config
 
@@ -756,9 +757,13 @@ class ModelManager(object):
         print('** Legacy version <= 2.2.5 model directory layout detected. Reorganizing.')
         print('** This is a quick one-time operation.')
         from shutil import move, rmtree
-        
+
         # transformer files get moved into the hub directory
-        hub = models_dir / 'hub'
+        if cls._is_huggingface_hub_directory_present():
+            hub = global_cache_dir('hub')
+        else:
+            hub = models_dir / 'hub'
+
         os.makedirs(hub, exist_ok=True)
         for model in legacy_locations:
             source = models_dir / model
@@ -771,7 +776,11 @@ class ModelManager(object):
                     move(source, dest)
 
         # anything else gets moved into the diffusers directory
-        diffusers = models_dir / 'diffusers'
+        if cls._is_huggingface_hub_directory_present():
+            diffusers = global_cache_dir('diffusers')
+        else:
+            diffusers = models_dir / 'diffusers'
+
         os.makedirs(diffusers, exist_ok=True)
         for root, dirs, _ in os.walk(models_dir, topdown=False):
             for dir in dirs:
@@ -819,11 +828,11 @@ class ModelManager(object):
             return model
 
         # diffusers really really doesn't like us moving a float16 model onto CPU
-        import logging
-        logging.getLogger('diffusers.pipeline_utils').setLevel(logging.CRITICAL)
+        verbosity = get_verbosity()
+        set_verbosity_error()
         model.cond_stage_model.device = 'cpu'
         model.to('cpu')
-        logging.getLogger('pipeline_utils').setLevel(logging.INFO)
+        set_verbosity(verbosity)
 
         for submodel in ('first_stage_model','cond_stage_model','model'):
             try:
@@ -962,3 +971,7 @@ class ModelManager(object):
             print(f'** Could not load VAE {name_or_path}: {str(deferred_error)}')
 
         return vae
+
+    @staticmethod
+    def _is_huggingface_hub_directory_present() -> bool:
+        return os.getenv('HF_HOME') is not None or os.getenv('XDG_CACHE_HOME') is not None
