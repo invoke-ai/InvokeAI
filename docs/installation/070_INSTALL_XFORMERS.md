@@ -15,7 +15,65 @@ xFormers can be installed into a working InvokeAI installation without
 any code changes or other updates. This document explains how to
 install xFormers.
 
-## Linux
+## Pip Install
+
+For both Windows and Linux, you can install `xformers` in just a
+couple of steps from the command line.
+
+If you are used to launching `invoke.sh` or `invoke.bat` to start
+InvokeAI, then run the launcher and select the "developer's console"
+to get to the command line. If you run invoke.py directly from the
+command line, then just be sure to activate it's virtual environment.
+
+Then run the following three commands:
+
+```sh
+pip install xformers==0.0.16rc425
+pip install triton
+python -m xformers.info output
+```
+
+The first command installs `xformers`, the second installs the
+`triton` training accelerator, and the third prints out the `xformers`
+installation status. If all goes well, you'll see a report like the
+following:
+
+```sh
+xFormers 0.0.16rc425
+memory_efficient_attention.cutlassF:               available
+memory_efficient_attention.cutlassB:               available
+memory_efficient_attention.flshattF:               available
+memory_efficient_attention.flshattB:               available
+memory_efficient_attention.smallkF:                available
+memory_efficient_attention.smallkB:                available
+memory_efficient_attention.tritonflashattF:        available
+memory_efficient_attention.tritonflashattB:        available
+swiglu.fused.p.cpp:                                available
+is_triton_available:                               True
+is_functorch_available:                            False
+pytorch.version:                                   1.13.1+cu117
+pytorch.cuda:                                      available
+gpu.compute_capability:                            8.6
+gpu.name:                                          NVIDIA RTX A2000 12GB
+build.info:                                        available
+build.cuda_version:                                1107
+build.python_version:                              3.10.9
+build.torch_version:                               1.13.1+cu117
+build.env.TORCH_CUDA_ARCH_LIST:                    5.0+PTX 6.0 6.1 7.0 7.5 8.0 8.6
+build.env.XFORMERS_BUILD_TYPE:                     Release
+build.env.XFORMERS_ENABLE_DEBUG_ASSERTIONS:        None
+build.env.NVCC_FLAGS:                              None
+build.env.XFORMERS_PACKAGE_FROM:                   wheel-v0.0.16rc425
+source.privacy:                                    open source
+```
+
+## Source Builds
+
+`xformers` is currently under active development and at some point you
+may wish to build it from sourcce to get the latest features and
+bugfixes.
+
+### Source Build on Linux
 
 Note that xFormers only works with true NVIDIA GPUs and will not work
 properly with the ROCm driver for AMD acceleration.
@@ -25,7 +83,7 @@ installed from source. These instructions were written for a system
 running Ubuntu 22.04, but other Linux distributions should be able to
 adapt this recipe.
 
-### 1. Install CUDA Toolkit 11.7
+#### 1. Install CUDA Toolkit 11.7
 
 You will need the CUDA developer's toolkit in order to compile and
 install xFormers. **Do not try to install Ubuntu's nvidia-cuda-toolkit
@@ -51,7 +109,7 @@ Rather than cut-and-paste this example, We recommend that you walk
 through the toolkit wizard in order to get the most up to date
 installer for your system.
 
-### 2. Confirm/Install pyTorch 1.13 with CUDA 11.7 support
+#### 2. Confirm/Install pyTorch 1.13 with CUDA 11.7 support
 
 If you are using InvokeAI 2.3 or higher, these will already be
 installed. If not, you can check whether you have the needed libraries
@@ -73,7 +131,7 @@ most up to date libraries with this command:
 pip install --upgrade --force-reinstall torch torchvision
 ```
 
-### 3. Install the triton module
+#### 3. Install the triton module
 
 This module isn't necessary for xFormers image inference optimization,
 but avoids a startup warning.
@@ -82,7 +140,7 @@ but avoids a startup warning.
 pip install triton
 ```
 
-### 4. Install source code build prerequisites
+#### 4. Install source code build prerequisites
 
 To build xFormers from source, you will need the `build-essentials`
 package. If you don't have it installed already, run:
@@ -91,7 +149,7 @@ package. If you don't have it installed already, run:
 sudo apt install build-essential
 ```
 
-### 5. Build xFormers
+#### 5. Build xFormers
 
 There is no pip wheel package for xFormers at this time (January
 2023). Although there is a conda package, InvokeAI no longer
@@ -139,11 +197,10 @@ memory_efficient_attention.tritonflashattB:        available
 
 You can now launch InvokeAI and enjoy the benefits of xFormers.
 
-## Windows
+### Windows
 
 To come
 
-## Macintosh
 
-Since CUDA is unavailable on Macintosh systems, you will not benefit
-from xFormers.
+---
+(c) Copyright 2023 Lincoln Stein and the InvokeAI Development Team
