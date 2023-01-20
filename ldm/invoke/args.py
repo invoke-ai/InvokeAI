@@ -483,6 +483,12 @@ class Args(object):
             help='Force free gpu memory before final decoding',
         )
         model_group.add_argument(
+            '--xformers',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Enable/disable xformers support (default enabled if installed)',
+        )
+        model_group.add_argument(
             "--always_use_cpu",
             dest="always_use_cpu",
             action="store_true",
