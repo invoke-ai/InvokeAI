@@ -219,7 +219,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
     def get_model_names(self)->(List[str],int):
         conf = OmegaConf.load(os.path.join(Globals.root,'configs/models.yaml'))
-        model_names = list(conf.keys())
+        model_names = sorted(list(conf.keys()))
         defaults = [idx for idx in range(len(model_names)) if 'default' in conf[model_names[idx]]]
         return (model_names,defaults[0])
 

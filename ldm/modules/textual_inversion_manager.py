@@ -66,8 +66,9 @@ class TextualInversionManager():
                 self._add_textual_inversion(embedding_info['name'],
                                             embedding_info['embedding'],
                                             defer_injecting_tokens=defer_injecting_tokens)
-            except ValueError:
-                print(f'   | ignoring incompatible embedding {embedding_info["name"]}')
+            except ValueError as e:
+                print(f'   | Ignoring incompatible embedding {embedding_info["name"]}')
+                print(f'   | The error was {str(e)}')
         else:
             print(f'>> Failed to load embedding located at {ckpt_path}. Unsupported file.')
 
@@ -151,7 +152,8 @@ class TextualInversionManager():
                 try:
                     self._inject_tokens_and_assign_embeddings(ti)
                 except ValueError as e:
-                    print(f'   | ignoring incompatible embedding trigger {ti.trigger_string}')
+                    print(f'   | Ignoring incompatible embedding trigger {ti.trigger_string}')
+                    print(f'   | The error was {str(e)}')
                     continue
                 injected_token_ids.append(ti.trigger_token_id)
                 injected_token_ids.extend(ti.pad_token_ids)
