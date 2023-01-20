@@ -25,6 +25,7 @@ import torch
 import safetensors
 import transformers
 from diffusers import AutoencoderKL, logging as dlogging
+from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
@@ -827,11 +828,11 @@ class ModelManager(object):
             return model
 
         # diffusers really really doesn't like us moving a float16 model onto CPU
-        import logging
-        logging.getLogger('diffusers.pipeline_utils').setLevel(logging.CRITICAL)
+        verbosity = get_verbosity()
+        set_verbosity_error()
         model.cond_stage_model.device = 'cpu'
         model.to('cpu')
-        logging.getLogger('pipeline_utils').setLevel(logging.INFO)
+        set_verbosity(verbosity)
 
         for submodel in ('first_stage_model','cond_stage_model','model'):
             try:
