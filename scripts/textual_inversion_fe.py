@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import List
 import argparse
 
-TRAINING_DATA = 'training-data'
-TRAINING_DIR = 'text-inversion-training'
+TRAINING_DATA = 'text-inversion-training-data'
+TRAINING_DIR = 'text-inversion-output'
 CONF_FILE = 'preferences.conf'
 
 class textualInversionForm(npyscreen.FormMultiPageAction):
@@ -219,7 +219,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
     def get_model_names(self)->(List[str],int):
         conf = OmegaConf.load(os.path.join(Globals.root,'configs/models.yaml'))
-        model_names = sorted(list(conf.keys()))
+        model_names = [idx for idx in sorted(list(conf.keys())) if conf[idx].get('format',None)=='diffusers']
         defaults = [idx for idx in range(len(model_names)) if 'default' in conf[model_names[idx]]]
         return (model_names,defaults[0])
 

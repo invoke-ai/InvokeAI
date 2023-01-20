@@ -746,7 +746,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
-    for name in ('models','configs','embeddings'):
+    for name in ('models','configs','embeddings','text-inversion-data','text-inversion-training-data'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
     for src in (['configs']):
         dest = os.path.join(root,src)
