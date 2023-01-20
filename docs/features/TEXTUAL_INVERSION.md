@@ -262,6 +262,10 @@ resources:
   associated paper for details and limitations.
 * [HuggingFace's textual inversion training
   page](https://huggingface.co/docs/diffusers/training/text_inversion)
+* [HuggingFace example script
+  documentation](https://github.com/huggingface/diffusers/tree/main/examples/textual_inversion)
+  (Note that this script is similar to, but not identical, to
+  `textual_inversion`, but produces embed files that are completely compatible.
 
 ---
 
