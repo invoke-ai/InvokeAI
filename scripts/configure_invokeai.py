@@ -291,7 +291,7 @@ for more information.
 
 Visit https://huggingface.co/settings/tokens to generate a token. (Sign up for an account if needed).
 
-Paste the token below using Ctrl-V on macOS/Linux, or Ctrl-Shift-V or right-click on Windows. 
+Paste the token below using Ctrl-V on macOS/Linux, or Ctrl-Shift-V or right-click on Windows.
 Alternatively press 'Enter' to skip this step and continue.
 You may re-run the configuration script again in the future if you do not wish to set the token right now.
         ''')
@@ -676,7 +676,8 @@ def download_weights(opt:dict) -> Union[str, None]:
         return
 
     access_token = authenticate()
-    HfFolder.save_token(access_token)
+    if access_token is not None:
+        HfFolder.save_token(access_token)
 
     print('\n** DOWNLOADING WEIGHTS **')
     successfully_downloaded = download_weight_datasets(models, access_token, precision=precision)

@@ -43,6 +43,9 @@ Globals.always_use_cpu = False
 # The CLI will test connectivity at startup time.
 Globals.internet_available = True
 
+# Whether to disable xformers
+Globals.disable_xformers = False
+
 # whether we are forcing full precision
 Globals.full_precision = False
 
