@@ -333,10 +333,10 @@ def setup_cross_attention_control(model, context: Context):
                 indices[b0:b1] = indices_target[a0:a1]
                 mask[b0:b1] = 1
 
-    context.register_cross_attention_modules(model)
+    #context.register_cross_attention_modules(model)
     context.cross_attention_mask = mask.to(device)
     context.cross_attention_index_map = indices.to(device)
-    inject_attention_function(model, context)
+    #inject_attention_function(model, context)
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
@@ -443,6 +443,7 @@ def get_mem_free_total(device):
     mem_free_torch = mem_reserved - mem_active
     mem_free_total = mem_free_cuda + mem_free_torch
     return mem_free_total
+
 
 
 class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention, InvokeAICrossAttentionMixin):
