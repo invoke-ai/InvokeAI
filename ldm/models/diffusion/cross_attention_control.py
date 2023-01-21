@@ -9,6 +9,7 @@ from torch import nn
 from diffusers.models.unet_2d_condition import UNet2DConditionModel
 from ldm.invoke.devices import torch_dtype
 
+
 # adapted from bloc97's CrossAttentionControl colab
 # https://github.com/bloc97/CrossAttentionControl
 
@@ -304,11 +305,16 @@ class InvokeAICrossAttentionMixin:
 
 
 
-def remove_cross_attention_control(model):
-    remove_attention_function(model)
+def remove_cross_attention_control(model, is_running_diffusers: bool):
+    if is_running_diffusers:
+        unet = model
+        print("** need to know what cross attn processor to use by default, None in the following line is wrong")
+        unet.set_attn_processor(CrossAttnProcessor())
+    else:
+        remove_attention_function(model)
 
 
-def setup_cross_attention_control(model, context: Context):
+def setup_cross_attention_control(model, context: Context, is_running_diffusers = False):
     """
     Inject attention parameters and functions into the passed in model to enable cross attention editing.
 
@@ -333,10 +339,16 @@ def setup_cross_attention_control(model, context: Context):
                 indices[b0:b1] = indices_target[a0:a1]
                 mask[b0:b1] = 1
 
-    #context.register_cross_attention_modules(model)
     context.cross_attention_mask = mask.to(device)
     context.cross_attention_index_map = indices.to(device)
-    #inject_attention_function(model, context)
+    if is_running_diffusers:
+        unet = model
+        unet.set_attn_processor(SwapCrossAttnProcessor())
+    else:
+        context.register_cross_attention_modules(model)
+        inject_attention_function(model, context)
+
+
 
 
 def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[str, InvokeAICrossAttentionMixin]]:
@@ -459,5 +471,157 @@ class InvokeAIDiffusersCrossAttention(diffusers.models.attention.CrossAttention,
         attention_result = self.get_invokeai_attention_mem_efficient(query, key, value)
 
         hidden_states = self.reshape_batch_dim_to_heads(attention_result)
+        return hidden_states
+
+
+
+
+
+## 🧨diffusers implementation follows
+
+
+"""
+# base implementation
+
+class CrossAttnProcessor:
+    def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None):
+        batch_size, sequence_length, _ = hidden_states.shape
+        attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
+
+        query = attn.to_q(hidden_states)
+        query = attn.head_to_batch_dim(query)
+
+        encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
+        key = attn.to_k(encoder_hidden_states)
+        value = attn.to_v(encoder_hidden_states)
+        key = attn.head_to_batch_dim(key)
+        value = attn.head_to_batch_dim(value)
+
+        attention_probs = attn.get_attention_scores(query, key, attention_mask)
+        hidden_states = torch.bmm(attention_probs, value)
+        hidden_states = attn.batch_to_head_dim(hidden_states)
+
+        # linear proj
+        hidden_states = attn.to_out[0](hidden_states)
+        # dropout
+        hidden_states = attn.to_out[1](hidden_states)
+
+        return hidden_states
+
+"""
+import enum
+from dataclasses import field, dataclass
+
+import torch
+
+from diffusers.models.cross_attention import CrossAttention, CrossAttnProcessor
+from ldm.models.diffusion.cross_attention_control import CrossAttentionType
+
+
+@dataclass
+class SwapCrossAttnContext:
+    modified_text_embeddings: torch.Tensor
+    index_map: torch.Tensor # maps from original prompt token indices to the equivalent tokens in the modified prompt
+    mask: torch.Tensor # in the target space of the index_map
+    cross_attention_types_to_do: list[CrossAttentionType] = field(default_factory=[])
+
+    def __int__(self,
+                cac_types_to_do: [CrossAttentionType],
+                modified_text_embeddings: torch.Tensor,
+                index_map: torch.Tensor,
+                mask: torch.Tensor):
+        self.cross_attention_types_to_do = cac_types_to_do
+        self.modified_text_embeddings = modified_text_embeddings
+        self.index_map = index_map
+        self.mask = mask
+
+    def wants_cross_attention_control(self, attn_type: CrossAttentionType) -> bool:
+        return attn_type in self.cross_attention_types_to_do
+
+    @classmethod
+    def make_mask_and_index_map(cls, edit_opcodes: list[tuple[str, int, int, int, int]], max_length: int) \
+            -> tuple[torch.Tensor, torch.Tensor]:
+
+        # mask=1 means use original prompt attention, mask=0 means use modified prompt attention
+        mask = torch.zeros(max_length)
+        indices_target = torch.arange(max_length, dtype=torch.long)
+        indices = torch.arange(max_length, dtype=torch.long)
+        for name, a0, a1, b0, b1 in edit_opcodes:
+            if b0 < max_length:
+                if name == "equal":
+                    # these tokens remain the same as in the original prompt
+                    indices[b0:b1] = indices_target[a0:a1]
+                    mask[b0:b1] = 1
+
+        return mask, indices
+
+
+class SwapCrossAttnProcessor(CrossAttnProcessor):
+
+    def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None,
+                 # kwargs
+                 swap_cross_attn_context: SwapCrossAttnContext=None):
+
+        attention_type = CrossAttentionType.SELF if encoder_hidden_states is None else CrossAttentionType.TOKENS
+
+        # if cross-attention control is not in play, just call through to the base implementation.
+        if swap_cross_attn_context is None or not swap_cross_attn_context.wants_cross_attention_control(attention_type):
+            #print(f"SwapCrossAttnContext for {attention_type} not active - passing request to superclass")
+            return super().__call__(attn, hidden_states, encoder_hidden_states, attention_mask)
+        #else:
+        #    print(f"SwapCrossAttnContext for {attention_type} active")
+
+        batch_size, sequence_length, _ = hidden_states.shape
+        attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length)
+
+        query = attn.to_q(hidden_states)
+        query = attn.head_to_batch_dim(query)
+
+        # helper function
+        def get_attention_probs(embeddings):
+            this_key = attn.to_k(embeddings)
+            this_key = attn.head_to_batch_dim(this_key)
+            return attn.get_attention_scores(query, this_key, attention_mask)
+
+        if attention_type == CrossAttentionType.SELF:
+            # self attention has no remapping, it just bluntly copies the whole tensor
+            attention_probs = get_attention_probs(hidden_states)
+            value = attn.to_v(hidden_states)
+        else:
+            # tokens (cross) attention
+            # first, find attention probabilities for the "original" prompt
+            original_text_embeddings = encoder_hidden_states
+            original_attention_probs = get_attention_probs(original_text_embeddings)
+
+            # then, find attention probabilities for the "modified" prompt
+            modified_text_embeddings = swap_cross_attn_context.modified_text_embeddings
+            modified_attention_probs = get_attention_probs(modified_text_embeddings)
+
+            # because the prompt modifications may result in token sequences shifted forwards or backwards,
+            # the original attention probabilities must be remapped to account for token index changes in the
+            # modified prompt
+            remapped_original_attention_probs = torch.index_select(original_attention_probs, -1,
+                                                                   swap_cross_attn_context.index_map)
+
+            # only some tokens taken from the original attention probabilities. this is controlled by the mask.
+            mask = swap_cross_attn_context.mask
+            inverse_mask = 1 - mask
+            attention_probs = \
+                remapped_original_attention_probs * mask + \
+                modified_attention_probs * inverse_mask
+
+            # for the "value" just use the modified text embeddings.
+            value = attn.to_v(modified_text_embeddings)
+
+        value = attn.head_to_batch_dim(value)
+
+        hidden_states = torch.bmm(attention_probs, value)
+        hidden_states = attn.batch_to_head_dim(hidden_states)
+
+        # linear proj
+        hidden_states = attn.to_out[0](hidden_states)
+        # dropout
+        hidden_states = attn.to_out[1](hidden_states)
+
         return hidden_states
 

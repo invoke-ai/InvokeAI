@@ -24,9 +24,6 @@ from ...models.diffusion import cross_attention_control
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
-# monkeypatch diffusers CrossAttention 🙈
-# this is to make prompt2prompt and (future) attention maps work
-attention.CrossAttention = cross_attention_control.InvokeAIDiffusersCrossAttention
 
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
@@ -295,7 +292,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
+        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward, is_running_diffusers=True)
         use_full_precision = (precision == 'float32' or precision == 'autocast')
         self.textual_inversion_manager = TextualInversionManager(tokenizer=self.tokenizer,
                                                                  text_encoder=self.text_encoder,
@@ -389,6 +386,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         attention_map_saver: Optional[AttentionMapSaver] = None
         self.invokeai_diffuser.remove_attention_map_saving()
+
         for i, t in enumerate(self.progress_bar(timesteps)):
             batched_t.fill_(t)
             step_output = self.step(batched_t, latents, conditioning_data,
@@ -447,7 +445,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         return step_output
 
-    def _unet_forward(self, latents, t, text_embeddings):
+    def _unet_forward(self, latents, t, text_embeddings, cross_attention_kwargs: Optional[dict[str,Any]] = None):
         """predict the noise residual"""
         if is_inpainting_model(self.unet) and latents.size(1) == 4:
             # Pad out normal non-inpainting inputs for an inpainting model.
@@ -460,7 +458,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype)
             ).add_mask_channels(latents)
 
-        return self.unet(latents, t, encoder_hidden_states=text_embeddings).sample
+        return self.unet(sample=latents,
+                         timestep=t,
+                         encoder_hidden_states=text_embeddings,
+                         cross_attention_kwargs=cross_attention_kwargs).sample
 
     def img2img_from_embeddings(self,
                                 init_image: Union[torch.FloatTensor, PIL.Image.Image],

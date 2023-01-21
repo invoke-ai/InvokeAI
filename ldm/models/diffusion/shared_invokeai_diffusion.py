@@ -1,14 +1,14 @@
 import math
 from dataclasses import dataclass
 from math import ceil
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, Any
 
 import numpy as np
 import torch
 
 from ldm.models.diffusion.cross_attention_control import Arguments, \
     remove_cross_attention_control, setup_cross_attention_control, Context, get_cross_attention_modules, \
-    CrossAttentionType
+    CrossAttentionType, SwapCrossAttnContext
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 
 
@@ -30,24 +30,28 @@ class InvokeAIDiffuserComponent:
     debug_thresholding = False
 
 
+    @dataclass
     class ExtraConditioningInfo:
-        def __init__(self, tokens_count_including_eos_bos:int, cross_attention_control_args: Optional[Arguments]):
-            self.tokens_count_including_eos_bos = tokens_count_including_eos_bos
-            self.cross_attention_control_args = cross_attention_control_args
+
+        tokens_count_including_eos_bos: int
+        cross_attention_control_args: Optional[Arguments] = None
 
         @property
         def wants_cross_attention_control(self):
             return self.cross_attention_control_args is not None
 
+
     def __init__(self, model, model_forward_callback:
-                    Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
-                ):
+                    Callable[[torch.Tensor, torch.Tensor, torch.Tensor, Optional[dict[str,Any]]], torch.Tensor],
+                 is_running_diffusers: bool=False,
+                 ):
         """
         :param model: the unet model to pass through to cross attention control
         :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
         """
         self.conditioning = None
         self.model = model
+        self.is_running_diffusers = is_running_diffusers
         self.model_forward_callback = model_forward_callback
         self.cross_attention_control_context = None
 
@@ -57,12 +61,14 @@ class InvokeAIDiffuserComponent:
             arguments=self.conditioning.cross_attention_control_args,
             step_count=step_count
         )
-        setup_cross_attention_control(self.model, self.cross_attention_control_context)
+        setup_cross_attention_control(self.model,
+                                      self.cross_attention_control_context,
+                                      is_running_diffusers=self.is_running_diffusers)
 
     def remove_cross_attention_control(self):
         self.conditioning = None
         self.cross_attention_control_context = None
-        remove_cross_attention_control(self.model)
+        remove_cross_attention_control(self.model, is_running_diffusers=self.is_running_diffusers)
 
     def setup_attention_map_saving(self, saver: AttentionMapSaver):
         def callback(slice, dim, offset, slice_size, key):
@@ -168,7 +174,41 @@ class InvokeAIDiffuserComponent:
         return unconditioned_next_x, conditioned_next_x
 
 
-    def apply_cross_attention_controlled_conditioning(self, x:torch.Tensor, sigma, unconditioning, conditioning, cross_attention_control_types_to_do):
+    def apply_cross_attention_controlled_conditioning(self,
+                                                     x: torch.Tensor,
+                                                     sigma,
+                                                     unconditioning,
+                                                     conditioning,
+                                                     cross_attention_control_types_to_do):
+        if self.is_running_diffusers:
+            return self.apply_cross_attention_controlled_conditioning__diffusers(x, sigma, unconditioning, conditioning, cross_attention_control_types_to_do)
+        else:
+            return self.apply_cross_attention_controlled_conditioning__compvis(x, sigma, unconditioning, conditioning, cross_attention_control_types_to_do)
+
+    def apply_cross_attention_controlled_conditioning__diffusers(self,
+                                                                 x: torch.Tensor,
+                                                                 sigma,
+                                                                 unconditioning,
+                                                                 conditioning,
+                                                                 cross_attention_control_types_to_do):
+        context: Context = self.cross_attention_control_context
+
+        cross_attn_processor_context = SwapCrossAttnContext(modified_text_embeddings=context.arguments.edited_conditioning,
+                                                            index_map=context.cross_attention_index_map,
+                                                            mask=context.cross_attention_mask,
+                                                            cross_attention_types_to_do=[])
+        # no cross attention for unconditioning (negative prompt)
+        unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning,
+                                                           {"swap_cross_attn_context": cross_attn_processor_context})
+
+        # do requested cross attention types for conditioning (positive prompt)
+        cross_attn_processor_context.cross_attention_types_to_do = cross_attention_control_types_to_do
+        conditioned_next_x = self.model_forward_callback(x, sigma, conditioning,
+                                                         {"swap_cross_attn_context": cross_attn_processor_context})
+        return unconditioned_next_x, conditioned_next_x
+
+
+    def apply_cross_attention_controlled_conditioning__compvis(self, x:torch.Tensor, sigma, unconditioning, conditioning, cross_attention_control_types_to_do):
         # print('pct', percent_through, ': doing cross attention control on', cross_attention_control_types_to_do)
         # slower non-batched path (20% slower on mac MPS)
         # We are only interested in using attention maps for conditioned_next_x, but batching them with generation of
