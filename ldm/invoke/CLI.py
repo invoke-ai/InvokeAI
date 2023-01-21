@@ -577,7 +577,7 @@ def import_model(model_path:str, gen, opt, completer):
     elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     elif os.path.isdir(model_path):
-        model_name = import_diffuser_model(model_path, gen, opt, completer)
+        model_name = import_diffuser_model(Path(model_path), gen, opt, completer)
     else:
         print(f'** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can\'t import.')
 
