@@ -1,18 +1,16 @@
 import math
-import os.path
+from functools import partial
 from typing import Optional
 
+import clip
+import kornia
 import torch
 import torch.nn as nn
-from functools import partial
-import clip
-from einops import rearrange, repeat
+from einops import repeat
 from transformers import CLIPTokenizer, CLIPTextModel
-import kornia
-from ldm.invoke.devices import choose_torch_device
-from ldm.invoke.globals import Globals, global_cache_dir
-#from ldm.modules.textual_inversion_manager import TextualInversionManager
 
+from ldm.invoke.devices import choose_torch_device
+from ldm.invoke.globals import global_cache_dir
 from ldm.modules.x_transformer import (
     Encoder,
     TransformerWrapper,
@@ -663,12 +661,12 @@ class WeightedFrozenCLIPEmbedder(FrozenCLIPEmbedder):
             all_token_ids = all_token_ids[0:self.max_length]
             per_token_weights = per_token_weights[0:self.max_length]
 
-        # pad out to a 77-entry array: [eos_token, <prompt tokens>, eos_token, ..., eos_token]
+        # pad out to a 77-entry array: [bos_token, <prompt tokens>, eos_token, pad_token…]
         # (77 = self.max_length)
         all_token_ids = [self.tokenizer.bos_token_id] + all_token_ids + [self.tokenizer.eos_token_id]
         per_token_weights = [1.0] + per_token_weights + [1.0]
         pad_length = self.max_length - len(all_token_ids)
-        all_token_ids += [self.tokenizer.eos_token_id] * pad_length
+        all_token_ids += [self.tokenizer.pad_token_id] * pad_length
         per_token_weights += [1.0] * pad_length
 
         all_token_ids_tensor = torch.tensor(all_token_ids, dtype=torch.long).to(self.device)
