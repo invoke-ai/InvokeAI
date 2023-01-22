@@ -5,14 +5,11 @@ import os
 import sys
 import traceback
 import argparse
-import safetensors.torch
-from ldm.invoke.globals import Globals, global_set_root, global_cache_dir
+from ldm.invoke.globals import Globals, global_set_root, global_cache_dir, global_config_file
 from ldm.invoke.model_manager import ModelManager
 from omegaconf import OmegaConf
 from pathlib import Path
 from typing import List
-
-CONFIG_FILE = None
 
 class FloatSlider(npyscreen.Slider):
     # this is supposed to adjust display precision, but doesn't
@@ -120,16 +117,16 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         self.merge_method.value=0
         
     def on_ok(self):
-        if self.validate_field_values():
+        if self.validate_field_values() and self.check_for_overwrite():
             self.parentApp.setNextForm(None)
             self.editing = False
             self.parentApp.merge_arguments = self.marshall_arguments()
             npyscreen.notify('Starting the merge...')
-            import diffusers  # this keeps the message up while diffusers loads
+            import ldm.invoke.merge_diffusers  # this keeps the message up while diffusers loads
         else:
             self.editing = True
 
-    def ok_cancel(self):
+    def on_cancel(self):
         sys.exit(0)
 
     def marshall_arguments(self)->dict:
@@ -141,17 +138,21 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         if self.model3.value[0] > 0:
             models.append(model_names[self.model3.value[0]-1])
 
-        models = [self.model_manager.model_name_or_path(x) for x in models]
-            
         args = dict(
-            pretrained_model_name_or_path_list=models,
+            models=models,
             alpha = self.alpha.value,
             interp = self.interpolations[self.merge_method.value[0]],
             force = self.force.value,
-            cache_dir = global_cache_dir('diffusers'),
             merged_model_name = self.merged_model_name.value,
         )
         return args
+
+    def check_for_overwrite(self)->bool:
+        model_out = self.merged_model_name.value
+        if model_out not in self.model_names:
+            return True
+        else:
+            return npyscreen.notify_yes_no(f'The chosen merged model destination, {model_out}, is already in use. Overwrite?')
 
     def validate_field_values(self)->bool:
         bad_fields = []
@@ -178,7 +179,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
 class Mergeapp(npyscreen.NPSAppManaged):
     def __init__(self):
         super().__init__()
-        conf = OmegaConf.load(Path(Globals.root) / 'configs' / 'models.yaml')
+        conf = OmegaConf.load(global_config_file())
         self.model_manager = ModelManager(conf,'cpu','float16') # precision doesn't really matter here
 
     def onStart(self):
@@ -195,51 +196,22 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     global_set_root(args.root_dir)
-    
-    CONFIG_FILE = os.path.join(Globals.root,'configs/models.yaml')
-    os.environ['HF_HOME'] = str(global_cache_dir('diffusers'))
+
+    cache_dir = str(global_cache_dir('diffusers')) # because not clear the merge pipeline is honoring cache_dir
+    os.environ['HF_HOME'] = cache_dir
 
     mergeapp = Mergeapp()
     mergeapp.run()
-    from diffusers import DiffusionPipeline
-    args = mergeapp.merge_arguments 
-    merged_model_name = args['merged_model_name']
-    merged_pipe = None
-    print(args)
+
+    args = mergeapp.merge_arguments
+    args.update(cache_dir = cache_dir)
+    from ldm.invoke.merge_diffusers import merge_diffusion_models
 
     try:
-        print(f'DEBUG: {args["pretrained_model_name_or_path_list"][0]}')
-        pipe = DiffusionPipeline.from_pretrained(args['pretrained_model_name_or_path_list'][0],
-                                                 custom_pipeline='checkpoint_merger'
-                                                 )
-        merged_pipe = pipe.merge(**args)
-        dump_path = Path(Globals.root) / 'models' / 'merged_diffusers'
-        os.makedirs(dump_path,exist_ok=True)
-        dump_path = dump_path / merged_model_name
-        merged_pipe.save_pretrained (
-            dump_path,
-            safe_serialization=1
-        )
+        merge_diffusion_models(**args)
+        print(f'>> Models merged into new model: "{args["merged_model_name"]}".')
     except Exception as e:
         print(f'** An error occurred while merging the pipelines: {str(e)}')
         print('** DETAILS:')
         print(traceback.format_exc())
         sys.exit(-1)
-
-    print(f'>> Merged model is saved to {dump_path}')
-    response = input('Import this model into InvokeAI? [y]').strip() or 'y'
-    if response.startswith(('y','Y')):
-        try:
-            mergeapp.model_manager.import_diffuser_model(
-                dump_path,
-                model_name = merged_model_name,
-                description = f'Merge of models {args["pretrained_model_name_or_path_list"]}'
-            )
-            mergeapp.model_manager.commit(CONFIG_FILE)
-            print('>> Merged model imported.')
-        except Exception as e:
-            print(f'** New model could not be committed to config.yaml: {str(e)}')
-            print('** DETAILS:')
-            print(traceback.format_exc())
-            
-
