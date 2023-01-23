@@ -608,7 +608,7 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
         model_description=default_description
     )
     vae = None
-    if input('Replace this model\'s VAE with "stabilityai/sd-vae-ft-se"? [n] ').strip() in ('y','Y'):
+    if input('Replace this model\'s VAE with "stabilityai/sd-vae-ft-mse"? [n] ').strip() in ('y','Y'):
         vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
 
     if not manager.import_diffuser_model(
