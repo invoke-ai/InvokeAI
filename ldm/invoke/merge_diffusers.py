@@ -29,6 +29,9 @@ def merge_diffusion_models(models:List['str'],
     '''
     config_file = global_config_file()
     model_manager = ModelManager(OmegaConf.load(config_file))
+    for mod in models:
+        assert (mod in model_manager.model_names()), f'** Unknown model "{mod}"'
+        assert (model_manager.model_info(mod).get('format',None) == 'diffusers'), f'** {mod} is not a diffusers model. It must be optimized before merging.'
     model_ids_or_paths = [model_manager.model_name_or_path(x) for x in models]
 
     pipe = DiffusionPipeline.from_pretrained(model_ids_or_paths[0],
