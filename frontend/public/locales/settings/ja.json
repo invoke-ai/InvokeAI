@@ -1,0 +1,14 @@
+{
+    "models": "モデル",
+    "displayInProgress": "生成中の画像を表示する",
+    "saveSteps": "nステップごとに画像を保存",
+    "confirmOnDelete": "削除時に確認",
+    "displayHelpIcons": "ヘルプアイコンを表示",
+    "useCanvasBeta": "キャンバスレイアウト(Beta)を使用する",
+    "enableImageDebugging": "画像のデバッグを有効化",
+    "resetWebUI": "WebUIをリセット",
+    "resetWebUIDesc1": "WebUIのリセットは、画像と保存された設定のキャッシュをリセットするだけです。画像を削除するわけではありません。",
+    "resetWebUIDesc2": "もしギャラリーに画像が表示されないなど、何か問題が発生した場合はGitHubにissueを提出する前にリセットを試してください。",
+    "resetComplete": "WebUIはリセットされました。F5を押して再読み込みしてください。"
+  }
+  
