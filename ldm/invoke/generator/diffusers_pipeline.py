@@ -39,6 +39,7 @@ from diffusers.utils.outputs import BaseOutput
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
+from ldm.invoke.globals import Globals
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, ThresholdSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
 
@@ -306,7 +307,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             textual_inversion_manager=self.textual_inversion_manager
         )
 
-        if is_xformers_available():
+        if is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,

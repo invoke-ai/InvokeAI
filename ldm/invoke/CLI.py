@@ -45,6 +45,7 @@ def main():
     Globals.try_patchmatch = args.patchmatch
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
+    Globals.disable_xformers = not args.xformers
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
@@ -902,7 +903,7 @@ def prepare_image_metadata(
         try:
             filename = opt.fnformat.format(**wildcards)
         except KeyError as e:
-            print(f'** The filename format contains an unknown key \'{e.args[0]}\'. Will use \'{{prefix}}.{{seed}}.png\' instead')
+            print(f'** The filename format contains an unknown key \'{e.args[0]}\'. Will use {{prefix}}.{{seed}}.png\' instead')
             filename = f'{prefix}.{seed}.png'
         except IndexError:
             print(f'** The filename format is broken or complete. Will use \'{{prefix}}.{{seed}}.png\' instead')

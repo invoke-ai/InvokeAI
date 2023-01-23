@@ -18,7 +18,9 @@ experience and preferences.
     InvokeAI and its dependencies. We offer two recipes: one suited to
     those who prefer the `conda` tool, and one suited to those who prefer
     `pip` and Python virtual environments. In our hands the pip install
-    is faster and more reliable, but your mileage may vary.
+    is faster and more reliable, but your mileage may vary. 
+    Note that the conda installation method is currently deprecated and 
+    will not be supported at some point in the future.
 
     This method is recommended for users who have previously used `conda`
     or `pip` in the past, developers, and anyone who wishes to remain on
