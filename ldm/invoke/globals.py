@@ -29,6 +29,7 @@ else:
 
 # Where to look for the initialization file
 Globals.initfile = 'invokeai.init'
+Globals.models_file = 'models.yaml'
 Globals.models_dir = 'models'
 Globals.config_dir = 'configs'
 Globals.autoscan_dir = 'weights'
@@ -43,8 +44,14 @@ Globals.always_use_cpu = False
 # The CLI will test connectivity at startup time.
 Globals.internet_available = True
 
+# Whether to disable xformers
+Globals.disable_xformers = False
+
 # whether we are forcing full precision
 Globals.full_precision = False
+
+def global_config_file()->Path:
+    return Path(Globals.root, Globals.config_dir, Globals.models_file)
 
 def global_config_dir()->Path:
     return Path(Globals.root, Globals.config_dir)

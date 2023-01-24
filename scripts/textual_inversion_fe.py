@@ -115,6 +115,14 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             value=self.precisions.index(saved_args.get('mixed_precision','fp16')),
             max_height=4,
         )
+        self.num_train_epochs = self.add_widget_intelligent(
+            npyscreen.TitleSlider,
+            name='Number of training epochs:',
+            out_of=1000,
+            step=50,
+            lowest=1,
+            value=saved_args.get('num_train_epochs',100)
+        )
         self.max_train_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
             name='Max Training Steps:',
@@ -130,6 +138,22 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             step=1,
             lowest=1,
             value=saved_args.get('train_batch_size',8),
+        )
+        self.gradient_accumulation_steps = self.add_widget_intelligent(
+            npyscreen.TitleSlider,
+            name='Gradient Accumulation Steps (may need to decrease this to resume from a checkpoint):',
+            out_of=10,
+            step=1,
+            lowest=1,
+            value=saved_args.get('gradient_accumulation_steps',4)
+        )
+        self.lr_warmup_steps = self.add_widget_intelligent(
+            npyscreen.TitleSlider,
+            name='Warmup Steps:',
+            out_of=100,
+            step=1,
+            lowest=0,
+            value=saved_args.get('lr_warmup_steps',0),
         )
         self.learning_rate = self.add_widget_intelligent(
             npyscreen.TitleText,
@@ -153,22 +177,6 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             max_height=7,
             scroll_exit = True,
             value=self.lr_schedulers.index(saved_args.get('lr_scheduler','constant')),
-        )
-        self.gradient_accumulation_steps = self.add_widget_intelligent(
-            npyscreen.TitleSlider,
-            name='Gradient Accumulation Steps:',
-            out_of=10,
-            step=1,
-            lowest=1,
-            value=saved_args.get('gradient_accumulation_steps',4)
-        )
-        self.lr_warmup_steps = self.add_widget_intelligent(
-            npyscreen.TitleSlider,
-            name='Warmup Steps:',
-            out_of=100,
-            step=1,
-            lowest=0,
-            value=saved_args.get('lr_warmup_steps',0),
         )
 
     def initializer_changed(self):
@@ -236,7 +244,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             
         # all the integers
         for attr in ('train_batch_size','gradient_accumulation_steps',
-                     'max_train_steps','lr_warmup_steps'):
+                     'num_train_epochs','max_train_steps','lr_warmup_steps'):
             args[attr] = int(getattr(self,attr).value)
 
         # the floats (just one)
@@ -324,6 +332,7 @@ if __name__ == '__main__':
         save_args(args)
 
         try:
+            print(f'DEBUG: args = {args}')
             do_textual_inversion_training(**args)
             copy_to_embeddings_folder(args)
         except Exception as e:
