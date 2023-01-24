@@ -42,7 +42,11 @@ VAE_TO_REPO_ID = { # hack, see note in convert_and_import()
     }
 
 class ModelManager(object):
-    def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
+    def __init__(self,
+                 config:OmegaConf,
+                 device_type:str='cpu',
+                 precision:str='float16',
+                 max_loaded_models=DEFAULT_MAX_MODELS):
         '''
         Initialize with the path to the models.yaml config file,
         the torch device type, and precision. The optional
@@ -565,7 +569,7 @@ class ModelManager(object):
             format='diffusers',
         )
         if isinstance(repo_or_path,Path) and repo_or_path.exists():
-            new_config.update(path=repo_or_path)
+            new_config.update(path=str(repo_or_path))
         else:
             new_config.update(repo_id=repo_or_path)
 

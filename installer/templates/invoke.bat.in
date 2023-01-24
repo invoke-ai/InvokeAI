@@ -10,8 +10,9 @@ echo Do you want to generate images using the
 echo 1. command-line
 echo 2. browser-based UI
 echo 3. run textual inversion training
-echo 4. open the developer console
-echo 5. re-run the configure script to download new models
+echo 4. merge models (diffusers type only)
+echo 5. open the developer console
+echo 6. re-run the configure script to download new models
 set /P restore="Please enter 1, 2, 3, 4 or 5: [5] "
 if not defined restore set restore=2
 IF /I "%restore%" == "1" (
@@ -24,6 +25,9 @@ IF /I "%restore%" == "1" (
     echo Starting textual inversion training..
     python .venv\Scripts\textual_inversion_fe.py --web %*
 ) ELSE IF /I "%restore%" == "4" (
+    echo Starting model merging script..
+    python .venv\Scripts\merge_models_fe.py --web %*
+) ELSE IF /I "%restore%" == "5" (
     echo Developer Console
     echo Python command is:
     where python
@@ -35,7 +39,7 @@ IF /I "%restore%" == "1" (
     echo *************************
     echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
     call cmd /k
-) ELSE IF /I "%restore%" == "5" (
+) ELSE IF /I "%restore%" == "6" (
     echo Running configure_invokeai.py...
     python .venv\Scripts\configure_invokeai.py --web %*
 ) ELSE (

@@ -1,0 +1,16 @@
+{
+    "feature": {
+      "prompt": "これはプロンプトフィールドです。プロンプトには生成オブジェクトや文法用語が含まれます。プロンプトにも重み(Tokenの重要度)を付けることができますが、CLIコマンドやパラメータは機能しません。",
+      "gallery": "ギャラリーは、出力先フォルダから生成物を表示します。設定はファイル内に保存され、コンテキストメニューからアクセスできます。.",
+      "other": "These options will enable alternative processing modes for Invoke. 'Seamless tiling' will create repeating patterns in the output. 'High resolution' is generation in two steps with img2img: use this setting when you want a larger and more coherent image without artifacts. It will take longer that usual txt2img.",
+      "seed": "シード値は、画像が形成される際の初期ノイズに影響します。以前の画像から既に存在するシードを使用することができます。ノイズしきい値は高いCFG値でのアーティファクトを軽減するために使用され、Perlinは生成中にPerlinノイズを追加します(0-10の範囲を試してみてください): どちらも出力にバリエーションを追加するのに役立ちます。",
+      "variations": "0.1から1.0の間の値で試し、付与されたシードに対する結果を変えてみてください。面白いバリュエーションは0.1〜0.3の間です。",
+      "upscale": "生成直後の画像をアップスケールするには、ESRGANを使用します。",
+      "faceCorrection": "GFPGANまたはCodeformerによる顔の修復: 画像内の顔を検出し不具合を修正するアルゴリズムです。高い値を設定すると画像がより変化し、より魅力的な顔になります。Codeformerは顔の修復を犠牲にして、元の画像をできる限り保持します。",
+      "imageToImage": "Image To Imageは任意の画像を初期値として読み込み、プロンプトとともに新しい画像を生成するために使用されます。値が高いほど結果画像はより変化します。0.0から1.0までの値が可能で、推奨範囲は0.25から0.75です。",
+      "boundingBox": "バウンディングボックスは、Text To ImageまたはImage To Imageの幅/高さの設定と同じです。ボックス内の領域のみが処理されます。",
+      "seamCorrection": "キャンバス上の生成された画像間に発生する可視可能な境界の処理を制御します。",
+      "infillAndScaling": "Manage infill methods (used on masked or erased areas of the canvas) and scaling (useful for small bounding box sizes)."
+    }
+  }
+  
