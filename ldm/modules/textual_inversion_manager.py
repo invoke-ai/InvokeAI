@@ -38,11 +38,15 @@ class TextualInversionManager():
             if concept_name in self.hf_concepts_library.concepts_loaded:
                 continue
             trigger = self.hf_concepts_library.concept_to_trigger(concept_name)
-            if self.has_textual_inversion_for_trigger_string(trigger):
+            if self.has_textual_inversion_for_trigger_string(trigger) \
+               or self.has_textual_inversion_for_trigger_string(concept_name) \
+               or self.has_textual_inversion_for_trigger_string(f'<{concept_name}>'):  # in case a token with literal angle brackets encountered
+                print(f'>> Loaded local embedding for trigger {concept_name}')
                 continue
             bin_file = self.hf_concepts_library.get_concept_model_path(concept_name)
             if not bin_file:
                 continue
+            print(f'>> Loaded remote embedding for trigger {concept_name}')
             self.load_textual_inversion(bin_file)
             self.hf_concepts_library.concepts_loaded[concept_name]=True
 
@@ -50,6 +54,8 @@ class TextualInversionManager():
         return [ti.trigger_string for ti in self.textual_inversions]
 
     def load_textual_inversion(self, ckpt_path, defer_injecting_tokens: bool=False):
+        if str(ckpt_path).endswith('.DS_Store'):
+            return
         try:
             scan_result = scan_file_path(ckpt_path)
             if scan_result.infected_files == 1:
