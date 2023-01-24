@@ -1,6 +1,6 @@
 <div align="center">
 
-![project logo](docs/assets/invoke_ai_banner.png)
+![project logo](https://github.com/mauwii/InvokeAI/raw/main/docs/assets/invoke_ai_banner.png)
 
 # InvokeAI: A Stable Diffusion Toolkit
 
@@ -28,6 +28,7 @@
 [latest commit to main link]: https://github.com/invoke-ai/InvokeAI/commits/main
 [latest release badge]: https://flat.badgen.net/github/release/invoke-ai/InvokeAI/development?icon=github
 [latest release link]: https://github.com/invoke-ai/InvokeAI/releases
+
 </div>
 
 InvokeAI is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. InvokeAI offers an industry leading Web Interface, interactive Command Line Interface, and also serves as the foundation for multiple commercial products.
@@ -38,8 +39,11 @@ _Note: InvokeAI is rapidly evolving. Please use the
 [Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to report bugs and make feature
 requests. Be sure to use the provided templates. They will help us diagnose issues faster._
 
+<div align="center">
 
-![canvas preview](docs/assets/canvas_preview.png)
+![canvas preview](https://github.com/mauwii/InvokeAI/raw/main/docs/assets/canvas_preview.png)
+
+</div>
 
 # Getting Started with InvokeAI
 
@@ -81,6 +85,7 @@ instructions, please see:
 InvokeAI is supported across Linux, Windows and macOS. Linux
 users can use either an Nvidia-based card (with CUDA support) or an
 AMD card (using the ROCm driver).
+
 #### System
 
 You will need one of the following:
@@ -104,19 +109,24 @@ to render 512x512 images.
 
 Feature documentation can be reviewed by navigating to [the InvokeAI Documentation page](https://invoke-ai.github.io/InvokeAI/features/)
 
-### *Web Server & UI* 
+### *Web Server & UI*
+
 InvokeAI offers a locally hosted Web Server & React Frontend, with an industry leading user experience. The Web-based UI allows for simple and intuitive workflows, and is responsive for use on mobile devices and tablets accessing the web server.
 
 ### *Unified Canvas*
+
 The Unified Canvas is a fully integrated canvas implementation with support for all core generation capabilities, in/outpainting, brush tools, and more. This creative tool unlocks the capability for artists to create with AI as a creative collaborator, and can be used to augment AI-generated imagery, sketches, photography, renders, and more.
 
 ### *Advanced Prompt Syntax*
+
 InvokeAI's advanced prompt syntax allows for token weighting, cross-attention control, and prompt blending, allowing for fine-tuned tweaking of your invocations and exploration of the latent space.
 
 ### *Command Line Interface*
+
 For users utilizing a terminal-based environment, or who want to take advantage of CLI features, InvokeAI offers an extensive and actively supported command-line interface that provides the full suite of generation functionality available in the tool.
 
 ### Other features
+
 - *Support for both ckpt and diffusers models*
 - *SD 2.0, 2.1 support*
 - *Noise Control & Tresholding*
@@ -126,6 +136,7 @@ For users utilizing a terminal-based environment, or who want to take advantage 
 - *Model Manager & Support*
 
 ### Coming Soon
+
 - *Node-Based Architecture & UI*
 - And more...
 
@@ -149,7 +160,7 @@ To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the 
 
 If you are unfamiliar with how
 to contribute to GitHub projects, here is a
-[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress. You can **make your pull request against the "main" branch**. 
+[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). A full set of contribution guidelines, along with templates, are in progress. You can **make your pull request against the "main" branch**.
 
 We hope you enjoy using our software as much as we enjoy creating it,
 and we hope that some of those of you who are reading this will elect
