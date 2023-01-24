@@ -254,65 +254,10 @@ steps:
     source invokeai/bin/activate
     ```
 
-4.  Pick the correct `requirements*.txt` file for your hardware and operating
-    system.
-
-    We have created a series of environment files suited for different operating
-    systems and GPU hardware. They are located in the
-    `environments-and-requirements` directory:
-
-    <figure markdown>
-
-    |              filename               |                               OS                                |
-    | :---------------------------------: | :-------------------------------------------------------------: |
-    |      requirements-lin-amd.txt       |                  Linux with an AMD (ROCm) GPU                   |
-    |     requirements-lin-arm64.txt      |                 Linux running on arm64 systems                  |
-    |      requirements-lin-cuda.txt      |                 Linux with an NVIDIA (CUDA) GPU                 |
-    |    requirements-mac-mps-cpu.txt     |                Macintoshes with MPS acceleration                |
-    | requirements-lin-win-colab-cuda.txt | Windows with an NVIDA (CUDA) GPU<br>(supports Google Colab too) |
-
-    </figure>
-
-    Select the appropriate requirements file, and make a link to it from
-    `requirements.txt` in the top-level InvokeAI directory. The command to do
-    this from the top-level directory is:
-
-    !!! example ""
-
-        === "Macintosh and Linux"
-
-            !!! info "Replace `xxx` and `yyy` with the appropriate OS and GPU codes."
-
-            ```bash
-            ln -sf environments-and-requirements/requirements-xxx-yyy.txt requirements.txt
-            ```
-
-        === "Windows"
-
-            !!! info "on Windows, admin privileges are required to make links, so we use the copy command instead"
-
-            ```cmd
-            copy environments-and-requirements\requirements-lin-win-colab-cuda.txt requirements.txt
-            ```
-
-        !!! warning
-
-            Please do not link or copy `environments-and-requirements/requirements-base.txt`.
-            This is a base requirements file that does not have the platform-specific
-            libraries. Also, be sure to link or copy the platform-specific file to
-	    a top-level file named `requirements.txt` as shown here. Running pip on
-	    a requirements file in a subdirectory will not work as expected.
-
-    When this is done, confirm that a file named `requirements.txt` has been
-    created in the InvokeAI root directory and that it points to the correct
-    file in `environments-and-requirements`.
-
-5.  Run PIP
-
-    Be sure that the `invokeai` environment is active before doing this:
+4.  Run PIP
 
     ```bash
-    pip install --prefer-binary -r requirements.txt
+    pip --python invokeai install --use-pep517 .
     ```
 
 ---
