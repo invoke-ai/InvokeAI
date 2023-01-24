@@ -844,6 +844,7 @@ class Generate:
             model_data = cache.get_model(model_name)
         except Exception as e:
             print(f'** model {model_name} could not be loaded: {str(e)}')
+            print(traceback.format_exc(), file=sys.stderr)
             if previous_model_name is None:
                 raise e
             print(f'** trying to reload previous model')
