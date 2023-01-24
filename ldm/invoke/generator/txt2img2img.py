@@ -15,6 +15,9 @@ from ldm.models.diffusion.shared_invokeai_diffusion import ThresholdSettings
 
 
 class Txt2Img2Img(Generator):
+    init_width: int
+    init_height: int
+
     def __init__(self, model, precision):
         super().__init__(model, precision)
         self.init_latent = None    # for get_noise()
@@ -38,10 +41,32 @@ class Txt2Img2Img(Generator):
                 uc, c, cfg_scale, extra_conditioning_info,
                 threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
-        scale_dim = min(width, height)
-        scale = 512 / scale_dim
 
-        init_width, init_height = trim_to_multiple_of(scale * width, scale * height)
+        # Scale the input width and height for the initial generation
+        # Make their area equivalent to the model's resolution area (e.g. 512*512 = 262144),
+        # while keeping the minimum dimension at least 0.5 * resolution (e.g. 512*0.5 = 256)
+
+        aspect = width / height
+        dimension = 512
+        try:
+            dimension = self.model.unet.config.sample_size * self.model.vae_scale_factor
+        except:
+            pass
+        min_dimension = math.floor(dimension * 0.5)
+
+        model_area = dimension * dimension # hardcoded for now
+
+        if aspect > 1.0:
+            init_height = max(min_dimension, math.sqrt(model_area / aspect))
+            init_width = init_height * aspect
+        else:
+            init_width = max(min_dimension, math.sqrt(model_area * aspect))
+            init_height = init_width / aspect
+
+        init_width, init_height = trim_to_multiple_of(math.floor(init_width), math.floor(init_height))
+        self.init_width = init_width
+        self.init_height = init_height
+        print(f"\n>> Using initial resolution of {init_width}x{init_height}")
 
         def make_image(x_T):
 
@@ -111,6 +136,9 @@ class Txt2Img2Img(Generator):
             scale = math.sqrt(trained_square / actual_square)
             scaled_width = math.ceil(scale * width / 64) * 64
             scaled_height = math.ceil(scale * height / 64) * 64
+            # Use our previously calculated values from get_make_image if that's been called.
+            scaled_width = self.init_width or scaled_width
+            scaled_height = self.init_height or scaled_height
         else:
             scaled_width = width
             scaled_height = height
