@@ -1,0 +1,17 @@
+{
+    "generations": "Generations",
+    "showGenerations": "Show Generations",
+    "uploads": "アップロード",
+    "showUploads": "アップロードした画像を見る",
+    "galleryImageSize": "画像のサイズ",
+    "galleryImageResetSize": "サイズをリセット",
+    "gallerySettings": "ギャラリーの設定",
+    "maintainAspectRatio": "アスペクト比を維持",
+    "autoSwitchNewImages": "Auto-Switch to New Images",
+    "singleColumnLayout": "シングルカラムレイアウト",
+    "pinGallery": "ギャラリーにピン留め",
+    "allImagesLoaded": "すべての画像を読み込む",
+    "loadMore": "さらに読み込む",
+    "noImagesInGallery": "ギャラリーに画像がありません"
+  }
+  

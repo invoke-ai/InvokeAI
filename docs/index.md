@@ -93,9 +93,15 @@ getting InvokeAI up and running on your system. For alternative installation and
 upgrade instructions, please see:
 [InvokeAI Installation Overview](installation/)
 
-Linux users who wish to make use of the PyPatchMatch inpainting functions will
-need to perform a bit of extra work to enable this module. Instructions can be
-found at [Installing PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md).
+Users who wish to make use of the **PyPatchMatch** inpainting functions
+will need to perform a bit of extra work to enable this
+module. Instructions can be found at [Installing
+PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md).
+
+If you have an NVIDIA card, you can benefit from the significant
+memory savings and performance benefits provided by Facebook Lab's
+**xFormers** module. Instructions for Linux and Windows users can be found
+at [Installing xFormers](installation/070_INSTALL_XFORMERS.md).
 
 ## :fontawesome-solid-computer: Hardware Requirements
 
@@ -150,6 +156,8 @@ images in full-precision mode:
 - [Generating Variations](features/VARIATIONS.md)
 <!-- seperator -->
 - [Prompt Engineering](features/PROMPTS.md)
+<!-- seperator -->
+- [Model Merging](features/MODEL_MERGING.md)
 <!-- seperator -->
 - Miscellaneous
   - [NSFW Checker](features/NSFW.md)
