@@ -146,7 +146,7 @@ class Generate:
             gfpgan=None,
             codeformer=None,
             esrgan=None,
-            free_gpu_mem=False,
+            free_gpu_mem: bool=False,
             safety_checker:bool=False,
             max_loaded_models:int=2,
             # these are deprecated; if present they override values in the conf file
@@ -464,10 +464,13 @@ class Generate:
         init_image = None
         mask_image = None
 
-
-        if self.free_gpu_mem and self.model.cond_stage_model.device != self.model.device:
-            self.model.cond_stage_model.device = self.model.device
-            self.model.cond_stage_model.to(self.model.device)
+        try:
+            if self.free_gpu_mem and self.model.cond_stage_model.device != self.model.device:
+                self.model.cond_stage_model.device = self.model.device
+                self.model.cond_stage_model.to(self.model.device)
+        except AttributeError:
+            print(">> Warning: '--free_gpu_mem' is not yet supported when generating image using model based on HuggingFace Diffuser.")
+            pass
 
         try:
             uc, c, extra_conditioning_info = get_uc_and_c_and_ec(
@@ -535,6 +538,7 @@ class Generate:
                 inpaint_height = inpaint_height,
                 inpaint_width = inpaint_width,
                 enable_image_debugging = enable_image_debugging,
+                free_gpu_mem=self.free_gpu_mem,
             )
 
             if init_color:

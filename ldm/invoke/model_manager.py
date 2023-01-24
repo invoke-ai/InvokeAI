@@ -37,7 +37,11 @@ from ldm.util import instantiate_from_config, ask_user
 DEFAULT_MAX_MODELS=2
 
 class ModelManager(object):
-    def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
+    def __init__(self,
+                 config:OmegaConf,
+                 device_type:str='cpu',
+                 precision:str='float16',
+                 max_loaded_models=DEFAULT_MAX_MODELS):
         '''
         Initialize with the path to the models.yaml config file,
         the torch device type, and precision. The optional
@@ -143,7 +147,7 @@ class ModelManager(object):
         Return true if this is a legacy (.ckpt) model
         '''
         info = self.model_info(model_name)
-        if 'weights' in info and info['weights'].endswith('.ckpt'):
+        if 'weights' in info and info['weights'].endswith(('.ckpt','.safetensors')):
             return True
         return False
 
@@ -362,8 +366,14 @@ class ModelManager(object):
                 vae = os.path.normpath(os.path.join(Globals.root,vae))
             if os.path.exists(vae):
                 print(f'   | Loading VAE weights from: {vae}')
-                vae_ckpt = torch.load(vae, map_location="cpu")
-                vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
+                vae_ckpt = None
+                vae_dict = None
+                if vae.endswith('.safetensors'):
+                    vae_ckpt = safetensors.torch.load_file(vae)
+                    vae_dict = {k: v for k, v in vae_ckpt.items() if k[0:4] != "loss"}
+                else:
+                    vae_ckpt = torch.load(vae, map_location="cpu")
+                    vae_dict = {k: v for k, v in vae_ckpt['state_dict'].items() if k[0:4] != "loss"}
                 model.first_stage_model.load_state_dict(vae_dict, strict=False)
             else:
                 print(f'   | VAE file {vae} not found. Skipping.')
@@ -536,7 +546,7 @@ class ModelManager(object):
             format='diffusers',
         )
         if isinstance(repo_or_path,Path) and repo_or_path.exists():
-            new_config.update(path=repo_or_path)
+            new_config.update(path=str(repo_or_path))
         else:
             new_config.update(repo_id=repo_or_path)
 
