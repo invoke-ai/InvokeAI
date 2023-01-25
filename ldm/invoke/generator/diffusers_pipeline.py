@@ -307,8 +307,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
         else:
-            slice_size = 2
+            slice_size = 4 # or 2, or 8. i chose this arbitrarily.
             self.enable_attention_slicing(slice_size=slice_size)
+
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,
