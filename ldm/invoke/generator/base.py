@@ -117,7 +117,7 @@ class Generator:
                     attention_maps_image = None if len(attention_maps_images)==0 else attention_maps_images[-1]
                     image_callback(image, seed, first_seed=first_seed, attention_maps_image=attention_maps_image)
 
-                seed = self.new_seed()
+                seed = self.new_seed(seed) # for determinism in iterations, provide the last seed as a seed for the PRNG.
 
         return results
 
@@ -240,7 +240,10 @@ class Generator:
         noise = torch.stack([rand_perlin_2d((height, width), (8, 8), device = self.model.device).to(fixdevice) for _ in range(self.latent_channels)], dim=0).to(self.model.device)
         return noise
 
-    def new_seed(self):
+    def new_seed(self, last_seed = None):
+        # Use last_seed to generate determinism from the PRNG - useful for iterations
+        if last_seed is not None:
+            random.seed(last_seed)
         self.seed = random.randrange(0, np.iinfo(np.uint32).max)
         return self.seed
 
