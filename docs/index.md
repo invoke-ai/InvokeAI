@@ -157,6 +157,8 @@ images in full-precision mode:
 <!-- seperator -->
 - [Prompt Engineering](features/PROMPTS.md)
 <!-- seperator -->
+- [Model Merging](features/MODEL_MERGING.md)
+<!-- seperator -->
 - Miscellaneous
   - [NSFW Checker](features/NSFW.md)
   - [Embiggen upscaling](features/EMBIGGEN.md)

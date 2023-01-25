@@ -18,7 +18,9 @@ import traceback
 import warnings
 import safetensors.torch
 from pathlib import Path
+from shutil import move, rmtree
 from typing import Union, Any
+from huggingface_hub import scan_cache_dir
 from ldm.util import download_with_progress_bar
 
 import torch
@@ -35,9 +37,16 @@ from ldm.invoke.globals import Globals, global_models_dir, global_autoscan_dir, 
 from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
+VAE_TO_REPO_ID = { # hack, see note in convert_and_import()
+    'vae-ft-mse-840000-ema-pruned':  'stabilityai/sd-vae-ft-mse',
+    }
 
 class ModelManager(object):
-    def __init__(self, config:OmegaConf, device_type:str, precision:str, max_loaded_models=DEFAULT_MAX_MODELS):
+    def __init__(self,
+                 config:OmegaConf,
+                 device_type:str='cpu',
+                 precision:str='float16',
+                 max_loaded_models=DEFAULT_MAX_MODELS):
         '''
         Initialize with the path to the models.yaml config file,
         the torch device type, and precision. The optional
@@ -143,7 +152,7 @@ class ModelManager(object):
         Return true if this is a legacy (.ckpt) model
         '''
         info = self.model_info(model_name)
-        if 'weights' in info and info['weights'].endswith('.ckpt'):
+        if 'weights' in info and info['weights'].endswith(('.ckpt','.safetensors')):
             return True
         return False
 
@@ -226,7 +235,7 @@ class ModelManager(object):
                 line = f'\033[1m{line}\033[0m'
             print(line)
 
-    def del_model(self, model_name:str) -> None:
+    def del_model(self, model_name:str, delete_files:bool=False) -> None:
         '''
         Delete the named model.
         '''
@@ -234,9 +243,25 @@ class ModelManager(object):
         if model_name not in omega:
             print(f'** Unknown model {model_name}')
             return
+        # save these for use in deletion later
+        conf = omega[model_name]
+        repo_id = conf.get('repo_id',None)
+        path = self._abs_path(conf.get('path',None))
+        weights = self._abs_path(conf.get('weights',None))
+
         del omega[model_name]
         if model_name in self.stack:
             self.stack.remove(model_name)
+        if delete_files:
+            if weights:
+                print(f'** deleting file {weights}')
+                Path(weights).unlink(missing_ok=True)
+            elif path:
+                print(f'** deleting directory {path}')
+                rmtree(path,ignore_errors=True)
+            elif repo_id:
+                print(f'** deleting the cached model directory for {repo_id}')
+                self._delete_model_from_cache(repo_id)
 
     def add_model(self, model_name:str, model_attributes:dict, clobber:bool=False) -> None:
         '''
@@ -362,8 +387,14 @@ class ModelManager(object):
                 vae = os.path.normpath(os.path.join(Globals.root,vae))
             if os.path.exists(vae):
                 print(f'   | Loading VAE weights from: {vae}')
-                vae_ckpt = torch.load(vae, map_location="cpu")
-                vae_dict = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss"}
+                vae_ckpt = None
+                vae_dict = None
+                if vae.endswith('.safetensors'):
+                    vae_ckpt = safetensors.torch.load_file(vae)
+                    vae_dict = {k: v for k, v in vae_ckpt.items() if k[0:4] != "loss"}
+                else:
+                    vae_ckpt = torch.load(vae, map_location="cpu")
+                    vae_dict = {k: v for k, v in vae_ckpt['state_dict'].items() if k[0:4] != "loss"}
                 model.first_stage_model.load_state_dict(vae_dict, strict=False)
             else:
                 print(f'   | VAE file {vae} not found. Skipping.')
@@ -407,7 +438,7 @@ class ModelManager(object):
             safety_checker=None,
             local_files_only=not Globals.internet_available
         )
-        if 'vae' in mconfig:
+        if 'vae' in mconfig and mconfig['vae'] is not None:
              vae = self._load_vae(mconfig['vae'])
              pipeline_args.update(vae=vae)
         if not isinstance(name_or_path,Path):
@@ -513,11 +544,12 @@ class ModelManager(object):
             print('>> Model scanned ok!')
 
     def import_diffuser_model(self,
-                        repo_or_path:Union[str,Path],
-                        model_name:str=None,
-                        description:str=None,
-                        commit_to_conf:Path=None,
-                        )->bool:
+                              repo_or_path:Union[str,Path],
+                              model_name:str=None,
+                              description:str=None,
+                              vae:dict=None,
+                              commit_to_conf:Path=None,
+                              )->bool:
         '''
         Attempts to install the indicated diffuser model and returns True if successful.
 
@@ -533,10 +565,11 @@ class ModelManager(object):
         description = description or f'imported diffusers model {model_name}'
         new_config = dict(
             description=description,
+            vae=vae,
             format='diffusers',
         )
         if isinstance(repo_or_path,Path) and repo_or_path.exists():
-            new_config.update(path=repo_or_path)
+            new_config.update(path=str(repo_or_path))
         else:
             new_config.update(repo_id=repo_or_path)
 
@@ -546,17 +579,21 @@ class ModelManager(object):
         return True
 
     def import_ckpt_model(self,
-                    weights:Union[str,Path],
-                    config:Union[str,Path]='configs/stable-diffusion/v1-inference.yaml',
-                    model_name:str=None,
-                    model_description:str=None,
-                    commit_to_conf:Path=None,
-    )->bool:
+                          weights:Union[str,Path],
+                          config:Union[str,Path]='configs/stable-diffusion/v1-inference.yaml',
+                          vae:Union[str,Path]=None,
+                          model_name:str=None,
+                          model_description:str=None,
+                          commit_to_conf:Path=None,
+                          )->bool:
         '''
         Attempts to install the indicated ckpt file and returns True if successful.
 
         "weights" can be either a path-like object corresponding to a local .ckpt file
         or a http/https URL pointing to a remote model.
+
+        "vae" is a Path or str object pointing to a ckpt or safetensors file to be used
+        as the VAE for this model.
 
         "config" is the model config file to use with this ckpt file. It defaults to
         v1-inference.yaml. If a URL is provided, the config will be downloaded.
@@ -584,6 +621,8 @@ class ModelManager(object):
             width=512,
             height=512
         )
+        if vae:
+            new_config['vae'] = vae
         self.add_model(model_name, new_config, True)
         if commit_to_conf:
             self.commit(commit_to_conf)
@@ -623,7 +662,7 @@ class ModelManager(object):
 
     def convert_and_import(self,
                            ckpt_path:Path,
-                           diffuser_path:Path,
+                           diffusers_path:Path,
                            model_name=None,
                            model_description=None,
                            commit_to_conf:Path=None,
@@ -635,45 +674,55 @@ class ModelManager(object):
         new_config = None
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
         import transformers
-        if diffuser_path.exists():
-            print(f'ERROR: The path {str(diffuser_path)} already exists. Please move or remove it and try again.')
+        if diffusers_path.exists():
+            print(f'ERROR: The path {str(diffusers_path)} already exists. Please move or remove it and try again.')
             return
 
-        model_name = model_name or diffuser_path.name
+        model_name = model_name or diffusers_path.name
         model_description = model_description or 'Optimized version of {model_name}'
-        print(f'>> {model_name}: optimizing (30-60s).')
+        print(f'>> Optimizing {model_name} (30-60s)')
         try:
             verbosity =transformers.logging.get_verbosity()
             transformers.logging.set_verbosity_error()
-            convert_ckpt_to_diffuser(ckpt_path, diffuser_path,extract_ema=True)
+            convert_ckpt_to_diffuser(ckpt_path, diffusers_path,extract_ema=True)
             transformers.logging.set_verbosity(verbosity)
-            print(f'>> Success. Optimized model is now located at {str(diffuser_path)}')
-            print(f'>> Writing new config file entry for {model_name}...',end='')
+            print(f'>> Success. Optimized model is now located at {str(diffusers_path)}')
+            print(f'>> Writing new config file entry for {model_name}')
             new_config = dict(
-                path=str(diffuser_path),
+                path=str(diffusers_path),
                 description=model_description,
                 format='diffusers',
             )
+
+            # HACK (LS): in the event that the original entry is using a custom ckpt VAE, we try to
+            # map that VAE onto a diffuser VAE using a hard-coded dictionary.
+            # I would prefer to do this differently: We load the ckpt model into memory, swap the
+            # VAE in memory, and then pass that to convert_ckpt_to_diffuser() so that the swapped
+            # VAE is built into the model. However, when I tried this I got obscure key errors.
+            if model_name in self.config and (vae_ckpt_path := self.model_info(model_name)['vae']):
+                vae_basename = Path(vae_ckpt_path).stem
+                diffusers_vae = None
+                if (diffusers_vae := VAE_TO_REPO_ID.get(vae_basename,None)):
+                    print(f'>> {vae_basename} VAE corresponds to known {diffusers_vae} diffusers version')
+                    new_config.update(
+                        vae = {'repo_id': diffusers_vae}
+                    )
+                else:
+                    print(f'** Custom VAE "{vae_basename}" found, but corresponding diffusers model unknown')
+                    print(f'** Using "stabilityai/sd-vae-ft-mse"; If this isn\'t right, please edit the model config')
+                    new_config.update(
+                        vae = {'repo_id': 'stabilityai/sd-vae-ft-mse'}
+                    )
+
             self.del_model(model_name)
             self.add_model(model_name, new_config, True)
             if commit_to_conf:
                 self.commit(commit_to_conf)
+            print('>> Conversion succeeded')
         except Exception as e:
             print(f'** Conversion failed: {str(e)}')
-            traceback.print_exc()
 
-        print('done.')
         return new_config
-
-    def del_config(self, model_name:str, gen, opt, completer):
-        current_model = gen.model_name
-        if model_name == current_model:
-            print("** Can't delete active model. !switch to another model first. **")
-            return
-        gen.model_manager.del_model(model_name)
-        gen.model_manager.commit(opt.conf)
-        print(f'** {model_name} deleted')
-        completer.del_model(model_name)
 
     def search_models(self, search_folder):
         print(f'>> Finding Models In: {search_folder}')
@@ -756,7 +805,6 @@ class ModelManager(object):
 
         print('** Legacy version <= 2.2.5 model directory layout detected. Reorganizing.')
         print('** This is a quick one-time operation.')
-        from shutil import move, rmtree
 
         # transformer files get moved into the hub directory
         if cls._is_huggingface_hub_directory_present():
@@ -971,6 +1019,27 @@ class ModelManager(object):
             print(f'** Could not load VAE {name_or_path}: {str(deferred_error)}')
 
         return vae
+
+    @staticmethod
+    def _delete_model_from_cache(repo_id):
+        cache_info = scan_cache_dir(global_cache_dir('diffusers'))
+
+        # I'm sure there is a way to do this with comprehensions
+        # but the code quickly became incomprehensible!
+        hashes_to_delete = set()
+        for repo in cache_info.repos:
+            if repo.repo_id==repo_id:
+                for revision in repo.revisions:
+                    hashes_to_delete.add(revision.commit_hash)
+        strategy = cache_info.delete_revisions(*hashes_to_delete)
+        print(f'** deletion of this model is expected to free {strategy.expected_freed_size_str}')
+        strategy.execute()
+
+    @staticmethod
+    def _abs_path(path:Union(str,Path))->Path:
+        if path is None or Path(path).is_absolute():
+            return path
+        return Path(Globals.root,path).resolve()
 
     @staticmethod
     def _is_huggingface_hub_directory_present() -> bool:
