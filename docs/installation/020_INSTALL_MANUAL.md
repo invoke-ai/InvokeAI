@@ -119,10 +119,8 @@ manager, please follow these steps:
 
 6.  Run PIP
 
-    Be sure that the `invokeai` environment is active before doing this:
-
     ```bash
-    pip install --prefer-binary -r requirements.txt
+    pip --python invokeai install --use-pep517 .
     ```
 
 7.  Set up the runtime directory
@@ -137,7 +135,7 @@ manager, please follow these steps:
     default to `invokeai` in your home directory.
 
     ```bash
-    configure_invokeai.py --root_dir ~/Programs/invokeai
+    configure_invokeai --root_dir ~/Programs/invokeai
     ```
 
     The script `configure_invokeai.py` will interactively guide you through the
@@ -452,7 +450,7 @@ time. Note that this method only works with the PIP method.
    step.
 
 3. Run one additional step while you are in the source code repository
-   directory `pip install .` (note the dot at the end).
+   directory `pip install --use-pep517 .` (note the dot at the end).
 
 4. That's all! Now, whenever you activate the virtual environment,
    `invoke.py` will know where to look for the runtime directory without

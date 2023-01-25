@@ -1,0 +1,208 @@
+{
+    "keyboardShortcuts": "キーボードショートカット",
+    "appHotkeys": "アプリのホットキー",
+    "generalHotkeys": "Generalのホットキー",
+    "galleryHotkeys": "ギャラリーのホットキー",
+    "unifiedCanvasHotkeys": "Unified Canvasのホットキー",
+    "invoke": {
+      "title": "Invoke",
+      "desc": "画像を生成"
+    },
+    "cancel": {
+      "title": "キャンセル",
+      "desc": "画像の生成をキャンセル"
+    },
+    "focusPrompt": {
+      "title": "Focus Prompt",
+      "desc": "プロンプトテキストボックスにフォーカス"
+    },
+    "toggleOptions": {
+      "title": "オプションパネルのトグル",
+      "desc": "オプションパネルの開閉"
+    },
+    "pinOptions": {
+      "title": "ピン",
+      "desc": "オプションパネルを固定"
+    },
+    "toggleViewer": {
+      "title": "ビュワーのトグル",
+      "desc": "ビュワーを開閉"
+    },
+    "toggleGallery": {
+      "title": "ギャラリーのトグル",
+      "desc": "ギャラリードロワーの開閉"
+    },
+    "maximizeWorkSpace": {
+      "title": "作業領域の最大化",
+      "desc": "パネルを閉じて、作業領域を最大に"
+    },
+    "changeTabs": {
+      "title": "タブの切替",
+      "desc": "他の作業領域と切替"
+    },
+    "consoleToggle": {
+      "title": "コンソールのトグル",
+      "desc": "コンソールの開閉"
+    },
+    "setPrompt": {
+      "title": "プロンプトをセット",
+      "desc": "現在の画像のプロンプトを使用"
+    },
+    "setSeed": {
+      "title": "シード値をセット",
+      "desc": "現在の画像のシード値を使用"
+    },
+    "setParameters": {
+      "title": "パラメータをセット",
+      "desc": "現在の画像のすべてのパラメータを使用"
+    },
+    "restoreFaces": {
+      "title": "顔の修復",
+      "desc": "現在の画像を修復"
+    },
+    "upscale": {
+      "title": "アップスケール",
+      "desc": "現在の画像をアップスケール"
+    },
+    "showInfo": {
+      "title": "情報を見る",
+      "desc": "現在の画像のメタデータ情報を表示"
+    },
+    "sendToImageToImage": {
+      "title": "Image To Imageに転送",
+      "desc": "現在の画像をImage to Imageに転送"
+    },
+    "deleteImage": {
+      "title": "画像を削除",
+      "desc": "現在の画像を削除"
+    },
+    "closePanels": {
+      "title": "パネルを閉じる",
+      "desc": "開いているパネルを閉じる"
+    },
+    "previousImage": {
+      "title": "前の画像",
+      "desc": "ギャラリー内の1つ前の画像を表示"
+    },
+    "nextImage": {
+      "title": "次の画像",
+      "desc": "ギャラリー内の1つ後の画像を表示"
+    },
+    "toggleGalleryPin": {
+      "title": "ギャラリードロワーの固定",
+      "desc": "ギャラリーをUIにピン留め/解除"
+    },
+    "increaseGalleryThumbSize": {
+      "title": "ギャラリーの画像を拡大",
+      "desc": "ギャラリーのサムネイル画像を拡大"
+    },
+    "decreaseGalleryThumbSize": {
+      "title": "ギャラリーの画像サイズを縮小",
+      "desc": "ギャラリーのサムネイル画像を縮小"
+    },
+    "selectBrush": {
+      "title": "ブラシを選択",
+      "desc": "ブラシを選択"
+    },
+    "selectEraser": {
+      "title": "消しゴムを選択",
+      "desc": "消しゴムを選択"
+    },
+    "decreaseBrushSize": {
+      "title": "ブラシサイズを縮小",
+      "desc": "ブラシ/消しゴムのサイズを縮小"
+    },
+    "increaseBrushSize": {
+      "title": "ブラシサイズを拡大",
+      "desc": "ブラシ/消しゴムのサイズを拡大"
+    },
+    "decreaseBrushOpacity": {
+      "title": "ブラシの不透明度を下げる",
+      "desc": "キャンバスブラシの不透明度を下げる"
+    },
+    "increaseBrushOpacity": {
+      "title": "ブラシの不透明度を上げる",
+      "desc": "キャンバスブラシの不透明度を上げる"
+    },
+    "moveTool": {
+      "title": "Move Tool",
+      "desc": "Allows canvas navigation"
+    },
+    "fillBoundingBox": {
+      "title": "バウンディングボックスを塗りつぶす",
+      "desc": "ブラシの色でバウンディングボックス領域を塗りつぶす"
+    },
+    "eraseBoundingBox": {
+      "title": "バウンディングボックスを消す",
+      "desc": "バウンディングボックス領域を消す"
+    },
+    "colorPicker": {
+      "title": "カラーピッカーを選択",
+      "desc": "カラーピッカーを選択"
+    },
+    "toggleSnap": {
+      "title": "Toggle Snap",
+      "desc": "Toggles Snap to Grid"
+    },
+    "quickToggleMove": {
+      "title": "Quick Toggle Move",
+      "desc": "Temporarily toggles Move mode"
+    },
+    "toggleLayer": {
+      "title": "レイヤーを切替",
+      "desc": "マスク/ベースレイヤの選択を切替"
+    },
+    "clearMask": {
+      "title": "マスクを消す",
+      "desc": "マスク全体を消す"
+    },
+    "hideMask": {
+      "title": "マスクを非表示",
+      "desc": "マスクを表示/非表示"
+    },
+    "showHideBoundingBox": {
+      "title": "バウンディングボックスを表示/非表示",
+      "desc": "バウンディングボックスの表示/非表示を切替"
+    },
+    "mergeVisible": {
+      "title": "Merge Visible",
+      "desc": "Merge all visible layers of canvas"
+    },
+    "saveToGallery": {
+      "title": "ギャラリーに保存",
+      "desc": "現在のキャンバスをギャラリーに保存"
+    },
+    "copyToClipboard": {
+      "title": "クリップボードにコピー",
+      "desc": "現在のキャンバスをクリップボードにコピー"
+    },
+    "downloadImage": {
+      "title": "画像をダウンロード",
+      "desc": "現在の画像をダウンロード"
+    },
+    "undoStroke": {
+      "title": "Undo Stroke",
+      "desc": "Undo a brush stroke"
+    },
+    "redoStroke": {
+      "title": "Redo Stroke",
+      "desc": "Redo a brush stroke"
+    },
+    "resetView": {
+      "title": "キャンバスをリセット",
+      "desc": "キャンバスをリセット"
+    },
+    "previousStagingImage": {
+      "title": "Previous Staging Image",
+      "desc": "Previous Staging Area Image"
+    },
+    "nextStagingImage": {
+      "title": "Next Staging Image",
+      "desc": "Next Staging Area Image"
+    },
+    "acceptStagingImage": {
+      "title": "Accept Staging Image",
+      "desc": "Accept Current Staging Area Image"
+    }
+  }
+  

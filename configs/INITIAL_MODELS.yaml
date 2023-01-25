@@ -93,6 +93,7 @@ voxel_art-1.0:
    format: ckpt
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
+     file: vae-ft-mse-840000-ema-pruned.ckpt
    recommended: False
    width: 512
    height: 512
@@ -102,7 +103,7 @@ ft-mse-improved-autoencoder-840000:
    format: ckpt
    config: VAE/default
    file: vae-ft-mse-840000-ema-pruned.ckpt
-   recommended: False
+   recommended: True
    width: 512
    height: 512
 trinart_vae:

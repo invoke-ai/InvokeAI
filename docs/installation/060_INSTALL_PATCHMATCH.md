@@ -18,7 +18,13 @@ Windows systems with no extra intervention.
 
 ## Macintosh
 
-PyPatchMatch is not currently supported, but the team is working on it.
+You need to have opencv installed so that pypatchmatch can be built:
+
+```bash
+brew install opencv
+```
+
+The next time you start `invoke`, after sucesfully installing opencv, pypatchmatch will be built.
 
 ## Linux
 
@@ -39,23 +45,16 @@ Prior to installing PyPatchMatch, you need to take the following steps:
     sudo apt install python3-opencv libopencv-dev
     ```
 
-3. Fix the naming of the `opencv` package configuration file:
-
-    ```sh
-    cd /usr/lib/x86_64-linux-gnu/pkgconfig/
-    ln -sf opencv4.pc opencv.pc
-    ```
-
-4. Activate the environment you use for invokeai, either with `conda` or with a
+3. Activate the environment you use for invokeai, either with `conda` or with a
    virtual environment.
 
-5. Install pypatchmatch:
+4. Install pypatchmatch:
 
     ```sh
-    pip install "git+https://github.com/invoke-ai/PyPatchMatch@0.1.3#egg=pypatchmatch"
+    pip install pypatchmatch
     ```
 
-6. Confirm that pypatchmatch is installed. At the command-line prompt enter
+5. Confirm that pypatchmatch is installed. At the command-line prompt enter
    `python`, and then at the `>>>` line type
    `from patchmatch import patch_match`: It should look like the follwing:
 

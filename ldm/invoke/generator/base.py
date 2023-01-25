@@ -62,9 +62,11 @@ class Generator:
     def generate(self,prompt,init_image,width,height,sampler, iterations=1,seed=None,
                  image_callback=None, step_callback=None, threshold=0.0, perlin=0.0,
                  safety_checker:dict=None,
+                 free_gpu_mem: bool=False,
                  **kwargs):
         scope = nullcontext
         self.safety_checker = safety_checker
+        self.free_gpu_mem = free_gpu_mem
         attention_maps_images = []
         attention_maps_callback = lambda saver: attention_maps_images.append(saver.get_stacked_maps_image())
         make_image = self.get_make_image(

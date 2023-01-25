@@ -485,7 +485,7 @@ def do_command(command:str, gen, opt:Args, completer) -> tuple:
             optimize_model(path[1], gen, opt, completer)
         completer.add_history(command)
         operation = None
-        
+
 
     elif command.startswith('!optimize'):
         path = shlex.split(command)
@@ -570,27 +570,26 @@ def import_model(model_path:str, gen, opt, completer):
     (3) a huggingface repository id
     '''
     model_name = None
-    
+
     if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
-    elif os.path.exists(model_path) and model_path.endswith('.ckpt') and os.path.isfile(model_path):
+    elif os.path.exists(model_path) and model_path.endswith(('.ckpt','.safetensors')) and os.path.isfile(model_path):
         model_name = import_ckpt_model(model_path, gen, opt, completer)        
     elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     elif os.path.isdir(model_path):
-        model_name = import_diffuser_model(model_path, gen, opt, completer)
+        model_name = import_diffuser_model(Path(model_path), gen, opt, completer)
     else:
         print(f'** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can\'t import.')
 
     if not model_name:
         return
-        
+
     if not _verify_load(model_name, gen):
         print('** model failed to load. Discarding configuration entry')
         gen.model_manager.del_model(model_name)
         return
-    
-    if input('Make this the default model? [n] ') in ('y','Y'):
+    if input('Make this the default model? [n] ').strip() in ('y','Y'):
         gen.model_manager.set_default_model(model_name)
 
     gen.model_manager.commit(opt.conf)
@@ -607,10 +606,14 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
         model_name=default_name,
         model_description=default_description
     )
+    vae = None
+    if input('Replace this model\'s VAE with "stabilityai/sd-vae-ft-mse"? [n] ').strip() in ('y','Y'):
+        vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
 
     if not manager.import_diffuser_model(
             path_or_repo,
             model_name = model_name,
+            vae = vae,
             description = model_description):
         print('** model failed to import')
         return None
@@ -627,18 +630,29 @@ def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
         model_description=default_description
     )
     config_file = None
+    default = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
 
     completer.complete_extensions(('.yaml','.yml'))
-    completer.set_line('configs/stable-diffusion/v1-inference.yaml')
+    completer.set_line(str(default))
     done = False
     while not done:
         config_file = input('Configuration file for this model: ').strip()
         done = os.path.exists(config_file)
+
+    completer.complete_extensions(('.ckpt','.safetensors'))
+    vae = None
+    default = Path(Globals.root,'models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt')
+    completer.set_line(str(default))
+    done = False
+    while not done:
+        vae = input('VAE file for this model (leave blank for none): ').strip() or None
+        done = (not vae) or os.path.exists(vae)
     completer.complete_extensions(None)
 
     if not manager.import_ckpt_model(
             path_or_url,
             config = config_file,
+            vae = vae,
             model_name = model_name,
             model_description = model_description,
             commit_to_conf = opt.conf,
@@ -690,7 +704,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
     else:
         print(f'** {model_name_or_path} is neither an existing model nor the path to a .ckpt file')
         return
-    
+
     if not ckpt_path.is_absolute():
         ckpt_path = Path(Globals.root,ckpt_path)
 
@@ -698,7 +712,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
     if diffuser_path.exists():
         print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
-     
+
     new_config = gen.model_manager.convert_and_import(
         ckpt_path,
         diffuser_path,
@@ -710,7 +724,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
         return
 
     completer.update_models(gen.model_manager.list_models())
-    if input(f'Load optimized model {model_name}? [y] ') not in ('n','N'):
+    if input(f'Load optimized model {model_name}? [y] ').strip() not in ('n','N'):
         gen.set_model(model_name)
 
     response = input(f'Delete the original .ckpt file at ({ckpt_path} ? [n] ')
@@ -726,7 +740,12 @@ def del_config(model_name:str, gen, opt, completer):
     if model_name not in gen.model_manager.config:
         print(f"** Unknown model {model_name}")
         return
-    gen.model_manager.del_model(model_name)
+
+    if input(f'Remove {model_name} from the list of models known to InvokeAI? [y] ').strip().startswith(('n','N')):
+        return
+    
+    delete_completely = input('Completely remove the model file or directory from disk? [n] ').startswith(('y','Y'))
+    gen.model_manager.del_model(model_name,delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
     print(f'** {model_name} deleted')
     completer.update_models(gen.model_manager.list_models())
@@ -747,7 +766,7 @@ def edit_model(model_name:str, gen, opt, completer):
             continue
         completer.set_line(info[attribute])
         info[attribute] = input(f'{attribute}: ') or info[attribute]
-        
+
     if new_name != model_name:
         manager.del_model(model_name)
 
@@ -1099,7 +1118,7 @@ def report_model_error(opt:Namespace, e:Exception):
     if yes_to_all is not None:
         sys.argv.append(yes_to_all)
 
-    import configure_invokeai
+    import ldm.invoke.configure_invokeai as configure_invokeai
     configure_invokeai.main()
     print('** InvokeAI will now restart')
     sys.argv = previous_args
