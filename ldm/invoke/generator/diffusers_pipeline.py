@@ -307,8 +307,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
         else:
-            slice_size = 4 # or 2, or 8. i chose this arbitrarily.
-            self.enable_attention_slicing(slice_size=slice_size)
+            if torch.backends.mps.is_available():
+                # until pytorch #91617 is fixed, slicing is borked on MPS
+                # https://github.com/pytorch/pytorch/issues/91617
+                # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
+                pass
+            else:
+                slice_size = 4 # or 2, or 8. i chose this arbitrarily.
+                self.enable_attention_slicing(slice_size=slice_size)
 
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
