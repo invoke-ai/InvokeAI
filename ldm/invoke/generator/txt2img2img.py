@@ -54,7 +54,7 @@ class Txt2Img2Img(Generator):
             pass
         min_dimension = math.floor(dimension * 0.5)
 
-        model_area = dimension * dimension # hardcoded for now
+        model_area = dimension * dimension
 
         if aspect > 1.0:
             init_height = max(min_dimension, math.sqrt(model_area / aspect))
