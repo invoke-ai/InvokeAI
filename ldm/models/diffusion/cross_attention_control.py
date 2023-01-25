@@ -7,6 +7,7 @@ import torch
 import diffusers
 from torch import nn
 from diffusers.models.unet_2d_condition import UNet2DConditionModel
+from diffusers.models.cross_attention import AttnProcessor
 from ldm.invoke.devices import torch_dtype
 
 
@@ -305,11 +306,10 @@ class InvokeAICrossAttentionMixin:
 
 
 
-def remove_cross_attention_control(model, is_running_diffusers: bool):
+def remove_cross_attention_control(model, is_running_diffusers: bool, restore_attention_processor: Optional[AttnProcessor]=None):
     if is_running_diffusers:
         unet = model
-        print("** need to know what cross attn processor to use by default, None in the following line is wrong")
-        unet.set_attn_processor(CrossAttnProcessor())
+        unet.set_attn_processor(restore_attention_processor or CrossAttnProcessor())
     else:
         remove_attention_function(model)
 
@@ -343,10 +343,16 @@ def setup_cross_attention_control(model, context: Context, is_running_diffusers 
     context.cross_attention_index_map = indices.to(device)
     if is_running_diffusers:
         unet = model
-        unet.set_attn_processor(SwapCrossAttnProcessor())
+        old_attn_processors = unet.attn_processors
+        # try to re-use an existing slice size
+        default_slice_size = 4
+        slice_size = next((p for p in old_attn_processors.values() if type(p) is SlicedAttnProcessor), default_slice_size)
+        unet.set_attn_processor(SlicedSwapCrossAttnProcesser(slice_size=slice_size))
+        return old_attn_processors
     else:
         context.register_cross_attention_modules(model)
         inject_attention_function(model, context)
+        return None
 
 
 
@@ -509,13 +515,11 @@ class CrossAttnProcessor:
         return hidden_states
 
 """
-import enum
 from dataclasses import field, dataclass
 
 import torch
 
-from diffusers.models.cross_attention import CrossAttention, CrossAttnProcessor, SlicedAttnProcessor
-from ldm.models.diffusion.cross_attention_control import CrossAttentionType
+from diffusers.models.cross_attention import CrossAttention, CrossAttnProcessor, SlicedAttnProcessor, AttnProcessor
 
 
 @dataclass
@@ -523,7 +527,7 @@ class SwapCrossAttnContext:
     modified_text_embeddings: torch.Tensor
     index_map: torch.Tensor # maps from original prompt token indices to the equivalent tokens in the modified prompt
     mask: torch.Tensor # in the target space of the index_map
-    cross_attention_types_to_do: list[CrossAttentionType] = field(default_factory=[])
+    cross_attention_types_to_do: list[CrossAttentionType] = field(default_factory=list)
 
     def __int__(self,
                 cac_types_to_do: [CrossAttentionType],
@@ -629,9 +633,6 @@ class SwapCrossAttnProcessor(CrossAttnProcessor):
 
 class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
 
-    def __init__(self, slice_size = 1e6):
-        self.slice_count = slice_size
-
     # TODO: dynamically pick slice size based on memory conditions
 
     def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None, attention_mask=None,
@@ -660,7 +661,7 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
         original_text_key = attn.head_to_batch_dim(original_text_key)
         modified_text_embeddings = swap_cross_attn_context.modified_text_embeddings
         modified_text_key = attn.to_k(modified_text_embeddings)
-        modified_text_key = attn.head_to_batch_dim(original_text_key)
+        modified_text_key = attn.head_to_batch_dim(modified_text_key)
 
         # for the "value" just use the modified text embeddings.
         value = attn.to_v(modified_text_embeddings)
