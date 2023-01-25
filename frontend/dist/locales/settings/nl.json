@@ -1,0 +1,13 @@
+{
+  "models": "Modellen",
+  "displayInProgress": "Toon afbeeldingen gedurende verwerking",
+  "saveSteps": "Bewaar afbeeldingen elke n stappen",
+  "confirmOnDelete": "Bevestig bij verwijderen",
+  "displayHelpIcons": "Toon hulppictogrammen",
+  "useCanvasBeta": "Gebruik bètavormgeving van canvas",
+  "enableImageDebugging": "Schakel foutopsporing afbeelding in",
+  "resetWebUI": "Herstel web-UI",
+  "resetWebUIDesc1": "Herstel web-UI herstelt alleen de lokale afbeeldingscache en de onthouden instellingen van je browser. Het verwijdert geen afbeeldingen van schijf.",
+  "resetWebUIDesc2": "Als afbeeldingen niet getoond worden in de galerij of iets anders werkt niet, probeer dan eerst deze herstelfunctie voordat je een fout aanmeldt op GitHub.",
+  "resetComplete": "Webgebruikersinterface is hersteld. Vernieuw de pasgina om opnieuw te laden."
+}
