@@ -1,0 +1,15 @@
+{
+  "feature": {
+    "prompt": "Dit is het invoertekstvak. De invoertekst bevat de te genereren voorwerpen en stylistische termen. Je kunt hiernaast in de invoertekst ook het gewicht (het belang van een trefwoord) toekennen. Opdrachten en parameters voor op de opdrachtregelinterface werken hier niet.",
+    "gallery": "De galerij toont gegenereerde afbeeldingen uit de uitvoermap nadat ze gegenereerd zijn. Instellingen worden opgeslagen binnen de bestanden zelf en zijn toegankelijk via het contextmenu.",
+    "other": "Deze opties maken alternative werkingsstanden voor Invoke mogelijk. De optie 'Naadloze tegels' maakt herhalende patronen in de uitvoer. 'Hoge resolutie' genereert in twee stappen via Afbeelding naar afbeelding: gebruik dit als je een grotere en coherentere afbeelding wilt zonder artifacten. Dit zal meer tijd in beslag nemen t.o.v. Tekst naar afbeelding.",
+    "seed": "Seedwaarden hebben invloed op de initiële ruis op basis waarvan de afbeelding wordt gevormd. Je kunt de al bestaande seeds van eerdere afbeeldingen gebruiken. De waarde 'Drempelwaarde ruis' wordt gebruikt om de hoeveelheid artifacten te verkleinen bij hoge CFG-waarden (beperk je tot 0 - 10). De Perlinruiswaarde wordt gebruikt om Perlinruis toe te voegen bij het genereren: beide dienen als variatie op de uitvoer.",
+    "variations": "Probeer een variatie met een waarden tussen 0,1 en 1,0 om het resultaat voor een bepaalde seed te beïnvloeden. Interessante seedvariaties ontstaan bij waarden tussen 0,1 en 0,3.",
+    "upscale": "Gebruik ESRGAN om de afbeelding direct na het genereren te vergroten.",
+    "faceCorrection": "Gezichtsherstel via GFPGAN of Codeformer: het algoritme herkent gezichten die voorkomen in de afbeelding en herstelt onvolkomenheden. Een hogere waarde heeft meer invloed op de afbeelding, wat leidt tot aantrekkelijkere gezichten. Codeformer met een hogere getrouwheid behoudt de oorspronkelijke afbeelding ten koste van een sterkere gezichtsherstel.",
+    "imageToImage": "Afbeelding naar afbeelding laadt een afbeelding als initiële afbeelding, welke vervolgens gebruikt wordt om een nieuwe afbeelding mee te maken i.c.m. de invoertekst. Hoe hoger de waarde, des te meer invloed dit heeft op de uiteindelijke afbeelding. Waarden tussen 0,1 en 1,0 zijn mogelijk. Aanbevolen waarden zijn 0,25 - 0,75",
+    "boundingBox": "Het tekenvak is gelijk aan de instellingen Breedte en Hoogte voor de functies Tekst naar afbeelding en Afbeelding naar afbeelding. Alleen het gebied in het tekenvak wordt verwerkt.",
+    "seamCorrection": "Heeft invloed op hoe wordt omgegaan met zichtbare naden die voorkomen tussen gegenereerde afbeeldingen op het canvas.",
+    "infillAndScaling": "Onderhoud van infillmethodes (gebruikt op gemaskeerde of gewiste gebieden op het canvas) en opschaling (nuttig bij kleine tekenvakken)."
+  }
+}

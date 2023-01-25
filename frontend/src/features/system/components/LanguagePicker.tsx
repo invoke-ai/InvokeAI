@@ -21,6 +21,7 @@ export default function LanguagePicker() {
     zh_cn: t('common:langSimplifiedChinese'),
     es: t('common:langSpanish'),
     ja: t('common:langJapanese'),
+    nl: t('common:langDutch'),
   };
 
   const renderLanguagePicker = () => {
