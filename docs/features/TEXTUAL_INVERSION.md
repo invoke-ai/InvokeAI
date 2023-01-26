@@ -55,7 +55,7 @@ Please enter 1, 2, 3, or 4: [1] 3
 
 From the command line, with the InvokeAI virtual environment active,
 you can launch the front end with the command
-`textual_inversion_fe`.
+`textual_inversion --gui`.
 
 This will launch a text-based front end that will look like this:
 
@@ -219,11 +219,9 @@ term. For example `a plate of banana sushi in <psychedelic> style`.
 
 ## **Training with the Command-Line Script**
 
-InvokeAI also comes with a traditional command-line script for
-launching textual inversion training. It is named
-`textual_inversion`, and can be launched from within the
-"developer's console", or from the command line after activating
-InvokeAI's virtual environment.
+Training can also be done using a traditional command-line script. It
+can be launched from within the "developer's console", or from the
+command line after activating InvokeAI's virtual environment.
 
 It accepts a large number of arguments, which can be summarized by
 passing the `--help` argument:

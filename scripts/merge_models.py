@@ -15,7 +15,6 @@ from ldm.invoke.model_manager import ModelManager
 parser = argparse.ArgumentParser(description="InvokeAI textual inversion training")
 parser.add_argument(
     "--root_dir",
-    "--root-dir",
     type=Path,
     default=Globals.root,
     help="Path to the invokeai runtime directory",

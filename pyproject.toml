@@ -98,6 +98,8 @@ test = ["pytest>6.0.0", "pytest-cov"]
 "load_models" = "scripts:configure_invokeai.main"
 "merge_embeddings" = "scripts:merge_embeddings.main"
 "preload_models" = "ldm.invoke.configure_invokeai:main"
+"textual_inversion" = "ldm.invoke.textual_inversion:main"
+"merge_models" = "ldm.invoke.merge_models:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"

@@ -31,6 +31,10 @@ from diffusers.utils.import_utils import is_xformers_available
 from huggingface_hub import HfFolder, Repository, whoami
 
 # invokeai stuff
+from ldm.invoke.args import (
+    PagingArgumentParser,
+    ArgFormatter
+)
 from ldm.invoke.globals import Globals, global_cache_dir
 from omegaconf import OmegaConf
 
@@ -74,145 +78,32 @@ def save_progress(text_encoder, placeholder_token_id, accelerator, placeholder_t
     torch.save(learned_embeds_dict, save_path)
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Simple example of a training script.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=500,
-        help="Save learned_embeds.bin every X updates steps.",
+    parser = PagingArgumentParser(
+        description="Textual inversion training",
+        formatter_class=ArgFormatter
     )
-    parser.add_argument(
+    general_group = parser.add_argument_group('General')
+    model_group = parser.add_argument_group('Models and Paths')
+    image_group = parser.add_argument_group('Training Image Location and Options')
+    trigger_group = parser.add_argument_group('Trigger Token')
+    training_group = parser.add_argument_group('Training Parameters')
+    checkpointing_group = parser.add_argument_group('Checkpointing and Resume')
+    integration_group = parser.add_argument_group('Integration')
+    general_group.add_argument(
+        '--front_end',
+        '--gui',
+        dest='front_end',
+        action="store_true",
+        default=False,
+        help="Activate the text-based graphical front end for collecting parameters. Other parameters will be ignored."
+    )
+    general_group.add_argument(
         '--root_dir','--root',
         type=Path,
         default=Globals.root,
         help="Path to the invokeai runtime directory",
     )
-    parser.add_argument(
-        "--only_save_embeds",
-        action="store_true",
-        default=False,
-        help="Save only the embeddings for the new concept.",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        required=True,
-        help="Name of the diffusers model to train against, as defined in configs/models.yaml.",
-    )
-    parser.add_argument(
-        "--revision",
-        type=str,
-        default=None,
-        required=False,
-        help="Revision of pretrained model identifier from huggingface.co/models.",
-    )
-    parser.add_argument(
-        "--tokenizer_name",
-        type=str,
-        default=None,
-        help="Pretrained tokenizer name or path if not the same as model_name",
-    )
-    parser.add_argument(
-        "--train_data_dir",
-        type=Path,
-        default=None,
-        required=True,
-        help="A folder containing the training data."
-    )
-    parser.add_argument(
-        "--placeholder_token",
-        type=str,
-        default=None,
-        required=True,
-        help="A token to use as a placeholder for the concept.",
-    )
-    parser.add_argument(
-        "--initializer_token",
-        type=str,
-        default=None,
-        required=False,
-        help="A token to use as initializer word."
-    )
-    parser.add_argument("--learnable_property", type=str, default="object", help="Choose between 'object' and 'style'")
-    parser.add_argument("--repeats", type=int, default=100, help="How many times to repeat the training data.")
-    parser.add_argument(
-        "--output_dir",
-        type=Path,
-        default=f'{Globals.root}/text-inversion-model',
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
-    parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
-    parser.add_argument(
-        "--resolution",
-        type=int,
-        default=512,
-        help=(
-            "The resolution for input images, all the images in the train/validation dataset will be resized to this"
-            " resolution"
-        ),
-    )
-    parser.add_argument(
-        "--center_crop", action="store_true", help="Whether to center crop images before resizing to resolution"
-    )
-    parser.add_argument(
-        "--train_batch_size", type=int, default=16, help="Batch size (per device) for the training dataloader."
-    )
-    parser.add_argument("--num_train_epochs", type=int, default=100)
-    parser.add_argument(
-        "--max_train_steps",
-        type=int,
-        default=5000,
-        help="Total number of training steps to perform.  If provided, overrides num_train_epochs.",
-    )
-    parser.add_argument(
-        "--gradient_accumulation_steps",
-        type=int,
-        default=1,
-        help="Number of updates steps to accumulate before performing a backward/update pass.",
-    )
-    parser.add_argument(
-        "--gradient_checkpointing",
-        action="store_true",
-        help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
-    )
-    parser.add_argument(
-        "--learning_rate",
-        type=float,
-        default=1e-4,
-        help="Initial learning rate (after the potential warmup period) to use.",
-    )
-    parser.add_argument(
-        "--scale_lr",
-        action="store_true",
-        default=True,
-        help="Scale the learning rate by the number of GPUs, gradient accumulation steps, and batch size.",
-    )
-    parser.add_argument(
-        "--lr_scheduler",
-        type=str,
-        default="constant",
-        help=(
-            'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
-            ' "constant", "constant_with_warmup"]'
-        ),
-    )
-    parser.add_argument(
-        "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
-    )
-    parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
-    parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
-    parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
-    parser.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer")
-    parser.add_argument("--push_to_hub", action="store_true", help="Whether or not to push the model to the Hub.")
-    parser.add_argument("--hub_token", type=str, default=None, help="The token to use to push to the Model Hub.")
-    parser.add_argument(
-        "--hub_model_id",
-        type=str,
-        default=None,
-        help="The name of the repository to keep in sync with the local `output_dir`.",
-    )
-    parser.add_argument(
+    general_group.add_argument(
         "--logging_dir",
         type=Path,
         default="logs",
@@ -221,7 +112,147 @@ def parse_args():
             " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."
         ),
     )
-    parser.add_argument(
+    general_group.add_argument(
+        "--output_dir",
+        type=Path,
+        default=f'{Globals.root}/text-inversion-model',
+        help="The output directory where the model predictions and checkpoints will be written.",
+    )
+    model_group.add_argument(
+        "--model",
+        type=str,
+        default='stable-diffusion-1.5',
+        help="Name of the diffusers model to train against, as defined in configs/models.yaml.",
+    )
+    model_group.add_argument(
+        "--revision",
+        type=str,
+        default=None,
+        required=False,
+        help="Revision of pretrained model identifier from huggingface.co/models.",
+    )
+    
+    model_group.add_argument(
+        "--tokenizer_name",
+        type=str,
+        default=None,
+        help="Pretrained tokenizer name or path if not the same as model_name",
+    )
+    image_group.add_argument(
+        "--train_data_dir",
+        type=Path,
+        default=None,
+        help="A folder containing the training data."
+    )
+    image_group.add_argument(
+        "--resolution",
+        type=int,
+        default=512,
+        help=(
+            "The resolution for input images, all the images in the train/validation dataset will be resized to this"
+            " resolution"
+        ),
+    )
+    image_group.add_argument(
+        "--center_crop", action="store_true", help="Whether to center crop images before resizing to resolution"
+    )
+    trigger_group.add_argument(
+        "--placeholder_token",
+        "--trigger_term",
+        dest='placeholder_token',
+        type=str,
+        default=None,
+        help="A token to use as a placeholder for the concept. This token will trigger the concept when included in the prompt as \"<trigger>\".",
+    )
+    trigger_group.add_argument(
+        "--learnable_property",
+        type=str,
+        choices=['object','style'],
+        default="object",
+        help="Choose between 'object' and 'style'"
+    )
+    trigger_group.add_argument(
+        "--initializer_token",
+        type=str,
+        default='*',
+        help="A symbol to use as the initializer word."
+    )
+    checkpointing_group.add_argument(
+        "--checkpointing_steps",
+        type=int,
+        default=500,
+        help=(
+            "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
+            " training using `--resume_from_checkpoint`."
+        ),
+    )
+    checkpointing_group.add_argument(
+        "--resume_from_checkpoint",
+        type=Path,
+        default=None,
+        help=(
+            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
+            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
+        ),
+    )
+    checkpointing_group.add_argument(
+        "--save_steps",
+        type=int,
+        default=500,
+        help="Save learned_embeds.bin every X updates steps.",
+    )
+    training_group.add_argument("--repeats", type=int, default=100, help="How many times to repeat the training data.")
+    training_group.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
+    training_group.add_argument(
+        "--train_batch_size", type=int, default=16, help="Batch size (per device) for the training dataloader."
+    )
+    training_group.add_argument("--num_train_epochs", type=int, default=100)
+    training_group.add_argument(
+        "--max_train_steps",
+        type=int,
+        default=5000,
+        help="Total number of training steps to perform.  If provided, overrides num_train_epochs.",
+    )
+    training_group.add_argument(
+        "--gradient_accumulation_steps",
+        type=int,
+        default=1,
+        help="Number of updates steps to accumulate before performing a backward/update pass.",
+    )
+    training_group.add_argument(
+        "--gradient_checkpointing",
+        action="store_true",
+        help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
+    )
+    training_group.add_argument(
+        "--learning_rate",
+        type=float,
+        default=1e-4,
+        help="Initial learning rate (after the potential warmup period) to use.",
+    )
+    training_group.add_argument(
+        "--scale_lr",
+        action="store_true",
+        default=True,
+        help="Scale the learning rate by the number of GPUs, gradient accumulation steps, and batch size.",
+    )
+    training_group.add_argument(
+        "--lr_scheduler",
+        type=str,
+        default="constant",
+        help=(
+            'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
+            ' "constant", "constant_with_warmup"]'
+        ),
+    )
+    training_group.add_argument(
+        "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
+    )
+    training_group.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
+    training_group.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
+    training_group.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
+    training_group.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer")
+    training_group.add_argument(
         "--mixed_precision",
         type=str,
         default="no",
@@ -232,7 +263,7 @@ def parse_args():
             "and an Nvidia Ampere GPU."
         ),
     )
-    parser.add_argument(
+    training_group.add_argument(
         "--allow_tf32",
         action="store_true",
         help=(
@@ -240,7 +271,24 @@ def parse_args():
             " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"
         ),
     )
+    training_group.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
     parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
+    )
+
+    integration_group.add_argument(
+        "--only_save_embeds",
+        action="store_true",
+        default=False,
+        help="Save only the embeddings for the new concept.",
+    )
+    integration_group.add_argument(
+        "--hub_model_id",
+        type=str,
+        default=None,
+        help="The name of the repository to keep in sync with the local `output_dir`.",
+    )
+    integration_group.add_argument(
         "--report_to",
         type=str,
         default="tensorboard",
@@ -249,29 +297,8 @@ def parse_args():
             ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
         ),
     )
-    parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
-    parser.add_argument(
-        "--checkpointing_steps",
-        type=int,
-        default=500,
-        help=(
-            "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
-            " training using `--resume_from_checkpoint`."
-        ),
-    )
-    parser.add_argument(
-        "--resume_from_checkpoint",
-        type=Path,
-        default=None,
-        help=(
-            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
-            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
-        ),
-    )
-    parser.add_argument(
-        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
-    )
-
+    integration_group.add_argument("--push_to_hub", action="store_true", help="Whether or not to push the model to the Hub.")
+    integration_group.add_argument("--hub_token", type=str, default=None, help="The token to use to push to the Model Hub.")
     args = parser.parse_args()
     return args
 
@@ -462,7 +489,11 @@ def do_textual_inversion_training(
         enable_xformers_memory_efficient_attention:bool=False,
         root_dir:Path=None,
         hub_model_id:str=None,
+        **kwargs,
 ):
+    assert model, 'Please specify a base model with --model'
+    assert train_data_dir, 'Please specify a directory containing the training images using --train_data_dir'
+    assert placeholder_token, 'Please specify a trigger term using --placeholder_token'
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != local_rank:
         local_rank = env_local_rank
