@@ -64,6 +64,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         self.add_widget_intelligent(
             npyscreen.FixedText,
             value="Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields, cursor arrows to make a selection, and space to toggle checkboxes.",
+            editable=False,
         )
 
         self.model = self.add_widget_intelligent(
@@ -72,11 +73,13 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             values=self.model_names,
             value=default,
             max_height=len(self.model_names) + 1,
+            scroll_exit=True,
         )
         self.placeholder_token = self.add_widget_intelligent(
             npyscreen.TitleText,
             name="Trigger Term:",
             value="",  # saved_args.get('placeholder_token',''), # to restore previous term
+            scroll_exit=True,
         )
         self.placeholder_token.when_value_edited = self.initializer_changed
         self.nextrely -= 1
@@ -85,17 +88,21 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             npyscreen.FixedText,
             name="Trigger term for use in prompt",
             value="",
+            editable=False,
+            scroll_exit=True,
         )
         self.nextrelx -= 30
         self.initializer_token = self.add_widget_intelligent(
             npyscreen.TitleText,
             name="Initializer:",
             value=saved_args.get("initializer_token", default_initializer_token),
+            scroll_exit=True,
         )
         self.resume_from_checkpoint = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Resume from last saved checkpoint",
             value=False,
+            scroll_exit=True,
         )
         self.learnable_property = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
@@ -105,6 +112,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
                 saved_args.get("learnable_property", "object")
             ),
             max_height=4,
+            scroll_exit=True,
         )
         self.train_data_dir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
@@ -117,6 +125,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
                     Path(Globals.root) / TRAINING_DATA / default_placeholder_token,
                 )
             ),
+            scroll_exit=True,
         )
         self.output_dir = self.add_widget_intelligent(
             npyscreen.TitleFilename,
@@ -129,19 +138,21 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
                     Path(Globals.root) / TRAINING_DIR / default_placeholder_token,
                 )
             ),
+            scroll_exit=True,
         )
         self.resolution = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
             name="Image resolution (pixels):",
             values=self.resolutions,
             value=self.resolutions.index(saved_args.get("resolution", 512)),
-            scroll_exit=True,
             max_height=4,
+            scroll_exit=True,
         )
         self.center_crop = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Center crop images before resizing to resolution",
             value=saved_args.get("center_crop", False),
+            scroll_exit=True,
         )
         self.mixed_precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
@@ -149,6 +160,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             values=self.precisions,
             value=self.precisions.index(saved_args.get("mixed_precision", "fp16")),
             max_height=4,
+            scroll_exit=True,
         )
         self.num_train_epochs = self.add_widget_intelligent(
             npyscreen.TitleSlider,
@@ -157,6 +169,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             step=50,
             lowest=1,
             value=saved_args.get("num_train_epochs", 100),
+            scroll_exit=True,
         )
         self.max_train_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
@@ -165,6 +178,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             step=500,
             lowest=1,
             value=saved_args.get("max_train_steps", 3000),
+            scroll_exit=True,
         )
         self.train_batch_size = self.add_widget_intelligent(
             npyscreen.TitleSlider,
@@ -173,6 +187,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             step=1,
             lowest=1,
             value=saved_args.get("train_batch_size", 8),
+            scroll_exit=True,
         )
         self.gradient_accumulation_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
@@ -181,6 +196,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             step=1,
             lowest=1,
             value=saved_args.get("gradient_accumulation_steps", 4),
+            scroll_exit=True,
         )
         self.lr_warmup_steps = self.add_widget_intelligent(
             npyscreen.TitleSlider,
@@ -189,6 +205,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             step=1,
             lowest=0,
             value=saved_args.get("lr_warmup_steps", 0),
+            scroll_exit=True,
         )
         self.learning_rate = self.add_widget_intelligent(
             npyscreen.TitleText,
@@ -196,25 +213,29 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             value=str(
                 saved_args.get("learning_rate", "5.0e-04"),
             ),
+            scroll_exit=True,
         )
         self.scale_lr = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Scale learning rate by number GPUs, steps and batch size",
             value=saved_args.get("scale_lr", True),
+            scroll_exit=True,
         )
         self.enable_xformers_memory_efficient_attention = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Use xformers acceleration",
             value=saved_args.get("enable_xformers_memory_efficient_attention", False),
+            scroll_exit=True,
         )
         self.lr_scheduler = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
             name="Learning rate scheduler:",
             values=self.lr_schedulers,
             max_height=7,
-            scroll_exit=True,
             value=self.lr_schedulers.index(saved_args.get("lr_scheduler", "constant")),
+            scroll_exit=True,
         )
+        self.model.editing = True
 
     def initializer_changed(self):
         placeholder = self.placeholder_token.value
@@ -418,7 +439,9 @@ def main():
             do_textual_inversion_training(**vars(args))
     except AssertionError as e:
         print(str(e))
-
+        sys.exit(-1)
+    except KeyboardInterrupt:
+        pass
 
 if __name__ == "__main__":
     main()
