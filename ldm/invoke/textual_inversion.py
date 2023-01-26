@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 
-import argparse
-import curses
+"""
+This is the frontend to "textual_inversion_training.py".
+
+Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
+"""
+
+
 import os
 import re
 import shutil
@@ -402,6 +407,7 @@ def do_front_end(args: Namespace):
             print("** DETAILS:")
             print(traceback.format_exc())
 
+
 def main():
     args = parse_args()
     global_set_root(args.root_dir or Globals.root)
@@ -412,3 +418,7 @@ def main():
             do_textual_inversion_training(**vars(args))
     except AssertionError as e:
         print(str(e))
+
+
+if __name__ == "__main__":
+    main()

@@ -33,6 +33,7 @@ Globals.models_file = 'models.yaml'
 Globals.models_dir = 'models'
 Globals.config_dir = 'configs'
 Globals.autoscan_dir = 'weights'
+Globals.converted_ckpts_dir = 'converted-ckpts'
 
 # Try loading patchmatch
 Globals.try_patchmatch = True
