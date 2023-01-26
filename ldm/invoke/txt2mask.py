@@ -108,8 +108,7 @@ class Txt2Mask(object):
                                 padding=True,
                                 return_tensors='pt')
         outputs = self.model(**inputs)
-        preds = outputs.logits
-        heatmap = torch.sigmoid(preds)
+        heatmap = torch.sigmoid(outputs.logits)
         return SegmentedGrayscale(image, heatmap)
 
     def _scale_and_crop(self, image:Image)->Image:
