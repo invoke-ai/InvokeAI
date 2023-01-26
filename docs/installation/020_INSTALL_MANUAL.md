@@ -52,8 +52,6 @@ manager, please follow these steps:
 3.  From within the InvokeAI top-level directory, create and activate a virtual
     environment named `invokeai`:
 
-    ** WOULDN'T WE WANT TO PUT THE VENV INSIDE THE ROOTDIR RATHER THAN THE REPO? **
-
     ```bash
     python -m venv invokeai
     source invokeai/bin/activate
@@ -121,8 +119,6 @@ manager, please follow these steps:
 
 6.  Run PIP
 
-    THIS IS WRONG?... should be pip install invokeai --use-pep517 .
-    
     ```bash
     pip --python invokeai install --use-pep517 .
     ```
