@@ -72,7 +72,14 @@ def global_cache_dir(subdir:Union[str,Path]='')->Path:
     is provided, it will be appended to the end of the path, allowing
     for huggingface-style conventions:
          global_cache_dir('diffusers')
+         global_cache_dir('hub')
+    Current HuggingFace documentation (mid-Jan 2023) indicates that
+    transformers models will be cached into a "transformers" subdirectory,
+    but in practice they seem to go into "hub". But if needed:
          global_cache_dir('transformers')
+    One other caveat is that HuggingFace is moving some diffusers models
+    into the "hub" subdirectory as well, so this will need to be revisited
+    from time to time.
     '''
     home: str = os.getenv('HF_HOME')
 

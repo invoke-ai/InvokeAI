@@ -23,7 +23,7 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import React, { FocusEvent, useEffect, useMemo, useState } from 'react';
+import React, { FocusEvent, useMemo, useState, useEffect } from 'react';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 import _ from 'lodash';
@@ -81,7 +81,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
     withInput = false,
     isInteger = false,
     inputWidth = '5.5rem',
-    inputReadOnly = true,
+    inputReadOnly = false,
     withReset = false,
     hideTooltip = false,
     isCompact = false,
@@ -103,32 +103,35 @@ export default function IAISlider(props: IAIFullSliderProps) {
     ...rest
   } = props;
 
-  const [localInputValue, setLocalInputValue] = useState<string>(String(value));
+  const [localInputValue, setLocalInputValue] = useState<
+    string | number | undefined
+  >(String(value));
+
+  useEffect(() => {
+    setLocalInputValue(value);
+  }, [value]);
 
   const numberInputMax = useMemo(
     () => (sliderNumberInputProps?.max ? sliderNumberInputProps.max : max),
     [max, sliderNumberInputProps?.max]
   );
 
-  useEffect(() => {
-    if (String(value) !== localInputValue && localInputValue !== '') {
-      setLocalInputValue(String(value));
-    }
-  }, [value, localInputValue, setLocalInputValue]);
+  const handleSliderChange = (v: number) => {
+    onChange(v);
+  };
 
   const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
+    if (e.target.value === '') e.target.value = String(min);
     const clamped = _.clamp(
-      isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
+      isInteger ? Math.floor(Number(e.target.value)) : Number(localInputValue),
       min,
       numberInputMax
     );
-    setLocalInputValue(String(clamped));
     onChange(clamped);
   };
 
   const handleInputChange = (v: number | string) => {
-    setLocalInputValue(String(v));
-    onChange(Number(v));
+    setLocalInputValue(v);
   };
 
   const handleResetDisable = () => {
@@ -172,7 +175,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
           min={min}
           max={max}
           step={step}
-          onChange={handleInputChange}
+          onChange={handleSliderChange}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
           focusThumbOnChange={false}
@@ -236,13 +239,19 @@ export default function IAISlider(props: IAIFullSliderProps) {
             <NumberInputField
               className="invokeai__slider-number-input"
               width={inputWidth}
-              minWidth={inputWidth}
               readOnly={inputReadOnly}
+              minWidth={inputWidth}
               {...sliderNumberInputFieldProps}
             />
             <NumberInputStepper {...sliderNumberInputStepperProps}>
-              <NumberIncrementStepper className="invokeai__slider-number-stepper" />
-              <NumberDecrementStepper className="invokeai__slider-number-stepper" />
+              <NumberIncrementStepper
+                onClick={() => onChange(Number(localInputValue))}
+                className="invokeai__slider-number-stepper"
+              />
+              <NumberDecrementStepper
+                onClick={() => onChange(Number(localInputValue))}
+                className="invokeai__slider-number-stepper"
+              />
             </NumberInputStepper>
           </NumberInput>
         )}
