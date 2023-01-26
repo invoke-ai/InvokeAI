@@ -60,13 +60,12 @@ class InvokeAIDiffuserComponent:
     @contextmanager
     def custom_attention_context(self,
                                  extra_conditioning_info: Optional[ExtraConditioningInfo],
-                                 step_count: int,
-                                 do_attention_map_saving: bool):
+                                 step_count: int):
         do_swap = extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control
         old_attn_processor = None
         if do_swap:
             old_attn_processor = self.setup_cross_attention_control(extra_conditioning_info,
-                                                              step_count=step_count)
+                                                                    step_count=step_count)
         try:
             yield None
         finally:
