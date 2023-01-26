@@ -71,7 +71,8 @@ def global_cache_dir(subdir:Union[str,Path]='')->Path:
     is provided, it will be appended to the end of the path, allowing
     for huggingface-style conventions:
          global_cache_dir('diffusers')
-         global_cache_dir('transformers')
+         global_cache_dir('hub')
+         global_cache_dir('transformers')  # not used?
     '''
     home: str = os.getenv('HF_HOME')
 
