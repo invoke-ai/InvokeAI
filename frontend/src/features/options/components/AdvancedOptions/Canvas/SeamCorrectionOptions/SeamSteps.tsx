@@ -17,7 +17,7 @@ export default function SeamSteps() {
       sliderMarkRightOffset={-4}
       label={t('options:seamSteps')}
       min={1}
-      max={32}
+      max={100}
       sliderNumberInputProps={{ max: 999 }}
       value={seamSteps}
       onChange={(v) => {
@@ -27,7 +27,7 @@ export default function SeamSteps() {
       withSliderMarks
       withReset
       handleReset={() => {
-        dispatch(setSeamSteps(10));
+        dispatch(setSeamSteps(30));
       }}
     />
   );
