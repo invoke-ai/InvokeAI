@@ -66,7 +66,7 @@ introduces several changes you should know about.
    cache models in. To tell InvokeAI to use the standard HuggingFace
    cache directory, you would set HF_HOME like this (Linux/Mac):
 
-   `export HF_HOME=~/.cache/hugging_face`
+   `export HF_HOME=~/.cache/huggingface`
 
 3. If you upgrade to InvokeAI 2.3.* from an earlier version, there
    will be a one-time migration from the old models directory format
