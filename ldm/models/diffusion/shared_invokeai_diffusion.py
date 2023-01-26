@@ -69,7 +69,8 @@ class InvokeAIDiffuserComponent:
         try:
             yield None
         finally:
-            self.remove_cross_attention_control(old_attn_processor)
+            if old_attn_processor is not None:
+                self.remove_cross_attention_control(old_attn_processor)
             # TODO resuscitate attention map saving
             #self.remove_attention_map_saving()
 
