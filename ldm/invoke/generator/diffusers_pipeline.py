@@ -366,7 +366,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             self.scheduler.set_timesteps(num_inference_steps, device=self.unet.device)
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(self.generate_latents_from_embeddings, PipelineIntermediateState)
-        self._enable_memory_efficient_attention()
         result: PipelineIntermediateState = infer_latents_from_embeddings(
             latents, timesteps, conditioning_data,
             noise=noise,
