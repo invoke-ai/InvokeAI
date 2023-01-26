@@ -75,11 +75,12 @@ const BoundingBoxSettings = () => {
         step={64}
         value={boundingBoxDimensions.width}
         onChange={handleChangeWidth}
-        handleReset={handleResetWidth}
         sliderNumberInputProps={{ max: 4096 }}
         withSliderMarks
         withInput
+        inputReadOnly
         withReset
+        handleReset={handleResetWidth}
       />
       <IAISlider
         label={t('options:height')}
@@ -88,11 +89,12 @@ const BoundingBoxSettings = () => {
         step={64}
         value={boundingBoxDimensions.height}
         onChange={handleChangeHeight}
-        handleReset={handleResetHeight}
         sliderNumberInputProps={{ max: 4096 }}
         withSliderMarks
         withInput
+        inputReadOnly
         withReset
+        handleReset={handleResetHeight}
       />
     </Flex>
   );

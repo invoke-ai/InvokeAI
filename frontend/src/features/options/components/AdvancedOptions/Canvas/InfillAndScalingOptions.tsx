@@ -124,11 +124,12 @@ const InfillAndScalingOptions = () => {
         step={64}
         value={scaledBoundingBoxDimensions.width}
         onChange={handleChangeScaledWidth}
-        handleReset={handleResetScaledWidth}
         sliderNumberInputProps={{ max: 4096 }}
         withSliderMarks
         withInput
+        inputReadOnly
         withReset
+        handleReset={handleResetScaledWidth}
       />
       <IAISlider
         isInputDisabled={!isManual}
@@ -140,11 +141,12 @@ const InfillAndScalingOptions = () => {
         step={64}
         value={scaledBoundingBoxDimensions.height}
         onChange={handleChangeScaledHeight}
-        handleReset={handleResetScaledHeight}
         sliderNumberInputProps={{ max: 4096 }}
         withSliderMarks
         withInput
+        inputReadOnly
         withReset
+        handleReset={handleResetScaledHeight}
       />
       <InpaintReplace />
       <IAISelect
@@ -166,12 +168,12 @@ const InfillAndScalingOptions = () => {
         onChange={(v) => {
           dispatch(setTileSize(v));
         }}
-        handleReset={() => {
-          dispatch(setTileSize(32));
-        }}
         withInput
         withSliderMarks
         withReset
+        handleReset={() => {
+          dispatch(setTileSize(32));
+        }}
       />
     </Flex>
   );
