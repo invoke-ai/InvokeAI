@@ -41,8 +41,8 @@ waifu-diffusion-1.4:
   description: Latest waifu diffusion 1.4 (diffusers version)
   format: diffusers
   repo_id: hakurei/waifu-diffusion
-   vae:
-     repo_id: stabilityai/sd-vae-ft-mse
+  vae:
+    repo_id: stabilityai/sd-vae-ft-mse
   recommended: True
 waifu-diffusion-1.3:
    description: Stable Diffusion 1.4 fine tuned on anime-styled images (ckpt version) (4.27 GB)
