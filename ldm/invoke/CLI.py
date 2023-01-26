@@ -708,7 +708,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
     if not ckpt_path.is_absolute():
         ckpt_path = Path(Globals.root,ckpt_path)
 
-    diffuser_path = Path(Globals.root, 'models','optimized-ckpts',model_name)
+    diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir,model_name)
     if diffuser_path.exists():
         print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
