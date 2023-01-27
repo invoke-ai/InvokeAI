@@ -72,8 +72,16 @@ export default function DiffusersModelEdit() {
       setEditModelFormValues({
         name: openModel,
         description: retrievedModel[openModel]?.description,
-        path: retrievedModel[openModel]?.path,
-        repo_id: retrievedModel[openModel]?.repo_id,
+        path:
+          retrievedModel[openModel]?.path &&
+          retrievedModel[openModel]?.path !== 'None'
+            ? retrievedModel[openModel]?.path
+            : '',
+        repo_id:
+          retrievedModel[openModel]?.repo_id &&
+          retrievedModel[openModel]?.repo_id !== 'None'
+            ? retrievedModel[openModel]?.repo_id
+            : '',
         vae: {
           repo_id: retrievedModel[openModel]?.vae?.repo_id
             ? retrievedModel[openModel]?.vae?.repo_id
@@ -91,6 +99,13 @@ export default function DiffusersModelEdit() {
   const editModelFormSubmitHandler = (
     values: InvokeDiffusersModelConfigProps
   ) => {
+    const diffusersModelToEdit = values;
+
+    if (values.path === '') delete diffusersModelToEdit.path;
+    if (values.repo_id === '') delete diffusersModelToEdit.repo_id;
+    if (values.vae.path === '') delete diffusersModelToEdit.vae.path;
+    if (values.vae.repo_id === '') delete diffusersModelToEdit.vae.repo_id;
+
     dispatch(addNewModel(values));
   };
 

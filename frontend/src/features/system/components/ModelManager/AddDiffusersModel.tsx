@@ -77,17 +77,10 @@ export default function AddDiffusersModel() {
   ) => {
     const diffusersModelToAdd = values;
 
-    if (values.path === '') diffusersModelToAdd['path'] = undefined;
-    if (values.repo_id === '') diffusersModelToAdd['repo_id'] = undefined;
-    if (values.vae.path === '') {
-      if (values.path === undefined) {
-        diffusersModelToAdd['vae']['path'] = undefined;
-      } else {
-        diffusersModelToAdd['vae']['path'] = values.path + '/vae';
-      }
-    }
-    if (values.vae.repo_id === '')
-      diffusersModelToAdd['vae']['repo_id'] = undefined;
+    if (values.path === '') delete diffusersModelToAdd.path;
+    if (values.repo_id === '') delete diffusersModelToAdd.repo_id;
+    if (values.vae.path === '') delete diffusersModelToAdd.vae.path;
+    if (values.vae.repo_id === '') delete diffusersModelToAdd.vae.repo_id;
 
     dispatch(addNewModel(diffusersModelToAdd));
     dispatch(setAddNewModelUIOption(null));

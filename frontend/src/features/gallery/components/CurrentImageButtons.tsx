@@ -399,11 +399,11 @@ const CurrentImageButtons = () => {
               {t('options:copyImageToLink')}
             </IAIButton>
 
-            <IAIButton leftIcon={<FaDownload />} size={'sm'}>
-              <Link download={true} href={currentImage?.url}>
+            <Link download={true} href={currentImage?.url}>
+              <IAIButton leftIcon={<FaDownload />} size={'sm'} w="100%">
                 {t('options:downloadImage')}
-              </Link>
-            </IAIButton>
+              </IAIButton>
+            </Link>
           </div>
         </IAIPopover>
         <IAIIconButton
