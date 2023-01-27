@@ -3,7 +3,9 @@ title: Installing Manually
 ---
 
 <figure markdown>
+
 # :fontawesome-brands-linux: Linux | :fontawesome-brands-apple: macOS | :fontawesome-brands-windows: Windows
+
 </figure>
 
 !!! warning "This is for advanced Users"
@@ -64,66 +66,13 @@ manager, please follow these steps:
     python -m pip install --upgrade pip
     ```
 
-5.  Pick the correct `requirements*.txt` file for your hardware and operating
-    system.
-
-    We have created a series of environment files suited for different operating
-    systems and GPU hardware. They are located in the
-    `environments-and-requirements` directory:
-
-    <figure markdown>
-
-    |              filename               |                               OS                                |
-    | :---------------------------------: | :-------------------------------------------------------------: |
-    |      requirements-lin-amd.txt       |                  Linux with an AMD (ROCm) GPU                   |
-    |     requirements-lin-arm64.txt      |                 Linux running on arm64 systems                  |
-    |      requirements-lin-cuda.txt      |                 Linux with an NVIDIA (CUDA) GPU                 |
-    |    requirements-mac-mps-cpu.txt     |                Macintoshes with MPS acceleration                |
-    | requirements-lin-win-colab-cuda.txt | Windows with an NVIDA (CUDA) GPU<br>(supports Google Colab too) |
-
-    </figure>
-
-    Select the appropriate requirements file, and make a link to it from
-    `requirements.txt` in the top-level InvokeAI directory. The command to do
-    this from the top-level directory is:
-
-    !!! example ""
-
-        === "Macintosh and Linux"
-
-            !!! info "Replace `xxx` and `yyy` with the appropriate OS and GPU codes."
-
-            ```bash
-            ln -sf environments-and-requirements/requirements-xxx-yyy.txt requirements.txt
-            ```
-
-        === "Windows"
-
-            !!! info "on Windows, admin privileges are required to make links, so we use the copy command instead"
-
-            ```cmd
-            copy environments-and-requirements\requirements-lin-win-colab-cuda.txt requirements.txt
-            ```
-
-        !!! warning
-
-            Please do not link or copy `environments-and-requirements/requirements-base.txt`.
-            This is a base requirements file that does not have the platform-specific
-            libraries. Also, be sure to link or copy the platform-specific file to
-            a top-level file named `requirements.txt` as shown here. Running pip on
-            a requirements file in a subdirectory will not work as expected.
-
-    When this is done, confirm that a file named `requirements.txt` has been
-    created in the InvokeAI root directory and that it points to the correct
-    file in `environments-and-requirements`.
-
-6.  Run PIP
+5.  Run PIP
 
     ```bash
     pip --python invokeai install --use-pep517 .
     ```
 
-7.  Set up the runtime directory
+6.  Set up the runtime directory
 
     In this step you will initialize a runtime directory that will
     contain the models, model config files, directory for textual
@@ -162,7 +111,7 @@ manager, please follow these steps:
         prompted) and configure InvokeAI to use the previously-downloaded files. The
         process for this is described in [here](050_INSTALLING_MODELS.md).
 
-8.  Run the command-line- or the web- interface:
+7.  Run the command-line- or the web- interface:
 
     Activate the environment (with `source invokeai/bin/activate`), and then
     run the script `invoke.py`. If you selected a non-default location
@@ -198,7 +147,7 @@ manager, please follow these steps:
 
         You can permanently set the location of the runtime directory by setting the environment variable INVOKEAI_ROOT to the path of the directory.
 
-9.  Render away!
+8.  Render away!
 
     Browse the [features](../features/CLI.md) section to learn about all the things you
     can do with InvokeAI.
@@ -208,7 +157,7 @@ manager, please follow these steps:
     time you try to generate an image. Fortunately, after the warm-up period
     rendering will be fast.
 
-10. Subsequently, to relaunch the script, be sure to enter `InvokeAI` directory,
+9.  Subsequently, to relaunch the script, be sure to enter `InvokeAI` directory,
     activate the virtual environment, and then launch `invoke.py` script.
     If you forget to activate the virtual environment,
     the script will fail with multiple `ModuleNotFound` errors.
