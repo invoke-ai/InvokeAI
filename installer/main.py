@@ -26,6 +26,13 @@ if __name__ == "__main__":
         default=False,
     )
 
+    parser.add_argument(
+        "--version",
+        dest="version",
+        help="Version of InvokeAI to install. Default to the latest stable release. A special 'pre' value will install the latest published pre-release version.",
+        default=None,
+    )
+
     args = parser.parse_args()
 
     inst = Installer()

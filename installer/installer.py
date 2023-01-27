@@ -9,7 +9,7 @@ import subprocess
 import sys
 import venv
 from pathlib import Path
-from tempfile import TemporaryDirectory, TemporaryFile
+from tempfile import TemporaryDirectory
 from typing import Union
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
@@ -25,8 +25,6 @@ FF_VENV_IN_RUNTIME = True
 
 # Install the wheel from pypi
 FF_USE_WHEEL = False
-
-INVOKE_AI_SRC = f"https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${VERSION}.zip"
 
 
 class Installer:
@@ -67,11 +65,10 @@ class Installer:
         # and a stack trace.
         # `ignore_cleanup_errors` was only added in Python 3.10
         # users of Python 3.9 will see a gnarly stack trace on installer exit
-        if OS == "Windows" and int(platform.python_version_tuple()[1])>=10:
+        if OS == "Windows" and int(platform.python_version_tuple()[1]) >= 10:
             venv_dir = TemporaryDirectory(prefix="invokeai-installer-", ignore_cleanup_errors=True)
         else:
             venv_dir = TemporaryDirectory(prefix="invokeai-installer-")
-
 
         venv.create(venv_dir.name, with_pip=True)
         self.venv_dir = venv_dir
@@ -133,13 +130,6 @@ class Installer:
         venv.create(venv_dir, with_pip=True)
         return venv_dir
 
-    def get_payload():
-        """
-        Obtain the InvokeAI installation payload
-        """
-
-        pass
-
     def install(self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -161,14 +151,11 @@ class Installer:
         # create the venv for the app
         self.venv = self.app_venv()
 
-        self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv)
+        self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv, version=version)
 
         # install dependencies and the InvokeAI application
-        extra_index_url=get_torch_source() if not yes_to_all else None
-        if FF_USE_WHEEL:
-            self.instance.deploy_wheel(extra_index_url)
-        else:
-            self.instance.deploy_src(extra_index_url)
+
+        self.instance.install(extra_index_url = get_torch_source() if not yes_to_all else None)
 
         # run through the configuration flow
         self.instance.configure()
@@ -184,11 +171,12 @@ class InvokeAiInstance:
     A single runtime directory *may* be shared by multiple virtual environments, though this isn't currently tested or supported.
     """
 
-    def __init__(self, runtime: Path, venv: Path) -> None:
+    def __init__(self, runtime: Path, venv: Path, version: str) -> None:
 
         self.runtime = runtime
         self.venv = venv
         self.pip = get_venv_pip(venv)
+        self.version = version
 
         add_venv_site(venv)
         os.environ["INVOKEAI_ROOT"] = str(self.runtime.expanduser().resolve())
@@ -204,75 +192,23 @@ class InvokeAiInstance:
 
         return (self.runtime, self.venv)
 
-    def deploy_src(self, extra_index_url=None):
+    def install(self, extra_index_url=None):
         """
-        Install packages with pip ("source" installer)
+        Install this instance, including depenencies and the app itself
 
         :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
         :type extra_index_url: str
         """
 
-        ### TODO: pull the source archive from Github like the current installer does?
-        ### Alternatively, decide if this should just be used to perform an editable install
-
         import messages
-        from plumbum import FG, local
 
-        # pre-installing Torch because this is the most reliable way to ensure
-        # the correct version gets installed.
-        # this works with either source or wheel install and has
-        # negligible impact on installation times.
-        # this is only necessary for the source installer.
+        # install torch first to ensure the correct version gets installed.
+        # works with either source or wheel install with negligible impact on installation times.
         messages.simple_banner("Installing PyTorch :fire:")
         self.install_torch(extra_index_url)
 
-        messages.simple_banner("Installing InvokeAI base dependencies :rocket:")
-        extra_index_url_arg = "--extra-index-url" if extra_index_url is not None else None
-
-        pip = local[self.pip]
-
-        (
-            pip[
-                "install",
-                "--require-virtualenv",
-                "-r",
-                (Path(__file__).parents[1] / "environments-and-requirements/requirements-base.txt")
-                .expanduser()
-                .resolve(),
-                "--use-pep517",
-                extra_index_url_arg,
-                extra_index_url,
-            ]
-            & FG
-        )
-
-    def deploy_wheel(self, extra_index_url=None):
-        """
-        Use 'pip' to install packages with from PyPi and optionally other indexes ("wheel" installer)
-
-        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
-        :type extra_index_url: str
-        """
-
-        import messages
-        from plumbum import FG, local
-
         messages.simple_banner("Installing the InvokeAI Application :art:")
-        extra_index_url_arg = "--extra-index-url" if extra_index_url is not None else None
-
-        pip = local[self.pip]
-
-        (
-            pip[
-                "install",
-                "--require-virtualenv",
-                "--use-pep517",
-                "invokeai",
-                extra_index_url_arg,
-                extra_index_url,
-            ]
-            & FG
-        )
+        self.install_app(extra_index_url)
 
     def install_torch(self, extra_index_url=None):
         """
@@ -280,8 +216,6 @@ class InvokeAiInstance:
         """
 
         from plumbum import FG, local
-
-        extra_index_url_arg = "--extra-index-url" if extra_index_url is not None else None
 
         pip = local[self.pip]
 
@@ -291,8 +225,48 @@ class InvokeAiInstance:
                 "--require-virtualenv",
                 "torch",
                 "torchvision",
-                extra_index_url_arg,
+                "--extra-index-url" if extra_index_url is not None else None,
                 extra_index_url,
+            ]
+            & FG
+        )
+
+    def install_app(self, extra_index_url=None):
+        """
+        Install the application with pip.
+        Supports installation from PyPi or from a local source directory.
+
+        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
+        :type extra_index_url: str
+        """
+
+        if self.version == "pre":
+            version = None
+            pre = "--pre"
+        else:
+            version = self.version
+            pre = None
+
+        if FF_USE_WHEEL:
+            src = f"invokeai=={version}" if version is not None else "invokeai"
+        else:
+            # this makes an assumption about the location of the installer package in the source tree
+            src = Path(__file__).parents[1].expanduser().resolve()
+
+        import messages
+        from plumbum import FG, local
+
+        pip = local[self.pip]
+
+        (
+            pip[
+                "install",
+                "--require-virtualenv",
+                "--use-pep517",
+                src,
+                "--extra-index-url" if extra_index_url is not None else None,
+                extra_index_url,
+                pre,
             ]
             & FG
         )
@@ -318,12 +292,12 @@ class InvokeAiInstance:
         Copy the launch and update scripts to the runtime dir
         """
 
-        ext = 'bat' if OS == 'Windows' else 'sh'
+        ext = "bat" if OS == "Windows" else "sh"
 
         for script in ["invoke", "update"]:
             src = Path(__file__).parent / "templates" / f"{script}.{ext}.in"
             dest = self.runtime / f"{script}.{ext}"
-            shutil.copy (src, dest)
+            shutil.copy(src, dest)
             os.chmod(dest, 0o0755)
 
     def update(self):
@@ -349,7 +323,7 @@ def get_venv_pip(venv_path: Path) -> str:
     """
 
     pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
-    return str(venv_path.absolute() / pip)
+    return str(venv_path.expanduser().resolve() / pip)
 
 
 def add_venv_site(venv_path: Path) -> None:
@@ -363,7 +337,7 @@ def add_venv_site(venv_path: Path) -> None:
     """
 
     lib = "Lib" if OS == "Windows" else f"lib/python{sys.version_info.major}.{sys.version_info.minor}"
-    sys.path.append(str(Path(venv_path, lib, "site-packages").absolute()))
+    sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
 def get_torch_source() -> Union[str, None]:
