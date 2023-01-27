@@ -91,7 +91,7 @@ dependencies = [
 
 [project.scripts]
 "configure_invokeai" = "ldm.invoke.configure_invokeai:main"
-"invoke" = "ldm.invoke.CLI:main"
+"invokeai-config" = "ldm.invoke.config.configure_invokeai:main"
 "textual_inversion" = "ldm.invoke.textual_inversion:main"
 "merge_models" = "ldm.invoke.merge_diffusers:main"   # note name munging
 
@@ -107,16 +107,12 @@ version = { attr = "ldm.invoke.__version__" }
 
 [tool.setuptools.packages.find]
 "where" = ["."]
-"include" = ["assets", "backend*", "configs*", "frontend.dist*", "ldm*"]
+"include" = ["assets", "backend*", "frontend.dist*", "ldm*"]
 
 [tool.setuptools.package-data]
 "assets" = ["caution.png"]
 "backend" = ["**.png"]
-"configs" = ["*.example", "**/*.yaml", "*.txt"]
 "frontend.dist" = ["**"]
-
-[tool.setuptools.exclude-package-data]
-configs = ["models.yaml"]
 
 [tool.pytest.ini_options]
 addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"
