@@ -14,7 +14,6 @@ import os
 import sys
 import textwrap
 import time
-import traceback
 import warnings
 import safetensors.torch
 from pathlib import Path
@@ -639,7 +638,7 @@ class ModelManager(object):
         and import.
         '''
         weights_directory = weights_directory or global_autoscan_dir()
-        dest_directory = dest_directory or Path(global_models_dir(), 'optimized-ckpts')
+        dest_directory = dest_directory or Path(global_models_dir(), Globals.converted_ckpts_dir)
 
         print('>> Checking for unconverted .ckpt files in {weights_directory}')
         ckpt_files = dict()
