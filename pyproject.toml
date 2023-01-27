@@ -87,7 +87,7 @@ dependencies = [
   "mkdocs-git-revision-date-localized-plugin",
   "mkdocs-redirects==1.2.0",
 ]
-test = ["pytest>6.0.0", "pytest-cov"]
+"test" = ["pytest>6.0.0", "pytest-cov"]
 
 [project.scripts]
 "configure_invokeai" = "ldm.invoke.configure_invokeai:main"
@@ -119,8 +119,4 @@ version = { attr = "ldm.invoke.__version__" }
 configs = ["models.yaml"]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov=./ldm/ --cov=./backend --cov-branch"
-python_files = ["test_*.py"]
-pythonpath = [".venv/lib/python3.9", ".venv/lib/python3.10"]
-testpaths = ["tests"]
+addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"
