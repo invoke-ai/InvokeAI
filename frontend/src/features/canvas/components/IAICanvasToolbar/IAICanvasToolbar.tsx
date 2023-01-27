@@ -42,6 +42,7 @@ import {
 } from 'features/canvas/store/canvasTypes';
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -156,7 +157,12 @@ const IAICanvasOutpaintingControls = () => {
 
   const handleSelectMoveTool = () => dispatch(setTool('move'));
 
-  const handleResetCanvasView = () => {
+  const handleClickResetCanvasView = useSingleAndDoubleClick(
+    () => handleResetCanvasView(false),
+    () => handleResetCanvasView(true)
+  );
+
+  const handleResetCanvasView = (shouldScaleTo1 = false) => {
     const canvasBaseLayer = getCanvasBaseLayer();
     if (!canvasBaseLayer) return;
     const clientRect = canvasBaseLayer.getClientRect({
@@ -165,6 +171,7 @@ const IAICanvasOutpaintingControls = () => {
     dispatch(
       resetCanvasView({
         contentRect: clientRect,
+        shouldScaleTo1,
       })
     );
   };
@@ -247,7 +254,7 @@ const IAICanvasOutpaintingControls = () => {
           aria-label={`${t('unifiedcanvas:resetView')} (R)`}
           tooltip={`${t('unifiedcanvas:resetView')} (R)`}
           icon={<FaCrosshairs />}
-          onClick={handleResetCanvasView}
+          onClick={handleClickResetCanvasView}
         />
       </ButtonGroup>
 
