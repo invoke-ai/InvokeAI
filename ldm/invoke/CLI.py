@@ -21,6 +21,9 @@ import ldm.invoke
 # global used in multiple functions (fix)
 infile = None
 
+if sys.platform == 'darwin':
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile

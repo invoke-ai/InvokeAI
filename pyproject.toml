@@ -61,6 +61,7 @@ dependencies = [
   "picklescan",
   "pillow",
   "pudb",
+  "prompt-toolkit",
   "pypatchmatch",
   "pyreadline3",
   "pytorch-lightning==1.7.7",
@@ -90,10 +91,10 @@ dependencies = [
 "test" = ["pytest>6.0.0", "pytest-cov"]
 
 [project.scripts]
-"configure_invokeai" = "ldm.invoke.configure_invokeai:main"
-"invokeai-config" = "ldm.invoke.config.configure_invokeai:main"
-"textual_inversion" = "ldm.invoke.textual_inversion:main"
-"merge_models" = "ldm.invoke.merge_diffusers:main"   # note name munging
+"invoke" = "ldm.invoke.CLI:main"
+"invoke-configure" = "ldm.invoke.config.configure_invokeai:main"
+"invoke-merge" = "ldm.invoke.merge_diffusers:main"   # note name munging
+"invoke-ti" = "ldm.invoke.training.textual_inversion:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
