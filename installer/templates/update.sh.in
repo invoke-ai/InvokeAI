@@ -15,7 +15,7 @@ if [ $# -ge 1 ] && [ "${1:0:2}" == "-h" ]; then
 fi
 
 INVOKE_AI_VERSION=${1:-latest}
-    
+
 INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive/$INVOKE_AI_VERSION.zip"
 INVOKE_AI_DEP=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/environments-and-requirements/requirements-base.txt
 INVOKE_AI_MODELS=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/configs/INITIAL_MODELS.yaml
