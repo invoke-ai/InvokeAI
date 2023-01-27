@@ -22,7 +22,6 @@ def infill_methods()->list[str]:
     methods = [
         "tile",
         "solid",
-        "blur"
     ]
     if PatchMatch.patchmatch_available():
         methods.insert(0, 'patchmatch')
@@ -214,11 +213,6 @@ class Inpaint(Img2Img):
             elif infill_method == 'solid':
                 solid_bg = PIL.Image.new("RGBA", init_image.size, (0x7F, 0x7F, 0x7F, 0xFF))
                 init_filled = PIL.Image.alpha_composite(solid_bg, init_image)
-            elif infill_method == 'blur':
-                solid_bg = PIL.Image.new("RGBA", init_image.size, (0x7F, 0x7F, 0x7F, 0xFF))
-                non_transparent = PIL.Image.alpha_composite(solid_bg, init_image)
-                blurred = non_transparent.copy().filter(ImageFilter.GaussianBlur(radius=mask_blur_radius))
-                init_filled = PIL.Image.alpha_composite(non_transparent, blurred)
             else:
                 raise ValueError(f"Non-supported infill type {infill_method}", infill_method)
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
