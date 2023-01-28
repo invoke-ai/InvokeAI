@@ -29,8 +29,9 @@ version of InvokeAI with the option to upgrade to experimental versions later.
 2.  Check that your system has an up-to-date Python installed. To do this, open
     up a command-line window ("Terminal" on Linux and Macintosh, "Command" or
     "Powershell" on Windows) and type `python --version`. If Python is
-    installed, it will print out the version number. If it is version `3.9.1` or
-    higher, you meet requirements.
+    installed, it will print out the version number. If it is version `3.9.1` or `3.10.x`, you meet requirements.
+
+    !!! warning "At this time we do not recommend Python 3.11"
 
     !!! warning "If you see an older version, or get a command not found error"
 
@@ -39,7 +40,6 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         [Version 3.10.9](https://www.python.org/downloads/release/python-3109/),
         which has been extensively tested with InvokeAI.
 
-    !!! warning "At this time we do not recommend Python 3.11"
 
     _Please select your platform in the section below for platform-specific
     setup requirements._
@@ -108,12 +108,11 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - InvokeAI-installer-2.X.X-mac.zip
-    - InvokeAI-installer-2.X.X-windows.zip
-    - InvokeAI-installer-2.X.X-linux.zip
+    - InvokeAI-installer-2.X.X.zip
 
     (Where 2.X.X is the current release number).
-    Download the one that is appropriate for your operating system.
+
+    Download the latest release.
 
 4.  Unpack the zip file into a convenient directory. This will create a new
     directory named "InvokeAI-Installer". This example shows how this would look
