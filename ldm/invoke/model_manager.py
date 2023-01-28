@@ -923,7 +923,7 @@ class ModelManager(object):
     def _has_cuda(self) -> bool:
         return self.device.type == 'cuda'
 
-    def _diffuser_sha256(self,name_or_path:Union[str, Path])->Union[str,bytes]:
+    def _diffuser_sha256(self,name_or_path:Union[str, Path],chunksize=4096)->Union[str,bytes]:
         path = None
         if isinstance(name_or_path,Path):
            path = name_or_path
@@ -945,7 +945,8 @@ class ModelManager(object):
             for name in files:
                 count += 1
                 with open(os.path.join(root,name),'rb') as f:
-                    sha.update(f.read())
+                    while chunk := f.read(chunksize):
+                        sha.update(chunk)
         hash = sha.hexdigest()
         toc = time.time()
         print(f'  | sha256 = {hash} ({count} files hashed in','%4.2fs)' % (toc - tic))
