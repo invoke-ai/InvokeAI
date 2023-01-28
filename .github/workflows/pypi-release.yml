@@ -1,0 +1,31 @@
+name: PyPI Release
+
+on:
+  push:
+    paths:
+      - 'ldm/invoke/_version.py'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    env:
+      TWINE_USERNAME: __token__
+      TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      TWINE_NON_INTERACTIVE: 1
+    steps:
+      - name: checkout sources
+        uses: actions/checkout@v3
+
+      - name: install deps
+        run: pip install --upgrade build twine
+
+      - name: build package
+        run: python3 -m build
+
+      - name: check distribution
+        run: twine check dist/*
+
+      - name: upload package
+        if: github.ref == 'refs/heads/main'
+        run: twine upload dist/*
