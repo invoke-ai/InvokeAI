@@ -449,37 +449,37 @@ class PromptParserTestCase(unittest.TestCase):
         self.assertEqual(Blend([FlattenedPrompt([('mountain man', 1)]),
                                 FlattenedPrompt([('man mountain', 1)])],
                                 weights=[0.5,0.5]),
-                         pp.parse_legacy_blend('mountain man:1 man mountain:1'))
+                         pp.parse_legacy_blend('mountain man:1 man mountain:1', skip_normalize=False))
 
         self.assertEqual(Blend([FlattenedPrompt([('mountain', 1.1), ('man', 1)]),
                                 FlattenedPrompt([('man', 1), ('mountain', 0.9)])],
                                 weights=[0.5,0.5]),
-                         pp.parse_legacy_blend('mountain+ man:1 man mountain-:1'))
+                         pp.parse_legacy_blend('mountain+ man:1 man mountain-:1', skip_normalize=False))
 
         self.assertEqual(Blend([FlattenedPrompt([('mountain', 1.1), ('man', 1)]),
                                 FlattenedPrompt([('man', 1), ('mountain', 0.9)])],
                                 weights=[0.5,0.5]),
-                         pp.parse_legacy_blend('mountain+ man:1 man mountain-'))
+                         pp.parse_legacy_blend('mountain+ man:1 man mountain-', skip_normalize=False))
 
         self.assertEqual(Blend([FlattenedPrompt([('mountain', 1.1), ('man', 1)]),
                                 FlattenedPrompt([('man', 1), ('mountain', 0.9)])],
                                 weights=[0.5,0.5]),
-                         pp.parse_legacy_blend('mountain+ man: man mountain-:'))
+                         pp.parse_legacy_blend('mountain+ man: man mountain-:', skip_normalize=False))
 
         self.assertEqual(Blend([FlattenedPrompt([('mountain man', 1)]),
                                 FlattenedPrompt([('man mountain', 1)])],
                                 weights=[0.75,0.25]),
-                         pp.parse_legacy_blend('mountain man:3 man mountain:1'))
+                         pp.parse_legacy_blend('mountain man:3 man mountain:1', skip_normalize=False))
 
         self.assertEqual(Blend([FlattenedPrompt([('mountain man', 1)]),
                                 FlattenedPrompt([('man mountain', 1)])],
                                 weights=[1.0,0.0]),
-                         pp.parse_legacy_blend('mountain man:3 man mountain:0'))
+                         pp.parse_legacy_blend('mountain man:3 man mountain:0', skip_normalize=False))
 
         self.assertEqual(Blend([FlattenedPrompt([('mountain man', 1)]),
                                 FlattenedPrompt([('man mountain', 1)])],
                                 weights=[0.8,0.2]),
-                         pp.parse_legacy_blend('"mountain man":4 man mountain'))
+                         pp.parse_legacy_blend('"mountain man":4 man mountain', skip_normalize=False))
 
 
     def test_single(self):
