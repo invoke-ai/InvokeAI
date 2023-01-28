@@ -556,12 +556,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         guidance: List[Callable] = []
 
         if is_inpainting_model(self.unet):
-            # TODO: we should probably pass this in so we don't have to try/finally around setting it.
-
             # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
             # (that's why there's a mask!) but it seems to really want that blanked out.
-            masked_latents = self.non_noised_latents_from_image(
-                init_image * (1 - mask), device=device, dtype=latents_dtype)
+            masked_init_image = init_image * torch.where(mask < 0.5, 1, 0)
+            masked_latents = self.non_noised_latents_from_image(masked_init_image, device=device, dtype=latents_dtype)
+
+            # TODO: we should probably pass this in so we don't have to try/finally around setting it.
             self.invokeai_diffuser.model_forward_callback = \
                 AddsMaskLatents(self._unet_forward, latent_mask, masked_latents)
         else:
