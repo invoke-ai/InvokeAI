@@ -107,12 +107,12 @@ jobs:
           key: ${{ env.cache-name }}
           enableCrossOsArchive: true
 
-      - name: run configure_invokeai
+      - name: run invokeai-configure
         id: run-preload-models
         env:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
         run: >
-          configure_invokeai
+          invokeai-configure
           --yes
           --default_only
           --full-precision

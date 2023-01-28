@@ -91,10 +91,16 @@ dependencies = [
 "test" = ["pytest>6.0.0", "pytest-cov"]
 
 [project.scripts]
-"invoke" = "ldm.invoke.CLI:main"
-"invoke-configure" = "ldm.invoke.config.configure_invokeai:main"
-"invoke-merge" = "ldm.invoke.merge_diffusers:main"   # note name munging
-"invoke-ti" = "ldm.invoke.training.textual_inversion:main"
+
+# legacy entrypoints; provided for backwards compatibility
+"invoke.py" = "ldm.invoke.CLI:main"
+"configure_invokeai.py" = "ldm.invoke.config.configure_invokeai:main"
+
+# modern entrypoints
+"invokeai" = "ldm.invoke.CLI:main"
+"invokeai-configure" = "ldm.invoke.config.configure_invokeai:main"
+"invokeai-merge" = "ldm.invoke.merge_diffusers:main"   # note name munging
+"invokeai-ti" = "ldm.invoke.training.textual_inversion:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
