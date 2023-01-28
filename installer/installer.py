@@ -23,8 +23,8 @@ VERSION = "latest"
 # Install the virtualenv into the runtime dir
 FF_VENV_IN_RUNTIME = True
 
-# Install the wheel from pypi
-FF_USE_WHEEL = False
+# Install the wheel packaged with the installer
+FF_USE_LOCAL_WHEEL = True
 
 
 class Installer:
@@ -240,6 +240,7 @@ class InvokeAiInstance:
         :type extra_index_url: str
         """
 
+        ## this only applies to pypi installs; TODO actually use this
         if self.version == "pre":
             version = None
             pre = "--pre"
@@ -247,11 +248,16 @@ class InvokeAiInstance:
             version = self.version
             pre = None
 
-        if FF_USE_WHEEL:
-            src = f"invokeai=={version}" if version is not None else "invokeai"
-        else:
+        ## TODO: only local wheel will be installed as of now; support for --version arg is TODO
+        if FF_USE_LOCAL_WHEEL:
+            src = str(next(Path.cwd().glob("InvokeAI-*.whl")))
+
+        elif version == "source":
             # this makes an assumption about the location of the installer package in the source tree
             src = Path(__file__).parents[1].expanduser().resolve()
+        else:
+            # will install from PyPp
+            src = f"invokeai=={version}" if version is not None else "invokeai"
 
         import messages
         from plumbum import FG, local

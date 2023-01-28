@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 cd "$(dirname "$0")"
 
 VERSION=$(cd ..; python -c "from ldm.invoke import __version__ as version; print(version)")
@@ -23,38 +25,49 @@ if [ "$RESPONSE" == 'y' ]; then
     git tag -fa latest
 fi
 
+# ----------------------
+
+echo Building the wheel
+if [[ -v "VIRTUAL_ENV" ]]; then deactivate; fi
+
+# install the 'build' package in the user site packages, if needed
+# could be improved by using a temporary venv, but it's tiny and harmless
+if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
+    pip install --user build
+fi
+
+python -m build --wheel --outdir dist/ ../.
+
+# ----------------------
+
 echo Building installer zip fles for InvokeAI $VERSION
 
 # get rid of any old ones
-rm *.zip
-
+rm -f *.zip
 rm -rf InvokeAI-Installer
+
+# copy content
 mkdir InvokeAI-Installer
+for f in templates *.py *.txt *.reg; do
+    cp -r ${f} InvokeAI-Installer/
+done
 
-cp -pr ../environments-and-requirements templates readme.txt InvokeAI-Installer/
-mkdir InvokeAI-Installer/templates/rootdir
+# Move the wheel
+mv dist/*.whl InvokeAI-Installer/
 
-cp -pr ../configs InvokeAI-Installer/templates/rootdir/
-
-mkdir InvokeAI-Installer/templates/rootdir/{outputs,embeddings,models}
-
+# Install scripts
+# Mac/Linux
 perl -p -e "s/^INVOKEAI_VERSION=.*/INVOKEAI_VERSION=\"$VERSION\"/" install.sh.in > InvokeAI-Installer/install.sh
 chmod a+rx InvokeAI-Installer/install.sh
 
-zip -r InvokeAI-installer-$VERSION-linux.zip InvokeAI-Installer
-zip -r InvokeAI-installer-$VERSION-mac.zip InvokeAI-Installer
-
-# now do the windows installer
-rm InvokeAI-Installer/install.sh
+# Windows
 perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in > InvokeAI-Installer/install.bat
 cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
-# this gets rid of the "-e ." at the end of the windows requirements file
-# because it is easier to do it now than in the .bat install script
-egrep -v '^-e .' InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt > InvokeAI-Installer/requirements.txt
-cp InvokeAI-Installer/requirements.txt InvokeAI-Installer/environments-and-requirements/requirements-win-colab-cuda.txt
-zip -r InvokeAI-installer-$VERSION-windows.zip InvokeAI-Installer
+# Zip everything up
+zip -r InvokeAI-installer-$VERSION.zip InvokeAI-Installer
 
+# Updater
 mkdir tmp
 cp templates/update.sh.in tmp/update.sh
 cp templates/update.bat.in tmp/update.bat
@@ -66,9 +79,6 @@ cd ..
 mv tmp/InvokeAI-updater-$VERSION.zip .
 
 # clean up
-rm -rf InvokeAI-Installer tmp
-
+rm -rf InvokeAI-Installer tmp dist
 
 exit 0
-
-
