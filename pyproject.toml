@@ -108,10 +108,10 @@ version = { attr = "ldm.invoke.__version__" }
 
 [tool.setuptools.packages.find]
 "where" = ["."]
-"include" = ["assets", "backend*", "frontend.dist*", "ldm*"]
+"include" = ["assets.web*", "backend*", "frontend.dist*", "ldm*"]
 
 [tool.setuptools.package-data]
-"assets" = ["caution.png"]
+"assets.web" = ["**.png"]
 "backend" = ["**.png"]
 "frontend.dist" = ["**"]
 

@@ -23,7 +23,7 @@ from ldm.models.diffusion.ddpm import DiffusionWrapper
 from ldm.util import rand_perlin_2d
 
 downsampling = 8
-CAUTION_IMG = 'assets/caution.png'
+CAUTION_IMG = 'assets/web/caution.png'
 
 class Generator:
     downsampling_factor: int
@@ -345,4 +345,3 @@ class Generator:
 
     def torch_dtype(self)->torch.dtype:
         return torch.float16 if self.precision == 'float16' else torch.float32
-

@@ -21,7 +21,7 @@ from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ldm.util import rand_perlin_2d
 
 downsampling = 8
-CAUTION_IMG = 'assets/caution.png'
+CAUTION_IMG = 'assets/web/caution.png'
 
 class CkptGenerator():
     def __init__(self, model, precision):
