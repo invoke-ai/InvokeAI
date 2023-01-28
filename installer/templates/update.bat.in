@@ -24,7 +24,7 @@ if "%arg%" neq "" (
 set INVOKE_AI_SRC="https://github.com/invoke-ai/InvokeAI/archive/!INVOKE_AI_VERSION!.zip"
 set INVOKE_AI_DEP=https://raw.githubusercontent.com/invoke-ai/InvokeAI/!INVOKE_AI_VERSION!/environments-and-requirements/requirements-base.txt
 set INVOKE_AI_MODELS=https://raw.githubusercontent.com/invoke-ai/InvokeAI/$INVOKE_AI_VERSION/configs/INITIAL_MODELS.yaml
- 
+
 call curl -I "%INVOKE_AI_DEP%" -fs >.tmp.out
 if %errorlevel% neq 0 (
     echo '!INVOKE_AI_VERSION!' is not a known branch name or tag. Please check the version and try again.
@@ -57,7 +57,7 @@ if %errorlevel% neq 0 (
    exit /b
 )
 
-@rem call .venv\Scripts\python .venv\Scripts\configure_invokeai.py --root=.
+@rem call .venv\Scripts\invokeai-configure --root=.
 
 @rem if %errorlevel% neq 0 (
 @rem    echo Configuration InvokeAI failed. See https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting for suggestions.
@@ -70,4 +70,3 @@ echo InvokeAI has been updated to '%INVOKE_AI_VERSION%'
 echo "Press any key to continue"
 pause
 endlocal
-

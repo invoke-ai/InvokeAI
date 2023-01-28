@@ -28,11 +28,11 @@ should "just work" without further intervention. Simply pass the `--upscale`
 the popup in the Web GUI.
 
 **GFPGAN** requires a series of downloadable model files to work. These are
-loaded when you run `scripts/configure_invokeai.py`. If GFPAN is failing with an
+loaded when you run `invokeai-configure`. If GFPAN is failing with an
 error, please run the following from the InvokeAI directory:
 
 ```bash
-python scripts/configure_invokeai.py
+invokeai-configure
 ```
 
 If you do not run this script in advance, the GFPGAN module will attempt to
@@ -106,7 +106,7 @@ This repo also allows you to perform face restoration using
 [CodeFormer](https://github.com/sczhou/CodeFormer).
 
 In order to setup CodeFormer to work, you need to download the models like with
-GFPGAN. You can do this either by running `configure_invokeai.py` or by manually
+GFPGAN. You can do this either by running `invokeai-configure` or by manually
 downloading the
 [model file](https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth)
 and saving it to `ldm/invoke/restoration/codeformer/weights` folder.

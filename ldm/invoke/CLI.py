@@ -1103,11 +1103,11 @@ def write_commands(opt, file_path:str, outfilepath:str):
 def report_model_error(opt:Namespace, e:Exception):
     print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
     print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
-    response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
+    response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
     if response.startswith(('n','N')):
         return
 
-    print('configure_invokeai is launching....\n')
+    print('invokeai-configure is launching....\n')
 
     # Match arguments that were set on the CLI
     # only the arguments accepted by the configuration script are parsed
@@ -1115,7 +1115,7 @@ def report_model_error(opt:Namespace, e:Exception):
     config = ["--config", opt.conf] if opt.conf is not None else []
     yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
     previous_args = sys.argv
-    sys.argv = [ 'configure_invokeai' ]
+    sys.argv = [ 'invokeai-configure' ]
     sys.argv.extend(root_dir)
     sys.argv.extend(config)
     if yes_to_all is not None:

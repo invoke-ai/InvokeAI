@@ -135,10 +135,10 @@ manager, please follow these steps:
     default to `invokeai` in your home directory.
 
     ```bash
-    configure_invokeai --root_dir ~/Programs/invokeai
+    invokeai-configure --root_dir ~/Programs/invokeai
     ```
 
-    The script `configure_invokeai.py` will interactively guide you through the
+    The script `invokeai-configure` will interactively guide you through the
     process of downloading and installing the weights files needed for InvokeAI.
     Note that the main Stable Diffusion weights file is protected by a license
     agreement that you have to agree to. The script will list the steps you need
@@ -149,10 +149,10 @@ manager, please follow these steps:
     If you get an error message about a module not being installed, check that
     the `invokeai` environment is active and if not, repeat step 5.
 
-    Note that `configure_invokeai.py` and `invoke.py` should be installed
+    Note that `invokeai-configure` and `invoke.py` should be installed
     under your virtual environment directory and the system should find them
     on the PATH. If this isn't working on your system, you can call the
-    scripts directory using `python scripts/configure_invokeai.py` and
+    scripts directory using `python scripts/invokeai-configure` and
     `python scripts/invoke.py`.
 
     !!! tip
@@ -353,10 +353,10 @@ manager, please follow these steps:
     default to `invokeai` in your home directory.
 
     ```bash
-    python scripts/configure_invokeai.py --root_dir ~/Programs/invokeai
+    python scripts/invokeai-configure --root_dir ~/Programs/invokeai
     ```
 
-    The script `configure_invokeai.py` will interactively guide you through the
+    The script `invokeai-configure` will interactively guide you through the
     process of downloading and installing the weights files needed for InvokeAI.
     Note that the main Stable Diffusion weights file is protected by a license
     agreement that you have to agree to. The script will list the steps you need
@@ -367,7 +367,7 @@ manager, please follow these steps:
     If you get an error message about a module not being installed, check that
     the `invokeai` environment is active and if not, repeat step 5.
 
-    Note that `configure_invokeai.py` and `invoke.py` should be
+    Note that `invokeai-configure` and `invoke.py` should be
     installed under your conda directory and the system should find
     them automatically on the PATH. If this isn't working on your
     system, you can call the scripts directory using `python
@@ -468,7 +468,7 @@ greatest version, launch the Anaconda window, enter `InvokeAI` and type:
 ```bash
 git pull
 conda env update
-python scripts/configure_invokeai.py --skip-sd-weights #optional
+python scripts/invokeai-configure --skip-sd-weights #optional
 ```
 
 This will bring your local copy into sync with the remote one. The last step may
@@ -518,7 +518,7 @@ brew install llvm
 
 If brew config has Clang installed, update to the latest llvm and try creating the environment again.
 
-#### `configure_invokeai.py` or `invoke.py` crashes at an early stage
+#### `invokeai-configure` or `invoke.py` crashes at an early stage
 
 This is usually due to an incomplete or corrupted Conda install. Make sure you
 have linked to the correct environment file and run `conda update` again.

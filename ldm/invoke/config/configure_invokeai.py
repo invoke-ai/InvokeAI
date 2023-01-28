@@ -752,7 +752,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
         f.write(f'''# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
-# or renaming it and then running configure_invokeai.py again.
+# or renaming it and then running invokeai-configure again.
 
 # the --outdir option controls the default location of image files.
 --outdir="{outputs}"

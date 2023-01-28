@@ -51,7 +51,7 @@ You can also combine styles and concepts:
     If you used an installer to install InvokeAI, you may have already set a HuggingFace token.
     If you skipped this step, you can:
 
-    - run the InvokeAI configuration script again (if you used a manual installer): `scripts/configure_invokeai.py`
+    - run the InvokeAI configuration script again (if you used a manual installer): `invokeai-configure`
     - set one of the `HUGGINGFACE_TOKEN` or `HUGGING_FACE_HUB_TOKEN` environment variables to contain your token
 
     Finally, if you already used any HuggingFace library on your computer, you might already have a token
