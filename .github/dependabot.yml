@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "yarn" # See documentation for possible values
+  - package-ecosystem: "npm" # See documentation for possible values
     directory: "/frontend" # Location of package manifests
     schedule:
       interval: "weekly"
