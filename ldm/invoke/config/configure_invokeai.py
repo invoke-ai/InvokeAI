@@ -77,17 +77,15 @@ def postscript(errors: None):
 You're all set!
 
 ---
-
 If you installed manually from source or with 'pip install': activate the virtual environment
 then run one of the following commands to start InvokeAI.
 
 Web UI:
-   invoke.py --web # (connect to http://localhost:9090)
-   invoke.py --web --host 0.0.0.0 # (connect to http://your-lan-ip:9090 from another computer on the local network)
+   invokeai --web # (connect to http://localhost:9090)
+   invokeai --web --host 0.0.0.0 # (connect to http://your-lan-ip:9090 from another computer on the local network)
 
 Command-line interface:
-   invoke.py
-
+   invokeai
 ---
 
 If you installed using an installation script, run:
