@@ -35,9 +35,9 @@ class Installer:
     def __init__(self) -> None:
         self.reqs = INSTALLER_REQS
         self.preflight()
-        if os.getenv("VIRTUAL_ENV") is None:
-            # Only bootstrap if not already in a venv
-            self.bootstrap()
+        if os.getenv("VIRTUAL_ENV") is not None:
+            raise NotImplementedError("A virtual environment is already activated. Please 'deactivate' before installation.")
+        self.bootstrap()
 
     def preflight(self) -> None:
         """
