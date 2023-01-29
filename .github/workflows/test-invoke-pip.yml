@@ -67,7 +67,6 @@ jobs:
           #   os: windows-2022
           #   extra-index-url: 'https://download.pytorch.org/whl/cu117'
           #   github-env: $env:GITHUB_ENV
-      fail-fast: false
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     env:
