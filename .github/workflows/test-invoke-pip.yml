@@ -127,7 +127,7 @@ jobs:
           HF_DATASETS_OFFLINE: 1
           TRANSFORMERS_OFFLINE: 1
         run: >
-          invoke
+          invokeai
           --no-patchmatch
           --no-nsfw_checker
           --from_file ${{ env.TEST_PROMPTS }}
