@@ -81,7 +81,7 @@ const initialOptionsState: OptionsState = {
   seamBlur: 16,
   seamless: false,
   seamSize: 96,
-  seamSteps: 10,
+  seamSteps: 30,
   seamStrength: 0.7,
   seed: 0,
   seedWeights: '',

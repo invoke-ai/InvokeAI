@@ -1,7 +1,7 @@
 // import { Feature } from 'app/features';
 import { Feature } from 'app/features';
 import ImageToImageStrength from 'features/options/components/AdvancedOptions/ImageToImage/ImageToImageStrength';
-import SeamCorrectionOptions from 'features/options/components/AdvancedOptions/Canvas/SeamCorrectionOptions';
+import SeamCorrectionOptions from 'features/options/components/AdvancedOptions/Canvas/SeamCorrectionOptions/SeamCorrectionOptions';
 import SeedOptions from 'features/options/components/AdvancedOptions/Seed/SeedOptions';
 import GenerateVariationsToggle from 'features/options/components/AdvancedOptions/Variations/GenerateVariations';
 import VariationsOptions from 'features/options/components/AdvancedOptions/Variations/VariationsOptions';
