@@ -47,11 +47,7 @@ class Txt2Img2Img(Generator):
         # while keeping the minimum dimension at least 0.5 * resolution (e.g. 512*0.5 = 256)
 
         aspect = width / height
-        dimension = 512
-        try:
-            dimension = self.model.unet.config.sample_size * self.model.vae_scale_factor
-        except:
-            pass
+        dimension = self.model.unet.config.sample_size * self.model.vae_scale_factor
         min_dimension = math.floor(dimension * 0.5)
 
         model_area = dimension * dimension
