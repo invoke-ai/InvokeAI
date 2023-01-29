@@ -15,9 +15,6 @@ from ldm.models.diffusion.shared_invokeai_diffusion import ThresholdSettings
 
 
 class Txt2Img2Img(Generator):
-    init_width: int
-    init_height: int
-
     def __init__(self, model, precision):
         super().__init__(model, precision)
         self.init_latent = None    # for get_noise()
@@ -42,28 +39,6 @@ class Txt2Img2Img(Generator):
                 threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
 
-        # Scale the input width and height for the initial generation
-        # Make their area equivalent to the model's resolution area (e.g. 512*512 = 262144),
-        # while keeping the minimum dimension at least 0.5 * resolution (e.g. 512*0.5 = 256)
-
-        aspect = width / height
-        dimension = self.model.unet.config.sample_size * self.model.vae_scale_factor
-        min_dimension = math.floor(dimension * 0.5)
-
-        model_area = dimension * dimension
-
-        if aspect > 1.0:
-            init_height = max(min_dimension, math.sqrt(model_area / aspect))
-            init_width = init_height * aspect
-        else:
-            init_width = max(min_dimension, math.sqrt(model_area * aspect))
-            init_height = init_width / aspect
-
-        init_width, init_height = trim_to_multiple_of(math.floor(init_width), math.floor(init_height))
-        self.init_width = init_width
-        self.init_height = init_height
-        print(f"\n>> Using initial resolution of {init_width}x{init_height}")
-
         def make_image(x_T):
 
             first_pass_latent_output, _ = pipeline.latents_from_embeddings(
@@ -75,6 +50,10 @@ class Txt2Img2Img(Generator):
                 # TODO: threshold = threshold,
             )
 
+            # Get our initial generation width and height directly from the latent output so
+            # the message below is accurate.
+            init_width = first_pass_latent_output.size()[3] * self.downsampling_factor
+            init_height = first_pass_latent_output.size()[2] * self.downsampling_factor
             print(
                   f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
                  )
@@ -127,14 +106,24 @@ class Txt2Img2Img(Generator):
     def get_noise(self,width,height,scale = True):
         # print(f"Get noise: {width}x{height}")
         if scale:
-            trained_square = 512 * 512
-            actual_square = width * height
-            scale = math.sqrt(trained_square / actual_square)
-            scaled_width = math.ceil(scale * width / 64) * 64
-            scaled_height = math.ceil(scale * height / 64) * 64
-            # Use our previously calculated values from get_make_image if that's been called.
-            scaled_width = self.init_width or scaled_width
-            scaled_height = self.init_height or scaled_height
+            # Scale the input width and height for the initial generation
+            # Make their area equivalent to the model's resolution area (e.g. 512*512 = 262144),
+            # while keeping the minimum dimension at least 0.5 * resolution (e.g. 512*0.5 = 256)
+
+            aspect = width / height
+            dimension = self.model.unet.config.sample_size * self.model.vae_scale_factor
+            min_dimension = math.floor(dimension * 0.5)
+            model_area = dimension * dimension # hardcoded for now since all models are trained on square images
+
+            if aspect > 1.0:
+                init_height = max(min_dimension, math.sqrt(model_area / aspect))
+                init_width = init_height * aspect
+            else:
+                init_width = max(min_dimension, math.sqrt(model_area * aspect))
+                init_height = init_width / aspect
+
+            scaled_width, scaled_height = trim_to_multiple_of(math.floor(init_width), math.floor(init_height))
+
         else:
             scaled_width = width
             scaled_height = height
