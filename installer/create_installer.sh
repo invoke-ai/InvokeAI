@@ -57,8 +57,8 @@ mv dist/*.whl InvokeAI-Installer/
 
 # Install scripts
 # Mac/Linux
-perl -p -e "s/^INVOKEAI_VERSION=.*/INVOKEAI_VERSION=\"$VERSION\"/" install.sh.in > InvokeAI-Installer/install.sh
-chmod a+rx InvokeAI-Installer/install.sh
+cp install.sh.in InvokeAI-Installer/install.sh
+chmod a+x InvokeAI-Installer/install.sh
 
 # Windows
 perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in > InvokeAI-Installer/install.bat

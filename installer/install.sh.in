@@ -4,6 +4,4 @@
 # (don't need to check status)
 deactivate >/dev/null 2>&1
 
-set -euo pipefail
-
 exec python3 $(dirname $0)/main.py ${@}
