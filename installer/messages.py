@@ -2,6 +2,7 @@
 Installer user interaction
 """
 
+import os
 import platform
 from pathlib import Path
 
@@ -24,7 +25,6 @@ TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMA
 """
 
 
-
 OS = platform.uname().system
 ARCH = platform.uname().machine
 
@@ -33,6 +33,7 @@ if OS == "Windows":
     console = Console(style=Style(color="grey74"))
 else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
+
 
 def welcome():
     console.rule()
@@ -64,59 +65,65 @@ def dest_path(init_path=None) -> Path:
     :rtype: Path
     """
 
-    # TODO: feels like this could be refactored for clarity (@ebr)
-
     dest = init_path
     if dest is not None:
-        dest = Path(dest).expanduser().resolve()
+        dest = Path(dest)
+    else:
+        dest = Path.cwd()
 
     dest_confirmed = False
+    prev_dest = dest
+
+    console.line()
+    print(f"InvokeAI will be installed at {dest.expanduser().resolve()}")
+    dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
 
     while not dest_confirmed:
+
+        # if the given destination already exists, the starting point for browsing is its parent directory.
+        # the user may have made a typo, or otherwise wants to place the root dir next to an existing one.
+        # if the destination dir does NOT exist, then the user must have changed their mind about the selection.
+        # since we can't read their mind, start browsing at Path.cwd().
+        browse_start = (prev_dest.parent if prev_dest.exists() else Path.cwd()).expanduser().resolve()
+
+        path_completer = PathCompleter(
+            only_directories=True,
+            expanduser=True,
+            get_paths=lambda: [browse_start],
+            # get_paths=lambda: [".."].extend(list(browse_start.iterdir()))
+        )
+
+        console.line()
+        print(f"[orange3]Please select the destination directory for the installation:[/] \[{browse_start}]: ")
+        selected = prompt(
+            f">>> ",
+            complete_in_thread=True,
+            completer=path_completer,
+            default=str(browse_start) + os.sep,
+            vi_mode=True,
+            complete_while_typing=True
+            # Test that this is not needed on Windows
+            # complete_style=CompleteStyle.READLINE_LIKE,
+        )
+        prev_dest = dest
+        dest = Path(selected)
         console.line()
 
-        old_dest = dest
-
-        print(f"InvokeAI will be installed at {dest}")
-        dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
-
+        if dest.exists():
+            print(f":exclamation: Directory {dest.expanduser().resolve()} already exists :exclamation:")
+            dest_confirmed = Confirm.ask(
+                ":stop_sign: Are you sure you want to (re)install in this location?",
+                default=False,
+            )
+            console.line()
+        else:
+            print(f"InvokeAI will be installed at {dest.expanduser().resolve()}")
+            dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
 
         if not dest_confirmed:
+            dest = prev_dest
 
-            # needs more thought into how to handle this nicely
-            # so that the first selected destination continues to shows up as
-            # default until the user is done selecting (potentially multiple times)
-
-            path_completer = PathCompleter(
-                only_directories=True,
-                expanduser=True,
-                get_paths=lambda: [Path(dest).parent],
-                file_filter=lambda n: not n.startswith("."),
-            )
-            print(f"Please select the destination directory for the installation \[{dest}]: ")
-            selected = prompt(
-                "[Tab] to complete ❯ ",
-                complete_in_thread=True,
-                completer=path_completer,
-                complete_style=CompleteStyle.READLINE_LIKE,
-            )
-            if Path(selected).is_absolute():
-                # use the absolute path directly
-                dest = Path(selected)
-            else:
-                # the user entered a relative path - offer to create it as a sibling to the original destination
-                dest = dest.parent / Path(selected)
-            dest = dest.expanduser().resolve()
-
-        if dest.exists():
-            console.line()
-            print(f":exclamation: Directory {dest} already exists.")
-            console.line()
-            dest_confirmed = Confirm.ask(
-                ":question: Are you sure you want to (re)install in this location?", default="y"
-            )
-            if not dest_confirmed:
-                dest = old_dest
+    dest = dest.expanduser().resolve()
 
     try:
         dest.mkdir(exist_ok=True, parents=True)
@@ -146,15 +153,26 @@ def graphical_accelerator():
     but this is not yet supported or reliable. Also, some users may have exotic preferences.
     """
 
-
     if ARCH == "arm64" and OS != "Darwin":
         print(f"Only CPU acceleration is available on {ARCH} architecture. Proceeding with that.")
         return "cpu"
 
-    nvidia = ("an [gold1 b]NVIDIA[/] GPU (using CUDA™)", "cuda",)
-    amd = ("an [gold1 b]AMD[/] GPU (using ROCm™)", "rocm",)
-    cpu = ("no compatible GPU, or specifically prefer to use the CPU", "cpu",)
-    idk = ("I'm not sure what to choose", "idk",)
+    nvidia = (
+        "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
+        "cuda",
+    )
+    amd = (
+        "an [gold1 b]AMD[/] GPU (using ROCm™)",
+        "rocm",
+    )
+    cpu = (
+        "no compatible GPU, or specifically prefer to use the CPU",
+        "cpu",
+    )
+    idk = (
+        "I'm not sure what to choose",
+        "idk",
+    )
 
     if OS == "Windows":
         options = [nvidia, cpu]
@@ -165,7 +183,7 @@ def graphical_accelerator():
         # future CoreML?
 
     if len(options) == 1:
-        print(f"Your platform [gold1]{OS}-{ARCH}[/] only supports the \"{options[0][1]}\" driver. Proceeding with that.")
+        print(f'Your platform [gold1]{OS}-{ARCH}[/] only supports the "{options[0][1]}" driver. Proceeding with that.')
         return options[0][1]
 
     # "I don't know" is always added the last option
@@ -174,25 +192,40 @@ def graphical_accelerator():
     options = {str(i): opt for i, opt in enumerate(options, 1)}
 
     console.rule(":space_invader: GPU (Graphics Card) selection :space_invader:")
-    console.print(Panel(
-            Group("\n".join([
-                f"Detected the [gold1]{OS}-{ARCH}[/] platform",
-                "",
-                "See [steel_blue3]https://invoke-ai.github.io/InvokeAI/#system[/] to ensure your system meets the minimum requirements.",
-                "",
-                "[red3]🠶[/] [b]Your GPU drivers must be correctly installed before using InvokeAI![/] [red3]🠴[/]"]),
+    console.print(
+        Panel(
+            Group(
+                "\n".join(
+                    [
+                        f"Detected the [gold1]{OS}-{ARCH}[/] platform",
+                        "",
+                        "See [steel_blue3]https://invoke-ai.github.io/InvokeAI/#system[/] to ensure your system meets the minimum requirements.",
+                        "",
+                        "[red3]🠶[/] [b]Your GPU drivers must be correctly installed before using InvokeAI![/] [red3]🠴[/]",
+                    ]
+                ),
                 "",
                 "Please select the type of GPU installed in your computer.",
-                Panel("\n".join([f"[spring_green3 b i]{i}[/] [dark_red]🢒[/]{opt[0]}" for (i, opt) in options.items()]), box=box.MINIMAL),
+                Panel(
+                    "\n".join([f"[dark_goldenrod b i]{i}[/] [dark_red]🢒[/]{opt[0]}" for (i, opt) in options.items()]),
+                    box=box.MINIMAL,
+                ),
             ),
             box=box.MINIMAL,
             padding=(1, 1),
         )
     )
-    choice = prompt("Please make your selection: ", validator=Validator.from_callable(lambda n: n in options.keys(), error_message="Please select one the above options"))
+    choice = prompt(
+        "Please make your selection: ",
+        validator=Validator.from_callable(
+            lambda n: n in options.keys(), error_message="Please select one the above options"
+        ),
+    )
 
     if options[choice][1] == "idk":
-        console.print("No problem. We will try to install a version that [i]should[/i] be compatible. :crossed_fingers:")
+        console.print(
+            "No problem. We will try to install a version that [i]should[/i] be compatible. :crossed_fingers:"
+        )
 
     return options[choice][1]
 
@@ -207,26 +240,33 @@ def simple_banner(message: str) -> None:
 
     console.rule(message)
 
+
 # TODO this does not yet work correctly
 def windows_long_paths_registry() -> None:
     """
     Display a message about applying the Windows long paths registry fix
     """
 
-    with open(str(Path(__file__).parent/"WinLongPathsEnabled.reg"), "r", encoding="utf-16le") as code:
+    with open(str(Path(__file__).parent / "WinLongPathsEnabled.reg"), "r", encoding="utf-16le") as code:
         syntax = Syntax(code.read(), line_numbers=True)
 
-    console.print(Panel(
-        Group("\n".join([
-            "We will now apply a registry fix to enable long paths on Windows. InvokeAI needs this to function correctly. We are asking your permission to modify the Windows Registry on your behalf.",
-            "",
-            "This is the change that will be applied:",
-            syntax,
-        ])),
-        title="Windows Long Paths registry fix",
-        box=box.HORIZONTALS,
-        padding=(1, 1),
-    ))
+    console.print(
+        Panel(
+            Group(
+                "\n".join(
+                    [
+                        "We will now apply a registry fix to enable long paths on Windows. InvokeAI needs this to function correctly. We are asking your permission to modify the Windows Registry on your behalf.",
+                        "",
+                        "This is the change that will be applied:",
+                        syntax,
+                    ]
+                )
+            ),
+            title="Windows Long Paths registry fix",
+            box=box.HORIZONTALS,
+            padding=(1, 1),
+        )
+    )
 
 
 def introduction() -> None:
@@ -236,15 +276,20 @@ def introduction() -> None:
 
     console.rule()
 
-    console.print(Panel(title=":art: Configuring InvokeAI :art:", renderable=Group(
-        "",
-        "[b]This script will:",
-        "",
-        "1. Configure the InvokeAI application directory",
-        "2. Help download the Stable Diffusion weight files",
-        "   and other large models that are needed for text to image generation",
-        "3. Create initial configuration files.",
-        "",
-        "[i]At any point you may interrupt this program and resume later.",
-    )))
+    console.print(
+        Panel(
+            title=":art: Configuring InvokeAI :art:",
+            renderable=Group(
+                "",
+                "[b]This script will:",
+                "",
+                "1. Configure the InvokeAI application directory",
+                "2. Help download the Stable Diffusion weight files",
+                "   and other large models that are needed for text to image generation",
+                "3. Create initial configuration files.",
+                "",
+                "[i]At any point you may interrupt this program and resume later.",
+            ),
+        )
+    )
     console.line(2)
