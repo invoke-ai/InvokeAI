@@ -18,10 +18,9 @@ prompts you to select the models to merge, how to merge them, and the
 merged model name.
 
 Alternatively you may activate InvokeAI's virtual environment from the
-command line, and call the script via `merge_models_fe.py` (the "fe"
-stands for "front end"). There is also a version that accepts
-command-line arguments, which you can run with the command
-`merge_models.py`.
+command line, and call the script via `merge_models --gui` to open up
+a version that has a nice graphical front end. To get the commandline-
+only version, omit `--gui`.
 
 The user interface for the text-based interactive script is
 straightforward. It shows you a series of setting fields. Use control-N (^N)
@@ -47,7 +46,7 @@ under the selected name and register it with InvokeAI.
   display all the diffusers-style models that InvokeAI knows about.
   If you do not see the model you are looking for, then it is probably
   a legacy checkpoint model and needs to be converted using the
-  `invoke.py` command-line client and its `!optimize` command. You
+  `invoke` command-line client and its `!optimize` command. You
   must select at least two models to merge. The third can be left at
   "None" if you desire.
 

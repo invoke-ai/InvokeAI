@@ -304,6 +304,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             textual_inversion_manager=self.textual_inversion_manager
         )
 
+        self._enable_memory_efficient_attention()
+
+
+    def _enable_memory_efficient_attention(self):
+        """
+        if xformers is available, use it, otherwise use sliced attention.
+        """
         if is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
         else:
@@ -313,9 +320,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
                 pass
             else:
-                slice_size = 4 # or 2, or 8. i chose this arbitrarily.
-                self.enable_attention_slicing(slice_size=slice_size)
-
+                self.enable_attention_slicing(slice_size='auto')
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,
@@ -381,8 +386,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             additional_guidance = []
         extra_conditioning_info = conditioning_data.extra
         with self.invokeai_diffuser.custom_attention_context(extra_conditioning_info=extra_conditioning_info,
-                                                             step_count=len(self.scheduler.timesteps),
-                                                             do_attention_map_saving=False):
+                                                             step_count=len(self.scheduler.timesteps)
+                                                             ):
 
             yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
                                             latents=latents)

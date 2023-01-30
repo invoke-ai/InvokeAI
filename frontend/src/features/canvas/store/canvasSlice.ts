@@ -602,9 +602,10 @@ export const canvasSlice = createSlice({
       state,
       action: PayloadAction<{
         contentRect: IRect;
+        shouldScaleTo1?: boolean;
       }>
     ) => {
-      const { contentRect } = action.payload;
+      const { contentRect, shouldScaleTo1 } = action.payload;
       const {
         stageDimensions: { width: stageWidth, height: stageHeight },
       } = state;
@@ -612,13 +613,15 @@ export const canvasSlice = createSlice({
       const { x, y, width, height } = contentRect;
 
       if (width !== 0 && height !== 0) {
-        const newScale = calculateScale(
-          stageWidth,
-          stageHeight,
-          width,
-          height,
-          STAGE_PADDING_PERCENTAGE
-        );
+        const newScale = shouldScaleTo1
+          ? 1
+          : calculateScale(
+              stageWidth,
+              stageHeight,
+              width,
+              height,
+              STAGE_PADDING_PERCENTAGE
+            );
 
         const newCoordinates = calculateCoordinates(
           stageWidth,

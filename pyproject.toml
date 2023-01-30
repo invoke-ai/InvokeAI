@@ -36,8 +36,7 @@ classifiers = [
 dependencies = [
   "accelerate",
   "albumentations",
-  "clip_anytorch",                                                                         # replaceing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  "clipseg @ https://github.com/invoke-ai/clipseg/archive/relaxed-python-requirement.zip", # is this still necesarry with diffusers?
+  "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "datasets",
   "diffusers[torch]~=0.11",
   "dnspython==2.2.1",
@@ -53,7 +52,7 @@ dependencies = [
   "huggingface-hub>=0.11.1",
   "imageio",
   "imageio-ffmpeg",
-  "k-diffusion",                                                                           # replaceing "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
+  "k-diffusion",              # replacing "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
   "kornia",
   "npyscreen",
   "numpy~=1.23",
@@ -92,12 +91,9 @@ test = ["pytest>6.0.0", "pytest-cov"]
 
 [project.scripts]
 "configure_invokeai" = "ldm.invoke.configure_invokeai:main"
-"dream" = "ldm.invoke:CLI.main"
-"invoke" = "ldm.invoke:CLI.main"
-"legacy_api" = "scripts:legacy_api.main"
-"load_models" = "scripts:configure_invokeai.main"
-"merge_embeddings" = "scripts:merge_embeddings.main"
-"preload_models" = "ldm.invoke.configure_invokeai:main"
+"invoke" = "ldm.invoke.CLI:main"
+"textual_inversion" = "ldm.invoke.textual_inversion:main"
+"merge_models" = "ldm.invoke.merge_diffusers:main"   # note name munging
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
