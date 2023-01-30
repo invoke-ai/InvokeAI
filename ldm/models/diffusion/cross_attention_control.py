@@ -108,7 +108,7 @@ class Context:
             return self.tokens_cross_attention_action == Context.Action.APPLY
         return False
 
-    def get_active_cross_attention_control_types_for_step(self, percent_through:Optional[float]=None, step_size:Optional[float]=None)\
+    def get_active_cross_attention_control_types_for_step(self, percent_through:float=None)\
             -> list[CrossAttentionType]:
         """
         Should cross-attention control be applied on the given step?
@@ -117,11 +117,6 @@ class Context:
         """
         if percent_through is None:
             return [CrossAttentionType.SELF, CrossAttentionType.TOKENS]
-        if step_size is not None:
-            # adjust percent_through to ignore the first step
-            percent_through = (percent_through - step_size) / (1.0 - step_size)
-            if percent_through < 0:
-                return []
 
         opts = self.arguments.edit_options
         to_control = []
