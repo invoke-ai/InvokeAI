@@ -250,7 +250,17 @@ class InvokeAiInstance:
 
         ## TODO: only local wheel will be installed as of now; support for --version arg is TODO
         if FF_USE_LOCAL_WHEEL:
-            src = str(next(Path.cwd().glob("InvokeAI-*.whl")))
+            # if no wheel, try to do a source install before giving up
+            try:
+                src = str(next(Path.cwd().glob("InvokeAI-*.whl")))
+            except StopIteration:
+                try:
+                    src = Path(__file__).parents[1].expanduser().resolve()
+                    # if the above directory contains one of these files, we'll do a source install
+                    next(src.glob("pyproject.toml"))
+                    next(src.glob("ldm"))
+                except StopIteration:
+                    print("Unable to find a wheel or perform a source install. Giving up.")
 
         elif version == "source":
             # this makes an assumption about the location of the installer package in the source tree
