@@ -43,9 +43,9 @@ class CFGDenoiser(nn.Module):
         extra_conditioning_info = kwargs.get('extra_conditioning_info', None)
 
         if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = t_enc)
+            self.invokeai_diffuser.override_cross_attention(extra_conditioning_info, step_count = t_enc)
         else:
-            self.invokeai_diffuser.remove_cross_attention_control()
+            self.invokeai_diffuser.restore_default_cross_attention()
 
 
     def forward(self, x, sigma, uncond, cond, cond_scale):
