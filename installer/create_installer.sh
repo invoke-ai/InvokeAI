@@ -4,6 +4,13 @@ set -e
 
 cd "$(dirname "$0")"
 
+if [[ -v "VIRTUAL_ENV" ]]; then
+    # we can't just call 'deactivate' because this function is not exported
+    # to the environment of this script from the bash process that runs the script
+    echo "A virtual environment is activated. Please deactivate it before proceeding".
+    exit -1
+fi
+
 VERSION=$(cd ..; python -c "from ldm.invoke import __version__ as version; print(version)")
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
@@ -28,7 +35,6 @@ fi
 # ----------------------
 
 echo Building the wheel
-if [[ -v "VIRTUAL_ENV" ]]; then deactivate; fi
 
 # install the 'build' package in the user site packages, if needed
 # could be improved by using a temporary venv, but it's tiny and harmless
