@@ -72,7 +72,7 @@ class Installer:
 
         venv.create(venv_dir.name, with_pip=True)
         self.venv_dir = venv_dir
-        add_venv_site(Path(venv_dir.name))
+        add_venv_to_path(Path(venv_dir.name))
 
         return venv_dir
 
@@ -87,7 +87,7 @@ class Installer:
         print("Initializing the installer. This may take a minute - please wait...")
 
         venv_dir = self.mktemp_venv()
-        pip = get_venv_pip(Path(venv_dir.name))
+        pip = get_pip_from_venv(Path(venv_dir.name))
 
         cmd = [pip, "install", "--require-virtualenv", "--use-pep517"]
         cmd.extend(self.reqs)
@@ -175,10 +175,10 @@ class InvokeAiInstance:
 
         self.runtime = runtime
         self.venv = venv
-        self.pip = get_venv_pip(venv)
+        self.pip = get_pip_from_venv(venv)
         self.version = version
 
-        add_venv_site(venv)
+        add_venv_to_path(venv)
         os.environ["INVOKEAI_ROOT"] = str(self.runtime.expanduser().resolve())
         os.environ["VIRTUAL_ENV"] = str(self.venv.expanduser().resolve())
 
@@ -316,7 +316,7 @@ class InvokeAiInstance:
 ### Utility functions ###
 
 
-def get_venv_pip(venv_path: Path) -> str:
+def get_pip_from_venv(venv_path: Path) -> str:
     """
     Given a path to a virtual environment, get the absolute path to the `pip` executable
     in a cross-platform fashion. Does not validate that the pip executable
@@ -332,7 +332,7 @@ def get_venv_pip(venv_path: Path) -> str:
     return str(venv_path.expanduser().resolve() / pip)
 
 
-def add_venv_site(venv_path: Path) -> None:
+def add_venv_to_path(venv_path: Path) -> None:
     """
     Given a path to a virtual environment, add the python site-packages directory from this venv
     into the sys.path, in a cross-platform fashion, such that packages from this venv
