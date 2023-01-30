@@ -306,7 +306,7 @@ class InvokeAICrossAttentionMixin:
 
 
 
-def remove_cross_attention_control(model, is_running_diffusers: bool, restore_attention_processor: Optional[AttnProcessor]=None):
+def restore_default_cross_attention(model, is_running_diffusers: bool, restore_attention_processor: Optional[AttnProcessor]=None):
     if is_running_diffusers:
         unet = model
         unet.set_attn_processor(restore_attention_processor or CrossAttnProcessor())
@@ -314,7 +314,7 @@ def remove_cross_attention_control(model, is_running_diffusers: bool, restore_at
         remove_attention_function(model)
 
 
-def setup_cross_attention_control(model, context: Context, is_running_diffusers = False):
+def override_cross_attention(model, context: Context, is_running_diffusers = False):
     """
     Inject attention parameters and functions into the passed in model to enable cross attention editing.
 
