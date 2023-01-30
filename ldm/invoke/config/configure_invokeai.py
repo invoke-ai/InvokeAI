@@ -22,6 +22,7 @@ from urllib import request
 import requests
 import transformers
 from diffusers import StableDiffusionPipeline, AutoencoderKL
+from invokeai import configs, frontend
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.devices import choose_precision, choose_torch_device
 from getpass_asterisk import getpass_asterisk
@@ -50,8 +51,8 @@ except ImportError:
 Model_dir = 'models'
 Weights_dir = 'ldm/stable-diffusion-v1/'
 
-# the initial "configs" dir is now bundled with the `config` package
-Dataset_path = Path(__file__).parent / "configs" / 'INITIAL_MODELS.yaml'
+# the initial "configs" dir is now bundled in the `invokeai.configs` package
+Dataset_path = Path(configs.__path__[-1]) / 'INITIAL_MODELS.yaml'
 
 Default_config_file =  Path (global_config_dir()) / 'models.yaml'
 SD_Configs = Path (global_config_dir()) / 'stable-diffusion'
@@ -738,7 +739,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
     for name in ('models','configs','embeddings','text-inversion-data','text-inversion-training-data'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
 
-    configs_src = Path(__file__).parent / "configs"
+    configs_src = Path(configs.__path__[-1])
     configs_dest = Path(root) / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)

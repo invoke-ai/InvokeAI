@@ -55,7 +55,7 @@ dependencies = [
   "k-diffusion",              # replacing "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
   "kornia",
   "npyscreen",
-  "numpy~=1.23",
+  "numpy<1.24",
   "omegaconf",
   "opencv-python",
   "picklescan",
@@ -66,7 +66,7 @@ dependencies = [
   "pyreadline3",
   "pytorch-lightning==1.7.7",
   "realesrgan",
-  "requests==2.25.1",
+  "requests==2.28.2",
   "safetensors",
   "scikit-image>=0.19",
   "send2trash",
@@ -114,12 +114,13 @@ version = { attr = "ldm.invoke.__version__" }
 
 [tool.setuptools.packages.find]
 "where" = ["."]
-"include" = ["assets.web*", "backend*", "frontend.dist*", "ldm*"]
+"include" = ["invokeai.assets.web*", "invokeai.backend*", "invokeai.frontend.dist*", "invokeai.configs*", "ldm*"]
 
 [tool.setuptools.package-data]
-"assets.web" = ["**.png"]
-"backend" = ["**.png"]
-"frontend.dist" = ["**"]
+"invokeai.assets.web" = ["**.png"]
+"invokeai.backend" = ["**.png"]
+"invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
+"invokeai.frontend.dist" = ["**"]
 
 [tool.pytest.ini_options]
 addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"
