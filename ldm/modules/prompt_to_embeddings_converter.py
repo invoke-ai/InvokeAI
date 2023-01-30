@@ -3,8 +3,9 @@ import math
 import torch
 from transformers import CLIPTokenizer, CLIPTextModel
 
-from ldm.modules.textual_inversion_manager import TextualInversionManager
 from ldm.invoke.devices import torch_dtype
+from ldm.modules.textual_inversion_manager import TextualInversionManager
+
 
 class WeightedPromptFragmentsToEmbeddingsConverter():
 
@@ -22,8 +23,8 @@ class WeightedPromptFragmentsToEmbeddingsConverter():
         return self.tokenizer.model_max_length
 
     def get_embeddings_for_weighted_prompt_fragments(self,
-                                                     text: list[str],
-                                                     fragment_weights: list[float],
+                                                     text: list[list[str]],
+                                                     fragment_weights: list[list[float]],
                                                      should_return_tokens: bool = False,
                                                      device='cpu'
                                                      ) -> torch.Tensor:
@@ -198,12 +199,12 @@ class WeightedPromptFragmentsToEmbeddingsConverter():
             all_token_ids = all_token_ids[0:max_token_count_without_bos_eos_markers]
             per_token_weights = per_token_weights[0:max_token_count_without_bos_eos_markers]
 
-        # pad out to a self.max_length-entry array: [eos_token, <prompt tokens>, eos_token, ..., eos_token]
+        # pad out to a self.max_length-entry array: [bos_token, <prompt tokens>, eos_token, pad_token…]
         # (typically self.max_length == 77)
         all_token_ids = [self.tokenizer.bos_token_id] + all_token_ids + [self.tokenizer.eos_token_id]
         per_token_weights = [1.0] + per_token_weights + [1.0]
         pad_length = self.max_length - len(all_token_ids)
-        all_token_ids += [self.tokenizer.eos_token_id] * pad_length
+        all_token_ids += [self.tokenizer.pad_token_id] * pad_length
         per_token_weights += [1.0] * pad_length
 
         all_token_ids_tensor = torch.tensor(all_token_ids, dtype=torch.long, device=device)

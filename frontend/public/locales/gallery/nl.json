@@ -1,0 +1,16 @@
+{
+  "generations": "Gegenereerde afbeeldingen",
+  "showGenerations": "Toon gegenereerde afbeeldingen",
+  "uploads": "Uploads",
+  "showUploads": "Toon uploads",
+  "galleryImageSize": "Afbeeldingsgrootte",
+  "galleryImageResetSize": "Herstel grootte",
+  "gallerySettings": "Instellingen galerij",
+  "maintainAspectRatio": "Behoud beeldverhoiding",
+  "autoSwitchNewImages": "Wissel autom. naar nieuwe afbeeldingen",
+  "singleColumnLayout": "Eenkolomsindeling",
+  "pinGallery": "Zet galerij vast",
+  "allImagesLoaded": "Alle afbeeldingen geladen",
+  "loadMore": "Laad meer",
+  "noImagesInGallery": "Geen afbeeldingen in galerij"
+}

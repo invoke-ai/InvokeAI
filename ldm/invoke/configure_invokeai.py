@@ -30,7 +30,7 @@ from huggingface_hub.utils._errors import RevisionNotFoundError
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
-from transformers import CLIPTokenizer, CLIPTextModel
+from transformers import CLIPTokenizer, CLIPTextModel, AutoProcessor, CLIPSegForImageSegmentation
 
 from ldm.invoke.globals import Globals, global_cache_dir
 from ldm.invoke.readline import generic_completer
@@ -601,31 +601,10 @@ def download_codeformer():
 #---------------------------------------------
 def download_clipseg():
     print('Installing clipseg model for text-based masking...',end='', file=sys.stderr)
-    import zipfile
+    CLIPSEG_MODEL = 'CIDAS/clipseg-rd64-refined'
     try:
-        model_url = 'https://owncloud.gwdg.de/index.php/s/ioHbRzFx6th32hn/download'
-        model_dest = os.path.join(Globals.root,'models/clipseg/clipseg_weights')
-        weights_zip = 'models/clipseg/weights.zip'
-
-        if not os.path.exists(model_dest):
-            os.makedirs(os.path.dirname(model_dest), exist_ok=True)
-        if not os.path.exists(f'{model_dest}/rd64-uni-refined.pth'):
-            dest = os.path.join(Globals.root,weights_zip)
-            request.urlretrieve(model_url,dest)
-            with zipfile.ZipFile(dest,'r') as zip:
-                zip.extractall(os.path.join(Globals.root,'models/clipseg'))
-            os.remove(dest)
-
-            from clipseg.clipseg import CLIPDensePredT
-            model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, )
-            model.eval()
-            model.load_state_dict(
-                torch.load(
-                    os.path.join(Globals.root,'models/clipseg/clipseg_weights/rd64-uni-refined.pth'),
-                    map_location=torch.device('cpu')
-                    ),
-                strict=False,
-            )
+        download_from_hf(AutoProcessor,CLIPSEG_MODEL)
+        download_from_hf(CLIPSegForImageSegmentation,CLIPSEG_MODEL)
     except Exception:
         print('Error installing clipseg model:')
         print(traceback.format_exc())
@@ -747,7 +726,7 @@ def initialize_rootdir(root:str,yes_to_all:bool=False):
 
     safety_checker = '--nsfw_checker' if enable_safety_checker else '--no-nsfw_checker'
 
-    for name in ('models','configs','embeddings'):
+    for name in ('models','configs','embeddings','text-inversion-data','text-inversion-training-data'):
         os.makedirs(os.path.join(root,name), exist_ok=True)
     for src in (['configs']):
         dest = os.path.join(root,src)

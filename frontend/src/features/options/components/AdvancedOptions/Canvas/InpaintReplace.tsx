@@ -36,7 +36,7 @@ export default function InpaintReplace() {
   const { t } = useTranslation();
 
   return (
-    <Flex alignItems={'center'} columnGap={'1rem'}>
+    <Flex alignItems={'center'} columnGap={'0.2rem'}>
       <IAISlider
         label={t('options:inpaintReplace')}
         value={inpaintReplace}
@@ -51,7 +51,8 @@ export default function InpaintReplace() {
         withSliderMarks
         sliderMarkRightOffset={-2}
         withReset
-        handleReset={() => dispatch(setInpaintReplace(1))}
+        handleReset={() => dispatch(setInpaintReplace(0.1))}
+        withInput
         isResetDisabled={!shouldUseInpaintReplace}
       />
       <IAISwitch

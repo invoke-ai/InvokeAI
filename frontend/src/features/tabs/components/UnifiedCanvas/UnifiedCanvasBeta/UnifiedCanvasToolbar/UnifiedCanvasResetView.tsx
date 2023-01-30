@@ -1,5 +1,6 @@
 import { useAppDispatch } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
 import { resetCanvasView } from 'features/canvas/store/canvasSlice';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import React from 'react';
@@ -24,7 +25,12 @@ export default function UnifiedCanvasResetView() {
     [canvasBaseLayer]
   );
 
-  const handleResetCanvasView = () => {
+  const handleClickResetCanvasView = useSingleAndDoubleClick(
+    () => handleResetCanvasView(false),
+    () => handleResetCanvasView(true)
+  );
+
+  const handleResetCanvasView = (shouldScaleTo1 = false) => {
     const canvasBaseLayer = getCanvasBaseLayer();
     if (!canvasBaseLayer) return;
     const clientRect = canvasBaseLayer.getClientRect({
@@ -33,6 +39,7 @@ export default function UnifiedCanvasResetView() {
     dispatch(
       resetCanvasView({
         contentRect: clientRect,
+        shouldScaleTo1,
       })
     );
   };
@@ -41,7 +48,7 @@ export default function UnifiedCanvasResetView() {
       aria-label={`${t('unifiedcanvas:resetView')} (R)`}
       tooltip={`${t('unifiedcanvas:resetView')} (R)`}
       icon={<FaCrosshairs />}
-      onClick={handleResetCanvasView}
+      onClick={handleClickResetCanvasView}
     />
   );
 }
