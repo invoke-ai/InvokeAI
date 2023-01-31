@@ -23,7 +23,7 @@ jobs:
           # - '3.9'
           - '3.10'
         pytorch:
-          - linux-cuda-11_6
+          # - linux-cuda-11_6
           - linux-cuda-11_7
           - linux-rocm-5_2
           - linux-cpu
@@ -33,10 +33,10 @@ jobs:
           # - windows-cuda-11_6
           # - windows-cuda-11_7
         include:
-          - pytorch: linux-cuda-11_6
-            os: ubuntu-22.04
-            extra-index-url: 'https://download.pytorch.org/whl/cu116'
-            github-env: $GITHUB_ENV
+          # - pytorch: linux-cuda-11_6
+          #   os: ubuntu-22.04
+          #   extra-index-url: 'https://download.pytorch.org/whl/cu116'
+          #   github-env: $GITHUB_ENV
           - pytorch: linux-cuda-11_7
             os: ubuntu-22.04
             github-env: $GITHUB_ENV
