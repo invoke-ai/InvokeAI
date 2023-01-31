@@ -19,9 +19,9 @@ class DDIMSampler(Sampler):
         all_timesteps_count = kwargs.get('all_timesteps_count', t_enc)
 
         if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info, step_count = all_timesteps_count)
+            self.invokeai_diffuser.override_cross_attention(extra_conditioning_info, step_count = all_timesteps_count)
         else:
-            self.invokeai_diffuser.remove_cross_attention_control()
+            self.invokeai_diffuser.restore_default_cross_attention()
 
 
     # This is the central routine

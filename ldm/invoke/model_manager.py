@@ -125,7 +125,7 @@ class ModelManager(object):
         Set the default model. The change will not take
         effect until you call model_manager.commit()
         '''
-        assert model_name in self.models,f"unknown model '{model_name}'"
+        assert model_name in self.model_names(), f"unknown model '{model_name}'"
 
         config = self.config
         for model in config:
