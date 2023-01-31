@@ -184,6 +184,7 @@ class Inpaint(Img2Img):
                        infill_method = None,
                        inpaint_width=None,
                        inpaint_height=None,
+                       inpaint_fill:tuple(int)=(0x7F, 0x7F, 0x7F, 0xFF),
                        attention_maps_callback=None,
                        **kwargs):
         """
@@ -211,7 +212,7 @@ class Inpaint(Img2Img):
                     tile_size = tile_size
                 )
             elif infill_method == 'solid':
-                solid_bg = PIL.Image.new("RGBA", init_image.size, (0x7F, 0x7F, 0x7F, 0xFF))
+                solid_bg = PIL.Image.new("RGBA", init_image.size, inpaint_fill)
                 init_filled = PIL.Image.alpha_composite(solid_bg, init_image)
             else:
                 raise ValueError(f"Non-supported infill type {infill_method}", infill_method)
