@@ -22,7 +22,7 @@ from invokeai.backend.modules.get_canvas_generation_mode import (
     get_canvas_generation_mode,
 )
 from invokeai.backend.modules.parameters import parameters_to_command
-from invokeai import frontend
+import invokeai.frontend.dist as frontend
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
@@ -95,9 +95,8 @@ class InvokeAIWebServer:
                 _cors = _cors.split(",")
             socketio_args["cors_allowed_origins"] = _cors
 
-        frontend_path = self.find_frontend()
         self.app = Flask(
-            __name__, static_url_path="", static_folder=frontend_path
+            __name__, static_url_path="", static_folder=frontend.__path__[0]
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)
@@ -254,16 +253,6 @@ class InvokeAIWebServer:
                     certfile=args.certfile,
                     keyfile=args.keyfile,
                 )
-
-    def find_frontend(self):
-        for candidate in [
-                *frontend.__path__,
-                Path(__file__).parent / '..' / 'frontend'
-        ]:
-            path = Path(candidate,'dist')
-            if path.exists():
-                return path
-        assert path.exists(),"Frontend files cannot be found. Cannot continue"
 
     def setup_app(self):
         self.result_url = "outputs/"
