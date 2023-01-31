@@ -19,22 +19,22 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '3.9'
+          # - '3.9'
           - '3.10'
         pytorch:
-          - linux-cuda-11_6
+          # - linux-cuda-11_6
           - linux-cuda-11_7
           - linux-rocm-5_2
           - linux-cpu
           - macos-default
           - windows-cpu
-          - windows-cuda-11_6
-          - windows-cuda-11_7
+          # - windows-cuda-11_6
+          # - windows-cuda-11_7
         include:
-          - pytorch: linux-cuda-11_6
-            os: ubuntu-22.04
-            extra-index-url: 'https://download.pytorch.org/whl/cu116'
-            github-env: $GITHUB_ENV
+          # - pytorch: linux-cuda-11_6
+          #   os: ubuntu-22.04
+          #   extra-index-url: 'https://download.pytorch.org/whl/cu116'
+          #   github-env: $GITHUB_ENV
           - pytorch: linux-cuda-11_7
             os: ubuntu-22.04
             github-env: $GITHUB_ENV
@@ -52,14 +52,14 @@ jobs:
           - pytorch: windows-cpu
             os: windows-2022
             github-env: $env:GITHUB_ENV
-          - pytorch: windows-cuda-11_6
-            os: windows-2022
-            extra-index-url: 'https://download.pytorch.org/whl/cu116'
-            github-env: $env:GITHUB_ENV
-          - pytorch: windows-cuda-11_7
-            os: windows-2022
-            extra-index-url: 'https://download.pytorch.org/whl/cu117'
-            github-env: $env:GITHUB_ENV
+          # - pytorch: windows-cuda-11_6
+          #   os: windows-2022
+          #   extra-index-url: 'https://download.pytorch.org/whl/cu116'
+          #   github-env: $env:GITHUB_ENV
+          # - pytorch: windows-cuda-11_7
+          #   os: windows-2022
+          #   extra-index-url: 'https://download.pytorch.org/whl/cu117'
+          #   github-env: $env:GITHUB_ENV
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     steps:
