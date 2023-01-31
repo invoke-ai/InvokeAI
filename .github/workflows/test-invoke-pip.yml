@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-          # - '3.9'
+          - '3.9'
           - '3.10'
         pytorch:
           - linux-cuda-11_6
@@ -93,9 +93,15 @@ jobs:
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
       - name: install invokeai
-        run: pip3 install --use-pep517 -e .
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
+        run: >
+          pip3 install
+          --use-pep517
+          --editable=".[test]"
+
+      - name: run pytest
+        run: pytest
 
       - name: Use Cached models
         id: cache-sd-model

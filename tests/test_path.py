@@ -1,13 +1,13 @@
+import pathlib
 import unittest
 from os import path as osp
-import pathlib
 
-import invokeai.frontend.dist as frontend
 import invokeai.configs as configs
+import invokeai.frontend.dist as frontend
 
 
 def get_frontend_path() -> pathlib.Path:
-    """Get the path of the frontend"""
+    """Get the path of the frontend dist folder"""
     return pathlib.Path(frontend.__path__[0])
 
 
@@ -18,14 +18,12 @@ def get_configs_path() -> pathlib.Path:
 
 def test_frontend_path():
     """Test that the frontend path is correct"""
-    # test path of the frontend
     TEST_PATH = str(get_frontend_path())
     assert TEST_PATH.endswith(osp.join("invokeai", "frontend", "dist"))
 
 
 def test_configs_path():
-    """Test that the frontend path is correct"""
-    # test path of the frontend
+    """Test that the configs path is correct"""
     TEST_PATH = str(get_configs_path())
     assert TEST_PATH.endswith(osp.join("invokeai", "configs"))
 
