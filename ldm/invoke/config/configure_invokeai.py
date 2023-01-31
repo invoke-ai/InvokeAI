@@ -22,7 +22,7 @@ from urllib import request
 import requests
 import transformers
 from diffusers import StableDiffusionPipeline, AutoencoderKL
-from invokeai import configs, frontend
+from invokeai import configs
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.devices import choose_precision, choose_torch_device
 from getpass_asterisk import getpass_asterisk
