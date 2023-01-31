@@ -786,8 +786,8 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
         model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
             model_name = default_name
-        if not re.match('^[\w._+-]+$',model_name):
-            print('** model name must contain only words, digits and the characters "._+-" **')
+        if not re.match('^[\w._+:/-]+$',model_name):
+            print('** model name must contain only words, digits and the characters "._+:/-" **')
         elif model_name != default_name and model_name in existing_names:
             print(f'** the name {model_name} is already in use. Pick another.')
         else:
