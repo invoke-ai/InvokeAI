@@ -3,10 +3,10 @@ ldm.invoke.generator.txt2img inherits from ldm.invoke.generator
 '''
 
 import math
-from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from typing import Callable, Optional
 
 import torch
+from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 
 from ldm.invoke.generator.base import Generator
 from ldm.invoke.generator.diffusers_pipeline import trim_to_multiple_of, StableDiffusionGeneratorPipeline, \
@@ -38,10 +38,6 @@ class Txt2Img2Img(Generator):
                 uc, c, cfg_scale, extra_conditioning_info,
                 threshold = ThresholdSettings(threshold, warmup=0.2) if threshold else None)
             .add_scheduler_args_if_applicable(pipeline.scheduler, eta=ddim_eta))
-        scale_dim = min(width, height)
-        scale = 512 / scale_dim
-
-        init_width, init_height = trim_to_multiple_of(scale * width, scale * height)
 
         def make_image(x_T):
 
@@ -54,6 +50,10 @@ class Txt2Img2Img(Generator):
                 # TODO: threshold = threshold,
             )
 
+            # Get our initial generation width and height directly from the latent output so
+            # the message below is accurate.
+            init_width = first_pass_latent_output.size()[3] * self.downsampling_factor
+            init_height = first_pass_latent_output.size()[2] * self.downsampling_factor
             print(
                   f"\n>> Interpolating from {init_width}x{init_height} to {width}x{height} using DDIM sampling"
                  )
@@ -106,27 +106,35 @@ class Txt2Img2Img(Generator):
     def get_noise(self,width,height,scale = True):
         # print(f"Get noise: {width}x{height}")
         if scale:
-            trained_square = 512 * 512
-            actual_square = width * height
-            scale = math.sqrt(trained_square / actual_square)
-            scaled_width = math.ceil(scale * width / 64) * 64
-            scaled_height = math.ceil(scale * height / 64) * 64
+            # Scale the input width and height for the initial generation
+            # Make their area equivalent to the model's resolution area (e.g. 512*512 = 262144),
+            # while keeping the minimum dimension at least 0.5 * resolution (e.g. 512*0.5 = 256)
+
+            aspect = width / height
+            dimension = self.model.unet.config.sample_size * self.model.vae_scale_factor
+            min_dimension = math.floor(dimension * 0.5)
+            model_area = dimension * dimension # hardcoded for now since all models are trained on square images
+
+            if aspect > 1.0:
+                init_height = max(min_dimension, math.sqrt(model_area / aspect))
+                init_width = init_height * aspect
+            else:
+                init_width = max(min_dimension, math.sqrt(model_area * aspect))
+                init_height = init_width / aspect
+
+            scaled_width, scaled_height = trim_to_multiple_of(math.floor(init_width), math.floor(init_height))
+
         else:
             scaled_width = width
             scaled_height = height
 
-        device      = self.model.device
+        device = self.model.device
+        channels = self.latent_channels
+        if channels == 9:
+            channels = 4  # we don't really want noise for all the mask channels
+        shape = (1, channels,
+                 scaled_height // self.downsampling_factor, scaled_width // self.downsampling_factor)
         if self.use_mps_noise or device.type == 'mps':
-            return torch.randn([1,
-                                self.latent_channels,
-                                scaled_height // self.downsampling_factor,
-                                scaled_width  // self.downsampling_factor],
-                               dtype=self.torch_dtype(),
-                               device='cpu').to(device)
+            return torch.randn(shape, dtype=self.torch_dtype(), device='cpu').to(device)
         else:
-            return torch.randn([1,
-                                self.latent_channels,
-                                scaled_height // self.downsampling_factor,
-                                scaled_width  // self.downsampling_factor],
-                               dtype=self.torch_dtype(),
-                               device=device)
+            return torch.randn(shape, dtype=self.torch_dtype(), device=device)
