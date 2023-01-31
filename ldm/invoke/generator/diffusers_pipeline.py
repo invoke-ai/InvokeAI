@@ -24,9 +24,6 @@ from ...models.diffusion import cross_attention_control
 from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
-# monkeypatch diffusers CrossAttention 🙈
-# this is to make prompt2prompt and (future) attention maps work
-attention.CrossAttention = cross_attention_control.InvokeAIDiffusersCrossAttention
 
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
@@ -295,7 +292,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
+        self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward, is_running_diffusers=True)
         use_full_precision = (precision == 'float32' or precision == 'autocast')
         self.textual_inversion_manager = TextualInversionManager(tokenizer=self.tokenizer,
                                                                  text_encoder=self.text_encoder,
@@ -307,8 +304,23 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             textual_inversion_manager=self.textual_inversion_manager
         )
 
+        self._enable_memory_efficient_attention()
+
+
+    def _enable_memory_efficient_attention(self):
+        """
+        if xformers is available, use it, otherwise use sliced attention.
+        """
         if is_xformers_available() and not Globals.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
+        else:
+            if torch.backends.mps.is_available():
+                # until pytorch #91617 is fixed, slicing is borked on MPS
+                # https://github.com/pytorch/pytorch/issues/91617
+                # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
+                pass
+            else:
+                self.enable_attention_slicing(slice_size='auto')
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,
@@ -373,42 +385,40 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if additional_guidance is None:
             additional_guidance = []
         extra_conditioning_info = conditioning_data.extra
-        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            self.invokeai_diffuser.setup_cross_attention_control(extra_conditioning_info,
-                                                                 step_count=len(self.scheduler.timesteps))
-        else:
-            self.invokeai_diffuser.remove_cross_attention_control()
+        with self.invokeai_diffuser.custom_attention_context(extra_conditioning_info=extra_conditioning_info,
+                                                             step_count=len(self.scheduler.timesteps)
+                                                             ):
 
-        yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
-                                        latents=latents)
+            yield PipelineIntermediateState(run_id=run_id, step=-1, timestep=self.scheduler.num_train_timesteps,
+                                            latents=latents)
 
-        batch_size = latents.shape[0]
-        batched_t = torch.full((batch_size,), timesteps[0],
-                               dtype=timesteps.dtype, device=self.unet.device)
-        latents = self.scheduler.add_noise(latents, noise, batched_t)
+            batch_size = latents.shape[0]
+            batched_t = torch.full((batch_size,), timesteps[0],
+                                   dtype=timesteps.dtype, device=self.unet.device)
+            latents = self.scheduler.add_noise(latents, noise, batched_t)
 
-        attention_map_saver: Optional[AttentionMapSaver] = None
-        self.invokeai_diffuser.remove_attention_map_saving()
-        for i, t in enumerate(self.progress_bar(timesteps)):
-            batched_t.fill_(t)
-            step_output = self.step(batched_t, latents, conditioning_data,
-                                    step_index=i,
-                                    total_step_count=len(timesteps),
-                                    additional_guidance=additional_guidance)
-            latents = step_output.prev_sample
-            predicted_original = getattr(step_output, 'pred_original_sample', None)
+            attention_map_saver: Optional[AttentionMapSaver] = None
 
-            if i == len(timesteps)-1 and extra_conditioning_info is not None:
-                eos_token_index = extra_conditioning_info.tokens_count_including_eos_bos - 1
-                attention_map_token_ids = range(1, eos_token_index)
-                attention_map_saver = AttentionMapSaver(token_ids=attention_map_token_ids, latents_shape=latents.shape[-2:])
-                self.invokeai_diffuser.setup_attention_map_saving(attention_map_saver)
+            for i, t in enumerate(self.progress_bar(timesteps)):
+                batched_t.fill_(t)
+                step_output = self.step(batched_t, latents, conditioning_data,
+                                        step_index=i,
+                                        total_step_count=len(timesteps),
+                                        additional_guidance=additional_guidance)
+                latents = step_output.prev_sample
+                predicted_original = getattr(step_output, 'pred_original_sample', None)
 
-            yield PipelineIntermediateState(run_id=run_id, step=i, timestep=int(t), latents=latents,
-                                            predicted_original=predicted_original, attention_map_saver=attention_map_saver)
+                # TODO resuscitate attention map saving
+                #if i == len(timesteps)-1 and extra_conditioning_info is not None:
+                #    eos_token_index = extra_conditioning_info.tokens_count_including_eos_bos - 1
+                #    attention_map_token_ids = range(1, eos_token_index)
+                #    attention_map_saver = AttentionMapSaver(token_ids=attention_map_token_ids, latents_shape=latents.shape[-2:])
+                #    self.invokeai_diffuser.setup_attention_map_saving(attention_map_saver)
 
-        self.invokeai_diffuser.remove_attention_map_saving()
-        return latents, attention_map_saver
+                yield PipelineIntermediateState(run_id=run_id, step=i, timestep=int(t), latents=latents,
+                                                predicted_original=predicted_original, attention_map_saver=attention_map_saver)
+
+            return latents, attention_map_saver
 
     @torch.inference_mode()
     def step(self, t: torch.Tensor, latents: torch.Tensor,
@@ -447,7 +457,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         return step_output
 
-    def _unet_forward(self, latents, t, text_embeddings):
+    def _unet_forward(self, latents, t, text_embeddings, cross_attention_kwargs: Optional[dict[str,Any]] = None):
         """predict the noise residual"""
         if is_inpainting_model(self.unet) and latents.size(1) == 4:
             # Pad out normal non-inpainting inputs for an inpainting model.
@@ -460,7 +470,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype)
             ).add_mask_channels(latents)
 
-        return self.unet(latents, t, encoder_hidden_states=text_embeddings).sample
+        return self.unet(sample=latents,
+                         timestep=t,
+                         encoder_hidden_states=text_embeddings,
+                         cross_attention_kwargs=cross_attention_kwargs).sample
 
     def img2img_from_embeddings(self,
                                 init_image: Union[torch.FloatTensor, PIL.Image.Image],
