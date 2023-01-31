@@ -22,7 +22,7 @@ from urllib import request
 import requests
 import transformers
 from diffusers import StableDiffusionPipeline, AutoencoderKL
-from invokeai import configs
+import invokeai.configs as configs
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.devices import choose_precision, choose_torch_device
 from getpass_asterisk import getpass_asterisk
@@ -52,7 +52,7 @@ Model_dir = 'models'
 Weights_dir = 'ldm/stable-diffusion-v1/'
 
 # the initial "configs" dir is now bundled in the `invokeai.configs` package
-Dataset_path = Path(configs.__path__[-1]) / 'INITIAL_MODELS.yaml'
+Dataset_path = Path(configs.__path__[0]) / 'INITIAL_MODELS.yaml'
 
 Default_config_file =  Path (global_config_dir()) / 'models.yaml'
 SD_Configs = Path (global_config_dir()) / 'stable-diffusion'
