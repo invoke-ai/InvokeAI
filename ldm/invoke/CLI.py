@@ -41,11 +41,13 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
-    # alert - setting a global here
+    # alert - setting a few globals here
     Globals.try_patchmatch = args.patchmatch
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
+    Globals.ckpt_convert = args.ckpt_convert
+    
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:

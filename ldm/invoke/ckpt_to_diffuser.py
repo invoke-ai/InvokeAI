@@ -51,6 +51,8 @@ from diffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
 from diffusers.utils import is_safetensors_available
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPVisionConfig
 
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
+
 def shave_segments(path, n_shave_prefix_segments=1):
     """
     Removes segments. Positive values shave the first segments, negative shave the last segments.
@@ -794,7 +796,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         prediction_type:str=None,
         extract_ema:bool=True,
         upcast_attn:bool=False,
-)->StableDiffusionPipeline:
+)->StableDiffusionGeneratorPipeline:
     '''
     Load a Stable Diffusion pipeline object from a CompVis-style `.ckpt`/`.safetensors` file and (ideally) a `.yaml`
     config file.
@@ -829,7 +831,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     if "global_step" in checkpoint:
         global_step = checkpoint["global_step"]
     else:
-        print("global_step key not found in model")
+        print(">> global_step key not found in model")
         global_step = None
 
     # sometimes there is a state_dict key and sometimes not
@@ -913,7 +915,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     unet_config["upcast_attention"] = upcast_attention
     unet = UNet2DConditionModel(**unet_config)
 
-    print(f'DEBUG: extract_ema={extract_ema}')
     converted_unet_checkpoint = convert_ldm_unet_checkpoint(
         checkpoint, unet_config, path=checkpoint_path, extract_ema=extract_ema
     )
@@ -934,8 +935,11 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
     if model_type == "FrozenOpenCLIPEmbedder":
         text_model = convert_open_clip_checkpoint(checkpoint)
-        tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2", subfolder="tokenizer",cache_dir=global_cache_dir('diffusers'))
-        pipe = StableDiffusionPipeline(
+        tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2",
+                                                  subfolder="tokenizer",
+                                                  cache_dir=global_cache_dir('diffusers')
+                                                  )
+        pipe = StableDiffusionGeneratorPipeline(
             vae=vae,
             text_encoder=text_model,
             tokenizer=tokenizer,
@@ -962,7 +966,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14",cache_dir=cache_dir)
         safety_checker = StableDiffusionSafetyChecker.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
         feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
-        pipe = StableDiffusionPipeline(
+        pipe = StableDiffusionGeneratorPipeline(
             vae=vae,
             text_encoder=text_model,
             tokenizer=tokenizer,

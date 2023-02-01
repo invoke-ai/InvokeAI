@@ -150,6 +150,10 @@ class ModelManager(object):
         '''
         Return true if this is a legacy (.ckpt) model
         '''
+        # if we are converting legacy files automatically, then
+        # there are no legacy ckpts!
+        if Globals.ckpt_convert:
+            return False
         info = self.model_info(model_name)
         if 'weights' in info and info['weights'].endswith(('.ckpt','.safetensors')):
             return True
@@ -340,6 +344,23 @@ class ModelManager(object):
             config = os.path.join(Globals.root,config)
         if not os.path.isabs(weights):
             weights = os.path.normpath(os.path.join(Globals.root,weights))
+
+        # if converting automatically to diffusers, then we do the conversion and return
+        # a diffusers pipeline
+        if Globals.ckpt_convert:
+            print(f'>> Converting legacy checkpoint {model_name} into a diffusers model...')
+            from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
+            pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
+                checkpoint_path = weights,
+                original_config_file = config,
+            )
+            return (
+                pipeline.to(self.device).to(torch.float16 if self.precision == 'float16' else torch.float32),
+                width,
+                height,
+                'NOHASH'
+                )
+
         # scan model
         self.scan_model(model_name, weights)
 
@@ -684,7 +705,7 @@ class ModelManager(object):
         try:
             verbosity =transformers.logging.get_verbosity()
             transformers.logging.set_verbosity_error()
-            convert_ckpt_to_diffuser(ckpt_path, diffusers_path,extract_ema=True)
+            convert_ckpt_to_diffuser(ckpt_path, diffusers_path, extract_ema=True)
             transformers.logging.set_verbosity(verbosity)
             print(f'>> Success. Optimized model is now located at {str(diffusers_path)}')
             print(f'>> Writing new config file entry for {model_name}')
