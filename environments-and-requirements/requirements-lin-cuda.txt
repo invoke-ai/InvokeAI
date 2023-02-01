@@ -2,4 +2,5 @@
 -r environments-and-requirements/requirements-base.txt
 torch>=1.13.1
 torchvision>=0.14.1
+xformers~=0.16
 -e .

@@ -53,10 +53,11 @@ def main():
 
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
-            print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
-            print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
-            print('** This script will now exit.')
-            sys.exit(-1)
+            report_model_error(opt, e)
+            # print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
+            # print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
+            # print('** This script will now exit.')
+            # sys.exit(-1)
 
     print(f'>> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
@@ -789,8 +790,8 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
         model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
             model_name = default_name
-        if not re.match('^[\w._+-]+$',model_name):
-            print('** model name must contain only words, digits and the characters "._+-" **')
+        if not re.match('^[\w._+:/-]+$',model_name):
+            print('** model name must contain only words, digits and the characters "._+:/-" **')
         elif model_name != default_name and model_name in existing_names:
             print(f'** the name {model_name} is already in use. Pick another.')
         else:

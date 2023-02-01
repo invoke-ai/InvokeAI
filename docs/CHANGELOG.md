@@ -52,12 +52,17 @@ introduces several changes you should know about.
   path: models/diffusers/hakurei-haifu-diffusion-1.4
   ```
 
-2. The format of the models directory has changed to mimic the
-   HuggingFace cache directory. By default, diffusers models are
-   now automatically downloaded and retrieved from the directory
-   `ROOTDIR/models/diffusers`, while other models are stored in
-   the directory `ROOTDIR/models/hub`. This organization is the
-   same as that used by HuggingFace for its cache management.
+2. In order of precedence, InvokeAI will now use HF_HOME, then
+   XDG_CACHE_HOME, then finally default to `ROOTDIR/models` to
+   store HuggingFace diffusers models.
+
+   Consequently, the format of the models directory has changed to
+   mimic the HuggingFace cache directory. When HF_HOME and XDG_HOME
+   are not set, diffusers models are now automatically downloaded
+   and retrieved from the directory `ROOTDIR/models/diffusers`,
+   while other models are stored in the directory
+   `ROOTDIR/models/hub`. This organization is the same as that used
+   by HuggingFace for its cache management.
 
    This allows you to share diffusers and ckpt model files easily with
    other machine learning applications that use the HuggingFace
@@ -66,7 +71,13 @@ introduces several changes you should know about.
    cache models in. To tell InvokeAI to use the standard HuggingFace
    cache directory, you would set HF_HOME like this (Linux/Mac):
 
-   `export HF_HOME=~/.cache/hugging_face`
+   `export HF_HOME=~/.cache/huggingface`
+
+   Both HuggingFace and InvokeAI will fall back to the XDG_CACHE_HOME
+   environment variable if HF_HOME is not set; this path
+   takes precedence over `ROOTDIR/models` to allow for the same sharing
+   with other machine learning applications that use HuggingFace
+   libraries.
 
 3. If you upgrade to InvokeAI 2.3.* from an earlier version, there
    will be a one-time migration from the old models directory format
