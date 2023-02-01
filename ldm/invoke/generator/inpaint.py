@@ -19,10 +19,12 @@ from ldm.util import debug_image
 
 
 def infill_methods()->list[str]:
-    methods = list()
+    methods = [
+        "tile",
+        "solid",
+    ]
     if PatchMatch.patchmatch_available():
-        methods.append('patchmatch')
-    methods.append('tile')
+        methods.insert(0, 'patchmatch')
     return methods
 
 class Inpaint(Img2Img):
@@ -182,6 +184,7 @@ class Inpaint(Img2Img):
                        infill_method = None,
                        inpaint_width=None,
                        inpaint_height=None,
+                       inpaint_fill:tuple(int)=(0x7F, 0x7F, 0x7F, 0xFF),
                        attention_maps_callback=None,
                        **kwargs):
         """
@@ -202,12 +205,17 @@ class Inpaint(Img2Img):
             # Do infill
             if infill_method == 'patchmatch' and PatchMatch.patchmatch_available():
                 init_filled = self.infill_patchmatch(self.pil_image.copy())
-            else: # if infill_method == 'tile': # Only two methods right now, so always use 'tile' if not patchmatch
+            elif infill_method == 'tile':
                 init_filled = self.tile_fill_missing(
                     self.pil_image.copy(),
                     seed = self.seed,
                     tile_size = tile_size
                 )
+            elif infill_method == 'solid':
+                solid_bg = PIL.Image.new("RGBA", init_image.size, inpaint_fill)
+                init_filled = PIL.Image.alpha_composite(solid_bg, init_image)
+            else:
+                raise ValueError(f"Non-supported infill type {infill_method}", infill_method)
             init_filled.paste(init_image, (0,0), init_image.split()[-1])
 
             # Resize if requested for inpainting
