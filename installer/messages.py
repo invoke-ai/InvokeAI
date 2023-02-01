@@ -54,29 +54,38 @@ def welcome():
     )
     console.line()
 
+def confirm_install(dest: Path) -> bool:
+    if dest.exists():
+        print(f":exclamation: Directory {dest} already exists :exclamation:")
+        dest_confirmed = Confirm.ask(
+            ":stop_sign: Are you sure you want to (re)install in this location?",
+            default=False,
+        )
+    else:
+        print(f"InvokeAI will be installed at {dest}")
+        dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
+    console.line()
 
-def dest_path(init_path=None) -> Path:
+    return dest_confirmed
+
+
+def dest_path(dest=None) -> Path:
     """
     Prompt the user for the destination path and create the path
 
-    :param init_path: a filesystem path, defaults to None
-    :type init_path: str, optional
+    :param dest: a filesystem path, defaults to None
+    :type dest: str, optional
     :return: absolute path to the created installation directory
     :rtype: Path
     """
 
-    dest = init_path
     if dest is not None:
-        dest = Path(dest)
+        dest = Path(dest).expanduser().resolve()
     else:
-        dest = Path.cwd()
+        dest = Path.cwd().expanduser().resolve()
+    prev_dest = dest.expanduser().resolve()
 
-    dest_confirmed = False
-    prev_dest = dest
-
-    console.line()
-    print(f"InvokeAI will be installed at {dest.expanduser().resolve()}")
-    dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
+    dest_confirmed = confirm_install(dest)
 
     while not dest_confirmed:
 
@@ -109,16 +118,7 @@ def dest_path(init_path=None) -> Path:
         dest = Path(selected)
         console.line()
 
-        if dest.exists():
-            print(f":exclamation: Directory {dest.expanduser().resolve()} already exists :exclamation:")
-            dest_confirmed = Confirm.ask(
-                ":stop_sign: Are you sure you want to (re)install in this location?",
-                default=False,
-            )
-            console.line()
-        else:
-            print(f"InvokeAI will be installed at {dest.expanduser().resolve()}")
-            dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
+        dest_confirmed = confirm_install(dest.expanduser().resolve())
 
         if not dest_confirmed:
             dest = prev_dest
