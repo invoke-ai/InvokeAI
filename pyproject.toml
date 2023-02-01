@@ -89,6 +89,10 @@ dependencies = [
   "mkdocs-redirects==1.2.0",
 ]
 "test" = ["pytest>6.0.0", "pytest-cov"]
+"xformers" = [
+	   "xformers~=0.0.16; sys_platform!='darwin'",
+	   "triton; sys_platform!='darwin'",
+]
 
 [project.scripts]
 
