@@ -17,19 +17,19 @@ set /P restore="Please enter 1, 2, 3, 4 or 5: [5] "
 if not defined restore set restore=2
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
-    python .venv\Scripts\invoke %*
+    python .venv\Scripts\invokeai.exe %*
 ) ELSE IF /I "%restore%" == "2" (
     echo Starting the InvokeAI browser-based UI..
-    python .venv\Scripts\invoke --web %*
+    python .venv\Scripts\invokeai.exe --web %*
 ) ELSE IF /I "%restore%" == "3" (
     echo Starting textual inversion training..
-    python .venv\Scripts\textual_inversion --gui %*
+    python .venv\Scripts\invokeai-ti.exe --gui %*
 ) ELSE IF /I "%restore%" == "4" (
     echo Starting model merging script..
-    python .venv\Scripts\merge_models --gui %*
+    python .venv\Scripts\invokeai-merge.exe --gui %*
 ) ELSE IF /I "%restore%" == "5" (
     echo Running invokeai-configure...
-    python .venv\Scripts\invokeai-configure %*
+    python .venv\Scripts\invokeai-configure.exe %*
 ) ELSE IF /I "%restore%" == "6" (
     echo Developer Console
     echo Python command is:
