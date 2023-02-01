@@ -14,6 +14,7 @@ from typing import Union
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
+BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -66,13 +67,13 @@ class Installer:
         # `ignore_cleanup_errors` was only added in Python 3.10
         # users of Python 3.9 will see a gnarly stack trace on installer exit
         if OS == "Windows" and int(platform.python_version_tuple()[1]) >= 10:
-            venv_dir = TemporaryDirectory(prefix="invokeai-installer-", ignore_cleanup_errors=True)
+            venv_dir = TemporaryDirectory(prefix=BOOTSTRAP_VENV_PREFIX, ignore_cleanup_errors=True)
         else:
-            venv_dir = TemporaryDirectory(prefix="invokeai-installer-")
+            venv_dir = TemporaryDirectory(prefix=BOOTSTRAP_VENV_PREFIX)
 
         venv.create(venv_dir.name, with_pip=True)
         self.venv_dir = venv_dir
-        add_venv_to_path(Path(venv_dir.name))
+        set_sys_path(Path(venv_dir.name))
 
         return venv_dir
 
@@ -178,7 +179,7 @@ class InvokeAiInstance:
         self.pip = get_pip_from_venv(venv)
         self.version = version
 
-        add_venv_to_path(venv)
+        set_sys_path(venv)
         os.environ["INVOKEAI_ROOT"] = str(self.runtime.expanduser().resolve())
         os.environ["VIRTUAL_ENV"] = str(self.venv.expanduser().resolve())
 
@@ -342,17 +343,30 @@ def get_pip_from_venv(venv_path: Path) -> str:
     return str(venv_path.expanduser().resolve() / pip)
 
 
-def add_venv_to_path(venv_path: Path) -> None:
+def set_sys_path(venv_path: Path) -> None:
     """
-    Given a path to a virtual environment, add the python site-packages directory from this venv
-    into the sys.path, in a cross-platform fashion, such that packages from this venv
-    may be imported in the current process.
+    Given a path to a virtual environment, set the sys.path, in a cross-platform fashion,
+    such that packages from the given venv may be imported in the current process.
+    Ensure that the packages from system environment are not visible (emulate
+    the virtual env 'activate' script) - this doesn't work on Windows yet.
 
     :param venv_path: Path to the virtual environment
     :type venv_path: Path
     """
 
+    # filter out any paths in sys.path that may be system- or user-wide
+    # but leave the temporary bootstrap virtualenv as it contains packages we
+    # temporarily need at install time
+    sys.path = list(filter(
+        lambda p: not p.endswith("-packages")
+        or p.find(BOOTSTRAP_VENV_PREFIX) != -1,
+        sys.path
+    ))
+
+    # determine site-packages/lib directory location for the venv
     lib = "Lib" if OS == "Windows" else f"lib/python{sys.version_info.major}.{sys.version_info.minor}"
+
+    # add the site-packages location to the venv
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
