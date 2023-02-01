@@ -23,6 +23,7 @@ import torch
 from pathlib import Path
 from ldm.invoke.globals import Globals, global_cache_dir
 from safetensors.torch import load_file
+from typing import Union
 
 try:
     from omegaconf import OmegaConf
@@ -47,6 +48,7 @@ from diffusers import (
 from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
 from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder, PaintByExamplePipeline
 from diffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
+from diffusers.utils import is_safetensors_available
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPVisionConfig
 
 def shave_segments(path, n_shave_prefix_segments=1):
@@ -318,11 +320,10 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     unet_key = "model.diffusion_model."
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100:
-        print(f"Checkpoint {path} has both EMA and non-EMA weights.")
+        print(f">> Checkpoint {path} has both EMA and non-EMA weights.")
         if extract_ema:
             print(
-                "In this conversion only the EMA weights are extracted. If you want to instead extract the non-EMA"
-                " weights (useful to continue fine-tuning), please make sure to remove the `--extract_ema` flag."
+                '>> Extracting EMA weights (usually better for inference)'
             )
             for key in keys:
                 if key.startswith("model.diffusion_model"):
@@ -330,8 +331,7 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                     unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(flat_ema_key)
         else:
             print(
-                "In this conversion only the non-EMA weights are extracted. If you want to instead extract the EMA"
-                " weights (usually better for inference), please make sure to add the `--extract_ema` flag."
+                '>> Extracting only the non-EMA weights (usually better for fine-tuning)'
             )
 
     for key in keys:
@@ -784,17 +784,43 @@ def convert_open_clip_checkpoint(checkpoint):
 
     return text_model
 
-def convert_ckpt_to_diffuser(checkpoint_path:str,
-                             dump_path:str,
-                             original_config_file:str=None,
-                             num_in_channels:int=None,
-                             scheduler_type:str='pndm',
-                             pipeline_type:str=None,
-                             image_size:int=None,
-                             prediction_type:str=None,
-                             extract_ema:bool=False,
-                             upcast_attn:bool=False,
-                             ):
+def load_pipeline_from_original_stable_diffusion_ckpt(
+        checkpoint_path:str,
+        original_config_file:str=None,
+        num_in_channels:int=None,
+        scheduler_type:str='pndm',
+        pipeline_type:str=None,
+        image_size:int=None,
+        prediction_type:str=None,
+        extract_ema:bool=True,
+        upcast_attn:bool=False,
+)->StableDiffusionPipeline:
+    '''
+    Load a Stable Diffusion pipeline object from a CompVis-style `.ckpt`/`.safetensors` file and (ideally) a `.yaml`
+    config file.
+
+    Although many of the arguments can be automatically inferred, some of these rely on brittle checks against the
+    global step count, which will likely fail for models that have undergone further fine-tuning. Therefore, it is
+    recommended that you override the default values and/or supply an `original_config_file` wherever possible.
+
+    :param checkpoint_path: Path to `.ckpt` file. 
+    :param original_config_file: Path to `.yaml` config file corresponding to the original architecture. 
+      If `None`, will be automatically inferred by looking for a key that only exists in SD2.0 models.
+    :param image_size: The image size that the model was trained on. Use 512 for Stable Diffusion v1.X and Stable Diffusion v2
+      Base. Use 768 for Stable Diffusion v2.
+    :param prediction_type: The prediction type that the model was trained on. Use `'epsilon'` for Stable Diffusion
+     v1.X and Stable Diffusion v2 Base. Use `'v-prediction'` for Stable Diffusion v2.
+    :param num_in_channels: The number of input channels. If `None` number of input channels will be automatically
+    inferred. 
+    :param scheduler_type: Type of scheduler to use. Should be one of `["pndm", "lms", "heun", "euler",
+     "euler-ancestral", "dpm", "ddim"]`. :param model_type: The pipeline type. `None` to automatically infer, or one of
+     `["FrozenOpenCLIPEmbedder", "FrozenCLIPEmbedder", "PaintByExample"]`. :param extract_ema: Only relevant for
+     checkpoints that have both EMA and non-EMA weights. Whether to extract the EMA weights
+     or not. Defaults to `False`. Pass `True` to extract the EMA weights. EMA weights usually yield higher
+     quality images for inference. Non-EMA weights are usually better to continue fine-tuning.
+    :param upcast_attention: Whether the attention computation should always be upcasted. This is necessary when
+    running stable diffusion 2.1.
+    '''
 
     checkpoint = load_file(checkpoint_path) if Path(checkpoint_path).suffix == '.safetensors' else torch.load(checkpoint_path)
     cache_dir = global_cache_dir('hub')
@@ -887,6 +913,7 @@ def convert_ckpt_to_diffuser(checkpoint_path:str,
     unet_config["upcast_attention"] = upcast_attention
     unet = UNet2DConditionModel(**unet_config)
 
+    print(f'DEBUG: extract_ema={extract_ema}')
     converted_unet_checkpoint = convert_ldm_unet_checkpoint(
         checkpoint, unet_config, path=checkpoint_path, extract_ema=extract_ema
     )
@@ -950,7 +977,23 @@ def convert_ckpt_to_diffuser(checkpoint_path:str,
         tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased",cache_dir=cache_dir)
         pipe = LDMTextToImagePipeline(vqvae=vae, bert=text_model, tokenizer=tokenizer, unet=unet, scheduler=scheduler)
 
+    return pipe
+
+def convert_ckpt_to_diffuser(
+        checkpoint_path:Union[str,Path],
+        dump_path:Union[str,Path],
+        **kwargs,
+):
+    '''
+    Takes all the arguments of load_pipeline_from_original_stable_diffusion_ckpt(),
+    and in addition a path-like object indicating the location of the desired diffusers
+    model to be written.
+    '''
+    pipe = load_pipeline_from_original_stable_diffusion_ckpt(
+        checkpoint_path,
+        **kwargs
+    )
     pipe.save_pretrained(
         dump_path,
-        safe_serialization=1,                 
+        safe_serialization=is_safetensors_available(),
     )

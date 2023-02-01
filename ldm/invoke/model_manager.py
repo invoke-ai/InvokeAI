@@ -18,7 +18,7 @@ import warnings
 import safetensors.torch
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Union, Any
+from typing import Union
 from huggingface_hub import scan_cache_dir
 from ldm.util import download_with_progress_bar
 
@@ -664,6 +664,7 @@ class ModelManager(object):
                            diffusers_path:Path,
                            model_name=None,
                            model_description=None,
+                           vae= None,
                            commit_to_conf:Path=None,
     )->dict:
         '''
@@ -698,7 +699,11 @@ class ModelManager(object):
             # I would prefer to do this differently: We load the ckpt model into memory, swap the
             # VAE in memory, and then pass that to convert_ckpt_to_diffuser() so that the swapped
             # VAE is built into the model. However, when I tried this I got obscure key errors.
-            if model_name in self.config and (vae_ckpt_path := self.model_info(model_name)['vae']):
+            if vae:
+                new_config.update(
+                    vae = vae
+                )
+            elif model_name in self.config and (vae_ckpt_path := self.model_info(model_name)['vae']):
                 vae_basename = Path(vae_ckpt_path).stem
                 diffusers_vae = None
                 if (diffusers_vae := VAE_TO_REPO_ID.get(vae_basename,None)):
@@ -712,8 +717,8 @@ class ModelManager(object):
                     new_config.update(
                         vae = {'repo_id': 'stabilityai/sd-vae-ft-mse'}
                     )
-
-            self.del_model(model_name)
+            if model_name in self.config:
+                self.del_model(model_name)
             self.add_model(model_name, new_config, True)
             if commit_to_conf:
                 self.commit(commit_to_conf)
