@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Eugene Brodsky (https://github.com/ebr)
 """
 Installer user interaction
 """
