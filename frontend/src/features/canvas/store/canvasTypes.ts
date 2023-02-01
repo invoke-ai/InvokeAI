@@ -125,7 +125,6 @@ export interface CanvasState {
   cursorPosition: Vector2d | null;
   doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];
-  inpaintReplace: number;
   intermediateImage?: InvokeAI.Image;
   isCanvasInitialized: boolean;
   isDrawing: boolean;
@@ -159,7 +158,6 @@ export interface CanvasState {
   shouldShowStagingImage: boolean;
   shouldShowStagingOutline: boolean;
   shouldSnapToGrid: boolean;
-  shouldUseInpaintReplace: boolean;
   stageCoordinates: Vector2d;
   stageDimensions: Dimensions;
   stageScale: number;

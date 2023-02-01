@@ -21,7 +21,6 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import _ from 'lodash';
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import InpaintReplace from './InpaintReplace';
 
 const selector = createSelector(
   [optionsSelector, systemSelector, canvasSelector],
@@ -148,7 +147,6 @@ const InfillAndScalingOptions = () => {
         withReset
         handleReset={handleResetScaledHeight}
       />
-      <InpaintReplace />
       <IAISelect
         label={t('options:infillMethod')}
         value={infillMethod}
