@@ -9,6 +9,7 @@ on:
 jobs:
   pyflakes:
     name: runner / pyflakes
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
