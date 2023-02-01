@@ -21,6 +21,38 @@ import ldm.invoke
 # global used in multiple functions (fix)
 infile = None
 
+def report_model_error(opt:Namespace, e:Exception):
+    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
+    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
+    if not str("--yes") in os.environ['INVOKE_MODEL_RECONFIGURE'].split():
+        response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
+        if response.startswith(('n','N')):
+            return
+
+    print('configure_invokeai is launching....\n')
+
+    # Match arguments that were set on the CLI
+    # only the arguments accepted by the configuration script are parsed
+    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
+    config = ["--config", opt.conf] if opt.conf is not None else []
+    if os.getenv('INVOKE_MODEL_RECONFIGURE'):
+        yes_to_all = os.environ['INVOKE_MODEL_RECONFIGURE'].split()
+    else:
+        yes_to_all = None
+    previous_args = sys.argv
+    sys.argv = [ 'configure_invokeai' ]
+    sys.argv.extend(root_dir)
+    sys.argv.extend(config)
+    if yes_to_all is not None:
+        for argv in yes_to_all:
+            sys.argv.append(argv)
+
+    import ldm.invoke.configure_invokeai as configure_invokeai
+    sys.exit(configure_invokeai.main())
+    print('** InvokeAI will now restart')
+    sys.argv = previous_args
+    sys.exit(main()) # would rather do a os.exec(), but doesn't exist?
+
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
@@ -50,10 +82,11 @@ def main():
 
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
-            print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
-            print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
-            print('** This script will now exit.')
-            sys.exit(-1)
+            report_model_error(opt, e)
+            # print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
+            # print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
+            # print('** This script will now exit.')
+            # sys.exit(-1)
 
     print(f'>> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
@@ -574,7 +607,7 @@ def import_model(model_path:str, gen, opt, completer):
     if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif os.path.exists(model_path) and model_path.endswith(('.ckpt','.safetensors')) and os.path.isfile(model_path):
-        model_name = import_ckpt_model(model_path, gen, opt, completer)        
+        model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     elif os.path.isdir(model_path):
@@ -743,7 +776,7 @@ def del_config(model_name:str, gen, opt, completer):
 
     if input(f'Remove {model_name} from the list of models known to InvokeAI? [y] ').strip().startswith(('n','N')):
         return
-    
+
     delete_completely = input('Completely remove the model file or directory from disk? [n] ').startswith(('y','Y'))
     gen.model_manager.del_model(model_name,delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
@@ -1096,34 +1129,6 @@ def write_commands(opt, file_path:str, outfilepath:str):
         with open(outfilepath, 'w', encoding='utf-8') as f:
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
-
-def report_model_error(opt:Namespace, e:Exception):
-    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
-    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
-    response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
-    if response.startswith(('n','N')):
-        return
-
-    print('configure_invokeai is launching....\n')
-
-    # Match arguments that were set on the CLI
-    # only the arguments accepted by the configuration script are parsed
-    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
-    config = ["--config", opt.conf] if opt.conf is not None else []
-    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
-    previous_args = sys.argv
-    sys.argv = [ 'configure_invokeai' ]
-    sys.argv.extend(root_dir)
-    sys.argv.extend(config)
-    if yes_to_all is not None:
-        sys.argv.append(yes_to_all)
-
-    import ldm.invoke.configure_invokeai as configure_invokeai
-    configure_invokeai.main()
-    print('** InvokeAI will now restart')
-    sys.argv = previous_args
-    main() # would rather do a os.exec(), but doesn't exist?
-    sys.exit(0)
 
 def check_internet()->bool:
     '''
