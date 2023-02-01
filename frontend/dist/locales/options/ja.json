@@ -30,7 +30,6 @@
     "seamBlur": "Seam Blur",
     "seamStrength": "Seam Strength",
     "seamSteps": "Seam Steps",
-    "inpaintReplace": "Inpaint Replace",
     "scaleBeforeProcessing": "処理前のスケール",
     "scaledWidth": "幅のスケール",
     "scaledHeight": "高さのスケール",
