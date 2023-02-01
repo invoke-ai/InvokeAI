@@ -544,6 +544,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             init_image = image_resized_to_grid_as_tensor(init_image.convert('RGB'))
 
         init_image = init_image.to(device=device, dtype=latents_dtype)
+        mask = mask.to(device=device, dtype=latents_dtype)
 
         if init_image.dim() == 3:
             init_image = init_image.unsqueeze(0)
@@ -562,17 +563,22 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         if mask.dim() == 3:
             mask = mask.unsqueeze(0)
-        mask = tv_resize(mask, init_image_latents.shape[-2:], T.InterpolationMode.BILINEAR) \
+        latent_mask = tv_resize(mask, init_image_latents.shape[-2:], T.InterpolationMode.BILINEAR) \
             .to(device=device, dtype=latents_dtype)
 
         guidance: List[Callable] = []
 
         if is_inpainting_model(self.unet):
+            # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
+            # (that's why there's a mask!) but it seems to really want that blanked out.
+            masked_init_image = init_image * torch.where(mask < 0.5, 1, 0)
+            masked_latents = self.non_noised_latents_from_image(masked_init_image, device=device, dtype=latents_dtype)
+
             # TODO: we should probably pass this in so we don't have to try/finally around setting it.
             self.invokeai_diffuser.model_forward_callback = \
-                AddsMaskLatents(self._unet_forward, mask, init_image_latents)
+                AddsMaskLatents(self._unet_forward, latent_mask, masked_latents)
         else:
-            guidance.append(AddsMaskGuidance(mask, init_image_latents, self.scheduler, noise))
+            guidance.append(AddsMaskGuidance(latent_mask, init_image_latents, self.scheduler, noise))
 
         try:
             result_latents, result_attention_maps = self.latents_from_embeddings(
@@ -591,11 +597,20 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             output = InvokeAIStableDiffusionPipelineOutput(images=image, nsfw_content_detected=[], attention_map_saver=result_attention_maps)
             return self.check_for_safety(output, dtype=conditioning_data.dtype)
 
-    def non_noised_latents_from_image(self, init_image, *, device, dtype):
+    def non_noised_latents_from_image(self, init_image, *, device: torch.device, dtype):
         init_image = init_image.to(device=device, dtype=dtype)
         with torch.inference_mode():
+            if device.type == 'mps':
+                # workaround for torch MPS bug that has been fixed in https://github.com/kulinseth/pytorch/pull/222
+                # TODO remove this workaround once kulinseth#222 is merged to pytorch mainline
+                self.vae.to('cpu')
+                init_image = init_image.to('cpu')
             init_latent_dist = self.vae.encode(init_image).latent_dist
             init_latents = init_latent_dist.sample().to(dtype=dtype)  # FIXME: uses torch.randn. make reproducible!
+            if device.type == 'mps':
+                self.vae.to(device)
+                init_latents = init_latents.to(device)
+
         init_latents = 0.18215 * init_latents
         return init_latents
 
