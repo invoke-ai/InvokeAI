@@ -47,7 +47,6 @@ from diffusers import (
 )
 from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
 from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder, PaintByExamplePipeline
-from diffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
 from diffusers.utils import is_safetensors_available
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPVisionConfig
 
@@ -964,7 +963,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     elif model_type in ['FrozenCLIPEmbedder','WeightedFrozenCLIPEmbedder']:
         text_model = convert_ldm_clip_checkpoint(checkpoint)
         tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14",cache_dir=cache_dir)
-        safety_checker = StableDiffusionSafetyChecker.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
         feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
         pipe = StableDiffusionGeneratorPipeline(
             vae=vae,
@@ -972,7 +970,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             tokenizer=tokenizer,
             unet=unet,
             scheduler=scheduler,
-            safety_checker=safety_checker,
+            safety_checker=None,
             feature_extractor=feature_extractor,
         )
     else:
