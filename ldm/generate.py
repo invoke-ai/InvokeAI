@@ -20,6 +20,7 @@ import torch
 import transformers
 from PIL import Image, ImageOps
 from diffusers.pipeline_utils import DiffusionPipeline
+from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything, logging
 
@@ -203,6 +204,14 @@ class Generate:
             self.precision = choose_precision(self.device)
         Globals.full_precision = self.precision=='float32'
 
+        if is_xformers_available():
+            if not Globals.disable_xformers:
+                print('>> xformers memory-efficient attention is available and enabled')
+            else:
+                print('>> xformers memory-efficient attention is available but disabled')
+        else:
+            print('>> xformers not installed')
+            
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         # don't accept invalid models
