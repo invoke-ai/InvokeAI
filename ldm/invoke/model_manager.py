@@ -18,7 +18,7 @@ import warnings
 import safetensors.torch
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Union
+from typing import Union, Any
 from huggingface_hub import scan_cache_dir
 from ldm.util import download_with_progress_bar
 
@@ -350,9 +350,12 @@ class ModelManager(object):
         if Globals.ckpt_convert:
             print(f'>> Converting legacy checkpoint {model_name} into a diffusers model...')
             from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
+            if vae_config := self._choose_diffusers_vae(model_name):
+                vae = self._load_vae(vae_config)
             pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
                 checkpoint_path = weights,
                 original_config_file = config,
+                vae = vae,
             )
             return (
                 pipeline.to(self.device).to(torch.float16 if self.precision == 'float16' else torch.float32),
@@ -505,7 +508,7 @@ class ModelManager(object):
         return pipeline, width, height, model_hash
 
     def model_name_or_path(self, model_name:Union[str,DictConfig]) -> str | Path:
-        if isinstance(model_name,DictConfig):
+        if isinstance(model_name,DictConfig) or isinstance(model_name,dict):
             mconfig = model_name
         elif model_name in self.config:
             mconfig = self.config[model_name]
@@ -703,41 +706,22 @@ class ModelManager(object):
         model_description = model_description or 'Optimized version of {model_name}'
         print(f'>> Optimizing {model_name} (30-60s)')
         try:
-            verbosity =transformers.logging.get_verbosity()
-            transformers.logging.set_verbosity_error()
-            convert_ckpt_to_diffuser(ckpt_path, diffusers_path, extract_ema=True)
-            transformers.logging.set_verbosity(verbosity)
-            print(f'>> Success. Optimized model is now located at {str(diffusers_path)}')
-            print(f'>> Writing new config file entry for {model_name}')
+            # By passing the specified VAE too the conversion function, the autoencoder
+            # will be built into the model rather than tacked on afterward via the config file
+            vae_model = self._load_vae(vae) if vae else None
+            convert_ckpt_to_diffuser(
+                ckpt_path,
+                diffusers_path,
+                extract_ema = True,
+                vae = vae_model,
+            )
+            print(f'  | Success. Optimized model is now located at {str(diffusers_path)}')
+            print(f'  | Writing new config file entry for {model_name}')
             new_config = dict(
                 path=str(diffusers_path),
                 description=model_description,
                 format='diffusers',
             )
-
-            # HACK (LS): in the event that the original entry is using a custom ckpt VAE, we try to
-            # map that VAE onto a diffuser VAE using a hard-coded dictionary.
-            # I would prefer to do this differently: We load the ckpt model into memory, swap the
-            # VAE in memory, and then pass that to convert_ckpt_to_diffuser() so that the swapped
-            # VAE is built into the model. However, when I tried this I got obscure key errors.
-            if vae:
-                new_config.update(
-                    vae = vae
-                )
-            elif model_name in self.config and (vae_ckpt_path := self.model_info(model_name)['vae']):
-                vae_basename = Path(vae_ckpt_path).stem
-                diffusers_vae = None
-                if (diffusers_vae := VAE_TO_REPO_ID.get(vae_basename,None)):
-                    print(f'>> {vae_basename} VAE corresponds to known {diffusers_vae} diffusers version')
-                    new_config.update(
-                        vae = {'repo_id': diffusers_vae}
-                    )
-                else:
-                    print(f'** Custom VAE "{vae_basename}" found, but corresponding diffusers model unknown')
-                    print(f'** Using "stabilityai/sd-vae-ft-mse"; If this isn\'t right, please edit the model config')
-                    new_config.update(
-                        vae = {'repo_id': 'stabilityai/sd-vae-ft-mse'}
-                    )
             if model_name in self.config:
                 self.del_model(model_name)
             self.add_model(model_name, new_config, True)
@@ -767,6 +751,27 @@ class ModelManager(object):
             })
 
         return search_folder, found_models
+
+    def _choose_diffusers_vae(self, model_name:str, vae:str=None)->Union[dict,str]:
+        
+        # In the event that the original entry is using a custom ckpt VAE, we try to
+        # map that VAE onto a diffuser VAE using a hard-coded dictionary.
+        # I would prefer to do this differently: We load the ckpt model into memory, swap the
+        # VAE in memory, and then pass that to convert_ckpt_to_diffuser() so that the swapped
+        # VAE is built into the model. However, when I tried this I got obscure key errors.
+        if vae:
+            return vae
+        if model_name in self.config and (vae_ckpt_path := self.model_info(model_name).get('vae',None)):
+            vae_basename = Path(vae_ckpt_path).stem
+            diffusers_vae = None
+            if (diffusers_vae := VAE_TO_REPO_ID.get(vae_basename,None)):
+                print(f'>> {vae_basename} VAE corresponds to known {diffusers_vae} diffusers version')
+                vae = {'repo_id': diffusers_vae}
+            else:
+                print(f'** Custom VAE "{vae_basename}" found, but corresponding diffusers model unknown')
+                print('** Using "stabilityai/sd-vae-ft-mse"; If this isn\'t right, please edit the model config')
+                vae = {'repo_id': 'stabilityai/sd-vae-ft-mse'}
+        return vae
 
     def _make_cache_room(self) -> None:
         num_loaded_models = len(self.models)
@@ -1002,7 +1007,7 @@ class ModelManager(object):
             f.write(hash)
         return hash
 
-    def _load_vae(self, vae_config):
+    def _load_vae(self, vae_config)->AutoencoderKL:
         vae_args = {}
         name_or_path = self.model_name_or_path(vae_config)
         using_fp16 = self.precision == 'float16'
