@@ -164,12 +164,12 @@ class Installer:
             optional_modules,
             find_links,
         )
-        # run through the configuration flow
-        self.instance.configure()
 
         # install the launch/update scripts into the runtime directory
         self.instance.install_user_scripts()
 
+        # run through the configuration flow
+        self.instance.configure()
 
 class InvokeAiInstance:
     """

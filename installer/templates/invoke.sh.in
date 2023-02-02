@@ -59,7 +59,7 @@ if [ "$0" != "bash" ]; then
             bash --init-file "$file_name"
             ;;
         6)
-            exec invokeai-config --root ${INVOKEAI_ROOT}
+            exec invokeai-configure --root ${INVOKEAI_ROOT}
             ;;
         7)
             exec invokeai --help
