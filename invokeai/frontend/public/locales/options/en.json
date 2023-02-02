@@ -30,7 +30,6 @@
   "seamBlur": "Seam Blur",
   "seamStrength": "Seam Strength",
   "seamSteps": "Seam Steps",
-  "inpaintReplace": "Inpaint Replace",
   "scaleBeforeProcessing": "Scale Before Processing",
   "scaledWidth": "Scaled W",
   "scaledHeight": "Scaled H",

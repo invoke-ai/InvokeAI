@@ -49,7 +49,6 @@ const initialCanvasState: CanvasState = {
   cursorPosition: null,
   doesCanvasNeedScaling: false,
   futureLayerStates: [],
-  inpaintReplace: 0.1,
   isCanvasInitialized: false,
   isDrawing: false,
   isMaskEnabled: true,
@@ -82,7 +81,6 @@ const initialCanvasState: CanvasState = {
   shouldShowStagingImage: true,
   shouldShowStagingOutline: true,
   shouldSnapToGrid: true,
-  shouldUseInpaintReplace: false,
   stageCoordinates: { x: 0, y: 0 },
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
@@ -263,12 +261,6 @@ export const canvasSlice = createSlice({
     clearCanvasHistory: (state) => {
       state.pastLayerStates = [];
       state.futureLayerStates = [];
-    },
-    setShouldUseInpaintReplace: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseInpaintReplace = action.payload;
-    },
-    setInpaintReplace: (state, action: PayloadAction<number>) => {
-      state.inpaintReplace = action.payload;
     },
     setShouldLockBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldLockBoundingBox = action.payload;
@@ -858,7 +850,6 @@ export const {
   setCursorPosition,
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
-  setInpaintReplace,
   setIsDrawing,
   setIsMaskEnabled,
   setIsMouseOverBoundingBox,
@@ -885,7 +876,6 @@ export const {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
   setShouldSnapToGrid,
-  setShouldUseInpaintReplace,
   setStageCoordinates,
   setStageScale,
   setTool,
