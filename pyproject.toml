@@ -99,6 +99,8 @@ dependencies = [
 # legacy entrypoints; provided for backwards compatibility
 "invoke.py" = "ldm.invoke.CLI:main"
 "configure_invokeai.py" = "ldm.invoke.config.configure_invokeai:main"
+"textual_inversion.py" = "ldm.invoke.training.textual_inversion:main"
+"merge_embeddings.py" = "ldm.invoke.merge_diffusers:main"
 
 # modern entrypoints
 "invokeai" = "ldm.invoke.CLI:main"
