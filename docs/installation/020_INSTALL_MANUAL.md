@@ -87,8 +87,7 @@ please follow these steps:
     `~/invokeai`.
 
     ```bash
-    configure_invokeai \
-        --root_dir ~/Programs/invokeai
+    invokeai-configure --root_dir ~/Programs/invokeai
     ```
 
     The script `invokeai-configure` will interactively guide you through the
@@ -198,3 +197,4 @@ works with the PIP method.
    code repository entirely.
 
    (Don't move the runtime directory!)
+

@@ -504,6 +504,13 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
+            '--ckpt_convert',
+            action=argparse.BooleanOptionalAction,
+            dest='ckpt_convert',
+            default=False,
+            help='Load legacy ckpt files as diffusers. Pass --no-ckpt-convert to inhibit this behavior',
+        )
+        model_group.add_argument(
             '--internet',
             action=argparse.BooleanOptionalAction,
             dest='internet_available',

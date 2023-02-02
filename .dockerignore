@@ -1,19 +1,18 @@
 *
+!assets/caution.png
 !backend
-!environments-and-requirements
-!frontend
+!frontend/dist
 !ldm
-!main.py
+!pyproject.toml
+!README.md
 !scripts
-!server
-!static
-!setup.py
 
 # Guard against pulling in any models that might exist in the directory tree
-**/*.pt*
+**.pt*
 
 # unignore configs, but only ignore the custom models.yaml, in case it exists
 !configs
 configs/models.yaml
+configs/models.yaml.orig
 
 **/__pycache__

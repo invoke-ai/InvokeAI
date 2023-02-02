@@ -21,6 +21,9 @@ import ldm.invoke
 # global used in multiple functions (fix)
 infile = None
 
+if sys.platform == 'darwin':
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 def main():
     """Initialize command-line parsers and the diffusion model"""
     global infile
@@ -41,19 +44,22 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
-    # alert - setting a global here
+    # alert - setting a few globals here
     Globals.try_patchmatch = args.patchmatch
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
+    Globals.ckpt_convert = args.ckpt_convert
+    
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
         if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
-            print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
-            print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
-            print('** This script will now exit.')
-            sys.exit(-1)
+            report_model_error(opt, e)
+            # print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
+            # print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
+            # print('** This script will now exit.')
+            # sys.exit(-1)
 
     print(f'>> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
@@ -574,7 +580,7 @@ def import_model(model_path:str, gen, opt, completer):
     if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif os.path.exists(model_path) and model_path.endswith(('.ckpt','.safetensors')) and os.path.isfile(model_path):
-        model_name = import_ckpt_model(model_path, gen, opt, completer)        
+        model_name = import_ckpt_model(model_path, gen, opt, completer)
     elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
         model_name = import_diffuser_model(model_path, gen, opt, completer)
     elif os.path.isdir(model_path):
@@ -713,11 +719,16 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
         print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
 
+    vae = None
+    if input('Replace this model\'s VAE with "stabilityai/sd-vae-ft-mse"? [n] ').strip() in ('y','Y'):
+        vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
+
     new_config = gen.model_manager.convert_and_import(
         ckpt_path,
         diffuser_path,
         model_name=model_name,
         model_description=model_description,
+        vae = vae,
         commit_to_conf=opt.conf,
     )
     if not new_config:
@@ -743,7 +754,7 @@ def del_config(model_name:str, gen, opt, completer):
 
     if input(f'Remove {model_name} from the list of models known to InvokeAI? [y] ').strip().startswith(('n','N')):
         return
-    
+
     delete_completely = input('Completely remove the model file or directory from disk? [n] ').startswith(('y','Y'))
     gen.model_manager.del_model(model_name,delete_files=delete_completely)
     gen.model_manager.commit(opt.conf)
@@ -786,8 +797,8 @@ def _get_model_name(existing_names,completer,default_name:str='')->str:
         model_name = input(f'Short name for this model [{default_name}]: ').strip()
         if len(model_name)==0:
             model_name = default_name
-        if not re.match('^[\w._+-]+$',model_name):
-            print('** model name must contain only words, digits and the characters "._+-" **')
+        if not re.match('^[\w._+:/-]+$',model_name):
+            print('** model name must contain only words, digits and the characters "._+:/-" **')
         elif model_name != default_name and model_name in existing_names:
             print(f'** the name {model_name} is already in use. Pick another.')
         else:
@@ -955,7 +966,7 @@ def get_next_command(infile=None, model_name='no model') -> str:  # command stri
 
 def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     print('\n* --web was specified, starting web server...')
-    from backend.invoke_ai_web_server import InvokeAIWebServer
+    from invokeai.backend import InvokeAIWebServer
     # Change working directory to the stable-diffusion directory
     os.chdir(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -1100,11 +1111,11 @@ def write_commands(opt, file_path:str, outfilepath:str):
 def report_model_error(opt:Namespace, e:Exception):
     print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
     print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
-    response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
+    response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
     if response.startswith(('n','N')):
         return
 
-    print('configure_invokeai is launching....\n')
+    print('invokeai-configure is launching....\n')
 
     # Match arguments that were set on the CLI
     # only the arguments accepted by the configuration script are parsed
@@ -1112,13 +1123,13 @@ def report_model_error(opt:Namespace, e:Exception):
     config = ["--config", opt.conf] if opt.conf is not None else []
     yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
     previous_args = sys.argv
-    sys.argv = [ 'configure_invokeai' ]
+    sys.argv = [ 'invokeai-configure' ]
     sys.argv.extend(root_dir)
     sys.argv.extend(config)
     if yes_to_all is not None:
         sys.argv.append(yes_to_all)
 
-    import ldm.invoke.configure_invokeai as configure_invokeai
+    from ldm.invoke.config import configure_invokeai
     configure_invokeai.main()
     print('** InvokeAI will now restart')
     sys.argv = previous_args

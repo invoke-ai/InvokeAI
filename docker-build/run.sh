@@ -4,17 +4,14 @@ set -e
 # How to use: https://invoke-ai.github.io/InvokeAI/installation/INSTALL_DOCKER/#run-the-container
 # IMPORTANT: You need to have a token on huggingface.co to be able to download the checkpoints!!!
 
-source ./docker-build/env.sh \
-  || echo "please run from repository root" \
-  || exit 1
+cd "$(dirname "$0")" || exit 1
 
-# check if HUGGINGFACE_TOKEN is available
-# You must have accepted the terms of use for required models
-HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:?Please set your token for Huggingface as HUGGINGFACE_TOKEN}
+source ./env.sh
 
 echo -e "You are using these values:\n"
-echo -e "Volumename:\t ${VOLUMENAME}"
-echo -e "Invokeai_tag:\t ${INVOKEAI_TAG}\n"
+echo -e "Volumename:\t${VOLUMENAME}"
+echo -e "Invokeai_tag:\t${INVOKEAI_TAG}"
+echo -e "local Models:\t${MODELSPATH:-unset}\n"
 
 docker run \
   --interactive \
@@ -23,8 +20,10 @@ docker run \
   --platform="$PLATFORM" \
   --name="${REPOSITORY_NAME,,}" \
   --hostname="${REPOSITORY_NAME,,}" \
-  --mount="source=$VOLUMENAME,target=/data" \
-  --env="HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}" \
+  --mount=source="$VOLUMENAME",target=/data \
+  ${MODELSPATH:+-u "$(id -u):$(id -g)"} \
+  ${MODELSPATH:+--mount=type=bind,source=${MODELSPATH},target=/data/models} \
+  ${HUGGING_FACE_HUB_TOKEN:+--env=HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}} \
   --publish=9090:9090 \
   --cap-add=sys_nice \
   ${GPU_FLAGS:+--gpus=${GPU_FLAGS}} \

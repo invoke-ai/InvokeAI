@@ -3,4 +3,5 @@
 --extra-index-url https://download.pytorch.org/whl/cu117 --trusted-host https://download.pytorch.org
 torch==1.13.1
 torchvision==0.14.1
+xformers~=0.0.16
 -e .

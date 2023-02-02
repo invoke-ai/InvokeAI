@@ -136,7 +136,7 @@ mixture of both using any of the accepted command switch formats:
     # InvokeAI initialization file
     # This is the InvokeAI initialization file, which contains command-line default values.
     # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
-    # or renaming it and then running configure_invokeai.py again.
+    # or renaming it and then running invokeai-configure again.
 
     # The --root option below points to the folder in which InvokeAI stores its models, configs and outputs.
     --root="/Users/mauwii/invokeai"

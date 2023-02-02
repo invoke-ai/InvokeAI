@@ -43,8 +43,8 @@ Launching the installer:
   './install.sh' (while keeping it inside the InvokeAI-Installer
   folder).
 
-The installer will create a directory named "invokeai" in the folder
-of your choice. This directory contains everything you need to run
+The installer will create a directory of your choice and install the
+InvokeAI application within it. This directory contains everything you need to run
 invokeai. Once InvokeAI is up and running, you may delete the
 InvokeAI-Installer folder at your convenience.
 

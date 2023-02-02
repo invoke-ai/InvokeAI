@@ -155,7 +155,7 @@ class CrossAttentionControlSubstitute(CrossAttentionControlledFragment):
         default_options = {
             's_start': 0.0,
             's_end': 0.2062994740159002, # ~= shape_freedom=0.5
-            't_start': 0.0,
+            't_start': 0.1,
             't_end': 1.0
         }
         merged_options = default_options
@@ -289,7 +289,7 @@ class PromptParser():
 
         return self.flatten(root[0])
 
-    def parse_legacy_blend(self, text: str, skip_normalize: bool) -> Optional[Blend]:
+    def parse_legacy_blend(self, text: str, skip_normalize: bool = False) -> Optional[Blend]:
         weighted_subprompts = split_weighted_subprompts(text, skip_normalize=skip_normalize)
         if len(weighted_subprompts) <= 1:
             return None
