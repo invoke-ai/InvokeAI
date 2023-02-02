@@ -30,7 +30,6 @@
   "seamBlur": "Nahtunschärfe",
   "seamStrength": "Stärke der Naht",
   "seamSteps": "Nahtstufen",
-  "inpaintReplace": "Inpaint Ersetzen",
   "scaleBeforeProcessing": "Skalieren vor der Verarbeitung",
   "scaledWidth": "Skaliert W",
   "scaledHeight": "Skaliert H",
