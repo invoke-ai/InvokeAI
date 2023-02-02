@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 from typing import Union
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
-INSTALLER_REQS = ["pip>=23.0", "rich", "semver", "requests", "plumbum", "prompt-toolkit"]
+INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 
 OS = platform.uname().system
