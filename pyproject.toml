@@ -60,6 +60,7 @@ dependencies = [
   "opencv-python",
   "picklescan",
   "pillow",
+  'pip>=23.0',
   "pudb",
   "prompt-toolkit",
   "pypatchmatch",
@@ -91,7 +92,7 @@ dependencies = [
 "test" = ["pytest>6.0.0", "pytest-cov"]
 "xformers" = [
 	   "xformers~=0.0.16; sys_platform!='darwin'",
-	   "triton; sys_platform!='darwin'",
+	   "triton; sys_platform=='linux'",
 ]
 
 [project.scripts]

@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 from typing import Union
 
 SUPPORTED_PYTHON = ">=3.9.0,<3.11"
-INSTALLER_REQS = ["pip", "rich", "semver", "requests", "plumbum", "prompt-toolkit"]
+INSTALLER_REQS = ["pip>=23.0", "rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 
 OS = platform.uname().system
@@ -91,7 +91,7 @@ class Installer:
         venv_dir = self.mktemp_venv()
         pip = get_pip_from_venv(Path(venv_dir.name))
 
-        cmd = [pip, "install", "--require-virtualenv", "--use-pep517", "--upgrade"]
+        cmd = [pip, "install", "--require-virtualenv", "--use-pep517"]
         cmd.extend(self.reqs)
 
         try:
@@ -308,6 +308,18 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
+        print(f'DEBUG: sys.argv = {sys.argv}')
+        new_argv = [sys.argv[0]]
+        for i in range(1,len(sys.argv)):
+            el = sys.argv[i]
+            if el in ['-r','--root']:
+                new_argv.append(el)
+                new_argv.append(sys.argv[i+1])
+            elif el in ['-y','--yes','--yes-to-all']:
+                new_argv.append(el)
+        sys.argv = new_argv
+        print(f'DEBUG: sys.argv = {sys.argv}')
+
         from messages import introduction
 
         introduction()
@@ -317,6 +329,9 @@ class InvokeAiInstance:
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
         # this may change in the future with config refactoring!
+
+        # set sys.argv to a consistent state
+
         configure_invokeai.main()
 
     def install_user_scripts(self):
