@@ -63,8 +63,8 @@ def confirm_install(dest: Path) -> bool:
             default=False,
         )
     else:
-        print(f"InvokeAI will be installed at {dest}")
-        dest_confirmed = Confirm.ask(f"Is this correct?", default="y")
+        print(f"InvokeAI will be installed in {dest}")
+        dest_confirmed = not Confirm.ask(f"Would you like to pick a different location?", default=False)
     console.line()
 
     return dest_confirmed
