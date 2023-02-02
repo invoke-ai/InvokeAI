@@ -130,6 +130,15 @@ class Installer:
             venv_dir = self.dest / ".venv"
 
         venv.create(venv_dir, with_pip=True)
+
+        # upgrade pip in Python 3.9 environments
+        if int(platform.python_version_tuple()[1]) == 9:
+
+            from plumbum import FG, local
+
+            pip = local[get_pip_from_venv(venv_dir)]
+            pip[ "install", "--upgrade", "pip"] & FG
+
         return venv_dir
 
     def install(self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Path = None) -> None:
