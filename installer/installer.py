@@ -281,7 +281,7 @@ class InvokeAiInstance:
             # this makes an assumption about the location of the installer package in the source tree
             src = Path(__file__).parents[1].expanduser().resolve()
         else:
-            # will install from PyPp
+            # will install from PyPi
             src = f"invokeai=={version}" if version is not None else "invokeai"
 
         from plumbum import FG, local
@@ -308,7 +308,6 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
-        print(f'DEBUG: sys.argv = {sys.argv}')
         new_argv = [sys.argv[0]]
         for i in range(1,len(sys.argv)):
             el = sys.argv[i]
@@ -318,7 +317,6 @@ class InvokeAiInstance:
             elif el in ['-y','--yes','--yes-to-all']:
                 new_argv.append(el)
         sys.argv = new_argv
-        print(f'DEBUG: sys.argv = {sys.argv}')
 
         from messages import introduction
 
