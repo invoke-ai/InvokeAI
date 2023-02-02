@@ -44,11 +44,13 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
-    # alert - setting a global here
+    # alert - setting a few globals here
     Globals.try_patchmatch = args.patchmatch
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
+    Globals.ckpt_convert = args.ckpt_convert
+    
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
@@ -717,11 +719,16 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
         print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
 
+    vae = None
+    if input('Replace this model\'s VAE with "stabilityai/sd-vae-ft-mse"? [n] ').strip() in ('y','Y'):
+        vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
+
     new_config = gen.model_manager.convert_and_import(
         ckpt_path,
         diffuser_path,
         model_name=model_name,
         model_description=model_description,
+        vae = vae,
         commit_to_conf=opt.conf,
     )
     if not new_config:
