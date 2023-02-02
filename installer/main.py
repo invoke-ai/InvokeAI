@@ -3,6 +3,7 @@ InvokeAI Installer
 """
 
 import argparse
+from pathlib import Path
 from installer import Installer
 
 if __name__ == "__main__":
@@ -33,6 +34,14 @@ if __name__ == "__main__":
         default=None,
     )
 
+    parser.add_argument(
+        "--find-links",
+        dest="find_links",
+        help="Specifies a directory of local wheel files to be searched prior to searching the online repositories.",
+        type=Path,
+        default=None,
+    )
+    
     args = parser.parse_args()
 
     inst = Installer()

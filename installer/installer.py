@@ -132,7 +132,7 @@ class Installer:
         venv.create(venv_dir, with_pip=True)
         return venv_dir
 
-    def install(self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False) -> None:
+    def install(self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Path = None) -> None:
         """
         Install the InvokeAI application into the given runtime path
 
@@ -142,6 +142,8 @@ class Installer:
         :type version: str
         :param yes: Accept defaults to all questions
         :type yes: bool
+        :param find_links: A local directory to search for requirement wheels before going to remote indexes
+        :type find_links: Path
         """
 
         import messages
@@ -160,6 +162,7 @@ class Installer:
         self.instance.install(
             extra_index_url,
             optional_modules,
+            find_links,
         )
         # run through the configuration flow
         self.instance.configure()
@@ -196,7 +199,7 @@ class InvokeAiInstance:
 
         return (self.runtime, self.venv)
 
-    def install(self, extra_index_url=None, optional_modules=None):
+    def install(self, extra_index_url=None, optional_modules=None, find_links=None):
         """
         Install this instance, including dependencies and the app itself
 
@@ -209,12 +212,12 @@ class InvokeAiInstance:
         # install torch first to ensure the correct version gets installed.
         # works with either source or wheel install with negligible impact on installation times.
         messages.simple_banner("Installing PyTorch :fire:")
-        self.install_torch(extra_index_url)
+        self.install_torch(extra_index_url, find_links)
 
         messages.simple_banner("Installing the InvokeAI Application :art:")
-        self.install_app(extra_index_url, optional_modules)
+        self.install_app(extra_index_url, optional_modules, find_links)
 
-    def install_torch(self, extra_index_url=None):
+    def install_torch(self, extra_index_url=None, find_links=None):
         """
         Install PyTorch
         """
@@ -229,19 +232,27 @@ class InvokeAiInstance:
                 "--require-virtualenv",
                 "torch",
                 "torchvision",
+                "--find-links" if find_links is not None else None,
+                find_links,
                 "--extra-index-url" if extra_index_url is not None else None,
                 extra_index_url,
             ]
             & FG
         )
 
-    def install_app(self, extra_index_url=None, optional_modules=None):
+    def install_app(self, extra_index_url=None, optional_modules=None, find_links=None):
         """
         Install the application with pip.
         Supports installation from PyPi or from a local source directory.
 
         :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
         :type extra_index_url: str
+
+        :param optional_modules: optional modules to install using "[module1,module2]" format.
+        :type optional_modules: str
+
+        :param find_links: path to a directory containing wheels to be searched prior to going to the internet
+        :type find_links: Path
         """
 
         ## this only applies to pypi installs; TODO actually use this
@@ -283,6 +294,8 @@ class InvokeAiInstance:
                 "--require-virtualenv",
                 "--use-pep517",
                 str(src)+(optional_modules if optional_modules else ''),
+                "--find-links" if find_links is not None else None,
+                find_links,
                 "--extra-index-url" if extra_index_url is not None else None,
                 extra_index_url,
                 pre,
