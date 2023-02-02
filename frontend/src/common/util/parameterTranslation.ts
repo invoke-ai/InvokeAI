@@ -196,8 +196,6 @@ export const frontendToBackendParameters = (
       layerState: { objects },
       boundingBoxCoordinates,
       boundingBoxDimensions,
-      inpaintReplace,
-      shouldUseInpaintReplace,
       stageScale,
       isMaskEnabled,
       shouldPreserveMaskedArea,
@@ -222,10 +220,6 @@ export const frontendToBackendParameters = (
     generationParameters.strength = img2imgStrength;
 
     generationParameters.invert_mask = shouldPreserveMaskedArea;
-
-    if (shouldUseInpaintReplace) {
-      generationParameters.inpaint_replace = inpaintReplace;
-    }
 
     generationParameters.bounding_box = boundingBox;
 

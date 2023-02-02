@@ -30,7 +30,6 @@
   "seamBlur": "Desfoque da Fronteira",
   "seamStrength": "Força da Fronteira",
   "seamSteps": "Passos da Fronteira",
-  "inpaintReplace": "Substituir com Inpaint",
   "scaleBeforeProcessing": "Escala Antes do Processamento",
   "scaledWidth": "L Escalada",
   "scaledHeight": "A Escalada",
