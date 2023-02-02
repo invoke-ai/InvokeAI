@@ -1,4 +1,4 @@
-from backend.modules.parse_seed_weights import parse_seed_weights
+from invokeai.backend.modules.parse_seed_weights import parse_seed_weights
 import argparse
 
 SAMPLER_CHOICES = [

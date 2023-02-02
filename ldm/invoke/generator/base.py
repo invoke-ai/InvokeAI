@@ -13,17 +13,20 @@ from contextlib import nullcontext
 import cv2
 import numpy as np
 import torch
+
 from PIL import Image, ImageFilter, ImageChops
 from diffusers import DiffusionPipeline
 from einops import rearrange
+from pathlib import Path
 from pytorch_lightning import seed_everything
 from tqdm import trange
 
+import invokeai.assets.web as web_assets
 from ldm.models.diffusion.ddpm import DiffusionWrapper
 from ldm.util import rand_perlin_2d
 
 downsampling = 8
-CAUTION_IMG = 'assets/caution.png'
+CAUTION_IMG = 'caution.png'
 
 class Generator:
     downsampling_factor: int
@@ -319,15 +322,8 @@ class Generator:
         path = None
         if self.caution_img:
             return self.caution_img
-        # Find the caution image. If we are installed in the package directory it will
-        # be six levels up. If we are in the repo directory it will be three levels up.
-        for dots in ('../../..','../../../../../..'):
-            caution_path = osp.join(osp.dirname(__file__),dots,CAUTION_IMG)
-            if osp.exists(caution_path):
-                path = caution_path
-                break
-        if not path:
-            return
+        path = Path(web_assets.__path__[0]) / CAUTION_IMG
+        print(f'DEBUG: path to caution = {path}')
         caution = Image.open(path)
         self.caution_img = caution.resize((caution.width // 2, caution.height //2))
         return self.caution_img
@@ -345,4 +341,3 @@ class Generator:
 
     def torch_dtype(self)->torch.dtype:
         return torch.float16 if self.precision == 'float16' else torch.float32
-

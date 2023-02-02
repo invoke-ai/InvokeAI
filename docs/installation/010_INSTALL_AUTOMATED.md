@@ -29,8 +29,9 @@ version of InvokeAI with the option to upgrade to experimental versions later.
 2.  Check that your system has an up-to-date Python installed. To do this, open
     up a command-line window ("Terminal" on Linux and Macintosh, "Command" or
     "Powershell" on Windows) and type `python --version`. If Python is
-    installed, it will print out the version number. If it is version `3.9.1` or
-    higher, you meet requirements.
+    installed, it will print out the version number. If it is version `3.9.1` or `3.10.x`, you meet requirements.
+
+    !!! warning "At this time we do not recommend Python 3.11"
 
     !!! warning "If you see an older version, or get a command not found error"
 
@@ -39,7 +40,6 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         [Version 3.10.9](https://www.python.org/downloads/release/python-3109/),
         which has been extensively tested with InvokeAI.
 
-    !!! warning "At this time we do not recommend Python 3.11"
 
     _Please select your platform in the section below for platform-specific
     setup requirements._
@@ -108,12 +108,11 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest), and
     look for a series of files named:
 
-    - InvokeAI-installer-2.X.X-mac.zip
-    - InvokeAI-installer-2.X.X-windows.zip
-    - InvokeAI-installer-2.X.X-linux.zip
+    - InvokeAI-installer-2.X.X.zip
 
     (Where 2.X.X is the current release number).
-    Download the one that is appropriate for your operating system.
+
+    Download the latest release.
 
 4.  Unpack the zip file into a convenient directory. This will create a new
     directory named "InvokeAI-Installer". This example shows how this would look
@@ -177,8 +176,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
     minutes and nothing is happening, you can interrupt the script with ^C. You
     may restart it and it will pick up where it left off.
 
-10. After installation completes, the installer will launch a script called
-    `configure_invokeai.py`, which will guide you through the first-time process
+10. After installation completes, the installer will launch the configuration script, which will guide you through the first-time process
     of selecting one or more Stable Diffusion model weights files, downloading
     and configuring them. We provide a list of popular models that InvokeAI
     performs well with. However, you can add more weight files later on using
@@ -227,7 +225,7 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         `invokeai\invokeai.init`. It contains a variety of examples that you can
         follow to add and modify launch options.
 
-!!! warning "The `invokeai` directory contains the `invoke` application, its
+!!! warning "The `invokeai` directory contains the `invokeai` application, its
 configuration files, the model weight files, and outputs of image generation.
 Once InvokeAI is installed, do not move or remove this directory."
 
@@ -253,18 +251,18 @@ will bring InvokeAI up to date with the latest libraries.
 
 ### Corrupted configuration file
 
-Everything seems to install ok, but `invoke` complains of a corrupted
+Everything seems to install ok, but `invokeai` complains of a corrupted
 configuration file and goes back into the configuration process (asking you to
 download models, etc), but this doesn't fix the problem.
 
 This issue is often caused by a misconfigured configuration directive in the
 `invokeai\invokeai.init` initialization file that contains startup settings. The
 easiest way to fix the problem is to move the file out of the way and re-run
-`configure_invokeai.py`. Enter the developer's console (option 3 of the launcher
+`invokeai-configure`. Enter the developer's console (option 3 of the launcher
 script) and run this command:
 
 ```cmd
-configure_invokeai.py --root=.
+invokeai-configure --root=.
 ```
 
 Note the dot (.) after `--root`. It is part of the command.
@@ -289,15 +287,15 @@ hours, and often much sooner.
 This distribution is changing rapidly, and we add new features on a daily basis.
 To update to the latest released version (recommended), run the `update.sh`
 (Linux/Mac) or `update.bat` (Windows) scripts. This will fetch the latest
-release and re-run the `configure_invokeai` script to download any updated
+release and re-run the `invokeai-configure` script to download any updated
 models files that may be needed. You can also use this to add additional models
 that you did not select at installation time.
 
 You can now close the developer console and run `invoke` as before. If you get
 complaints about missing models, then you may need to do the additional step of
-running `configure_invokeai.py`. This happens relatively infrequently. To do
+running `invokeai-configure`. This happens relatively infrequently. To do
 this, simply open up the developer's console again and type
-`python scripts/configure_invokeai.py`.
+`invokeai-configure`.
 
 You may also use the `update` script to install any selected version of
 InvokeAI. From https://github.com/invoke-ai/InvokeAI, navigate to the zip file

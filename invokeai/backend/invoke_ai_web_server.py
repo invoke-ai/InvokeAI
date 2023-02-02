@@ -11,16 +11,18 @@ from threading import Event
 from uuid import uuid4
 
 import eventlet
+from pathlib import Path
 from PIL import Image
 from PIL.Image import Image as ImageType
 from flask import Flask, redirect, send_from_directory, request, make_response
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
 
-from backend.modules.get_canvas_generation_mode import (
+from invokeai.backend.modules.get_canvas_generation_mode import (
     get_canvas_generation_mode,
 )
-from backend.modules.parameters import parameters_to_command
+from invokeai.backend.modules.parameters import parameters_to_command
+import invokeai.frontend.dist as frontend
 from ldm.generate import Generate
 from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
@@ -93,9 +95,8 @@ class InvokeAIWebServer:
                 _cors = _cors.split(",")
             socketio_args["cors_allowed_origins"] = _cors
 
-        frontend_path = self.find_frontend()
         self.app = Flask(
-            __name__, static_url_path="", static_folder=frontend_path
+            __name__, static_url_path="", static_folder=frontend.__path__[0]
         )
 
         self.socketio = SocketIO(self.app, **socketio_args)
@@ -252,18 +253,6 @@ class InvokeAIWebServer:
                     certfile=args.certfile,
                     keyfile=args.keyfile,
                 )
-
-    def find_frontend(self):
-        my_dir = os.path.dirname(__file__)
-        # LS: setup.py seems to put the frontend in different places on different systems, so
-        # this is fragile and needs to be replaced with a better way of finding the front end.
-        for candidate in (os.path.join(my_dir,'..','frontend','dist'),          # pip install -e .
-                          os.path.join(my_dir,'../../../../frontend','dist'),   # pip install . (Linux, Mac)
-                          os.path.join(my_dir,'../../../frontend','dist'),      # pip install . (Windows)
-        ):
-            if os.path.exists(candidate):
-                return candidate
-        assert "Frontend files cannot be found. Cannot continue"
 
     def setup_app(self):
         self.result_url = "outputs/"

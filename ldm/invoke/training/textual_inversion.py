@@ -14,13 +14,13 @@ import sys
 import traceback
 from argparse import Namespace
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import npyscreen
 from omegaconf import OmegaConf
 
 from ldm.invoke.globals import Globals, global_set_root
-from ldm.invoke.textual_inversion_training import (
+from ldm.invoke.training.textual_inversion_training import (
     do_textual_inversion_training,
     parse_args,
 )
@@ -283,7 +283,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         else:
             return True
 
-    def get_model_names(self) -> (List[str], int):
+    def get_model_names(self) -> Tuple[List[str], int]:
         conf = OmegaConf.load(os.path.join(Globals.root, "configs/models.yaml"))
         model_names = [
             idx

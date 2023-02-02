@@ -72,6 +72,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+junit/
 
 # Translations
 *.mo
@@ -229,9 +230,6 @@ installer/install.bat
 installer/install.sh
 installer/update.bat
 installer/update.sh
-
-# this may be present if the user created a venv
-invokeai
 
 # no longer stored in source directory
 models

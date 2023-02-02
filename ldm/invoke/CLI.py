@@ -21,37 +21,8 @@ import ldm.invoke
 # global used in multiple functions (fix)
 infile = None
 
-def report_model_error(opt:Namespace, e:Exception):
-    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
-    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
-    if not str("--yes") in os.environ['INVOKE_MODEL_RECONFIGURE'].split():
-        response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
-        if response.startswith(('n','N')):
-            return
-
-    print('configure_invokeai is launching....\n')
-
-    # Match arguments that were set on the CLI
-    # only the arguments accepted by the configuration script are parsed
-    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
-    config = ["--config", opt.conf] if opt.conf is not None else []
-    if os.getenv('INVOKE_MODEL_RECONFIGURE'):
-        yes_to_all = os.environ['INVOKE_MODEL_RECONFIGURE'].split()
-    else:
-        yes_to_all = None
-    previous_args = sys.argv
-    sys.argv = [ 'configure_invokeai' ]
-    sys.argv.extend(root_dir)
-    sys.argv.extend(config)
-    if yes_to_all is not None:
-        for argv in yes_to_all:
-            sys.argv.append(argv)
-
-    import ldm.invoke.configure_invokeai as configure_invokeai
-    sys.exit(configure_invokeai.main())
-    print('** InvokeAI will now restart')
-    sys.argv = previous_args
-    sys.exit(main()) # would rather do a os.exec(), but doesn't exist?
+if sys.platform == 'darwin':
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
@@ -995,7 +966,7 @@ def get_next_command(infile=None, model_name='no model') -> str:  # command stri
 
 def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     print('\n* --web was specified, starting web server...')
-    from backend.invoke_ai_web_server import InvokeAIWebServer
+    from invokeai.backend import InvokeAIWebServer
     # Change working directory to the stable-diffusion directory
     os.chdir(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -1136,6 +1107,34 @@ def write_commands(opt, file_path:str, outfilepath:str):
         with open(outfilepath, 'w', encoding='utf-8') as f:
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
+
+def report_model_error(opt:Namespace, e:Exception):
+    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
+    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
+    response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
+    if response.startswith(('n','N')):
+        return
+
+    print('invokeai-configure is launching....\n')
+
+    # Match arguments that were set on the CLI
+    # only the arguments accepted by the configuration script are parsed
+    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
+    config = ["--config", opt.conf] if opt.conf is not None else []
+    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
+    previous_args = sys.argv
+    sys.argv = [ 'invokeai-configure' ]
+    sys.argv.extend(root_dir)
+    sys.argv.extend(config)
+    if yes_to_all is not None:
+        sys.argv.append(yes_to_all)
+
+    from ldm.invoke.config import configure_invokeai
+    configure_invokeai.main()
+    print('** InvokeAI will now restart')
+    sys.argv = previous_args
+    main() # would rather do a os.exec(), but doesn't exist?
+    sys.exit(0)
 
 def check_internet()->bool:
     '''
