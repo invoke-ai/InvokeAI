@@ -608,7 +608,7 @@ def new_config_file_contents(successfully_downloaded: dict, config_file: Path) -
     # if no default model was chosen, then we select the first
     # one in the list
     if not default_selected:
-        conf[successfully_downloaded.keys()[0]]["default"] = True
+        conf[list(successfully_downloaded.keys())[0]]["default"] = True
 
     return OmegaConf.to_yaml(conf)
 
