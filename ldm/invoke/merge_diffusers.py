@@ -7,6 +7,7 @@ Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
 import argparse
 import os
 import sys
+import traceback
 from argparse import Namespace
 from pathlib import Path
 from typing import List, Union
@@ -372,7 +373,8 @@ def main():
             run_cli(args)
         print(f">> Conversion successful. New model is named {args.merged_model_name}")
     except Exception as e:
-        print(f"** An error occurred while merging the pipelines: {str(e)}")
+        print(">> An error occurred:")
+        traceback.print_exc()
         sys.exit(-1)
     except KeyboardInterrupt:
         sys.exit(-1)
