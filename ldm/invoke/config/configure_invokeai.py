@@ -320,6 +320,8 @@ You may re-run the configuration script again in the future if you do not wish t
         while again:
             try:
                 access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ❯ ")
+                if access_token is None or len(access_token)==0:
+                    raise EOFError
                 HfLogin(access_token)
                 access_token = HfFolder.get_token()
                 again = False
