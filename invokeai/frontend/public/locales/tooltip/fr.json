@@ -1,0 +1,15 @@
+{
+  "feature": {
+    "prompt": "Ceci est le champ prompt. Le prompt inclut des objets de génération et des termes stylistiques. Vous pouvez également ajouter un poids (importance du jeton) dans le prompt, mais les commandes CLI et les paramètres ne fonctionneront pas.",
+    "gallery": "La galerie affiche les générations à partir du dossier de sortie à mesure qu'elles sont créées. Les paramètres sont stockés dans des fichiers et accessibles via le menu contextuel.",
+    "other": "Ces options activent des modes de traitement alternatifs pour Invoke. 'Tuilage seamless' créera des motifs répétitifs dans la sortie. 'Haute résolution' est la génération en deux étapes avec img2img: utilisez ce paramètre lorsque vous souhaitez une image plus grande et plus cohérente sans artefacts. Cela prendra plus de temps que d'habitude txt2img.",
+    "seed": "La valeur de grain affecte le bruit initial à partir duquel l'image est formée. Vous pouvez utiliser les graines déjà existantes provenant d'images précédentes. 'Seuil de bruit' est utilisé pour atténuer les artefacts à des valeurs CFG élevées (essayez la plage de 0 à 10), et Perlin pour ajouter du bruit Perlin pendant la génération: les deux servent à ajouter de la variété à vos sorties.",
+    "variations": "Essayez une variation avec une valeur comprise entre 0,1 et 1,0 pour changer le résultat pour une graine donnée. Des variations intéressantes de la graine sont entre 0,1 et 0,3.",
+    "upscale": "Utilisez ESRGAN pour agrandir l'image immédiatement après la génération.",
+    "faceCorrection": "Correction de visage avec GFPGAN ou Codeformer: l'algorithme détecte les visages dans l'image et corrige tout défaut. La valeur élevée changera plus l'image, ce qui donnera des visages plus attirants. Codeformer avec une fidélité plus élevée préserve l'image originale au prix d'une correction de visage plus forte.",
+    "imageToImage": "Image to Image charge n'importe quelle image en tant qu'initiale, qui est ensuite utilisée pour générer une nouvelle avec le prompt. Plus la valeur est élevée, plus l'image de résultat changera. Des valeurs de 0,0 à 1,0 sont possibles, la plage recommandée est de 0,25 à 0,75",
+    "boundingBox": "La boîte englobante est la même que les paramètres Largeur et Hauteur pour Texte à Image ou Image à Image. Seulement la zone dans la boîte sera traitée.",
+    "seamCorrection": "Contrôle la gestion des coutures visibles qui se produisent entre les images générées sur la toile.",
+    "infillAndScaling": "Gérer les méthodes de remplissage (utilisées sur les zones masquées ou effacées de la toile) et le redimensionnement (utile pour les petites tailles de boîte englobante)."
+  }
+}
