@@ -46,6 +46,7 @@
   "sendTo": "Send to",
   "sendToImg2Img": "Send to Image to Image",
   "sendToUnifiedCanvas": "Send To Unified Canvas",
+  "copyImage": "Copy Image",
   "copyImageToLink": "Copy Image To Link",
   "downloadImage": "Download Image",
   "openInViewer": "Open In Viewer",
