@@ -129,7 +129,14 @@ class Installer:
         else:
             venv_dir = self.dest / ".venv"
 
-        venv.create(venv_dir, with_pip=True)
+        # Prefer to copy python executables
+        # so that updates to system python don't break InvokeAI
+        try:
+            venv.create(venv_dir, with_pip=True)
+        # If installing over an existing environment previously created with symlinks,
+        # the executables will fail to copy. Keep symlinks in that case
+        except shutil.SameFileError:
+            venv.create(venv_dir, with_pip=True, symlinks=True)
 
         # upgrade pip in Python 3.9 environments
         if int(platform.python_version_tuple()[1]) == 9:
