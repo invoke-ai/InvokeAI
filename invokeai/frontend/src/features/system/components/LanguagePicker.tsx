@@ -22,6 +22,7 @@ export default function LanguagePicker() {
     es: t('common:langSpanish'),
     ja: t('common:langJapanese'),
     nl: t('common:langDutch'),
+    ua: t('common:langUkranian'),
   };
 
   const renderLanguagePicker = () => {
