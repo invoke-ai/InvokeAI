@@ -355,7 +355,10 @@ class InvokeAiInstance:
 
         ext = "bat" if OS == "Windows" else "sh"
 
-        for script in ["invoke", "update"]:
+        #scripts = ['invoke', 'update']
+        scripts = ['invoke']
+        
+        for script in scripts:
             src = Path(__file__).parent / "templates" / f"{script}.{ext}.in"
             dest = self.runtime / f"{script}.{ext}"
             shutil.copy(src, dest)
