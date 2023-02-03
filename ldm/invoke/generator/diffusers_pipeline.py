@@ -404,6 +404,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                         total_step_count=len(timesteps),
                                         additional_guidance=additional_guidance)
                 latents = step_output.prev_sample
+
+                if conditioning_data.threshold:
+                    latents = self.invokeai_diffuser.do_thresholding(conditioning_data.threshold.threshold, conditioning_data.threshold.warmup, latents, batched_t, i, len(timesteps))
+
                 predicted_original = getattr(step_output, 'pred_original_sample', None)
 
                 # TODO resuscitate attention map saving
