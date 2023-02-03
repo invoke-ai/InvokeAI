@@ -35,12 +35,12 @@ FROM node:lts as frontend-builder
 # Copy Sources
 ARG APPDIR=/usr/src
 WORKDIR ${APPDIR}
-COPY . .
+COPY --link . .
 
 # install dependencies and build frontend
 WORKDIR ${APPDIR}/invokeai/frontend
 RUN \
-  --mount=type=cache,target=/root/.yarn \
+  --mount=type=cache,target=/usr/local/share/.cache/yarn/v6 \
   yarn install \
   --prefer-offline \
   --frozen-lockfile \
