@@ -101,7 +101,6 @@ class Txt2Mask(object):
 
         image = ImageOps.exif_transpose(image)
         img = self._scale_and_crop(image)
-        # img = transform(img).unsqueeze(0)
 
         inputs = self.processor(text=[prompt],
                                 images=[img],
