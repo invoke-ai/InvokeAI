@@ -45,11 +45,11 @@ from diffusers import (
     PNDMScheduler,
     StableDiffusionPipeline,
     UNet2DConditionModel,
+    logging as dlogging,
 )
 from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
 from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder, PaintByExamplePipeline
 from diffusers.utils import is_safetensors_available
-from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPVisionConfig
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
