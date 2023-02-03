@@ -138,15 +138,7 @@ class InvokeAIDiffuserComponent:
         cross_attention_control_types_to_do = []
         context: Context = self.cross_attention_control_context
         if self.cross_attention_control_context is not None:
-            if step_index is not None and total_step_count is not None:
-                # 🧨diffusers codepath
-                percent_through = step_index / total_step_count  # will never reach 1.0 - this is deliberate
-            else:
-                # legacy compvis codepath
-                # TODO remove when compvis codepath support is dropped
-                if step_index is None and sigma is None:
-                    raise ValueError(f"Either step_index or sigma is required when doing cross attention control, but both are None.")
-                percent_through = self.estimate_percent_through(step_index, sigma)
+            percent_through = self.calculate_percent_through(sigma, step_index, total_step_count)
             cross_attention_control_types_to_do = context.get_active_cross_attention_control_types_for_step(percent_through)
 
         wants_cross_attention_control = (len(cross_attention_control_types_to_do) > 0)
@@ -161,10 +153,24 @@ class InvokeAIDiffuserComponent:
 
         combined_next_x = self._combine(unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale)
 
-        if threshold:
-            combined_next_x = self._threshold(threshold.threshold, threshold.warmup, combined_next_x, sigma)
-
         return combined_next_x
+
+    def do_thresholding(self, threshold, warmup, latents: torch.Tensor, sigma, step_index, total_step_count) -> torch.Tensor:
+        percent_through = self.calculate_percent_through(sigma, step_index, total_step_count)
+        return self._threshold(threshold, warmup, latents, percent_through)
+
+    def calculate_percent_through(self, sigma, step_index, total_step_count):
+        if step_index is not None and total_step_count is not None:
+            # 🧨diffusers codepath
+            percent_through = step_index / total_step_count  # will never reach 1.0 - this is deliberate
+        else:
+            # legacy compvis codepath
+            # TODO remove when compvis codepath support is dropped
+            if step_index is None and sigma is None:
+                raise ValueError(
+                    f"Either step_index or sigma is required when doing cross attention control, but both are None.")
+            percent_through = self.estimate_percent_through(step_index, sigma)
+        return percent_through
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
@@ -275,17 +281,15 @@ class InvokeAIDiffuserComponent:
         combined_next_x = unconditioned_next_x + scaled_delta
         return combined_next_x
 
-    def _threshold(self, threshold, warmup, latents: torch.Tensor, sigma) -> torch.Tensor:
-        warmup_scale = (1 - sigma.item() / 1000) / warmup if warmup else math.inf
-        if warmup_scale < 1:
-            # This arithmetic based on https://github.com/invoke-ai/InvokeAI/pull/395
-            warming_threshold = 1 + (threshold - 1) * warmup_scale
-            current_threshold = np.clip(warming_threshold, 1, threshold)
+    def _threshold(self, threshold, warmup, latents: torch.Tensor, percent_through) -> torch.Tensor:
+        if percent_through < warmup:
+            current_threshold = threshold + threshold * (1 - (percent_through / warmup))
         else:
             current_threshold = threshold
 
         if current_threshold <= 0:
             return latents
+
         maxval = latents.max().item()
         minval = latents.min().item()
 
@@ -294,7 +298,7 @@ class InvokeAIDiffuserComponent:
         if self.debug_thresholding:
             std, mean = [i.item() for i in torch.std_mean(latents)]
             outside = torch.count_nonzero((latents < -current_threshold) | (latents > current_threshold))
-            print(f"\nThreshold: 𝜎={sigma.item()} threshold={current_threshold:.3f} (of {threshold:.3f})\n"
+            print(f"\nThreshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})\n"
                   f"  | min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}\n"
                   f"  | {outside / latents.numel() * 100:.2f}% values outside threshold")
 
@@ -302,17 +306,21 @@ class InvokeAIDiffuserComponent:
             return latents
 
         if maxval > current_threshold:
+            latents = torch.clone(latents)
             maxval = np.clip(maxval * scale, 1, current_threshold)
+            latents[latents > maxval] = torch.rand_like(latents[latents > maxval]) * maxval
 
         if minval < -current_threshold:
+            latents = torch.clone(latents)
             minval = np.clip(minval * scale, -current_threshold, -1)
+            latents[latents < minval] = torch.rand_like(latents[latents < minval]) * minval
 
         if self.debug_thresholding:
             outside = torch.count_nonzero((latents < minval) | (latents > maxval))
             print(f"  | min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})\n"
                   f"  | {outside / latents.numel() * 100:.2f}% values will be clamped")
 
-        return latents.clamp(minval, maxval)
+        return latents
 
     def estimate_percent_through(self, step_index, sigma):
         if step_index is not None and self.cross_attention_control_context is not None:
@@ -376,4 +384,3 @@ class InvokeAIDiffuserComponent:
         # assert(0 == len(torch.nonzero(old_return_value - (uncond_latents + deltas_merged * cond_scale))))
 
         return uncond_latents + deltas_merged * global_guidance_scale
-
