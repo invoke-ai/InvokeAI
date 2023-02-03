@@ -530,8 +530,8 @@ def update_config_file(successfully_downloaded: dict, opt: dict):
     # this check is ignored if opt.config_file is specified - user is assumed to know what they
     # are doing if they are passing a custom config file from elsewhere.
     if config_file is Default_config_file and not config_file.parent.exists():
-        configs_src = Path(__file__).parent / "configs"
-        configs_dest = Path(Globals.root) / "configs"
+        configs_src = Dataset_path.parent
+        configs_dest = Default_config_file.parent
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
     yaml = new_config_file_contents(successfully_downloaded, config_file)
