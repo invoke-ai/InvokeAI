@@ -50,7 +50,7 @@ def main():
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
     Globals.ckpt_convert = args.ckpt_convert
-    
+
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
@@ -1111,9 +1111,13 @@ def write_commands(opt, file_path:str, outfilepath:str):
 def report_model_error(opt:Namespace, e:Exception):
     print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
     print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
-    response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
-    if response.startswith(('n','N')):
-        return
+    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
+    if yes_to_all:
+        print('** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE')
+    else:
+        response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
+        if response.startswith(('n', 'N')):
+            return
 
     print('invokeai-configure is launching....\n')
 
@@ -1121,13 +1125,13 @@ def report_model_error(opt:Namespace, e:Exception):
     # only the arguments accepted by the configuration script are parsed
     root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
     config = ["--config", opt.conf] if opt.conf is not None else []
-    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
     previous_args = sys.argv
     sys.argv = [ 'invokeai-configure' ]
     sys.argv.extend(root_dir)
     sys.argv.extend(config)
     if yes_to_all is not None:
-        sys.argv.append(yes_to_all)
+        for arg in yes_to_all.split():
+            sys.argv.append(arg)
 
     from ldm.invoke.config import configure_invokeai
     configure_invokeai.main()
