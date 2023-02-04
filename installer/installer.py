@@ -284,7 +284,7 @@ class InvokeAiInstance:
         if FF_USE_LOCAL_WHEEL:
             # if no wheel, try to do a source install before giving up
             try:
-                src = str(next(Path.cwd().glob("InvokeAI-*.whl")))
+                src = str(next(Path(__file__).parent.glob("InvokeAI-*.whl")))
             except StopIteration:
                 try:
                     src = Path(__file__).parents[1].expanduser().resolve()
