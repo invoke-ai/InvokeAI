@@ -339,7 +339,7 @@ class InvokeAiInstance:
 
         introduction()
 
-        from ldm.invoke.config import configure_invokeai
+        from ldm.invoke.config import invokeai_configure
 
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
@@ -347,7 +347,7 @@ class InvokeAiInstance:
 
         # set sys.argv to a consistent state
 
-        configure_invokeai.main()
+        invokeai_configure.main()
 
     def install_user_scripts(self):
         """
