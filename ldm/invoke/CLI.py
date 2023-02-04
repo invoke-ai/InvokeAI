@@ -4,6 +4,9 @@ import sys
 import shlex
 import traceback
 
+if sys.platform == "darwin":
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 from ldm.invoke.globals import Globals
 from ldm.generate import Generate
 from ldm.invoke.prompt_parser import PromptParser
@@ -20,9 +23,6 @@ import ldm.invoke
 
 # global used in multiple functions (fix)
 infile = None
-
-if sys.platform == 'darwin':
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
