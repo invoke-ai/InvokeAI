@@ -26,7 +26,7 @@ import { useTranslation } from 'react-i18next';
 import type { FieldInputProps, FormikProps } from 'formik';
 import type { RootState } from 'app/store';
 import type { InvokeModelConfigProps } from 'app/invokeai';
-import { setAddNewModelUIOption } from 'features/options/store/optionsSlice';
+import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { BiArrowBack } from 'react-icons/bi';
 
