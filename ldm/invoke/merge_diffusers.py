@@ -8,13 +8,14 @@ import argparse
 import curses
 import os
 import sys
+import traceback
+import warnings
 from argparse import Namespace
 from pathlib import Path
 from typing import List, Union
 
 import npyscreen
-import warnings
-from diffusers import DiffusionPipeline
+from diffusers import DiffusionPipeline, logging as dlogging
 from omegaconf import OmegaConf
 
 from ldm.invoke.globals import (
@@ -46,18 +47,24 @@ def merge_diffusion_models(
     **kwargs - the default DiffusionPipeline.get_config_dict kwargs:
          cache_dir, resume_download, force_download, proxies, local_files_only, use_auth_token, revision, torch_dtype, device_map
     """
-    pipe = DiffusionPipeline.from_pretrained(
-        model_ids_or_paths[0],
-        cache_dir=kwargs.get("cache_dir", global_cache_dir()),
-        custom_pipeline="checkpoint_merger",
-    )
-    merged_pipe = pipe.merge(
-        pretrained_model_name_or_path_list=model_ids_or_paths,
-        alpha=alpha,
-        interp=interp,
-        force=force,
-        **kwargs,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        verbosity = dlogging.get_verbosity()
+        dlogging.set_verbosity_error()
+        
+        pipe = DiffusionPipeline.from_pretrained(
+            model_ids_or_paths[0],
+            cache_dir=kwargs.get("cache_dir", global_cache_dir()),
+            custom_pipeline="checkpoint_merger",
+        )
+        merged_pipe = pipe.merge(
+            pretrained_model_name_or_path_list=model_ids_or_paths,
+            alpha=alpha,
+            interp=interp,
+            force=force,
+            **kwargs,
+        )
+        dlogging.set_verbosity(verbosity)
     return merged_pipe
 
 
@@ -442,23 +449,6 @@ def main():
         "HF_HOME"
     ] = cache_dir  # because not clear the merge pipeline is honoring cache_dir
     args.cache_dir = cache_dir
-
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        try:
-            if args.front_end:
-                run_gui(args)
-            else:
-                run_cli(args)
-            print(f'>> Conversion successful.')
-        except Exception as e:
-            if str(e).startswith('Not enough space'):
-                print('** Not enough horizontal space! Try making the window wider, or relaunch with a smaller starting size.')
-            else:
-                print(f"** An error occurred while merging the pipelines: {str(e)}")
-            sys.exit(-1)
-        except KeyboardInterrupt:
-            sys.exit(-1)
 
 if __name__ == "__main__":
     main()
