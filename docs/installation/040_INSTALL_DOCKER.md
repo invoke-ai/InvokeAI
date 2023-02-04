@@ -83,7 +83,7 @@ Some Suggestions of variables you may want to change besides the Token:
 | `INVOKEAI_TAG`        | latest                          | the Container Repository / Tag which will be used                                            |
 | `PIP_REQUIREMENTS`    | `requirements-lin-cuda.txt`     | the requirements file to use (from `environments-and-requirements`)                          |
 | `CONTAINER_FLAVOR`    | cuda                            | the flavor of the image, which can be changed if you build f.e. with amd requirements file.  |
-| `INVOKE_DOCKERFILE`   | `docker-build/Dockerfile`       | the Dockerfile which should be built, handy for development                                  |
+| `INVOKE_DOCKERFILE`   | `Dockerfile`       | the Dockerfile which should be built, handy for development                                  |
 | `CONTAINER_FLAVOR`    |                                 | the flavor of the image to built, available options are `cuda`, `rocm` and `cpu`             |
 | `PIP_EXTRA_INDEX_URL` |                                 | if you want to use a custom pip-extra-index-url                                              |
 
@@ -91,11 +91,11 @@ Some Suggestions of variables you may want to change besides the Token:
 
 #### Build the Image
 
-I provided a build script, which is located in `docker-build/build.sh` but still
+I provided a build script, which is located in `docker/build.sh` but still
 needs to be executed from the Repository root.
 
 ```bash
-./docker-build/build.sh
+./docker/build.sh
 ```
 
 The build Script not only builds the container, but also creates the docker
@@ -104,10 +104,10 @@ volume if not existing yet, or if empty it will just download the models.
 #### Run the Container
 
 After the build process is done, you can run the container via the provided
-`docker-build/run.sh` script
+`docker/run.sh` script
 
 ```bash
-./docker-build/run.sh
+./docker/run.sh
 ```
 
 When used without arguments, the container will start the webserver and provide
@@ -117,7 +117,7 @@ also do so.
 !!! example "run script example"
 
     ```bash
-    ./docker-build/run.sh "banana sushi" -Ak_lms -S42 -s10
+    ./docker/run.sh "banana sushi" -Ak_lms -S42 -s10
     ```
 
     This would generate the legendary "banana sushi" with Seed 42, k_lms Sampler and 10 steps.
@@ -133,7 +133,7 @@ the container with an extra environment variable to enable GPU usage and have
 the process run much faster:
 
 ```bash
-GPU_FLAGS=all ./docker-build/run.sh
+GPU_FLAGS=all ./docker/run.sh
 ```
 
 This passes the `--gpus all` to docker and uses the GPU.
