@@ -13,6 +13,7 @@ jobs:
       TWINE_USERNAME: __token__
       TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       TWINE_NON_INTERACTIVE: 1
+    if: github.repository == "invoke-ai/InvokeAI"
     steps:
       - name: checkout sources
         uses: actions/checkout@v3
@@ -36,5 +37,5 @@ jobs:
           print(f'PACKAGE_EXISTS={EXISTS}')" >> $GITHUB_ENV
 
       - name: upload package
-        if: env.PACKAGE_EXISTS == 'False'
+        if: env.PACKAGE_EXISTS == 'False' && env.TWINE_PASSWORD != ""
         run: twine upload dist/*
