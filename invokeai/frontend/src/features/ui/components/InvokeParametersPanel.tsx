@@ -1,10 +1,5 @@
 import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
-import React, { ReactNode, useCallback, useEffect, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import { CSSTransition } from 'react-transition-group';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
   setShouldHoldParametersPanelOpen,
@@ -12,10 +7,16 @@ import {
   setShouldShowParametersPanel,
 } from 'features/ui/store/uiSlice';
 
-import { setParametersPanelScrollPosition } from 'features/ui/store/uiSlice';
+import React, { ReactNode, useCallback, useEffect, useRef } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
+import { CSSTransition } from 'react-transition-group';
+
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { setParametersPanelScrollPosition } from 'features/ui/store/uiSlice';
 
 import InvokeAILogo from 'assets/images/logo.png';
+import { isEqual } from 'lodash';
 import { uiSelector } from '../store/uiSelectors';
 
 type Props = { children: ReactNode };
@@ -39,7 +40,7 @@ const optionsPanelSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

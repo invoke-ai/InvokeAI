@@ -1,15 +1,19 @@
 import { FormControl, Textarea } from '@chakra-ui/react';
-import { ChangeEvent, KeyboardEvent, useRef } from 'react';
+import { generateImage } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { generateImage } from 'app/socketio/actions';
+import { ChangeEvent, KeyboardEvent, useRef } from 'react';
 
-import { GenerationState, setPrompt } from 'features/parameters/store/generationSlice';
 import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { readinessSelector } from 'app/selectors/readinessSelector';
+import {
+  GenerationState,
+  setPrompt,
+} from 'features/parameters/store/generationSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+
+import { isEqual } from 'lodash';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 const promptInputSelector = createSelector(
@@ -22,7 +26,7 @@ const promptInputSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

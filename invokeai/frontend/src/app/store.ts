@@ -5,13 +5,13 @@ import storage from 'redux-persist/lib/storage'; // defaults to localStorage for
 
 import { getPersistConfig } from 'redux-deep-persist';
 
+import canvasReducer from 'features/canvas/store/canvasSlice';
+import galleryReducer from 'features/gallery/store/gallerySlice';
+import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
-import galleryReducer from 'features/gallery/store/gallerySlice';
 import systemReducer from 'features/system/store/systemSlice';
-import canvasReducer from 'features/canvas/store/canvasSlice';
 import uiReducer from 'features/ui/store/uiSlice';
-import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 

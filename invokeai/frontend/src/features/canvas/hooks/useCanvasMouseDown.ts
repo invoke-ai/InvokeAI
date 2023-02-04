@@ -1,10 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { KonvaEventObject } from 'konva/lib/Node';
-import _ from 'lodash';
-import { MutableRefObject, useCallback } from 'react';
 import {
   canvasSelector,
   isStagingSelector,
@@ -14,6 +9,12 @@ import {
   setIsDrawing,
   setIsMovingStage,
 } from 'features/canvas/store/canvasSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import Konva from 'konva';
+import { KonvaEventObject } from 'konva/lib/Node';
+import { isEqual } from 'lodash';
+
+import { MutableRefObject, useCallback } from 'react';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
 
@@ -27,7 +28,7 @@ const selector = createSelector(
       isStaging,
     };
   },
-  { memoizeOptions: { resultEqualityCheck: _.isEqual } }
+  { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
 const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {

@@ -1,8 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { KonvaEventObject } from 'konva/lib/Node';
-import _ from 'lodash';
-import { useCallback } from 'react';
 import {
   canvasSelector,
   isStagingSelector,
@@ -11,6 +8,10 @@ import {
   setIsMovingStage,
   setStageCoordinates,
 } from 'features/canvas/store/canvasSlice';
+import { KonvaEventObject } from 'konva/lib/Node';
+import { isEqual } from 'lodash';
+
+import { useCallback } from 'react';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -22,7 +23,7 @@ const selector = createSelector(
       isMovingBoundingBox,
     };
   },
-  { memoizeOptions: { resultEqualityCheck: _.isEqual } }
+  { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
 const useCanvasDrag = () => {

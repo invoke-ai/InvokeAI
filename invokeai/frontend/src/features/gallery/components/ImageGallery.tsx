@@ -1,19 +1,16 @@
 import { Button } from '@chakra-ui/button';
 import { NumberSize, Resizable } from 're-resizable';
 
-import React, {
-  ChangeEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { MdPhotoLibrary } from 'react-icons/md';
-import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
+import { ButtonGroup } from '@chakra-ui/react';
 import { requestImages } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIButton from 'common/components/IAIButton';
+import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import IAISlider from 'common/components/IAISlider';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { imageGallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
   selectNextImage,
   selectPrevImage,
@@ -25,24 +22,28 @@ import {
   setShouldAutoSwitchToNewImages,
   setShouldHoldGalleryOpen,
   setShouldPinGallery,
+  setShouldShowGallery,
   setShouldUseSingleGalleryColumn,
 } from 'features/gallery/store/gallerySlice';
-import HoverableImage from './HoverableImage';
-import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
-import { ButtonGroup } from '@chakra-ui/react';
-import { CSSTransition } from 'react-transition-group';
-import { Direction } from 're-resizable/lib/resizer';
-import { imageGallerySelector } from 'features/gallery/store/gallerySelectors';
-import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
-import IAIPopover from 'common/components/IAIPopover';
-import IAISlider from 'common/components/IAISlider';
-import { BiReset } from 'react-icons/bi';
-import IAICheckbox from 'common/components/IAICheckbox';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
-import _ from 'lodash';
-import IAIButton from 'common/components/IAIButton';
 import { InvokeTabName } from 'features/ui/store/tabMap';
+
+import { clamp } from 'lodash';
+import { Direction } from 're-resizable/lib/resizer';
+import React, {
+  ChangeEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { BiReset } from 'react-icons/bi';
+import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
+import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
+import { MdPhotoLibrary } from 'react-icons/md';
+import { CSSTransition } from 'react-transition-group';
+import HoverableImage from './HoverableImage';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
 const GALLERY_IMAGE_WIDTH_OFFSET = 40;
@@ -212,7 +213,7 @@ export default function ImageGallery() {
     'shift+up',
     () => {
       if (galleryImageMinimumWidth < 256) {
-        const newMinWidth = _.clamp(
+        const newMinWidth = clamp(
           galleryImageMinimumWidth + IMAGE_SIZE_STEP,
           32,
           256
@@ -227,7 +228,7 @@ export default function ImageGallery() {
     'shift+down',
     () => {
       if (galleryImageMinimumWidth > 32) {
-        const newMinWidth = _.clamp(
+        const newMinWidth = clamp(
           galleryImageMinimumWidth - IMAGE_SIZE_STEP,
           32,
           256
@@ -315,7 +316,7 @@ export default function ImageGallery() {
             delta: NumberSize
           ) => {
             const newWidth = shouldPinGallery
-              ? _.clamp(
+              ? clamp(
                   Number(galleryWidth) + delta.width,
                   galleryMinWidth,
                   Number(galleryMaxWidth)
@@ -342,7 +343,7 @@ export default function ImageGallery() {
             elementRef: HTMLElement,
             delta: NumberSize
           ) => {
-            const newWidth = _.clamp(
+            const newWidth = clamp(
               Number(galleryWidth) + delta.width,
               galleryMinWidth,
               Number(
@@ -553,7 +554,7 @@ export default function ImageGallery() {
         {isResizing && (
           <div
             style={{
-              width: galleryWidth + 'px',
+              width: `${galleryWidth}px`,
               height: '100%',
             }}
           />

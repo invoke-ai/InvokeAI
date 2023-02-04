@@ -1,20 +1,20 @@
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 
-import { UpscalingLevel } from 'features/parameters/store/postprocessingSlice';
 import {
   setUpscalingLevel,
   setUpscalingStrength,
+  UpscalingLevel,
 } from 'features/parameters/store/postprocessingSlice';
 
-import { UPSCALING_LEVELS } from 'app/constants';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
-import { ChangeEvent } from 'react';
+import { UPSCALING_LEVELS } from 'app/constants';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
-import { useTranslation } from 'react-i18next';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { isEqual } from 'lodash';
+import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const parametersSelector = createSelector(
   [postprocessingSelector, systemSelector],

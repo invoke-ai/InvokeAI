@@ -7,4 +7,4 @@ export const tabMap = [
   'training',
 ] as const;
 
-export type InvokeTabName = typeof tabMap[number];
+export type InvokeTabName = (typeof tabMap)[number];

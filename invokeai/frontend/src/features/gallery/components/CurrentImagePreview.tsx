@@ -1,6 +1,5 @@
 import { IconButton, Image } from '@chakra-ui/react';
-import { useState } from 'react';
-import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
   GalleryCategory,
@@ -8,11 +7,13 @@ import {
   selectNextImage,
   selectPrevImage,
 } from 'features/gallery/store/gallerySlice';
-import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
-import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import { uiSelector } from 'features/ui/store/uiSelectors';
+import { isEqual } from 'lodash';
+
+import { useState } from 'react';
+import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { gallerySelector } from '../store/gallerySelectors';
+import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 
 export const imagesSelector = createSelector(
   [gallerySelector, uiSelector],
@@ -45,7 +46,7 @@ export const imagesSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

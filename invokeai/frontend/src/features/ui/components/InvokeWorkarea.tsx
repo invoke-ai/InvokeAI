@@ -1,23 +1,23 @@
 import { Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { DragEvent, ReactNode } from 'react';
-import { VscSplitHorizontal } from 'react-icons/vsc';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import ImageGallery from 'features/gallery/components/ImageGallery';
+import { setInitialImage } from 'features/parameters/store/generationSlice';
 import {
   activeTabNameSelector,
   uiSelector,
 } from 'features/ui/store/uiSelectors';
-import { setInitialImage } from 'features/parameters/store/generationSlice';
+import { DragEvent, ReactNode } from 'react';
+import { VscSplitHorizontal } from 'react-icons/vsc';
 
-import { setShouldShowDualDisplay } from 'features/ui/store/uiSlice';
 import {
   setDoesCanvasNeedScaling,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
-import _ from 'lodash';
 import useGetImageByUuid from 'features/gallery/hooks/useGetImageByUuid';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { setShouldShowDualDisplay } from 'features/ui/store/uiSlice';
+import { isEqual } from 'lodash';
 
 const workareaSelector = createSelector(
   [uiSelector, lightboxSelector, activeTabNameSelector],
@@ -34,7 +34,7 @@ const workareaSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 
 import { VStack } from '@chakra-ui/react';
-import IAIPopover from 'common/components/IAIPopover';
-import React from 'react';
 import IAIButton from 'common/components/IAIButton';
-import { useTranslation } from 'react-i18next';
 import IAIIconButton from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import { useTranslation } from 'react-i18next';
 import { FaLanguage } from 'react-icons/fa';
 
 export default function LanguagePicker() {

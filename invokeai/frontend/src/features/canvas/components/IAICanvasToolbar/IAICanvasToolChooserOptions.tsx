@@ -1,5 +1,14 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIColorPicker from 'common/components/IAIColorPicker';
+import IAIIconButton from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import IAISlider from 'common/components/IAISlider';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import {
   addEraseRect,
   addFillRect,
@@ -7,9 +16,11 @@ import {
   setBrushSize,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { clamp, isEqual } from 'lodash';
+
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import {
   FaEraser,
   FaEyeDropper,
@@ -18,16 +29,6 @@ import {
   FaPlus,
   FaSlidersH,
 } from 'react-icons/fa';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
-import { useHotkeys } from 'react-hotkeys-hook';
-import IAIPopover from 'common/components/IAIPopover';
-import IAISlider from 'common/components/IAISlider';
-import IAIColorPicker from 'common/components/IAIColorPicker';
-import { useTranslation } from 'react-i18next';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector, systemSelector],
@@ -45,7 +46,7 @@ export const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -143,7 +144,7 @@ const IAICanvasToolChooserOptions = () => {
       dispatch(
         setBrushColor({
           ...brushColor,
-          a: _.clamp(brushColor.a - 0.05, 0.05, 1),
+          a: clamp(brushColor.a - 0.05, 0.05, 1),
         })
       );
     },
@@ -160,7 +161,7 @@ const IAICanvasToolChooserOptions = () => {
       dispatch(
         setBrushColor({
           ...brushColor,
-          a: _.clamp(brushColor.a + 0.05, 0.05, 1),
+          a: clamp(brushColor.a + 0.05, 0.05, 1),
         })
       );
     },

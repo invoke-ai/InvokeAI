@@ -1,5 +1,4 @@
 import { Flex } from '@chakra-ui/react';
-import React from 'react';
 import UnifiedCanvasBrushSize from './UnifiedCanvasBrushSize';
 import UnifiedCanvasColorPicker from './UnifiedCanvasColorPicker';
 

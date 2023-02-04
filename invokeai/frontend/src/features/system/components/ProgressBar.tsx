@@ -1,8 +1,8 @@
 import { Progress } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
 import { useAppSelector } from 'app/storeHooks';
 import { SystemState } from 'features/system/store/systemSlice';
+import { isEqual } from 'lodash';
 import { systemSelector } from '../store/systemSelectors';
 
 const progressBarSelector = createSelector(

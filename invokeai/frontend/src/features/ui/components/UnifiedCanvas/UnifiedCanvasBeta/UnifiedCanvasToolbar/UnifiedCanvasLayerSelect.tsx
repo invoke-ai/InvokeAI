@@ -6,12 +6,13 @@ import {
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
 import { setIsMaskEnabled, setLayer } from 'features/canvas/store/canvasSlice';
-import React, { ChangeEvent } from 'react';
-import _ from 'lodash';
 import {
   CanvasLayer,
   LAYER_NAMES_DICT,
 } from 'features/canvas/store/canvasTypes';
+import { isEqual } from 'lodash';
+
+import { ChangeEvent } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
@@ -23,7 +24,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

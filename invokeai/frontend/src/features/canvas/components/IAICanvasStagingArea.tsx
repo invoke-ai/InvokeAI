@@ -1,9 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import { GroupConfig } from 'konva/lib/Group';
-import _ from 'lodash';
-import { Group, Rect } from 'react-konva';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { GroupConfig } from 'konva/lib/Group';
+import { isEqual } from 'lodash';
+
+import { Group, Rect } from 'react-konva';
 import IAICanvasImage from './IAICanvasImage';
 
 const selector = createSelector(
@@ -34,7 +35,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
