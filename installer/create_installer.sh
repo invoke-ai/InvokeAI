@@ -29,7 +29,7 @@ if [ "$RESPONSE" == 'y' ]; then
 	    exit -1
     fi
     git push origin :refs/tags/v2.3-latest
-    git tag -fa latest
+    git tag -fa v2.3-latest
 fi
 
 # ----------------------
