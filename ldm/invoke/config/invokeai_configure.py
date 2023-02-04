@@ -433,9 +433,7 @@ def _download_diffusion_weights(
             )
         except OSError as e:
             if str(e).startswith("fp16 is not a valid"):
-                print(
-                    f"Could not fetch half-precision version of model {repo_id}; fetching full-precision instead"
-                )
+                pass
             else:
                 print(f"An unexpected error occurred while downloading the model: {e})")
         if path:
@@ -866,7 +864,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
 
-    configs_src = Path(configs.__path__[-1])
+    configs_src = Path(configs.__path__[0])
     configs_dest = Path(root) / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)

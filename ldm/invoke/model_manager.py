@@ -483,12 +483,11 @@ class ModelManager(object):
                     **pipeline_args,
                     **fp_args,
                 )
-
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print(f'Could not fetch half-precision version of model {name_or_path}; fetching full-precision instead')
+                    pass
                 else:
-                    print(f'An unexpected error occurred while downloading the model: {e})')
+                    print(f'** An unexpected error occurred while downloading the model: {e})')
             if pipeline:
                 break
 
@@ -1039,7 +1038,7 @@ class ModelManager(object):
                 vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args, **fp_args)
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print('  | Half-precision version of model not available; fetching full-precision instead')
+                    pass
                 else:
                     deferred_error = e
             if vae:
