@@ -127,7 +127,7 @@ script do it for you. Manual installation is described at:
 
 https://invoke-ai.github.io/InvokeAI/installation/020_INSTALL_MANUAL/
 
-You may download the recommended models (about 10GB total), select a customized set, or
+You may download the recommended models (about 20GB total!), select a customized set, or
 completely skip this step.
 """
     )
