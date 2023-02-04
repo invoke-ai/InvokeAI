@@ -18,8 +18,6 @@ from .api.routers import images, sessions
 from .api.dependencies import ApiDependencies
 from ..args import Args
 
-origins = []
-
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
 app = FastAPI(
