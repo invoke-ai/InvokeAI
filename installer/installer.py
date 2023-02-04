@@ -38,7 +38,8 @@ class Installer:
         self.reqs = INSTALLER_REQS
         self.preflight()
         if os.getenv("VIRTUAL_ENV") is not None:
-            raise NotImplementedError("A virtual environment is already activated. Please 'deactivate' before installation.")
+            print("A virtual environment is already activated. Please 'deactivate' before installation.")
+            sys.exit(-1)
         self.bootstrap()
 
     def preflight(self) -> None:
@@ -283,7 +284,7 @@ class InvokeAiInstance:
         if FF_USE_LOCAL_WHEEL:
             # if no wheel, try to do a source install before giving up
             try:
-                src = str(next(Path.cwd().glob("InvokeAI-*.whl")))
+                src = str(next(Path(__file__).parent.glob("InvokeAI-*.whl")))
             except StopIteration:
                 try:
                     src = Path(__file__).parents[1].expanduser().resolve()
@@ -355,7 +356,10 @@ class InvokeAiInstance:
 
         ext = "bat" if OS == "Windows" else "sh"
 
-        for script in ["invoke", "update"]:
+        #scripts = ['invoke', 'update']
+        scripts = ['invoke']
+        
+        for script in scripts:
             src = Path(__file__).parent / "templates" / f"{script}.{ext}.in"
             dest = self.runtime / f"{script}.{ext}"
             shutil.copy(src, dest)
