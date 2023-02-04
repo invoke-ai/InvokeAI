@@ -9,25 +9,26 @@
 @use './Themes/Colors_Green';
 
 // Component Styles
-//app
+
+// app
 @use '../app/App.scss';
 
-//system
+// system
 @use '../features/system/components/SiteHeader.scss';
 @use '../features/system/components/StatusIndicator.scss';
 @use '../features/system/components/SettingsModal/SettingsModal.scss';
 @use '../features/system/components/ModelManager/AddModel.scss';
 @use '../features/system/components/HotkeysModal/HotkeysModal.scss';
 @use '../features/system/components/Console.scss';
-
-// options
-@use '../features/options/components/PromptInput/PromptInput.scss';
-@use '../features/options/components/ProcessButtons/ProcessButtons.scss';
-@use '../features/options/components/MainOptions/MainOptions.scss';
-@use '../features/options/components/AccordionItems/AdvancedSettings.scss';
-@use '../features/options/components/AdvancedOptions/Upscale/UpscaleOptions.scss';
-@use '../features/options/components/AdvancedOptions/Canvas/BoundingBoxSettings/BoundingBoxSettings.scss';
 @use '../features/system/components/ProgressBar.scss';
+
+// parameters
+@use '../features/parameters/components/PromptInput/PromptInput.scss';
+@use '../features/parameters/components/ProcessButtons/ProcessButtons.scss';
+@use '../features/parameters/components/MainParameters/MainParameters.scss';
+@use '../features/parameters/components/AccordionItems/AdvancedSettings.scss';
+@use '../features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings.scss';
+@use '../features/parameters/components/AdvancedParameters/Canvas/BoundingBox/BoundingBoxSettings.scss';
 
 // gallery
 @use '../features/gallery/components/CurrentImageDisplay.scss';
@@ -40,13 +41,13 @@
 @use '../features/lightbox/components/Lightbox.scss';
 
 // Tabs
-@use '../features/tabs/components/InvokeTabs.scss';
-@use '../features/tabs/components/InvokeWorkarea.scss';
-@use '../features/tabs/components/InvokeOptionsPanel.scss';
-@use '../features/tabs/components/TextToImage/TextToImage.scss';
-@use '../features/tabs/components/ImageToImage/ImageToImage.scss';
-@use '../features/tabs/components/FloatingButton.scss';
-@use '../features/tabs/components/UnifiedCanvas/CanvasWorkarea.scss';
+@use '../features/ui/components/InvokeTabs.scss';
+@use '../features/ui/components/InvokeWorkarea.scss';
+@use '../features/ui/components/InvokeParametersPanel.scss';
+@use '../features/ui/components/TextToImage/TextToImage.scss';
+@use '../features/ui/components/ImageToImage/ImageToImage.scss';
+@use '../features/ui/components/FloatingButton.scss';
+@use '../features/ui/components/UnifiedCanvas/CanvasWorkarea.scss';
 
 // Component Shared
 @use '../common/components/IAINumberInput.scss';

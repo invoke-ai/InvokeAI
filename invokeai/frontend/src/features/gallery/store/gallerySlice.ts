@@ -3,7 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import _, { clamp } from 'lodash';
 import * as InvokeAI from 'app/invokeai';
 import { IRect } from 'konva/lib/types';
-import { InvokeTabName } from 'features/tabs/tabMap';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 
 export type GalleryCategory = 'user' | 'result';
 
@@ -241,6 +241,7 @@ export const gallerySlice = createSlice({
     setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGallery = action.payload;
     },
+
     setGalleryScrollPosition: (state, action: PayloadAction<number>) => {
       state.galleryScrollPosition = action.payload;
     },

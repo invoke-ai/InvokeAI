@@ -18,7 +18,6 @@ import { ChangeEvent, ReactElement, SyntheticEvent } from 'react';
 import { cloneElement, forwardRef, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { deleteImage } from 'app/socketio/actions';
-import { RootState } from 'app/store';
 import {
   setShouldConfirmOnDelete,
   SystemState,
@@ -26,9 +25,10 @@ import {
 import * as InvokeAI from 'app/invokeai';
 import { useHotkeys } from 'react-hotkeys-hook';
 import _ from 'lodash';
+import { systemSelector } from 'features/system/store/systemSelectors';
 
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
+const deleteImageModalSelector = createSelector(
+  systemSelector,
   (system: SystemState) => {
     const { shouldConfirmOnDelete, isConnected, isProcessing } = system;
     return { shouldConfirmOnDelete, isConnected, isProcessing };
@@ -60,8 +60,9 @@ const DeleteImageModal = forwardRef(
   ({ image, children }: DeleteImageModalProps, ref) => {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const dispatch = useAppDispatch();
-    const { shouldConfirmOnDelete, isConnected, isProcessing } =
-      useAppSelector(systemSelector);
+    const { shouldConfirmOnDelete, isConnected, isProcessing } = useAppSelector(
+      deleteImageModalSelector
+    );
     const cancelRef = useRef<HTMLButtonElement>(null);
 
     const handleClickDelete = (e: SyntheticEvent) => {

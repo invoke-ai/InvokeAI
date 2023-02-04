@@ -1,23 +1,21 @@
-import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import CurrentImageButtons from './CurrentImageButtons';
 import { MdPhoto } from 'react-icons/md';
 import CurrentImagePreview from './CurrentImagePreview';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
-import { OptionsState } from 'features/options/store/optionsSlice';
 import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import {
+  activeTabNameSelector,
+  uiSelector,
+} from 'features/ui/store/uiSelectors';
+import { gallerySelector } from '../store/gallerySelectors';
 
 export const currentImageDisplaySelector = createSelector(
-  [
-    (state: RootState) => state.gallery,
-    (state: RootState) => state.options,
-    activeTabNameSelector,
-  ],
-  (gallery: GalleryState, options: OptionsState, activeTabName) => {
+  [gallerySelector, uiSelector, activeTabNameSelector],
+  (gallery: GalleryState, ui, activeTabName) => {
     const { currentImage, intermediateImage } = gallery;
-    const { shouldShowImageDetails } = options;
+    const { shouldShowImageDetails } = ui;
 
     return {
       activeTabName,

@@ -2,9 +2,9 @@ import { AnyAction, ThunkAction } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
 import * as InvokeAI from 'app/invokeai';
 import { v4 as uuidv4 } from 'uuid';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { setInitialImage } from 'features/options/store/optionsSlice';
+import { setInitialImage } from 'features/parameters/store/generationSlice';
 import { addImage } from '../gallerySlice';
 
 type UploadImageConfig = {

@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 
 import type { RootState } from 'app/store';
-import { setAddNewModelUIOption } from 'features/options/store/optionsSlice';
+import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import AddCheckpointModel from './AddCheckpointModel';
 import AddDiffusersModel from './AddDiffusersModel';
 
@@ -54,7 +54,7 @@ export default function AddModel() {
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const addNewModelUIOption = useAppSelector(
-    (state: RootState) => state.options.addNewModelUIOption
+    (state: RootState) => state.ui.addNewModelUIOption
   );
 
   const dispatch = useAppDispatch();

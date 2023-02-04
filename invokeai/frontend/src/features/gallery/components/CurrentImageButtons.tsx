@@ -2,24 +2,21 @@ import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
 import {
-  OptionsState,
-  setActiveTab,
   setAllParameters,
   setInitialImage,
-  setIsLightBoxOpen,
   setPrompt,
   setSeed,
-  setShouldShowImageDetails,
-} from 'features/options/store/optionsSlice';
+} from 'features/parameters/store/generationSlice';
+import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
+import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import DeleteImageModal from './DeleteImageModal';
 import { SystemState } from 'features/system/store/systemSlice';
 import IAIButton from 'common/components/IAIButton';
 import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import IAIIconButton from 'common/components/IAIIconButton';
-import UpscaleOptions from 'features/options/components/AdvancedOptions/Upscale/UpscaleOptions';
-import FaceRestoreOptions from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreOptions';
+import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
+import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { ButtonGroup, Link, useToast } from '@chakra-ui/react';
 import {
@@ -41,32 +38,43 @@ import {
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import {
+  activeTabNameSelector,
+  uiSelector,
+} from 'features/ui/store/uiSelectors';
 import IAIPopover from 'common/components/IAIPopover';
 import { useTranslation } from 'react-i18next';
+import { setActiveTab } from 'features/ui/store/uiSlice';
+import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { gallerySelector } from '../store/gallerySelectors';
 
-const systemSelector = createSelector(
+const currentImageButtonsSelector = createSelector(
   [
-    (state: RootState) => state.system,
-    (state: RootState) => state.options,
-    (state: RootState) => state.gallery,
+    systemSelector,
+    gallerySelector,
+    postprocessingSelector,
+    uiSelector,
+    lightboxSelector,
     activeTabNameSelector,
   ],
   (
     system: SystemState,
-    options: OptionsState,
     gallery: GalleryState,
+    postprocessing,
+    ui,
+    lightbox,
     activeTabName
   ) => {
     const { isProcessing, isConnected, isGFPGANAvailable, isESRGANAvailable } =
       system;
 
-    const {
-      upscalingLevel,
-      facetoolStrength,
-      shouldShowImageDetails,
-      isLightBoxOpen,
-    } = options;
+    const { upscalingLevel, facetoolStrength } = postprocessing;
+
+    const { isLightboxOpen } = lightbox;
+
+    const { shouldShowImageDetails } = ui;
 
     const { intermediateImage, currentImage } = gallery;
 
@@ -81,7 +89,7 @@ const systemSelector = createSelector(
       currentImage,
       shouldShowImageDetails,
       activeTabName,
-      isLightBoxOpen,
+      isLightboxOpen,
     };
   },
   {
@@ -107,34 +115,18 @@ const CurrentImageButtons = () => {
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
     currentImage,
-    isLightBoxOpen,
+    isLightboxOpen,
     activeTabName,
-  } = useAppSelector(systemSelector);
+  } = useAppSelector(currentImageButtonsSelector);
 
   const toast = useToast();
   const { t } = useTranslation();
 
   const handleClickUseAsInitialImage = () => {
     if (!currentImage) return;
-    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+    if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
     dispatch(setInitialImage(currentImage));
     dispatch(setActiveTab('img2img'));
-  };
-
-  const handleCopyImage = async () => {
-    if (!currentImage) return;
-
-    const blob = await fetch(currentImage.url).then((res) => res.blob());
-    const data = [new ClipboardItem({ [blob.type]: blob })];
-
-    await navigator.clipboard.write(data);
-
-    toast({
-      title: t('toast:imageCopied'),
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
   };
 
   const handleCopyImageLink = () => {
@@ -342,7 +334,7 @@ const CurrentImageButtons = () => {
 
   const handleSendToCanvas = () => {
     if (!currentImage) return;
-    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+    if (isLightboxOpen) dispatch(setIsLightboxOpen(false));
 
     dispatch(setInitialCanvasImage(currentImage));
     dispatch(setDoesCanvasNeedScaling(true));
@@ -377,7 +369,7 @@ const CurrentImageButtons = () => {
   );
 
   const handleLightBox = () => {
-    dispatch(setIsLightBoxOpen(!isLightBoxOpen));
+    dispatch(setIsLightboxOpen(!isLightboxOpen));
   };
 
   return (
@@ -387,7 +379,7 @@ const CurrentImageButtons = () => {
           trigger="hover"
           triggerComponent={
             <IAIIconButton
-              aria-label={`${t('options:sendTo')}...`}
+              aria-label={`${t('parameters:sendTo')}...`}
               icon={<FaShareAlt />}
             />
           }
@@ -398,34 +390,26 @@ const CurrentImageButtons = () => {
               onClick={handleClickUseAsInitialImage}
               leftIcon={<FaShare />}
             >
-              {t('options:sendToImg2Img')}
+              {t('parameters:sendToImg2Img')}
             </IAIButton>
             <IAIButton
               size={'sm'}
               onClick={handleSendToCanvas}
               leftIcon={<FaShare />}
             >
-              {t('options:sendToUnifiedCanvas')}
-            </IAIButton>
-
-            <IAIButton
-              size={'sm'}
-              onClick={handleCopyImage}
-              leftIcon={<FaCopy />}
-            >
-              {t('options:copyImage')}
+              {t('parameters:sendToUnifiedCanvas')}
             </IAIButton>
             <IAIButton
               size={'sm'}
               onClick={handleCopyImageLink}
               leftIcon={<FaCopy />}
             >
-              {t('options:copyImageToLink')}
+              {t('parameters:copyImageToLink')}
             </IAIButton>
 
             <Link download={true} href={currentImage?.url}>
               <IAIButton leftIcon={<FaDownload />} size={'sm'} w="100%">
-                {t('options:downloadImage')}
+                {t('parameters:downloadImage')}
               </IAIButton>
             </Link>
           </div>
@@ -433,16 +417,16 @@ const CurrentImageButtons = () => {
         <IAIIconButton
           icon={<FaExpand />}
           tooltip={
-            !isLightBoxOpen
-              ? `${t('options:openInViewer')} (Z)`
-              : `${t('options:closeViewer')} (Z)`
+            !isLightboxOpen
+              ? `${t('parameters:openInViewer')} (Z)`
+              : `${t('parameters:closeViewer')} (Z)`
           }
           aria-label={
-            !isLightBoxOpen
-              ? `${t('options:openInViewer')} (Z)`
-              : `${t('options:closeViewer')} (Z)`
+            !isLightboxOpen
+              ? `${t('parameters:openInViewer')} (Z)`
+              : `${t('parameters:closeViewer')} (Z)`
           }
-          data-selected={isLightBoxOpen}
+          data-selected={isLightboxOpen}
           onClick={handleLightBox}
         />
       </ButtonGroup>
@@ -450,24 +434,24 @@ const CurrentImageButtons = () => {
       <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaQuoteRight />}
-          tooltip={`${t('options:usePrompt')} (P)`}
-          aria-label={`${t('options:usePrompt')} (P)`}
+          tooltip={`${t('parameters:usePrompt')} (P)`}
+          aria-label={`${t('parameters:usePrompt')} (P)`}
           isDisabled={!currentImage?.metadata?.image?.prompt}
           onClick={handleClickUsePrompt}
         />
 
         <IAIIconButton
           icon={<FaSeedling />}
-          tooltip={`${t('options:useSeed')} (S)`}
-          aria-label={`${t('options:useSeed')} (S)`}
+          tooltip={`${t('parameters:useSeed')} (S)`}
+          aria-label={`${t('parameters:useSeed')} (S)`}
           isDisabled={!currentImage?.metadata?.image?.seed}
           onClick={handleClickUseSeed}
         />
 
         <IAIIconButton
           icon={<FaAsterisk />}
-          tooltip={`${t('options:useAll')} (A)`}
-          aria-label={`${t('options:useAll')} (A)`}
+          tooltip={`${t('parameters:useAll')} (A)`}
+          aria-label={`${t('parameters:useAll')} (A)`}
           isDisabled={
             !['txt2img', 'img2img'].includes(
               currentImage?.metadata?.image?.type
@@ -483,12 +467,12 @@ const CurrentImageButtons = () => {
           triggerComponent={
             <IAIIconButton
               icon={<FaGrinStars />}
-              aria-label={t('options:restoreFaces')}
+              aria-label={t('parameters:restoreFaces')}
             />
           }
         >
           <div className="current-image-postprocessing-popover">
-            <FaceRestoreOptions />
+            <FaceRestoreSettings />
             <IAIButton
               isDisabled={
                 !isGFPGANAvailable ||
@@ -498,7 +482,7 @@ const CurrentImageButtons = () => {
               }
               onClick={handleClickFixFaces}
             >
-              {t('options:restoreFaces')}
+              {t('parameters:restoreFaces')}
             </IAIButton>
           </div>
         </IAIPopover>
@@ -508,12 +492,12 @@ const CurrentImageButtons = () => {
           triggerComponent={
             <IAIIconButton
               icon={<FaExpandArrowsAlt />}
-              aria-label={t('options:upscale')}
+              aria-label={t('parameters:upscale')}
             />
           }
         >
           <div className="current-image-postprocessing-popover">
-            <UpscaleOptions />
+            <UpscaleSettings />
             <IAIButton
               isDisabled={
                 !isESRGANAvailable ||
@@ -523,7 +507,7 @@ const CurrentImageButtons = () => {
               }
               onClick={handleClickUpscale}
             >
-              {t('options:upscaleImage')}
+              {t('parameters:upscaleImage')}
             </IAIButton>
           </div>
         </IAIPopover>
@@ -532,8 +516,8 @@ const CurrentImageButtons = () => {
       <ButtonGroup isAttached={true}>
         <IAIIconButton
           icon={<FaCode />}
-          tooltip={`${t('options:info')} (I)`}
-          aria-label={`${t('options:info')} (I)`}
+          tooltip={`${t('parameters:info')} (I)`}
+          aria-label={`${t('parameters:info')} (I)`}
           data-selected={shouldShowImageDetails}
           onClick={handleClickShowImageDetails}
         />
@@ -542,8 +526,8 @@ const CurrentImageButtons = () => {
       <DeleteImageModal image={currentImage}>
         <IAIIconButton
           icon={<FaTrash />}
-          tooltip={`${t('options:deleteImage')} (Del)`}
-          aria-label={`${t('options:deleteImage')} (Del)`}
+          tooltip={`${t('parameters:deleteImage')} (Del)`}
+          aria-label={`${t('parameters:deleteImage')} (Del)`}
           isDisabled={!currentImage || !isConnected || isProcessing}
           style={{ backgroundColor: 'var(--btn-delete-image)' }}
         />

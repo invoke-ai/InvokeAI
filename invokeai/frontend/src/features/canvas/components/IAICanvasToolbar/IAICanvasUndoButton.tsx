@@ -6,7 +6,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 import _ from 'lodash';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { undo } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { useTranslation } from 'react-i18next';

@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { CanvasImage, CanvasState, isCanvasBaseImage } from './canvasTypes';
 

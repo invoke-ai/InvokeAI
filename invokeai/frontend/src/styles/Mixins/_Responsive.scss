@@ -89,17 +89,17 @@
                                             'options'
                                             'gallery';
                         row-gap: 15px;
-                        .options-panel-wrapper{
+                        .parameters-panel-wrapper{
                             grid-area: options;
                             width: 100%;
                             max-width: 100%;
                             height: inherit;
                             overflow: inherit;
                             padding: 0 10px;
-                            .main-options-row{
+                            .main-settings-row{
                                 max-width: 100%;
                             }
-                            .advanced-settings-item{
+                            .advanced-parameters-item{
                                 max-width: 100%;
                             }
                         }

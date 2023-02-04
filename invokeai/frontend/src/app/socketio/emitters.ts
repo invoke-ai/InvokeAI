@@ -10,14 +10,13 @@ import {
   GalleryState,
   removeImage,
 } from 'features/gallery/store/gallerySlice';
-import { OptionsState } from 'features/options/store/optionsSlice';
 import {
   addLogEntry,
   generationRequested,
   modelChangeRequested,
   setIsProcessing,
 } from 'features/system/store/systemSlice';
-import { InvokeTabName } from 'features/tabs/tabMap';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import * as InvokeAI from 'app/invokeai';
 import type { RootState } from 'app/store';
 
@@ -39,7 +38,8 @@ const makeSocketIOEmitters = (
       const state: RootState = getState();
 
       const {
-        options: optionsState,
+        generation: generationState,
+        postprocessing: postprocessingState,
         system: systemState,
         canvas: canvasState,
       } = state;
@@ -47,7 +47,8 @@ const makeSocketIOEmitters = (
       const frontendToBackendParametersConfig: FrontendToBackendParametersConfig =
         {
           generationMode,
-          optionsState,
+          generationState,
+          postprocessingState,
           canvasState,
           systemState,
         };
@@ -90,8 +91,11 @@ const makeSocketIOEmitters = (
     },
     emitRunESRGAN: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const options: OptionsState = getState().options;
-      const { upscalingLevel, upscalingStrength } = options;
+
+      const {
+        postprocessing: { upscalingLevel, upscalingStrength },
+      } = getState();
+
       const esrganParameters = {
         upscale: [upscalingLevel, upscalingStrength],
       };
@@ -111,8 +115,10 @@ const makeSocketIOEmitters = (
     },
     emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const options: OptionsState = getState().options;
-      const { facetoolType, facetoolStrength, codeformerFidelity } = options;
+
+      const {
+        postprocessing: { facetoolType, facetoolStrength, codeformerFidelity },
+      } = getState();
 
       const facetoolParameters: Record<string, unknown> = {
         facetool_strength: facetoolStrength,

@@ -3,7 +3,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { FaRedo } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 import _ from 'lodash';
