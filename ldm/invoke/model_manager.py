@@ -356,6 +356,7 @@ class ModelManager(object):
                 checkpoint_path = weights,
                 original_config_file = config,
                 vae = vae,
+                return_generator_pipeline=True,
             )
             return (
                 pipeline.to(self.device).to(torch.float16 if self.precision == 'float16' else torch.float32),
