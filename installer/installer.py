@@ -38,7 +38,8 @@ class Installer:
         self.reqs = INSTALLER_REQS
         self.preflight()
         if os.getenv("VIRTUAL_ENV") is not None:
-            raise NotImplementedError("A virtual environment is already activated. Please 'deactivate' before installation.")
+            print("A virtual environment is already activated. Please 'deactivate' before installation.")
+            sys.exit(-1)
         self.bootstrap()
 
     def preflight(self) -> None:
@@ -283,7 +284,7 @@ class InvokeAiInstance:
         if FF_USE_LOCAL_WHEEL:
             # if no wheel, try to do a source install before giving up
             try:
-                src = str(next(Path.cwd().glob("InvokeAI-*.whl")))
+                src = str(next(Path(__file__).parent.glob("InvokeAI-*.whl")))
             except StopIteration:
                 try:
                     src = Path(__file__).parents[1].expanduser().resolve()
@@ -446,6 +447,7 @@ def get_torch_source() -> (Union[str, None],str):
             url = "https://download.pytorch.org/whl/cpu"
 
     if device == 'cuda':
+        url = 'https://download.pytorch.org/whl/cu117'
         optional_modules = '[xformers]'
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13

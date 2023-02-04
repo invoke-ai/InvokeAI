@@ -13,7 +13,7 @@ echo 3. run textual inversion training
 echo 4. merge models (diffusers type only)
 echo 5. re-run the configure script to download new models
 echo 6. open the developer console
-set /P restore="Please enter 1, 2, 3, 4 or 5: [5] "
+set /P restore="Please enter 1, 2, 3, 4 or 5: [2] "
 if not defined restore set restore=2
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
