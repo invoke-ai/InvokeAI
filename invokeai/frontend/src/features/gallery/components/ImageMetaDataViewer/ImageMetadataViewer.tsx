@@ -14,11 +14,7 @@ import { useAppDispatch } from 'app/storeHooks';
 import * as InvokeAI from 'app/invokeai';
 import {
   setCfgScale,
-  setFacetoolStrength,
-  setCodeformerFidelity,
-  setFacetoolType,
   setHeight,
-  setHiresFix,
   setImg2imgStrength,
   setMaskPath,
   setPrompt,
@@ -28,14 +24,20 @@ import {
   setSeedWeights,
   setShouldFitToWidthHeight,
   setSteps,
-  setUpscalingLevel,
-  setUpscalingStrength,
   setWidth,
   setInitialImage,
-  setShouldShowImageDetails,
   setThreshold,
   setPerlin,
-} from 'features/options/store/optionsSlice';
+} from 'features/parameters/store/generationSlice';
+import {
+  setFacetoolStrength,
+  setCodeformerFidelity,
+  setFacetoolType,
+  setHiresFix,
+  setUpscalingLevel,
+  setUpscalingStrength,
+} from 'features/parameters/store/postprocessingSlice';
+import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { FaCopy } from 'react-icons/fa';

@@ -5,10 +5,13 @@ import storage from 'redux-persist/lib/storage'; // defaults to localStorage for
 
 import { getPersistConfig } from 'redux-deep-persist';
 
-import optionsReducer from 'features/options/store/optionsSlice';
+import generationReducer from 'features/parameters/store/generationSlice';
+import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
 import systemReducer from 'features/system/store/systemSlice';
 import canvasReducer from 'features/canvas/store/canvasSlice';
+import uiReducer from 'features/ui/store/uiSlice';
+import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 
 import { socketioMiddleware } from './socketio/middleware';
 
@@ -58,10 +61,13 @@ const galleryBlacklist = [
 ].map((blacklistItem) => `gallery.${blacklistItem}`);
 
 const rootReducer = combineReducers({
-  options: optionsReducer,
+  generation: generationReducer,
+  postprocessing: postprocessingReducer,
   gallery: galleryReducer,
   system: systemReducer,
   canvas: canvasReducer,
+  ui: uiReducer,
+  lightbox: lightboxReducer,
 });
 
 const rootPersistConfig = getPersistConfig({
@@ -89,8 +95,8 @@ export const store = configureStore({
       'canvas/setStageCoordinates',
       'canvas/setStageScale',
       'canvas/setIsDrawing',
-      // 'canvas/setBoundingBoxCoordinates',
-      // 'canvas/setBoundingBoxDimensions',
+      'canvas/setBoundingBoxCoordinates',
+      'canvas/setBoundingBoxDimensions',
       'canvas/setIsDrawing',
       'canvas/addPointToCurrentLine',
     ],

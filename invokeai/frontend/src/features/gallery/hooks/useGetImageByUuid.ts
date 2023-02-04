@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import { gallerySelector } from '../store/gallerySliceSelectors';
+import { gallerySelector } from '../store/gallerySelectors';
 
 const selector = createSelector(gallerySelector, (gallery) => ({
   resultImages: gallery.categories.result.images,

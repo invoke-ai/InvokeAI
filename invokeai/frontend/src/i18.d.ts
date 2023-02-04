@@ -3,7 +3,7 @@ import 'i18next';
 // Import All Namespaces (for the default language only)
 import common from '../public/locales/common/en.json';
 import unifiedcanvas from '../public/locales/unifiedcanvas/en.json';
-import options from '../public/locales/options/en.json';
+import parameters from '../public/locales/parameters/en.json';
 import gallery from '../public/locales/gallery/en.json';
 import toast from '../public/locales/toast/en.json';
 import hotkeys from '../public/locales/hotkeys/en.json';
@@ -20,7 +20,7 @@ declare module 'i18next' {
     resources: {
       common: typeof common;
       unifiedcanvas: typeof unifiedcanvas;
-      options: typeof options;
+      parameters: typeof parameters;
       gallery: typeof gallery;
       toast: typeof toast;
       hotkeys: typeof hotkeys;

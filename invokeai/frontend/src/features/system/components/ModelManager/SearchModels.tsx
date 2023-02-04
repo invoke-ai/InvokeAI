@@ -17,7 +17,7 @@ import {
   setFoundModels,
   setSearchFolder,
 } from 'features/system/store/systemSlice';
-import { setShouldShowExistingModelsInSearch } from 'features/options/store/optionsSlice';
+import { setShouldShowExistingModelsInSearch } from 'features/ui/store/uiSlice';
 
 import _ from 'lodash';
 
@@ -128,7 +128,7 @@ export default function SearchModels() {
   const existingModels = useAppSelector(existingModelsSelector);
 
   const shouldShowExistingModelsInSearch = useAppSelector(
-    (state: RootState) => state.options.shouldShowExistingModelsInSearch
+    (state: RootState) => state.ui.shouldShowExistingModelsInSearch
   );
 
   const isProcessing = useAppSelector(

@@ -12,12 +12,12 @@ import { useTranslation } from 'react-i18next';
 import _ from 'lodash';
 
 import type { ChangeEvent, ReactNode } from 'react';
-import type { RootState } from 'app/store';
 import type { SystemState } from 'features/system/store/systemSlice';
 import IAIButton from 'common/components/IAIButton';
+import { systemSelector } from 'features/system/store/systemSelectors';
 
 const modelListSelector = createSelector(
-  (state: RootState) => state.system,
+  systemSelector,
   (system: SystemState) => {
     const models = _.map(system.model_list, (model, key) => {
       return { name: key, ...model };

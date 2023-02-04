@@ -11,7 +11,7 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIInput from 'common/components/IAIInput';
-import { setAddNewModelUIOption } from 'features/options/store/optionsSlice';
+import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
 import { Field, Formik } from 'formik';
 import React from 'react';
 import { useTranslation } from 'react-i18next';

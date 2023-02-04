@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useColorMode, VStack } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { setCurrentTheme } from 'features/options/store/optionsSlice';
+import { setCurrentTheme } from 'features/ui/store/uiSlice';
 import IAIPopover from 'common/components/IAIPopover';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaCheck, FaPalette } from 'react-icons/fa';
@@ -15,7 +15,7 @@ export default function ThemeChanger() {
   const { setColorMode, colorMode } = useColorMode();
   const dispatch = useAppDispatch();
   const currentTheme = useAppSelector(
-    (state: RootState) => state.options.currentTheme
+    (state: RootState) => state.ui.currentTheme
   );
 
   const THEMES = {

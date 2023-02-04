@@ -32,7 +32,7 @@ import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
 import { ButtonGroup } from '@chakra-ui/react';
 import { CSSTransition } from 'react-transition-group';
 import { Direction } from 're-resizable/lib/resizer';
-import { imageGallerySelector } from 'features/gallery/store/gallerySliceSelectors';
+import { imageGallerySelector } from 'features/gallery/store/gallerySelectors';
 import { FaImage, FaUser, FaWrench } from 'react-icons/fa';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISlider from 'common/components/IAISlider';
@@ -41,7 +41,7 @@ import IAICheckbox from 'common/components/IAICheckbox';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import _ from 'lodash';
 import IAIButton from 'common/components/IAIButton';
-import { InvokeTabName } from 'features/tabs/tabMap';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import { useTranslation } from 'react-i18next';
 
 const GALLERY_SHOW_BUTTONS_MIN_WIDTH = 320;
@@ -81,13 +81,13 @@ export default function ImageGallery() {
     shouldAutoSwitchToNewImages,
     areMoreImagesAvailable,
     galleryWidth,
-    isLightBoxOpen,
+    isLightboxOpen,
     isStaging,
     shouldEnableResize,
     shouldUseSingleGalleryColumn,
   } = useAppSelector(imageGallerySelector);
 
-  const { galleryMinWidth, galleryMaxWidth } = isLightBoxOpen
+  const { galleryMinWidth, galleryMaxWidth } = isLightboxOpen
     ? {
         galleryMinWidth: LIGHTBOX_GALLERY_WIDTH,
         galleryMaxWidth: LIGHTBOX_GALLERY_WIDTH,
