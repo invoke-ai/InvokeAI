@@ -121,6 +121,22 @@ const CurrentImageButtons = () => {
     dispatch(setActiveTab('img2img'));
   };
 
+  const handleCopyImage = async () => {
+    if (!currentImage) return;
+
+    const blob = await fetch(currentImage.url).then((res) => res.blob());
+    const data = [new ClipboardItem({ [blob.type]: blob })];
+
+    await navigator.clipboard.write(data);
+
+    toast({
+      title: t('toast:imageCopied'),
+      status: 'success',
+      duration: 2500,
+      isClosable: true,
+    });
+  };
+
   const handleCopyImageLink = () => {
     navigator.clipboard
       .writeText(
@@ -390,6 +406,14 @@ const CurrentImageButtons = () => {
               leftIcon={<FaShare />}
             >
               {t('options:sendToUnifiedCanvas')}
+            </IAIButton>
+
+            <IAIButton
+              size={'sm'}
+              onClick={handleCopyImage}
+              leftIcon={<FaCopy />}
+            >
+              {t('options:copyImage')}
             </IAIButton>
             <IAIButton
               size={'sm'}
