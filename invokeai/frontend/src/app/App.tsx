@@ -9,11 +9,16 @@ import useToastWatcher from 'features/system/hooks/useToastWatcher';
 
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
+import { useGetPetByIdQuery } from './invokeApi';
 
 keepGUIAlive();
 
 const App = () => {
   useToastWatcher();
+
+  const { data, error, isLoading } = useGetPetByIdQuery({ petId: 1 });
+
+  console.log(data, error, isLoading);
 
   return (
     <div className="App">

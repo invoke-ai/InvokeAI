@@ -4,16 +4,17 @@
   "version": "0.0.1",
   "scripts": {
     "prepare": "cd ../../ && husky install invokeai/frontend/.husky",
-    "dev": "vite dev",
-    "build": "tsc && vite build",
-    "build-dev": "tsc && vite build -m development",
+    "dev": "yarn run gen-api && vite dev",
+    "build": "tsc && yarn run gen-api && vite build",
+    "build-dev": "tsc && yarn run gen-api && vite build -m development",
     "preview": "vite preview",
     "madge": "madge --circular src/main.tsx",
     "lint": "eslint --fix .",
     "lint-staged": "lint-staged",
     "prettier": "prettier *.{json,js,ts,html} src/**/*.{ts,tsx,scss} --write .",
     "fmt": "npm run prettier -- --write",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "gen-api": "npx @rtk-query/codegen-openapi openapi-config.ts"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.0.10",
@@ -57,6 +58,7 @@
     "yarn": "^1.22.19"
   },
   "devDependencies": {
+    "@rtk-query/codegen-openapi": "^1.0.0",
     "@types/dateformat": "^5.0.0",
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
@@ -81,6 +83,7 @@
     "rollup-plugin-visualizer": "^5.9.0",
     "sass": "^1.55.0",
     "terser": "^5.16.1",
+    "ts-node": "^10.9.1",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.6.4",
     "vite": "^3.0.7",
