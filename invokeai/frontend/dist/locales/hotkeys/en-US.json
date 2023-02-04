@@ -1,0 +1,207 @@
+{
+  "keyboardShortcuts": "Keyboard Shorcuts",
+  "appHotkeys": "App Hotkeys",
+  "generalHotkeys": "General Hotkeys",
+  "galleryHotkeys": "Gallery Hotkeys",
+  "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
+  "invoke": {
+    "title": "Invoke",
+    "desc": "Generate an image"
+  },
+  "cancel": {
+    "title": "Cancel",
+    "desc": "Cancel image generation"
+  },
+  "focusPrompt": {
+    "title": "Focus Prompt",
+    "desc": "Focus the prompt input area"
+  },
+  "toggleOptions": {
+    "title": "Toggle Options",
+    "desc": "Open and close the options panel"
+  },
+  "pinOptions": {
+    "title": "Pin Options",
+    "desc": "Pin the options panel"
+  },
+  "toggleViewer": {
+    "title": "Toggle Viewer",
+    "desc": "Open and close Image Viewer"
+  },
+  "toggleGallery": {
+    "title": "Toggle Gallery",
+    "desc": "Open and close the gallery drawer"
+  },
+  "maximizeWorkSpace": {
+    "title": "Maximize Workspace",
+    "desc": "Close panels and maximize work area"
+  },
+  "changeTabs": {
+    "title": "Change Tabs",
+    "desc": "Switch to another workspace"
+  },
+  "consoleToggle": {
+    "title": "Console Toggle",
+    "desc": "Open and close console"
+  },
+  "setPrompt": {
+    "title": "Set Prompt",
+    "desc": "Use the prompt of the current image"
+  },
+  "setSeed": {
+    "title": "Set Seed",
+    "desc": "Use the seed of the current image"
+  },
+  "setParameters": {
+    "title": "Set Parameters",
+    "desc": "Use all parameters of the current image"
+  },
+  "restoreFaces": {
+    "title": "Restore Faces",
+    "desc": "Restore the current image"
+  },
+  "upscale": {
+    "title": "Upscale",
+    "desc": "Upscale the current image"
+  },
+  "showInfo": {
+    "title": "Show Info",
+    "desc": "Show metadata info of the current image"
+  },
+  "sendToImageToImage": {
+    "title": "Send To Image To Image",
+    "desc": "Send current image to Image to Image"
+  },
+  "deleteImage": {
+    "title": "Delete Image",
+    "desc": "Delete the current image"
+  },
+  "closePanels": {
+    "title": "Close Panels",
+    "desc": "Closes open panels"
+  },
+  "previousImage": {
+    "title": "Previous Image",
+    "desc": "Display the previous image in gallery"
+  },
+  "nextImage": {
+    "title": "Next Image",
+    "desc": "Display the next image in gallery"
+  },
+  "toggleGalleryPin": {
+    "title": "Toggle Gallery Pin",
+    "desc": "Pins and unpins the gallery to the UI"
+  },
+  "increaseGalleryThumbSize": {
+    "title": "Increase Gallery Image Size",
+    "desc": "Increases gallery thumbnails size"
+  },
+  "decreaseGalleryThumbSize": {
+    "title": "Decrease Gallery Image Size",
+    "desc": "Decreases gallery thumbnails size"
+  },
+  "selectBrush": {
+    "title": "Select Brush",
+    "desc": "Selects the canvas brush"
+  },
+  "selectEraser": {
+    "title": "Select Eraser",
+    "desc": "Selects the canvas eraser"
+  },
+  "decreaseBrushSize": {
+    "title": "Decrease Brush Size",
+    "desc": "Decreases the size of the canvas brush/eraser"
+  },
+  "increaseBrushSize": {
+    "title": "Increase Brush Size",
+    "desc": "Increases the size of the canvas brush/eraser"
+  },
+  "decreaseBrushOpacity": {
+    "title": "Decrease Brush Opacity",
+    "desc": "Decreases the opacity of the canvas brush"
+  },
+  "increaseBrushOpacity": {
+    "title": "Increase Brush Opacity",
+    "desc": "Increases the opacity of the canvas brush"
+  },
+  "moveTool": {
+    "title": "Move Tool",
+    "desc": "Allows canvas navigation"
+  },
+  "fillBoundingBox": {
+    "title": "Fill Bounding Box",
+    "desc": "Fills the bounding box with brush color"
+  },
+  "eraseBoundingBox": {
+    "title": "Erase Bounding Box",
+    "desc": "Erases the bounding box area"
+  },
+  "colorPicker": {
+    "title": "Select Color Picker",
+    "desc": "Selects the canvas color picker"
+  },
+  "toggleSnap": {
+    "title": "Toggle Snap",
+    "desc": "Toggles Snap to Grid"
+  },
+  "quickToggleMove": {
+    "title": "Quick Toggle Move",
+    "desc": "Temporarily toggles Move mode"
+  },
+  "toggleLayer": {
+    "title": "Toggle Layer",
+    "desc": "Toggles mask/base layer selection"
+  },
+  "clearMask": {
+    "title": "Clear Mask",
+    "desc": "Clear the entire mask"
+  },
+  "hideMask": {
+    "title": "Hide Mask",
+    "desc": "Hide and unhide mask"
+  },
+  "showHideBoundingBox": {
+    "title": "Show/Hide Bounding Box",
+    "desc": "Toggle visibility of bounding box"
+  },
+  "mergeVisible": {
+    "title": "Merge Visible",
+    "desc": "Merge all visible layers of canvas"
+  },
+  "saveToGallery": {
+    "title": "Save To Gallery",
+    "desc": "Save current canvas to gallery"
+  },
+  "copyToClipboard": {
+    "title": "Copy to Clipboard",
+    "desc": "Copy current canvas to clipboard"
+  },
+  "downloadImage": {
+    "title": "Download Image",
+    "desc": "Download current canvas"
+  },
+  "undoStroke": {
+    "title": "Undo Stroke",
+    "desc": "Undo a brush stroke"
+  },
+  "redoStroke": {
+    "title": "Redo Stroke",
+    "desc": "Redo a brush stroke"
+  },
+  "resetView": {
+    "title": "Reset View",
+    "desc": "Reset Canvas View"
+  },
+  "previousStagingImage": {
+    "title": "Previous Staging Image",
+    "desc": "Previous Staging Area Image"
+  },
+  "nextStagingImage": {
+    "title": "Next Staging Image",
+    "desc": "Next Staging Area Image"
+  },
+  "acceptStagingImage": {
+    "title": "Accept Staging Image",
+    "desc": "Accept Current Staging Area Image"
+  }
+}

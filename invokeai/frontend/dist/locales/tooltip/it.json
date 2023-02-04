@@ -1,0 +1,15 @@
+{
+  "feature": {
+    "prompt": "Questo è il campo del prompt. Il prompt include oggetti di generazione e termini stilistici. Puoi anche aggiungere il peso (importanza del token) nel prompt, ma i comandi e i parametri dell'interfaccia a linea di comando non funzioneranno.",
+    "gallery": "Galleria visualizza le generazioni dalla cartella degli output man mano che vengono create. Le impostazioni sono memorizzate all'interno di file e accessibili dal menu contestuale.",
+    "other": "Queste opzioni abiliteranno modalità di elaborazione alternative per Invoke. 'Piastrella senza cuciture' creerà modelli ripetuti nell'output. 'Ottimizzzazione Alta risoluzione' è la generazione in due passaggi con 'Immagine a Immagine': usa questa impostazione quando vuoi un'immagine più grande e più coerente senza artefatti. Ci vorrà più tempo del solito 'Testo a Immagine'.",
+    "seed": "Il valore del Seme influenza il rumore iniziale da cui è formata l'immagine. Puoi usare i semi già esistenti dalle immagini precedenti. 'Soglia del rumore' viene utilizzato per mitigare gli artefatti a valori CFG elevati (provare l'intervallo 0-10) e Perlin per aggiungere il rumore Perlin durante la generazione: entrambi servono per aggiungere variazioni ai risultati.",
+    "variations": "Prova una variazione con un valore compreso tra 0.1 e 1.0 per modificare il risultato per un dato seme. Variazioni interessanti del seme sono comprese tra 0.1 e 0.3.",
+    "upscale": "Utilizza ESRGAN per ingrandire l'immagine subito dopo la generazione.",
+    "faceCorrection": "Correzione del volto con GFPGAN o Codeformer: l'algoritmo rileva i volti nell'immagine e corregge eventuali difetti. Un valore alto cambierà maggiormente l'immagine, dando luogo a volti più attraenti. Codeformer con una maggiore fedeltà preserva l'immagine originale a scapito di una correzione facciale più forte.",
+    "imageToImage": "Da Immagine a Immagine carica qualsiasi immagine come iniziale, che viene quindi utilizzata per generarne una nuova in base al prompt. Più alto è il valore, più cambierà l'immagine risultante. Sono possibili valori da 0.0 a 1.0, l'intervallo consigliato è 0.25-0.75",
+    "boundingBox": "Il riquadro di selezione è lo stesso delle impostazioni Larghezza e Altezza per da Testo a Immagine o da Immagine a Immagine. Verrà elaborata solo l'area nella casella.",
+    "seamCorrection": "Controlla la gestione delle giunzioni visibili che si verificano tra le immagini generate sulla tela.",
+    "infillAndScaling": "Gestisce i metodi di riempimento (utilizzati su aree mascherate o cancellate dell'area di disegno) e il ridimensionamento (utile per i riquadri di selezione di piccole dimensioni)."
+  }
+}
