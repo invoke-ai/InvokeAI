@@ -74,25 +74,25 @@ Some Suggestions of variables you may want to change besides the Token:
 
 <figure markdown>
 
-| Environment-Variable  | Default value                   | Description                                                                                  |
-| --------------------- | ------------------------------- | -------------------------------------------------------------------------------------------- |
-| `HUGGINGFACE_TOKEN`   | No default, but **required**!   | This is the only **required** variable, without it you can't download the huggingface models |
-| `REPOSITORY_NAME`     | The Basename of the Repo folder | This name will used as the container repository/image name                                   |
-| `VOLUMENAME`          | `${REPOSITORY_NAME,,}_data`     | Name of the Docker Volume where model files will be stored                                   |
-| `ARCH`                | arch of the build machine       | can be changed if you want to build the image for another arch                               |
-| `INVOKEAI_TAG`        | latest                          | the Container Repository / Tag which will be used                                            |
-| `PIP_REQUIREMENTS`    | `requirements-lin-cuda.txt`     | the requirements file to use (from `environments-and-requirements`)                          |
-| `CONTAINER_FLAVOR`    | cuda                            | the flavor of the image, which can be changed if you build f.e. with amd requirements file.  |
-| `INVOKE_DOCKERFILE`   | `Dockerfile`       | the Dockerfile which should be built, handy for development                                  |
-| `CONTAINER_FLAVOR`    |                                 | the flavor of the image to built, available options are `cuda`, `rocm` and `cpu`             |
-| `PIP_EXTRA_INDEX_URL` |                                 | if you want to use a custom pip-extra-index-url                                              |
+| Environment-Variable     | Default value                   | Description                                                                                  |
+| ------------------------ | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `HUGGING_FACE_HUB_TOKEN` | No default, but **required**!   | This is the only **required** variable, without it you can't download the huggingface models |
+| `REPOSITORY_NAME`        | The Basename of the Repo folder | This name will used as the container repository/image name                                   |
+| `VOLUMENAME`             | `${REPOSITORY_NAME,,}_data`     | Name of the Docker Volume where model files will be stored                                   |
+| `ARCH`                   | arch of the build machine       | can be changed if you want to build the image for another arch                               |
+| `INVOKEAI_TAG`           | latest                          | the Container Repository / Tag which will be used                                            |
+| `PIP_REQUIREMENTS`       | `requirements-lin-cuda.txt`     | the requirements file to use (from `environments-and-requirements`)                          |
+| `CONTAINER_FLAVOR`       | cuda                            | the flavor of the image, which can be changed if you build f.e. with amd requirements file.  |
+| `INVOKE_DOCKERFILE`      | `Dockerfile`                    | the Dockerfile which should be built, handy for development                                  |
+| `CONTAINER_FLAVOR`       |                                 | the flavor of the image to built, available options are `cuda`, `rocm` and `cpu`             |
+| `PIP_EXTRA_INDEX_URL`    |                                 | if you want to use a custom pip-extra-index-url                                              |
 
 </figure>
 
 #### Build the Image
 
-I provided a build script, which is located in `docker/build.sh` but still
-needs to be executed from the Repository root.
+I provided a build script, which is located in `docker/build.sh` but still needs
+to be executed from the Repository root.
 
 ```bash
 ./docker/build.sh
