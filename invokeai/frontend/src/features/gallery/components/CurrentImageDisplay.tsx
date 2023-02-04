@@ -1,15 +1,16 @@
-import { useAppSelector } from 'app/storeHooks';
-import CurrentImageButtons from './CurrentImageButtons';
-import { MdPhoto } from 'react-icons/md';
-import CurrentImagePreview from './CurrentImagePreview';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
-import _ from 'lodash';
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/storeHooks';
+import { GalleryState } from 'features/gallery/store/gallerySlice';
 import {
   activeTabNameSelector,
   uiSelector,
 } from 'features/ui/store/uiSelectors';
+import { isEqual } from 'lodash';
+
+import { MdPhoto } from 'react-icons/md';
 import { gallerySelector } from '../store/gallerySelectors';
+import CurrentImageButtons from './CurrentImageButtons';
+import CurrentImagePreview from './CurrentImagePreview';
 
 export const currentImageDisplaySelector = createSelector(
   [gallerySelector, uiSelector, activeTabNameSelector],
@@ -25,7 +26,7 @@ export const currentImageDisplaySelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

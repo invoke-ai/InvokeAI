@@ -18,7 +18,8 @@ import {
   setTileSize,
 } from 'features/parameters/store/generationSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import _ from 'lodash';
+import { isEqual } from 'lodash';
+
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -45,7 +46,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

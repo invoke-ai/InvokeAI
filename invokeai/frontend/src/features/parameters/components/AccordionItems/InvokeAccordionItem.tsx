@@ -6,9 +6,9 @@ import {
   Box,
   Flex,
 } from '@chakra-ui/react';
-import { ReactNode } from 'react';
 import { Feature } from 'app/features';
 import GuideIcon from 'common/components/GuideIcon';
+import { ReactNode } from 'react';
 
 export interface InvokeAccordionItemProps {
   header: string;

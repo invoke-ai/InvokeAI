@@ -1,4 +1,3 @@
-import React from 'react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
@@ -7,7 +6,9 @@ import { useTranslation } from 'react-i18next';
 
 export default function MainCFGScale() {
   const dispatch = useAppDispatch();
-  const cfgScale = useAppSelector((state: RootState) => state.generation.cfgScale);
+  const cfgScale = useAppSelector(
+    (state: RootState) => state.generation.cfgScale
+  );
   const { t } = useTranslation();
 
   const handleChangeCfgScale = (v: number) => dispatch(setCfgScale(v));

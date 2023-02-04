@@ -272,4 +272,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   );
 }, memoEqualityCheck);
 
+HoverableImage.displayName = 'HoverableImage';
+
 export default HoverableImage;

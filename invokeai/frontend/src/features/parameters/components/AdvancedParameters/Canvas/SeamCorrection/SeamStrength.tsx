@@ -2,7 +2,6 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setSeamStrength } from 'features/parameters/store/generationSlice';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function SeamStrength() {

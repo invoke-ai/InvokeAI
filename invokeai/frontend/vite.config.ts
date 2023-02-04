@@ -1,20 +1,26 @@
-import { defineConfig } from 'vite';
+import legacy from '@vitejs/plugin-legacy';
 import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
+import { defineConfig } from 'vite';
 import eslint from 'vite-plugin-eslint';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import legacy from '@vitejs/plugin-legacy';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const common = {
     base: '',
     plugins: [
-      react(),
+      react({
+        babel: {
+          babelrc: true,
+        },
+      }),
       eslint(),
       tsconfigPaths(),
       legacy({
         modernPolyfills: ['es.array.find-last'],
       }),
+      visualizer(),
     ],
     server: {
       // Proxy HTTP requests to the flask server

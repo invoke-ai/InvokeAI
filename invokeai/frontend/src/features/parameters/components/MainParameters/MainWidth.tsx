@@ -1,10 +1,10 @@
-import React, { ChangeEvent } from 'react';
 import { WIDTHS } from 'app/constants';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { setWidth } from 'features/parameters/store/generationSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function MainWidth() {

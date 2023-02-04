@@ -2,10 +2,10 @@ import { Accordion, ExpandedIndex } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { setOpenAccordions } from 'features/system/store/systemSlice';
+import { ReactElement } from 'react';
 import InvokeAccordionItem, {
   InvokeAccordionItemProps,
 } from './AccordionItems/InvokeAccordionItem';
-import { ReactElement } from 'react';
 
 type ParametersAccordionType = {
   [parametersAccordionKey: string]: InvokeAccordionItemProps;

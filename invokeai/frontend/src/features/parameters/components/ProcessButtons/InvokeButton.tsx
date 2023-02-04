@@ -1,5 +1,3 @@
-import { useHotkeys } from 'react-hotkeys-hook';
-import { FaPlay } from 'react-icons/fa';
 import { readinessSelector } from 'app/selectors/readinessSelector';
 import { generateImage } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
@@ -8,7 +6,9 @@ import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { FaPlay } from 'react-icons/fa';
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {

@@ -2,7 +2,6 @@ import { useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import useImageUploader from 'common/hooks/useImageUploader';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUpload } from 'react-icons/fa';
 

@@ -1,10 +1,11 @@
 import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
-import dateFormat from 'dateformat';
-import { Socket } from 'socket.io-client';
+import * as InvokeAI from 'app/invokeai';
+import type { RootState } from 'app/store';
 import {
   frontendToBackendParameters,
   FrontendToBackendParametersConfig,
 } from 'common/util/parameterTranslation';
+import dateFormat from 'dateformat';
 import {
   GalleryCategory,
   GalleryState,
@@ -17,8 +18,7 @@ import {
   setIsProcessing,
 } from 'features/system/store/systemSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
-import * as InvokeAI from 'app/invokeai';
-import type { RootState } from 'app/store';
+import { Socket } from 'socket.io-client';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.

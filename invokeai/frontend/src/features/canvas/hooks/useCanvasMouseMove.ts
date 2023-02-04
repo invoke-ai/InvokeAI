@@ -1,10 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import Konva from 'konva';
-import { Vector2d } from 'konva/lib/types';
-import _ from 'lodash';
-import { MutableRefObject, useCallback } from 'react';
 import {
   canvasSelector,
   isStagingSelector,
@@ -13,6 +8,12 @@ import {
   addPointToCurrentLine,
   setCursorPosition,
 } from 'features/canvas/store/canvasSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import Konva from 'konva';
+import { Vector2d } from 'konva/lib/types';
+import { isEqual } from 'lodash';
+
+import { MutableRefObject, useCallback } from 'react';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
 
@@ -27,7 +28,7 @@ const selector = createSelector(
       isStaging,
     };
   },
-  { memoizeOptions: { resultEqualityCheck: _.isEqual } }
+  { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
 const useCanvasMouseMove = (

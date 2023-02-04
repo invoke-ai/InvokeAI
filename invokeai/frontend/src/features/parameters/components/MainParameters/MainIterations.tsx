@@ -1,6 +1,4 @@
 import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
-import React from 'react';
 import type { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
@@ -8,6 +6,8 @@ import {
   GenerationState,
   setIterations,
 } from 'features/parameters/store/generationSlice';
+import { isEqual } from 'lodash';
+
 import { useTranslation } from 'react-i18next';
 
 const mainIterationsSelector = createSelector(
@@ -21,7 +21,7 @@ const mainIterationsSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

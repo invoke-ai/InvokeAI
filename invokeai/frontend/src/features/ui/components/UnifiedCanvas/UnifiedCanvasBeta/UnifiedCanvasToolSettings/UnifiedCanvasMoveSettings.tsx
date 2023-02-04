@@ -1,5 +1,4 @@
 import { Flex } from '@chakra-ui/layout';
-import React from 'react';
 import UnifiedCanvasDarkenOutsideSelection from './UnifiedCanvasDarkenOutsideSelection';
 import UnifiedCanvasShowGrid from './UnifiedCanvasShowGrid';
 import UnifiedCanvasSnapToGrid from './UnifiedCanvasSnapToGrid';

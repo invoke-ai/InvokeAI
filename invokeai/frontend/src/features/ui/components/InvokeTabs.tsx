@@ -1,28 +1,27 @@
 import { Tab, TabPanel, TabPanels, Tabs, Tooltip } from '@chakra-ui/react';
-import _ from 'lodash';
-import React, { ReactElement } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import NodesWIP from 'common/components/WorkInProgress/NodesWIP';
 import { PostProcessingWIP } from 'common/components/WorkInProgress/PostProcessingWIP';
+import TrainingWIP from 'common/components/WorkInProgress/Training';
+import useUpdateTranslations from 'common/hooks/useUpdateTranslations';
 import ImageToImageIcon from 'common/icons/ImageToImageIcon';
 import NodesIcon from 'common/icons/NodesIcon';
 import PostprocessingIcon from 'common/icons/PostprocessingIcon';
 import TextToImageIcon from 'common/icons/TextToImageIcon';
+import TrainingIcon from 'common/icons/TrainingIcon';
+import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
+import Lightbox from 'features/lightbox/components/Lightbox';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import i18n from 'i18n';
+import { ReactElement } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { activeTabIndexSelector } from '../store/uiSelectors';
 import ImageToImageWorkarea from './ImageToImage';
 import TextToImageWorkarea from './TextToImage';
-import Lightbox from 'features/lightbox/components/Lightbox';
 import UnifiedCanvasWorkarea from './UnifiedCanvas/UnifiedCanvasWorkarea';
-import UnifiedCanvasIcon from 'common/icons/UnifiedCanvasIcon';
-import TrainingWIP from 'common/components/WorkInProgress/Training';
-import TrainingIcon from 'common/icons/TrainingIcon';
-import { InvokeTabName } from 'features/ui/store/tabMap';
-import i18n from 'i18n';
-import useUpdateTranslations from 'common/hooks/useUpdateTranslations';
-import { activeTabIndexSelector } from '../store/uiSelectors';
 
 export interface InvokeTabInfo {
   title: ReactElement;

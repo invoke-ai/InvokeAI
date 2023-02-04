@@ -1,16 +1,16 @@
 import {
+  Box,
   Popover,
   PopoverArrow,
   PopoverContent,
   PopoverTrigger,
-  Box,
 } from '@chakra-ui/react';
-import { SystemState } from 'features/system/store/systemSlice';
-import { useAppSelector } from 'app/storeHooks';
 import { createSelector } from '@reduxjs/toolkit';
-import { ReactElement } from 'react';
 import { Feature, useFeatureHelpInfo } from 'app/features';
+import { useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { SystemState } from 'features/system/store/systemSlice';
+import { ReactElement } from 'react';
 
 type GuideProps = {
   children: ReactElement;

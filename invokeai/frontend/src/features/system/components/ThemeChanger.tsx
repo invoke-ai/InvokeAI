@@ -1,14 +1,14 @@
-import { useEffect } from 'react';
 import { useColorMode, VStack } from '@chakra-ui/react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { setCurrentTheme } from 'features/ui/store/uiSlice';
-import IAIPopover from 'common/components/IAIPopover';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaCheck, FaPalette } from 'react-icons/fa';
 import IAIButton from 'common/components/IAIButton';
-import { useTranslation } from 'react-i18next';
+import IAIIconButton from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import { setCurrentTheme } from 'features/ui/store/uiSlice';
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaCheck, FaPalette } from 'react-icons/fa';
 
 export default function ThemeChanger() {
   const { t } = useTranslation();

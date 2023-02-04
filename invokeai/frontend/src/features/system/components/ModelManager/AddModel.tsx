@@ -10,13 +10,12 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 
-import React from 'react';
 import IAIButton from 'common/components/IAIButton';
 
 import { FaPlus } from 'react-icons/fa';
 
-import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { useTranslation } from 'react-i18next';
 
 import type { RootState } from 'app/store';
 import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';

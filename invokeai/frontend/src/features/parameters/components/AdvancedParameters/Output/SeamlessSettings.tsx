@@ -1,9 +1,9 @@
 import { Flex } from '@chakra-ui/react';
-import { ChangeEvent } from 'react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setSeamless } from 'features/parameters/store/generationSlice';
+import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -12,7 +12,9 @@ import { useTranslation } from 'react-i18next';
 const SeamlessSettings = () => {
   const dispatch = useAppDispatch();
 
-  const seamless = useAppSelector((state: RootState) => state.generation.seamless);
+  const seamless = useAppSelector(
+    (state: RootState) => state.generation.seamless
+  );
 
   const handleChangeSeamless = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(setSeamless(e.target.checked));

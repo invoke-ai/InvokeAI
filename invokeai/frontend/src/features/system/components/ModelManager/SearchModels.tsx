@@ -1,12 +1,12 @@
-import React from 'react';
-import IAICheckbox from 'common/components/IAICheckbox';
 import IAIButton from 'common/components/IAIButton';
+import IAICheckbox from 'common/components/IAICheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
+import React from 'react';
 
-import { createSelector } from '@reduxjs/toolkit';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { Box, Flex, FormControl, HStack, Text, VStack } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { useTranslation } from 'react-i18next';
 
 import { FaPlus } from 'react-icons/fa';
@@ -19,13 +19,12 @@ import {
 } from 'features/system/store/systemSlice';
 import { setShouldShowExistingModelsInSearch } from 'features/ui/store/uiSlice';
 
-import _ from 'lodash';
-
-import type { RootState } from 'app/store';
-import type { ReactNode, ChangeEvent } from 'react';
 import type { FoundModel } from 'app/invokeai';
+import type { RootState } from 'app/store';
 import IAIInput from 'common/components/IAIInput';
 import { Field, Formik } from 'formik';
+import { forEach, remove } from 'lodash';
+import type { ChangeEvent, ReactNode } from 'react';
 import { BiReset } from 'react-icons/bi';
 
 const existingModelsSelector = createSelector([systemSelector], (system) => {
@@ -33,7 +32,7 @@ const existingModelsSelector = createSelector([systemSelector], (system) => {
 
   const existingModels: string[] = [];
 
-  _.forEach(model_list, (value) => {
+  forEach(model_list, (value) => {
     existingModels.push(value.weights);
   });
 
@@ -77,7 +76,7 @@ function SearchModelEntry({
     if (!modelsToAdd.includes(e.target.value)) {
       setModelsToAdd([...modelsToAdd, e.target.value]);
     } else {
-      setModelsToAdd(_.remove(modelsToAdd, (v) => v !== e.target.value));
+      setModelsToAdd(remove(modelsToAdd, (v) => v !== e.target.value));
     }
   };
 

@@ -4,7 +4,8 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
-import _ from 'lodash';
+import { isEqual } from 'lodash';
+
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -19,7 +20,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

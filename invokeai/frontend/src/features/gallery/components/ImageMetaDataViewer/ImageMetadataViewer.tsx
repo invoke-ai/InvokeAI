@@ -1,3 +1,4 @@
+import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
   Center,
   Flex,
@@ -7,16 +8,17 @@ import {
   Text,
   Tooltip,
 } from '@chakra-ui/react';
-import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { memo } from 'react';
-import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { useAppDispatch } from 'app/storeHooks';
 import * as InvokeAI from 'app/invokeai';
+import { useAppDispatch } from 'app/storeHooks';
+import promptToString from 'common/util/promptToString';
+import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import {
   setCfgScale,
   setHeight,
   setImg2imgStrength,
+  setInitialImage,
   setMaskPath,
+  setPerlin,
   setPrompt,
   setSampler,
   setSeamless,
@@ -24,24 +26,22 @@ import {
   setSeedWeights,
   setShouldFitToWidthHeight,
   setSteps,
-  setWidth,
-  setInitialImage,
   setThreshold,
-  setPerlin,
+  setWidth,
 } from 'features/parameters/store/generationSlice';
 import {
-  setFacetoolStrength,
   setCodeformerFidelity,
+  setFacetoolStrength,
   setFacetoolType,
   setHiresFix,
   setUpscalingLevel,
   setUpscalingStrength,
 } from 'features/parameters/store/postprocessingSlice';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
-import promptToString from 'common/util/promptToString';
-import { seedWeightsToString } from 'common/util/seedWeightPairs';
-import { FaCopy } from 'react-icons/fa';
+import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { FaCopy } from 'react-icons/fa';
+import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -458,5 +458,7 @@ const ImageMetadataViewer = memo(
   },
   memoEqualityCheck
 );
+
+ImageMetadataViewer.displayName = 'ImageMetadataViewer';
 
 export default ImageMetadataViewer;

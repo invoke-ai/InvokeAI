@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
-import _ from 'lodash';
+import { isEqual } from 'lodash';
+
 import { tabMap } from './tabMap';
 import { UIState } from './uiTypes';
 
@@ -9,7 +10,7 @@ export const activeTabNameSelector = createSelector(
   (ui: UIState) => tabMap[ui.activeTab],
   {
     memoizeOptions: {
-      equalityCheck: _.isEqual,
+      equalityCheck: isEqual,
     },
   }
 );
@@ -19,7 +20,7 @@ export const activeTabIndexSelector = createSelector(
   (ui: UIState) => ui.activeTab,
   {
     memoizeOptions: {
-      equalityCheck: _.isEqual,
+      equalityCheck: isEqual,
     },
   }
 );
@@ -29,7 +30,7 @@ export const uiSelector = createSelector(
   (ui) => ui,
   {
     memoizeOptions: {
-      equalityCheck: _.isEqual,
+      equalityCheck: isEqual,
     },
   }
 );
