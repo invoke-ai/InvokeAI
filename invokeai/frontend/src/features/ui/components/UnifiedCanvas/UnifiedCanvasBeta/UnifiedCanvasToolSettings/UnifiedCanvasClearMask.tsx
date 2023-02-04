@@ -2,7 +2,6 @@ import { useAppDispatch } from 'app/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 
 import { clearMask } from 'features/canvas/store/canvasSlice';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FaTrash } from 'react-icons/fa';

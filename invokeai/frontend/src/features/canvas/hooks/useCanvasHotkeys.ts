@@ -1,7 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
   resetCanvasInteractionState,
@@ -10,12 +12,11 @@ import {
   setShouldSnapToGrid,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { isEqual } from 'lodash';
+
 import { useRef } from 'react';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { CanvasTool } from '../store/canvasTypes';
 import { getCanvasStage } from '../util/konvaInstanceProvider';
 
@@ -44,7 +45,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

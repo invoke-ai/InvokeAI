@@ -1,6 +1,6 @@
 import { useAppDispatch } from 'app/storeHooks';
-import { useCallback } from 'react';
 import { mouseLeftCanvas } from 'features/canvas/store/canvasSlice';
+import { useCallback } from 'react';
 
 const useCanvasMouseOut = () => {
   const dispatch = useAppDispatch();

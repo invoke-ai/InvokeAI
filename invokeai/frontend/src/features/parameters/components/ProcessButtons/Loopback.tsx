@@ -1,10 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { FaRecycle } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import { setShouldLoopback } from 'features/parameters/store/postprocessingSlice';
 import { useTranslation } from 'react-i18next';
-import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
+import { FaRecycle } from 'react-icons/fa';
 
 const loopbackSelector = createSelector(
   postprocessingSelector,

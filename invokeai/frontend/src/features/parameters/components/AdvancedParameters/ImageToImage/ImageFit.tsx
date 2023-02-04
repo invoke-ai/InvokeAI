@@ -1,8 +1,8 @@
-import React, { ChangeEvent } from 'react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldFitToWidthHeight } from 'features/parameters/store/generationSlice';
+import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function ImageFit() {

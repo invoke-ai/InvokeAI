@@ -3,7 +3,6 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
 import { resetCanvasView } from 'features/canvas/store/canvasSlice';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCrosshairs } from 'react-icons/fa';

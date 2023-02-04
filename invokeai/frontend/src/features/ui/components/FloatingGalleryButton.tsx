@@ -1,11 +1,11 @@
-import { MdPhotoLibrary } from 'react-icons/md';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { floatingSelector } from './FloatingParametersPanelButtons';
+import { setShouldShowGallery } from 'features/gallery/store/gallerySlice';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { MdPhotoLibrary } from 'react-icons/md';
+import { floatingSelector } from './FloatingParametersPanelButtons';
 
 const FloatingGalleryButton = () => {
   const dispatch = useAppDispatch();

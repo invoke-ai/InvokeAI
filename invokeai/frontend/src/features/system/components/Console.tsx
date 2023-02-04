@@ -1,16 +1,16 @@
 import { IconButton, Tooltip } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
   errorSeen,
   setShouldShowLogViewer,
   SystemState,
 } from 'features/system/store/systemSlice';
-import { useLayoutEffect, useRef, useState } from 'react';
-import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
-import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { Resizable } from 're-resizable';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
 import { systemSelector } from '../store/systemSelectors';
 
 const logSelector = createSelector(

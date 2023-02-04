@@ -1,20 +1,20 @@
-import {
-  useCallback,
-  ReactNode,
-  useState,
-  useEffect,
-  KeyboardEvent,
-} from 'react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { FileRejection, useDropzone } from 'react-dropzone';
 import { useToast } from '@chakra-ui/react';
 import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { tabDict } from 'features/ui/components/InvokeTabs';
-import ImageUploadOverlay from './ImageUploadOverlay';
-import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import useImageUploader from 'common/hooks/useImageUploader';
+import { uploadImage } from 'features/gallery/store/thunks/uploadImage';
+import { tabDict } from 'features/ui/components/InvokeTabs';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import {
+  KeyboardEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
+import { FileRejection, useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
+import ImageUploadOverlay from './ImageUploadOverlay';
 
 type ImageUploaderProps = {
   children: ReactNode;
@@ -33,7 +33,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
     (rejection: FileRejection) => {
       setIsHandlingUpload(true);
       const msg = rejection.errors.reduce(
-        (acc: string, cur: { message: string }) => acc + '\n' + cur.message,
+        (acc: string, cur: { message: string }) => `${acc}\n${cur.message}`,
         ''
       );
       toast({

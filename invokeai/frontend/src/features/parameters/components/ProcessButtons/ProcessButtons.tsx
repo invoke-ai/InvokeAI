@@ -1,8 +1,8 @@
-import InvokeButton from './InvokeButton';
-import CancelButton from './CancelButton';
-import LoopbackButton from './Loopback';
 import { useAppSelector } from 'app/storeHooks';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import CancelButton from './CancelButton';
+import InvokeButton from './InvokeButton';
+import LoopbackButton from './Loopback';
 
 /**
  * Buttons to start and cancel image generation.

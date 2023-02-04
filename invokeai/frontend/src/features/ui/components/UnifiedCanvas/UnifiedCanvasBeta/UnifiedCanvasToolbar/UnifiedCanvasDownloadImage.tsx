@@ -4,7 +4,6 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaDownload } from 'react-icons/fa';

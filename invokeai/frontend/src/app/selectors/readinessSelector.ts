@@ -1,10 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { isEqual } from 'lodash';
 
 export const readinessSelector = createSelector(
   [
@@ -65,8 +65,8 @@ export const readinessSelector = createSelector(
   },
   {
     memoizeOptions: {
-      equalityCheck: _.isEqual,
-      resultEqualityCheck: _.isEqual,
+      equalityCheck: isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

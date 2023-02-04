@@ -1,5 +1,4 @@
 import { ChangeEvent } from 'react';
-import React from 'react';
 
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';

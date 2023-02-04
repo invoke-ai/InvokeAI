@@ -11,14 +11,14 @@ import {
 } from 'features/parameters/store/postprocessingSlice';
 
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
+import { FACETOOL_TYPES } from 'app/constants';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISelect from 'common/components/IAISelect';
-import { FACETOOL_TYPES } from 'app/constants';
-import { ChangeEvent } from 'react';
-import { useTranslation } from 'react-i18next';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { isEqual } from 'lodash';
+import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const optionsSelector = createSelector(
   [postprocessingSelector, systemSelector],

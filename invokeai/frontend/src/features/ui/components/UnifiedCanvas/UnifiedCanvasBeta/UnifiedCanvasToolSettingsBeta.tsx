@@ -1,12 +1,11 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import React from 'react';
-import _ from 'lodash';
 
+import { Flex } from '@chakra-ui/react';
+import { isEqual } from 'lodash';
 import UnifiedCanvasBaseBrushSettings from './UnifiedCanvasToolSettings/UnifiedCanvasBaseBrushSettings';
 import UnifiedCanvasMaskBrushSettings from './UnifiedCanvasToolSettings/UnifiedCanvasMaskBrushSettings';
-import { Flex } from '@chakra-ui/react';
 import UnifiedCanvasMoveSettings from './UnifiedCanvasToolSettings/UnifiedCanvasMoveSettings';
 
 const selector = createSelector(
@@ -20,7 +19,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
