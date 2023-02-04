@@ -127,8 +127,8 @@ script do it for you. Manual installation is described at:
 
 https://invoke-ai.github.io/InvokeAI/installation/020_INSTALL_MANUAL/
 
-You may download the recommended models (about 20GB total!), select a customized set, or
-completely skip this step.
+You may download the recommended models (about 15GB total), install all models (40 GB!!) 
+select a customized set, or completely skip this step.
 """
     )
     completer.set_options(["recommended", "customized", "skip"])
