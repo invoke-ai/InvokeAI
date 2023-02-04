@@ -1,6 +1,6 @@
+import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { useContext } from 'react';
 import { FaUpload } from 'react-icons/fa';
-import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import IAIIconButton from './IAIIconButton';
 
 const ImageUploaderIconButton = () => {

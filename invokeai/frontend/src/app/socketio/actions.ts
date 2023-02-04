@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
+import * as InvokeAI from 'app/invokeai';
 import { GalleryCategory } from 'features/gallery/store/gallerySlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
-import * as InvokeAI from 'app/invokeai';
 
 /**
  * We can't use redux-toolkit's createSlice() to make these actions,

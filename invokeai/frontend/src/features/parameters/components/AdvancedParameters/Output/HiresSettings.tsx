@@ -1,9 +1,9 @@
 import { Flex } from '@chakra-ui/react';
-import { ChangeEvent } from 'react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setHiresFix } from 'features/parameters/store/postprocessingSlice';
+import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -12,7 +12,9 @@ import { useTranslation } from 'react-i18next';
 const HiresSettings = () => {
   const dispatch = useAppDispatch();
 
-  const hiresFix = useAppSelector((state: RootState) => state.postprocessing.hiresFix);
+  const hiresFix = useAppSelector(
+    (state: RootState) => state.postprocessing.hiresFix
+  );
 
   const { t } = useTranslation();
 

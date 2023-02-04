@@ -3,7 +3,6 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { setBrushSize } from 'features/canvas/store/canvasSlice';
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 

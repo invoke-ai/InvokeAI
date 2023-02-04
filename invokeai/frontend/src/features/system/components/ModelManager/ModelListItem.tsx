@@ -1,4 +1,4 @@
-import { EditIcon, DeleteIcon } from '@chakra-ui/icons';
+import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
 import { Box, Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
 import { ModelStatus } from 'app/invokeai';
 import { deleteModel, requestModelChange } from 'app/socketio/actions';
@@ -7,7 +7,6 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setOpenModel } from 'features/system/store/systemSlice';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 type ModelListItemProps = {

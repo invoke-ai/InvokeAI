@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Feature } from 'app/features';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
 import FaceRestoreToggle from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreToggle';
 import ImageFit from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageFit';
@@ -15,9 +15,9 @@ import ParametersAccordion from 'features/parameters/components/ParametersAccord
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import { setHiresFix } from 'features/parameters/store/postprocessingSlice';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function ImageToImagePanel() {

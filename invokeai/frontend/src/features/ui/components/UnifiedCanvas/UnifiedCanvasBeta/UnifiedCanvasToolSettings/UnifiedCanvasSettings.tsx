@@ -1,21 +1,22 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAICheckbox from 'common/components/IAICheckbox';
+import IAIIconButton from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldShowCanvasDebugInfo,
   setShouldShowIntermediates,
 } from 'features/canvas/store/canvasSlice';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaWrench } from 'react-icons/fa';
-import IAIPopover from 'common/components/IAIPopover';
-import IAICheckbox from 'common/components/IAICheckbox';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import EmptyTempFolderButtonModal from 'features/system/components/ClearTempFolderButtonModal';
 
+import { FaWrench } from 'react-icons/fa';
+
 import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
+import { isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 
 export const canvasControlsSelector = createSelector(
@@ -37,7 +38,7 @@ export const canvasControlsSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

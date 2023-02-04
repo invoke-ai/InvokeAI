@@ -1,6 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
+import { isEqual } from 'lodash';
+
 import { Group, Line, Rect } from 'react-konva';
 import {
   isCanvasBaseImage,
@@ -9,8 +12,6 @@ import {
   isCanvasFillRect,
 } from '../store/canvasTypes';
 import IAICanvasImage from './IAICanvasImage';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 const selector = createSelector(
   [canvasSelector],
@@ -24,7 +25,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

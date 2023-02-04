@@ -1,9 +1,9 @@
-import React, { ChangeEvent } from 'react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIInput from 'common/components/IAIInput';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { setSeedWeights } from 'features/parameters/store/generationSlice';
+import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function SeedWeights() {

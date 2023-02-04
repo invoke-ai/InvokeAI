@@ -23,10 +23,11 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import React, { FocusEvent, useMemo, useState, useEffect } from 'react';
+import { clamp } from 'lodash';
+
+import { FocusEvent, useEffect, useMemo, useState } from 'react';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
-import _ from 'lodash';
 
 export type IAIFullSliderProps = {
   label: string;
@@ -122,7 +123,7 @@ export default function IAISlider(props: IAIFullSliderProps) {
 
   const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
     if (e.target.value === '') e.target.value = String(min);
-    const clamped = _.clamp(
+    const clamped = clamp(
       isInteger ? Math.floor(Number(e.target.value)) : Number(localInputValue),
       min,
       numberInputMax

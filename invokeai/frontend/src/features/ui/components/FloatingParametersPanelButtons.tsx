@@ -1,22 +1,23 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
-import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
-import InvokeButton from 'features/parameters/components/ProcessButtons/InvokeButton';
-import _ from 'lodash';
 import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
-import { FaSlidersH } from 'react-icons/fa';
-import {
-  activeTabNameSelector,
-  uiSelector,
-} from 'features/ui/store/uiSelectors';
-import { useHotkeys } from 'react-hotkeys-hook';
+import { gallerySelector } from 'features/gallery/store/gallerySelectors';
 import {
   GalleryState,
   setShouldShowGallery,
 } from 'features/gallery/store/gallerySlice';
-import { gallerySelector } from 'features/gallery/store/gallerySelectors';
+import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
+import InvokeButton from 'features/parameters/components/ProcessButtons/InvokeButton';
+import {
+  activeTabNameSelector,
+  uiSelector,
+} from 'features/ui/store/uiSelectors';
+import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
+import { isEqual } from 'lodash';
+
+import { useHotkeys } from 'react-hotkeys-hook';
+import { FaSlidersH } from 'react-icons/fa';
 
 export const floatingSelector = createSelector(
   [gallerySelector, uiSelector, activeTabNameSelector],
@@ -60,7 +61,7 @@ export const floatingSelector = createSelector(
       shouldShowGalleryButton,
     };
   },
-  { memoizeOptions: { resultEqualityCheck: _.isEqual } }
+  { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
 const FloatingParametersPanelButtons = () => {

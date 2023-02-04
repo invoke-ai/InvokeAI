@@ -3,7 +3,6 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { setTool } from 'features/canvas/store/canvasSlice';
-import React from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaArrowsAlt } from 'react-icons/fa';

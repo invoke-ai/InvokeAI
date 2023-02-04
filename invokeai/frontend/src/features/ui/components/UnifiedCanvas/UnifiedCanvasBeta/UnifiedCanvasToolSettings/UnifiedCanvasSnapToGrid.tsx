@@ -2,7 +2,7 @@ import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAICheckbox from 'common/components/IAICheckbox';
 import { setShouldSnapToGrid } from 'features/canvas/store/canvasSlice';
-import React, { ChangeEvent } from 'react';
+import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function UnifiedCanvasSnapToGrid() {

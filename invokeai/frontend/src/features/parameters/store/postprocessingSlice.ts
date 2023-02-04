@@ -1,10 +1,10 @@
-import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import { FACETOOL_TYPES } from 'app/constants';
 
 export type UpscalingLevel = 2 | 4;
 
-export type FacetoolType = typeof FACETOOL_TYPES[number];
+export type FacetoolType = (typeof FACETOOL_TYPES)[number];
 
 export interface PostprocessingState {
   codeformerFidelity: number;

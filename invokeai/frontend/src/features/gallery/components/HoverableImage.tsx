@@ -4,9 +4,6 @@ import {
   setCurrentImage,
   setShouldHoldGalleryOpen,
 } from 'features/gallery/store/gallerySlice';
-import { FaCheck, FaTrashAlt } from 'react-icons/fa';
-import DeleteImageModal from './DeleteImageModal';
-import { DragEvent, memo, useState } from 'react';
 import {
   setAllImageToImageParameters,
   setAllTextToImageParameters,
@@ -14,16 +11,19 @@ import {
   setPrompt,
   setSeed,
 } from 'features/parameters/store/generationSlice';
+import { DragEvent, memo, useState } from 'react';
+import { FaCheck, FaTrashAlt } from 'react-icons/fa';
+import DeleteImageModal from './DeleteImageModal';
 
-import * as InvokeAI from 'app/invokeai';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import * as InvokeAI from 'app/invokeai';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
 import { hoverableImageSelector } from 'features/gallery/store/gallerySelectors';
-import { useTranslation } from 'react-i18next';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import { useTranslation } from 'react-i18next';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -259,5 +259,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     </ContextMenu.Root>
   );
 }, memoEqualityCheck);
+
+HoverableImage.displayName = 'HoverableImage';
 
 export default HoverableImage;

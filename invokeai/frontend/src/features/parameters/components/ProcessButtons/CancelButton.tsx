@@ -1,15 +1,16 @@
-import { MdCancel } from 'react-icons/md';
+import { createSelector } from '@reduxjs/toolkit';
 import { cancelProcessing } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { createSelector } from '@reduxjs/toolkit';
-import { SystemState } from 'features/system/store/systemSlice';
-import _ from 'lodash';
-import { useTranslation } from 'react-i18next';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { SystemState } from 'features/system/store/systemSlice';
+import { isEqual } from 'lodash';
+
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
+import { MdCancel } from 'react-icons/md';
 
 const cancelButtonSelector = createSelector(
   systemSelector,
@@ -22,7 +23,7 @@ const cancelButtonSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

@@ -1,11 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { GalleryState } from './gallerySlice';
-import _ from 'lodash';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { isEqual } from 'lodash';
+
+import { GalleryState } from './gallerySlice';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
@@ -59,7 +60,7 @@ export const imageGallerySelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -78,7 +79,7 @@ export const hoverableImageSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

@@ -1,13 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 // import IAICanvas from 'features/canvas/components/IAICanvas';
-import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
-import _ from 'lodash';
-import { useLayoutEffect } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
 import IAICanvas from 'features/canvas/components/IAICanvas';
+import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
 import IAICanvasOutpaintingControls from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { setDoesCanvasNeedScaling } from 'features/canvas/store/canvasSlice';
+import { debounce, isEqual } from 'lodash';
+
+import { useLayoutEffect } from 'react';
 
 const selector = createSelector(
   [canvasSelector],
@@ -19,7 +20,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -32,7 +33,7 @@ const UnifiedCanvasDisplay = () => {
   useLayoutEffect(() => {
     dispatch(setDoesCanvasNeedScaling(true));
 
-    const resizeCallback = _.debounce(() => {
+    const resizeCallback = debounce(() => {
       dispatch(setDoesCanvasNeedScaling(true));
     }, 250);
 

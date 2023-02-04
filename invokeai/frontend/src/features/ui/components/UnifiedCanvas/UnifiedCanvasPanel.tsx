@@ -1,7 +1,9 @@
 // import { Feature } from 'app/features';
 import { Feature } from 'app/features';
-import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
+import BoundingBoxSettings from 'features/parameters/components/AdvancedParameters/Canvas/BoundingBox/BoundingBoxSettings';
+import InfillAndScalingSettings from 'features/parameters/components/AdvancedParameters/Canvas/InfillAndScalingSettings';
 import SeamCorrectionSettings from 'features/parameters/components/AdvancedParameters/Canvas/SeamCorrection/SeamCorrectionSettings';
+import ImageToImageStrength from 'features/parameters/components/AdvancedParameters/ImageToImage/ImageToImageStrength';
 import SeedSettings from 'features/parameters/components/AdvancedParameters/Seed/SeedSettings';
 import GenerateVariationsToggle from 'features/parameters/components/AdvancedParameters/Variations/GenerateVariations';
 import VariationsSettings from 'features/parameters/components/AdvancedParameters/Variations/VariationsSettings';
@@ -10,8 +12,6 @@ import ParametersAccordion from 'features/parameters/components/ParametersAccord
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import PromptInput from 'features/parameters/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/ui/components/InvokeParametersPanel';
-import BoundingBoxSettings from 'features/parameters/components/AdvancedParameters/Canvas/BoundingBox/BoundingBoxSettings';
-import InfillAndScalingSettings from 'features/parameters/components/AdvancedParameters/Canvas/InfillAndScalingSettings';
 import { useTranslation } from 'react-i18next';
 
 export default function UnifiedCanvasPanel() {

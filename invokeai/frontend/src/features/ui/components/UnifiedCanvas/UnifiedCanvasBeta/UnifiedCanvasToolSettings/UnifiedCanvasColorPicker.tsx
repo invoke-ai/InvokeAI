@@ -8,8 +8,8 @@ import {
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
 import { setBrushColor, setMaskColor } from 'features/canvas/store/canvasSlice';
-import React from 'react';
-import _ from 'lodash';
+import { clamp, isEqual } from 'lodash';
+
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const selector = createSelector(
@@ -25,7 +25,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -47,7 +47,7 @@ export default function UnifiedCanvasColorPicker() {
       dispatch(
         setBrushColor({
           ...brushColor,
-          a: _.clamp(brushColor.a - 0.05, 0.05, 1),
+          a: clamp(brushColor.a - 0.05, 0.05, 1),
         })
       );
     },
@@ -64,7 +64,7 @@ export default function UnifiedCanvasColorPicker() {
       dispatch(
         setBrushColor({
           ...brushColor,
-          a: _.clamp(brushColor.a + 0.05, 0.05, 1),
+          a: clamp(brushColor.a + 0.05, 0.05, 1),
         })
       );
     },

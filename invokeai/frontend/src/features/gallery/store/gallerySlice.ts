@@ -1,9 +1,9 @@
-import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import _, { clamp } from 'lodash';
+import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
-import { IRect } from 'konva/lib/types';
 import { InvokeTabName } from 'features/ui/store/tabMap';
+import { IRect } from 'konva/lib/types';
+import { clamp } from 'lodash';
 
 export type GalleryCategory = 'user' | 'result';
 

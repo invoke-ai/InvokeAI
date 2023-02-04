@@ -1,9 +1,9 @@
 import { Flex } from '@chakra-ui/react';
+import Perlin from './Perlin';
 import RandomizeSeed from './RandomizeSeed';
 import Seed from './Seed';
 import ShuffleSeed from './ShuffleSeed';
 import Threshold from './Threshold';
-import Perlin from './Perlin';
 
 /**
  * Seed & variation options. Includes iteration, seed, seed randomization, variation options.

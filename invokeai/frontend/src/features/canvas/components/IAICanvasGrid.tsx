@@ -3,10 +3,11 @@
 import { useColorMode } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { isEqual, range } from 'lodash';
+
 import { ReactNode, useCallback, useLayoutEffect, useState } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 const selector = createSelector(
   [canvasSelector],
@@ -16,7 +17,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -85,7 +86,7 @@ const IAICanvasGrid = () => {
       xSteps = Math.round(xSize / 64) + 1,
       ySteps = Math.round(ySize / 64) + 1;
 
-    const xLines = _.range(0, xSteps).map((i) => (
+    const xLines = range(0, xSteps).map((i) => (
       <KonvaLine
         key={`x_${i}`}
         x={fullRect.x1 + i * 64}
@@ -95,7 +96,7 @@ const IAICanvasGrid = () => {
         strokeWidth={1}
       />
     ));
-    const yLines = _.range(0, ySteps).map((i) => (
+    const yLines = range(0, ySteps).map((i) => (
       <KonvaLine
         key={`y_${i}`}
         x={fullRect.x1}

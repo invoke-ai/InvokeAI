@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
 import { RootState } from 'app/store';
+import { isEqual } from 'lodash';
 
 export const generationSelector = (state: RootState) => state.generation;
 
@@ -11,7 +11,7 @@ export const mayGenerateMultipleImagesSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

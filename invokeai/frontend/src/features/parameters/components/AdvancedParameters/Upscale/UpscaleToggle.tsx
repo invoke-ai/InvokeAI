@@ -1,8 +1,8 @@
-import { ChangeEvent } from 'react';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldRunESRGAN } from 'features/parameters/store/postprocessingSlice';
+import { ChangeEvent } from 'react';
 
 export default function UpscaleToggle() {
   const isESRGANAvailable = useAppSelector(

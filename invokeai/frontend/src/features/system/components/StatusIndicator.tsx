@@ -1,8 +1,8 @@
 import { Text, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { errorSeen, SystemState } from 'features/system/store/systemSlice';
+import { isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 import { systemSelector } from '../store/systemSelectors';
 
@@ -61,9 +61,9 @@ const StatusIndicator = () => {
   if (statusMessage)
     if (isProcessing) {
       if (totalIterations > 1) {
-        statusMessage =
-          t(statusMessage as keyof typeof t) +
-          ` (${currentIteration}/${totalIterations})`;
+        statusMessage = `${t(
+          statusMessage as keyof typeof t
+        )} (${currentIteration}/${totalIterations})`;
       }
     }
 

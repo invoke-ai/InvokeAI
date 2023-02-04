@@ -4,14 +4,14 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import CurrentImageButtons from 'features/gallery/components/CurrentImageButtons';
 import { imagesSelector } from 'features/gallery/components/CurrentImagePreview';
+import ImageGallery from 'features/gallery/components/ImageGallery';
+import ImageMetadataViewer from 'features/gallery/components/ImageMetaDataViewer/ImageMetadataViewer';
 import {
   selectNextImage,
   selectPrevImage,
 } from 'features/gallery/store/gallerySlice';
-import ImageGallery from 'features/gallery/components/ImageGallery';
-import ImageMetadataViewer from 'features/gallery/components/ImageMetaDataViewer/ImageMetadataViewer';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BiExit } from 'react-icons/bi';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';

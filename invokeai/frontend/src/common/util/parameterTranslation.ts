@@ -1,24 +1,24 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
+import { Dimensions } from 'features/canvas/store/canvasTypes';
 import { GenerationState } from 'features/parameters/store/generationSlice';
 import { SystemState } from 'features/system/store/systemSlice';
 import { Vector2d } from 'konva/lib/types';
-import { Dimensions } from 'features/canvas/store/canvasTypes';
 
-import { stringToSeedWeightsArray } from './seedWeightPairs';
-import randomInt from './randomInt';
-import { InvokeTabName } from 'features/ui/store/tabMap';
 import {
   CanvasState,
   isCanvasMaskLine,
 } from 'features/canvas/store/canvasTypes';
 import generateMask from 'features/canvas/util/generateMask';
-import openBase64ImageInTab from './openBase64ImageInTab';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import type {
-  UpscalingLevel,
   FacetoolType,
+  UpscalingLevel,
 } from 'features/parameters/store/postprocessingSlice';
 import { PostprocessingState } from 'features/parameters/store/postprocessingSlice';
+import { InvokeTabName } from 'features/ui/store/tabMap';
+import openBase64ImageInTab from './openBase64ImageInTab';
+import randomInt from './randomInt';
+import { stringToSeedWeightsArray } from './seedWeightPairs';
 
 export type FrontendToBackendParametersConfig = {
   generationMode: InvokeTabName;

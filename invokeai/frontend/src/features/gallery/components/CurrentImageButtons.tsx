@@ -1,24 +1,40 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 
+import { ButtonGroup, Link, useToast } from '@chakra-ui/react';
+import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIButton from 'common/components/IAIButton';
+import IAIIconButton from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import {
+  setDoesCanvasNeedScaling,
+  setInitialCanvasImage,
+} from 'features/canvas/store/canvasSlice';
+import { GalleryState } from 'features/gallery/store/gallerySlice';
+import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
+import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
+import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
 import {
   setAllParameters,
   setInitialImage,
   setPrompt,
   setSeed,
 } from 'features/parameters/store/generationSlice';
-import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
-import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
-import DeleteImageModal from './DeleteImageModal';
+import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { SystemState } from 'features/system/store/systemSlice';
-import IAIButton from 'common/components/IAIButton';
-import { runESRGAN, runFacetool } from 'app/socketio/actions';
-import IAIIconButton from 'common/components/IAIIconButton';
-import UpscaleSettings from 'features/parameters/components/AdvancedParameters/Upscale/UpscaleSettings';
-import FaceRestoreSettings from 'features/parameters/components/AdvancedParameters/FaceRestore/FaceRestoreSettings';
+import {
+  activeTabNameSelector,
+  uiSelector,
+} from 'features/ui/store/uiSelectors';
+import {
+  setActiveTab,
+  setShouldShowImageDetails,
+} from 'features/ui/store/uiSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { ButtonGroup, Link, useToast } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 import {
   FaAsterisk,
   FaCode,
@@ -33,22 +49,8 @@ import {
   FaShareAlt,
   FaTrash,
 } from 'react-icons/fa';
-import {
-  setDoesCanvasNeedScaling,
-  setInitialCanvasImage,
-} from 'features/canvas/store/canvasSlice';
-import { GalleryState } from 'features/gallery/store/gallerySlice';
-import {
-  activeTabNameSelector,
-  uiSelector,
-} from 'features/ui/store/uiSelectors';
-import IAIPopover from 'common/components/IAIPopover';
-import { useTranslation } from 'react-i18next';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
-import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { gallerySelector } from '../store/gallerySelectors';
+import DeleteImageModal from './DeleteImageModal';
 
 const currentImageButtonsSelector = createSelector(
   [
