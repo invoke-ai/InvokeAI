@@ -35,14 +35,14 @@ import {
   setInfillMethod,
   setInitialImage,
   setMaskPath,
-} from 'features/options/store/optionsSlice';
+} from 'features/parameters/store/generationSlice';
 import {
   requestImages,
   requestNewImages,
   requestSystemConfig,
 } from './actions';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { tabMap } from 'features/tabs/tabMap';
+import { tabMap } from 'features/ui/store/tabMap';
 import type { RootState } from 'app/store';
 
 /**
@@ -104,8 +104,9 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const state: RootState = getState();
-        const { shouldLoopback, activeTab } = state.options;
+        const state = getState();
+        const { activeTab } = state.ui;
+        const { shouldLoopback } = state.postprocessing;
         const { boundingBox: _, generationMode, ...rest } = data;
 
         const newImage = {
@@ -327,7 +328,9 @@ const makeSocketIOListeners = (
       dispatch(removeImage(data));
 
       // remove references to image in options
-      const { initialImage, maskPath } = getState().options;
+      const {
+        generation: { initialImage, maskPath },
+      } = getState();
 
       if (
         initialImage === url ||

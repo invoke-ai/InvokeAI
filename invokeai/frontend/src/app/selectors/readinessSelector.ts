@@ -1,32 +1,26 @@
 import { createSelector } from '@reduxjs/toolkit';
 import _ from 'lodash';
-import { RootState } from 'app/store';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
-import { OptionsState } from 'features/options/store/optionsSlice';
-import { SystemState } from 'features/system/store/systemSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { initialCanvasImageSelector } from 'features/canvas/store/canvasSelectors';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 
 export const readinessSelector = createSelector(
   [
-    (state: RootState) => state.options,
-    (state: RootState) => state.system,
+    generationSelector,
+    systemSelector,
     initialCanvasImageSelector,
     activeTabNameSelector,
   ],
-  (
-    options: OptionsState,
-    system: SystemState,
-    initialCanvasImage,
-    activeTabName
-  ) => {
+  (generation, system, initialCanvasImage, activeTabName) => {
     const {
       prompt,
       shouldGenerateVariations,
       seedWeights,
       initialImage,
       seed,
-    } = options;
+    } = generation;
 
     const { isProcessing, isConnected } = system;
 
