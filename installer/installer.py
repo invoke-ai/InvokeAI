@@ -130,10 +130,24 @@ class Installer:
         else:
             venv_dir = self.dest / ".venv"
 
+        # if there is an existing venv directory, then we move it out of the way
+        # to create a clean install
+        if venv_dir.exists():
+            backup_venv = self.dest / ".venv-backup"
+            print(f"Previous .venv directory detected. Renaming to {backup_venv}",end='')
+            if backup_venv.exists():
+                print(f' and removing existing {backup_venv} directory',end='')
+                shutil.rmtree(backup_venv)
+            venv_dir.replace(backup_venv)
+            print('')
+
         # Prefer to copy python executables
         # so that updates to system python don't break InvokeAI
         try:
             venv.create(venv_dir, with_pip=True)
+        # Because we moved away the previous .venv, the following code
+        # isn't strictly necessary, but keeping it here in case we decide
+        # it better to upgrade an existing venv rather than replace.
         # If installing over an existing environment previously created with symlinks,
         # the executables will fail to copy. Keep symlinks in that case
         except shutil.SameFileError:
