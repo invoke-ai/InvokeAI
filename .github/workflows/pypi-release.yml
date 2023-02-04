@@ -2,8 +2,6 @@ name: PyPI Release
 
 on:
   push:
-    branches:
-      - "dev/ci/add-pypi-release"
     paths:
       - 'ldm/invoke/_version.py'
   workflow_dispatch:
@@ -29,7 +27,7 @@ jobs:
         run: twine check dist/*
 
       - name: check PyPI versions
-        # if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         run: |
           pip install --upgrade requests
           python -c "\
@@ -37,8 +35,6 @@ jobs:
           EXISTS=scripts.pypi_helper.local_on_pypi(); \
           print(f'PACKAGE_EXISTS={EXISTS}')" >> $GITHUB_ENV
 
-      - name: just for debugging
-        run: echo $PACKAGE_EXISTS
-      # - name: upload package
-      #   if: env.PACKAGE_EXISTS == 'False'
-      #   run: twine upload dist/*
+      - name: upload package
+        if: env.PACKAGE_EXISTS == 'False'
+        run: twine upload dist/*
