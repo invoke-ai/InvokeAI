@@ -35,7 +35,7 @@ else
 fi
 
 # Build Container
-docker build \
+DOCKER_BUILDKIT=1 docker build \
     --platform="${PLATFORM}" \
     --tag="${CONTAINER_IMAGE}" \
     ${PIP_EXTRA_INDEX_URL:+--build-arg="PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}"} \
