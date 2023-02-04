@@ -1,8 +1,12 @@
 # syntax=docker/dockerfile:1
-FROM python:3.9-slim AS python-base
 
-# use bash
-SHELL [ "/bin/bash", "-c" ]
+# Maintained by Matthias Wild <mauwii@outlook.de>
+
+ARG PYTHON_VERSION=3.9
+##################
+### base image ###
+##################
+FROM python:${PYTHON_VERSION}-slim AS python-base
 
 # Install necesarry packages
 RUN \
@@ -17,12 +21,39 @@ RUN \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-ARG APPDIR=/usr/src/app
-ENV APPDIR ${APPDIR}
+# set working directory and path
+ARG APPDIR=/usr/src
+ARG APPNAME=InvokeAI
 WORKDIR ${APPDIR}
+ENV PATH=${APPDIR}/${APPNAME}/bin:$PATH
 
-FROM python-base AS builder
+######################
+### build frontend ###
+######################
+FROM node:lts as frontend-builder
 
+# Copy Sources
+ARG APPDIR=/usr/src
+WORKDIR ${APPDIR}
+COPY --link . .
+
+# install dependencies and build frontend
+WORKDIR ${APPDIR}/invokeai/frontend
+RUN \
+  --mount=type=cache,target=/usr/local/share/.cache/yarn/v6 \
+  yarn install \
+  --prefer-offline \
+  --frozen-lockfile \
+  --non-interactive \
+  --production=false \
+  && yarn build
+
+###################################
+### install python dependencies ###
+###################################
+FROM python-base AS pyproject-builder
+
+# Install dependencies
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -34,25 +65,28 @@ RUN \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
+# create virtual environment
+RUN python3 -m venv "${APPNAME}" \
+  --upgrade-deps
+
 # copy sources
-COPY --link . .
+COPY --from=frontend-builder ${APPDIR} .
+
+# install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+  "${APPDIR}/${APPNAME}/bin/pip" install \
+  --use-pep517 \
+  .
 
-# install requirements
-RUN python3 -m venv invokeai \
-  && ${APPDIR}/invokeai/bin/pip \
-    install \
-    --no-cache-dir \
-    --use-pep517 \
-    .
-
+#####################
+### runtime image ###
+#####################
 FROM python-base AS runtime
 
 # setup environment
-COPY --link . .
-COPY --from=builder ${APPDIR}/invokeai ${APPDIR}/invokeai
-ENV PATH=${APPDIR}/invokeai/bin:$PATH
+COPY --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPDIR}/${APPNAME}
 ENV INVOKEAI_ROOT=/data
 ENV INVOKE_MODEL_RECONFIGURE="--yes --default_only"
 
@@ -73,6 +107,6 @@ RUN \
   && rm -rf /var/lib/apt/lists/*
 
 # set Entrypoint and default CMD
-ENTRYPOINT [ "invoke" ]
+ENTRYPOINT [ "invokeai" ]
 CMD [ "--web", "--host=0.0.0.0" ]
 VOLUME [ "/data" ]
