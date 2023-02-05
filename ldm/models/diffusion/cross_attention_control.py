@@ -285,9 +285,9 @@ class InvokeAICrossAttentionMixin:
                     return self.einsum_op_slice_dim1(q, k, v, slice_size)
 
         # fallback for when there is no saved strategy, or saved strategy does not slice
-        mem_free_total = get_mem_free_total(q.device)
+        mem_free_total_bytes = get_mem_free_total(q.device)
         # Divide factor of safety as there's copying and fragmentation
-        return self.einsum_op_tensor_mem(q, k, v, mem_free_total / 3.3 / (1 << 20))
+        return self.einsum_op_tensor_mem(q, k, v, mem_free_total_bytes / 3.3 / (1 << 20))
 
 
     def get_invokeai_attention_mem_efficient(self, q, k, v):

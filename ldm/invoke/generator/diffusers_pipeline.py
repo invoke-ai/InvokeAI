@@ -7,6 +7,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any
 
+from ...models.diffusion.dynamic_slice_attention_processor import DynamicSlicedAttnProcessor
+
 if sys.version_info < (3, 10):
     from typing_extensions import ParamSpec
 else:
@@ -317,7 +319,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
                 pass
             else:
-                self.enable_attention_slicing(slice_size='auto')
+                unet: UNet2DConditionModel = self.unet
+                unet.set_attn_processor(DynamicSlicedAttnProcessor())
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,

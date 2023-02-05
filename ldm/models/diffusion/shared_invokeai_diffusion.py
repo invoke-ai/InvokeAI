@@ -166,9 +166,13 @@ class InvokeAIDiffuserComponent:
 
         return combined_next_x
 
-    # methods below are called from do_diffusion_step and should be considered private to this class.
 
-    def apply_standard_conditioning(self, x, sigma, unconditioning, conditioning):
+    # methods below are called from do_diffusion_step and should be considered private to this class.
+    def apply_standard_conditioning(self,
+                                    x: torch.Tensor,
+                                    sigma: torch.Tensor,
+                                    unconditioning: torch.Tensor,
+                                    conditioning: torch.Tensor):
         # fast batched path
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
