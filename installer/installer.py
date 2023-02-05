@@ -130,24 +130,10 @@ class Installer:
         else:
             venv_dir = self.dest / ".venv"
 
-        # if there is an existing venv directory, then we move it out of the way
-        # to create a clean install
-        if venv_dir.exists():
-            backup_venv = self.dest / ".venv-backup"
-            print(f"Previous .venv directory detected. Renaming to {backup_venv}",end='')
-            if backup_venv.exists():
-                print(f' and removing existing {backup_venv} directory',end='')
-                shutil.rmtree(backup_venv)
-            venv_dir.replace(backup_venv)
-            print('')
-
         # Prefer to copy python executables
         # so that updates to system python don't break InvokeAI
         try:
             venv.create(venv_dir, with_pip=True)
-        # Because we moved away the previous .venv, the following code
-        # isn't strictly necessary, but keeping it here in case we decide
-        # it better to upgrade an existing venv rather than replace.
         # If installing over an existing environment previously created with symlinks,
         # the executables will fail to copy. Keep symlinks in that case
         except shutil.SameFileError:
@@ -263,6 +249,7 @@ class InvokeAiInstance:
                 "--require-virtualenv",
                 "torch",
                 "torchvision",
+                "--force-reinstall",
                 "--find-links" if find_links is not None else None,
                 find_links,
                 "--extra-index-url" if extra_index_url is not None else None,
@@ -339,6 +326,7 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
+        # set sys.argv to a consistent state
         new_argv = [sys.argv[0]]
         for i in range(1,len(sys.argv)):
             el = sys.argv[i]
@@ -353,15 +341,13 @@ class InvokeAiInstance:
 
         introduction()
 
-        from ldm.invoke.config import configure_invokeai
+        from ldm.invoke.config import invokeai_configure
 
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
         # this may change in the future with config refactoring!
 
-        # set sys.argv to a consistent state
-
-        configure_invokeai.main()
+        invokeai_configure.main()
 
     def install_user_scripts(self):
         """
