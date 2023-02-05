@@ -35,11 +35,11 @@ FROM node:lts as frontend-builder
 
 # Copy Sources
 ARG APPDIR=/usr/src
-WORKDIR ${APPDIR}
-COPY ./invokeai/frontend ./invokeai/frontend
+ARG FRONTEND_DIR=invokeai/frontend
+WORKDIR ${APPDIR}/${FRONTEND_DIR}
+COPY ${FRONTEND_DIR} .
 
 # install dependencies
-WORKDIR ${APPDIR}/invokeai/frontend
 RUN \
   --mount=type=cache,target=/usr/local/share/.cache/yarn \
   yarn install \
@@ -72,7 +72,8 @@ RUN python3 -m venv "${APPNAME}" \
 
 # copy sources
 COPY --link . .
-COPY --from=frontend-builder ${APPDIR}/invokeai/frontend/dist ${APPDIR}/invokeai/frontend/dist
+ARG FRONTEND_DIR=invokeai/frontend
+COPY --from=frontend-builder ${APPDIR}/${FRONTEND_DIR}/dist ${FRONTEND_DIR}/dist
 
 # install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
