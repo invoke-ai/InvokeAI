@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 
-if python -c "import torch" &>/dev/null; then
-  if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
-    # Decide which container flavor to build if not specified
-    if [[ -z "$CONTAINER_FLAVOR" ]]; then
-      # Check for CUDA and ROCm
-      CUDA_AVAILABLE=$(python -c "import torch;print(torch.cuda.is_available())")
-      ROCM_AVAILABLE=$(python -c "import torch;print(torch.version.hip is not None)")
-      if [[ "$(uname -s)" != "Darwin" && "${CUDA_AVAILABLE}" == "True" ]]; then
-        CONTAINER_FLAVOR="cuda"
-      elif [[ "$(uname -s)" != "Darwin" && "${ROCM_AVAILABLE}" == "True" ]]; then
-        CONTAINER_FLAVOR="rocm"
-      else
-        CONTAINER_FLAVOR="cpu"
-      fi
+if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
+  # Decide which container flavor to build if not specified
+  if [[ -z "$CONTAINER_FLAVOR" ]] && python -c "import torch" &>/dev/null; then
+    # Check for CUDA and ROCm
+    CUDA_AVAILABLE=$(python -c "import torch;print(torch.cuda.is_available())")
+    ROCM_AVAILABLE=$(python -c "import torch;print(torch.version.hip is not None)")
+    if [[ "$(uname -s)" != "Darwin" && "${CUDA_AVAILABLE}" == "True" ]]; then
+      CONTAINER_FLAVOR="cuda"
+    elif [[ "$(uname -s)" != "Darwin" && "${ROCM_AVAILABLE}" == "True" ]]; then
+      CONTAINER_FLAVOR="rocm"
+    else
+      CONTAINER_FLAVOR="cpu"
     fi
-    # Set PIP_EXTRA_INDEX_URL based on container flavor
-    if [[ "$CONTAINER_FLAVOR" == "rocm" ]]; then
-      PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/rocm"
-    elif [[ "$CONTAINER_FLAVOR" == "cpu" ]]; then
-      PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
-    fi
+  fi
+  # Set PIP_EXTRA_INDEX_URL based on container flavor
+  if [[ "$CONTAINER_FLAVOR" == "rocm" ]]; then
+    PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/rocm"
+  elif [[ "$CONTAINER_FLAVOR" == "cpu" ]]; then
+    PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
+  # elif [[ -z "$CONTAINER_FLAVOR" || "$CONTAINER_FLAVOR" == "cuda" ]]; then
+  #   PIP_PACKAGE=${PIP_PACKAGE-".[xformers]"}
   fi
 fi
 

@@ -39,5 +39,6 @@ DOCKER_BUILDKIT=1 docker build \
     --platform="${PLATFORM}" \
     --tag="${CONTAINER_IMAGE}" \
     ${PIP_EXTRA_INDEX_URL:+--build-arg="PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}"} \
+    ${PIP_PACKAGE:+--build-arg="PIP_PACKAGE=${PIP_PACKAGE}"} \
     --file="${DOCKERFILE}" \
     ..
