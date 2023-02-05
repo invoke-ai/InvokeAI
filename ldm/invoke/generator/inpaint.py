@@ -194,7 +194,8 @@ class Inpaint(Img2Img):
         """
 
         self.enable_image_debugging = enable_image_debugging
-        self.infill_method = infill_method or infill_methods()[0], # The infill method to use
+        infill_method = infill_method or infill_methods()[0]
+        self.infill_method = infill_method
 
         self.inpaint_width = inpaint_width
         self.inpaint_height = inpaint_height

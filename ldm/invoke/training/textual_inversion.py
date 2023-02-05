@@ -295,7 +295,8 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             for idx in range(len(model_names))
             if "default" in conf[model_names[idx]]
         ]
-        return (model_names, defaults[0])
+        default = defaults[0] if len(defaults)>0 else 0
+        return (model_names, default)
 
     def marshall_arguments(self) -> dict:
         args = dict()

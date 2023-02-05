@@ -18,7 +18,7 @@ import warnings
 import safetensors.torch
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Union, Any
+from typing import Any, Optional, Union
 from huggingface_hub import scan_cache_dir
 from ldm.util import download_with_progress_bar
 
@@ -484,12 +484,11 @@ class ModelManager(object):
                     **pipeline_args,
                     **fp_args,
                 )
-
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print(f'Could not fetch half-precision version of model {name_or_path}; fetching full-precision instead')
+                    pass
                 else:
-                    print(f'An unexpected error occurred while downloading the model: {e})')
+                    print(f'** An unexpected error occurred while downloading the model: {e})')
             if pipeline:
                 break
 
@@ -881,14 +880,14 @@ class ModelManager(object):
         print('** Migration is done. Continuing...')
 
 
-    def _resolve_path(self, source:Union[str,Path], dest_directory:str)->Path:
+    def _resolve_path(self, source: Union[str, Path], dest_directory: str) -> Optional[Path]:
         resolved_path = None
-        if source.startswith(('http:','https:','ftp:')):
+        if str(source).startswith(('http:','https:','ftp:')):
             basename = os.path.basename(source)
             if not os.path.isabs(dest_directory):
                 dest_directory = os.path.join(Globals.root,dest_directory)
             dest = os.path.join(dest_directory,basename)
-            if download_with_progress_bar(source,dest):
+            if download_with_progress_bar(str(source), Path(dest)):
                 resolved_path = Path(dest)
         else:
             if not os.path.isabs(source):
@@ -1040,7 +1039,7 @@ class ModelManager(object):
                 vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args, **fp_args)
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print('  | Half-precision version of model not available; fetching full-precision instead')
+                    pass
                 else:
                     deferred_error = e
             if vae:

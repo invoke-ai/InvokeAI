@@ -346,7 +346,6 @@ class InvokeAiInstance:
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
         # this may change in the future with config refactoring!
-
         invokeai_configure.main()
 
     def install_user_scripts(self):
