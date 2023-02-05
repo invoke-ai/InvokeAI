@@ -1,10 +1,10 @@
 import { Middleware } from '@reduxjs/toolkit';
-import { io } from 'socket.io-client';
 
 import makeSocketIOEmitters from './emitters';
 import makeSocketIOListeners from './listeners';
 
 import * as InvokeAI from 'app/invokeai';
+import { io } from 'socket.io-client';
 
 /**
  * Creates a socketio middleware to handle communication with server.
@@ -28,6 +28,9 @@ export const socketioMiddleware = () => {
     timeout: 60000,
     path: `${window.location.pathname}socket.io`,
   });
+
+  // immediately disconnect while working on nodes
+  socketio.disconnect();
 
   let areListenersSet = false;
 

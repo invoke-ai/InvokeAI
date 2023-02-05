@@ -13,7 +13,6 @@ import postprocessingReducer from 'features/parameters/store/postprocessingSlice
 import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 
-import { invokeApi } from './invokeApi';
 import { socketioMiddleware } from './socketio/middleware';
 
 /**
@@ -69,7 +68,6 @@ const rootReducer = combineReducers({
   canvas: canvasReducer,
   ui: uiReducer,
   lightbox: lightboxReducer,
-  [invokeApi.reducerPath]: invokeApi.reducer,
 });
 
 const rootPersistConfig = getPersistConfig({
@@ -89,9 +87,7 @@ export const store = configureStore({
     getDefaultMiddleware({
       immutableCheck: false,
       serializableCheck: false,
-    })
-      .concat(invokeApi.middleware)
-      .concat(socketioMiddleware()),
+    }).concat(socketioMiddleware()),
   devTools: {
     // Uncommenting these very rapidly called actions makes the redux dev tools output much more readable
     actionsDenylist: [
