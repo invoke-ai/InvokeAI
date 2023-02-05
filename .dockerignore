@@ -13,6 +13,7 @@
 
 # whitelist frontend, but ignore node_modules
 invokeai/frontend/node_modules
+invokeai/frontend/dist/**
 
 # ignore python cache
 **/__pycache__
