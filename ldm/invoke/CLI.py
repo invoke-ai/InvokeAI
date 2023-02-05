@@ -1133,8 +1133,8 @@ def report_model_error(opt:Namespace, e:Exception):
         for arg in yes_to_all.split():
             sys.argv.append(arg)
 
-    from ldm.invoke.config import configure_invokeai
-    configure_invokeai.main()
+    from ldm.invoke.config import invokeai_configure
+    invokeai_configure.main()
     print('** InvokeAI will now restart')
     sys.argv = previous_args
     main() # would rather do a os.exec(), but doesn't exist?
