@@ -1,0 +1,41 @@
+name: PyPI Release
+
+on:
+  push:
+    paths:
+      - 'ldm/invoke/_version.py'
+  workflow_dispatch:
+
+jobs:
+  release:
+    if: github.repository == 'invoke-ai/InvokeAI'
+    runs-on: ubuntu-22.04
+    env:
+      TWINE_USERNAME: __token__
+      TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      TWINE_NON_INTERACTIVE: 1
+    steps:
+      - name: checkout sources
+        uses: actions/checkout@v3
+
+      - name: install deps
+        run: pip install --upgrade build twine
+
+      - name: build package
+        run: python3 -m build
+
+      - name: check distribution
+        run: twine check dist/*
+
+      - name: check PyPI versions
+        if: github.ref == 'refs/heads/main'
+        run: |
+          pip install --upgrade requests
+          python -c "\
+          import scripts.pypi_helper; \
+          EXISTS=scripts.pypi_helper.local_on_pypi(); \
+          print(f'PACKAGE_EXISTS={EXISTS}')" >> $GITHUB_ENV
+
+      - name: upload package
+        if: env.PACKAGE_EXISTS == 'False' && env.TWINE_PASSWORD != ''
+        run: twine upload dist/*
