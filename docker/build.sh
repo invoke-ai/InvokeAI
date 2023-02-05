@@ -17,14 +17,14 @@ DOCKERFILE=${INVOKE_DOCKERFILE:-Dockerfile}
 
 # print the settings
 echo -e "You are using these values:\n"
-echo -e "Dockerfile: \t${DOCKERFILE}"
-echo -e "index-url: \t${PIP_EXTRA_INDEX_URL:-none}"
-echo -e "Volumename: \t${VOLUMENAME}"
-echo -e "Platform: \t${PLATFORM}"
-echo -e "Registry: \t${CONTAINER_REGISTRY}"
-echo -e "Repository: \t${CONTAINER_REPOSITORY}"
-echo -e "Container Tag: \t${CONTAINER_TAG}"
-echo -e "Container Image: ${CONTAINER_IMAGE}\n"
+echo -e "Dockerfile:\t\t${DOCKERFILE}"
+echo -e "index-url:\t\t${PIP_EXTRA_INDEX_URL:-none}"
+echo -e "Volumename:\t\t${VOLUMENAME}"
+echo -e "Platform:\t\t${PLATFORM}"
+echo -e "Registry:\t\t${CONTAINER_REGISTRY}"
+echo -e "Repository:\t\t${CONTAINER_REPOSITORY}"
+echo -e "Container Tag:\t\t${CONTAINER_TAG}"
+echo -e "Container Image:\t${CONTAINER_IMAGE}\n"
 
 # Create docker volume
 if [[ -n "$(docker volume ls -f name="${VOLUMENAME}" -q)" ]]; then
