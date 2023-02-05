@@ -15,7 +15,8 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update \
-  && apt-get install -y \
+  && apt-get install \
+    -yqq \
     --no-install-recommends \
     libgl1-mesa-glx=20.3.* \
     libglib2.0-0=2.66.* \
@@ -28,38 +29,24 @@ ARG APPNAME=InvokeAI
 WORKDIR ${APPDIR}
 ENV PATH=${APPDIR}/${APPNAME}/bin:$PATH
 
-######################
-##  build frontend  ##
-######################
-FROM node:lts as frontend-builder
-
-# Copy Sources
-ARG APPDIR=/usr/src
-ARG FRONTEND_DIR=invokeai/frontend
-WORKDIR ${APPDIR}/${FRONTEND_DIR}
-COPY ${FRONTEND_DIR} .
-
-# install dependencies
-RUN \
-  --mount=type=cache,target=/usr/local/share/.cache/yarn \
-  yarn install \
-  --frozen-lockfile \
-  --non-interactive
-
-# build frontend
-RUN yarn build
-
-###################################
-##  install python dependencies  ##
-###################################
+#######################
+##  build pyproject  ##
+#######################
 FROM python-base AS pyproject-builder
 ENV PIP_USE_PEP517=1
 
+# prepare for buildkit cache
+ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
+ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
+RUN mkdir -p ${PIP_CACHE_DIR}
+
 # Install dependencies
 RUN \
+  --mount=type=cache,target=${PIP_CACHE_DIR} \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update \
-  && apt-get install -y \
+  && apt-get install \
+    -yqq \
     --no-install-recommends \
     build-essential=12.9 \
     gcc=4:10.2.* \
@@ -67,19 +54,18 @@ RUN \
   && rm -rf /var/lib/apt/lists/*
 
 # create virtual environment
-RUN python3 -m venv "${APPNAME}" \
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
+  python3 -m venv "${APPNAME}" \
   --upgrade-deps
 
 # copy sources
 COPY --link . .
-ARG FRONTEND_DIR=invokeai/frontend
-COPY --from=frontend-builder ${APPDIR}/${FRONTEND_DIR}/dist ${FRONTEND_DIR}/dist
 
 # install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
 ARG PIP_PACKAGE=.
-RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
   "${APPDIR}/${APPNAME}/bin/pip" install ${PIP_PACKAGE}
 
 # build patchmatch
@@ -91,7 +77,7 @@ RUN python3 -c "from patchmatch import patch_match"
 FROM python-base AS runtime
 
 # setup environment
-COPY --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPDIR}/${APPNAME}
+COPY --from=pyproject-builder --link ${APPDIR}/${APPNAME} ${APPDIR}/${APPNAME}
 ENV INVOKEAI_ROOT=/data
 ENV INVOKE_MODEL_RECONFIGURE="--yes --default_only"
 
