@@ -29,6 +29,7 @@ if [ "$RESPONSE" == 'y' ]; then
 	    echo "Existing/invalid tag"
 	    exit -1
     fi
+
     git push origin :refs/tags/$LATEST_TAG
     git tag -fa $LATEST_TAG
 fi
