@@ -18,7 +18,7 @@ import warnings
 import safetensors.torch
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Union, Any
+from typing import Any, Optional, Union
 from huggingface_hub import scan_cache_dir
 from ldm.util import download_with_progress_bar
 
@@ -880,14 +880,14 @@ class ModelManager(object):
         print('** Migration is done. Continuing...')
 
 
-    def _resolve_path(self, source:Union[str,Path], dest_directory:str)->Path:
+    def _resolve_path(self, source: Union[str, Path], dest_directory: str) -> Optional[Path]:
         resolved_path = None
-        if source.startswith(('http:','https:','ftp:')):
+        if str(source).startswith(('http:','https:','ftp:')):
             basename = os.path.basename(source)
             if not os.path.isabs(dest_directory):
                 dest_directory = os.path.join(Globals.root,dest_directory)
             dest = os.path.join(dest_directory,basename)
-            if download_with_progress_bar(source,dest):
+            if download_with_progress_bar(str(source), Path(dest)):
                 resolved_path = Path(dest)
         else:
             if not os.path.isabs(source):
