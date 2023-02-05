@@ -284,9 +284,9 @@ class ProgressBar():
 
 def download_with_progress_bar(url:str, dest:Path)->bool:
     try:
-        if not os.path.exists(dest):
-            os.makedirs((os.path.dirname(dest) or '.'), exist_ok=True)
-            request.urlretrieve(url,dest,ProgressBar(os.path.basename(dest)))
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            request.urlretrieve(url,dest,ProgressBar(dest.stem))
             return True
         else:
             return True
