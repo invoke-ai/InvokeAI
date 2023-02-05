@@ -71,6 +71,8 @@ def main():
     # when the frozen CLIP tokenizer is imported
     import transformers
     transformers.logging.set_verbosity_error()
+    import diffusers
+    diffusers.logging.set_verbosity_error()
 
     # Loading Face Restoration and ESRGAN Modules
     gfpgan,codeformer,esrgan = load_face_restoration(opt)
