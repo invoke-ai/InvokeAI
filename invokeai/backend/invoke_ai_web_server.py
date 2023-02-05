@@ -626,9 +626,10 @@ class InvokeAIWebServer:
                         printable_parameters["init_mask"][:64] + "..."
                     )
 
-                print(
-                    f">> Image generation requested: {printable_parameters}\nESRGAN parameters: {esrgan_parameters}\nFacetool parameters: {facetool_parameters}"
-                )
+                print(f'\n>> Image Generation Parameters:\n\n{printable_parameters}\n')
+                print(f'>> ESRGAN Parameters: {esrgan_parameters}')
+                print(f'>> Facetool Parameters: {facetool_parameters}')
+
                 self.generate_images(
                     generation_parameters,
                     esrgan_parameters,
@@ -1154,7 +1155,7 @@ class InvokeAIWebServer:
                     image, os.path.basename(path), self.thumbnail_image_path
                 )
 
-                print(f'>> Image generated: "{path}"')
+                print(f'\n\n>> Image generated: "{path}"\n')
                 self.write_log_message(f'[Generated] "{path}": {command}')
 
                 if progress.total_iterations > progress.current_iteration:
@@ -1192,8 +1193,6 @@ class InvokeAIWebServer:
                 eventlet.sleep(0)
 
                 progress.set_current_iteration(progress.current_iteration + 1)
-
-            print(generation_parameters)
 
             def diffusers_step_callback_adapter(*cb_args, **kwargs):
                 if isinstance(cb_args[0], PipelineIntermediateState):
@@ -1304,8 +1303,6 @@ class InvokeAIWebServer:
                 ]
 
             rfc_dict["variations"] = variations
-
-            print(parameters)
 
             if rfc_dict["type"] == "img2img":
                 rfc_dict["strength"] = parameters["strength"]
