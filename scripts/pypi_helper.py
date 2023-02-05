@@ -1,6 +1,6 @@
 import requests
 
-from ldm.invoke.__init__ import __app_name__, __version__
+from ldm.invoke import __app_name__, __version__
 
 local_version = str(__version__).replace("-", "")
 package_name = str(__app_name__)
