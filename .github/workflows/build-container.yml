@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'update/ci/*'
     tags:
       - 'v*.*.*'
 
@@ -42,13 +43,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=ref,event=branch
+            type=ref,event=branch,suffix=-${{ matrix.flavor }}
             type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha,enable=true,prefix=sha-,suffix=${{ matrix.flavor}},format=short
-            type=raw,value={{branch}}-${{ matrix.flavor }}
+            type=sha,enable=true,prefix=sha-,suffix=-${{ matrix.flavor}},format=short
           flavor: |
             latest=${{ matrix.flavor == 'cuda' && github.ref == 'refs/heads/main' }}
 
