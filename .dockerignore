@@ -1,18 +1,21 @@
 # use this file as a whitelist
 *
-!backend
 !invokeai
 !ldm
 !pyproject.toml
 !README.md
-!scripts
 
 # Guard against pulling in any models that might exist in the directory tree
 **/*.pt*
 **/*.ckpt
 
-# whitelist frontend, but ignore node_modules
-invokeai/frontend/node_modules
+# ignore frontend but whitelist dist
+invokeai/frontend/**
+!invokeai/frontend/dist
+
+# ignore invokeai/assets but whitelist invokeai/assets/web
+invokeai/assets
+!invokeai/assets/web
 
 # ignore python cache
 **/__pycache__
