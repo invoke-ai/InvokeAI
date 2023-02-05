@@ -1,28 +1,20 @@
-# Stable Diffusion Web UI
+# InvokeAI UI dev setup
 
-## Run
+The UI is in `invokeai/frontend`.
 
-- `python scripts/dream.py --web` serves both frontend and backend at
-  http://localhost:9090
+## Environment set up
 
-## Evironment
-
-Install [node](https://nodejs.org/en/download/) (includes npm) and optionally
+Install [node](https://nodejs.org/en/download/) (includes npm) and
 [yarn](https://yarnpkg.com/getting-started/install).
 
-From `frontend/` run `npm install` / `yarn install` to install the frontend
-packages.
+From `invokeai/frontend/` run `yarn install` to get everything set up.
 
 ## Dev
 
-1. From `frontend/`, run `npm dev` / `yarn dev` to start the dev server.
-2. Run `python scripts/dream.py --web`.
-3. Navigate to the dev server address e.g. `http://localhost:5173/`.
+1. Start the dev server: `yarn dev`
+2. Start the InvokeAI UI per usual: `invokeai --web`
+3. Point your browser to the dev server address e.g. `http://localhost:5173/`
 
-To build for dev: `npm build-dev` / `yarn build-dev`
+To build for dev: `yarn build-dev`
 
-To build for production: `npm build` / `yarn build`
-
-## TODO
-
-- Search repo for "TODO"
+To build for production: `yarn build`
