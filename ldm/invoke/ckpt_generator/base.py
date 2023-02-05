@@ -15,13 +15,15 @@ from tqdm import tqdm, trange
 from PIL import Image, ImageFilter, ImageChops
 import cv2 as cv
 from einops import rearrange, repeat
+from pathlib import Path
 from pytorch_lightning import seed_everything
+import invokeai.assets.web as web_assets
 from ldm.invoke.devices import choose_autocast
 from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 from ldm.util import rand_perlin_2d
 
 downsampling = 8
-CAUTION_IMG = 'assets/caution.png'
+CAUTION_IMG = 'caution.png'
 
 class CkptGenerator():
     def __init__(self, model, precision):
@@ -314,15 +316,7 @@ class CkptGenerator():
         path = None
         if self.caution_img:
             return self.caution_img
-        # Find the caution image. If we are installed in the package directory it will
-        # be six levels up. If we are in the repo directory it will be three levels up.
-        for dots in ('../../..','../../../../../..'):
-            caution_path = osp.join(osp.dirname(__file__),dots,CAUTION_IMG)
-            if osp.exists(caution_path):
-                path = caution_path
-                break
-        if not path:
-            return
+        path = Path(web_assets.__path__[0]) / CAUTION_IMG
         caution = Image.open(path)
         self.caution_img = caution.resize((caution.width // 2, caution.height //2))
         return self.caution_img

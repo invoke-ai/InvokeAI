@@ -120,7 +120,7 @@ A number of caveats:
    (`--iterations`) argument.
 
 3. Your results will be _much_ better if you use the `inpaint-1.5` model
-   released by runwayML and installed by default by `scripts/configure_invokeai.py`.
+   released by runwayML and installed by default by `invokeai-configure`.
    This model was trained specifically to harmoniously fill in image gaps. The
    standard model will work as well, but you may notice color discontinuities at
    the border.

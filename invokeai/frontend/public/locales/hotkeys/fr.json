@@ -1,0 +1,207 @@
+{
+  "keyboardShortcuts": "Raccourcis clavier",
+  "appHotkeys": "Raccourcis de l'application",
+  "GeneralHotkeys": "Raccourcis généraux",
+  "galleryHotkeys": "Raccourcis de la galerie",
+  "unifiedCanvasHotkeys": "Raccourcis du Canvas unifié",
+  "invoke": {
+    "title": "Invoquer",
+    "desc": "Générer une image"
+  },
+  "cancel": {
+    "title": "Annuler",
+    "desc": "Annuler la génération d'image"
+  },
+  "focusPrompt": {
+    "title": "Prompt de Focus",
+    "desc": "Mettre en focus la zone de saisie de la commande"
+  },
+  "toggleOptions": {
+    "title": "Basculer Options",
+    "desc": "Ouvrir et fermer le panneau d'options"
+  },
+  "pinOptions": {
+    "title": "Epingler Options",
+    "desc": "Epingler le panneau d'options"
+  },
+  "toggleViewer": {
+    "title": "Basculer Visionneuse",
+    "desc": "Ouvrir et fermer la visionneuse d'image"
+  },
+  "toggleGallery": {
+    "title": "Basculer Galerie",
+    "desc": "Ouvrir et fermer le tiroir de galerie"
+  },
+  "maximizeWorkSpace": {
+    "title": "Maximiser Espace de travail",
+    "desc": "Fermer les panneaux et maximiser la zone de travail"
+  },
+  "changeTabs": {
+    "title": "Changer d'onglets",
+    "desc": "Passer à un autre espace de travail"
+  },
+  "consoleToggle": {
+    "title": "Bascule de la console",
+    "desc": "Ouvrir et fermer la console"
+  },
+  "setPrompt": {
+    "title": "Définir le prompt",
+    "desc": "Utiliser le prompt de l'image actuelle"
+  },
+  "setSeed": {
+    "title": "Définir la graine",
+    "desc": "Utiliser la graine de l'image actuelle"
+  },
+  "setParameters": {
+    "title": "Définir les paramètres",
+    "desc": "Utiliser tous les paramètres de l'image actuelle"
+  },
+  "restoreFaces": {
+    "title": "Restaurer les faces",
+    "desc": "Restaurer l'image actuelle"
+  },
+  "upscale": {
+    "title": "Agrandir",
+    "desc": "Agrandir l'image actuelle"
+  },
+  "showInfo": {
+    "title": "Afficher les informations",
+    "desc": "Afficher les informations de métadonnées de l'image actuelle"
+  },
+  "sendToImageToImage": {
+    "title": "Envoyer à l'image à l'image",
+    "desc": "Envoyer l'image actuelle à l'image à l'image"
+  },
+  "deleteImage": {
+    "title": "Supprimer l'image",
+    "desc": "Supprimer l'image actuelle"
+  },
+  "closePanels": {
+    "title": "Fermer les panneaux",
+    "desc": "Fermer les panneaux ouverts"
+  },
+   "previousImage": {
+    "title": "Image précédente",
+    "desc": "Afficher l'image précédente dans la galerie"
+  },
+  "nextImage": {
+    "title": "Image suivante",
+    "desc": "Afficher l'image suivante dans la galerie"
+  },
+  "toggleGalleryPin": {
+    "title": "Activer/désactiver l'épinglage de la galerie",
+    "desc": "Épingle ou dépingle la galerie à l'interface utilisateur"
+  },
+  "increaseGalleryThumbSize": {
+    "title": "Augmenter la taille des miniatures de la galerie",
+    "desc": "Augmente la taille des miniatures de la galerie"
+  },
+  "decreaseGalleryThumbSize": {
+    "title": "Diminuer la taille des miniatures de la galerie",
+    "desc": "Diminue la taille des miniatures de la galerie"
+  },
+  "selectBrush": {
+    "title": "Sélectionner un pinceau",
+    "desc": "Sélectionne le pinceau de la toile"
+  },
+  "selectEraser": {
+    "title": "Sélectionner un gomme",
+    "desc": "Sélectionne la gomme de la toile"
+  },
+  "decreaseBrushSize": {
+    "title": "Diminuer la taille du pinceau",
+    "desc": "Diminue la taille du pinceau/gomme de la toile"
+  },
+  "increaseBrushSize": {
+    "title": "Augmenter la taille du pinceau",
+    "desc": "Augmente la taille du pinceau/gomme de la toile"
+  },
+  "decreaseBrushOpacity": {
+    "title": "Diminuer l'opacité du pinceau",
+    "desc": "Diminue l'opacité du pinceau de la toile"
+  },
+  "increaseBrushOpacity": {
+    "title": "Augmenter l'opacité du pinceau",
+    "desc": "Augmente l'opacité du pinceau de la toile"
+  },
+  "moveTool": {
+    "title": "Outil de déplacement",
+    "desc": "Permet la navigation sur la toile"
+  },
+  "fillBoundingBox": {
+    "title": "Remplir la boîte englobante",
+    "desc": "Remplit la boîte englobante avec la couleur du pinceau"
+  },
+  "eraseBoundingBox": {
+    "title": "Effacer la boîte englobante",
+    "desc": "Efface la zone de la boîte englobante"
+  },
+  "colorPicker": {
+    "title": "Sélectionnez le sélecteur de couleur",
+    "desc": "Sélectionne le sélecteur de couleur de la toile"
+  },
+  "toggleSnap": {
+    "title": "Basculer Snap",
+    "desc": "Basculer Snap à la grille"
+  },
+  "quickToggleMove": {
+    "title": "Basculer rapidement déplacer",
+    "desc": "Basculer temporairement le mode Déplacer"
+  },
+  "toggleLayer": {
+    "title": "Basculer la couche",
+    "desc": "Basculer la sélection de la couche masque/base"
+  },
+  "clearMask": {
+    "title": "Effacer le masque",
+    "desc": "Effacer entièrement le masque"
+  },
+  "hideMask": {
+    "title": "Masquer le masque",
+    "desc": "Masquer et démasquer le masque"
+  },
+  "showHideBoundingBox": {
+    "title": "Afficher/Masquer la boîte englobante",
+    "desc": "Basculer la visibilité de la boîte englobante"
+  },
+  "mergeVisible": {
+    "title": "Fusionner visible",
+    "desc": "Fusionner toutes les couches visibles de la toile"
+  },
+  "saveToGallery": {
+    "title": "Enregistrer dans la galerie",
+    "desc": "Enregistrer la toile actuelle dans la galerie"
+  },
+  "copyToClipboard": {
+    "title": "Copier dans le presse-papiers",
+    "desc": "Copier la toile actuelle dans le presse-papiers"
+  },
+  "downloadImage": {
+    "title": "Télécharger l'image",
+    "desc": "Télécharger la toile actuelle"
+  },
+  "undoStroke": {
+    "title": "Annuler le trait",
+    "desc": "Annuler un coup de pinceau"
+  },
+  "redoStroke": {
+    "title": "Rétablir le trait",
+    "desc": "Rétablir un coup de pinceau"
+  },
+  "resetView": {
+    "title": "Réinitialiser la vue",
+    "desc": "Réinitialiser la vue de la toile"
+  },
+  "previousStagingImage": {
+    "title": "Image de mise en scène précédente",
+    "desc": "Image précédente de la zone de mise en scène"
+  },
+  "nextStagingImage": {
+    "title": "Image de mise en scène suivante",
+    "desc": "Image suivante de la zone de mise en scène"
+  },
+  "acceptStagingImage": {
+    "title": "Accepter l'image de mise en scène",
+    "desc": "Accepter l'image actuelle de la zone de mise en scène"
+  }
+}

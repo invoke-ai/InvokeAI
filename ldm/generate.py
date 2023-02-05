@@ -574,7 +574,7 @@ class Generate:
             print('>> Could not generate image.')
 
         toc = time.time()
-        print('>> Usage stats:')
+        print('\n>> Usage stats:')
         print(
             f'>>   {len(results)} image(s) generated in', '%4.2fs' % (
                 toc - tic)
@@ -847,7 +847,7 @@ class Generate:
         # the model cache does the loading and offloading
         cache = self.model_manager
         if not cache.valid_model(model_name):
-            raise KeyError('** "{model_name}" is not a known model name. Cannot change.')
+            raise KeyError(f'** "{model_name}" is not a known model name. Cannot change.')
 
         cache.print_vram_usage()
 

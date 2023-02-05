@@ -55,17 +55,18 @@ dependencies = [
   "k-diffusion",              # replacing "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
   "kornia",
   "npyscreen",
-  "numpy~=1.23",
+  "numpy<1.24",
   "omegaconf",
   "opencv-python",
   "picklescan",
   "pillow",
   "pudb",
+  "prompt-toolkit",
   "pypatchmatch",
   "pyreadline3",
   "pytorch-lightning==1.7.7",
   "realesrgan",
-  "requests==2.25.1",
+  "requests==2.28.2",
   "safetensors",
   "scikit-image>=0.19",
   "send2trash",
@@ -87,13 +88,25 @@ dependencies = [
   "mkdocs-git-revision-date-localized-plugin",
   "mkdocs-redirects==1.2.0",
 ]
-test = ["pytest>6.0.0", "pytest-cov"]
+"test" = ["pytest>6.0.0", "pytest-cov"]
+"xformers" = [
+	   "xformers~=0.0.16; sys_platform!='darwin'",
+	   "triton; sys_platform=='linux'",
+]
 
 [project.scripts]
-"configure_invokeai" = "ldm.invoke.configure_invokeai:main"
-"invoke" = "ldm.invoke.CLI:main"
-"textual_inversion" = "ldm.invoke.textual_inversion:main"
-"merge_models" = "ldm.invoke.merge_diffusers:main"   # note name munging
+
+# legacy entrypoints; provided for backwards compatibility
+"invoke.py" = "ldm.invoke.CLI:main"
+"configure_invokeai.py" = "ldm.invoke.config.invokeai_configure:main"
+"textual_inversion.py" = "ldm.invoke.training.textual_inversion:main"
+"merge_embeddings.py" = "ldm.invoke.merge_diffusers:main"
+
+# modern entrypoints
+"invokeai" = "ldm.invoke.CLI:main"
+"invokeai-configure" = "ldm.invoke.config.invokeai_configure:main"
+"invokeai-merge" = "ldm.invoke.merge_diffusers:main"   # note name munging
+"invokeai-ti" = "ldm.invoke.training.textual_inversion:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
@@ -107,20 +120,13 @@ version = { attr = "ldm.invoke.__version__" }
 
 [tool.setuptools.packages.find]
 "where" = ["."]
-"include" = ["assets", "backend*", "configs*", "frontend.dist*", "ldm*"]
+"include" = ["invokeai.assets.web*", "invokeai.backend*", "invokeai.frontend.dist*", "invokeai.configs*", "ldm*"]
 
 [tool.setuptools.package-data]
-"assets" = ["caution.png"]
-"backend" = ["**.png"]
-"configs" = ["*.example", "**/*.yaml", "*.txt"]
-"frontend.dist" = ["**"]
-
-[tool.setuptools.exclude-package-data]
-configs = ["models.yaml"]
+"invokeai.assets.web" = ["**.png"]
+"invokeai.backend" = ["**.png"]
+"invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
+"invokeai.frontend.dist" = ["**"]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov=./ldm/ --cov=./backend --cov-branch"
-python_files = ["test_*.py"]
-pythonpath = [".venv/lib/python3.9", ".venv/lib/python3.10"]
-testpaths = ["tests"]
+addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"

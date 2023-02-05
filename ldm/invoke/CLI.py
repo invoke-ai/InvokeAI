@@ -4,6 +4,9 @@ import sys
 import shlex
 import traceback
 
+if sys.platform == "darwin":
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 from ldm.invoke.globals import Globals
 from ldm.generate import Generate
 from ldm.invoke.prompt_parser import PromptParser
@@ -20,38 +23,6 @@ import ldm.invoke
 
 # global used in multiple functions (fix)
 infile = None
-
-def report_model_error(opt:Namespace, e:Exception):
-    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
-    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
-    if not str("--yes") in os.environ['INVOKE_MODEL_RECONFIGURE'].split():
-        response = input('Do you want to run configure_invokeai.py to select and/or reinstall models? [y] ')
-        if response.startswith(('n','N')):
-            return
-
-    print('configure_invokeai is launching....\n')
-
-    # Match arguments that were set on the CLI
-    # only the arguments accepted by the configuration script are parsed
-    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
-    config = ["--config", opt.conf] if opt.conf is not None else []
-    if os.getenv('INVOKE_MODEL_RECONFIGURE'):
-        yes_to_all = os.environ['INVOKE_MODEL_RECONFIGURE'].split()
-    else:
-        yes_to_all = None
-    previous_args = sys.argv
-    sys.argv = [ 'configure_invokeai' ]
-    sys.argv.extend(root_dir)
-    sys.argv.extend(config)
-    if yes_to_all is not None:
-        for argv in yes_to_all:
-            sys.argv.append(argv)
-
-    import ldm.invoke.configure_invokeai as configure_invokeai
-    sys.exit(configure_invokeai.main())
-    print('** InvokeAI will now restart')
-    sys.argv = previous_args
-    sys.exit(main()) # would rather do a os.exec(), but doesn't exist?
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
@@ -73,11 +44,13 @@ def main():
             print('--max_loaded_models must be >= 1; using 1')
             args.max_loaded_models = 1
 
-    # alert - setting a global here
+    # alert - setting a few globals here
     Globals.try_patchmatch = args.patchmatch
     Globals.always_use_cpu = args.always_use_cpu
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
+    Globals.ckpt_convert = args.ckpt_convert
+
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
@@ -98,6 +71,8 @@ def main():
     # when the frozen CLIP tokenizer is imported
     import transformers
     transformers.logging.set_verbosity_error()
+    import diffusers
+    diffusers.logging.set_verbosity_error()
 
     # Loading Face Restoration and ESRGAN Modules
     gfpgan,codeformer,esrgan = load_face_restoration(opt)
@@ -746,11 +721,16 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
         print(f'** {model_name_or_path} is already optimized. Will not overwrite. If this is an error, please remove the directory {diffuser_path} and try again.')
         return
 
+    vae = None
+    if input('Replace this model\'s VAE with "stabilityai/sd-vae-ft-mse"? [n] ').strip() in ('y','Y'):
+        vae = dict(repo_id='stabilityai/sd-vae-ft-mse')
+
     new_config = gen.model_manager.convert_and_import(
         ckpt_path,
         diffuser_path,
         model_name=model_name,
         model_description=model_description,
+        vae = vae,
         commit_to_conf=opt.conf,
     )
     if not new_config:
@@ -988,7 +968,7 @@ def get_next_command(infile=None, model_name='no model') -> str:  # command stri
 
 def invoke_ai_web_server_loop(gen: Generate, gfpgan, codeformer, esrgan):
     print('\n* --web was specified, starting web server...')
-    from backend.invoke_ai_web_server import InvokeAIWebServer
+    from invokeai.backend import InvokeAIWebServer
     # Change working directory to the stable-diffusion directory
     os.chdir(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -1129,6 +1109,38 @@ def write_commands(opt, file_path:str, outfilepath:str):
         with open(outfilepath, 'w', encoding='utf-8') as f:
             f.write('\n'.join(commands))
         print(f'>> File {outfilepath} with commands created')
+
+def report_model_error(opt:Namespace, e:Exception):
+    print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
+    print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
+    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
+    if yes_to_all:
+        print('** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE')
+    else:
+        response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
+        if response.startswith(('n', 'N')):
+            return
+
+    print('invokeai-configure is launching....\n')
+
+    # Match arguments that were set on the CLI
+    # only the arguments accepted by the configuration script are parsed
+    root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
+    config = ["--config", opt.conf] if opt.conf is not None else []
+    previous_args = sys.argv
+    sys.argv = [ 'invokeai-configure' ]
+    sys.argv.extend(root_dir)
+    sys.argv.extend(config)
+    if yes_to_all is not None:
+        for arg in yes_to_all.split():
+            sys.argv.append(arg)
+
+    from ldm.invoke.config import invokeai_configure
+    invokeai_configure.main()
+    print('** InvokeAI will now restart')
+    sys.argv = previous_args
+    main() # would rather do a os.exec(), but doesn't exist?
+    sys.exit(0)
 
 def check_internet()->bool:
     '''

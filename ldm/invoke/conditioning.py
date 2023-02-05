@@ -17,6 +17,7 @@ from ..models.diffusion import cross_attention_control
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
 from ..modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
+from ldm.invoke.globals import Globals
 
 
 def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
@@ -92,9 +93,9 @@ def _get_conditioning_for_prompt(parsed_prompt: Union[Blend, FlattenedPrompt], p
     Process prompt structure and tokens, and return (conditioning, unconditioning, extra_conditioning_info)
     """
 
-    if log_tokens:
-        print(f">> Parsed prompt to {parsed_prompt}")
-        print(f">> Parsed negative prompt to {parsed_negative_prompt}")
+    if log_tokens or Globals.log_tokenization:
+        print(f"\n>> [TOKENLOG] Parsed Prompt: {parsed_prompt}")
+        print(f"\n>> [TOKENLOG] Parsed Negative Prompt: {parsed_negative_prompt}")
 
     conditioning = None
     cac_args: cross_attention_control.Arguments = None
@@ -235,7 +236,7 @@ def _get_embeddings_and_tokens_for_prompt(model, flattened_prompt: FlattenedProm
     fragments = [x.text for x in flattened_prompt.children]
     weights = [x.weight for x in flattened_prompt.children]
     embeddings, tokens = model.get_learned_conditioning([fragments], return_tokens=True, fragment_weights=[weights])
-    if log_tokens:
+    if log_tokens or Globals.log_tokenization:
         text = " ".join(fragments)
         log_tokenization(text, model, display_label=log_display_label)
 
@@ -273,12 +274,12 @@ def log_tokenization(text, model, display_label=None):
     # usually tokens have '</w>' to indicate end-of-word,
     # but for readability it has been replaced with ' '
     """
-
     tokens = model.cond_stage_model.tokenizer.tokenize(text)
     tokenized = ""
     discarded = ""
     usedTokens = 0
     totalTokens = len(tokens)
+
     for i in range(0, totalTokens):
         token = tokens[i].replace('</w>', ' ')
         # alternate color
@@ -288,8 +289,11 @@ def log_tokenization(text, model, display_label=None):
             usedTokens += 1
         else:  # over max token length
             discarded = discarded + f"\x1b[0;3{s};40m{token}"
-    print(f"\n>> Tokens {display_label or ''} ({usedTokens}):\n{tokenized}\x1b[0m")
+
+    if usedTokens > 0:
+        print(f'\n>> [TOKENLOG] Tokens {display_label or ""} ({usedTokens}):')
+        print(f'{tokenized}\x1b[0m')
+    
     if discarded != "":
-        print(
-            f">> Tokens Discarded ({totalTokens - usedTokens}):\n{discarded}\x1b[0m"
-        )
+        print(f'\n>> [TOKENLOG] Tokens Discarded ({totalTokens - usedTokens}):')
+        print(f'{discarded}\x1b[0m')

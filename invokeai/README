@@ -1,0 +1,3 @@
+After version 2.3 is released, the ldm/invoke modules will be migrated to this location
+so that we have a proper invokeai distribution. Currently it is only being used for
+data files.

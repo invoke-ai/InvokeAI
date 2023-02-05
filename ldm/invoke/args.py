@@ -196,6 +196,7 @@ class Args(object):
             elif os.path.exists(legacyinit):
                 print(f'>> WARNING: Old initialization file found at {legacyinit}. This location is deprecated. Please move it to {Globals.root}/invokeai.init.')
                 sysargs.insert(0,f'@{legacyinit}')
+            Globals.log_tokenization = self._arg_parser.parse_args(sysargs).log_tokenization
 
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
@@ -504,6 +505,13 @@ class Args(object):
             default='auto',
         )
         model_group.add_argument(
+            '--ckpt_convert',
+            action=argparse.BooleanOptionalAction,
+            dest='ckpt_convert',
+            default=False,
+            help='Load legacy ckpt files as diffusers. Pass --no-ckpt-convert to inhibit this behavior',
+        )
+        model_group.add_argument(
             '--internet',
             action=argparse.BooleanOptionalAction,
             dest='internet_available',
@@ -591,6 +599,12 @@ class Args(object):
             metavar='SAMPLER_NAME',
             help=f'Set the default sampler. Supported samplers: {", ".join(SAMPLER_CHOICES)}',
             default='k_lms',
+        )
+        render_group.add_argument(
+            '--log_tokenization',
+            '-t',
+            action='store_true',
+            help='shows how the prompt is split into tokens'
         )
         render_group.add_argument(
             '-f',
@@ -737,7 +751,7 @@ class Args(object):
                 invoke> !fetch 0000015.8929913.png
                 invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
                 invoke> !fetch /path/to/images/*.png prompts.txt
- 
+
             !replay /path/to/prompts.txt
             Replays all the prompts contained in the file prompts.txt.
 

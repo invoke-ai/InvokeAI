@@ -20,9 +20,11 @@
 import os
 import re
 import torch
+import warnings
 from pathlib import Path
 from ldm.invoke.globals import Globals, global_cache_dir
 from safetensors.torch import load_file
+from typing import Union
 
 try:
     from omegaconf import OmegaConf
@@ -43,11 +45,14 @@ from diffusers import (
     PNDMScheduler,
     StableDiffusionPipeline,
     UNet2DConditionModel,
+    logging as dlogging,
 )
 from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
 from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder, PaintByExamplePipeline
-from diffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
+from diffusers.utils import is_safetensors_available
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextModel, CLIPTokenizer, CLIPVisionConfig
+
+from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """
@@ -318,11 +323,10 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     unet_key = "model.diffusion_model."
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100:
-        print(f"Checkpoint {path} has both EMA and non-EMA weights.")
+        print(f"  | Checkpoint {path} has both EMA and non-EMA weights.")
         if extract_ema:
             print(
-                "In this conversion only the EMA weights are extracted. If you want to instead extract the non-EMA"
-                " weights (useful to continue fine-tuning), please make sure to remove the `--extract_ema` flag."
+                '  | Extracting EMA weights (usually better for inference)'
             )
             for key in keys:
                 if key.startswith("model.diffusion_model"):
@@ -330,8 +334,7 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                     unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(flat_ema_key)
         else:
             print(
-                "In this conversion only the non-EMA weights are extracted. If you want to instead extract the EMA"
-                " weights (usually better for inference), please make sure to add the `--extract_ema` flag."
+                '  | Extracting only the non-EMA weights (usually better for fine-tuning)'
             )
 
     for key in keys:
@@ -784,173 +787,231 @@ def convert_open_clip_checkpoint(checkpoint):
 
     return text_model
 
-def convert_ckpt_to_diffuser(checkpoint_path:str,
-                             dump_path:str,
-                             original_config_file:str=None,
-                             num_in_channels:int=None,
-                             scheduler_type:str='pndm',
-                             pipeline_type:str=None,
-                             image_size:int=None,
-                             prediction_type:str=None,
-                             extract_ema:bool=False,
-                             upcast_attn:bool=False,
-                             ):
+def load_pipeline_from_original_stable_diffusion_ckpt(
+        checkpoint_path:str,
+        original_config_file:str=None,
+        num_in_channels:int=None,
+        scheduler_type:str='pndm',
+        pipeline_type:str=None,
+        image_size:int=None,
+        prediction_type:str=None,
+        extract_ema:bool=True,
+        upcast_attn:bool=False,
+        vae:AutoencoderKL=None,
+        return_generator_pipeline:bool=False,
+)->Union[StableDiffusionPipeline,StableDiffusionGeneratorPipeline]:
+    '''
+    Load a Stable Diffusion pipeline object from a CompVis-style `.ckpt`/`.safetensors` file and (ideally) a `.yaml`
+    config file.
 
-    checkpoint = load_file(checkpoint_path) if Path(checkpoint_path).suffix == '.safetensors' else torch.load(checkpoint_path)
-    cache_dir = global_cache_dir('hub')
+    Although many of the arguments can be automatically inferred, some of these rely on brittle checks against the
+    global step count, which will likely fail for models that have undergone further fine-tuning. Therefore, it is
+    recommended that you override the default values and/or supply an `original_config_file` wherever possible.
 
-    # Sometimes models don't have the global_step item
-    if "global_step" in checkpoint:
-        global_step = checkpoint["global_step"]
-    else:
-        print("global_step key not found in model")
-        global_step = None
+    :param checkpoint_path: Path to `.ckpt` file. 
+    :param original_config_file: Path to `.yaml` config file corresponding to the original architecture. 
+      If `None`, will be automatically inferred by looking for a key that only exists in SD2.0 models.
+    :param image_size: The image size that the model was trained on. Use 512 for Stable Diffusion v1.X and Stable Diffusion v2
+      Base. Use 768 for Stable Diffusion v2.
+    :param prediction_type: The prediction type that the model was trained on. Use `'epsilon'` for Stable Diffusion
+     v1.X and Stable Diffusion v2 Base. Use `'v-prediction'` for Stable Diffusion v2.
+    :param num_in_channels: The number of input channels. If `None` number of input channels will be automatically
+    inferred. 
+    :param scheduler_type: Type of scheduler to use. Should be one of `["pndm", "lms", "heun", "euler",
+     "euler-ancestral", "dpm", "ddim"]`. :param model_type: The pipeline type. `None` to automatically infer, or one of
+     `["FrozenOpenCLIPEmbedder", "FrozenCLIPEmbedder", "PaintByExample"]`. :param extract_ema: Only relevant for
+     checkpoints that have both EMA and non-EMA weights. Whether to extract the EMA weights
+     or not. Defaults to `False`. Pass `True` to extract the EMA weights. EMA weights usually yield higher
+     quality images for inference. Non-EMA weights are usually better to continue fine-tuning.
+    :param upcast_attention: Whether the attention computation should always be upcasted. This is necessary when
+    running stable diffusion 2.1.
+    '''
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        verbosity = dlogging.get_verbosity()
+        dlogging.set_verbosity_error()
 
-    # sometimes there is a state_dict key and sometimes not
-    if 'state_dict' in checkpoint:
-        checkpoint = checkpoint["state_dict"]
+        checkpoint = load_file(checkpoint_path) if Path(checkpoint_path).suffix == '.safetensors' else torch.load(checkpoint_path)
+        cache_dir = global_cache_dir('hub')
+        pipeline_class = StableDiffusionGeneratorPipeline if return_generator_pipeline else StableDiffusionPipeline
 
-    upcast_attention = False
-    if original_config_file is None:
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-
-        if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-            original_config_file = os.path.join(Globals.root,'configs','stable-diffusion','v2-inference-v.yaml')
-
-            if global_step == 110000:
-                # v2.1 needs to upcast attention
-                upcast_attention = True
+        # Sometimes models don't have the global_step item
+        if "global_step" in checkpoint:
+            global_step = checkpoint["global_step"]
         else:
-            original_config_file = os.path.join(Globals.root,'configs','stable-diffusion','v1-inference.yaml')
+            print("  | global_step key not found in model")
+            global_step = None
 
-    original_config = OmegaConf.load(original_config_file)
+        # sometimes there is a state_dict key and sometimes not
+        if 'state_dict' in checkpoint:
+            checkpoint = checkpoint["state_dict"]
 
-    if num_in_channels is not None:
-        original_config["model"]["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
+        upcast_attention = False
+        if original_config_file is None:
+            key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
 
-    if (
-        "parameterization" in original_config["model"]["params"]
-        and original_config["model"]["params"]["parameterization"] == "v"
-    ):
-        if prediction_type is None:
-            # NOTE: For stable diffusion 2 base it is recommended to pass `prediction_type=="epsilon"`
-            # as it relies on a brittle global step parameter here
-            prediction_type = "epsilon" if global_step == 875000 else "v_prediction"
-        if image_size is None:
-            # NOTE: For stable diffusion 2 base one has to pass `image_size==512`
-            # as it relies on a brittle global step parameter here
-            image_size = 512 if global_step == 875000 else 768
-    else:
-        if prediction_type is None:
-            prediction_type = "epsilon"
-        if image_size is None:
-            image_size = 512
+            if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
+                original_config_file = os.path.join(Globals.root,'configs','stable-diffusion','v2-inference-v.yaml')
 
-    num_train_timesteps = original_config.model.params.timesteps
-    beta_start = original_config.model.params.linear_start
-    beta_end = original_config.model.params.linear_end
+                if global_step == 110000:
+                    # v2.1 needs to upcast attention
+                    upcast_attention = True
+            else:
+                original_config_file = os.path.join(Globals.root,'configs','stable-diffusion','v1-inference.yaml')
 
-    scheduler = DDIMScheduler(
-        beta_end=beta_end,
-        beta_schedule="scaled_linear",
-        beta_start=beta_start,
-        num_train_timesteps=num_train_timesteps,
-        steps_offset=1,
-        clip_sample=False,
-        set_alpha_to_one=False,
-        prediction_type=prediction_type,
+        original_config = OmegaConf.load(original_config_file)
+
+        if num_in_channels is not None:
+            original_config["model"]["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
+
+        if (
+            "parameterization" in original_config["model"]["params"]
+            and original_config["model"]["params"]["parameterization"] == "v"
+        ):
+            if prediction_type is None:
+                # NOTE: For stable diffusion 2 base it is recommended to pass `prediction_type=="epsilon"`
+                # as it relies on a brittle global step parameter here
+                prediction_type = "epsilon" if global_step == 875000 else "v_prediction"
+            if image_size is None:
+                # NOTE: For stable diffusion 2 base one has to pass `image_size==512`
+                # as it relies on a brittle global step parameter here
+                image_size = 512 if global_step == 875000 else 768
+        else:
+            if prediction_type is None:
+                prediction_type = "epsilon"
+            if image_size is None:
+                image_size = 512
+
+        num_train_timesteps = original_config.model.params.timesteps
+        beta_start = original_config.model.params.linear_start
+        beta_end = original_config.model.params.linear_end
+
+        scheduler = DDIMScheduler(
+            beta_end=beta_end,
+            beta_schedule="scaled_linear",
+            beta_start=beta_start,
+            num_train_timesteps=num_train_timesteps,
+            steps_offset=1,
+            clip_sample=False,
+            set_alpha_to_one=False,
+            prediction_type=prediction_type,
+        )
+        # make sure scheduler works correctly with DDIM
+        scheduler.register_to_config(clip_sample=False)
+
+        if scheduler_type == "pndm":
+            config = dict(scheduler.config)
+            config["skip_prk_steps"] = True
+            scheduler = PNDMScheduler.from_config(config)
+        elif scheduler_type == "lms":
+            scheduler = LMSDiscreteScheduler.from_config(scheduler.config)
+        elif scheduler_type == "heun":
+            scheduler = HeunDiscreteScheduler.from_config(scheduler.config)
+        elif scheduler_type == "euler":
+            scheduler = EulerDiscreteScheduler.from_config(scheduler.config)
+        elif scheduler_type == "euler-ancestral":
+            scheduler = EulerAncestralDiscreteScheduler.from_config(scheduler.config)
+        elif scheduler_type == "dpm":
+            scheduler = DPMSolverMultistepScheduler.from_config(scheduler.config)
+        elif scheduler_type == "ddim":
+            scheduler = scheduler
+        else:
+            raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
+
+        # Convert the UNet2DConditionModel model.
+        unet_config = create_unet_diffusers_config(original_config, image_size=image_size)
+        unet_config["upcast_attention"] = upcast_attention
+        unet = UNet2DConditionModel(**unet_config)
+
+        converted_unet_checkpoint = convert_ldm_unet_checkpoint(
+            checkpoint, unet_config, path=checkpoint_path, extract_ema=extract_ema
+        )
+
+        unet.load_state_dict(converted_unet_checkpoint)
+
+        # Convert the VAE model, or use the one passed
+        if not vae:
+            print('  | Using checkpoint model\'s original VAE')
+            vae_config = create_vae_diffusers_config(original_config, image_size=image_size)
+            converted_vae_checkpoint = convert_ldm_vae_checkpoint(checkpoint, vae_config)
+
+            vae = AutoencoderKL(**vae_config)
+            vae.load_state_dict(converted_vae_checkpoint)
+        else:
+            print('  | Using external VAE specified in config')
+
+        # Convert the text model.
+        model_type = pipeline_type
+        if model_type is None:
+            model_type = original_config.model.params.cond_stage_config.target.split(".")[-1]
+
+        if model_type == "FrozenOpenCLIPEmbedder":
+            text_model = convert_open_clip_checkpoint(checkpoint)
+            tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2",
+                                                      subfolder="tokenizer",
+                                                      cache_dir=global_cache_dir('diffusers')
+                                                      )
+            pipe = pipeline_class(
+                vae=vae,
+                text_encoder=text_model,
+                tokenizer=tokenizer,
+                unet=unet,
+                scheduler=scheduler,
+                safety_checker=None,
+                feature_extractor=None,
+                requires_safety_checker=False,
+            )
+        elif model_type == "PaintByExample":
+            vision_model = convert_paint_by_example_checkpoint(checkpoint)
+            tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14",cache_dir=cache_dir)
+            feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
+            pipe = PaintByExamplePipeline(
+                vae=vae,
+                image_encoder=vision_model,
+                unet=unet,
+                scheduler=scheduler,
+                safety_checker=None,
+                feature_extractor=feature_extractor,
+            )
+        elif model_type in ['FrozenCLIPEmbedder','WeightedFrozenCLIPEmbedder']:
+            text_model = convert_ldm_clip_checkpoint(checkpoint)
+            tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14",cache_dir=cache_dir)
+            feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
+            pipe = pipeline_class(
+                vae=vae,
+                text_encoder=text_model,
+                tokenizer=tokenizer,
+                unet=unet,
+                scheduler=scheduler,
+                safety_checker=None,
+                feature_extractor=feature_extractor,
+            )
+        else:
+            text_config = create_ldm_bert_config(original_config)
+            text_model = convert_ldm_bert_checkpoint(checkpoint, text_config)
+            tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased",cache_dir=cache_dir)
+            pipe = LDMTextToImagePipeline(vqvae=vae, bert=text_model, tokenizer=tokenizer, unet=unet, scheduler=scheduler)
+    dlogging.set_verbosity(verbosity)
+
+    return pipe
+
+def convert_ckpt_to_diffuser(
+        checkpoint_path:Union[str,Path],
+        dump_path:Union[str,Path],
+        **kwargs,
+):
+    '''
+    Takes all the arguments of load_pipeline_from_original_stable_diffusion_ckpt(),
+    and in addition a path-like object indicating the location of the desired diffusers
+    model to be written.
+    '''
+    pipe = load_pipeline_from_original_stable_diffusion_ckpt(
+        checkpoint_path,
+        **kwargs
     )
-    # make sure scheduler works correctly with DDIM
-    scheduler.register_to_config(clip_sample=False)
-
-    if scheduler_type == "pndm":
-        config = dict(scheduler.config)
-        config["skip_prk_steps"] = True
-        scheduler = PNDMScheduler.from_config(config)
-    elif scheduler_type == "lms":
-        scheduler = LMSDiscreteScheduler.from_config(scheduler.config)
-    elif scheduler_type == "heun":
-        scheduler = HeunDiscreteScheduler.from_config(scheduler.config)
-    elif scheduler_type == "euler":
-        scheduler = EulerDiscreteScheduler.from_config(scheduler.config)
-    elif scheduler_type == "euler-ancestral":
-        scheduler = EulerAncestralDiscreteScheduler.from_config(scheduler.config)
-    elif scheduler_type == "dpm":
-        scheduler = DPMSolverMultistepScheduler.from_config(scheduler.config)
-    elif scheduler_type == "ddim":
-        scheduler = scheduler
-    else:
-        raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
-
-    # Convert the UNet2DConditionModel model.
-    unet_config = create_unet_diffusers_config(original_config, image_size=image_size)
-    unet_config["upcast_attention"] = upcast_attention
-    unet = UNet2DConditionModel(**unet_config)
-
-    converted_unet_checkpoint = convert_ldm_unet_checkpoint(
-        checkpoint, unet_config, path=checkpoint_path, extract_ema=extract_ema
-    )
-
-    unet.load_state_dict(converted_unet_checkpoint)
-
-    # Convert the VAE model.
-    vae_config = create_vae_diffusers_config(original_config, image_size=image_size)
-    converted_vae_checkpoint = convert_ldm_vae_checkpoint(checkpoint, vae_config)
-
-    vae = AutoencoderKL(**vae_config)
-    vae.load_state_dict(converted_vae_checkpoint)
-
-    # Convert the text model.
-    model_type = pipeline_type
-    if model_type is None:
-        model_type = original_config.model.params.cond_stage_config.target.split(".")[-1]
-
-    if model_type == "FrozenOpenCLIPEmbedder":
-        text_model = convert_open_clip_checkpoint(checkpoint)
-        tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2", subfolder="tokenizer",cache_dir=global_cache_dir('diffusers'))
-        pipe = StableDiffusionPipeline(
-            vae=vae,
-            text_encoder=text_model,
-            tokenizer=tokenizer,
-            unet=unet,
-            scheduler=scheduler,
-            safety_checker=None,
-            feature_extractor=None,
-            requires_safety_checker=False,
-        )
-    elif model_type == "PaintByExample":
-        vision_model = convert_paint_by_example_checkpoint(checkpoint)
-        tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14",cache_dir=cache_dir)
-        feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
-        pipe = PaintByExamplePipeline(
-            vae=vae,
-            image_encoder=vision_model,
-            unet=unet,
-            scheduler=scheduler,
-            safety_checker=None,
-            feature_extractor=feature_extractor,
-        )
-    elif model_type in ['FrozenCLIPEmbedder','WeightedFrozenCLIPEmbedder']:
-        text_model = convert_ldm_clip_checkpoint(checkpoint)
-        tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14",cache_dir=cache_dir)
-        safety_checker = StableDiffusionSafetyChecker.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
-        feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker",cache_dir=cache_dir)
-        pipe = StableDiffusionPipeline(
-            vae=vae,
-            text_encoder=text_model,
-            tokenizer=tokenizer,
-            unet=unet,
-            scheduler=scheduler,
-            safety_checker=safety_checker,
-            feature_extractor=feature_extractor,
-        )
-    else:
-        text_config = create_ldm_bert_config(original_config)
-        text_model = convert_ldm_bert_checkpoint(checkpoint, text_config)
-        tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased",cache_dir=cache_dir)
-        pipe = LDMTextToImagePipeline(vqvae=vae, bert=text_model, tokenizer=tokenizer, unet=unet, scheduler=scheduler)
-
+    
     pipe.save_pretrained(
         dump_path,
-        safe_serialization=1,                 
+        safe_serialization=is_safetensors_available(),
     )

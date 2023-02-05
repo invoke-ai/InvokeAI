@@ -3,14 +3,14 @@ name: Lint frontend
 on:
   pull_request:
     paths:
-      - 'frontend/**'
+      - 'invokeai/frontend/**'
   push:
     paths:
-      - 'frontend/**'
+      - 'invokeai/frontend/**'
 
 defaults:
   run:
-    working-directory: frontend
+    working-directory: invokeai/frontend
 
 jobs:
   lint-frontend:

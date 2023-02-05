@@ -51,6 +51,9 @@ Globals.disable_xformers = False
 # whether we are forcing full precision
 Globals.full_precision = False
 
+# whether we should convert ckpt files into diffusers models on the fly
+Globals.ckpt_convert = False
+
 def global_config_file()->Path:
     return Path(Globals.root, Globals.config_dir, Globals.models_file)
 
