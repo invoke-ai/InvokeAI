@@ -574,7 +574,7 @@ class Generate:
             print('>> Could not generate image.')
 
         toc = time.time()
-        print('>> Usage stats:')
+        print('\n>> Usage stats:')
         print(
             f'>>   {len(results)} image(s) generated in', '%4.2fs' % (
                 toc - tic)
