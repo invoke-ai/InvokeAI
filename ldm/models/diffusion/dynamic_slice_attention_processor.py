@@ -1,15 +1,14 @@
 import math
-from typing import Callable
 
 import psutil
 import torch
 from diffusers.models.cross_attention import CrossAttention, SlicedAttnProcessor
 
 
-def estimate_free_memory_bytes(device: str) -> int:
-    if device == 'cpu' or device == 'mps':
+def estimate_free_memory_bytes(device: torch.device) -> int:
+    if device.type == 'cpu' or device.type == 'mps':
         return psutil.virtual_memory().free
-    elif device == 'cuda':
+    elif device.type == 'cuda':
         stats = torch.cuda.memory_stats(device)
         mem_active = stats['active_bytes.all.current']
         mem_reserved = stats['reserved_bytes.all.current']
@@ -26,7 +25,7 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
         very_large_slice_size = 1024*1024
         super(DynamicSlicedAttnProcessor, self).__init__(slice_size=very_large_slice_size)
 
-    def get_free_memory_bytes(self, device:str) -> int:
+    def get_free_memory_bytes(self, device: torch.device) -> int:
         safety_factor = 3.3 / 4.0  # magic numbers pulled from old invoke code
         free_memory_bytes = int(estimate_free_memory_bytes(device) * safety_factor)
         return free_memory_bytes
@@ -51,13 +50,10 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
         batch_size_attention = query.shape[0]
         # self attention needs much more memory
         if is_self_attention:
-            # hidden states size [2, 4096, 320]
-            # -> baddbmm requires for self       [16, 4096, 4096]
-            # -> baddbmm requires for cross-attn [16, 4096, 77]
             bytes_per_element = hidden_states.element_size()
             required_size_for_baddbmm_bytes = batch_size_attention * sequence_length * sequence_length * bytes_per_element
 
-            free_memory_bytes = self.get_free_memory_bytes(hidden_states.device.type)
+            free_memory_bytes = self.get_free_memory_bytes(hidden_states.device)
             slice_count = math.ceil(required_size_for_baddbmm_bytes / free_memory_bytes)
             slice_size = math.ceil(batch_size_attention / slice_count)
             #one_gb = 1024*1024*1024
