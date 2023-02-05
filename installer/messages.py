@@ -38,13 +38,12 @@ else:
 
 def welcome():
     console.rule()
+    text = _platform_specific_help()
+    text.append(Text('Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with control-C and retry.'))
     print(
         Panel(
             title="[bold wheat1]Welcome to the InvokeAI Installer",
-            renderable=Text(
-                "Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with control-C and retry.",
-                justify="center",
-            ),
+            renderable=text,
             box=box.DOUBLE,
             width=80,
             expand=False,
@@ -294,3 +293,16 @@ def introduction() -> None:
         )
     )
     console.line(2)
+
+def _platform_specific_help()->str:
+    text = Text('')
+    if OS == 'Darwin':
+        text = Text.assemble(('OSX Users: ', 'bold'),'please be sure you have the ',('Xcode command-line tools','bold'),' installed before continuing. If not, cancel with control-C and follow the Xcode install instructions at https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE.\n\n')
+    elif OS == 'Windows':
+        text = Text.assemble(('Windows Users: ', 'bold'), """Before you start please do the following:
+  1. Double-click on the file WinLongPathsEnabled.reg in order to
+     enable long path support on your system.
+  2. Make sure you have the """,('Visual C++ core libraries','bold')," installed. If not, install from ",
+"""  https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170\n\n""")
+    return text
+    
