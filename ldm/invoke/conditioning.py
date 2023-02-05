@@ -17,6 +17,7 @@ from ..models.diffusion import cross_attention_control
 from ..models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from ..modules.encoders.modules import WeightedFrozenCLIPEmbedder
 from ..modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
+from ldm.invoke.globals import Globals
 
 
 def get_uc_and_c_and_ec(prompt_string, model, log_tokens=False, skip_normalize_legacy_blend=False):
@@ -92,7 +93,7 @@ def _get_conditioning_for_prompt(parsed_prompt: Union[Blend, FlattenedPrompt], p
     Process prompt structure and tokens, and return (conditioning, unconditioning, extra_conditioning_info)
     """
 
-    if log_tokens:
+    if log_tokens or Globals.log_tokenization:
         print(f">> Parsed prompt to {parsed_prompt}")
         print(f">> Parsed negative prompt to {parsed_negative_prompt}")
 
@@ -235,7 +236,7 @@ def _get_embeddings_and_tokens_for_prompt(model, flattened_prompt: FlattenedProm
     fragments = [x.text for x in flattened_prompt.children]
     weights = [x.weight for x in flattened_prompt.children]
     embeddings, tokens = model.get_learned_conditioning([fragments], return_tokens=True, fragment_weights=[weights])
-    if log_tokens:
+    if log_tokens or Globals.log_tokenization:
         text = " ".join(fragments)
         log_tokenization(text, model, display_label=log_display_label)
 
