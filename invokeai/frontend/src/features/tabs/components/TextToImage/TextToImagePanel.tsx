@@ -1,3 +1,4 @@
+import { Flex } from '@chakra-ui/react';
 import { Feature } from 'app/features';
 import FaceRestoreOptions from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreOptions';
 import FaceRestoreToggle from 'features/options/components/AdvancedOptions/FaceRestore/FaceRestoreToggle';
@@ -10,6 +11,7 @@ import VariationsOptions from 'features/options/components/AdvancedOptions/Varia
 import MainOptions from 'features/options/components/MainOptions/MainOptions';
 import OptionsAccordion from 'features/options/components/OptionsAccordion';
 import ProcessButtons from 'features/options/components/ProcessButtons/ProcessButtons';
+import { NegativePromptInput } from 'features/options/components/PromptInput/NegativePromptInput';
 import PromptInput from 'features/options/components/PromptInput/PromptInput';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 import { useTranslation } from 'react-i18next';
@@ -50,7 +52,10 @@ export default function TextToImagePanel() {
 
   return (
     <InvokeOptionsPanel>
-      <PromptInput />
+      <Flex flexDir="column" rowGap="0.5rem">
+        <PromptInput />
+        <NegativePromptInput />
+      </Flex>
       <ProcessButtons />
       <MainOptions />
       <OptionsAccordion accordionInfo={textToImageAccordions} />

@@ -5,6 +5,7 @@ import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { FACETOOL_TYPES } from 'app/constants';
 import { InvokeTabName, tabMap } from 'features/tabs/tabMap';
+import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -28,6 +29,7 @@ export interface OptionsState {
   optionsPanelScrollPosition: number;
   perlin: number;
   prompt: string;
+  negativePrompt: string;
   sampler: string;
   seamBlur: number;
   seamless: boolean;
@@ -77,6 +79,7 @@ const initialOptionsState: OptionsState = {
   optionsPanelScrollPosition: 0,
   perlin: 0,
   prompt: '',
+  negativePrompt: '',
   sampler: 'k_lms',
   seamBlur: 16,
   seamless: false,
@@ -121,6 +124,17 @@ export const optionsSlice = createSlice({
         state.prompt = newPrompt;
       } else {
         state.prompt = promptToString(newPrompt);
+      }
+    },
+    setNegativePrompt: (
+      state,
+      action: PayloadAction<string | InvokeAI.Prompt>
+    ) => {
+      const newPrompt = action.payload;
+      if (typeof newPrompt === 'string') {
+        state.negativePrompt = newPrompt;
+      } else {
+        state.negativePrompt = promptToString(newPrompt);
       }
     },
     setIterations: (state, action: PayloadAction<number>) => {
@@ -307,7 +321,14 @@ export const optionsSlice = createSlice({
         state.shouldRandomizeSeed = false;
       }
 
-      if (prompt) state.prompt = promptToString(prompt);
+      if (prompt) {
+        const [promptOnly, negativePrompt] = getPromptAndNegative(prompt);
+        if (promptOnly) state.prompt = promptOnly;
+        negativePrompt
+          ? (state.negativePrompt = negativePrompt)
+          : (state.negativePrompt = '');
+      }
+
       if (sampler) state.sampler = sampler;
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
@@ -448,6 +469,7 @@ export const {
   setParameter,
   setPerlin,
   setPrompt,
+  setNegativePrompt,
   setSampler,
   setSeamBlur,
   setSeamless,

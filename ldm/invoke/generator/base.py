@@ -123,8 +123,9 @@ class Generator:
                 seed = self.new_seed()
 
                 # Free up memory from the last generation.
-                if self.model.device.type == 'cuda':
-                    torch.cuda.empty_cache()
+                clear_cuda_cache = kwargs['clear_cuda_cache'] or None
+                if clear_cuda_cache is not None:
+                    clear_cuda_cache()
 
         return results
 
