@@ -13,6 +13,8 @@ import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 import BoundingBoxSettings from 'features/options/components/AdvancedOptions/Canvas/BoundingBoxSettings/BoundingBoxSettings';
 import InfillAndScalingOptions from 'features/options/components/AdvancedOptions/Canvas/InfillAndScalingOptions';
 import { useTranslation } from 'react-i18next';
+import { Flex } from '@chakra-ui/react';
+import { NegativePromptInput } from 'features/options/components/PromptInput/NegativePromptInput';
 
 export default function UnifiedCanvasPanel() {
   const { t } = useTranslation();
@@ -48,7 +50,10 @@ export default function UnifiedCanvasPanel() {
 
   return (
     <InvokeOptionsPanel>
-      <PromptInput />
+      <Flex flexDir="column" rowGap="0.5rem">
+        <PromptInput />
+        <NegativePromptInput />
+      </Flex>
       <ProcessButtons />
       <MainOptions />
       <ImageToImageStrength

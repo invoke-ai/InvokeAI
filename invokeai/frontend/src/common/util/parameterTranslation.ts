@@ -106,6 +106,7 @@ export const frontendToBackendParameters = (
     iterations,
     perlin,
     prompt,
+    negativePrompt,
     sampler,
     seamBlur,
     seamless,
@@ -154,6 +155,10 @@ export const frontendToBackendParameters = (
 
   let esrganParameters: false | BackendEsrGanParameters = false;
   let facetoolParameters: false | BackendFacetoolParameters = false;
+
+  if (negativePrompt !== '') {
+    generationParameters.prompt = `${prompt} [${negativePrompt}]`;
+  }
 
   generationParameters.seed = shouldRandomizeSeed
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
