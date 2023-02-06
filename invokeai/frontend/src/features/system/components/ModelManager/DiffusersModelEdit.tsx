@@ -271,7 +271,6 @@ export default function DiffusersModelEdit() {
   ) : (
     <Flex
       width="100%"
-      height="250px"
       justifyContent="center"
       alignItems="center"
       backgroundColor="var(--background-color)"
