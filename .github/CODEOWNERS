@@ -1,10 +1,14 @@
 # continuous integration
 /.github/workflows/ @mauwii
 
-# installation and configuration
+# documentation
 /docs/ @lstein @mauwii @tildebyte
+mkdocs.yml @lstein @mauwii
+
+# installation and configuration
+/pyproject.toml @mauwii @lstein @ebr
 /docker/ @mauwii
-/scripts/ @ebr @lstein 
+/scripts/ @ebr @lstein
 /installer/ @ebr @lstein @tildebyte
 ldm/invoke/config @lstein @ebr
 invokeai/assets @lstein @ebr
