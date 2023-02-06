@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 
 import torch
@@ -7,7 +9,7 @@ from ldm.invoke.devices import torch_dtype
 from ldm.modules.textual_inversion_manager import TextualInversionManager
 
 
-class WeightedPromptFragmentsToEmbeddingsConverter():
+class WeightedPromptFragmentsToEmbeddingsConverter:
 
     def __init__(self,
                 tokenizer: CLIPTokenizer, # converts strings to lists of int token ids
@@ -159,7 +161,7 @@ class WeightedPromptFragmentsToEmbeddingsConverter():
         # lerped embeddings has shape (77, 768)
 
 
-    def get_token_ids_and_expand_weights(self, fragments: list[str], weights: list[float], device: str) -> (torch.Tensor, torch.Tensor):
+    def get_token_ids_and_expand_weights(self, fragments: list[str], weights: list[float], device: str | torch.device) -> (torch.Tensor, torch.Tensor):
         '''
         Given a list of text fragments and corresponding weights: tokenize each fragment, append the token sequences
         together and return a padded token sequence starting with the bos marker, ending with the eos marker, and padded
@@ -208,7 +210,7 @@ class WeightedPromptFragmentsToEmbeddingsConverter():
         per_token_weights += [1.0] * pad_length
 
         all_token_ids_tensor = torch.tensor(all_token_ids, dtype=torch.long, device=device)
-        per_token_weights_tensor = torch.tensor(per_token_weights, dtype=torch_dtype(self.text_encoder.device), device=device)
+        per_token_weights_tensor = torch.tensor(per_token_weights, dtype=torch_dtype(device), device=device)
         #print(f"assembled all_token_ids_tensor with shape {all_token_ids_tensor.shape}")
         return all_token_ids_tensor, per_token_weights_tensor
 
