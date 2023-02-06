@@ -7,11 +7,11 @@ title: GitHub-Workflows
 ## Execute Workflows in your fork
 
 If you have forked [InvokeAI](https://github.com/invok-ai/InvokeAI) and want the
-Workflows to be executed, setup a repository secret with the name
-`RUN_WORKFLOWS` and any value. You can do this by opening your fork on
+Workflows to be executed, setup a repository variable with the name
+`RUN_WORKFLOWS` and any value but not empty. You can do this by opening your fork on
 [GitHub](https://github.com) and navigate to:
 
-settings --> Secrets and Variables --> Actions --> Variables
+Settings --> Secrets and Variables --> Actions --> Variables
 
 ![screenshot](../../assets/installation/Developers_documentation/RepositoryVariables.png)
 
