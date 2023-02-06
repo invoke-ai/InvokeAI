@@ -26,7 +26,7 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
         super(DynamicSlicedAttnProcessor, self).__init__(slice_size=very_large_slice_size)
 
     def get_free_memory_bytes(self, device: torch.device) -> int:
-        safety_factor = 3.3 / 4.0  # magic numbers pulled from old invoke code
+        safety_factor = 3.3 / 4.0 # magic numbers pulled from old Invoke code
         free_memory_bytes = int(estimate_free_memory_bytes(device) * safety_factor)
         return free_memory_bytes
 
@@ -48,26 +48,25 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
         value = attn.head_to_batch_dim(value)
 
         batch_size_attention = query.shape[0]
-        # self attention needs much more memory
-        if is_self_attention:
-            bytes_per_element = hidden_states.element_size()
-            required_size_for_baddbmm_bytes = batch_size_attention * sequence_length * sequence_length * bytes_per_element
-
-            free_memory_bytes = self.get_free_memory_bytes(hidden_states.device)
-            slice_count = math.ceil(required_size_for_baddbmm_bytes / free_memory_bytes)
-            slice_size = math.ceil(batch_size_attention / slice_count)
-            #one_gb = 1024*1024*1024
-            #print(f"free_memory gb: {free_memory_bytes/one_gb}, required: {required_size_for_baddbmm_bytes/one_gb}")
-            #if slice_count > 1:
-            #    print(f"dynamically slicing into {slice_count} pieces")
-        else:
-            # effectively: do not slice
-            slice_size = batch_size_attention
-
 
         hidden_states = torch.zeros(
             (batch_size_attention, sequence_length, dim // attn.heads), device=query.device, dtype=query.dtype
         )
+
+        # self attention needs much more memory
+        if is_self_attention:
+            # Use our original-precision tensor plus add in a 32-bit copy that's made by baddbmm.
+            bytes_per_element = hidden_states.element_size() + 4
+            # baddbmm returns a tensor the size of query.shape[0] * query.shape[1] * key.shape[1] * bytes_per_element
+            required_size_for_baddbmm_bytes = batch_size_attention * sequence_length * sequence_length * bytes_per_element
+            required_size_for_transpose_bytes = key.shape[0] * key.shape[1] * key.shape[2] * bytes_per_element
+
+            free_memory_bytes = self.get_free_memory_bytes(hidden_states.device)
+            slice_count = math.ceil((required_size_for_baddbmm_bytes + required_size_for_transpose_bytes) / free_memory_bytes)
+            slice_size = math.ceil(batch_size_attention / slice_count)
+        else:
+            # effectively: do not slice
+            slice_size = batch_size_attention
 
         assert(slice_size > 0)
         for i in range(hidden_states.shape[0] // slice_size):
@@ -83,6 +82,13 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
             attn_slice = torch.bmm(attn_slice, value[start_idx:end_idx])
 
             hidden_states[start_idx:end_idx] = attn_slice
+
+            del query_slice
+            del key_slice
+            del attn_mask_slice
+            del attn_slice
+            if hidden_states.device.type == 'cuda':
+                torch.cuda.empty_cache()
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
 
