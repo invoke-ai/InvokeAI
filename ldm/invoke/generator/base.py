@@ -122,6 +122,10 @@ class Generator:
 
                 seed = self.new_seed()
 
+                # Free up memory from the last generation.
+                if self.model.device.type == 'cuda':
+                    torch.cuda.empty_cache()
+
         return results
 
     def sample_to_image(self,samples)->Image.Image:
