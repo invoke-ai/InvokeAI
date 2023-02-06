@@ -66,8 +66,9 @@ class Txt2Img2Img(Generator):
             )
 
             # Free up memory from the last generation.
-            if self.model.device.type == 'cuda':
-                torch.cuda.empty_cache()
+            clear_cuda_cache = kwargs['clear_cuda_cache'] or None
+            if clear_cuda_cache is not None:
+                clear_cuda_cache()
 
             second_pass_noise = self.get_noise_like(resized_latents)
 
