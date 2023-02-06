@@ -14,9 +14,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  RUN_WORKFLOWS: ${{ secrets.RUN_WORKFLOWS }}
+
 jobs:
   matrix:
-    if: github.event.pull_request.draft == false && secrets.RUN_WORKFLOWS != ''
+    if: github.event.pull_request.draft == false && env.RUN_WORKFLOWS != ''
     strategy:
       matrix:
         python-version:

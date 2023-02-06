@@ -7,9 +7,12 @@ on:
     tags:
       - 'v*.*.*'
 
+env:
+  RUN_WORKFLOWS: ${{ secrets.RUN_WORKFLOWS }}
+
 jobs:
   docker:
-    if: github.event.pull_request.draft == false && secrets.RUN_WORKFLOWS != ''
+    if: github.event.pull_request.draft == false && env.RUN_WORKFLOWS != ''
     strategy:
       fail-fast: false
       matrix:
