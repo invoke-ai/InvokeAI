@@ -100,6 +100,7 @@ export const frontendToBackendParameters = (
     facetoolType,
     height,
     hiresFix,
+    hiresStrength,
     img2imgStrength,
     infillMethod,
     initialImage,
@@ -168,6 +169,8 @@ export const frontendToBackendParameters = (
   if (['txt2img', 'img2img'].includes(generationMode)) {
     generationParameters.seamless = seamless;
     generationParameters.hires_fix = hiresFix;
+
+    if (hiresFix) generationParameters.strength = hiresStrength;
 
     if (shouldRunESRGAN) {
       esrganParameters = {
