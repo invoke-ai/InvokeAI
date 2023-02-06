@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   matrix:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && secrets.RUN_WORKFLOWS != ''
     strategy:
       matrix:
         python-version:

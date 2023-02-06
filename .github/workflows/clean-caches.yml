@@ -8,6 +8,7 @@ on:
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+    if: secrets.RUN_WORKFLOWS != ''
     steps:
       - name: Check out code
         uses: actions/checkout@v3

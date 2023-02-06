@@ -8,7 +8,7 @@ on:
 
 jobs:
   release:
-    if: github.repository == 'invoke-ai/InvokeAI'
+    if: github.repository == 'invoke-ai/InvokeAI' && secrets.RUN_WORKFLOWS != ''
     runs-on: ubuntu-22.04
     env:
       TWINE_USERNAME: __token__
