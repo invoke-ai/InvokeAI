@@ -8,7 +8,7 @@ on:
 jobs:
   cleanup:
     runs-on: ubuntu-latest
-    if: vars.RUN_WORKFLOWS != ''
+    if: ${{ vars.RUN_WORKFLOWS != '' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3

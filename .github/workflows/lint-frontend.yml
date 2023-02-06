@@ -14,7 +14,7 @@ defaults:
 
 jobs:
   lint-frontend:
-    if: github.event.pull_request.draft == false && vars.RUN_WORKFLOWS != ''
+    if: ${{ github.event.pull_request.draft == false && vars.RUN_WORKFLOWS != '' }}
     runs-on: ubuntu-22.04
     steps:
       - name: Setup Node 18
