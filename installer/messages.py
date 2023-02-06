@@ -9,10 +9,9 @@ from pathlib import Path
 
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
-from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit.validation import Validator
 from rich import box, print
-from rich.console import Console, Group
+from rich.console import Console, Group, group
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.style import Style
@@ -37,16 +36,21 @@ else:
 
 
 def welcome():
+
+    @group()
+    def text():
+        if (platform_specific := _platform_specific_help()) != "":
+            yield platform_specific
+            yield ""
+        yield Text.from_markup("Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with [i]Control-C[/] and retry.", justify="center")
+
     console.rule()
-    text = _platform_specific_help()
-    text.append(Text('Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with control-C and retry.'))
     print(
         Panel(
             title="[bold wheat1]Welcome to the InvokeAI Installer",
-            renderable=text,
+            renderable=text(),
             box=box.DOUBLE,
-            width=80,
-            expand=False,
+            expand=True,
             padding=(1, 2),
             style=Style(bgcolor="grey23", color="orange1"),
             subtitle=f"[bold grey39]{OS}-{ARCH}",
@@ -199,7 +203,7 @@ def graphical_accelerator():
                     [
                         f"Detected the [gold1]{OS}-{ARCH}[/] platform",
                         "",
-                        "See [steel_blue3]https://invoke-ai.github.io/InvokeAI/#system[/] to ensure your system meets the minimum requirements.",
+                        "See [deep_sky_blue1]https://invoke-ai.github.io/InvokeAI/#system[/] to ensure your system meets the minimum requirements.",
                         "",
                         "[red3]🠶[/] [b]Your GPU drivers must be correctly installed before using InvokeAI![/] [red3]🠴[/]",
                     ]
@@ -295,14 +299,14 @@ def introduction() -> None:
     console.line(2)
 
 def _platform_specific_help()->str:
-    text = Text('')
-    if OS == 'Darwin':
-        text = Text.assemble(('OSX Users: ', 'bold'),'please be sure you have the ',('Xcode command-line tools','bold'),' installed before continuing. If not, cancel with control-C and follow the Xcode install instructions at https://invoke-ai.github.io/InvokeAI/INSTALL_SOURCE.\n\n')
-    elif OS == 'Windows':
-        text = Text.assemble(('Windows Users: ', 'bold'), """Before you start please do the following:
-  1. Double-click on the file WinLongPathsEnabled.reg in order to
+    if OS == "Darwin":
+        text = Text.from_markup("""[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/].""")
+    elif OS == "Windows":
+        text = Text.from_markup("""[b wheat1]Windows Users![/]\n\nBefore you start, please do the following:
+  1. Double-click on the file [b wheat1]WinLongPathsEnabled.reg[/] in order to
      enable long path support on your system.
-  2. Make sure you have the """,('Visual C++ core libraries','bold')," installed. If not, install from ",
-"""  https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170\n\n""")
+  2. Make sure you have the [b wheat1]Visual C++ core libraries[/] installed. If not, install from
+     [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]""")
+    else:
+        text = ""
     return text
-    
