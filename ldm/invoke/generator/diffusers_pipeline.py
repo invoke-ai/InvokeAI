@@ -360,7 +360,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 callback: Callable[[PipelineIntermediateState], None] = None
                                 ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if timesteps is None:
-            self.scheduler.set_timesteps(num_inference_steps, device=self.unet.device)
+            self.scheduler.set_timesteps(num_inference_steps, device=self.device)
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(self.generate_latents_from_embeddings, PipelineIntermediateState)
         result: PipelineIntermediateState = infer_latents_from_embeddings(
@@ -379,6 +379,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                          additional_guidance: List[Callable] = None):
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
+        assert not latents.is_meta
+        assert not noise.is_meta
         if additional_guidance is None:
             additional_guidance = []
         extra_conditioning_info = conditioning_data.extra
@@ -391,7 +393,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
             batch_size = latents.shape[0]
             batched_t = torch.full((batch_size,), timesteps[0],
-                                   dtype=timesteps.dtype, device=self.unet.device)
+                                   dtype=timesteps.dtype, device=self.device)
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             attention_map_saver: Optional[AttentionMapSaver] = None
@@ -488,7 +490,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             init_image = einops.rearrange(init_image, 'c h w -> 1 c h w')
 
         # 6. Prepare latent variables
-        device = self.unet.device
+        device = self.device
         latents_dtype = self.unet.dtype
         initial_latents = self.non_noised_latents_from_image(init_image, device=device, dtype=latents_dtype)
         noise = noise_func(initial_latents)
@@ -503,7 +505,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                             strength,
                                             noise: torch.Tensor, run_id=None, callback=None
                                             ) -> InvokeAIStableDiffusionPipelineOutput:
-        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength, self.unet.device)
+        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength, self.device)
         result_latents, result_attention_maps = self.latents_from_embeddings(
             initial_latents, num_inference_steps, conditioning_data,
             timesteps=timesteps,
@@ -542,7 +544,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             run_id=None,
             noise_func=None,
             ) -> InvokeAIStableDiffusionPipelineOutput:
-        device = self.unet.device
+        device = self.device
         latents_dtype = self.unet.dtype
 
         if isinstance(init_image, PIL.Image.Image):
@@ -656,6 +658,25 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def channels(self) -> int:
         """Compatible with DiffusionWrapper"""
         return self.unet.in_channels
+
+    @property
+    def device(self) -> torch.device:
+        maybe_device = super().device
+        if maybe_device.type != 'meta':
+            return maybe_device
+        # copied from StableDiffusionPipeline._execution_device:
+        #     Returns the device on which the pipeline's models will be executed. After calling
+        #     `pipeline.enable_sequential_cpu_offload()` the execution device can only be inferred
+        #     from Accelerate's module hooks.
+        # FIXME: poking around in implementation details of accelerate hooks is Bad News
+        for module in self.unet.modules():
+            if (
+                hasattr(module, "_hf_hook")
+                and hasattr(module._hf_hook, "execution_device")
+                and module._hf_hook.execution_device is not None
+            ):
+                return torch.device(module._hf_hook.execution_device)
+        return maybe_device
 
     def debug_latents(self, latents, msg):
         with torch.inference_mode():

@@ -23,7 +23,7 @@ import safetensors
 import safetensors.torch
 import torch
 import transformers
-from diffusers import AutoencoderKL, logging as dlogging
+from diffusers import AutoencoderKL, logging as dlogging, DiffusionPipeline
 from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
@@ -45,7 +45,8 @@ class ModelManager(object):
                  config:OmegaConf,
                  device_type:str | torch.device='cpu',
                  precision:str='float16',
-                 max_loaded_models=DEFAULT_MAX_MODELS):
+                 max_loaded_models=DEFAULT_MAX_MODELS,
+                 free_gpu_mem=False):
         '''
         Initialize with the path to the models.yaml config file,
         the torch device type, and precision. The optional
@@ -58,6 +59,7 @@ class ModelManager(object):
         self.config = config
         self.precision = precision
         self.device = torch.device(device_type)
+        self.free_gpu_mem = free_gpu_mem
         self.max_loaded_models = max_loaded_models
         self.models = {}
         self.stack = []  # this is an LRU FIFO
@@ -497,6 +499,9 @@ class ModelManager(object):
 
         pipeline.to(self.device)
 
+        if self.free_gpu_mem:
+            pipeline.enable_sequential_cpu_offload()
+
         model_hash = self._diffuser_sha256(name_or_path)
 
         # square images???
@@ -899,8 +904,12 @@ class ModelManager(object):
             self.stack.remove(model_name)
         self.models.pop(model_name,None)
 
-    def _model_to_cpu(self,model):
+    def _model_to_cpu(self, model):
         if self.device == 'cpu':
+            return model
+
+        if isinstance(model, DiffusionPipeline) and self.free_gpu_mem:
+            # diffusers CPU offloading is being handled by accelerate
             return model
 
         # diffusers really really doesn't like us moving a float16 model onto CPU
@@ -919,6 +928,10 @@ class ModelManager(object):
 
     def _model_from_cpu(self,model):
         if self.device == 'cpu':
+            return model
+
+        if isinstance(model, DiffusionPipeline) and self.free_gpu_mem:
+            # diffusers CPU offloading is being handled by accelerate
             return model
 
         model.to(self.device)
