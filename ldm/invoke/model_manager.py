@@ -15,24 +15,24 @@ import sys
 import textwrap
 import time
 import warnings
-import safetensors.torch
 from pathlib import Path
 from shutil import move, rmtree
 from typing import Any, Optional, Union
-from huggingface_hub import scan_cache_dir
-from ldm.util import download_with_progress_bar
 
-import torch
 import safetensors
+import safetensors.torch
+import torch
 import transformers
 from diffusers import AutoencoderKL, logging as dlogging
 from diffusers.utils.logging import get_verbosity, set_verbosity, set_verbosity_error
+from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
 
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import Globals, global_models_dir, global_autoscan_dir, global_cache_dir
+from ldm.util import download_with_progress_bar
 from ldm.util import instantiate_from_config, ask_user
 
 DEFAULT_MAX_MODELS=2
@@ -43,7 +43,7 @@ VAE_TO_REPO_ID = { # hack, see note in convert_and_import()
 class ModelManager(object):
     def __init__(self,
                  config:OmegaConf,
-                 device_type:str='cpu',
+                 device_type:str | torch.device='cpu',
                  precision:str='float16',
                  max_loaded_models=DEFAULT_MAX_MODELS):
         '''
@@ -697,7 +697,6 @@ class ModelManager(object):
         '''
         new_config = None
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
-        import transformers
         if diffusers_path.exists():
             print(f'ERROR: The path {str(diffusers_path)} already exists. Please move or remove it and try again.')
             return
@@ -706,7 +705,7 @@ class ModelManager(object):
         model_description = model_description or 'Optimized version of {model_name}'
         print(f'>> Optimizing {model_name} (30-60s)')
         try:
-            # By passing the specified VAE too the conversion function, the autoencoder
+            # By passing the specified VAE to the conversion function, the autoencoder
             # will be built into the model rather than tacked on afterward via the config file
             vae_model = self._load_vae(vae) if vae else None
             convert_ckpt_to_diffuser(
@@ -753,7 +752,6 @@ class ModelManager(object):
         return search_folder, found_models
 
     def _choose_diffusers_vae(self, model_name:str, vae:str=None)->Union[dict,str]:
-        
         # In the event that the original entry is using a custom ckpt VAE, we try to
         # map that VAE onto a diffuser VAE using a hard-coded dictionary.
         # I would prefer to do this differently: We load the ckpt model into memory, swap the
@@ -1066,7 +1064,7 @@ class ModelManager(object):
         strategy.execute()
 
     @staticmethod
-    def _abs_path(path:Union(str,Path))->Path:
+    def _abs_path(path: str | Path)->Path:
         if path is None or Path(path).is_absolute():
             return path
         return Path(Globals.root,path).resolve()

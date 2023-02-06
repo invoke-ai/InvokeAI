@@ -211,7 +211,7 @@ class Generate:
                 print('>> xformers memory-efficient attention is available but disabled')
         else:
             print('>> xformers not installed')
-            
+
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         # don't accept invalid models
