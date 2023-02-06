@@ -831,8 +831,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     running stable diffusion 2.1.
     '''
 
-    print(f'DEBUG: original_config_file={original_config_file}')
-    
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         verbosity = dlogging.get_verbosity()
