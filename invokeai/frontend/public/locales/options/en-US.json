@@ -24,6 +24,7 @@
   "otherOptions": "Other Options",
   "seamlessTiling": "Seamless Tiling",
   "hiresOptim": "High Res Optimization",
+  "hiresStrength": "High Res Strength",
   "imageFit": "Fit Initial Image To Output Size",
   "codeformerFidelity": "Fidelity",
   "seamSize": "Seam Size",
