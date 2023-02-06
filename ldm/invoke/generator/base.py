@@ -122,6 +122,10 @@ class Generator:
 
                 seed = self.new_seed()
 
+                # Free up memory from the last generation.
+                if self.model.device.type == 'cuda':
+                    torch.cuda.empty_cache()
+
         return results
 
     def sample_to_image(self,samples)->Image.Image:
@@ -240,7 +244,12 @@ class Generator:
 
     def get_perlin_noise(self,width,height):
         fixdevice = 'cpu' if (self.model.device.type == 'mps') else self.model.device
-        noise = torch.stack([rand_perlin_2d((height, width), (8, 8), device = self.model.device).to(fixdevice) for _ in range(self.latent_channels)], dim=0).to(self.model.device)
+        # limit noise to only the diffusion image channels, not the mask channels
+        input_channels = min(self.latent_channels, 4)
+        noise = torch.stack([
+            rand_perlin_2d((height, width),
+                           (8, 8),
+                           device = self.model.device).to(fixdevice) for _ in range(input_channels)], dim=0).to(self.model.device)
         return noise
 
     def new_seed(self):
@@ -341,3 +350,27 @@ class Generator:
 
     def torch_dtype(self)->torch.dtype:
         return torch.float16 if self.precision == 'float16' else torch.float32
+
+    # returns a tensor filled with random numbers from a normal distribution
+    def get_noise(self,width,height):
+        device         = self.model.device
+        # limit noise to only the diffusion image channels, not the mask channels
+        input_channels = min(self.latent_channels, 4)
+        if self.use_mps_noise or device.type == 'mps':
+            x = torch.randn([1,
+                             input_channels,
+                             height // self.downsampling_factor,
+                             width  // self.downsampling_factor],
+                            dtype=self.torch_dtype(),
+                            device='cpu').to(device)
+        else:
+            x = torch.randn([1,
+                             input_channels,
+                             height // self.downsampling_factor,
+                             width  // self.downsampling_factor],
+                            dtype=self.torch_dtype(),
+                            device=device)
+        if self.perlin > 0.0:
+            perlin_noise = self.get_perlin_noise(width  // self.downsampling_factor, height // self.downsampling_factor)
+            x = (1-self.perlin)*x + self.perlin*perlin_noise
+        return x
