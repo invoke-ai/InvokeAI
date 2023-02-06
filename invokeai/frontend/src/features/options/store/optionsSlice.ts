@@ -20,6 +20,7 @@ export interface OptionsState {
   facetoolType: FacetoolType;
   height: number;
   hiresFix: boolean;
+  hiresStrength: number;
   img2imgStrength: number;
   infillMethod: string;
   initialImage?: InvokeAI.Image | string; // can be an Image or url
@@ -71,6 +72,7 @@ const initialOptionsState: OptionsState = {
   facetoolType: 'gfpgan',
   height: 512,
   hiresFix: false,
+  hiresStrength: 0.75,
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   isLightBoxOpen: false,
@@ -188,6 +190,9 @@ export const optionsSlice = createSlice({
     },
     setHiresFix: (state, action: PayloadAction<boolean>) => {
       state.hiresFix = action.payload;
+    },
+    setHiresStrength: (state, action: PayloadAction<number>) => {
+      state.hiresStrength = action.payload;
     },
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
@@ -459,6 +464,7 @@ export const {
   setFacetoolType,
   setHeight,
   setHiresFix,
+  setHiresStrength,
   setImg2imgStrength,
   setInfillMethod,
   setInitialImage,
