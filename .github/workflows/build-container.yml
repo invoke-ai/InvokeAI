@@ -47,7 +47,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value='sha'-{{sha}}-${{ matrix.flavor}}
+            type=sha,enable=true,prefix=sha-,suffix=${{ matrix.flavor}},format=short
             type=raw,value={{branch}}-${{ matrix.flavor }}
           flavor: |
             latest=${{ matrix.flavor == 'cuda' && github.ref == 'refs/heads/main' }}
