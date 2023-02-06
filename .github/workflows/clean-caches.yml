@@ -5,13 +5,10 @@ on:
       - closed
   workflow_dispatch:
 
-env:
-  RUN_WORKFLOWS: ${{ secrets.RUN_WORKFLOWS }}
-
 jobs:
   cleanup:
     runs-on: ubuntu-latest
-    if: env.RUN_WORKFLOWS != ''
+    if: vars.RUN_WORKFLOWS != ''
     steps:
       - name: Check out code
         uses: actions/checkout@v3

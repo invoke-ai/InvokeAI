@@ -5,12 +5,9 @@ on:
       - 'main'
       - 'development'
 
-env:
-  RUN_WORKFLOWS: ${{ secrets.RUN_WORKFLOWS }}
-
 jobs:
   mkdocs-material:
-    if: github.event.pull_request.draft == false && env.RUN_WORKFLOWS != ''
+    if: github.event.pull_request.draft == false && vars.RUN_WORKFLOWS != ''
     runs-on: ubuntu-latest
     steps:
       - name: checkout sources

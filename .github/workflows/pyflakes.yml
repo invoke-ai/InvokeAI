@@ -6,13 +6,10 @@ on:
       - development
       - 'release-candidate-*'
 
-env:
-  RUN_WORKFLOWS: ${{ secrets.RUN_WORKFLOWS }}
-
 jobs:
   pyflakes:
     name: runner / pyflakes
-    if: github.event.pull_request.draft == false && env.RUN_WORKFLOWS != ''
+    if: github.event.pull_request.draft == false && vars.RUN_WORKFLOWS != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
