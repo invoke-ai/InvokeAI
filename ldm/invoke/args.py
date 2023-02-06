@@ -763,6 +763,7 @@ class Args(object):
             !models                                   -- list models in configs/models.yaml
             !switch <model_name>                      -- switch to model named <model_name>
             !import_model /path/to/weights/file.ckpt  -- adds a .ckpt model to your config
+            !import_model /path/to/weights/           -- interactively import models from a directory
             !import_model http://path_to_model.ckpt   -- downloads and adds a .ckpt model to your config
             !import_model hakurei/waifu-diffusion     -- downloads and adds a diffusers model to your config
             !optimize_model <model_name>              -- converts a .ckpt model to a diffusers model

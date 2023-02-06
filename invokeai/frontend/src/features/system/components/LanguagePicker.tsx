@@ -13,16 +13,16 @@ export default function LanguagePicker() {
 
   const LANGUAGES = {
     en: t('common:langEnglish'),
-    ru: t('common:langRussian'),
-    it: t('common:langItalian'),
-    pt_br: t('common:langBrPortuguese'),
-    de: t('common:langGerman'),
-    pl: t('common:langPolish'),
-    zh_cn: t('common:langSimplifiedChinese'),
-    es: t('common:langSpanish'),
-    ja: t('common:langJapanese'),
     nl: t('common:langDutch'),
     fr: t('common:langFrench'),
+    de: t('common:langGerman'),
+    it: t('common:langItalian'),
+    ja: t('common:langJapanese'),
+    pl: t('common:langPolish'),
+    pt_br: t('common:langBrPortuguese'),
+    ru: t('common:langRussian'),
+    zh_cn: t('common:langSimplifiedChinese'),
+    es: t('common:langSpanish'),
     ua: t('common:langUkranian'),
   };
 
