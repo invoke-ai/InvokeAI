@@ -2,10 +2,10 @@
 /.github/workflows/ @mauwii
 
 # installation and configuration
-/docs/ @lstein @mauwii
+/docs/ @lstein @mauwii @tildebyte
 /docker/ @mauwii
 /scripts/ @ebr @lstein 
-/installer/ @ebr @lstein
+/installer/ @ebr @lstein @tildebyte
 ldm/invoke/config @lstein @ebr
 invokeai/assets @lstein @ebr
 invokeai/configs @lstein @ebr
