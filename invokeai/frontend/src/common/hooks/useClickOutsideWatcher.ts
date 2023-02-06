@@ -11,7 +11,6 @@ const useClickOutsideWatcher = () => {
     function handleClickOutside(e: MouseEvent) {
       watchers.forEach(({ ref, enable, callback }) => {
         if (enable && ref.current && !ref.current.contains(e.target as Node)) {
-          console.log('callback');
           callback();
         }
       });

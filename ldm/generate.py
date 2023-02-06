@@ -211,7 +211,7 @@ class Generate:
                 print('>> xformers memory-efficient attention is available but disabled')
         else:
             print('>> xformers not installed')
-            
+
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         # don't accept invalid models
@@ -565,11 +565,19 @@ class Generate:
                                              image_callback = image_callback)
 
         except KeyboardInterrupt:
+            # Clear the CUDA cache on an exception
+            if self._has_cuda():
+                torch.cuda.empty_cache()
+
             if catch_interrupts:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
         except RuntimeError:
+            # Clear the CUDA cache on an exception
+            if self._has_cuda():
+                torch.cuda.empty_cache()
+
             print(traceback.format_exc(), file=sys.stderr)
             print('>> Could not generate image.')
 

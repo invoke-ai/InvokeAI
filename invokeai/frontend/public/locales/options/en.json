@@ -43,6 +43,7 @@
   "invoke": "Invoke",
   "cancel": "Cancel",
   "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
+  "negativePrompts": "Negative Prompts",
   "sendTo": "Send to",
   "sendToImg2Img": "Send to Image to Image",
   "sendToUnifiedCanvas": "Send To Unified Canvas",
