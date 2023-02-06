@@ -22,7 +22,11 @@ import re
 import torch
 import warnings
 from pathlib import Path
-from ldm.invoke.globals import Globals, global_cache_dir
+from ldm.invoke.globals import (
+    Globals,
+    global_cache_dir,
+    global_config_dir,
+    )
 from safetensors.torch import load_file
 from typing import Union
 
@@ -826,6 +830,8 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param upcast_attention: Whether the attention computation should always be upcasted. This is necessary when
     running stable diffusion 2.1.
     '''
+
+    print(f'DEBUG: original_config_file={original_config_file}')
     
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
@@ -852,13 +858,16 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
 
             if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-                original_config_file = os.path.join(Globals.root,'configs','stable-diffusion','v2-inference-v.yaml')
+                original_config_file = global_config_dir() / 'stable-diffusion' / 'v2-inference-v.yaml'
 
                 if global_step == 110000:
                     # v2.1 needs to upcast attention
                     upcast_attention = True
+            elif str(checkpoint_path).lower().find('inpaint') >= 0: # brittle - please pass original_config_file parameter!
+                print(f'  | checkpoint has "inpaint" in name, assuming an inpainting model')
+                original_config_file = global_config_dir() / 'stable-diffusion' / 'v1-inpainting-inference.yaml'
             else:
-                original_config_file = os.path.join(Globals.root,'configs','stable-diffusion','v1-inference.yaml')
+                original_config_file = global_config_dir() / 'stable-diffusion' / 'v1-inference.yaml'
 
         original_config = OmegaConf.load(original_config_file)
 
