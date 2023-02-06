@@ -65,6 +65,10 @@ class Txt2Img2Img(Generator):
                 mode="bilinear"
             )
 
+            # Free up memory from the last generation.
+            if self.model.device.type == 'cuda':
+                torch.cuda.empty_cache()
+
             second_pass_noise = self.get_noise_like(resized_latents)
 
             verbosity = get_verbosity()
