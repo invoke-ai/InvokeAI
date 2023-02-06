@@ -18,7 +18,7 @@ import warnings
 import safetensors.torch
 from pathlib import Path
 from shutil import move, rmtree
-from typing import Union, Any
+from typing import Any, Optional, Union
 from huggingface_hub import scan_cache_dir
 from ldm.util import download_with_progress_bar
 
@@ -356,6 +356,7 @@ class ModelManager(object):
                 checkpoint_path = weights,
                 original_config_file = config,
                 vae = vae,
+                return_generator_pipeline=True,
             )
             return (
                 pipeline.to(self.device).to(torch.float16 if self.precision == 'float16' else torch.float32),
@@ -483,12 +484,11 @@ class ModelManager(object):
                     **pipeline_args,
                     **fp_args,
                 )
-
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print(f'Could not fetch half-precision version of model {name_or_path}; fetching full-precision instead')
+                    pass
                 else:
-                    print(f'An unexpected error occurred while downloading the model: {e})')
+                    print(f'** An unexpected error occurred while downloading the model: {e})')
             if pipeline:
                 break
 
@@ -753,7 +753,7 @@ class ModelManager(object):
         return search_folder, found_models
 
     def _choose_diffusers_vae(self, model_name:str, vae:str=None)->Union[dict,str]:
-        
+
         # In the event that the original entry is using a custom ckpt VAE, we try to
         # map that VAE onto a diffuser VAE using a hard-coded dictionary.
         # I would prefer to do this differently: We load the ckpt model into memory, swap the
@@ -880,14 +880,14 @@ class ModelManager(object):
         print('** Migration is done. Continuing...')
 
 
-    def _resolve_path(self, source:Union[str,Path], dest_directory:str)->Path:
+    def _resolve_path(self, source: Union[str, Path], dest_directory: str) -> Optional[Path]:
         resolved_path = None
-        if source.startswith(('http:','https:','ftp:')):
+        if str(source).startswith(('http:','https:','ftp:')):
             basename = os.path.basename(source)
             if not os.path.isabs(dest_directory):
                 dest_directory = os.path.join(Globals.root,dest_directory)
             dest = os.path.join(dest_directory,basename)
-            if download_with_progress_bar(source,dest):
+            if download_with_progress_bar(str(source), Path(dest)):
                 resolved_path = Path(dest)
         else:
             if not os.path.isabs(source):
@@ -954,7 +954,7 @@ class ModelManager(object):
     def _has_cuda(self) -> bool:
         return self.device.type == 'cuda'
 
-    def _diffuser_sha256(self,name_or_path:Union[str, Path])->Union[str,bytes]:
+    def _diffuser_sha256(self,name_or_path:Union[str, Path],chunksize=4096)->Union[str,bytes]:
         path = None
         if isinstance(name_or_path,Path):
            path = name_or_path
@@ -976,7 +976,8 @@ class ModelManager(object):
             for name in files:
                 count += 1
                 with open(os.path.join(root,name),'rb') as f:
-                    sha.update(f.read())
+                    while chunk := f.read(chunksize):
+                        sha.update(chunk)
         hash = sha.hexdigest()
         toc = time.time()
         print(f'  | sha256 = {hash} ({count} files hashed in','%4.2fs)' % (toc - tic))
@@ -1039,7 +1040,7 @@ class ModelManager(object):
                 vae = AutoencoderKL.from_pretrained(name_or_path, **vae_args, **fp_args)
             except OSError as e:
                 if str(e).startswith('fp16 is not a valid'):
-                    print('  | Half-precision version of model not available; fetching full-precision instead')
+                    pass
                 else:
                     deferred_error = e
             if vae:

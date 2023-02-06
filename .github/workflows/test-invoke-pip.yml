@@ -8,10 +8,11 @@ on:
       - 'ready_for_review'
       - 'opened'
       - 'synchronize'
+  workflow_dispatch:
 
 concurrency:
-   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-   cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   matrix:
@@ -62,27 +63,12 @@ jobs:
           #   github-env: $env:GITHUB_ENV
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    env:
+      PIP_USE_PEP517: '1'
     steps:
       - name: Checkout sources
         id: checkout-sources
         uses: actions/checkout@v3
-
-      - name: setup python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Set Cache-Directory Windows
-        if: runner.os == 'Windows'
-        id: set-cache-dir-windows
-        run: |
-          echo "CACHE_DIR=$HOME\invokeai\models" >> ${{ matrix.github-env }}
-          echo "PIP_NO_CACHE_DIR=1" >> ${{ matrix.github-env }}
-
-      - name: Set Cache-Directory others
-        if: runner.os != 'Windows'
-        id: set-cache-dir-others
-        run: echo "CACHE_DIR=$HOME/invokeai/models" >> ${{ matrix.github-env }}
 
       - name: set test prompt to main branch validation
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -92,26 +78,29 @@ jobs:
         if: ${{ github.ref != 'refs/heads/main' }}
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
 
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
       - name: install invokeai
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
         run: >
           pip3 install
-          --use-pep517
           --editable=".[test]"
 
       - name: run pytest
+        id: run-pytest
         run: pytest
 
-      - name: Use Cached models
-        id: cache-sd-model
-        uses: actions/cache@v3
-        env:
-          cache-name: huggingface-models
-        with:
-          path: ${{ env.CACHE_DIR }}
-          key: ${{ env.cache-name }}
-          enableCrossOsArchive: true
+      - name: set INVOKEAI_OUTDIR
+        run: >
+          python -c
+          "import os;from ldm.invoke.globals import Globals;OUTDIR=os.path.join(Globals.root,str('outputs'));print(f'INVOKEAI_OUTDIR={OUTDIR}')"
+          >> ${{ matrix.github-env }}
 
       - name: run invokeai-configure
         id: run-preload-models
@@ -124,9 +113,8 @@ jobs:
           --full-precision
         # can't use fp16 weights without a GPU
 
-      - name: Run the tests
-        if: runner.os != 'Windows'
-        id: run-tests
+      - name: run invokeai
+        id: run-invokeai
         env:
           # Set offline mode to make sure configure preloaded successfully.
           HF_HUB_OFFLINE: 1
@@ -137,10 +125,11 @@ jobs:
           --no-patchmatch
           --no-nsfw_checker
           --from_file ${{ env.TEST_PROMPTS }}
+          --outdir ${{ env.INVOKEAI_OUTDIR }}/${{ matrix.python-version }}/${{ matrix.pytorch }}
 
       - name: Archive results
         id: archive-results
         uses: actions/upload-artifact@v3
         with:
-          name: results_${{ matrix.pytorch }}_${{ matrix.python-version }}
-          path: ${{ env.INVOKEAI_ROOT }}/outputs
+          name: results
+          path: ${{ env.INVOKEAI_OUTDIR }}

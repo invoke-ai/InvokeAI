@@ -1,0 +1,16 @@
+{
+  "generations": "Генерації",
+  "showGenerations": "Показувати генерації",
+  "uploads": "Завантаження",
+  "showUploads": "Показувати завантаження",
+  "galleryImageSize": "Розмір зображень",
+  "galleryImageResetSize": "Аатоматичний розмір",
+  "gallerySettings": "Налаштування галереї",
+  "maintainAspectRatio": "Зберігати пропорції",
+  "autoSwitchNewImages": "Автоматично вибирати нові",
+  "singleColumnLayout": "Одна колонка",
+  "pinGallery": "Закріпити галерею",
+  "allImagesLoaded": "Всі зображення завантажені",
+  "loadMore": "Завантажити більше",
+  "noImagesInGallery": "Зображень немає"
+}

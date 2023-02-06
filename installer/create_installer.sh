@@ -14,12 +14,13 @@ fi
 VERSION=$(cd ..; python -c "from ldm.invoke import __version__ as version; print(version)")
 PATCH=""
 VERSION="v${VERSION}${PATCH}"
+LATEST_TAG="v2.3-latest"
 
 echo Building installer for version $VERSION
 echo "Be certain that you're in the 'installer' directory before continuing."
 read -p "Press any key to continue, or CTRL-C to exit..."
 
-read -e -p "Commit and tag this repo with ${VERSION} and 'latest'? [n]: " input
+read -e -p "Commit and tag this repo with '${VERSION}' and '${LATEST_TAG}'? [n]: " input
 RESPONSE=${input:='n'}
 if [ "$RESPONSE" == 'y' ]; then
     git commit -a
@@ -28,8 +29,9 @@ if [ "$RESPONSE" == 'y' ]; then
 	    echo "Existing/invalid tag"
 	    exit -1
     fi
-    git push origin :refs/tags/latest
-    git tag -fa latest
+
+    git push origin :refs/tags/$LATEST_TAG
+    git tag -fa $LATEST_TAG
 fi
 
 # ----------------------

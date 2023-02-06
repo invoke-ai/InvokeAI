@@ -127,8 +127,8 @@ script do it for you. Manual installation is described at:
 
 https://invoke-ai.github.io/InvokeAI/installation/020_INSTALL_MANUAL/
 
-You may download the recommended models (about 10GB total), select a customized set, or
-completely skip this step.
+You may download the recommended models (about 15GB total), install all models (40 GB!!) 
+select a customized set, or completely skip this step.
 """
     )
     completer.set_options(["recommended", "customized", "skip"])
@@ -320,6 +320,8 @@ You may re-run the configuration script again in the future if you do not wish t
         while again:
             try:
                 access_token = getpass_asterisk.getpass_asterisk(prompt="HF Token ❯ ")
+                if access_token is None or len(access_token)==0:
+                    raise EOFError
                 HfLogin(access_token)
                 access_token = HfFolder.get_token()
                 again = False
@@ -433,9 +435,7 @@ def _download_diffusion_weights(
             )
         except OSError as e:
             if str(e).startswith("fp16 is not a valid"):
-                print(
-                    f"Could not fetch half-precision version of model {repo_id}; fetching full-precision instead"
-                )
+                pass
             else:
                 print(f"An unexpected error occurred while downloading the model: {e})")
         if path:
@@ -866,7 +866,7 @@ def initialize_rootdir(root: str, yes_to_all: bool = False):
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
 
-    configs_src = Path(configs.__path__[-1])
+    configs_src = Path(configs.__path__[0])
     configs_dest = Path(root) / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)

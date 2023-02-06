@@ -100,12 +100,14 @@ export const frontendToBackendParameters = (
     facetoolType,
     height,
     hiresFix,
+    hiresStrength,
     img2imgStrength,
     infillMethod,
     initialImage,
     iterations,
     perlin,
     prompt,
+    negativePrompt,
     sampler,
     seamBlur,
     seamless,
@@ -155,6 +157,10 @@ export const frontendToBackendParameters = (
   let esrganParameters: false | BackendEsrGanParameters = false;
   let facetoolParameters: false | BackendFacetoolParameters = false;
 
+  if (negativePrompt !== '') {
+    generationParameters.prompt = `${prompt} [${negativePrompt}]`;
+  }
+
   generationParameters.seed = shouldRandomizeSeed
     ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
     : seed;
@@ -163,6 +169,8 @@ export const frontendToBackendParameters = (
   if (['txt2img', 'img2img'].includes(generationMode)) {
     generationParameters.seamless = seamless;
     generationParameters.hires_fix = hiresFix;
+
+    if (hiresFix) generationParameters.strength = hiresStrength;
 
     if (shouldRunESRGAN) {
       esrganParameters = {

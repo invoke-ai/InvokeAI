@@ -1,18 +1,23 @@
+# use this file as a whitelist
 *
-!assets/caution.png
-!backend
-!frontend/dist
+!invokeai
 !ldm
 !pyproject.toml
 !README.md
-!scripts
 
 # Guard against pulling in any models that might exist in the directory tree
-**.pt*
+**/*.pt*
+**/*.ckpt
 
-# unignore configs, but only ignore the custom models.yaml, in case it exists
-!configs
-configs/models.yaml
-configs/models.yaml.orig
+# ignore frontend but whitelist dist
+invokeai/frontend/**
+!invokeai/frontend/dist
 
+# ignore invokeai/assets but whitelist invokeai/assets/web
+invokeai/assets
+!invokeai/assets/web
+
+# ignore python cache
 **/__pycache__
+**/*.py[cod]
+**/*.egg-info

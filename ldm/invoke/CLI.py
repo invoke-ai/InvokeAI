@@ -4,6 +4,13 @@ import sys
 import shlex
 import traceback
 
+from argparse import Namespace
+from pathlib import Path
+from typing import Optional, Union
+
+if sys.platform == "darwin":
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 from ldm.invoke.globals import Globals
 from ldm.generate import Generate
 from ldm.invoke.prompt_parser import PromptParser
@@ -13,16 +20,13 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from ldm.invoke.model_manager import ModelManager
-from pathlib import Path
-from argparse import Namespace
-import pyparsing
+
+import click  # type: ignore
 import ldm.invoke
+import pyparsing  # type: ignore
 
 # global used in multiple functions (fix)
 infile = None
-
-if sys.platform == 'darwin':
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 def main():
     """Initialize command-line parsers and the diffusion model"""
@@ -50,7 +54,7 @@ def main():
     Globals.internet_available = args.internet_available and check_internet()
     Globals.disable_xformers = not args.xformers
     Globals.ckpt_convert = args.ckpt_convert
-    
+
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
@@ -69,8 +73,10 @@ def main():
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
-    import transformers
+    import transformers  # type: ignore
     transformers.logging.set_verbosity_error()
+    import diffusers
+    diffusers.logging.set_verbosity_error()
 
     # Loading Face Restoration and ESRGAN Modules
     gfpgan,codeformer,esrgan = load_face_restoration(opt)
@@ -570,7 +576,7 @@ def set_default_output_dir(opt:Args, completer:Completer):
     completer.set_default_dir(opt.outdir)
 
 
-def import_model(model_path:str, gen, opt, completer):
+def import_model(model_path: str, gen, opt, completer):
     '''
     model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path; or
     (3) a huggingface repository id
@@ -579,12 +585,28 @@ def import_model(model_path:str, gen, opt, completer):
 
     if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
+
     elif os.path.exists(model_path) and model_path.endswith(('.ckpt','.safetensors')) and os.path.isfile(model_path):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
-    elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
-        model_name = import_diffuser_model(model_path, gen, opt, completer)
+
     elif os.path.isdir(model_path):
-        model_name = import_diffuser_model(Path(model_path), gen, opt, completer)
+
+        # Allow for a directory containing multiple models.
+        models = list(Path(model_path).rglob('*.ckpt')) + list(Path(model_path).rglob('*.safetensors'))
+
+        if models:
+            # Only the last model name will be used below.
+            for model in sorted(models):
+
+                if click.confirm(f'Import {model.stem} ?', default=True):
+                    model_name = import_ckpt_model(model, gen, opt, completer)
+                    print()
+        else:
+            model_name = import_diffuser_model(Path(model_path), gen, opt, completer)
+
+    elif re.match(r'^[\w.+-]+/[\w.+-]+$', model_path):
+        model_name = import_diffuser_model(model_path, gen, opt, completer)
+
     else:
         print(f'** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can\'t import.')
 
@@ -602,7 +624,7 @@ def import_model(model_path:str, gen, opt, completer):
     completer.update_models(gen.model_manager.list_models())
     print(f'>> {model_name} successfully installed')
 
-def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
+def import_diffuser_model(path_or_repo: Union[Path, str], gen, _, completer) -> Optional[str]:
     manager = gen.model_manager
     default_name = Path(path_or_repo).stem
     default_description = f'Imported model {default_name}'
@@ -625,7 +647,7 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
         return None
     return model_name
 
-def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
+def import_ckpt_model(path_or_url: Union[Path, str], gen, opt, completer) -> Optional[str]:
     manager = gen.model_manager
     default_name = Path(path_or_url).stem
     default_description = f'Imported model {default_name}'
@@ -1111,9 +1133,13 @@ def write_commands(opt, file_path:str, outfilepath:str):
 def report_model_error(opt:Namespace, e:Exception):
     print(f'** An error occurred while attempting to initialize the model: "{str(e)}"')
     print('** This can be caused by a missing or corrupted models file, and can sometimes be fixed by (re)installing the models.')
-    response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
-    if response.startswith(('n','N')):
-        return
+    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
+    if yes_to_all:
+        print('** Reconfiguration is being forced by environment variable INVOKE_MODEL_RECONFIGURE')
+    else:
+        response = input('Do you want to run invokeai-configure script to select and/or reinstall models? [y] ')
+        if response.startswith(('n', 'N')):
+            return
 
     print('invokeai-configure is launching....\n')
 
@@ -1121,16 +1147,16 @@ def report_model_error(opt:Namespace, e:Exception):
     # only the arguments accepted by the configuration script are parsed
     root_dir = ["--root", opt.root_dir] if opt.root_dir is not None else []
     config = ["--config", opt.conf] if opt.conf is not None else []
-    yes_to_all = os.environ.get('INVOKE_MODEL_RECONFIGURE')
     previous_args = sys.argv
     sys.argv = [ 'invokeai-configure' ]
     sys.argv.extend(root_dir)
     sys.argv.extend(config)
     if yes_to_all is not None:
-        sys.argv.append(yes_to_all)
+        for arg in yes_to_all.split():
+            sys.argv.append(arg)
 
-    from ldm.invoke.config import configure_invokeai
-    configure_invokeai.main()
+    from ldm.invoke.config import invokeai_configure
+    invokeai_configure.main()
     print('** InvokeAI will now restart')
     sys.argv = previous_args
     main() # would rather do a os.exec(), but doesn't exist?

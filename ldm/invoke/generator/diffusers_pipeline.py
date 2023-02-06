@@ -4,7 +4,6 @@ import dataclasses
 import inspect
 import secrets
 import sys
-import warnings
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any
 
@@ -641,7 +640,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     @property
     def cond_stage_model(self):
-        warnings.warn("legacy compatibility layer", DeprecationWarning)
         return self.prompt_fragments_to_embeddings_converter
 
     @torch.inference_mode()

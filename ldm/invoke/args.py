@@ -196,6 +196,7 @@ class Args(object):
             elif os.path.exists(legacyinit):
                 print(f'>> WARNING: Old initialization file found at {legacyinit}. This location is deprecated. Please move it to {Globals.root}/invokeai.init.')
                 sysargs.insert(0,f'@{legacyinit}')
+            Globals.log_tokenization = self._arg_parser.parse_args(sysargs).log_tokenization
 
             self._arg_switches = self._arg_parser.parse_args(sysargs)
             return self._arg_switches
@@ -600,6 +601,12 @@ class Args(object):
             default='k_lms',
         )
         render_group.add_argument(
+            '--log_tokenization',
+            '-t',
+            action='store_true',
+            help='shows how the prompt is split into tokens'
+        )
+        render_group.add_argument(
             '-f',
             '--strength',
             type=float,
@@ -744,7 +751,7 @@ class Args(object):
                 invoke> !fetch 0000015.8929913.png
                 invoke> a fantastic alien landscape -W 576 -H 512 -s 60 -A plms -C 7.5
                 invoke> !fetch /path/to/images/*.png prompts.txt
- 
+
             !replay /path/to/prompts.txt
             Replays all the prompts contained in the file prompts.txt.
 
@@ -756,6 +763,7 @@ class Args(object):
             !models                                   -- list models in configs/models.yaml
             !switch <model_name>                      -- switch to model named <model_name>
             !import_model /path/to/weights/file.ckpt  -- adds a .ckpt model to your config
+            !import_model /path/to/weights/           -- interactively import models from a directory
             !import_model http://path_to_model.ckpt   -- downloads and adds a .ckpt model to your config
             !import_model hakurei/waifu-diffusion     -- downloads and adds a diffusers model to your config
             !optimize_model <model_name>              -- converts a .ckpt model to a diffusers model
