@@ -28,4 +28,4 @@ docker run \
   --publish=9090:9090 \
   --cap-add=sys_nice \
   ${GPU_FLAGS:+--gpus="${GPU_FLAGS}"} \
-  "${CONTAINER_IMAGE}" ${1:+$@}
+  "${CONTAINER_IMAGE}" ${@:+$@}
