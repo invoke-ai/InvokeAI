@@ -110,7 +110,7 @@ class GraphInvocation(BaseInvocation):
     # TODO: figure out how to create a default here
     graph: 'Graph' = Field(description="The graph to run", default=None)
 
-    def invoke(self, services: InvocationServices, session_id: str) -> GraphInvocationOutput:
+    def invoke(self, services: InvocationServices, session_id: str) -> Union[GraphInvocationOutput, None]:
         """Invoke with provided services and return outputs."""
         pass
 
@@ -158,7 +158,7 @@ InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()]
 
 class Graph(BaseModel):
     nodes: dict[str, Annotated[InvocationsUnion, Field(discriminator="type")]] = Field(description="The nodes in this graph", default_factory=dict)
-    edges: set[(EdgeConnection,EdgeConnection)] = Field(description="The connections between nodes and their fields in this graph", default_factory=set)
+    edges: set[tuple[EdgeConnection,EdgeConnection]] = Field(description="The connections between nodes and their fields in this graph", default_factory=set)
 
     def add_node(self, node: BaseInvocation) -> None:
         """Adds a node to a graph
@@ -296,7 +296,7 @@ class Graph(BaseModel):
             # There's more node path left but this isn't a graph - failure
             raise NodeNotFoundError('Node path terminated early at a non-graph node')
 
-    def _get_input_edges(self, node_path: str, field: str = None) -> list[tuple[EdgeConnection,EdgeConnection]]:
+    def _get_input_edges(self, node_path: str, field: Optional[str] = None) -> list[tuple[EdgeConnection,EdgeConnection]]:
         """Gets all input edges for a node"""
         edges = list()
 
@@ -309,7 +309,7 @@ class Graph(BaseModel):
         if isinstance(node, GraphInvocation):
             graph = node.graph
             graph_edges = graph._get_input_edges(node_path[(len(node_id)+1):], field)
-            edges.extend(((EdgeConnection(f'{node_id}.{e[0].node_id}', e[0].field), EdgeConnection(f'{node_id}.{e[1].node_id}', e[1].field)) for e in graph_edges))
+            edges.extend(((EdgeConnection(node_id = f'{node_id}.{e[0].node_id}', field = e[0].field), EdgeConnection(node_id = f'{node_id}.{e[1].node_id}', field = e[1].field)) for e in graph_edges))
         
         return edges
     
@@ -329,12 +329,12 @@ class Graph(BaseModel):
         
         return edges
 
-    def _get_node_path(self, node_id: str, prefix: str = None) -> str:
+    def _get_node_path(self, node_id: str, prefix: Optional[str] = None) -> str:
         return node_id if prefix is None else f'{prefix}.{node_id}'
 
-    def _is_iterator_connection_valid(self, node_path: str, new_input: EdgeConnection = None, new_output: EdgeConnection = None) -> bool:
+    def _is_iterator_connection_valid(self, node_path: str, new_input: Optional[EdgeConnection] = None, new_output: Optional[EdgeConnection] = None) -> bool:
         inputs = list([e[0] for e in self._get_input_edges(node_path, 'collection')])
-        outputs = list([e for e in self._get_output_edges(node_path, 'item')])
+        outputs = list([e[0] for e in self._get_output_edges(node_path, 'item')])
 
         if new_input is not None:
             inputs.append(new_input)
@@ -360,7 +360,7 @@ class Graph(BaseModel):
 
         return True
 
-    def _is_collector_connection_valid(self, node_path: str, new_input: EdgeConnection = None, new_output: EdgeConnection = None) -> bool:
+    def _is_collector_connection_valid(self, node_path: str, new_input: Optional[EdgeConnection] = None, new_output: Optional[EdgeConnection] = None) -> bool:
         inputs = list([e[0] for e in self._get_input_edges(node_path, 'item')])
         outputs = list([e for e in self._get_output_edges(node_path, 'collection')])
 
@@ -403,7 +403,7 @@ class Graph(BaseModel):
         g.add_edges_from(set([(e[0].node_id, e[1].node_id) for e in self.edges]))
         return g
 
-    def nx_graph_flat(self, nx_graph: nx.DiGraph = None, prefix: str = None) -> nx.DiGraph:
+    def nx_graph_flat(self, nx_graph: Optional[nx.DiGraph] = None, prefix: Optional[str] = None) -> nx.DiGraph:
         """Returns a flattened NetworkX DiGraph, including all subgraphs (but not with iterations expanded)"""
         g = nx_graph or nx.DiGraph()
 
@@ -485,12 +485,12 @@ class GraphExecutionState(BaseModel):
         if all([n in self.executed for n in prepared_nodes]):
             self.executed.add(source_node)
 
-    def _get_node_iteration(self, node_id: str, iterations: set[str] = None) -> str:
+    def _get_node_iteration(self, node_id: str, iterations: Optional[set[str]] = None) -> str:
         prepared_nodes = self.source_prepared_mapping[node_id]
         # TODO: Throw if this returns none?
-        return next(n for n in prepared_nodes if iterations is None or self.prepared_node_iterations[n].issubset(iterations))
+        return next(n for n in prepared_nodes if iterations is None or self.prepared_node_iterations[n].issubset(iterations)) # TODO: `self.prepared_node_iterations` doesn't exist
 
-    def _create_execution_node(self, node_path: str, iteration_node_map: list[tuple[str, str]] = None) -> list[str]:
+    def _create_execution_node(self, node_path: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         """Prepares an iteration node and connects all edges, returning the new node id"""
 
         node = self.graph.get_node(node_path)
@@ -566,7 +566,7 @@ class GraphExecutionState(BaseModel):
         return iterators
 
 
-    def _prepare(self) -> str:
+    def _prepare(self) -> Optional[str]:
         # Get flattened source graph
         g = self.graph.nx_graph_flat()
 
@@ -610,7 +610,7 @@ class GraphExecutionState(BaseModel):
 
         return next(iter(new_node_ids), None)
         
-    def _get_iteration_node(self, source_node_path: str, graph: nx.DiGraph, execution_graph: nx.DiGraph, prepared_iterator_nodes: list[str]) -> str:
+    def _get_iteration_node(self, source_node_path: str, graph: nx.DiGraph, execution_graph: nx.DiGraph, prepared_iterator_nodes: list[str]) -> Optional[str]:
         """Gets the prepared version of the specified source node that matches every iteration specified"""
         prepared_nodes = self.source_prepared_mapping[source_node_path]
         if len(prepared_nodes) == 1:
@@ -627,7 +627,7 @@ class GraphExecutionState(BaseModel):
 
         return next((n for n in prepared_nodes if all(pit for pit in parent_iterators if nx.has_path(execution_graph, pit[0], n))), None)
 
-    def _get_next_node(self) -> BaseInvocation:
+    def _get_next_node(self) -> Optional[BaseInvocation]:
         g = self.execution_graph.nx_graph()
         sorted_nodes = nx.topological_sort(g)
         next_node = next((n for n in sorted_nodes if n not in self.executed), None)
