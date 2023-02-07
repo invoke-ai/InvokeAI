@@ -125,21 +125,33 @@ This fork is supported across Linux, Windows and Macintosh. Linux users can use
 either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
 driver).
 
-First time users, please see
-[Automated Installer](installation/010_INSTALL_AUTOMATED.md) for a walkthrough of
-getting InvokeAI up and running on your system. For alternative installation and
-upgrade instructions, please see:
-[InvokeAI Installation Overview](installation/)
+### Automated Installation
 
-Users who wish to make use of the **PyPatchMatch** inpainting functions
-will need to perform a bit of extra work to enable this
+
+First time users, please see [Automated
+Installer](installation/010_INSTALL_AUTOMATED.md) for a walkthrough of
+getting InvokeAI up and running on your system.
+
+### Manual Installation
+
+Power users who are comfortable with the command line can try the
+[Manual Installation](installation/020_INSTALL_MANUAL.md) method, which provides
+more flexibility. This manual also describes how to start developing
+with InvokeAI.
+
+### Docker Installation
+
+Another installation method is to run a Docker container containing
+InvokeAI and its dependencies. This method is recommended for
+individuals with experience with Docker containers and understand the
+pluses and minuses of a container-based install.
+
+### PyPatchMatch Library Installation
+
+Linux and Mac users who wish to make use of the **PyPatchMatch** inpainting
+optimization functions will need to perform a bit of extra work to enable this
 module. Instructions can be found at [Installing
 PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md).
-
-If you have an NVIDIA card, you can benefit from the significant
-memory savings and performance benefits provided by Facebook Lab's
-**xFormers** module. Instructions for Linux and Windows users can be found
-at [Installing xFormers](installation/070_INSTALL_XFORMERS.md).
 
 ## :octicons-gift-24: InvokeAI Features
 

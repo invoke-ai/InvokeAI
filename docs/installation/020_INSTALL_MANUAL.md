@@ -22,7 +22,7 @@ On Windows systems, you are encouraged to install and use the
 which provides compatibility with Linux and Mac shells and nice
 features such as command-line completion.
 
-### Prequisites
+### Prerequisites
 
 Before you start, make sure you have the following preqrequisites
 installed.  These are described in more detail in [Automated
@@ -121,7 +121,7 @@ manager, please follow these steps:
 
     === "Windows"
     	```bash
-        .venv\script\/activate
+        .venv\script\activate
     	```
 	If you get a permissions error at this point, run the command
 	`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`
@@ -272,3 +272,63 @@ manager, please follow these steps:
 
     Leave off the `--gui` option to run the script using command-line arguments. Pass the `--help` argument
     to get usage instructions.
+
+### Developer Install
+
+If you have an interest in how InvokeAI works, or you would like to
+add features or bugfixes, you are encouraged to install the source
+code for InvokeAI. For this to work, you will need to install the
+`git` source code management program. If it is not already installed
+on your system, please see the [Git Installation
+Guide](https://github.com/git-guides/install-git)
+
+1. From the command line, run this command:
+
+   ```bash
+   git clone https://github.com/invoke-ai/InvokeAI.git
+   ```
+
+This will create a directory named `InvokeAI` and populate it with the
+full source code from the InvokeAI repository.
+
+2. Activate the InvokeAI virtual environment as per step (4) of the manual
+installation protocol (important!)
+
+3. Enter the InvokeAI repository directory and run one of these
+   commands, based on your GPU:
+
+    === "CUDA (NVidia)"
+        ```bash
+        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+        ```
+
+    === "ROCm (AMD)"
+        ```bash
+        pip install -e . --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
+        ```
+
+    === "CPU (Intel Macs & non-GPU systems)"
+        ```bash
+        pip install -e . --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
+        ```
+
+    === "MPS (M1 and M2 Macs)"
+        ```bash
+        pip install -e . --use-pep517  --extra-index-url https://download.pytorch.org/whl/cpu
+        ```
+
+    Be sure to pass `-e` (for an editable install) and don't forget the
+    dot ("."). It is part of the command.
+
+    You can now run `invokeai` and its related commands. The code will be
+    read from the repository, so that you can edit the .py source files
+    and watch the code's behavior change.
+
+4.  If you wish to contribute to the InvokeAI project, you are
+    encouraged to establish a GitHub account and "fork"
+    https://github.com/invoke-ai/InvokeAI into your own copy of the
+    repository. You can then use GitHub functions to create and submit
+    pull requests to contribute improvements to the project.
+
+    Please see [Contributing](../../README.md#Contributing) for hints
+    on getting started.
