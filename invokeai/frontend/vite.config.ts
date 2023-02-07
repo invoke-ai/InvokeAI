@@ -1,4 +1,4 @@
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react-swc';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, PluginOption } from 'vite';
 import eslint from 'vite-plugin-eslint';
@@ -9,11 +9,7 @@ export default defineConfig(({ mode }) => {
   const common = {
     base: '',
     plugins: [
-      react({
-        babel: {
-          babelrc: true,
-        },
-      }),
+      react(),
       eslint(),
       tsconfigPaths(),
       visualizer() as unknown as PluginOption,
