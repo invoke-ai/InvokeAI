@@ -37,7 +37,7 @@ fi
 
 # Build Container
 DOCKER_BUILDKIT=1 docker build \
-    --platform="${PLATFORM:-Linux/amd64}" \
+    --platform="${PLATFORM:-linux/amd64}" \
     --tag="${CONTAINER_IMAGE:-invokeai}" \
     ${CONTAINER_FLAVOR:+--build-arg="CONTAINER_FLAVOR=${CONTAINER_FLAVOR}"} \
     ${PIP_EXTRA_INDEX_URL:+--build-arg="PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}"} \

@@ -16,7 +16,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean \
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt update \
+  apt-get update \
   && apt-get install -y \
     --no-install-recommends \
     libgl1-mesa-glx=20.3.* \
@@ -46,7 +46,7 @@ RUN \
   --mount=type=cache,target=${PIP_CACHE_DIR} \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt update \
+  apt-get update \
   && apt-get install -y \
     --no-install-recommends \
     build-essential=12.9 \

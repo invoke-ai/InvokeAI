@@ -48,6 +48,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=sha,format=long
             type=sha,enable=true,prefix=sha-,format=short
           flavor: |
             latest=${{ matrix.flavor == 'cuda' && github.ref == 'refs/heads/main' }}
@@ -89,7 +90,7 @@ jobs:
           build-args: PIP_EXTRA_INDEX_URL=${{ matrix.pip-extra-index-url }}
           cache-from: |
             type=gha
-            type=registry,ref=ghcr.io/${{ github.repository }}:main-${{ matrix.flavor }}
+            ghcr.io/${{ github.repository }}:main-${{ matrix.flavor }}
           cache-to: type=gha,mode=max
 
       - name: Docker Hub Description
