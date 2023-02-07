@@ -1,41 +1,48 @@
 import {
-  Text,
   AlertDialog,
   AlertDialogBody,
+  AlertDialogContent,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogContent,
   AlertDialogOverlay,
-  useDisclosure,
   Button,
-  Switch,
+  Flex,
   FormControl,
   FormLabel,
-  Flex,
+  Switch,
+  Text,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { ChangeEvent, ReactElement, SyntheticEvent } from 'react';
-import { cloneElement, forwardRef, useRef } from 'react';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import * as InvokeAI from 'app/invokeai';
 import { deleteImage } from 'app/socketio/actions';
-import { RootState } from 'app/store';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   setShouldConfirmOnDelete,
   SystemState,
 } from 'features/system/store/systemSlice';
-import * as InvokeAI from 'app/invokeai';
-import { useHotkeys } from 'react-hotkeys-hook';
-import _ from 'lodash';
+import { isEqual } from 'lodash';
 
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
+import {
+  ChangeEvent,
+  cloneElement,
+  forwardRef,
+  ReactElement,
+  SyntheticEvent,
+  useRef,
+} from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+
+const deleteImageModalSelector = createSelector(
+  systemSelector,
   (system: SystemState) => {
     const { shouldConfirmOnDelete, isConnected, isProcessing } = system;
     return { shouldConfirmOnDelete, isConnected, isProcessing };
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -60,8 +67,9 @@ const DeleteImageModal = forwardRef(
   ({ image, children }: DeleteImageModalProps, ref) => {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const dispatch = useAppDispatch();
-    const { shouldConfirmOnDelete, isConnected, isProcessing } =
-      useAppSelector(systemSelector);
+    const { shouldConfirmOnDelete, isConnected, isProcessing } = useAppSelector(
+      deleteImageModalSelector
+    );
     const cancelRef = useRef<HTMLButtonElement>(null);
 
     const handleClickDelete = (e: SyntheticEvent) => {
@@ -115,7 +123,7 @@ const DeleteImageModal = forwardRef(
                   </Text>
                   <FormControl>
                     <Flex alignItems={'center'}>
-                      <FormLabel mb={0}>Don't ask me again</FormLabel>
+                      <FormLabel mb={0}>Don&apos;t ask me again</FormLabel>
                       <Switch
                         checked={!shouldConfirmOnDelete}
                         onChange={handleChangeShouldConfirmOnDelete}
@@ -143,5 +151,7 @@ const DeleteImageModal = forwardRef(
     );
   }
 );
+
+DeleteImageModal.displayName = 'DeleteImageModal';
 
 export default DeleteImageModal;

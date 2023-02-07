@@ -1,25 +1,24 @@
 import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
-import dateFormat from 'dateformat';
-import { Socket } from 'socket.io-client';
+import * as InvokeAI from 'app/invokeai';
+import type { RootState } from 'app/store';
 import {
   frontendToBackendParameters,
   FrontendToBackendParametersConfig,
 } from 'common/util/parameterTranslation';
+import dateFormat from 'dateformat';
 import {
   GalleryCategory,
   GalleryState,
   removeImage,
 } from 'features/gallery/store/gallerySlice';
-import { OptionsState } from 'features/options/store/optionsSlice';
 import {
   addLogEntry,
   generationRequested,
   modelChangeRequested,
   setIsProcessing,
 } from 'features/system/store/systemSlice';
-import { InvokeTabName } from 'features/tabs/tabMap';
-import * as InvokeAI from 'app/invokeai';
-import type { RootState } from 'app/store';
+import { InvokeTabName } from 'features/ui/store/tabMap';
+import { Socket } from 'socket.io-client';
 
 /**
  * Returns an object containing all functions which use `socketio.emit()`.
@@ -39,7 +38,8 @@ const makeSocketIOEmitters = (
       const state: RootState = getState();
 
       const {
-        options: optionsState,
+        generation: generationState,
+        postprocessing: postprocessingState,
         system: systemState,
         canvas: canvasState,
       } = state;
@@ -47,7 +47,8 @@ const makeSocketIOEmitters = (
       const frontendToBackendParametersConfig: FrontendToBackendParametersConfig =
         {
           generationMode,
-          optionsState,
+          generationState,
+          postprocessingState,
           canvasState,
           systemState,
         };
@@ -90,8 +91,11 @@ const makeSocketIOEmitters = (
     },
     emitRunESRGAN: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const options: OptionsState = getState().options;
-      const { upscalingLevel, upscalingStrength } = options;
+
+      const {
+        postprocessing: { upscalingLevel, upscalingStrength },
+      } = getState();
+
       const esrganParameters = {
         upscale: [upscalingLevel, upscalingStrength],
       };
@@ -111,8 +115,10 @@ const makeSocketIOEmitters = (
     },
     emitRunFacetool: (imageToProcess: InvokeAI.Image) => {
       dispatch(setIsProcessing(true));
-      const options: OptionsState = getState().options;
-      const { facetoolType, facetoolStrength, codeformerFidelity } = options;
+
+      const {
+        postprocessing: { facetoolType, facetoolStrength, codeformerFidelity },
+      } = getState();
 
       const facetoolParameters: Record<string, unknown> = {
         facetool_strength: facetoolStrength,

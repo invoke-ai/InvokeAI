@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface HotkeysModalProps {
   hotkey: string;
   title: string;
