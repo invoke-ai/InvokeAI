@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 
-import React, { useEffect, useState } from 'react';
-import IAIInput from 'common/components/IAIInput';
 import IAIButton from 'common/components/IAIButton';
+import IAIInput from 'common/components/IAIInput';
+import { useEffect, useState } from 'react';
 
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
@@ -17,14 +17,13 @@ import {
   VStack,
 } from '@chakra-ui/react';
 
+import { addNewModel } from 'app/socketio/actions';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
-import { addNewModel } from 'app/socketio/actions';
 
-import _ from 'lodash';
-
-import type { RootState } from 'app/store';
 import type { InvokeDiffusersModelConfigProps } from 'app/invokeai';
+import type { RootState } from 'app/store';
+import { isEqual, pickBy } from 'lodash';
 
 const selector = createSelector(
   [systemSelector],
@@ -37,7 +36,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -65,8 +64,8 @@ export default function DiffusersModelEdit() {
 
   useEffect(() => {
     if (openModel) {
-      const retrievedModel = _.pickBy(model_list, (val, key) => {
-        return _.isEqual(key, openModel);
+      const retrievedModel = pickBy(model_list, (_val, key) => {
+        return isEqual(key, openModel);
       });
 
       setEditModelFormValues({

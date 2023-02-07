@@ -1,0 +1,54 @@
+@use '../../../../styles/Mixins/' as *;
+
+.advanced-parameters {
+  padding-top: 0.5rem;
+  display: grid;
+  row-gap: 0.5rem;
+}
+
+.advanced-parameters-item {
+  display: grid;
+  max-width: $options-bar-max-width;
+  border: none;
+  border-top: 0px;
+  border-radius: 0.4rem;
+  background-color: var(--tab-panel-bg);
+
+  &[aria-expanded='true'] {
+    background-color: var(--tab-hover-color);
+    border-radius: 0 0 0.4rem 0.4rem;
+  }
+}
+
+.advanced-parameters-panel {
+  background-color: var(--tab-panel-bg);
+  border-radius: 0 0 0.4rem 0.4rem;
+  padding: 1rem;
+
+  button {
+    background-color: var(--btn-base-color);
+    &:hover {
+      background-color: var(--btn-base-color-hover);
+    }
+
+    &:disabled {
+      &:hover {
+        background-color: var(--btn-base-color);
+      }
+    }
+  }
+}
+
+.advanced-parameters-header {
+  border-radius: 0.4rem;
+  font-weight: bold;
+
+  &[aria-expanded='true'] {
+    background-color: var(--tab-hover-color);
+    border-radius: 0.4rem 0.4rem 0 0;
+  }
+
+  &:hover {
+    background-color: var(--tab-hover-color);
+  }
+}

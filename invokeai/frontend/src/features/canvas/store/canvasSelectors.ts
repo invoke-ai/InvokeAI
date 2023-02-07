@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { CanvasImage, CanvasState, isCanvasBaseImage } from './canvasTypes';
 
 export const canvasSelector = (state: RootState): CanvasState => state.canvas;

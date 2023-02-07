@@ -3,7 +3,8 @@ import { RootState } from 'app/store';
 import { useAppSelector } from 'app/storeHooks';
 import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { ImageConfig } from 'konva/lib/shapes/Image';
-import _ from 'lodash';
+import { isEqual } from 'lodash';
+
 import { useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 
@@ -14,7 +15,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

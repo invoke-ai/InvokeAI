@@ -7,17 +7,17 @@ import {
   ModalOverlay,
   useDisclosure,
 } from '@chakra-ui/react';
-import React, { cloneElement } from 'react';
+import { cloneElement } from 'react';
 
-import { useTranslation } from 'react-i18next';
-import { useAppSelector } from 'app/storeHooks';
 import { RootState } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
+import { useTranslation } from 'react-i18next';
 
 import type { ReactElement } from 'react';
 
-import ModelList from './ModelList';
-import DiffusersModelEdit from './DiffusersModelEdit';
 import CheckpointModelEdit from './CheckpointModelEdit';
+import DiffusersModelEdit from './DiffusersModelEdit';
+import ModelList from './ModelList';
 
 type ModelManagerModalProps = {
   children: ReactElement;

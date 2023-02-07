@@ -2,15 +2,15 @@
   "name": "invoke-ai-ui",
   "private": true,
   "version": "0.0.1",
-  "type": "module",
   "scripts": {
+    "prepare": "cd ../../ && husky install invokeai/frontend/.husky",
     "dev": "vite dev",
     "build": "tsc && vite build",
-    "build-dev": "tsc && vite build -m development",
     "preview": "vite preview",
     "madge": "madge --circular src/main.tsx",
-    "lint": "eslint src/",
-    "prettier": "prettier *.{json,cjs,ts,html} src/**/*.{ts,tsx}",
+    "lint": "eslint --fix .",
+    "lint-staged": "lint-staged",
+    "prettier": "prettier *.{json,js,ts,html} src/**/*.{ts,tsx,scss} --write .",
     "fmt": "npm run prettier -- --write",
     "postinstall": "patch-package"
   },
@@ -25,6 +25,7 @@
     "@radix-ui/react-tooltip": "^1.0.2",
     "@reduxjs/toolkit": "^1.8.5",
     "@types/uuid": "^8.3.4",
+    "@vitejs/plugin-react-swc": "^3.1.0",
     "add": "^2.0.6",
     "dateformat": "^5.0.3",
     "formik": "^2.2.9",
@@ -62,22 +63,26 @@
     "@types/react-transition-group": "^4.4.5",
     "@typescript-eslint/eslint-plugin": "^5.36.2",
     "@typescript-eslint/parser": "^5.36.2",
-    "@vitejs/plugin-legacy": "^3.0.1",
-    "@vitejs/plugin-react": "^2.0.1",
+    "babel-plugin-transform-imports": "^2.0.0",
     "eslint": "^8.23.0",
+    "eslint-config-prettier": "^8.6.0",
     "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.1.0",
     "madge": "^5.0.1",
     "patch-package": "^6.5.0",
     "postinstall-postinstall": "^2.1.0",
-    "prettier": "^2.8.1",
+    "prettier": "^2.8.3",
+    "rollup-plugin-visualizer": "^5.9.0",
     "sass": "^1.55.0",
     "terser": "^5.16.1",
     "tsc-watch": "^5.0.3",
-    "typescript": "^4.6.4",
-    "vite": "^3.0.7",
+    "typescript": "^5.0.0-beta",
+    "vite": "^4.1.1",
     "vite-plugin-eslint": "^1.8.1",
-    "vite-tsconfig-paths": "^3.5.2"
+    "vite-tsconfig-paths": "^4.0.5"
   },
   "madge": {
     "detectiveOptions": {
@@ -88,5 +93,11 @@
         "skipTypeImports": true
       }
     }
+  },
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx,cjs}": [
+      "npx prettier --write",
+      "npx eslint --fix"
+    ]
   }
 }

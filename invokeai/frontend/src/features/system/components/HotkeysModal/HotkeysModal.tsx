@@ -10,7 +10,7 @@ import {
   ModalOverlay,
   useDisclosure,
 } from '@chakra-ui/react';
-import React, { cloneElement, ReactElement } from 'react';
+import { cloneElement, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import HotkeysModalItem from './HotkeysModalItem';
 

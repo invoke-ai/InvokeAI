@@ -1,7 +1,7 @@
 import { Box, forwardRef, Icon } from '@chakra-ui/react';
+import { Feature } from 'app/features';
 import { IconType } from 'react-icons';
 import { MdHelp } from 'react-icons/md';
-import { Feature } from 'app/features';
 import GuidePopover from './GuidePopover';
 
 type GuideIconProps = {

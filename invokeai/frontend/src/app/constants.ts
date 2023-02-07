@@ -16,6 +16,20 @@ export const SAMPLERS: Array<string> = [
   'k_heun',
 ];
 
+// Valid Diffusers Samplers
+export const DIFFUSERS_SAMPLERS: Array<string> = [
+  'ddim',
+  'plms',
+  'k_lms',
+  'dpmpp_2',
+  'k_dpm_2',
+  'k_dpm_2_a',
+  'k_dpmpp_2',
+  'k_euler',
+  'k_euler_a',
+  'k_heun',
+];
+
 // Valid image widths
 export const WIDTHS: Array<number> = [
   64, 128, 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960,
