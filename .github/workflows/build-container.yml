@@ -41,7 +41,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: |
             ghcr.io/${{ github.repository }}
-            ${{ vars.DOCKER_HUB }}
+            ${{ vars.DOCKERHUB_REPOSITORY }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -70,10 +70,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        if: github.event_name != 'pull_request' && vars.DOCKER_HUB != ''
+        if: github.event_name != 'pull_request' && vars.DOCKERHUB_REPOSITORY != ''
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build container
@@ -93,12 +93,12 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Docker Hub Description
-        if: github.event_name != 'pull_request' && vars.DOCKER_HUB != ''
+        if: github.event_name != 'pull_request' && vars.DOCKERHUB_REPOSITORY != ''
         uses: peter-evans/dockerhub-description@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ vars.DOCKER_HUB }}
+          repository: ${{ vars.DOCKERHUB_REPOSITORY }}
           short-description: ${{ github.event.repository.description }}
 
       - name: Output image, digest and metadata to summary
