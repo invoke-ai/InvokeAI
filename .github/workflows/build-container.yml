@@ -21,18 +21,15 @@ jobs:
         include:
           - flavor: amd
             pip-extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
-            dockerfile: docker/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - flavor: cuda
             pip-extra-index-url: ''
-            dockerfile: docker/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - flavor: cpu
             pip-extra-index-url: 'https://download.pytorch.org/whl/cpu'
-            dockerfile: docker/Dockerfile
-            platforms: linux/amd64,linux/arm64
     runs-on: ubuntu-latest
     name: ${{ matrix.flavor }}
+    env:
+      PLATFORMS: 'linux/amd64,linux/arm64'
+      DOCKERFILE: 'docker/Dockerfile'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -59,7 +56,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
-          platforms: ${{ matrix.platforms }}
+          platforms: ${{ env.PLATFORMS }}
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
@@ -74,15 +71,15 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
+          file: ${{ env.DOCKERFILE }}
+          platforms: ${{ env.PLATFORMS }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: PIP_EXTRA_INDEX_URL=${{ matrix.pip-extra-index-url }}
           cache-from: |
             type=gha
-            ghcr.io/${{ github.repository }}:main-${{ matrix.flavor }}
+            type=registry,ref=ghcr.io/${{ github.repository }}:main-${{ matrix.flavor }}
           cache-to: type=gha,mode=max
 
       - name: Output image, digest and metadata to summary
