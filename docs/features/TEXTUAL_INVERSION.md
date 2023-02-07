@@ -54,8 +54,7 @@ Please enter 1, 2, 3, or 4: [1] 3
 ```
 
 From the command line, with the InvokeAI virtual environment active,
-you can launch the front end with the command `textual_inversion
---gui`.
+you can launch the front end with the command `invokeai-ti --gui`.
 
 This will launch a text-based front end that will look like this:
 
@@ -227,12 +226,12 @@ It accepts a large number of arguments, which can be summarized by
 passing the `--help` argument:
 
 ```sh
-textual_inversion --help
+invokeai-ti --help
 ```
 
 Typical usage is shown here:
 ```sh
-textual_inversion \
+invokeai-ti \
        --model=stable-diffusion-1.5 \
        --resolution=512 \
        --learnable_property=style \
