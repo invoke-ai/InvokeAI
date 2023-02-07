@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { requestModelChange } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
-import { isEqual, map, reduce } from 'lodash';
+import { isEqual, map } from 'lodash';
 
 import { ChangeEvent } from 'react';
 import { activeModelSelector, systemSelector } from '../store/systemSelectors';
@@ -13,20 +13,7 @@ const selector = createSelector(
   (system) => {
     const { isProcessing, model_list } = system;
     const models = map(model_list, (model, key) => key);
-    const activeModel = reduce(
-      model_list,
-      (acc, model, key) => {
-        if (model.status === 'active') {
-          acc = key;
-        }
-
-        return acc;
-      },
-      ''
-    );
-    const activeDesc = model_list[activeModel].description;
-
-    return { models, activeModel, isProcessing, activeDesc };
+    return { models, isProcessing };
   },
   {
     memoizeOptions: {
