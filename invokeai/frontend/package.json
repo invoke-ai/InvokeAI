@@ -6,7 +6,6 @@
     "prepare": "cd ../../ && husky install invokeai/frontend/.husky",
     "dev": "vite dev",
     "build": "tsc && vite build",
-    "build-dev": "tsc && vite build -m development",
     "preview": "vite preview",
     "madge": "madge --circular src/main.tsx",
     "lint": "eslint --fix .",
