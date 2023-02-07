@@ -4,7 +4,7 @@ set -e
 # How to use: https://invoke-ai.github.io/InvokeAI/installation/INSTALL_DOCKER/#run-the-container
 # IMPORTANT: You need to have a token on huggingface.co to be able to download the checkpoints!!!
 
-SCRIPTDIR=$(dirname "$0")
+SCRIPTDIR=$(dirname "${BASH_SOURCE[0]}")
 cd "$SCRIPTDIR" || exit 1
 
 source ./env.sh

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
 if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
+  # Activate virtual environment if not already activated
+  if [[ -z $VIRTUAL_ENV ]]; then
+    [[ -e "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate" ]] \
+      && source "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate"
+  fi
   # Decide which container flavor to build if not specified
   if [[ -z "$CONTAINER_FLAVOR" ]] && python -c "import torch" &>/dev/null; then
     # Check for CUDA and ROCm
@@ -26,7 +31,8 @@ fi
 
 # Variables shared by build.sh and run.sh
 REPOSITORY_NAME="${REPOSITORY_NAME-$(basename "$(git rev-parse --show-toplevel)")}"
-VOLUMENAME="${VOLUMENAME-"${REPOSITORY_NAME,,}_data"}"
+REPOSITORY_NAME="${REPOSITORY_NAME,,}"
+VOLUMENAME="${VOLUMENAME-"${REPOSITORY_NAME}_data"}"
 ARCH="${ARCH-$(uname -m)}"
 PLATFORM="${PLATFORM-Linux/${ARCH}}"
 INVOKEAI_BRANCH="${INVOKEAI_BRANCH-$(git branch --show)}"

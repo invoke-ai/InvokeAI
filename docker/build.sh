@@ -8,12 +8,12 @@ set -e
 #   CPU:        https://download.pytorch.org/whl/cpu
 #   as found on https://pytorch.org/get-started/locally/
 
-SCRIPTDIR=$(dirname "$0")
+SCRIPTDIR=$(dirname "${BASH_SOURCE[0]}")
 cd "$SCRIPTDIR" || exit 1
 
 source ./env.sh
 
-DOCKERFILE=${INVOKE_DOCKERFILE:-Dockerfile}
+DOCKERFILE=${INVOKE_DOCKERFILE:-./Dockerfile}
 
 # print the settings
 echo -e "You are using these values:\n"
@@ -21,9 +21,10 @@ echo -e "Dockerfile:\t\t${DOCKERFILE}"
 echo -e "index-url:\t\t${PIP_EXTRA_INDEX_URL:-none}"
 echo -e "Volumename:\t\t${VOLUMENAME}"
 echo -e "Platform:\t\t${PLATFORM}"
-echo -e "Registry:\t\t${CONTAINER_REGISTRY}"
-echo -e "Repository:\t\t${CONTAINER_REPOSITORY}"
+echo -e "Container Registry:\t${CONTAINER_REGISTRY}"
+echo -e "Container Repository:\t${CONTAINER_REPOSITORY}"
 echo -e "Container Tag:\t\t${CONTAINER_TAG}"
+echo -e "Container Flavor:\t${CONTAINER_FLAVOR}"
 echo -e "Container Image:\t${CONTAINER_IMAGE}\n"
 
 # Create docker volume
@@ -41,5 +42,5 @@ DOCKER_BUILDKIT=1 docker build \
     ${CONTAINER_FLAVOR:+--build-arg="CONTAINER_FLAVOR=${CONTAINER_FLAVOR}"} \
     ${PIP_EXTRA_INDEX_URL:+--build-arg="PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}"} \
     ${PIP_PACKAGE:+--build-arg="PIP_PACKAGE=${PIP_PACKAGE}"} \
-    --file="${DOCKERFILE:-./Dockerfile}" \
+    --file="${DOCKERFILE}" \
     ..

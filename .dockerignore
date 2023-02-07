@@ -11,13 +11,13 @@
 
 # ignore frontend but whitelist dist
 invokeai/frontend/**
-!invokeai/frontend/dist
+!invokeai/frontend/dist/**
 
 # ignore invokeai/assets but whitelist invokeai/assets/web
-invokeai/assets
-!invokeai/assets/web
+invokeai/assets/**
+!invokeai/assets/web/*.png
 
-# ignore python cache
+# ignore python cache and build artifacts
 **/__pycache__
 **/*.py[cod]
 **/*.egg-info
