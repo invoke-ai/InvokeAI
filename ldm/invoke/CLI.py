@@ -712,10 +712,12 @@ def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_des
 def optimize_model(model_name_or_path:str, gen, opt, completer):
     manager = gen.model_manager
     ckpt_path = None
+    original_config_file = None
 
     if (model_info := manager.model_info(model_name_or_path)):
         if 'weights' in model_info:
             ckpt_path = Path(model_info['weights'])
+            original_config_file = Path(model_info['config'])
             model_name = model_name_or_path
             model_description = model_info['description']
         else:
@@ -723,11 +725,17 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
             return
     elif os.path.exists(model_name_or_path):
         ckpt_path = Path(model_name_or_path)
-        model_name,model_description = _get_model_name_and_desc(
+        model_name, model_description = _get_model_name_and_desc(
             manager,
             completer,
             ckpt_path.stem,
             f'Converted model {ckpt_path.stem}'
+        )
+        is_inpainting = input('Is this an inpainting model? [n] ').startswith(('y','Y'))
+        original_config_file = Path(
+            'configs',
+            'stable-diffusion',
+            'v1-inpainting-inference.yaml' if is_inpainting else 'v1-inference.yaml'
         )
     else:
         print(f'** {model_name_or_path} is neither an existing model nor the path to a .ckpt file')
@@ -735,6 +743,9 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
 
     if not ckpt_path.is_absolute():
         ckpt_path = Path(Globals.root,ckpt_path)
+
+    if original_config_file and not original_config_file.is_absolute():
+        original_config_file = Path(Globals.root,original_config_file)
 
     diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir,model_name)
     if diffuser_path.exists():
@@ -751,6 +762,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
         model_name=model_name,
         model_description=model_description,
         vae = vae,
+        original_config_file = original_config_file,
         commit_to_conf=opt.conf,
     )
     if not new_config:
