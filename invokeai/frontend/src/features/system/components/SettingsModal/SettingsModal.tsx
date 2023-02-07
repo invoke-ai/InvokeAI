@@ -13,11 +13,13 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import _, { isEqual } from 'lodash';
-import { ChangeEvent, cloneElement, ReactElement } from 'react';
+import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { persistor } from 'persistor';
+import IAINumberInput from 'common/components/IAINumberInput';
+import IAISelect from 'common/components/IAISelect';
+import IAISwitch from 'common/components/IAISwitch';
+import { systemSelector } from 'features/system/store/systemSelectors';
 import {
   InProgressImageType,
   setEnableImageDebugging,
@@ -26,18 +28,16 @@ import {
   setShouldDisplayGuides,
   setShouldDisplayInProgressType,
 } from 'features/system/store/systemSlice';
-import { IN_PROGRESS_IMAGE_TYPES } from 'app/constants';
-import IAISwitch from 'common/components/IAISwitch';
-import IAISelect from 'common/components/IAISelect';
-import IAINumberInput from 'common/components/IAINumberInput';
-import { systemSelector } from 'features/system/store/systemSelectors';
-import { optionsSelector } from 'features/options/store/optionsSelectors';
-import { setShouldUseCanvasBetaLayout } from 'features/options/store/optionsSlice';
+import { uiSelector } from 'features/ui/store/uiSelectors';
+import { setShouldUseCanvasBetaLayout } from 'features/ui/store/uiSlice';
+import { isEqual, map } from 'lodash';
+import { persistor } from 'persistor';
+import { ChangeEvent, cloneElement, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
-  [systemSelector, optionsSelector],
-  (system, options) => {
+  [systemSelector, uiSelector],
+  (system, ui) => {
     const {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
@@ -47,13 +47,13 @@ const selector = createSelector(
       enableImageDebugging,
     } = system;
 
-    const { shouldUseCanvasBetaLayout } = options;
+    const { shouldUseCanvasBetaLayout } = ui;
 
     return {
       shouldDisplayInProgressType,
       shouldConfirmOnDelete,
       shouldDisplayGuides,
-      models: _.map(model_list, (_model, key) => key),
+      models: map(model_list, (_model, key) => key),
       saveIntermediatesInterval,
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
@@ -79,7 +79,7 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const steps = useAppSelector((state: RootState) => state.options.steps);
+  const steps = useAppSelector((state: RootState) => state.generation.steps);
 
   const {
     isOpen: isSettingsModalOpen,

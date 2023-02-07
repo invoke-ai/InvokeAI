@@ -1,13 +1,13 @@
 import { Text, Tooltip } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
-import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { errorSeen, SystemState } from 'features/system/store/systemSlice';
+import { isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
+import { systemSelector } from '../store/systemSelectors';
 
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
+const statusIndicatorSelector = createSelector(
+  systemSelector,
   (system: SystemState) => {
     return {
       isConnected: system.isConnected,
@@ -33,7 +33,7 @@ const StatusIndicator = () => {
     currentStatus,
     hasError,
     wasErrorSeen,
-  } = useAppSelector(systemSelector);
+  } = useAppSelector(statusIndicatorSelector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -61,9 +61,9 @@ const StatusIndicator = () => {
   if (statusMessage)
     if (isProcessing) {
       if (totalIterations > 1) {
-        statusMessage =
-          t(statusMessage as keyof typeof t) +
-          ` (${currentIteration}/${totalIterations})`;
+        statusMessage = `${t(
+          statusMessage as keyof typeof t
+        )} (${currentIteration}/${totalIterations})`;
       }
     }
 
