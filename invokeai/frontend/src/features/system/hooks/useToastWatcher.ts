@@ -1,8 +1,8 @@
 import { useToast } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { useEffect } from 'react';
 import { toastQueueSelector } from 'features/system/store/systemSelectors';
 import { clearToastQueue } from 'features/system/store/systemSlice';
+import { useEffect } from 'react';
 
 const useToastWatcher = () => {
   const dispatch = useAppDispatch();

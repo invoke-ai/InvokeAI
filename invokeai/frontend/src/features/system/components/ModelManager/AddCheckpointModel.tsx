@@ -8,11 +8,11 @@ import {
   VStack,
 } from '@chakra-ui/react';
 
-import React from 'react';
+import IAIButton from 'common/components/IAIButton';
+import IAICheckbox from 'common/components/IAICheckbox';
 import IAIInput from 'common/components/IAIInput';
 import IAINumberInput from 'common/components/IAINumberInput';
-import IAICheckbox from 'common/components/IAICheckbox';
-import IAIButton from 'common/components/IAIButton';
+import React from 'react';
 
 import SearchModels from './SearchModels';
 
@@ -23,11 +23,11 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { FieldInputProps, FormikProps } from 'formik';
-import type { RootState } from 'app/store';
 import type { InvokeModelConfigProps } from 'app/invokeai';
-import { setAddNewModelUIOption } from 'features/options/store/optionsSlice';
+import type { RootState } from 'app/store';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
+import type { FieldInputProps, FormikProps } from 'formik';
 import { BiArrowBack } from 'react-icons/bi';
 
 const MIN_MODEL_SIZE = 64;

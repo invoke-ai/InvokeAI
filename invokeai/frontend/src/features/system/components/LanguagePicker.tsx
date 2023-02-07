@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 
 import { VStack } from '@chakra-ui/react';
-import IAIPopover from 'common/components/IAIPopover';
-import React from 'react';
 import IAIButton from 'common/components/IAIButton';
-import { useTranslation } from 'react-i18next';
 import IAIIconButton from 'common/components/IAIIconButton';
+import IAIPopover from 'common/components/IAIPopover';
+import { useTranslation } from 'react-i18next';
 import { FaLanguage } from 'react-icons/fa';
 
 export default function LanguagePicker() {
@@ -13,16 +12,16 @@ export default function LanguagePicker() {
 
   const LANGUAGES = {
     en: t('common:langEnglish'),
-    ru: t('common:langRussian'),
-    it: t('common:langItalian'),
-    pt_br: t('common:langBrPortuguese'),
-    de: t('common:langGerman'),
-    pl: t('common:langPolish'),
-    zh_cn: t('common:langSimplifiedChinese'),
-    es: t('common:langSpanish'),
-    ja: t('common:langJapanese'),
     nl: t('common:langDutch'),
     fr: t('common:langFrench'),
+    de: t('common:langGerman'),
+    it: t('common:langItalian'),
+    ja: t('common:langJapanese'),
+    pl: t('common:langPolish'),
+    pt_br: t('common:langBrPortuguese'),
+    ru: t('common:langRussian'),
+    zh_cn: t('common:langSimplifiedChinese'),
+    es: t('common:langSpanish'),
     ua: t('common:langUkranian'),
   };
 

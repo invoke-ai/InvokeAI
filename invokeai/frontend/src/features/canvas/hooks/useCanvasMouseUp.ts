@@ -1,9 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
-import Konva from 'konva';
-import _ from 'lodash';
-import { MutableRefObject, useCallback } from 'react';
 import {
   canvasSelector,
   isStagingSelector,
@@ -14,6 +10,11 @@ import {
   setIsDrawing,
   setIsMovingStage,
 } from 'features/canvas/store/canvasSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import Konva from 'konva';
+import { isEqual } from 'lodash';
+
+import { MutableRefObject, useCallback } from 'react';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 
 const selector = createSelector(
@@ -27,7 +28,7 @@ const selector = createSelector(
       isStaging,
     };
   },
-  { memoizeOptions: { resultEqualityCheck: _.isEqual } }
+  { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
 const useCanvasMouseUp = (

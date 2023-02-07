@@ -1,24 +1,24 @@
 import { Flex, Link, Text } from '@chakra-ui/react';
 
-import { FaGithub, FaDiscord, FaBug, FaKeyboard, FaCube } from 'react-icons/fa';
+import { FaBug, FaCube, FaDiscord, FaGithub, FaKeyboard } from 'react-icons/fa';
 
 import InvokeAILogo from 'assets/images/logo.png';
 import IAIIconButton from 'common/components/IAIIconButton';
 
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 
+import ModelManagerModal from './ModelManager/ModelManagerModal';
+import ModelSelect from './ModelSelect';
 import SettingsModal from './SettingsModal/SettingsModal';
 import StatusIndicator from './StatusIndicator';
 import ThemeChanger from './ThemeChanger';
-import ModelSelect from './ModelSelect';
-import ModelManagerModal from './ModelManager/ModelManagerModal';
 
 import LanguagePicker from './LanguagePicker';
 
+import type { RootState } from 'app/store';
+import { useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 import { MdSettings } from 'react-icons/md';
-import { useAppSelector } from 'app/storeHooks';
-import type { RootState } from 'app/store';
 
 /**
  * Header, includes color mode toggle, settings button, status message.

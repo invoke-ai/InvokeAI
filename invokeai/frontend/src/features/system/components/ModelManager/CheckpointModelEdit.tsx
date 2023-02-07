@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 
-import React, { useEffect, useState } from 'react';
+import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import IAINumberInput from 'common/components/IAINumberInput';
-import IAIButton from 'common/components/IAIButton';
+import { useEffect, useState } from 'react';
 
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
@@ -19,15 +19,14 @@ import {
   VStack,
 } from '@chakra-ui/react';
 
+import { addNewModel } from 'app/socketio/actions';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
-import { addNewModel } from 'app/socketio/actions';
 
-import _ from 'lodash';
-
+import type { InvokeModelConfigProps } from 'app/invokeai';
 import type { RootState } from 'app/store';
 import type { FieldInputProps, FormikProps } from 'formik';
-import type { InvokeModelConfigProps } from 'app/invokeai';
+import { isEqual, pickBy } from 'lodash';
 
 const selector = createSelector(
   [systemSelector],
@@ -40,7 +39,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -73,8 +72,8 @@ export default function CheckpointModelEdit() {
 
   useEffect(() => {
     if (openModel) {
-      const retrievedModel = _.pickBy(model_list, (val, key) => {
-        return _.isEqual(key, openModel);
+      const retrievedModel = pickBy(model_list, (_val, key) => {
+        return isEqual(key, openModel);
       });
       setEditModelFormValues({
         name: openModel,
@@ -316,7 +315,6 @@ export default function CheckpointModelEdit() {
   ) : (
     <Flex
       width="100%"
-      height="250px"
       justifyContent="center"
       alignItems="center"
       backgroundColor="var(--background-color)"

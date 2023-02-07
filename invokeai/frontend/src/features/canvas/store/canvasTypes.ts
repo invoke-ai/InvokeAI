@@ -9,7 +9,7 @@ export const LAYER_NAMES_DICT = [
 
 export const LAYER_NAMES = ['base', 'mask'] as const;
 
-export type CanvasLayer = typeof LAYER_NAMES[number];
+export type CanvasLayer = (typeof LAYER_NAMES)[number];
 
 export const BOUNDING_BOX_SCALES_DICT = [
   { key: 'Auto', value: 'auto' },
@@ -19,7 +19,7 @@ export const BOUNDING_BOX_SCALES_DICT = [
 
 export const BOUNDING_BOX_SCALES = ['none', 'auto', 'manual'] as const;
 
-export type BoundingBoxScale = typeof BOUNDING_BOX_SCALES[number];
+export type BoundingBoxScale = (typeof BOUNDING_BOX_SCALES)[number];
 
 export type CanvasDrawingTool = 'brush' | 'eraser';
 

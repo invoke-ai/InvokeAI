@@ -4,25 +4,27 @@ import {
   setCurrentImage,
   setShouldHoldGalleryOpen,
 } from 'features/gallery/store/gallerySlice';
-import { FaCheck, FaTrashAlt } from 'react-icons/fa';
-import DeleteImageModal from './DeleteImageModal';
-import { DragEvent, memo, useState } from 'react';
 import {
-  setActiveTab,
   setAllImageToImageParameters,
-  setAllTextToImageParameters,
+  setAllParameters,
   setInitialImage,
-  setIsLightBoxOpen,
+  setNegativePrompt,
   setPrompt,
   setSeed,
-} from 'features/options/store/optionsSlice';
-import * as InvokeAI from 'app/invokeai';
+} from 'features/parameters/store/generationSlice';
+import { DragEvent, memo, useState } from 'react';
+import { FaCheck, FaTrashAlt } from 'react-icons/fa';
+import DeleteImageModal from './DeleteImageModal';
+
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import * as InvokeAI from 'app/invokeai';
+import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
-import { hoverableImageSelector } from 'features/gallery/store/gallerySliceSelectors';
+import { hoverableImageSelector } from 'features/gallery/store/gallerySelectors';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useTranslation } from 'react-i18next';
 
 interface HoverableImageProps {
@@ -45,7 +47,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
     galleryImageObjectFit,
     galleryImageMinimumWidth,
     mayDeleteImage,
-    isLightBoxOpen,
     shouldUseSingleGalleryColumn,
   } = useAppSelector(hoverableImageSelector);
   const { image, isSelected } = props;
@@ -62,7 +63,17 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleMouseOut = () => setIsHovered(false);
 
   const handleUsePrompt = () => {
-    image.metadata && dispatch(setPrompt(image.metadata.image.prompt));
+    if (image.metadata) {
+      const [prompt, negativePrompt] = getPromptAndNegative(
+        image.metadata?.image?.prompt
+      );
+
+      prompt && dispatch(setPrompt(prompt));
+      negativePrompt
+        ? dispatch(setNegativePrompt(negativePrompt))
+        : dispatch(setNegativePrompt(''));
+    }
+
     toast({
       title: t('toast:promptSet'),
       status: 'success',
@@ -82,7 +93,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToImageToImage = () => {
-    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
     dispatch(setInitialImage(image));
     if (activeTabName !== 'img2img') {
       dispatch(setActiveTab('img2img'));
@@ -96,8 +106,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleSendToCanvas = () => {
-    if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
-
     dispatch(setInitialCanvasImage(image));
 
     dispatch(resizeAndScaleCanvas());
@@ -115,7 +123,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseAllParameters = () => {
-    metadata && dispatch(setAllTextToImageParameters(metadata));
+    metadata && dispatch(setAllParameters(metadata));
     toast({
       title: t('toast:parametersSet'),
       status: 'success',
@@ -156,7 +164,6 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleLightBox = () => {
-    dispatch(setIsLightBoxOpen(true));
     dispatch(setCurrentImage(image));
   };
 
@@ -200,7 +207,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             <div className="hoverable-image-delete-button">
               <DeleteImageModal image={image}>
                 <IconButton
-                  aria-label={t('options:deleteImage')}
+                  aria-label={t('parameters:deleteImage')}
                   icon={<FaTrashAlt />}
                   size="xs"
                   variant={'imageHoverIconButton'}
@@ -220,20 +227,20 @@ const HoverableImage = memo((props: HoverableImageProps) => {
         }}
       >
         <ContextMenu.Item onClickCapture={handleLightBox}>
-          {t('options:openInViewer')}
+          {t('parameters:openInViewer')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUsePrompt}
           disabled={image?.metadata?.image?.prompt === undefined}
         >
-          {t('options:usePrompt')}
+          {t('parameters:usePrompt')}
         </ContextMenu.Item>
 
         <ContextMenu.Item
           onClickCapture={handleUseSeed}
           disabled={image?.metadata?.image?.seed === undefined}
         >
-          {t('options:useSeed')}
+          {t('parameters:useSeed')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUseAllParameters}
@@ -241,28 +248,30 @@ const HoverableImage = memo((props: HoverableImageProps) => {
             !['txt2img', 'img2img'].includes(image?.metadata?.image?.type)
           }
         >
-          {t('options:useAll')}
+          {t('parameters:useAll')}
         </ContextMenu.Item>
         <ContextMenu.Item
           onClickCapture={handleUseInitialImage}
           disabled={image?.metadata?.image?.type !== 'img2img'}
         >
-          {t('options:useInitImg')}
+          {t('parameters:useInitImg')}
         </ContextMenu.Item>
         <ContextMenu.Item onClickCapture={handleSendToImageToImage}>
-          {t('options:sendToImg2Img')}
+          {t('parameters:sendToImg2Img')}
         </ContextMenu.Item>
         <ContextMenu.Item onClickCapture={handleSendToCanvas}>
-          {t('options:sendToUnifiedCanvas')}
+          {t('parameters:sendToUnifiedCanvas')}
         </ContextMenu.Item>
         <ContextMenu.Item data-warning>
           <DeleteImageModal image={image}>
-            <p>{t('options:deleteImage')}</p>
+            <p>{t('parameters:deleteImage')}</p>
           </DeleteImageModal>
         </ContextMenu.Item>
       </ContextMenu.Content>
     </ContextMenu.Root>
   );
 }, memoEqualityCheck);
+
+HoverableImage.displayName = 'HoverableImage';
 
 export default HoverableImage;

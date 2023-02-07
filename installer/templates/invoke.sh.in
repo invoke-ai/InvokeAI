@@ -47,11 +47,11 @@ if [ "$0" != "bash" ]; then
             ;;
         3)
             echo "Starting Textual Inversion:"
-            exec textual_inversion --gui $@
+            exec invokeai-ti --gui $@
             ;;
         4)
             echo "Merging Models:"
-            exec merge_models --gui $@
+            exec invokeai-merge --gui $@
             ;;
         5)
             echo "Developer Console:"

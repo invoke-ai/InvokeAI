@@ -1,6 +1,6 @@
-import { createSlice } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit';
 import { ExpandedIndex, UseToastOptions } from '@chakra-ui/react';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
 import i18n from 'i18n';
 
