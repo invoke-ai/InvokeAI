@@ -25,7 +25,7 @@ RUN \
 ARG APPDIR=/usr/src
 ARG APPNAME=InvokeAI
 WORKDIR ${APPDIR}
-ENV PATH=${APPDIR}/${APPNAME}/bin:$PATH
+ENV PATH ${APPDIR}/${APPNAME}/bin:$PATH
 
 #######################
 ##  build pyproject  ##
@@ -42,8 +42,8 @@ RUN mkdir -p ${PIP_CACHE_DIR}
 # Install dependencies
 RUN \
   --mount=type=cache,target=${PIP_CACHE_DIR},id=pip-${CONTAINER_FLAVOR} \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked,from=python-base \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked,from=python-base \
   apt update \
   && apt-get install -y \
     --no-install-recommends \
@@ -75,7 +75,7 @@ RUN python3 -c "from patchmatch import patch_match"
 FROM python-base AS runtime
 
 # setup environment
-COPY --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPDIR}/${APPNAME}
+COPY --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
 ENV INVOKEAI_ROOT=/data
 ENV INVOKE_MODEL_RECONFIGURE="--yes --default_only"
 
