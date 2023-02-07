@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'update/ci/*'
     tags:
       - 'v*.*.*'
 
@@ -47,11 +48,10 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha,enable=true,prefix=sha-,suffix=${{ matrix.flavor}},format=short
-            type=raw,value={{branch}}-${{ matrix.flavor }}
+            type=sha,enable=true,prefix=sha-,format=short
           flavor: |
             latest=${{ matrix.flavor == 'cuda' && github.ref == 'refs/heads/main' }}
-
+            suffix=-${{ matrix.flavor }},onlatest=false
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 

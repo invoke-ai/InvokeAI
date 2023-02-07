@@ -1,18 +1,8 @@
 import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import _ from 'lodash';
-import { useCallback } from 'react';
-import {
-  FaArrowLeft,
-  FaArrowRight,
-  FaCheck,
-  FaEye,
-  FaEyeSlash,
-  FaPlus,
-  FaSave,
-} from 'react-icons/fa';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   commitStagingAreaImage,
@@ -22,9 +12,20 @@ import {
   setShouldShowStagingImage,
   setShouldShowStagingOutline,
 } from 'features/canvas/store/canvasSlice';
+import { isEqual } from 'lodash';
+
+import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { saveStagingAreaImageToGallery } from 'app/socketio/actions';
 import { useTranslation } from 'react-i18next';
+import {
+  FaArrowLeft,
+  FaArrowRight,
+  FaCheck,
+  FaEye,
+  FaEyeSlash,
+  FaPlus,
+  FaSave,
+} from 'react-icons/fa';
 
 const selector = createSelector(
   [canvasSelector],
@@ -48,7 +49,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

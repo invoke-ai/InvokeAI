@@ -1,7 +1,4 @@
 # syntax=docker/dockerfile:1
-
-# Maintained by Matthias Wild <mauwii@outlook.de>
-
 ARG PYTHON_VERSION=3.9
 ##################
 ##  base image  ##
@@ -85,3 +82,5 @@ ENV INVOKE_MODEL_RECONFIGURE="--yes --default_only"
 ENTRYPOINT [ "invokeai" ]
 CMD [ "--web", "--host=0.0.0.0" ]
 VOLUME [ "/data" ]
+
+LABEL org.opencontainers.image.authors="mauwii@outlook.de"

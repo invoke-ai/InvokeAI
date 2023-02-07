@@ -1,5 +1,14 @@
 import { ButtonGroup } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
+import IAISelect from 'common/components/IAISelect';
+import useImageUploader from 'common/hooks/useImageUploader';
+import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
+import {
+  canvasSelector,
+  isStagingSelector,
+} from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
   resetCanvasView,
@@ -8,9 +17,18 @@ import {
   setLayer,
   setTool,
 } from 'features/canvas/store/canvasSlice';
-import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
-import IAIIconButton from 'common/components/IAIIconButton';
+import {
+  CanvasLayer,
+  LAYER_NAMES_DICT,
+} from 'features/canvas/store/canvasTypes';
+import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
+import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import { isEqual } from 'lodash';
+
+import { ChangeEvent } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import {
   FaArrowsAlt,
   FaCopy,
@@ -21,28 +39,11 @@ import {
   FaTrash,
   FaUpload,
 } from 'react-icons/fa';
-import IAICanvasUndoButton from './IAICanvasUndoButton';
+import IAICanvasMaskOptions from './IAICanvasMaskOptions';
 import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
-import IAICanvasMaskOptions from './IAICanvasMaskOptions';
-import { mergeAndUploadCanvas } from 'features/canvas/store/thunks/mergeAndUploadCanvas';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
-import useImageUploader from 'common/hooks/useImageUploader';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
-import IAISelect from 'common/components/IAISelect';
-import {
-  CanvasLayer,
-  LAYER_NAMES_DICT,
-} from 'features/canvas/store/canvasTypes';
-import { ChangeEvent } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
+import IAICanvasUndoButton from './IAICanvasUndoButton';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -62,7 +63,7 @@ export const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

@@ -1,14 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { FaRedo } from 'react-icons/fa';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { FaRedo } from 'react-icons/fa';
 
-import _ from 'lodash';
 import { redo } from 'features/canvas/store/canvasSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
+
+import { isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 
 const canvasRedoSelector = createSelector(
@@ -23,7 +24,7 @@ const canvasRedoSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

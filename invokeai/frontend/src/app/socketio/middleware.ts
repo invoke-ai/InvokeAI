@@ -1,8 +1,8 @@
 import { Middleware } from '@reduxjs/toolkit';
 import { io } from 'socket.io-client';
 
-import makeSocketIOListeners from './listeners';
 import makeSocketIOEmitters from './emitters';
+import makeSocketIOListeners from './listeners';
 
 import * as InvokeAI from 'app/invokeai';
 
@@ -26,7 +26,7 @@ export const socketioMiddleware = () => {
 
   const socketio = io(origin, {
     timeout: 60000,
-    path: window.location.pathname + 'socket.io',
+    path: `${window.location.pathname}socket.io`,
   });
 
   let areListenersSet = false;

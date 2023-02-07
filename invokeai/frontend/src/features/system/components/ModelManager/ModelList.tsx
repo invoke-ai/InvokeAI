@@ -1,7 +1,7 @@
-import React, { useState, useTransition, useMemo } from 'react';
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import IAIInput from 'common/components/IAIInput';
+import { useMemo, useState, useTransition } from 'react';
 
 import AddModel from './AddModel';
 import ModelListItem from './ModelListItem';
@@ -9,24 +9,23 @@ import ModelListItem from './ModelListItem';
 import { useAppSelector } from 'app/storeHooks';
 import { useTranslation } from 'react-i18next';
 
-import _ from 'lodash';
-
-import type { ChangeEvent, ReactNode } from 'react';
-import type { RootState } from 'app/store';
-import type { SystemState } from 'features/system/store/systemSlice';
 import IAIButton from 'common/components/IAIButton';
+import { systemSelector } from 'features/system/store/systemSelectors';
+import type { SystemState } from 'features/system/store/systemSlice';
+import { isEqual, map } from 'lodash';
+import type { ChangeEvent, ReactNode } from 'react';
 
 const modelListSelector = createSelector(
-  (state: RootState) => state.system,
+  systemSelector,
   (system: SystemState) => {
-    const models = _.map(system.model_list, (model, key) => {
+    const models = map(system.model_list, (model, key) => {
       return { name: key, ...model };
     });
     return models;
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

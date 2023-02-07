@@ -1,20 +1,20 @@
 import { IconButton, Tooltip } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
 import {
   errorSeen,
   setShouldShowLogViewer,
   SystemState,
 } from 'features/system/store/systemSlice';
-import { useLayoutEffect, useRef, useState } from 'react';
-import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
-import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash';
 import { Resizable } from 're-resizable';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { FaAngleDoubleDown, FaCode, FaMinus } from 'react-icons/fa';
+import { systemSelector } from '../store/systemSelectors';
 
 const logSelector = createSelector(
-  (state: RootState) => state.system,
+  systemSelector,
   (system: SystemState) => system.log,
   {
     memoizeOptions: {
@@ -24,8 +24,8 @@ const logSelector = createSelector(
   }
 );
 
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
+const consoleSelector = createSelector(
+  systemSelector,
   (system: SystemState) => {
     return {
       shouldShowLogViewer: system.shouldShowLogViewer,
@@ -47,7 +47,7 @@ const Console = () => {
   const dispatch = useAppDispatch();
   const log = useAppSelector(logSelector);
   const { shouldShowLogViewer, hasError, wasErrorSeen } =
-    useAppSelector(systemSelector);
+    useAppSelector(consoleSelector);
 
   // Rudimentary autoscroll
   const [shouldAutoscroll, setShouldAutoscroll] = useState<boolean>(true);
