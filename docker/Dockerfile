@@ -6,6 +6,8 @@ ARG PYTHON_VERSION=3.9
 ##################
 FROM python:${PYTHON_VERSION}-slim AS python-base
 
+LABEL org.opencontainers.image.authors="mauwii@outlook.de"
+
 # prepare for buildkit cache
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
@@ -83,5 +85,3 @@ ENV INVOKE_MODEL_RECONFIGURE="--yes --default_only"
 ENTRYPOINT [ "invokeai" ]
 CMD [ "--web", "--host=0.0.0.0" ]
 VOLUME [ "/data" ]
-
-LABEL org.opencontainers.image.authors="mauwii@outlook.de"
