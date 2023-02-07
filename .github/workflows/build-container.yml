@@ -88,10 +88,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: PIP_EXTRA_INDEX_URL=${{ matrix.pip-extra-index-url }}
-          cache-from: |
-            type=gha
-            ghcr.io/${{ github.repository }}:main-${{ matrix.flavor }}
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=$GITHUB_REF_NAME-${{ matrix.flavor }}
+          cache-to: type=gha,mode=max,scope=$GITHUB_REF_NAME-${{ matrix.flavor }}
 
       - name: Docker Hub Description
         if: github.event_name != 'pull_request' && vars.DOCKERHUB_REPOSITORY != ''
