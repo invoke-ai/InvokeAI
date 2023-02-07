@@ -6,30 +6,39 @@ title: Installing with the Automated Installer
 
 ## Introduction
 
-The automated installer is a shell script that attempts to automate every step
-needed to install and run InvokeAI on a stock computer running recent versions
-of Linux, MacOS or Windows. It will leave you with a version that runs a stable
-version of InvokeAI with the option to upgrade to experimental versions later.
+The automated installer is a Python script that attempts to automate
+every step needed to install and run InvokeAI on a stock computer
+running recent versions of Linux, MacOS or Windows. It will leave you
+with a version that runs a stable version of InvokeAI with the option
+to upgrade to experimental versions later.
 
 ## Walk through
 
-1.  Make sure that your system meets the
-    [hardware requirements](../index.md#hardware-requirements) and has the
-    appropriate GPU drivers installed. In particular, if you are a Linux user
-    with an AMD GPU installed, you may need to install the
+1.  Make sure that your system meets the [hardware
+    requirements](../index.md#hardware-requirements) and has the
+    appropriate GPU drivers installed. In particular, if you are a
+    Linux user with an AMD GPU installed, you may need to install the
     [ROCm driver](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html).
 
     !!! info "Required Space"
 
-        Installation requires roughly 18G of free disk space to load the libraries and
-        recommended model weights files.
+        Installation requires roughly 18G of free disk space to load
+        the libraries and recommended model weights files.
 
-        Regardless of your destination disk, your *system drive* (`C:\` on Windows, `/` on macOS/Linux) requires at least 6GB of free disk space to download and cache python dependencies. NOTE for Linux users: if your temporary directory is mounted as a `tmpfs`, ensure it has sufficient space.
+        Regardless of your destination disk, your *system drive*
+        (`C:\` on Windows, `/` on macOS/Linux) requires at least 6GB
+        of free disk space to download and cache python
+        dependencies.
 
-2.  Check that your system has an up-to-date Python installed. To do this, open
-    up a command-line window ("Terminal" on Linux and Macintosh, "Command" or
-    "Powershell" on Windows) and type `python --version`. If Python is
-    installed, it will print out the version number. If it is version `3.9.1` or `3.10.x`, you meet requirements.
+	NOTE for Linux users: if your temporary directory is mounted
+        as a `tmpfs`, ensure it has sufficient space.
+
+2.  Check that your system has an up-to-date Python installed. To do
+    this, open up a command-line window ("Terminal" on Linux and
+    Macintosh, "Command" or "Powershell" on Windows) and type `python
+    --version`. If Python is installed, it will print out the version
+    number. If it is version `3.9.1` or `3.10.x`, you meet
+    requirements.
 
     !!! warning "At this time we do not recommend Python 3.11"
 
@@ -52,7 +61,10 @@ version of InvokeAI with the option to upgrade to experimental versions later.
         find python, then open the Python installer again and choose
         "Modify" existing installation.
 
-        - Installation requires an up to date version of the Microsoft Visual C libraries. Please install the 2015-2022 libraries available here: https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
+        - Installation requires an up to date version of the Microsoft
+          Visual C libraries. Please install the 2015-2022 libraries
+          available here:
+          https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
 
     === "Mac users"
 
@@ -78,9 +90,8 @@ version of InvokeAI with the option to upgrade to experimental versions later.
 
     === "Linux users"
 
-        For reasons that are not entirely clear, installing the correct version of Python can be a bit of a challenge on Ubuntu, Linux Mint, Pop!_OS, and other Debian-derived distributions.
-
-        On Ubuntu 22.04 and higher, run the following:
+        To install an appropriate version of Python On Ubuntu 22.04
+        and higher, run the following:
 
         ```
         sudo apt update
@@ -233,21 +244,46 @@ Once InvokeAI is installed, do not move or remove this directory."
 
 ### _Package dependency conflicts_
 
-If you have previously installed InvokeAI or another Stable Diffusion package,
-the installer may occasionally pick up outdated libraries and either the
-installer or `invoke` will fail with complaints about library conflicts. You can
-address this by entering the `invokeai` directory and running `update.sh`, which
-will bring InvokeAI up to date with the latest libraries.
+If you have previously installed InvokeAI or another Stable Diffusion
+package, the installer may occasionally pick up outdated libraries and
+either the installer or `invoke` will fail with complaints about
+library conflicts. In this case, run the `invoke.sh`/`invoke.bat`
+command and enter the Developer's Console by picking option (5). This
+will take you to a command-line prompt.
 
-### ldm from pypi
+Then give this command:
 
-!!! warning
+`pip install InvokeAI --force-reinstall`
 
-    Some users have tried to correct dependency problems by installing
-    the `ldm` package from PyPi.org. Unfortunately this is an unrelated package that
-    has nothing to do with the 'latent diffusion model' used by InvokeAI. Installing
-    ldm will make matters worse. If you've installed ldm, uninstall it with
-    `pip uninstall ldm`.
+This should fix the issues.
+
+### InvokeAI runs extremely slowly on Linux or Windows systems
+
+The most frequent cause of this problem is when the installation
+process installed the CPU-only version of the torch machine-learning
+library, rather than a version that takes advantage of GPU
+acceleration. To confirm this issue, look at the InvokeAI startup
+messages. If you see a message saying ">> Using device CPU", then
+this is what happened.
+
+To fix this problem, first determine whether you have an NVidia or an
+AMD GPU. The former uses the CUDA driver, and the latter uses ROCm
+(only available on Linux). Then run the `invoke.sh`/`invoke.bat`
+command and enter the Developer's Console by picking option (5). This
+will take you to a command-line prompt.
+
+Then type the following commands:
+
+   === "NVIDIA System"
+        ```bash
+        pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu117
+	pip install xformers
+        ```
+
+   === "AMD System"
+        ```bash
+        pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/rocm5.2
+        ```
 
 ### Corrupted configuration file
 

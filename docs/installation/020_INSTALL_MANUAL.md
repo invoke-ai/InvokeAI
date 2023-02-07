@@ -68,7 +68,9 @@ manager, please follow these steps:
 
     Please keep in mind the disk space requirements - you will need at
     least 20GB for the models and the virtual environment.  From now
-    on we will refer to this directory as `INVOKEAI_ROOT`.
+    on we will refer to this directory as `INVOKEAI_ROOT`. For convenience,
+    the steps below create a shell variable of that name which contains the
+    path to `HOME/invokeai`.
 
     === "Linux/Mac"
     
@@ -80,7 +82,7 @@ manager, please follow these steps:
     === "Windows (Powershell)"
     
         ```bash
-        $INVOKEAI_ROOT=$Home/invokeai
+        Set-Variable -Name INVOKEAI_ROOT -Value $Home/invokeai
         mkdir $INVOKEAI_ROOT
         ```
 
@@ -94,8 +96,8 @@ manager, please follow these steps:
    environment inside the root directory, then you **must** set the
    `INVOKEAI_ROOT` environment variable in your shell environment, for
    example, by editing `~/.bashrc` or `~/.zshrc` files, or setting the
-   Windows environment variable. Refer to your operating system /
-   shell documentation for the correct way of doing so.
+   Windows environment variable using the Advanced System Settings dialogue.
+   Refer to your operating system documentation for details.
 
 
     === "Linux/Mac"
@@ -114,16 +116,20 @@ manager, please follow these steps:
 
     === "Linux/Mac"
     	```bash
-        source $INVOKEAI_ROOT/.venv/bin/activate
+        source .venv/bin/activate
     	```
 
     === "Windows"
     	```bash
-        $INVOKEAI_ROOT/.venv/scripts/activate
+        .venv\script\/activate
     	```
+	If you get a permissions error at this point, run the command
+	`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`
+	and try `activate` again.
 
     The command-line prompt should change to to show `(.venv)` at the
-    beginning of the prompt.
+    beginning of the prompt. Note that all the following steps should be
+    run while inside the INVOKEAI_ROOT directory
 
 5.  Make sure that pip is installed in your virtual environment and up to date:
 
@@ -135,22 +141,22 @@ manager, please follow these steps:
 
     === "CUDA (NVidia)"
         ```bash
-        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/cu117
+        pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
         ```
-	
+
     === "ROCm (AMD)"
         ```bash
-        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/rocm5.2
+        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
         ```
 
     === "CPU (Intel Macs & non-GPU systems)"
         ```bash
-        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
         ```
 
     === "MPS (M1 and M2 Macs)"
         ```bash
-        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install InvokeAI --use-pep517  --extra-index-url https://download.pytorch.org/whl/cpu
         ```
 
 7.  Deactivate and reactivate your runtime directory so that the invokeai-specific commands
@@ -158,12 +164,13 @@ manager, please follow these steps:
 
     === "Linux/Macintosh"
         ```bash
-        deactivate && source $INVOKEAI_ROOT/.venv/bin/activate
+        deactivate && source .venv/bin/activate
         ```
 
     === "Windows"
         ```bash
-        deactivate && $INVOKEAI_ROOT/.venv/Scripts/activate
+        deactivate
+	.venv\Scripts\activate
         ```
 
 8.  Set up the runtime directory
@@ -196,31 +203,32 @@ manager, please follow these steps:
 
 9.  Run the command-line- or the web- interface:
 
-    Activate the environment (with `source .venv/bin/activate`), and then run
-    the script `invokeai`. If you selected a non-default location for the
-    runtime directory, please specify the path with the `--root_dir` option
-    (abbreviated below as `--root`):
+    From within INVOKEAI_ROOT, activate the environment
+    (with `source .venv/bin/activate` or `.venv\scripts\activate), and then run
+    the script `invokeai`. If the virtual environment you selected is NOT inside
+    INVOKEAI_ROOT, then you must specify the path to the root directory by adding
+    `--root_dir \path\to\invokeai` to the commands below:
 
     !!! example ""
 
-        !!! warning "Make sure that the virtual environment is activated, which should create `(invokeai)` in front of your prompt!"
+        !!! warning "Make sure that the virtual environment is activated, which should create `(.venv)` in front of your prompt!"
 
         === "CLI"
 
             ```bash
-            invokeai --root ~/invokeai
+            invokeai
             ```
 
         === "local Webserver"
 
             ```bash
-            invokeai --web --root ~/invokeai
+            invokeai --web
             ```
 
         === "Public Webserver"
 
             ```bash
-            invokeai --web --host 0.0.0.0 --root ~/invokeai
+            invokeai --web --host 0.0.0.0
             ```
 
         If you choose the run the web interface, point your browser at
@@ -228,13 +236,17 @@ manager, please follow these steps:
 
     !!! tip
 
-        You can permanently set the location of the runtime directory by setting the environment variable `INVOKEAI_ROOT` to the path of the directory. As mentioned previously, this is
-        **required** if your virtual environment is located outside of your runtime directory.
+        You can permanently set the location of the runtime directory
+        by setting the environment variable `INVOKEAI_ROOT` to the
+        path of the directory. As mentioned previously, this is
+        *highly recommended** if your virtual environment is located outside of
+        your runtime directory.
 
 10.  Render away!
 
     Browse the [features](../features/CLI.md) section to learn about all the
     things you can do with InvokeAI.
+
 
 11.  Subsequently, to relaunch the script, activate the virtual environment, and
     then launch `invokeai` command. If you forget to activate the virtual
@@ -243,3 +255,20 @@ manager, please follow these steps:
     !!! warning
 
         Do not move the runtime directory after installation. The virtual environment will get confused if the directory is moved.
+
+12. Other scripts
+
+    The [Textual Inversion](../features/TEXTUAL_VERSION.md) script can be launched with the command:
+
+    ```bash
+    invokeai-ti --gui
+    ```
+
+    Similarly, the [Model Merging](../features/MODEL_MERGING.md) script can be launched with the command:
+
+    ```bash
+    invokeai-merge --gui
+    ```
+
+    Leave off the `--gui` option to run the script using command-line arguments. Pass the `--help` argument
+    to get usage instructions.
