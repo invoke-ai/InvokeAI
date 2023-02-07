@@ -5,6 +5,7 @@ import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
 import { FACETOOL_TYPES } from 'app/constants';
 import { InvokeTabName, tabMap } from 'features/tabs/tabMap';
+import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 
 export type UpscalingLevel = 2 | 4;
 
@@ -19,6 +20,7 @@ export interface OptionsState {
   facetoolType: FacetoolType;
   height: number;
   hiresFix: boolean;
+  hiresStrength: number;
   img2imgStrength: number;
   infillMethod: string;
   initialImage?: InvokeAI.Image | string; // can be an Image or url
@@ -28,6 +30,7 @@ export interface OptionsState {
   optionsPanelScrollPosition: number;
   perlin: number;
   prompt: string;
+  negativePrompt: string;
   sampler: string;
   seamBlur: number;
   seamless: boolean;
@@ -69,6 +72,7 @@ const initialOptionsState: OptionsState = {
   facetoolType: 'gfpgan',
   height: 512,
   hiresFix: false,
+  hiresStrength: 0.75,
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   isLightBoxOpen: false,
@@ -77,6 +81,7 @@ const initialOptionsState: OptionsState = {
   optionsPanelScrollPosition: 0,
   perlin: 0,
   prompt: '',
+  negativePrompt: '',
   sampler: 'k_lms',
   seamBlur: 16,
   seamless: false,
@@ -121,6 +126,17 @@ export const optionsSlice = createSlice({
         state.prompt = newPrompt;
       } else {
         state.prompt = promptToString(newPrompt);
+      }
+    },
+    setNegativePrompt: (
+      state,
+      action: PayloadAction<string | InvokeAI.Prompt>
+    ) => {
+      const newPrompt = action.payload;
+      if (typeof newPrompt === 'string') {
+        state.negativePrompt = newPrompt;
+      } else {
+        state.negativePrompt = promptToString(newPrompt);
       }
     },
     setIterations: (state, action: PayloadAction<number>) => {
@@ -174,6 +190,9 @@ export const optionsSlice = createSlice({
     },
     setHiresFix: (state, action: PayloadAction<boolean>) => {
       state.hiresFix = action.payload;
+    },
+    setHiresStrength: (state, action: PayloadAction<number>) => {
+      state.hiresStrength = action.payload;
     },
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
@@ -307,7 +326,14 @@ export const optionsSlice = createSlice({
         state.shouldRandomizeSeed = false;
       }
 
-      if (prompt) state.prompt = promptToString(prompt);
+      if (prompt) {
+        const [promptOnly, negativePrompt] = getPromptAndNegative(prompt);
+        if (promptOnly) state.prompt = promptOnly;
+        negativePrompt
+          ? (state.negativePrompt = negativePrompt)
+          : (state.negativePrompt = '');
+      }
+
       if (sampler) state.sampler = sampler;
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
@@ -438,6 +464,7 @@ export const {
   setFacetoolType,
   setHeight,
   setHiresFix,
+  setHiresStrength,
   setImg2imgStrength,
   setInfillMethod,
   setInitialImage,
@@ -448,6 +475,7 @@ export const {
   setParameter,
   setPerlin,
   setPrompt,
+  setNegativePrompt,
   setSampler,
   setSeamBlur,
   setSeamless,

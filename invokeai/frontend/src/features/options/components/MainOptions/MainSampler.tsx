@@ -1,13 +1,16 @@
 import React, { ChangeEvent } from 'react';
-import { SAMPLERS } from 'app/constants';
+import { DIFFUSERS_SAMPLERS, SAMPLERS } from 'app/constants';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISelect from 'common/components/IAISelect';
 import { setSampler } from 'features/options/store/optionsSlice';
 import { useTranslation } from 'react-i18next';
+import _ from 'lodash';
+import { activeModelSelector } from 'features/system/store/systemSelectors';
 
 export default function MainSampler() {
   const sampler = useAppSelector((state: RootState) => state.options.sampler);
+  const activeModel = useAppSelector(activeModelSelector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -19,7 +22,9 @@ export default function MainSampler() {
       label={t('options:sampler')}
       value={sampler}
       onChange={handleChangeSampler}
-      validValues={SAMPLERS}
+      validValues={
+        activeModel.format === 'diffusers' ? DIFFUSERS_SAMPLERS : SAMPLERS
+      }
       styleClass="main-option-block"
     />
   );

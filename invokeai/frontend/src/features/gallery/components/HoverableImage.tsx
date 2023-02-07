@@ -10,9 +10,10 @@ import { DragEvent, memo, useState } from 'react';
 import {
   setActiveTab,
   setAllImageToImageParameters,
-  setAllTextToImageParameters,
+  setAllParameters,
   setInitialImage,
   setIsLightBoxOpen,
+  setNegativePrompt,
   setPrompt,
   setSeed,
 } from 'features/options/store/optionsSlice';
@@ -24,6 +25,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { hoverableImageSelector } from 'features/gallery/store/gallerySliceSelectors';
 import { useTranslation } from 'react-i18next';
+import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 
 interface HoverableImageProps {
   image: InvokeAI.Image;
@@ -62,7 +64,17 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   const handleMouseOut = () => setIsHovered(false);
 
   const handleUsePrompt = () => {
-    image.metadata && dispatch(setPrompt(image.metadata.image.prompt));
+    if (image.metadata) {
+      const [prompt, negativePrompt] = getPromptAndNegative(
+        image.metadata?.image?.prompt
+      );
+
+      prompt && dispatch(setPrompt(prompt));
+      negativePrompt
+        ? dispatch(setNegativePrompt(negativePrompt))
+        : dispatch(setNegativePrompt(''));
+    }
+
     toast({
       title: t('toast:promptSet'),
       status: 'success',
@@ -115,7 +127,7 @@ const HoverableImage = memo((props: HoverableImageProps) => {
   };
 
   const handleUseAllParameters = () => {
-    metadata && dispatch(setAllTextToImageParameters(metadata));
+    metadata && dispatch(setAllParameters(metadata));
     toast({
       title: t('toast:parametersSet'),
       status: 'success',

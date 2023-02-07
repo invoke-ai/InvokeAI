@@ -9,6 +9,7 @@ import {
   setAllParameters,
   setInitialImage,
   setIsLightBoxOpen,
+  setNegativePrompt,
   setPrompt,
   setSeed,
   setShouldShowImageDetails,
@@ -44,6 +45,7 @@ import { GalleryState } from 'features/gallery/store/gallerySlice';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import IAIPopover from 'common/components/IAIPopover';
 import { useTranslation } from 'react-i18next';
+import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 
 const systemSelector = createSelector(
   [
@@ -241,9 +243,18 @@ const CurrentImageButtons = () => {
     [currentImage]
   );
 
-  const handleClickUsePrompt = () =>
-    currentImage?.metadata?.image?.prompt &&
-    dispatch(setPrompt(currentImage.metadata.image.prompt));
+  const handleClickUsePrompt = () => {
+    if (currentImage?.metadata?.image?.prompt) {
+      const [prompt, negativePrompt] = getPromptAndNegative(
+        currentImage?.metadata?.image?.prompt
+      );
+
+      prompt && dispatch(setPrompt(prompt));
+      negativePrompt
+        ? dispatch(setNegativePrompt(negativePrompt))
+        : dispatch(setNegativePrompt(''));
+    }
+  };
 
   useHotkeys(
     'p',

@@ -249,6 +249,7 @@ class InvokeAiInstance:
                 "--require-virtualenv",
                 "torch",
                 "torchvision",
+                "--force-reinstall",
                 "--find-links" if find_links is not None else None,
                 find_links,
                 "--extra-index-url" if extra_index_url is not None else None,
@@ -325,6 +326,7 @@ class InvokeAiInstance:
         Configure the InvokeAI runtime directory
         """
 
+        # set sys.argv to a consistent state
         new_argv = [sys.argv[0]]
         for i in range(1,len(sys.argv)):
             el = sys.argv[i]
@@ -344,9 +346,6 @@ class InvokeAiInstance:
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
         # this may change in the future with config refactoring!
-
-        # set sys.argv to a consistent state
-
         invokeai_configure.main()
 
     def install_user_scripts(self):

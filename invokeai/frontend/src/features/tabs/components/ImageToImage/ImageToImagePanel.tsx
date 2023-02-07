@@ -19,6 +19,8 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import InvokeOptionsPanel from 'features/tabs/components/InvokeOptionsPanel';
 import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
 import { useTranslation } from 'react-i18next';
+import { Flex } from '@chakra-ui/react';
+import { NegativePromptInput } from 'features/options/components/PromptInput/NegativePromptInput';
 
 export default function ImageToImagePanel() {
   const { t } = useTranslation();
@@ -67,7 +69,10 @@ export default function ImageToImagePanel() {
 
   return (
     <InvokeOptionsPanel>
-      <PromptInput />
+      <Flex flexDir="column" rowGap="0.5rem">
+        <PromptInput />
+        <NegativePromptInput />
+      </Flex>
       <ProcessButtons />
       <MainOptions />
       <ImageToImageStrength
