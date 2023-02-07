@@ -9,13 +9,15 @@ def estimate_free_memory_bytes(device: torch.device) -> int:
     if device.type == 'cpu' or device.type == 'mps':
         return psutil.virtual_memory().free
     elif device.type == 'cuda':
-        stats = torch.cuda.memory_stats(device)
-        mem_active = stats['active_bytes.all.current']
-        mem_reserved = stats['reserved_bytes.all.current']
         mem_free_cuda, _ = torch.cuda.mem_get_info(device)
-        mem_free_torch = mem_reserved - mem_active
-        mem_free_total = mem_free_cuda + mem_free_torch
-        return mem_free_total
+        return mem_free_cuda
+        # stats = torch.cuda.memory_stats(device)
+        # mem_active = stats['active_bytes.all.current']
+        # mem_reserved = stats['reserved_bytes.all.current']
+        # mem_free_cuda, _ = torch.cuda.mem_get_info(device)
+        # mem_free_torch = mem_reserved - mem_active
+        # mem_free_total = mem_free_cuda + mem_free_torch
+        # return mem_free_total
     else:
         raise ValueError(f"unrecognized device {device}")
 
@@ -29,6 +31,9 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
         safety_factor = 3.3 / 4.0 # magic numbers pulled from old Invoke code
         free_memory_bytes = int(estimate_free_memory_bytes(device) * safety_factor)
         return free_memory_bytes
+
+    def estimate_tensor_size_needed(self, query, key, bytes_per_element):
+        return query.shape[0] * query.shape[1] * key.shape[1] * bytes_per_element
 
     def __call__(self, attn: CrossAttention, hidden_states, encoder_hidden_states=None,
                  attention_mask=None):
@@ -58,12 +63,20 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
             # Use our original-precision tensor plus add in a 32-bit copy that's made by baddbmm.
             bytes_per_element = hidden_states.element_size() + 4
             # baddbmm returns a tensor the size of query.shape[0] * query.shape[1] * key.shape[1] * bytes_per_element
-            required_size_for_baddbmm_bytes = batch_size_attention * sequence_length * sequence_length * bytes_per_element
+            required_size_for_baddbmm_bytes = self.estimate_tensor_size_needed(query, key, bytes_per_element)
             required_size_for_transpose_bytes = key.shape[0] * key.shape[1] * key.shape[2] * bytes_per_element
 
+            free_memory_min = 1024 * 1024 * 1024 # 1 GB
             free_memory_bytes = self.get_free_memory_bytes(hidden_states.device)
-            slice_count = math.ceil((required_size_for_baddbmm_bytes + required_size_for_transpose_bytes) / free_memory_bytes)
+
+            if free_memory_bytes < free_memory_min and hidden_states.device.type == 'cuda':
+                torch.cuda.empty_cache()
+                free_memory_bytes = self.get_free_memory_bytes(hidden_states.device)
+
+            total_memory_required = required_size_for_baddbmm_bytes + required_size_for_transpose_bytes
+            slice_count = math.ceil(total_memory_required / free_memory_bytes)
             slice_size = math.ceil(batch_size_attention / slice_count)
+
         else:
             # effectively: do not slice
             slice_size = batch_size_attention
@@ -83,18 +96,19 @@ class DynamicSlicedAttnProcessor(SlicedAttnProcessor):
 
             hidden_states[start_idx:end_idx] = attn_slice
 
-            del query_slice
-            del key_slice
-            del attn_mask_slice
-            del attn_slice
-            if hidden_states.device.type == 'cuda':
-                torch.cuda.empty_cache()
-
         hidden_states = attn.batch_to_head_dim(hidden_states)
 
         # linear proj
         hidden_states = attn.to_out[0](hidden_states)
         # dropout
         hidden_states = attn.to_out[1](hidden_states)
+
+        if is_self_attention:
+            del query_slice
+            del key_slice
+            del attn_mask_slice
+            del attn_slice
+            # if hidden_states.device.type == 'cuda':
+            #     torch.cuda.empty_cache()
 
         return hidden_states
