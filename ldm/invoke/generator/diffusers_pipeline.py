@@ -323,12 +323,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     raise ValueError(f"unrecognized device {device}")
                 # input tensor of [1, 4, h/8, w/8]
                 # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
-                bytes_needed_for_baddbmm = latents.element_size() + 4
-                estimated_max_size_required =\
+                bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
+                max_size_required_for_baddbmm = \
                     16 * \
                     latents.size(dim=2) * latents.size(dim=3) * latents.size(dim=2) * latents.size(dim=3) * \
-                    bytes_needed_for_baddbmm
-                if estimated_max_size_required > (mem_free * 3.3 / 4.0): # 3.3 / 4.0 is from old Invoke code
+                    bytes_per_element_needed_for_baddbmm_duplication
+                if max_size_required_for_baddbmm > (mem_free * 3.3 / 4.0): # 3.3 / 4.0 is from old Invoke code
                     self.enable_attention_slicing(slice_size='max')
                 else:
                     self.disable_attention_slicing()
