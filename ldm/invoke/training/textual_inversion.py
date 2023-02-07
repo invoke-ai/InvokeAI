@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 import npyscreen
+from npyscreen import widget
 from omegaconf import OmegaConf
 
 from ldm.invoke.globals import Globals, global_set_root
@@ -295,7 +296,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             for idx in range(len(model_names))
             if "default" in conf[model_names[idx]]
         ]
-        default = defaults[0] if len(defaults)>0 else 0
+        default = defaults[0] if len(defaults) > 0 else 0
         return (model_names, default)
 
     def marshall_arguments(self) -> dict:
@@ -438,11 +439,20 @@ def main():
             do_front_end(args)
         else:
             do_textual_inversion_training(**vars(args))
+    except widget.NotEnoughSpaceForWidget as e:
+        if str(e).startswith("Height of 1 allocated"):
+            print(
+                "** You need to have at least one diffusers models defined in models.yaml in order to train"
+            )
+        else:
+            print(f"** A layout error has occurred: {str(e)}")
+        sys.exit(-1)
     except AssertionError as e:
         print(str(e))
         sys.exit(-1)
     except KeyboardInterrupt:
         pass
+
 
 if __name__ == "__main__":
     main()

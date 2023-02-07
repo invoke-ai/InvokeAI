@@ -211,7 +211,7 @@ class Generate:
                 print('>> xformers memory-efficient attention is available but disabled')
         else:
             print('>> xformers not installed')
-            
+
         # model caching system for fast switching
         self.model_manager = ModelManager(mconfig,self.device,self.precision,max_loaded_models=max_loaded_models)
         # don't accept invalid models
@@ -344,6 +344,7 @@ class Generate:
 
             **args,
     ):   # eat up additional cruft
+        self.clear_cuda_stats()
         """
         ldm.generate.prompt2image() is the common entry point for txt2img() and img2img()
         It takes the following arguments:
@@ -548,6 +549,7 @@ class Generate:
                 inpaint_width = inpaint_width,
                 enable_image_debugging = enable_image_debugging,
                 free_gpu_mem=self.free_gpu_mem,
+                clear_cuda_cache=self.clear_cuda_cache
             )
 
             if init_color:
@@ -565,11 +567,17 @@ class Generate:
                                              image_callback = image_callback)
 
         except KeyboardInterrupt:
+            # Clear the CUDA cache on an exception
+            self.clear_cuda_cache()
+
             if catch_interrupts:
                 print('**Interrupted** Partial results will be returned.')
             else:
                 raise KeyboardInterrupt
         except RuntimeError:
+            # Clear the CUDA cache on an exception
+            self.clear_cuda_cache()
+
             print(traceback.format_exc(), file=sys.stderr)
             print('>> Could not generate image.')
 
@@ -579,22 +587,42 @@ class Generate:
             f'>>   {len(results)} image(s) generated in', '%4.2fs' % (
                 toc - tic)
         )
+        self.print_cuda_stats()
+        return results
+
+    def clear_cuda_cache(self):
+        if self._has_cuda():
+            self.max_memory_allocated = max(
+                self.max_memory_allocated,
+                torch.cuda.max_memory_allocated()
+            )
+            self.memory_allocated = max(
+                self.memory_allocated,
+                torch.cuda.memory_allocated()
+            )
+            self.session_peakmem = max(
+                self.session_peakmem,
+                torch.cuda.max_memory_allocated()
+            )
+            torch.cuda.empty_cache()
+
+    def clear_cuda_stats(self):
+        self.max_memory_allocated = 0
+        self.memory_allocated = 0
+
+    def print_cuda_stats(self):
         if self._has_cuda():
             print(
                 '>>   Max VRAM used for this generation:',
-                '%4.2fG.' % (torch.cuda.max_memory_allocated() / 1e9),
+                '%4.2fG.' % (self.max_memory_allocated / 1e9),
                 'Current VRAM utilization:',
-                '%4.2fG' % (torch.cuda.memory_allocated() / 1e9),
+                '%4.2fG' % (self.memory_allocated / 1e9),
             )
 
-            self.session_peakmem = max(
-                self.session_peakmem, torch.cuda.max_memory_allocated()
-            )
             print(
                 '>>   Max VRAM used since script start: ',
                 '%4.2fG' % (self.session_peakmem / 1e9),
             )
-        return results
 
     # this needs to be generalized to all sorts of postprocessors, which should be wrapped
     # in a nice harmonized call signature. For now we have a bunch of if/elses!
