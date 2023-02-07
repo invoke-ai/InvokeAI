@@ -52,6 +52,7 @@ jobs:
           flavor: |
             latest=${{ matrix.flavor == 'cuda' && github.ref == 'refs/heads/main' }}
             suffix=-${{ matrix.flavor }},onlatest=false
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -90,6 +91,15 @@ jobs:
             type=gha
             type=registry,ref=ghcr.io/${{ github.repository }}:main-${{ matrix.flavor }}
           cache-to: type=gha,mode=max
+
+      - name: Docker Hub Description
+        if: github.event_name != 'pull_request' && vars.DOCKER_HUB != ''
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKER_HUB }}
+          short-description: ${{ github.event.repository.description }}
 
       - name: Output image, digest and metadata to summary
         run: |
