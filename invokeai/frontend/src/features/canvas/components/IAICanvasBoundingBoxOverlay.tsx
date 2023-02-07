@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
+import { isEqual } from 'lodash';
+
 import { Group, Rect } from 'react-konva';
 import { canvasSelector } from '../store/canvasSelectors';
 
@@ -27,7 +28,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

@@ -1,24 +1,24 @@
-import { AnyAction, MiddlewareAPI, Dispatch } from '@reduxjs/toolkit';
-import { v4 as uuidv4 } from 'uuid';
+import { AnyAction, Dispatch, MiddlewareAPI } from '@reduxjs/toolkit';
 import dateFormat from 'dateformat';
 import i18n from 'i18n';
+import { v4 as uuidv4 } from 'uuid';
 
 import * as InvokeAI from 'app/invokeai';
 
 import {
   addLogEntry,
+  addToast,
+  errorOccurred,
+  processingCanceled,
+  setCurrentStatus,
+  setFoundModels,
+  setIsCancelable,
   setIsConnected,
   setIsProcessing,
-  setSystemStatus,
-  setCurrentStatus,
-  setSystemConfig,
-  processingCanceled,
-  errorOccurred,
   setModelList,
-  setIsCancelable,
-  addToast,
-  setFoundModels,
   setSearchFolder,
+  setSystemConfig,
+  setSystemStatus,
 } from 'features/system/store/systemSlice';
 
 import {
@@ -30,20 +30,20 @@ import {
   setIntermediateImage,
 } from 'features/gallery/store/gallerySlice';
 
+import type { RootState } from 'app/store';
+import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   clearInitialImage,
   setInfillMethod,
   setInitialImage,
   setMaskPath,
-} from 'features/options/store/optionsSlice';
+} from 'features/parameters/store/generationSlice';
+import { tabMap } from 'features/ui/store/tabMap';
 import {
   requestImages,
   requestNewImages,
   requestSystemConfig,
 } from './actions';
-import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { tabMap } from 'features/tabs/tabMap';
-import type { RootState } from 'app/store';
 
 /**
  * Returns an object containing listener callbacks for socketio events.
@@ -104,8 +104,9 @@ const makeSocketIOListeners = (
      */
     onGenerationResult: (data: InvokeAI.ImageResultResponse) => {
       try {
-        const state: RootState = getState();
-        const { shouldLoopback, activeTab } = state.options;
+        const state = getState();
+        const { activeTab } = state.ui;
+        const { shouldLoopback } = state.postprocessing;
         const { boundingBox: _, generationMode, ...rest } = data;
 
         const newImage = {
@@ -327,7 +328,9 @@ const makeSocketIOListeners = (
       dispatch(removeImage(data));
 
       // remove references to image in options
-      const { initialImage, maskPath } = getState().options;
+      const {
+        generation: { initialImage, maskPath },
+      } = getState();
 
       if (
         initialImage === url ||

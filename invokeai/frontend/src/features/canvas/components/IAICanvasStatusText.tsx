@@ -1,10 +1,11 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
-import roundToHundreth from '../util/roundToHundreth';
+import { isEqual } from 'lodash';
+
 import { useTranslation } from 'react-i18next';
+import roundToHundreth from '../util/roundToHundreth';
+import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
 
 const selector = createSelector(
   [canvasSelector],
@@ -59,7 +60,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

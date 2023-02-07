@@ -1,7 +1,7 @@
 import { Heading } from '@chakra-ui/react';
+import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 import { useContext } from 'react';
 import { FaUpload } from 'react-icons/fa';
-import { ImageUploaderTriggerContext } from 'app/contexts/ImageUploaderTriggerContext';
 
 type ImageUploaderButtonProps = {
   styleClass?: string;

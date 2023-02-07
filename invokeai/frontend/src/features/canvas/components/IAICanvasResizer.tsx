@@ -1,18 +1,18 @@
 import { Spinner } from '@chakra-ui/react';
-import { useLayoutEffect, useRef } from 'react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import {
+  canvasSelector,
+  initialCanvasImageSelector,
+} from 'features/canvas/store/canvasSelectors';
 import {
   resizeAndScaleCanvas,
   resizeCanvas,
   setCanvasContainerDimensions,
   setDoesCanvasNeedScaling,
 } from 'features/canvas/store/canvasSlice';
-import { createSelector } from '@reduxjs/toolkit';
-import {
-  canvasSelector,
-  initialCanvasImageSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useLayoutEffect, useRef } from 'react';
 
 const canvasResizerSelector = createSelector(
   canvasSelector,

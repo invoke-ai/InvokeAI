@@ -1,10 +1,10 @@
 import { AnyAction, ThunkAction } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
 import * as InvokeAI from 'app/invokeai';
-import { v4 as uuidv4 } from 'uuid';
-import { activeTabNameSelector } from 'features/options/store/optionsSelectors';
+import { RootState } from 'app/store';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { setInitialImage } from 'features/options/store/optionsSlice';
+import { setInitialImage } from 'features/parameters/store/generationSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { v4 as uuidv4 } from 'uuid';
 import { addImage } from '../gallerySlice';
 
 type UploadImageConfig = {
@@ -32,7 +32,7 @@ export const uploadImage =
       })
     );
 
-    const response = await fetch(window.location.origin + '/upload', {
+    const response = await fetch(`${window.location.origin}/upload`, {
       method: 'POST',
       body: formData,
     });

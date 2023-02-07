@@ -317,7 +317,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
                 pass
             else:
-                self.enable_attention_slicing(slice_size='auto')
+                self.enable_attention_slicing(slice_size='max')
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,

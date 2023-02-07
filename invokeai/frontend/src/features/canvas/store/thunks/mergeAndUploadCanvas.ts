@@ -1,11 +1,7 @@
 import { AnyAction, ThunkAction } from '@reduxjs/toolkit';
-import { RootState } from 'app/store';
 import * as InvokeAI from 'app/invokeai';
-import { v4 as uuidv4 } from 'uuid';
-import layerToDataURL from '../../util/layerToDataURL';
-import downloadFile from '../../util/downloadFile';
-import copyImage from '../../util/copyImage';
-import { getCanvasBaseLayer } from '../../util/konvaInstanceProvider';
+import { RootState } from 'app/store';
+import { addImage } from 'features/gallery/store/gallerySlice';
 import {
   addToast,
   setCurrentStatus,
@@ -13,10 +9,14 @@ import {
   setIsProcessing,
   setProcessingIndeterminateTask,
 } from 'features/system/store/systemSlice';
-import { addImage } from 'features/gallery/store/gallerySlice';
+import i18n from 'i18n';
+import { v4 as uuidv4 } from 'uuid';
+import copyImage from '../../util/copyImage';
+import downloadFile from '../../util/downloadFile';
+import { getCanvasBaseLayer } from '../../util/konvaInstanceProvider';
+import layerToDataURL from '../../util/layerToDataURL';
 import { setMergedCanvas } from '../canvasSlice';
 import { CanvasState } from '../canvasTypes';
-import i18n from 'i18n';
 
 type MergeAndUploadCanvasConfig = {
   cropVisible?: boolean;
@@ -96,7 +96,7 @@ export const mergeAndUploadCanvas =
       })
     );
 
-    const response = await fetch(window.location.origin + '/upload', {
+    const response = await fetch(`${window.location.origin}/upload`, {
       method: 'POST',
       body: formData,
     });

@@ -6,7 +6,8 @@ import {
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
 import { IRect, Vector2d } from 'konva/lib/types';
-import _ from 'lodash';
+import { clamp, cloneDeep } from 'lodash';
+//
 import { RgbaColor } from 'react-colorful';
 import calculateCoordinates from '../util/calculateCoordinates';
 import calculateScale from '../util/calculateScale';
@@ -16,10 +17,10 @@ import getScaledBoundingBoxDimensions from '../util/getScaledBoundingBoxDimensio
 import roundDimensionsTo64 from '../util/roundDimensionsTo64';
 import {
   BoundingBoxScale,
+  CanvasBaseLine,
   CanvasImage,
   CanvasLayer,
   CanvasLayerState,
-  CanvasBaseLine,
   CanvasMaskLine,
   CanvasState,
   CanvasTool,
@@ -120,7 +121,7 @@ export const canvasSlice = createSlice({
       state.brushSize = action.payload;
     },
     clearMask: (state) => {
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
       state.layerState.objects = state.layerState.objects.filter(
         (obj) => !isCanvasMaskLine(obj)
       );
@@ -160,8 +161,8 @@ export const canvasSlice = createSlice({
       const { stageDimensions } = state;
 
       const newBoundingBoxDimensions = {
-        width: roundDownToMultiple(_.clamp(image.width, 64, 512), 64),
-        height: roundDownToMultiple(_.clamp(image.height, 64, 512), 64),
+        width: roundDownToMultiple(clamp(image.width, 64, 512), 64),
+        height: roundDownToMultiple(clamp(image.height, 64, 512), 64),
       };
 
       const newBoundingBoxCoordinates = {
@@ -185,7 +186,7 @@ export const canvasSlice = createSlice({
       state.boundingBoxDimensions = newBoundingBoxDimensions;
       state.boundingBoxCoordinates = newBoundingBoxCoordinates;
 
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       state.layerState = {
         ...initialLayerState,
@@ -297,7 +298,7 @@ export const canvasSlice = createSlice({
 
       if (!boundingBox || !image) return;
 
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -316,7 +317,7 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
     },
     discardStagedImages: (state) => {
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -334,7 +335,7 @@ export const canvasSlice = createSlice({
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } =
         state;
 
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -353,7 +354,7 @@ export const canvasSlice = createSlice({
     addEraseRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions } = state;
 
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -380,7 +381,7 @@ export const canvasSlice = createSlice({
       const newColor =
         layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
 
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -418,7 +419,7 @@ export const canvasSlice = createSlice({
 
       if (!targetState) return;
 
-      state.futureLayerStates.unshift(_.cloneDeep(state.layerState));
+      state.futureLayerStates.unshift(cloneDeep(state.layerState));
 
       if (state.futureLayerStates.length > state.maxHistory) {
         state.futureLayerStates.pop();
@@ -431,7 +432,7 @@ export const canvasSlice = createSlice({
 
       if (!targetState) return;
 
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -455,7 +456,7 @@ export const canvasSlice = createSlice({
       state.shouldShowIntermediates = action.payload;
     },
     resetCanvas: (state) => {
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       state.layerState = initialLayerState;
       state.futureLayerStates = [];
@@ -681,7 +682,7 @@ export const canvasSlice = createSlice({
     commitStagingAreaImage: (state) => {
       const { images, selectedImageIndex } = state.layerState.stagingArea;
 
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       if (state.pastLayerStates.length > state.maxHistory) {
         state.pastLayerStates.shift();
@@ -718,8 +719,8 @@ export const canvasSlice = createSlice({
           scaledStageHeight
       ) {
         const newBoundingBoxDimensions = {
-          width: roundDownToMultiple(_.clamp(scaledStageWidth, 64, 512), 64),
-          height: roundDownToMultiple(_.clamp(scaledStageHeight, 64, 512), 64),
+          width: roundDownToMultiple(clamp(scaledStageWidth, 64, 512), 64),
+          height: roundDownToMultiple(clamp(scaledStageHeight, 64, 512), 64),
         };
 
         const newBoundingBoxCoordinates = {
@@ -792,7 +793,7 @@ export const canvasSlice = createSlice({
       state.tool = 'brush';
     },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
-      state.pastLayerStates.push(_.cloneDeep(state.layerState));
+      state.pastLayerStates.push(cloneDeep(state.layerState));
 
       state.futureLayerStates = [];
 

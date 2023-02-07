@@ -1,10 +1,11 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { GroupConfig } from 'konva/lib/Group';
-import _ from 'lodash';
-import { Circle, Group } from 'react-konva';
 import { useAppSelector } from 'app/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
+import { GroupConfig } from 'konva/lib/Group';
+import { isEqual } from 'lodash';
+
+import { Circle, Group } from 'react-konva';
 import {
   COLOR_PICKER_SIZE,
   COLOR_PICKER_STROKE_RADIUS,
@@ -106,7 +107,7 @@ const canvasBrushPreviewSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

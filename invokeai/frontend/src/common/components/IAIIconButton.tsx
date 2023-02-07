@@ -1,9 +1,9 @@
 import {
-  IconButtonProps,
+  forwardRef,
   IconButton,
+  IconButtonProps,
   Tooltip,
   TooltipProps,
-  forwardRef,
 } from '@chakra-ui/react';
 
 export type IAIIconButtonProps = IconButtonProps & {
