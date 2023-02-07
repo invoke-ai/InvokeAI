@@ -56,12 +56,12 @@ rm -rf InvokeAI-Installer
 
 # copy content
 mkdir InvokeAI-Installer
-for f in templates *.py *.txt *.reg; do
+for f in templates lib *.txt *.reg; do
     cp -r ${f} InvokeAI-Installer/
 done
 
 # Move the wheel
-mv dist/*.whl InvokeAI-Installer/
+mv dist/*.whl InvokeAI-Installer/lib/
 
 # Install scripts
 # Mac/Linux
@@ -74,17 +74,6 @@ cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
 # Zip everything up
 zip -r InvokeAI-installer-$VERSION.zip InvokeAI-Installer
-
-# Updater
-mkdir tmp
-cp templates/update.sh.in tmp/update.sh
-cp templates/update.bat.in tmp/update.bat
-chmod +x tmp/update.sh
-chmod +x tmp/update.bat
-cd tmp
-zip InvokeAI-updater-$VERSION.zip update.sh update.bat
-cd ..
-mv tmp/InvokeAI-updater-$VERSION.zip .
 
 # clean up
 rm -rf InvokeAI-Installer tmp dist

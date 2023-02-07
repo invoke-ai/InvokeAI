@@ -126,7 +126,7 @@ either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
 driver).
 
 First time users, please see
-[Automated Installer](installation/INSTALL_AUTOMATED.md) for a walkthrough of
+[Automated Installer](installation/010_INSTALL_AUTOMATED.md) for a walkthrough of
 getting InvokeAI up and running on your system. For alternative installation and
 upgrade instructions, please see:
 [InvokeAI Installation Overview](installation/)
