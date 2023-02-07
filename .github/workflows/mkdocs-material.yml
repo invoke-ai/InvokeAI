@@ -4,6 +4,8 @@ on:
     branches:
       - 'main'
       - 'development'
+    paths:
+      - 'docs/**'
 
 jobs:
   mkdocs-material:

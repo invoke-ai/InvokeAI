@@ -3,11 +3,17 @@ on:
   push:
     branches:
       - 'main'
+    paths-ignore:
+      - 'invokeai/frontend/**'
+      - 'docs/**'
   pull_request:
     types:
       - 'ready_for_review'
       - 'opened'
       - 'synchronize'
+    paths-ignore:
+      - 'invokeai/frontend/**'
+      - 'docs/**'
   workflow_dispatch:
 
 concurrency:
