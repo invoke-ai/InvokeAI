@@ -63,8 +63,8 @@
     "@types/react-transition-group": "^4.4.5",
     "@typescript-eslint/eslint-plugin": "^5.36.2",
     "@typescript-eslint/parser": "^5.36.2",
-    "@vitejs/plugin-legacy": "^3.0.1",
-    "@vitejs/plugin-react": "^2.0.1",
+    "@vitejs/plugin-legacy": "^4.0.1",
+    "@vitejs/plugin-react": "^3.1.0",
     "babel-plugin-transform-imports": "^2.0.0",
     "eslint": "^8.23.0",
     "eslint-config-prettier": "^8.6.0",
@@ -83,9 +83,9 @@
     "terser": "^5.16.1",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.6.4",
-    "vite": "^3.0.7",
+    "vite": "^4.1.1",
     "vite-plugin-eslint": "^1.8.1",
-    "vite-tsconfig-paths": "^3.5.2"
+    "vite-tsconfig-paths": "^4.0.5"
   },
   "madge": {
     "detectiveOptions": {
