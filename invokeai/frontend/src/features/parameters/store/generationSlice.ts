@@ -1,9 +1,9 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/invokeai';
+import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 import promptToString from 'common/util/promptToString';
 import { seedWeightsToString } from 'common/util/seedWeightPairs';
-import { getPromptAndNegative } from 'common/util/getPromptAndNegative';
 
 export interface GenerationState {
   cfgScale: number;
