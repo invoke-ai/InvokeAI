@@ -74,17 +74,17 @@ manager, please follow these steps:
     
         ```bash
         export INVOKEAI_ROOT="~/invokeai"
-        mkdir ${INVOKEAI_ROOT}
+        mkdir $INVOKEAI_ROOT
         ```
 
-    === "Windows"
+    === "Windows (Powershell)"
     
         ```bash
-        set INVOKEAI_ROOT=%HomeDrive%%HomePath%/invokeai
-        mkdir %INVOKEAI_ROOT%
+        $INVOKEAI_ROOT=$Home/invokeai
+        mkdir $INVOKEAI_ROOT
         ```
 
-3. Enter the invokeai directory and create a virtual Python
+3. Enter the root (invokeai) directory and create a virtual Python
    environment within it named `.venv`. If the command `python`
    doesn't work, try `python3`. Note that while you may create the
    virtual environment anywhere in the file system, we recommend that
@@ -98,30 +98,29 @@ manager, please follow these steps:
    shell documentation for the correct way of doing so.
 
 
-    Linux or Mac:
-     ```bash
-     cd $INVOKEAI_ROOT
-     python -m venv create .venv
-     ```
+    === "Linux/Mac"
+        ```bash
+        cd $INVOKEAI_ROOT
+        python -m venv create .venv
+        ```
 
-    Windows:
-     ```bash
-     cd %INVOKEAI_ROOT%
-     python -m venv create .venv
-     ```
+    === "Windows"
+         ```bash
+         cd $INVOKEAI_ROOT
+     	 python -m venv create .venv
+     	 ```
 
 4.  Activate the new environment:
 
-    Linux, Mac:
-    
-    ```bash
-    source $INVOKEAI_ROOT/.venv/bin/activate
-    ```
+    === "Linux/Mac"
+    	```bash
+        source $INVOKEAI_ROOT/.venv/bin/activate
+    	```
 
-    Windows:
-    ```bash
-    %INVOKEAI_ROOT%/.venv/scripts/activate
-    ```
+    === "Windows"
+    	```bash
+        $INVOKEAI_ROOT/.venv/scripts/activate
+    	```
 
     The command-line prompt should change to to show `(.venv)` at the
     beginning of the prompt.
@@ -132,24 +131,40 @@ manager, please follow these steps:
     python -m pip install --upgrade pip
     ```
 
-6.  Install the InvokeAI Package
+6.  Install the InvokeAI Package. The `--extra-index-url` option is used to select among CUDA, ROCm and CPU/MPS drivers as shown below:
 
-    ```bash
-    pip install --use-pep517 --upgrade InvokeAI
-    ```
+    === "CUDA (NVidia)"
+        ```bash
+        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/cu117
+        ```
+	
+    === "ROCm (AMD)"
+        ```bash
+        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/rocm5.2
+        ```
+
+    === "CPU (Intel Macs & non-GPU systems)"
+        ```bash
+        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/cpu
+        ```
+
+    === "MPS (M1 and M2 Macs)"
+        ```bash
+        pip install InvokeAI --use-pep517 --upgrade --extra-index-url https://download.pytorch.org/whl/cpu
+        ```
 
 7.  Deactivate and reactivate your runtime directory so that the invokeai-specific commands
     become available in the environment
 
-    Linux/Macintosh:
-    ```bash
-    deactivate && source ${INVOKEAI_ROOT}/.venv/bin/activate
-    ```
+    === "Linux/Macintosh"
+        ```bash
+        deactivate && source $INVOKEAI_ROOT/.venv/bin/activate
+        ```
 
-    Windows:
-    ```bash
-    deactivate && %INVOKEAI_ROOT%/.venv/Scripts/activate
-    ```
+    === "Windows"
+        ```bash
+        deactivate && $INVOKEAI_ROOT/.venv/Scripts/activate
+        ```
 
 8.  Set up the runtime directory
 
@@ -177,7 +192,7 @@ manager, please follow these steps:
         If you have already downloaded the weights file(s) for another Stable
         Diffusion distribution, you may skip this step (by selecting "skip" when
         prompted) and configure InvokeAI to use the previously-downloaded files. The
-        process for this is described in [here](050_INSTALLING_MODELS.md).
+        process for this is described in [Installing Models](050_INSTALLING_MODELS.md).
 
 9.  Run the command-line- or the web- interface:
 
@@ -227,4 +242,4 @@ manager, please follow these steps:
 
     !!! warning
 
-        Do not move the runtime directory after installation. The virtual environment has absolute paths in it that get confused if the directory is moved.
+        Do not move the runtime directory after installation. The virtual environment will get confused if the directory is moved.
