@@ -26,7 +26,7 @@ export default function MainSampler() {
       validValues={
         activeModel.format === 'diffusers' ? DIFFUSERS_SAMPLERS : SAMPLERS
       }
-      styleClass="main-option-block"
+      styleClass="main-settings-block"
     />
   );
 }
