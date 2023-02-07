@@ -22,7 +22,7 @@ docker run \
   --name="${REPOSITORY_NAME,,}" \
   --hostname="${REPOSITORY_NAME,,}" \
   --mount=source="${VOLUMENAME}",target=/data \
-  ${MODELSPATH:+-u "$(id -u):$(id -g)"} \
+  ${MODELSPATH:+--user "$(id -u):$(id -g)"} \
   ${MODELSPATH:+--mount="type=bind,source=${MODELSPATH},target=/data/models"} \
   ${HUGGING_FACE_HUB_TOKEN:+--env="HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}"} \
   --publish=9090:9090 \

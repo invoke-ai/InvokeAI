@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 
 if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
+
   # Activate virtual environment if not already activated
   if [[ -z $VIRTUAL_ENV ]]; then
     [[ -e "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate" ]] \
       && source "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate"
   fi
+
   # Decide which container flavor to build if not specified
   if [[ -z "$CONTAINER_FLAVOR" ]] && python -c "import torch" &>/dev/null; then
     # Check for CUDA and ROCm
@@ -19,6 +21,7 @@ if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
       CONTAINER_FLAVOR="cpu"
     fi
   fi
+
   # Set PIP_EXTRA_INDEX_URL based on container flavor
   if [[ "$CONTAINER_FLAVOR" == "rocm" ]]; then
     PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/rocm"
