@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR},id=pip-${CONTAINER_FLAVOR} \
   --upgrade-deps
 
 # copy sources
-COPY --link . .
+COPY . .
 
 # install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
