@@ -1,11 +1,11 @@
 import {
+  BoxProps,
   Popover,
   PopoverArrow,
   PopoverContent,
+  PopoverProps,
   PopoverTrigger,
-  BoxProps,
 } from '@chakra-ui/react';
-import { PopoverProps } from '@chakra-ui/react';
 import { ReactNode } from 'react';
 
 type IAIPopoverProps = PopoverProps & {

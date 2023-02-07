@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react-swc';
+import { visualizer } from 'rollup-plugin-visualizer';
+import { defineConfig, PluginOption } from 'vite';
 import eslint from 'vite-plugin-eslint';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import legacy from '@vitejs/plugin-legacy';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -12,9 +12,7 @@ export default defineConfig(({ mode }) => {
       react(),
       eslint(),
       tsconfigPaths(),
-      legacy({
-        modernPolyfills: ['es.array.find-last'],
-      }),
+      visualizer() as unknown as PluginOption,
     ],
     server: {
       // Proxy HTTP requests to the flask server

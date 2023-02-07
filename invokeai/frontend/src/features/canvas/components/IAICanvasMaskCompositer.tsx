@@ -1,13 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { RectConfig } from 'konva/lib/shapes/Rect';
 import { Rect } from 'react-konva';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import Konva from 'konva';
 import { isNumber } from 'lodash';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const canvasMaskCompositerSelector = createSelector(
   canvasSelector,

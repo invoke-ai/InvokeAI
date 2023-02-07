@@ -1,7 +1,5 @@
 import { IconButton, Image } from '@chakra-ui/react';
-import { useState } from 'react';
-import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
-import { RootState } from 'app/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import {
   GalleryCategory,
@@ -9,16 +7,19 @@ import {
   selectNextImage,
   selectPrevImage,
 } from 'features/gallery/store/gallerySlice';
-import { createSelector } from '@reduxjs/toolkit';
-import _ from 'lodash';
-import { OptionsState } from 'features/options/store/optionsSlice';
+import { uiSelector } from 'features/ui/store/uiSelectors';
+import { isEqual } from 'lodash';
+
+import { useState } from 'react';
+import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
+import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 
 export const imagesSelector = createSelector(
-  [(state: RootState) => state.gallery, (state: RootState) => state.options],
-  (gallery: GalleryState, options: OptionsState) => {
+  [gallerySelector, uiSelector],
+  (gallery: GalleryState, ui) => {
     const { currentCategory, currentImage, intermediateImage } = gallery;
-    const { shouldShowImageDetails } = options;
+    const { shouldShowImageDetails } = ui;
 
     const tempImages =
       gallery.categories[
@@ -45,7 +46,7 @@ export const imagesSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
