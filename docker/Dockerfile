@@ -43,9 +43,9 @@ RUN mkdir -p ${PIP_CACHE_DIR}
 
 # Install dependencies
 RUN \
-  --mount=type=cache,target=${PIP_CACHE_DIR},id=pip-${CONTAINER_FLAVOR} \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked,from=python-base \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked,from=python-base \
+  --mount=type=cache,target=${PIP_CACHE_DIR} \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt update \
   && apt-get install -y \
     --no-install-recommends \
@@ -54,7 +54,7 @@ RUN \
     python3-dev=3.9.*
 
 # create virtual environment
-RUN --mount=type=cache,target=${PIP_CACHE_DIR},id=pip-${CONTAINER_FLAVOR} \
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
   python3 -m venv "${APPNAME}" \
   --upgrade-deps
 
@@ -64,9 +64,9 @@ COPY . .
 # install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-ARG PIP_PACKAGE=.
-RUN --mount=type=cache,target=${PIP_CACHE_DIR},id=pip-${CONTAINER_FLAVOR} \
-  "${APPNAME}/bin/pip" install ${PIP_PACKAGE}
+# ARG PIP_PACKAGE=.
+RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
+  "${APPNAME}/bin/pip" install .
 
 # build patchmatch
 RUN python3 -c "from patchmatch import patch_match"
