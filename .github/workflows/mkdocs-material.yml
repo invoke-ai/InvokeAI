@@ -6,6 +6,7 @@ on:
       - 'development'
     paths:
       - 'docs/**'
+      - 'mkdocs.yml'
 
 jobs:
   mkdocs-material:
