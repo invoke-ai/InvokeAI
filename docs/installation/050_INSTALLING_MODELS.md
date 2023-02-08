@@ -167,6 +167,10 @@ the command-line client's `!import_model` command.
          Once you have typed in `!import_model `, you can drag the model `.ckpt` file
          onto the command-line to insert the model path. This way, you don't need to
          type it or copy/paste.
+         
+    !!! tip "on Windows, you may need to use double backslash in the filename"
+    
+         Example: E:\\_Projects\\Code\\models\\ldm\\stable-diffusion-v1\\new-model-to-add.ckpt
 
 4.  Follow the wizard's instructions to complete installation as shown in the
     example here:
