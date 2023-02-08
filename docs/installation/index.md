@@ -30,8 +30,8 @@ install guide for frequently-encountered installation issues.
     InvokeAI and its dependencies. We offer two recipes: one suited to
     those who prefer the `conda` tool, and one suited to those who prefer
     `pip` and Python virtual environments. In our hands the pip install
-    is faster and more reliable, but your mileage may vary. 
-    Note that the conda installation method is currently deprecated and 
+    is faster and more reliable, but your mileage may vary.
+    Note that the conda installation method is currently deprecated and
     will not be supported at some point in the future.
 
     This method is recommended for users who have previously used `conda`
@@ -48,7 +48,7 @@ install guide for frequently-encountered installation issues.
 
 ## Quick Guides
 
-* [Installing CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
-* [Installing XFormers](installation/070_INSTALL_XFORMERS.md)
-* [Installing PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
-* [Installing New Models](installation/050_INSTALLING_MODELS.md)
+* [Installing CUDA and ROCm Drivers](./030_INSTALL_CUDA_AND_ROCM.md)
+* [Installing XFormers](./070_INSTALL_XFORMERS.md)
+* [Installing PyPatchMatch](./060_INSTALL_PATCHMATCH.md)
+* [Installing New Models](./050_INSTALLING_MODELS.md)

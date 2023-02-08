@@ -4,7 +4,7 @@ title: Changelog
 
 # :octicons-log-16: **Changelog**
 
-## v2.3.0 <small>(15 January 2023)</small>	
+## v2.3.0 <small>(15 January 2023)</small>
 
 **Transition to diffusers
 
@@ -44,7 +44,7 @@ introduces several changes you should know about.
   A configuration stanza for a diffuers model stored locally should
   look like this, with a `format` of `diffusers`, but a `path` field
   that points at the directory that contains `model_index.json`:
-  
+
   ```
   waifu-diffusion:
   description: Latest waifu diffusion 1.4
@@ -94,7 +94,7 @@ introduces several changes you should know about.
    !import_model /opt/sd-models/sd-1.4.ckpt
    !import_model https://huggingface.co/Fictiverse/Stable_Diffusion_PaperCut_Model/blob/main/PaperCut_v1.ckpt
    ```
-   
+
 **KNOWN BUGS (15 January 2023)
 
 1. On CUDA systems, the 768 pixel stable-diffusion-2.0 and
@@ -261,7 +261,7 @@ sections describe what's new for InvokeAI.
   [Installation](installation/index.md).
 - A streamlined manual installation process that works for both Conda and
   PIP-only installs. See
-  [Manual Installation](installation/INSTALL_MANUAL.md).
+  [Manual Installation](installation/020_INSTALL_MANUAL.md).
 - The ability to save frequently-used startup options (model to load, steps,
   sampler, etc) in a `.invokeai` file. See
   [Client](features/CLI.md)

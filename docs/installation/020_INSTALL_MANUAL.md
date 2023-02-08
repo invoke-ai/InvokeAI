@@ -36,7 +36,7 @@ gaming):
   install the [CUDA toolkit and optionally the XFormers library](070_INSTALL_XFORMERS.md).
 
 *  **ROCm Tools** For _Linux users with AMD GPUs_, you will need
-   to install the [ROCm toolkit](080_INSTALL_ROCM.md). Note that
+   to install the [ROCm toolkit](./030_INSTALL_CUDA_AND_ROCM.md). Note that
    InvokeAI does not support AMD GPUs on Windows systems due to
    lack of a Windows ROCm library.
 
@@ -73,14 +73,14 @@ manager, please follow these steps:
     path to `HOME/invokeai`.
 
     === "Linux/Mac"
-    
+
         ```bash
         export INVOKEAI_ROOT="~/invokeai"
         mkdir $INVOKEAI_ROOT
         ```
 
     === "Windows (Powershell)"
-    
+
         ```bash
         Set-Variable -Name INVOKEAI_ROOT -Value $Home/invokeai
         mkdir $INVOKEAI_ROOT
@@ -258,7 +258,7 @@ manager, please follow these steps:
 
 12. Other scripts
 
-    The [Textual Inversion](../features/TEXTUAL_VERSION.md) script can be launched with the command:
+    The [Textual Inversion](../features/TEXTUAL_INVERSION.md) script can be launched with the command:
 
     ```bash
     invokeai-ti --gui
@@ -330,5 +330,5 @@ installation protocol (important!)
     repository. You can then use GitHub functions to create and submit
     pull requests to contribute improvements to the project.
 
-    Please see [Contributing](../../README.md#Contributing) for hints
+    Please see [Contributing](/index.md#Contributing) for hints
     on getting started.

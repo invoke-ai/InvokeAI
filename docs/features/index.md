@@ -41,7 +41,7 @@ are the ticket.
 
 ## Model Management
 
-## * [Model Installation](050_INSTALLING_MODELS.md)
+## * [Model Installation](../installation/050_INSTALLING_MODELS.md)
 Learn how to import third-party models and switch among them. This
 guide also covers optimizing models to load quickly.
 

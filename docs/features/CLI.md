@@ -345,7 +345,7 @@ useful for debugging the text masking process prior to inpainting with the
 The CLI allows you to add new models on the fly, as well as to switch
 among them rapidly without leaving the script. There are several
 different model formats, each described in the [Model Installation
-Guide](050_INSTALLING_MODELS.md).
+Guide](../installation/050_INSTALLING_MODELS.md).
 
 #### `!models`
 
