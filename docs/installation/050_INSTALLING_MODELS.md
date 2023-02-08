@@ -219,6 +219,7 @@ Interface](../features/CLI.md). These include:
 
 ### Manually editing `configs/models.yaml`
 
+
 If you are comfortable with a text editor then you may simply edit `models.yaml`
 directly.
 
