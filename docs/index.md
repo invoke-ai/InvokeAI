@@ -100,24 +100,11 @@ images in full-precision mode:
 - GTX 1650 series cards
 - GTX 1660 series cards
 
-### :fontawesome-solid-memory: Memory
+### :fontawesome-solid-memory: Memory and Disk
 
 - At least 12 GB Main Memory RAM.
-
-### :fontawesome-regular-hard-drive: Disk
-
 - At least 18 GB of free disk space for the machine learning model, Python, and
   all its dependencies.
-
-!!! info
-
-    Precision is auto configured based on the device. If however you encounter errors like
-    `expected type Float but found Half` or `not implemented for Half` you can try starting
-    `invoke.py` with the `--precision=float32` flag:
-
-    ```bash
-    (invokeai) ~/InvokeAI$ python scripts/invoke.py --precision=float32
-    ```
 
 ## :octicons-package-dependencies-24: Installation
 
@@ -125,56 +112,49 @@ This fork is supported across Linux, Windows and Macintosh. Linux users can use
 either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
 driver).
 
-### Automated Installation
-
-
-First time users, please see [Automated
-Installer](installation/010_INSTALL_AUTOMATED.md) for a walkthrough of
-getting InvokeAI up and running on your system.
-
-### Manual Installation
-
-Power users who are comfortable with the command line can try the
-[Manual Installation](installation/020_INSTALL_MANUAL.md) method, which provides
-more flexibility. This manual also describes how to start developing
-with InvokeAI.
-
-### Docker Installation
-
-Another installation method is to run a Docker container containing
-InvokeAI and its dependencies. This method is recommended for
-individuals with experience with Docker containers and understand the
-pluses and minuses of a container-based install.
-
-### PyPatchMatch Library Installation
-
-Linux and Mac users who wish to make use of the **PyPatchMatch** inpainting
-optimization functions will need to perform a bit of extra work to enable this
-module. Instructions can be found at [Installing
-PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md).
+### [Installation Getting Started Guide](installation)
+#### [Automated Installer](installation/010_INSTALL_AUTOMATED.md)
+This method is recommended for 1st time users
+#### [Manual Installation](installation/020_INSTALL_MANUAL.md)
+This method is recommended for experienced users and developers
+#### [Docker Installation](installation/040_INSTALL_DOCKER.md)
+This method is recommended for those familiar with running Docker containers
+### Other Installation Guides
+  - [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
+  - [XFormers](installation/070_INSTALL_XFORMERS.md)
+  - [CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
+  - [Installing New Models](installation/050_INSTALLING_MODELS.md)
 
 ## :octicons-gift-24: InvokeAI Features
 
-- [The InvokeAI Web Interface](features/WEB.md) -
-[WebGUI hotkey reference guide](features/WEBUIHOTKEYS.md) -
-[WebGUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
-<!-- seperator -->
-- [The Command Line Interace](features/CLI.md) -
-[Image2Image](features/IMG2IMG.md) - [Inpainting](features/INPAINTING.md) -
-[Outpainting](features/OUTPAINTING.md) -
-[Adding custom styles and subjects](features/CONCEPTS.md) -
-[Upscaling and Face Reconstruction](features/POSTPROCESS.md)
-<!-- seperator -->
-- [Generating Variations](features/VARIATIONS.md)
-<!-- seperator -->
-- [Prompt Engineering](features/PROMPTS.md)
-<!-- seperator -->
+### The InvokeAI Web Interface
+- [WebUI overview](features/WEB.md)
+- [WebUI hotkey reference guide](features/WEBUIHOTKEYS.md)
+- [WebUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
+<!-- separator -->
+### The InvokeAI Command Line Interface
+- [Command Line Interace Reference Guide](features/CLI.md)
+<!-- separator -->
+### Image Management
+- [Image2Image](features/IMG2IMG.md)
+- [Inpainting](features/INPAINTING.md)
+- [Outpainting](features/OUTPAINTING.md)
+- [Adding custom styles and subjects](features/CONCEPTS.md)
+- [Upscaling and Face Reconstruction](features/POSTPROCESS.md)
+- [Embiggen upscaling](features/EMBIGGEN.md)
+- [Other Features](features/OTHER.md)
+
+<!-- separator -->
+### Model Management
+- [Installing](installation/050_INSTALLING_MODELS.md)
 - [Model Merging](features/MODEL_MERGING.md)
+- [Style/Subject Concepts and Embeddings](features/CONCEPTS.md)
+- [Textual Inversion](features/TEXTUAL_INVERSION.md)
+- [Not Safe for Work (NSFW) Checker](features/NSFW.md)
 <!-- seperator -->
-- Miscellaneous
-  - [NSFW Checker](features/NSFW.md)
-  - [Embiggen upscaling](features/EMBIGGEN.md)
-  - [Other](features/OTHER.md)
+### Prompt Engineering
+- [Prompt Syntax](features/PROMPTS.md)
+- [Generating Variations](features/VARIATIONS.md)
 
 ## :octicons-log-16: Latest Changes
 

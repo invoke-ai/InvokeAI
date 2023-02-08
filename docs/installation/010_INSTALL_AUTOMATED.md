@@ -14,7 +14,7 @@ experimental versions later.
 
 ## Walk through
 
-1.  Make sure that your system meets the [hardware
+1.  <a name="hardware_requirements">**Hardware Requirements**: </a>Make sure that your system meets the [hardware
     requirements](../index.md#hardware-requirements) and has the
     appropriate GPU drivers installed. For a system with an NVIDIA
     card installed, you will need to install the CUDA driver, while
@@ -36,22 +36,22 @@ experimental versions later.
 	NOTE for Linux users: if your temporary directory is mounted
         as a `tmpfs`, ensure it has sufficient space.
 
-2.  Check that your system has an up-to-date Python installed. To do
+2.  <a name="software_requirements">**Software Requirements**: </a>Check that your system has an up-to-date Python installed. To do
     this, open up a command-line window ("Terminal" on Linux and
     Macintosh, "Command" or "Powershell" on Windows) and type `python
     --version`. If Python is installed, it will print out the version
     number. If it is version `3.9.1` or `3.10.x`, you meet
     requirements.
 
-    !!! warning "At this time we do not recommend Python 3.11"
 
-    !!! warning "If you see an older version, or get a command not found error"
+    !!! warning "What to do if you have an unsupported version"
 
-        Go to [Python Downloads](https://www.python.org/downloads/) and
-        download the appropriate installer package for your platform. We recommend
-        [Version 3.10.9](https://www.python.org/downloads/release/python-3109/),
-        which has been extensively tested with InvokeAI.
-
+        Go to [Python Downloads](https://www.python.org/downloads/)
+        and download the appropriate installer package for your
+        platform. We recommend [Version
+        3.10.9](https://www.python.org/downloads/release/python-3109/),
+        which has been extensively tested with InvokeAI. At this time
+        we do not recommend Python 3.11.
 
     _Please select your platform in the section below for platform-specific
     setup requirements._
@@ -120,7 +120,7 @@ experimental versions later.
         install. If you already have them installed, you will instead see some
         output in the Terminal advising you that the tools are already installed. More information can be found at [FreeCode Camp](https://www.freecodecamp.org/news/install-xcode-command-line-tools/)
 
-3.  The InvokeAI installer is distributed as a ZIP files. Go to the
+3.  **Download the Installer**: The InvokeAI installer is distributed as a ZIP files. Go to the
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest),
     and look for a file named:
 
@@ -129,7 +129,7 @@ experimental versions later.
     where "2.X.X" is the latest released version. The file is located
     at the very bottom of the release page, under **Assets**.
 
-4.  Unpack the zip file into a convenient directory. This will create a new
+4.  **Unpack the installer**: Unpack the zip file into a convenient directory. This will create a new
     directory named "InvokeAI-Installer". When unpacked, the directory
     will look like this:
 
@@ -137,7 +137,7 @@ experimental versions later.
     ![zipfile-screenshot](../assets/installer-walkthrough/unpacked-zipfile.png)
     </figure>
 
-5.  If you are using a desktop GUI, double-click the installer file
+5.  **Launch the installer script from the desktop**: If you are using a desktop GUI, double-click the installer file
     appropriate for your platform. It will be named `install.bat` on
     Windows systems and `install.sh` on Linux and Macintosh
     systems. Be aware that your system's file browser may suppress the
@@ -146,14 +146,14 @@ experimental versions later.
     On Windows systems if you get an "Untrusted Publisher" warning.
     Click on "More Info" and then select "Run Anyway." You trust us, right?
 
-6.  Alternatively, from the command line, run the shell script or .bat file:
+6.  **[Alternative] Launch the installer script from the command line**: Alternatively, from the command line, run the shell script or .bat file:
 
     ```cmd
     C:\Documents\Linco> cd InvokeAI-Installer
     C:\Documents\Linco\invokeAI> install.bat
     ```
 
-7.  The script will ask you to choose where to install InvokeAI. Select a
+7.  **Select the location to install InvokeAI**: The script will ask you to choose where to install InvokeAI. Select a
     directory with at least 18G of free space for a full install. InvokeAI and
     all its support files will be installed into a new directory named
     `invokeai` located at the location you specify.
@@ -171,7 +171,7 @@ experimental versions later.
       Type part of the path (e.g. "C:\Users") and press ++tab++ repeatedly
       to suggest completions.
 
-8.  The installer will autodetect your platform and will request you to
+8.  **Select your GPU**: The installer will autodetect your platform and will request you to
     confirm the type of GPU your graphics card has. On Linux systems,
     you will have the choice of CUDA (NVidia cards), ROCm (AMD cards),
     or CPU (no graphics acceleration). On Windows, you'll have the
@@ -186,7 +186,7 @@ experimental versions later.
     </figure>
 
 
-9.  Sit back and let the install script work. It will install the third-party
+9.  **Watch it go!**: Sit back and let the install script work. It will install the third-party
     libraries needed by InvokeAI and the application itself.
 
     Be aware that some of the library download and install steps take a long
@@ -197,7 +197,7 @@ experimental versions later.
     minutes and nothing is happening, you can interrupt the script with ^C. You
     may restart it and it will pick up where it left off.
 
-10. After installation completes, the installer will launch the
+10. **Post-install Configuration**: After installation completes, the installer will launch the
     configuration script, which will guide you through the first-time
     process of selecting one or more Stable Diffusion model weights
     files, downloading and configuring them. We provide a list of
@@ -215,7 +215,7 @@ experimental versions later.
     prompted) and configure InvokeAI to use the previously-downloaded files. The
     process for this is described in [Installing Models](050_INSTALLING_MODELS.md).
 
-11. The script will now exit and you'll be ready to generate some images. Look
+11. **Running InvokeAI for the first time**: The script will now exit and you'll be ready to generate some images. Look
     for the directory `invokeai` installed in the location you chose at the
     beginning of the install session. Look for a shell script named `invoke.sh`
     (Linux/Mac) or `invoke.bat` (Windows). Launch the script by double-clicking
@@ -236,7 +236,7 @@ experimental versions later.
       http://localhost:9090. Click on this link to open up a browser
       and start exploring InvokeAI's features.
 
-12. You can launch InvokeAI with several different command-line arguments that
+12. **InvokeAI Options**: You can launch InvokeAI with several different command-line arguments that
     customize its behavior. For example, you can change the location of the
     image output directory, or select your favorite sampler. See the
     [Command-Line Interface](../features/CLI.md) for a full list of the options.

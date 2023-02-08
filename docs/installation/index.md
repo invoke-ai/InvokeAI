@@ -3,7 +3,17 @@ title: Overview
 ---
 
 We offer several ways to install InvokeAI, each one suited to your
-experience and preferences.
+experience and preferences. We suggest that everyone start by
+reviewing the
+[hardware](010_INSTALL_AUTOMATED.md#hardware_requirements) and
+[software](010_INSTALL_AUTOMATED.md#software_requirements)
+requirements, as they are the same across each install method. Then
+pick the install method most suitable to your level of experience and
+needs.
+
+See the [troubleshooting
+section](010_INSTALL_AUTOMATED.md#troubleshooting) of the automated
+install guide for frequently-encountered installation issues.
 
 1. [Automated Installer](010_INSTALL_AUTOMATED.md)
 
@@ -33,3 +43,9 @@ experience and preferences.
     InvokeAI and its dependencies. This method is recommended for
     individuals with experience with Docker containers and understand
     the pluses and minuses of a container-based install.
+
+4. Other Installation Guides
+- [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
+- [XFormers](installation/070_INSTALL_XFORMERS.md)
+- [CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
+- [Installing New Models](installation/050_INSTALLING_MODELS.md)
