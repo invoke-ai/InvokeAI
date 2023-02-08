@@ -236,9 +236,10 @@ For older changelogs, please visit the
 
 ## :material-target: Troubleshooting
 
-Please check out our
-**[:material-frequently-asked-questions: Q&A](help/TROUBLESHOOT.md)** to get
-solutions for common installation problems and other issues.
+Please check out our **[:material-frequently-asked-questions:
+Troubleshooting
+Guide](installation/010_INSTALL_AUTOMATED.md#troubleshooting)** to
+get solutions for common installation problems and other issues.
 
 ## :octicons-repo-push-24: Contributing
 
@@ -264,8 +265,8 @@ thank them for their time, hard work and effort.
 For support, please use this repository's GitHub Issues tracking service. Feel
 free to send me an email if you use and like the script.
 
-Original portions of the software are Copyright (c) 2020
-[Lincoln D. Stein](https://github.com/lstein)
+Original portions of the software are Copyright (c) 2022-23
+by [The InvokeAI Team](https://github.com/invoke-ai).
 
 ## :octicons-book-24: Further Reading
 
