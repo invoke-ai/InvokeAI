@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 set -e
 
-# How to use: https://invoke-ai.github.io/InvokeAI/installation/INSTALL_DOCKER/#setup
-# Some possible pip extra-index urls (cuda 11.7 is available without extra url):
-#   CUDA 11.6:  https://download.pytorch.org/whl/cu116
-#   ROCm 5.2:   https://download.pytorch.org/whl/rocm5.2
-#   CPU:        https://download.pytorch.org/whl/cpu
-#   as found on https://pytorch.org/get-started/locally/
+# If you want to build a specific flavor, set the CONTAINER_FLAVOR environment variable
+#   e.g. CONTAINER_FLAVOR=cpu ./build.sh
+#   Possible Values are:
+#     - cpu
+#     - cuda
+#     - rocm
+#   Don't forget to also set it when executing run.sh
+#   if it is not set, the script will try to detect the flavor by itself.
+#
+# Doc can be found here:
+#   https://invoke-ai.github.io/InvokeAI/installation/040_INSTALL_DOCKER/
 
 SCRIPTDIR=$(dirname "${BASH_SOURCE[0]}")
 cd "$SCRIPTDIR" || exit 1
