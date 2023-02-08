@@ -1,7 +1,7 @@
 {
   "images": "الصور",
   "steps": "الخطوات",
-  "cfgScale": "CFG Scale",
+  "cfgScale": "مقياس الإعداد الذاتي للجملة",
   "width": "عرض",
   "height": "ارتفاع",
   "sampler": "مزج",
@@ -9,7 +9,7 @@
   "randomizeSeed": "تبديل بذرة",
   "shuffle": "تشغيل",
   "noiseThreshold": "عتبة الضوضاء",
-  "perlinNoise": "Perlin Noise",
+  "perlinNoise": "ضجيج برلين",
   "variations": "تباينات",
   "variationAmount": "كمية التباين",
   "seedWeights": "أوزان البذور",
