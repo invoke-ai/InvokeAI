@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
+# This file is used to set environment variables for the build.sh and run.sh scripts.
+
+# Try to detect the container flavor if no PIP_EXTRA_INDEX_URL got specified
 if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
 
-  # Activate virtual environment if not already activated
+  # Activate virtual environment if not already activated and exists
   if [[ -z $VIRTUAL_ENV ]]; then
     [[ -e "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate" ]] \
       && source "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate"
@@ -13,9 +16,9 @@ if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
     # Check for CUDA and ROCm
     CUDA_AVAILABLE=$(python -c "import torch;print(torch.cuda.is_available())")
     ROCM_AVAILABLE=$(python -c "import torch;print(torch.version.hip is not None)")
-    if [[ "$(uname -s)" != "Darwin" && "${CUDA_AVAILABLE}" == "True" ]]; then
+    if [[ "${CUDA_AVAILABLE}" == "True" ]]; then
       CONTAINER_FLAVOR="cuda"
-    elif [[ "$(uname -s)" != "Darwin" && "${ROCM_AVAILABLE}" == "True" ]]; then
+    elif [[ "${ROCM_AVAILABLE}" == "True" ]]; then
       CONTAINER_FLAVOR="rocm"
     else
       CONTAINER_FLAVOR="cpu"
