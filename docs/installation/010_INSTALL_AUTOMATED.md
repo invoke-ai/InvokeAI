@@ -118,9 +118,7 @@ experimental versions later.
         Terminal, including InvokeAI. This package is provided
         directly by Apple. To install, open a terminal window and run `xcode-select --install`. You will get a macOS system popup guiding you through the
         install. If you already have them installed, you will instead see some
-        output in the Terminal advising you that the tools are already installed.
-	More information can be found at [FreeCode
-        Camp](https://www.freecodecamp.org/news/install-xcode-command-line-tools/)
+        output in the Terminal advising you that the tools are already installed. More information can be found at [FreeCode Camp](https://www.freecodecamp.org/news/install-xcode-command-line-tools/)
 
 3.  The InvokeAI installer is distributed as a ZIP files. Go to the
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest),

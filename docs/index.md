@@ -116,7 +116,7 @@ images in full-precision mode:
     `invoke.py` with the `--precision=float32` flag:
 
     ```bash
-    (invokeai) ~/InvokeAI$ python scripts/invoke.py --full_precision
+    (invokeai) ~/InvokeAI$ python scripts/invoke.py --precision=float32
     ```
 
 ## :octicons-package-dependencies-24: Installation
