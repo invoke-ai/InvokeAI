@@ -15,6 +15,8 @@ See the [troubleshooting
 section](010_INSTALL_AUTOMATED.md#troubleshooting) of the automated
 install guide for frequently-encountered installation issues.
 
+## Main Application
+
 1. [Automated Installer](010_INSTALL_AUTOMATED.md)
 
     This is a script that will install all of InvokeAI's essential
@@ -44,8 +46,9 @@ install guide for frequently-encountered installation issues.
     individuals with experience with Docker containers and understand
     the pluses and minuses of a container-based install.
 
-4. Other Installation Guides
-- [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
-- [XFormers](installation/070_INSTALL_XFORMERS.md)
-- [CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
-- [Installing New Models](installation/050_INSTALLING_MODELS.md)
+## Quick Guides
+
+* [Installing CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
+* [Installing XFormers](installation/070_INSTALL_XFORMERS.md)
+* [Installing PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
+* [Installing New Models](installation/050_INSTALLING_MODELS.md)
