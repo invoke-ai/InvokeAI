@@ -168,9 +168,10 @@ the command-line client's `!import_model` command.
          onto the command-line to insert the model path. This way, you don't need to
          type it or copy/paste.
          
-    !!! tip "on Windows, you may need to use double backslash in the filename"
+    !!! tip "on Windows, you may need to use double backslash in the filename, or alternatively replace backslashes with forward slashes"
     
          Example: E:\\_Projects\\Code\\models\\ldm\\stable-diffusion-v1\\new-model-to-add.ckpt
+         Or alternatively: E:/_Projects/Code/Models/ldm/stable-diffusion-v1/new-model-to-add.ckpt
 
 4.  Follow the wizard's instructions to complete installation as shown in the
     example here:
