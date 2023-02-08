@@ -230,7 +230,8 @@ class Args(object):
                     switches = ''
         try:
             self._cmd_switches = self._cmd_parser.parse_args(shlex.split(switches,comments=True))
-            setattr(self._cmd_switches,'prompt',prompt)
+            if not getattr(self._cmd_switches,'prompt'):
+                setattr(self._cmd_switches,'prompt',prompt)
             return self._cmd_switches
         except:
             return None

@@ -1,10 +1,11 @@
-import { GroupConfig } from 'konva/lib/Group';
-import { Group, Line } from 'react-konva';
-import { useAppSelector } from 'app/storeHooks';
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { GroupConfig } from 'konva/lib/Group';
+import { isEqual } from 'lodash';
+
+import { Group, Line } from 'react-konva';
 import { isCanvasMaskLine } from '../store/canvasTypes';
-import _ from 'lodash';
 
 export const canvasLinesSelector = createSelector(
   [canvasSelector],
@@ -13,7 +14,7 @@ export const canvasLinesSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

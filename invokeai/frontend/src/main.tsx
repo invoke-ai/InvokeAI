@@ -1,15 +1,15 @@
+import { ChakraProvider } from '@chakra-ui/react';
+import createCache from '@emotion/cache';
+import { CacheProvider } from '@emotion/react';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ChakraProvider } from '@chakra-ui/react';
-import { CacheProvider } from '@emotion/react';
-import createCache from '@emotion/cache';
-import { store } from './app/store';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
+import { store } from './app/store';
 import { persistor } from './persistor';
 
-import Loading from './Loading';
 import App from './app/App';
+import Loading from './Loading';
 
 export const emotionCache = createCache({
   key: 'invokeai-style-cache',

@@ -12,7 +12,7 @@
  * 'gfpgan'.
  */
 
-import { InvokeTabName } from 'features/tabs/tabMap';
+import { InvokeTabName } from 'features/ui/store/tabMap';
 import { IRect } from 'konva/lib/types';
 
 /**
