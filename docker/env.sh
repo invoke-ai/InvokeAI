@@ -8,7 +8,8 @@ if [[ -z "$PIP_EXTRA_INDEX_URL" ]]; then
   # Activate virtual environment if not already activated and exists
   if [[ -z $VIRTUAL_ENV ]]; then
     [[ -e "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate" ]] \
-      && source "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate"
+      && source "$(dirname "${BASH_SOURCE[0]}")/../.venv/bin/activate" \
+      && echo "Activated virtual environment: $VIRTUAL_ENV"
   fi
 
   # Decide which container flavor to build if not specified
