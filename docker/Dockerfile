@@ -82,7 +82,7 @@ FROM python-base AS runtime
 ARG UNAME=appuser
 RUN useradd \
   --no-log-init \
-  -M \
+  -m \
   -U \
   "${UNAME}"
 USER ${UNAME}
@@ -92,6 +92,7 @@ COPY --chown=${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
 ENV INVOKEAI_ROOT /data
 ENV TRANSFORMERS_CACHE /data/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
+EXPOSE 9090
 ENTRYPOINT [ "invokeai" ]
-CMD [ "--web", "--host=0.0.0.0" ]
+CMD [ "--web", "--host", "0.0.0.0", "--port", "9090" ]
 VOLUME [ "/data" ]
