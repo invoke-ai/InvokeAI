@@ -359,7 +359,7 @@ class InvokeAiInstance:
         scripts = ['invoke']
         
         for script in scripts:
-            src = Path(__file__).parent / "templates" / f"{script}.{ext}.in"
+            src = Path(__file__).parent / '..' / "templates" / f"{script}.{ext}.in"
             dest = self.runtime / f"{script}.{ext}"
             shutil.copy(src, dest)
             os.chmod(dest, 0o0755)

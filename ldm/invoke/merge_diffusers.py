@@ -457,7 +457,6 @@ def main():
             run_gui(args)
         else:
             run_cli(args)
-        print(f">> Conversion successful. New model is named {args.merged_model_name}")
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
             print(

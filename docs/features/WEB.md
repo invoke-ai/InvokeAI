@@ -5,11 +5,14 @@ title: InvokeAI Web Server
 # :material-web: InvokeAI Web Server
 
 As of version 2.0.0, this distribution comes with a full-featured web server
-(see screenshot). To use it, run the `invoke.py` script by adding the `--web`
-option:
+(see screenshot).
+
+To use it, launch the `invoke.sh`/`invoke.bat` script and select
+option (2). Alternatively, with the InvokeAI environment active, run
+the `invokeai` script by adding the `--web` option:
 
 ```bash
-(invokeai) ~/InvokeAI$ python3 scripts/invoke.py --web
+invokeai --web
 ```
 
 You can then connect to the server by pointing your web browser at
@@ -19,17 +22,23 @@ address of the host you are running it on, or the wildcard `0.0.0.0`. For
 example:
 
 ```bash
-(invokeai) ~/InvokeAI$ python3 scripts/invoke.py --web --host 0.0.0.0
+invoke.sh --host 0.0.0.0
 ```
 
-## Quick guided walkthrough of the WebGUI's features
+or
 
-While most of the WebGUI's features are intuitive, here is a guided walkthrough
+```bash
+invokeai --web --host 0.0.0.0
+```
+
+## Quick guided walkthrough of the WebUI's features
+
+While most of the WebUI's features are intuitive, here is a guided walkthrough
 through its various components.
 
 ![Invoke Web Server - Major Components](../assets/invoke-web-server-1.png){:width="640px"}
 
-The screenshot above shows the Text to Image tab of the WebGUI. There are three
+The screenshot above shows the Text to Image tab of the WebUI. There are three
 main sections:
 
 1. A **control panel** on the left, which contains various settings for text to
@@ -63,12 +72,14 @@ From top to bottom, these are:
 1. Text to Image - generate images from text
 2. Image to Image - from an uploaded starting image (drawing or photograph)
    generate a new one, modified by the text prompt
-3. Inpainting (pending) - Interactively erase portions of a starting image and
-   have the AI fill in the erased region from a text prompt.
-4. Outpainting (pending) - Interactively add blank space to the borders of a
-   starting image and fill in the background from a text prompt.
-5. Postprocessing (pending) - Interactively postprocess generated images using a
-   variety of filters.
+3. Unified Canvas - Interactively combine multiple images, extend them
+   with outpainting,and modify interior portions of the image with
+   inpainting, erase portions of a starting image and have the AI fill in
+   the erased region from a text prompt.
+4. Workflow Management (not yet implemented) - this panel will allow you to create
+   pipelines of common operations and combine them into workflows.
+5. Training (not yet implemented) - this panel will provide an interface to [textual
+   inversion training](TEXTUAL_INVERSION.md) and fine tuning.
 
 The inpainting, outpainting and postprocessing tabs are currently in
 development. However, limited versions of their features can already be accessed
@@ -76,18 +87,18 @@ through the Text to Image and Image to Image tabs.
 
 ## Walkthrough
 
-The following walkthrough will exercise most (but not all) of the WebGUI's
+The following walkthrough will exercise most (but not all) of the WebUI's
 feature set.
 
 ### Text to Image
 
-1. Launch the WebGUI using `python scripts/invoke.py --web` and connect to it
+1. Launch the WebUI using `python scripts/invoke.py --web` and connect to it
    with your browser by accessing `http://localhost:9090`. If the browser and
    server are running on different machines on your LAN, add the option
    `--host 0.0.0.0` to the launch command line and connect to the machine
    hosting the web server using its IP address or domain name.
 
-2. If all goes well, the WebGUI should come up and you'll see a green
+2. If all goes well, the WebUI should come up and you'll see a green
    `connected` message on the upper right.
 
 #### Basics
@@ -234,7 +245,7 @@ walkthrough.
 
 2.  Drag-and-drop the Lincoln-and-Parrot image into the Image panel, or click
     the blank area to get an upload dialog. The image will load into an area
-    marked _Initial Image_. (The WebGUI will also load the most
+    marked _Initial Image_. (The WebUI will also load the most
     recently-generated image from the gallery into a section on the left, but
     this image will be replaced in the next step.)
 
@@ -284,13 +295,17 @@ initial image" icons are located.
 
 ![Invoke Web Server - Use as Image Links](../assets/invoke-web-server-9.png){:width="640px"}
 
+### Unified Canvas
+
+See the [Unified Canvas Guide](UNIFIED_CANVAS.md)
+
 ## Parting remarks
 
 This concludes the walkthrough, but there are several more features that you can
 explore. Please check out the [Command Line Interface](CLI.md) documentation for
 further explanation of the advanced features that were not covered here.
 
-The WebGUI is only rapid development. Check back regularly for updates!
+The WebUI is only rapid development. Check back regularly for updates!
 
 ## Reference
 
