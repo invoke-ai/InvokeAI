@@ -81,12 +81,15 @@ FROM python-base AS runtime
 
 # Create a new User
 ARG UNAME=appuser
-RUN groupadd "${APPNAME}" \
-  && useradd -l -s /bin/bash "${UNAME}"
-USER "${UNAME}"
+RUN useradd \
+  --no-log-init \
+  -M \
+  -U \
+  "${UNAME}"
+USER ${UNAME}
 
 # setup runtime environment
-COPY --chown=${UNAME}:${APPNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
+COPY --chown=${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
 ENV INVOKEAI_ROOT /data
 ENV TRANSFORMERS_CACHE /data/.cache
 ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
