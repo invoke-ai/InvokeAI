@@ -57,6 +57,13 @@ containerization technologies such as Docker.
 For downloads and instructions, visit the [NVIDIA CUDA Container
 Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 
+### Torch Installation
+
+When installing torch and torchvision manually with `pip`, remember to provide
+the argument `--extra-index-url
+https://download.pytorch.org/whl/cu117` as described in the [Manual
+Installation Guide](020_INSTALL_MANUAL.md).
+
 ## :simple-amd: ROCm
 
 ### Linux Install
