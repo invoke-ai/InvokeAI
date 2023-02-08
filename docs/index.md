@@ -158,7 +158,7 @@ This method is recommended for those familiar with running Docker containers
 
 ## :octicons-log-16: Latest Changes
 
-### v2.3.0 <small>(XX February 2023)</small>
+### v2.3.0 <small>(9 February 2023)</small>
 
 #### Migration to Stable Diffusion `diffusers` models
 
