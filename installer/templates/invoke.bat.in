@@ -13,7 +13,8 @@ echo 3. run textual inversion training
 echo 4. merge models (diffusers type only)
 echo 5. re-run the configure script to download new models
 echo 6. open the developer console
-set /P restore="Please enter 1, 2, 3, 4 or 5: [2] "
+echo 7. command-line help
+set /P restore="Please enter 1, 2, 3, 4, 5, 6 or 7: [2] "
 if not defined restore set restore=2
 IF /I "%restore%" == "1" (
     echo Starting the InvokeAI command-line..
@@ -42,6 +43,11 @@ IF /I "%restore%" == "1" (
     echo *************************
     echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
     call cmd /k
+) ELSE IF /I "%restore%" == "7" (
+    echo Displaying command line help...
+    python .venv\Scripts\invokeai.exe --help %*
+    pause
+    exit /b
 ) ELSE (
     echo Invalid selection
     pause
