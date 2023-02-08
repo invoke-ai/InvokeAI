@@ -57,17 +57,17 @@ ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
 RUN mkdir -p ${PIP_CACHE_DIR}
 
 # create virtual environment
-RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
+RUN --mount=type=cache,target=${PIP_CACHE_DIR},sharing=locked \
   python3 -m venv "${APPNAME}" \
   --upgrade-deps
 
 # copy sources
-COPY . .
+COPY --link . .
 
 # install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
+RUN --mount=type=cache,target=${PIP_CACHE_DIR},sharing=locked \
   "${APPNAME}/bin/pip" install .
 
 # build patchmatch
