@@ -29,7 +29,7 @@ export default function ImageToImageStrength(props: ImageToImageStrengthProps) {
       label={label}
       step={0.01}
       min={0.01}
-      max={0.99}
+      max={1}
       onChange={handleChangeStrength}
       value={img2imgStrength}
       isInteger={false}
