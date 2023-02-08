@@ -49,10 +49,10 @@ running `nvidia-smi` from the command line.
 
 ### Linux Install with a Runtime Container
 
-On Linux systems, an alternative to installing the driver directly on
-your system is to run an NVIDIA software container that has the driver
-already in place. This is recommended if you are already familiar with
-containerization technologies such as Docker.
+On Linux systems, an alternative to installing CUDA Toolkit directly on
+your system is to run an NVIDIA software container that has the CUDA
+libraries already in place. This is recommended if you are already 
+familiar with containerization technologies such as Docker.
 
 For downloads and instructions, visit the [NVIDIA CUDA Container
 Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
