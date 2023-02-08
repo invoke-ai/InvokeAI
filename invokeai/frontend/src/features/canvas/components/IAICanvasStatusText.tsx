@@ -23,6 +23,7 @@ const selector = createSelector(
       shouldShowCanvasDebugInfo,
       layer,
       boundingBoxScaleMethod,
+      shouldPreserveMaskedArea,
     } = canvas;
 
     let boundingBoxColor = 'inherit';
@@ -56,6 +57,7 @@ const selector = createSelector(
       shouldShowCanvasDebugInfo,
       shouldShowBoundingBox: boundingBoxScaleMethod !== 'auto',
       shouldShowScaledBoundingBox: boundingBoxScaleMethod !== 'none',
+      shouldPreserveMaskedArea,
     };
   },
   {
@@ -79,6 +81,7 @@ const IAICanvasStatusText = () => {
     canvasScaleString,
     shouldShowCanvasDebugInfo,
     shouldShowBoundingBox,
+    shouldPreserveMaskedArea,
   } = useAppSelector(selector);
 
   const { t } = useTranslation();
@@ -91,6 +94,15 @@ const IAICanvasStatusText = () => {
         }}
       >{`${t('unifiedcanvas:activeLayer')}: ${activeLayerString}`}</div>
       <div>{`${t('unifiedcanvas:canvasScale')}: ${canvasScaleString}%`}</div>
+      {shouldPreserveMaskedArea && (
+        <div
+          style={{
+            color: 'var(--status-working-color)',
+          }}
+        >
+          Preserve Masked Area: On
+        </div>
+      )}
       {shouldShowBoundingBox && (
         <div
           style={{
