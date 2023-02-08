@@ -54,6 +54,7 @@ RUN \
 # prepare pip for buildkit cache
 ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
 ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
+RUN mkdir -p ${PIP_CACHE_DIR}
 
 # create virtual environment
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
