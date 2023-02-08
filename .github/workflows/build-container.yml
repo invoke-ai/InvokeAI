@@ -87,7 +87,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: PIP_EXTRA_INDEX_URL=${{ matrix.pip-extra-index-url }}
-          cache-from: type=gha,scope=${{ github.ref_name }}-${{ matrix.flavor }}
+          cache-from: |
+            type=gha,scope=${{ github.ref_name }}-${{ matrix.flavor }}
+            type=gha,scope=main-${{ matrix.flavor }}
           cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.flavor }}
 
       - name: Docker Hub Description
