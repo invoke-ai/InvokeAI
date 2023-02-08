@@ -8,7 +8,7 @@ import {
   BiZoomOut,
 } from 'react-icons/bi';
 import { MdFlip } from 'react-icons/md';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 
 type ReactPanZoomProps = {
   image: string;

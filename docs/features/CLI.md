@@ -6,38 +6,51 @@ title: Command-Line Interface
 
 ## **Interactive Command Line Interface**
 
-The `invoke.py` script, located in `scripts/`, provides an interactive interface
-to image generation similar to the "invoke mothership" bot that Stable AI
-provided on its Discord server.
+The InvokeAI command line interface (CLI) provides scriptable access
+to InvokeAI's features.Some advanced features are only available
+through the CLI, though they eventually find their way into the WebUI.
 
-Unlike the `txt2img.py` and `img2img.py` scripts provided in the original
-[CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion) source
-code repository, the time-consuming initialization of the AI model
-initialization only happens once. After that image generation from the
-command-line interface is very fast.
+The CLI is accessible from the `invoke.sh`/`invoke.bat` launcher by
+selecting option (1). Alternatively, it can be launched directly from
+the command line by activating the InvokeAI environment and giving the
+command:
+
+```bash
+invokeai
+```
+
+After some startup messages, you will be presented with the `invoke> `
+prompt. Here you can type prompts to generate images and issue other
+commands to load and manipulate generative models. The CLI has a large
+number of command-line options that control its behavior. To get a
+concise summary of the options, call `invokeai` with the `--help` argument:
+
+```bash
+invokeai --help
+```
 
 The script uses the readline library to allow for in-line editing, command
 history (++up++ and ++down++), autocompletion, and more. To help keep track of
 which prompts generated which images, the script writes a log file of image
 names and prompts to the selected output directory.
 
-In addition, as of version 1.02, it also writes the prompt into the PNG file's
-metadata where it can be retrieved using `scripts/images2prompt.py`
-
-The script is confirmed to work on Linux, Windows and Mac systems.
-
-!!! note
-
-    This script runs from the command-line or can be used as a Web application. The Web GUI is
-    currently rudimentary, but a much better replacement is on its way.
+Here is a typical session
 
 ```bash
-(invokeai) ~/stable-diffusion$ python3 ./scripts/invoke.py
+PS1:C:\Users\fred> invokeai
 * Initializing, be patient...
-Loading model from models/ldm/text2img-large/model.ckpt
-(...more initialization messages...)
-
-* Initialization done! Awaiting your command...
+* Initializing, be patient...
+>> Initialization file /home/lstein/invokeai/invokeai.init found. Loading...
+>> Internet connectivity is True
+>> InvokeAI, version 2.3.0-rc5
+>> InvokeAI runtime directory is "/home/lstein/invokeai"
+>> GFPGAN Initialized
+>> CodeFormer Initialized
+>> ESRGAN Initialized
+>> Using device_type cuda
+>> xformers memory-efficient attention is available and enabled
+     (...more initialization messages...)
+* Initialization done! Awaiting your command (-h for help, 'q' to quit)
 invoke> ashley judd riding a camel -n2 -s150
 Outputs:
    outputs/img-samples/00009.png: "ashley judd riding a camel" -n2 -s150 -S 416354203
@@ -47,27 +60,15 @@ invoke> "there's a fly in my soup" -n6 -g
     outputs/img-samples/00011.png: "there's a fly in my soup" -n6 -g -S 2685670268
     seeds for individual rows: [2685670268, 1216708065, 2335773498, 822223658, 714542046, 3395302430]
 invoke> q
-
-# this shows how to retrieve the prompt stored in the saved image's metadata
-(invokeai) ~/stable-diffusion$ python ./scripts/images2prompt.py outputs/img_samples/*.png
-00009.png: "ashley judd riding a camel" -s150 -S 416354203
-00010.png: "ashley judd riding a camel" -s150 -S 1362479620
-00011.png: "there's a fly in my soup" -n6 -g -S 2685670268
 ```
 
 ![invoke-py-demo](../assets/dream-py-demo.png)
 
-The `invoke>` prompt's arguments are pretty much identical to those used in the
-Discord bot, except you don't need to type `!invoke` (it doesn't hurt if you
-do). A significant change is that creation of individual images is now the
-default unless `--grid` (`-g`) is given. A full list is given in
-[List of prompt arguments](#list-of-prompt-arguments).
-
 ## Arguments
 
-The script itself also recognizes a series of command-line switches that will
-change important global defaults, such as the directory for image outputs and
-the location of the model weight files.
+The script recognizes a series of command-line switches that will
+change important global defaults, such as the directory for image
+outputs and the location of the model weight files.
 
 ### List of arguments recognized at the command line
 
@@ -82,10 +83,14 @@ overridden on a per-prompt basis (see
 | `--outdir <path>`                         | `-o<path>`                                | `outputs/img_samples`                          | Location for generated images.                                                                       |
 | `--prompt_as_dir`                         | `-p`                                      | `False`                                        | Name output directories using the prompt text.                                                       |
 | `--from_file <path>`                      |                                           | `None`                                         | Read list of prompts from a file. Use `-` to read from standard input                                |
-| `--model <modelname>`                     |                                           | `stable-diffusion-1.4`                         | Loads model specified in configs/models.yaml. Currently one of "stable-diffusion-1.4" or "laion400m" |
-| `--full_precision`                        | `-F`                                      | `False`                                        | Run in slower full-precision mode. Needed for Macintosh M1/M2 hardware and some older video cards.   |
+| `--model <modelname>`                     |                                           | `stable-diffusion-1.5`                         | Loads the initial model specified in configs/models.yaml. |
+| `--ckpt_convert `           |                                                         | `False`                                        | If provided both .ckpt and .safetensors files will be auto-converted into diffusers format in memory |
+| `--autoconvert <path>`                    |                          | `None`                                        | On startup, scan the indicated directory for new .ckpt/.safetensor files and automatically convert and import them |
+| `--precision`                             |                                           | `fp16`                                         | Provide `fp32` for full precision mode, `fp16` for half-precision. `fp32` needed for Macintoshes and some NVidia cards. |
 | `--png_compression <0-9>`                 | `-z<0-9>`                                 | `6`                                            | Select level of compression for output files, from 0 (no compression) to 9 (max compression)         |
 | `--safety-checker`                        |                                           | `False`                                        | Activate safety checker for NSFW and other potentially disturbing imagery                            |
+| `--patchmatch`, `--no-patchmatch`                 |                                   | `--patchmatch`                                        | Load/Don't load the PatchMatch inpainting extension    |
+| `--xformers`, `--no-xformers`                 |                                   | `--xformers`                                        | Load/Don't load the Xformers memory-efficient attention module (CUDA only)    |
 | `--web`                                   |                                           | `False`                                        | Start in web server mode                                                                             |
 | `--host <ip addr>`                        |                                           | `localhost`                                    | Which network interface web server should listen on. Set to 0.0.0.0 to listen on any.                |
 | `--port <port>`                           |                                           | `9090`                                         | Which port web server should listen for requests on.                                                 |
@@ -109,6 +114,7 @@ overridden on a per-prompt basis (see
 
     | Argument           |  Shortcut  |  Default            |  Description |
     |--------------------|------------|---------------------|--------------|
+    | `--full_precision`  |             | `False`                | Same as `--precision=fp32`|
     | `--weights <path>`   |            | `None`                | Path to weights file; use `--model stable-diffusion-1.4` instead |
     | `--laion400m`        | `-l`         | `False`               | Use older LAION400m weights; use `--model=laion400m` instead |
 
@@ -336,8 +342,10 @@ useful for debugging the text masking process prior to inpainting with the
 
 ### Model selection and importation
 
-The CLI allows you to add new models on the fly, as well as to switch among them
-rapidly without leaving the script.
+The CLI allows you to add new models on the fly, as well as to switch
+among them rapidly without leaving the script. There are several
+different model formats, each described in the [Model Installation
+Guide](../installation/050_INSTALLING_MODELS.md).
 
 #### `!models`
 
@@ -347,9 +355,9 @@ model is bold-faced
 Example:
 
 <pre>
-laion400m                 not loaded  <no description>
-<b>stable-diffusion-1.4          active  Stable Diffusion v1.4</b>
-waifu-diffusion           not loaded  Waifu Diffusion v1.3
+inpainting-1.5            not loaded  Stable Diffusion inpainting model
+<b>stable-diffusion-1.5          active  Stable Diffusion v1.5</b>
+waifu-diffusion           not loaded  Waifu Diffusion v1.4
 </pre>
 
 #### `!switch <model>`
@@ -361,43 +369,30 @@ Note how the second column of the `!models` table changes to `cached` after a
 model is first loaded, and that the long initialization step is not needed when
 loading a cached model.
 
-<pre>
-invoke> !models
-laion400m                 not loaded  <no description>
-<b>stable-diffusion-1.4          cached  Stable Diffusion v1.4</b>
-waifu-diffusion               active  Waifu Diffusion v1.3
+#### `!import_model <hugging_face_repo_ID>`
 
-invoke> !switch waifu-diffusion
->> Caching model stable-diffusion-1.4 in system RAM
->> Loading waifu-diffusion from models/ldm/stable-diffusion-v1/model-epoch08-float16.ckpt
-   | LatentDiffusion: Running in eps-prediction mode
-   | DiffusionWrapper has 859.52 M params.
-   | Making attention of type 'vanilla' with 512 in_channels
-   | Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
-   | Making attention of type 'vanilla' with 512 in_channels
-   | Using faster float16 precision
->> Model loaded in 18.24s
->> Max VRAM used to load the model: 2.17G
->> Current VRAM usage:2.17G
->> Setting Sampler to k_lms
+This imports and installs a `diffusers`-style model that is stored on
+the [HuggingFace Web Site](https://huggingface.co). You can look up
+any [Stable Diffusion diffusers
+model](https://huggingface.co/models?library=diffusers) and install it
+with a command like the following:
 
-invoke> !models
-laion400m                 not loaded  <no description>
-stable-diffusion-1.4          cached  Stable Diffusion v1.4
-<b>waifu-diffusion               active  Waifu Diffusion v1.3</b>
+```bash
+!import_model prompthero/openjourney
+```
 
-invoke> !switch stable-diffusion-1.4
->> Caching model waifu-diffusion in system RAM
->> Retrieving model stable-diffusion-1.4 from system RAM cache
->> Setting Sampler to k_lms
+#### `!import_model <path/to/diffusers/directory>`
 
-invoke> !models
-laion400m                 not loaded  <no description>
-<b>stable-diffusion-1.4          active  Stable Diffusion v1.4</b>
-waifu-diffusion               cached  Waifu Diffusion v1.3
-</pre>
+If you have a copy of a `diffusers`-style model saved to disk, you can
+import it by passing the path to model's top-level directory.
 
-#### `!import_model <path/to/model/weights>`
+#### `!import_model <url>`
+
+For a `.ckpt` or `.safetensors` file, if you have a direct download
+URL for the file, you can provide it to `!import_model` and the file
+will be downloaded and installed for you.
+
+#### `!import_model <path/to/model/weights.ckpt>`
 
 This command imports a new model weights file into InvokeAI, makes it available
 for image generation within the script, and writes out the configuration for the
@@ -417,35 +412,12 @@ below, the bold-faced text shows what the user typed in with the exception of
 the width, height and configuration file paths, which were filled in
 automatically.
 
-Example:
+#### `!import_model <path/to/directory_of_models>`
 
-<pre>
-invoke> <b>!import_model models/ldm/stable-diffusion-v1/model-epoch08-float16.ckpt</b>
->> Model import in process. Please enter the values needed to configure this model:
-
-Name for this model: <b>waifu-diffusion</b>
-Description of this model: <b>Waifu Diffusion v1.3</b>
-Configuration file for this model: <b>configs/stable-diffusion/v1-inference.yaml</b>
-Default image width: <b>512</b>
-Default image height: <b>512</b>
->> New configuration:
-waifu-diffusion:
-  config: configs/stable-diffusion/v1-inference.yaml
-  description: Waifu Diffusion v1.3
-  height: 512
-  weights: models/ldm/stable-diffusion-v1/model-epoch08-float16.ckpt
-  width: 512
-OK to import [n]? <b>y</b>
->> Caching model stable-diffusion-1.4 in system RAM
->> Loading waifu-diffusion from models/ldm/stable-diffusion-v1/model-epoch08-float16.ckpt
-   | LatentDiffusion: Running in eps-prediction mode
-   | DiffusionWrapper has 859.52 M params.
-   | Making attention of type 'vanilla' with 512 in_channels
-   | Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
-   | Making attention of type 'vanilla' with 512 in_channels
-   | Using faster float16 precision
-invoke>
-</pre>
+If you provide the path of a directory that contains one or more
+`.ckpt` or `.safetensors` files, the CLI will scan the directory and
+interactively offer to import the models it finds there. Also see the
+`--autoconvert` command-line option.
 
 #### `!edit_model <name_of_model>`
 
@@ -478,11 +450,6 @@ OK to import [n]? y
 >> Loading waifu-diffusion from models/ldm/stable-diffusion-v1/model-epoch10-float16.ckpt
 ...
 </pre>
-
-======= invoke> !fix 000017.4829112.gfpgan-00.png --embiggen 3 ...lots of
-text... Outputs: [2] outputs/img-samples/000018.2273800735.embiggen-00.png: !fix
-"outputs/img-samples/000017.243781548.gfpgan-00.png" -s 50 -S 2273800735 -W 512
--H 512 -C 7.5 -A k_lms --embiggen 3.0 0.75 0.25 ```
 
 ### History processing
 

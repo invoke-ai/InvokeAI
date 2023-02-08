@@ -1,19 +1,20 @@
 import {
   FormControl,
+  FormControlProps,
+  FormLabel,
+  FormLabelProps,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
   NumberInput,
   NumberInputField,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
-  NumberInputProps,
-  FormLabel,
   NumberInputFieldProps,
+  NumberInputProps,
   NumberInputStepperProps,
-  FormControlProps,
-  FormLabelProps,
-  TooltipProps,
   Tooltip,
+  TooltipProps,
 } from '@chakra-ui/react';
-import _ from 'lodash';
+import { clamp } from 'lodash';
+
 import { FocusEvent, useEffect, useState } from 'react';
 
 const numberStringRegex = /^-?(0\.)?\.?$/;
@@ -104,7 +105,7 @@ const IAINumberInput = (props: Props) => {
    * clamp it on blur and floor it if needed.
    */
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
-    const clamped = _.clamp(
+    const clamped = clamp(
       isInteger ? Math.floor(Number(e.target.value)) : Number(e.target.value),
       min,
       max

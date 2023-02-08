@@ -1,0 +1,5 @@
+dist/
+.husky/
+node_modules/
+patches/
+public/

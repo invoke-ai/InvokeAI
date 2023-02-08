@@ -1,10 +1,11 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
-import _ from 'lodash';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
-import roundToHundreth from '../util/roundToHundreth';
+import { isEqual } from 'lodash';
+
 import { useTranslation } from 'react-i18next';
+import roundToHundreth from '../util/roundToHundreth';
+import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
 
 const selector = createSelector(
   [canvasSelector],
@@ -22,6 +23,7 @@ const selector = createSelector(
       shouldShowCanvasDebugInfo,
       layer,
       boundingBoxScaleMethod,
+      shouldPreserveMaskedArea,
     } = canvas;
 
     let boundingBoxColor = 'inherit';
@@ -55,11 +57,12 @@ const selector = createSelector(
       shouldShowCanvasDebugInfo,
       shouldShowBoundingBox: boundingBoxScaleMethod !== 'auto',
       shouldShowScaledBoundingBox: boundingBoxScaleMethod !== 'none',
+      shouldPreserveMaskedArea,
     };
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );
@@ -78,6 +81,7 @@ const IAICanvasStatusText = () => {
     canvasScaleString,
     shouldShowCanvasDebugInfo,
     shouldShowBoundingBox,
+    shouldPreserveMaskedArea,
   } = useAppSelector(selector);
 
   const { t } = useTranslation();
@@ -90,6 +94,15 @@ const IAICanvasStatusText = () => {
         }}
       >{`${t('unifiedcanvas:activeLayer')}: ${activeLayerString}`}</div>
       <div>{`${t('unifiedcanvas:canvasScale')}: ${canvasScaleString}%`}</div>
+      {shouldPreserveMaskedArea && (
+        <div
+          style={{
+            color: 'var(--status-working-color)',
+          }}
+        >
+          Preserve Masked Area: On
+        </div>
+      )}
       {shouldShowBoundingBox && (
         <div
           style={{

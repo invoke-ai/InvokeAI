@@ -1,6 +1,5 @@
 import { useAppDispatch } from 'app/storeHooks';
 import Konva from 'konva';
-import _ from 'lodash';
 import {
   commitColorPickerColor,
   setColorPickerColor,
