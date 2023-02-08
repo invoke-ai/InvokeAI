@@ -83,7 +83,7 @@ jobs:
           context: .
           file: ${{ env.DOCKERFILE }}
           platforms: ${{ env.PLATFORMS }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/tags/*' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: PIP_EXTRA_INDEX_URL=${{ matrix.pip-extra-index-url }}
