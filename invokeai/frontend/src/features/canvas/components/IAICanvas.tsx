@@ -1,37 +1,38 @@
-import { useCallback, useRef } from 'react';
-import Konva from 'konva';
-import { Layer, Stage } from 'react-konva';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import {
   canvasSelector,
   isStagingSelector,
 } from 'features/canvas/store/canvasSelectors';
-import IAICanvasMaskLines from './IAICanvasMaskLines';
-import IAICanvasToolPreview from './IAICanvasToolPreview';
+import Konva from 'konva';
+import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
-import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
+import { isEqual } from 'lodash';
+
+import { useCallback, useRef } from 'react';
+import { Layer, Stage } from 'react-konva';
+import useCanvasDragMove from '../hooks/useCanvasDragMove';
 import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
-import _ from 'lodash';
-import { createSelector } from '@reduxjs/toolkit';
-import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
-import useCanvasWheel from '../hooks/useCanvasZoom';
 import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
-import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
 import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
 import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
-import useCanvasDragMove from '../hooks/useCanvasDragMove';
-import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
-import IAICanvasGrid from './IAICanvasGrid';
-import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
-import IAICanvasStatusText from './IAICanvasStatusText';
-import IAICanvasStagingArea from './IAICanvasStagingArea';
-import IAICanvasStagingAreaToolbar from './IAICanvasStagingAreaToolbar';
+import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
+import useCanvasWheel from '../hooks/useCanvasZoom';
 import {
   setCanvasBaseLayer,
   setCanvasStage,
 } from '../util/konvaInstanceProvider';
-import { KonvaEventObject } from 'konva/lib/Node';
 import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
+import IAICanvasGrid from './IAICanvasGrid';
+import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
+import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
+import IAICanvasMaskLines from './IAICanvasMaskLines';
+import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
+import IAICanvasStagingArea from './IAICanvasStagingArea';
+import IAICanvasStagingAreaToolbar from './IAICanvasStagingAreaToolbar';
+import IAICanvasStatusText from './IAICanvasStatusText';
+import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
+import IAICanvasToolPreview from './IAICanvasToolPreview';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -82,7 +83,7 @@ const selector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

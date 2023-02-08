@@ -1,9 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import React from 'react';
-import _ from 'lodash';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
+import { isEqual } from 'lodash';
+
 import { useTranslation } from 'react-i18next';
 
 const cursorPositionSelector = createSelector(
@@ -23,7 +23,7 @@ const cursorPositionSelector = createSelector(
   },
   {
     memoizeOptions: {
-      resultEqualityCheck: _.isEqual,
+      resultEqualityCheck: isEqual,
     },
   }
 );

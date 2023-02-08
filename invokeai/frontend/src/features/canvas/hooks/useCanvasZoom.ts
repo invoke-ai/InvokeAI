@@ -1,14 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
-import Konva from 'konva';
-import { KonvaEventObject } from 'konva/lib/Node';
-import _ from 'lodash';
-import { MutableRefObject, useCallback } from 'react';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setStageCoordinates,
   setStageScale,
 } from 'features/canvas/store/canvasSlice';
+import Konva from 'konva';
+import { KonvaEventObject } from 'konva/lib/Node';
+import { clamp, isEqual } from 'lodash';
+
+import { MutableRefObject, useCallback } from 'react';
 import {
   CANVAS_SCALE_BY,
   MAX_CANVAS_SCALE,
@@ -24,7 +25,7 @@ const selector = createSelector(
       stageScale,
     };
   },
-  { memoizeOptions: { resultEqualityCheck: _.isEqual } }
+  { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
 const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
@@ -55,7 +56,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
         delta = -delta;
       }
 
-      const newScale = _.clamp(
+      const newScale = clamp(
         stageScale * CANVAS_SCALE_BY ** delta,
         MIN_CANVAS_SCALE,
         MAX_CANVAS_SCALE

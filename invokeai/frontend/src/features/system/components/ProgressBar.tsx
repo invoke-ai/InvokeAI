@@ -1,12 +1,12 @@
 import { Progress } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash';
 import { useAppSelector } from 'app/storeHooks';
-import { RootState } from 'app/store';
 import { SystemState } from 'features/system/store/systemSlice';
+import { isEqual } from 'lodash';
+import { systemSelector } from '../store/systemSelectors';
 
-const systemSelector = createSelector(
-  (state: RootState) => state.system,
+const progressBarSelector = createSelector(
+  systemSelector,
   (system: SystemState) => {
     return {
       isProcessing: system.isProcessing,
@@ -22,7 +22,7 @@ const systemSelector = createSelector(
 
 const ProgressBar = () => {
   const { isProcessing, currentStep, totalSteps, currentStatusHasSteps } =
-    useAppSelector(systemSelector);
+    useAppSelector(progressBarSelector);
 
   const value = currentStep ? Math.round((currentStep * 100) / totalSteps) : 0;
 

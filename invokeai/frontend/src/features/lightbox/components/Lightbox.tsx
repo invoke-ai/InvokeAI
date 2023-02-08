@@ -4,14 +4,14 @@ import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import CurrentImageButtons from 'features/gallery/components/CurrentImageButtons';
 import { imagesSelector } from 'features/gallery/components/CurrentImagePreview';
+import ImageGallery from 'features/gallery/components/ImageGallery';
+import ImageMetadataViewer from 'features/gallery/components/ImageMetaDataViewer/ImageMetadataViewer';
 import {
   selectNextImage,
   selectPrevImage,
 } from 'features/gallery/store/gallerySlice';
-import ImageGallery from 'features/gallery/components/ImageGallery';
-import ImageMetadataViewer from 'features/gallery/components/ImageMetaDataViewer/ImageMetadataViewer';
-import { setIsLightBoxOpen } from 'features/options/store/optionsSlice';
-import React, { useState } from 'react';
+import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
+import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { BiExit } from 'react-icons/bi';
 import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
@@ -20,7 +20,7 @@ import ReactPanZoom from './ReactPanZoom';
 export default function Lightbox() {
   const dispatch = useAppDispatch();
   const isLightBoxOpen = useAppSelector(
-    (state: RootState) => state.options.isLightBoxOpen
+    (state: RootState) => state.lightbox.isLightboxOpen
   );
 
   const {
@@ -52,7 +52,7 @@ export default function Lightbox() {
   useHotkeys(
     'Esc',
     () => {
-      if (isLightBoxOpen) dispatch(setIsLightBoxOpen(false));
+      if (isLightBoxOpen) dispatch(setIsLightboxOpen(false));
     },
     [isLightBoxOpen]
   );
@@ -64,7 +64,7 @@ export default function Lightbox() {
         aria-label="Exit Viewer"
         className="lightbox-close-btn"
         onClick={() => {
-          dispatch(setIsLightBoxOpen(false));
+          dispatch(setIsLightboxOpen(false));
         }}
         fontSize={20}
       />

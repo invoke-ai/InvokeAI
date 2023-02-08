@@ -4,6 +4,10 @@ import sys
 import shlex
 import traceback
 
+from argparse import Namespace
+from pathlib import Path
+from typing import Optional, Union
+
 if sys.platform == "darwin":
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
@@ -16,10 +20,10 @@ from ldm.invoke.pngwriter import PngWriter, retrieve_metadata, write_metadata
 from ldm.invoke.image_util import make_grid
 from ldm.invoke.log import write_log
 from ldm.invoke.model_manager import ModelManager
-from pathlib import Path
-from argparse import Namespace
-import pyparsing
+
+import click  # type: ignore
 import ldm.invoke
+import pyparsing  # type: ignore
 
 # global used in multiple functions (fix)
 infile = None
@@ -69,7 +73,7 @@ def main():
 
     # these two lines prevent a horrible warning message from appearing
     # when the frozen CLIP tokenizer is imported
-    import transformers
+    import transformers  # type: ignore
     transformers.logging.set_verbosity_error()
     import diffusers
     diffusers.logging.set_verbosity_error()
@@ -572,7 +576,7 @@ def set_default_output_dir(opt:Args, completer:Completer):
     completer.set_default_dir(opt.outdir)
 
 
-def import_model(model_path:str, gen, opt, completer):
+def import_model(model_path: str, gen, opt, completer):
     '''
     model_path can be (1) a URL to a .ckpt file; (2) a local .ckpt file path; or
     (3) a huggingface repository id
@@ -581,12 +585,28 @@ def import_model(model_path:str, gen, opt, completer):
 
     if model_path.startswith(('http:','https:','ftp:')):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
+
     elif os.path.exists(model_path) and model_path.endswith(('.ckpt','.safetensors')) and os.path.isfile(model_path):
         model_name = import_ckpt_model(model_path, gen, opt, completer)
-    elif re.match('^[\w.+-]+/[\w.+-]+$',model_path):
-        model_name = import_diffuser_model(model_path, gen, opt, completer)
+
     elif os.path.isdir(model_path):
-        model_name = import_diffuser_model(Path(model_path), gen, opt, completer)
+
+        # Allow for a directory containing multiple models.
+        models = list(Path(model_path).rglob('*.ckpt')) + list(Path(model_path).rglob('*.safetensors'))
+
+        if models:
+            # Only the last model name will be used below.
+            for model in sorted(models):
+
+                if click.confirm(f'Import {model.stem} ?', default=True):
+                    model_name = import_ckpt_model(model, gen, opt, completer)
+                    print()
+        else:
+            model_name = import_diffuser_model(Path(model_path), gen, opt, completer)
+
+    elif re.match(r'^[\w.+-]+/[\w.+-]+$', model_path):
+        model_name = import_diffuser_model(model_path, gen, opt, completer)
+
     else:
         print(f'** {model_path} is neither the path to a .ckpt file nor a diffusers repository id. Can\'t import.')
 
@@ -604,7 +624,7 @@ def import_model(model_path:str, gen, opt, completer):
     completer.update_models(gen.model_manager.list_models())
     print(f'>> {model_name} successfully installed')
 
-def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
+def import_diffuser_model(path_or_repo: Union[Path, str], gen, _, completer) -> Optional[str]:
     manager = gen.model_manager
     default_name = Path(path_or_repo).stem
     default_description = f'Imported model {default_name}'
@@ -627,7 +647,7 @@ def import_diffuser_model(path_or_repo:str, gen, opt, completer)->str:
         return None
     return model_name
 
-def import_ckpt_model(path_or_url:str, gen, opt, completer)->str:
+def import_ckpt_model(path_or_url: Union[Path, str], gen, opt, completer) -> Optional[str]:
     manager = gen.model_manager
     default_name = Path(path_or_url).stem
     default_description = f'Imported model {default_name}'
@@ -692,10 +712,12 @@ def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_des
 def optimize_model(model_name_or_path:str, gen, opt, completer):
     manager = gen.model_manager
     ckpt_path = None
+    original_config_file = None
 
     if (model_info := manager.model_info(model_name_or_path)):
         if 'weights' in model_info:
             ckpt_path = Path(model_info['weights'])
+            original_config_file = Path(model_info['config'])
             model_name = model_name_or_path
             model_description = model_info['description']
         else:
@@ -703,11 +725,17 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
             return
     elif os.path.exists(model_name_or_path):
         ckpt_path = Path(model_name_or_path)
-        model_name,model_description = _get_model_name_and_desc(
+        model_name, model_description = _get_model_name_and_desc(
             manager,
             completer,
             ckpt_path.stem,
             f'Converted model {ckpt_path.stem}'
+        )
+        is_inpainting = input('Is this an inpainting model? [n] ').startswith(('y','Y'))
+        original_config_file = Path(
+            'configs',
+            'stable-diffusion',
+            'v1-inpainting-inference.yaml' if is_inpainting else 'v1-inference.yaml'
         )
     else:
         print(f'** {model_name_or_path} is neither an existing model nor the path to a .ckpt file')
@@ -715,6 +743,9 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
 
     if not ckpt_path.is_absolute():
         ckpt_path = Path(Globals.root,ckpt_path)
+
+    if original_config_file and not original_config_file.is_absolute():
+        original_config_file = Path(Globals.root,original_config_file)
 
     diffuser_path = Path(Globals.root, 'models',Globals.converted_ckpts_dir,model_name)
     if diffuser_path.exists():
@@ -731,6 +762,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
         model_name=model_name,
         model_description=model_description,
         vae = vae,
+        original_config_file = original_config_file,
         commit_to_conf=opt.conf,
     )
     if not new_config:

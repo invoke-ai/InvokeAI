@@ -16,10 +16,6 @@ title: Installing with Docker
 
     For general use, install locally to leverage your machine's GPU.
 
-!!! tip "For running on a cloud instance/service"
-
-    Check out the [Running InvokeAI in the cloud with Docker](#running-invokeai-in-the-cloud-with-docker) section below
-
 ## Why containers?
 
 They provide a flexible, reliable way to build and deploy InvokeAI. You'll also
@@ -78,38 +74,40 @@ Some Suggestions of variables you may want to change besides the Token:
 
 <figure markdown>
 
-| Environment-Variable | Default value                   | Description                                                                                  |
-| -------------------- | -----------------------------   | -------------------------------------------------------------------------------------------- |
-| `HUGGINGFACE_TOKEN`  | No default, but **required**!   | This is the only **required** variable, without it you can't download the huggingface models |
-| `REPOSITORY_NAME`    | The Basename of the Repo folder | This name will used as the container repository/image name                                   |
-| `VOLUMENAME`         | `${REPOSITORY_NAME,,}_data`     | Name of the Docker Volume where model files will be stored                                   |
-| `ARCH`               | arch of the build machine       | can be changed if you want to build the image for another arch                               |
-| `INVOKEAI_TAG`       | latest                          | the Container Repository / Tag which will be used                                            |
-| `PIP_REQUIREMENTS`   | `requirements-lin-cuda.txt`     | the requirements file to use (from `environments-and-requirements`)                          |
-| `CONTAINER_FLAVOR`   | cuda                            | the flavor of the image, which can be changed if you build f.e. with amd requirements file.  |
-| `INVOKE_DOCKERFILE`  | `docker-build/Dockerfile`       | the Dockerfile which should be built, handy for development                                  |
+| Environment-Variable <img width="220" align="right"/> | Default value <img width="360" align="right"/> | Description                                                                                                                                                                                       |
+| ----------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HUGGING_FACE_HUB_TOKEN`                              | No default, but **required**!                  | This is the only **required** variable, without it you can't download the huggingface models                                                                                                      |
+| `REPOSITORY_NAME`                                     | The Basename of the Repo folder                | This name will used as the container repository/image name                                                                                                                                        |
+| `VOLUMENAME`                                          | `${REPOSITORY_NAME,,}_data`                    | Name of the Docker Volume where model files will be stored                                                                                                                                        |
+| `ARCH`                                                | arch of the build machine                      | Can be changed if you want to build the image for another arch                                                                                                                                    |
+| `CONTAINER_REGISTRY`                                  | ghcr.io                                        | Name of the Container Registry to use for the full tag                                                                                                                                            |
+| `CONTAINER_REPOSITORY`                                | `$(whoami)/${REPOSITORY_NAME}`                 | Name of the Container Repository                                                                                                                                                                  |
+| `CONTAINER_FLAVOR`                                    | `cuda`                                         | The flavor of the image to built, available options are `cuda`, `rocm` and `cpu`. If you choose `rocm` or `cpu`, the extra-index-url will be selected automatically, unless you set one yourself. |
+| `CONTAINER_TAG`                                       | `${INVOKEAI_BRANCH##*/}-${CONTAINER_FLAVOR}`   | The Container Repository / Tag which will be used                                                                                                                                                 |
+| `INVOKE_DOCKERFILE`                                   | `Dockerfile`                                   | The Dockerfile which should be built, handy for development                                                                                                                                       |
+| `PIP_EXTRA_INDEX_URL`                                 |                                                | If you want to use a custom pip-extra-index-url                                                                                                                                                   |
 
 </figure>
 
 #### Build the Image
 
-I provided a build script, which is located in `docker-build/build.sh` but still
-needs to be executed from the Repository root.
+I provided a build script, which is located next to the Dockerfile in
+`docker/build.sh`. It can be executed from repository root like this:
 
 ```bash
-./docker-build/build.sh
+./docker/build.sh
 ```
 
 The build Script not only builds the container, but also creates the docker
-volume if not existing yet, or if empty it will just download the models.
+volume if not existing yet.
 
 #### Run the Container
 
 After the build process is done, you can run the container via the provided
-`docker-build/run.sh` script
+`docker/run.sh` script
 
 ```bash
-./docker-build/run.sh
+./docker/run.sh
 ```
 
 When used without arguments, the container will start the webserver and provide
@@ -119,7 +117,7 @@ also do so.
 !!! example "run script example"
 
     ```bash
-    ./docker-build/run.sh "banana sushi" -Ak_lms -S42 -s10
+    ./docker/run.sh "banana sushi" -Ak_lms -S42 -s10
     ```
 
     This would generate the legendary "banana sushi" with Seed 42, k_lms Sampler and 10 steps.
@@ -130,16 +128,18 @@ also do so.
 
 ## Running the container on your GPU
 
-If you have an Nvidia GPU, you can enable InvokeAI to run on the GPU by running the container with an extra
-environment variable to enable GPU usage and have the process run much faster:
+If you have an Nvidia GPU, you can enable InvokeAI to run on the GPU by running
+the container with an extra environment variable to enable GPU usage and have
+the process run much faster:
 
 ```bash
-GPU_FLAGS=all ./docker-build/run.sh
+GPU_FLAGS=all ./docker/run.sh
 ```
 
 This passes the `--gpus all` to docker and uses the GPU.
 
-If you don't have a GPU (or your host is not yet setup to use it) you will see a message like this:
+If you don't have a GPU (or your host is not yet setup to use it) you will see a
+message like this:
 
 `docker: Error response from daemon: could not select device driver "" with capabilities: [[gpu]].`
 
@@ -147,84 +147,8 @@ You can use the full set of GPU combinations documented here:
 
 https://docs.docker.com/config/containers/resource_constraints/#gpu
 
-For example, use `GPU_FLAGS=device=GPU-3a23c669-1f69-c64e-cf85-44e9b07e7a2a` to choose a specific device identified by a UUID.
-
-## Running InvokeAI in the cloud with Docker
-
-We offer an optimized Ubuntu-based image that has been well-tested in cloud deployments. Note: it also works well locally on Linux x86_64 systems with an Nvidia GPU. It *may* also work on Windows under WSL2 and on Intel Mac (not tested).
-
-An advantage of this method is that it does not need any local setup or additional dependencies.
-
-See the `docker-build/Dockerfile.cloud` file to familizarize yourself with the image's content.
-
-### Prerequisites
-
-- a `docker` runtime
-- `make` (optional but helps for convenience)
-- Huggingface token to download models, or an existing InvokeAI runtime directory from a previous installation
-
- Neither local Python nor any dependencies are required. If you don't have `make` (part of `build-essentials` on Ubuntu), or do not wish to install it, the commands from the `docker-build/Makefile` are readily adaptable to be executed directly.
-
-### Building and running the image locally
-
-1. Clone this repo and `cd docker-build`
-1. `make build` - this will build the image. (This does *not* require a GPU-capable system).
-1. _(skip this step if you already have a complete InvokeAI runtime directory)_
-    - `make configure` (This does *not* require a GPU-capable system)
-    - this will create a local cache of models and configs (a.k.a the _runtime dir_)
-    - enter your Huggingface token when prompted
-1. `make web`
-1. Open the `http://localhost:9090` URL in your browser, and enjoy the banana sushi!
-
-To use InvokeAI on the cli, run `make cli`. To open a Bash shell in the container for arbitraty advanced use, `make shell`.
-
-#### Building and running without `make`
-
-(Feel free to adapt paths such as `${HOME}/invokeai` to your liking, and modify the CLI arguments as necessary).
-
-!!! example "Build the image and configure the runtime directory"
-    ```Shell
-    cd docker-build
-
-    DOCKER_BUILDKIT=1 docker build -t local/invokeai:latest -f Dockerfile.cloud ..
-
-    docker run --rm -it -v ${HOME}/invokeai:/mnt/invokeai local/invokeai:latest -c "python scripts/configure_invokeai.py"
-    ```
-
-!!! example "Run the web server"
-    ```Shell
-    docker run --runtime=nvidia --gpus=all --rm -it -v ${HOME}/invokeai:/mnt/invokeai -p9090:9090 local/invokeai:latest
-    ```
-
-    Access the Web UI at http://localhost:9090
-
-!!! example "Run the InvokeAI interactive CLI"
-    ```
-    docker run --runtime=nvidia --gpus=all --rm -it -v ${HOME}/invokeai:/mnt/invokeai local/invokeai:latest -c "python scripts/invoke.py"
-    ```
-
-### Running the image in the cloud
-
-This image works anywhere you can run a container with a mounted Docker volume. You may either build this image on a cloud instance, or build and push it to your Docker registry. To manually run this on a cloud instance (such as AWS EC2, GCP or Azure VM):
-
-1. build this image either in the cloud (you'll need to pull the repo), or locally
-1. `docker tag` it as `your-registry/invokeai` and push to your registry (i.e. Dockerhub)
-1. `docker pull` it on your cloud instance
-1. configure the runtime directory as per above example, using `docker run ... configure_invokeai.py` script
-1. use either one of the `docker run` commands above, substituting the image name for your own image.
-
-To run this on Runpod, please refer to the following Runpod template: https://www.runpod.io/console/gpu-secure-cloud?template=vm19ukkycf (you need a Runpod subscription). When launching the template, feel free to set the image to pull your own build.
-
-The template's `README` provides ample detail, but at a high level, the process is as follows:
-
-1. create a pod using this Docker image
-1. ensure the pod has an `INVOKEAI_ROOT=<path_to_your_persistent_volume>` environment variable, and that it corresponds to the path to your pod's persistent volume mount
-1. Run the pod with `sleep infinity` as the Docker command
-1. Use Runpod basic SSH to connect to the pod, and run `python scripts/configure_invokeai.py` script
-1. Stop the pod, and change the Docker command to `python scripts/invoke.py --web --host 0.0.0.0`
-1. Run the pod again, connect to your pod on HTTP port 9090, and enjoy the banana sushi!
-
-Running on other cloud providers such as Vast.ai will likely work in a similar fashion.
+For example, use `GPU_FLAGS=device=GPU-3a23c669-1f69-c64e-cf85-44e9b07e7a2a` to
+choose a specific device identified by a UUID.
 
 ---
 
@@ -240,13 +164,12 @@ Running on other cloud providers such as Vast.ai will likely work in a similar f
 If you're on a **Linux container** the `invoke` script is **automatically
 started** and the output dir set to the Docker volume you created earlier.
 
-If you're **directly on macOS follow these startup instructions**.
-With the Conda environment activated (`conda activate ldm`), run the interactive
+If you're **directly on macOS follow these startup instructions**. With the
+Conda environment activated (`conda activate ldm`), run the interactive
 interface that combines the functionality of the original scripts `txt2img` and
-`img2img`:
-Use the more accurate but VRAM-intensive full precision math because
-half-precision requires autocast and won't work.
-By default the images are saved in `outputs/img-samples/`.
+`img2img`: Use the more accurate but VRAM-intensive full precision math because
+half-precision requires autocast and won't work. By default the images are saved
+in `outputs/img-samples/`.
 
 ```Shell
 python3 scripts/invoke.py --full_precision
@@ -262,9 +185,9 @@ invoke> q
 ### Text to Image
 
 For quick (but bad) image results test with 5 steps (default 50) and 1 sample
-image. This will let you know that everything is set up correctly.
-Then increase steps to 100 or more for good (but slower) results.
-The prompt can be in quotes or not.
+image. This will let you know that everything is set up correctly. Then increase
+steps to 100 or more for good (but slower) results. The prompt can be in quotes
+or not.
 
 ```Shell
 invoke> The hulk fighting with sheldon cooper -s5 -n1
@@ -277,10 +200,9 @@ You'll need to experiment to see if face restoration is making it better or
 worse for your specific prompt.
 
 If you're on a container the output is set to the Docker volume. You can copy it
-wherever you want.
-You can download it from the Docker Desktop app, Volumes, my-vol, data.
-Or you can copy it from your Mac terminal. Keep in mind `docker cp` can't expand
-`*.png` so you'll need to specify the image file name.
+wherever you want. You can download it from the Docker Desktop app, Volumes,
+my-vol, data. Or you can copy it from your Mac terminal. Keep in mind
+`docker cp` can't expand `*.png` so you'll need to specify the image file name.
 
 On your host Mac (you can use the name of any container that mounted the
 volume):

@@ -1208,18 +1208,30 @@ class InvokeAIWebServer:
             )
 
         except KeyboardInterrupt:
+            # Clear the CUDA cache on an exception
+            self.empty_cuda_cache()
             self.socketio.emit("processingCanceled")
             raise
         except CanceledException:
+            # Clear the CUDA cache on an exception
+            self.empty_cuda_cache()
             self.socketio.emit("processingCanceled")
             pass
         except Exception as e:
+            # Clear the CUDA cache on an exception
+            self.empty_cuda_cache()
             print(e)
             self.socketio.emit("error", {"message": (str(e))})
             print("\n")
 
             traceback.print_exc()
             print("\n")
+
+    def empty_cuda_cache(self):
+        if self.generate.device.type == "cuda":
+            import torch.cuda
+
+            torch.cuda.empty_cache()
 
     def parameters_to_generated_image_metadata(self, parameters):
         try:

@@ -63,6 +63,6 @@ export const stringToSeedWeightsArray = (
   const stringPairs = string.split(',');
   const arrPairs = stringPairs.map((p) => p.split(':'));
   return arrPairs.map(
-    (p: Array<string>): Array<number> => [parseInt(p[0]), parseFloat(p[1])]
+    (p: Array<string>): Array<number> => [parseInt(p[0], 10), parseFloat(p[1])]
   );
 };
