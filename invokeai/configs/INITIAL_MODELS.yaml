@@ -1,5 +1,5 @@
 stable-diffusion-1.5:
-   description: Stable Diffusion version 1.5 weight file (4.27 GB)
+   description: Stable Diffusion version 1.5 diffusers model (4.27 GB)
    repo_id: runwayml/stable-diffusion-v1-5
    format: diffusers
    vae:
@@ -7,14 +7,14 @@ stable-diffusion-1.5:
    recommended: True
    default: True
 inpainting-1.5:
-  description: RunwayML SD 1.5 model optimized for inpainting (4.27 GB)
+  description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
   repo_id: runwayml/stable-diffusion-inpainting
   format: diffusers
   vae:
     repo_id: stabilityai/sd-vae-ft-mse
   recommended: True
 dreamlike-diffusion-1.0:
-  description: An SD 1.5 model fine tuned on high quality art by dreamlike.art
+  description: An SD 1.5 model fine tuned on high quality art by dreamlike.art, diffusers version (2.13 BG)
   format: diffusers
   repo_id: dreamlike-art/dreamlike-diffusion-1.0
   vae:
@@ -49,9 +49,8 @@ nitro-diffusion-1.0:
    vae:
      repo_id: stabilityai/sd-vae-ft-mse
    recommended: False
-
 trinart-2.0:
-   description: An SD model finetuned with ~40,000 assorted high resolution manga/anime-style pictures (2.13 GB)
+   description: An SD model finetuned with ~40,000 assorted high resolution manga/anime-style pictures, diffusers version (2.13 GB)
    repo_id: naclbit/trinart_stable_diffusion_v2
    format: diffusers
    vae:
