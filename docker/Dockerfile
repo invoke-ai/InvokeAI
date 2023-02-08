@@ -53,7 +53,6 @@ RUN \
 
 # prepare pip for buildkit cache
 ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
-ARG CONTAINER_FLAVOR=cuda
 ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
 
 # create virtual environment
@@ -67,7 +66,6 @@ COPY . .
 # install pyproject.toml
 ARG PIP_EXTRA_INDEX_URL
 ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-# ARG PIP_PACKAGE=.
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
   "${APPNAME}/bin/pip" install .
 
