@@ -195,8 +195,11 @@ export const generationSlice = createSlice({
       } else {
         state.threshold = threshold;
       }
-      if (perlin) state.perlin = perlin;
-      if (typeof perlin === 'undefined') state.perlin = 0;
+      if (typeof perlin === 'undefined') {
+        state.perlin = 0;
+      } else {
+        state.perlin = perlin;
+      }
       if (typeof seamless === 'boolean') state.seamless = seamless;
       // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
       if (width) state.width = width;
@@ -268,10 +271,16 @@ export const generationSlice = createSlice({
       if (sampler) state.sampler = sampler;
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
-      if (threshold) state.threshold = threshold;
-      if (typeof threshold === 'undefined') state.threshold = 0;
-      if (perlin) state.perlin = perlin;
-      if (typeof perlin === 'undefined') state.perlin = 0;
+      if (typeof threshold === 'undefined') {
+        state.threshold = 0;
+      } else {
+        state.threshold = threshold;
+      }
+      if (typeof perlin === 'undefined') {
+        state.perlin = 0;
+      } else {
+        state.perlin = perlin;
+      }
       if (typeof seamless === 'boolean') state.seamless = seamless;
       // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
       if (width) state.width = width;
