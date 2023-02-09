@@ -1057,7 +1057,7 @@ def load_face_restoration(opt):
             else:
                 print('>> Face restoration disabled')
             if opt.esrgan:
-                esrgan = restoration.load_esrgan(opt.esrgan_bg_tile)
+                esrgan = restoration.load_esrgan(opt.esrgan_bg_tile, opt.esrgan_denoise_str)
             else:
                 print('>> Upscaling disabled')
         else:

@@ -8,8 +8,9 @@ from PIL import Image
 from PIL.Image import Image as ImageType
 
 class ESRGAN():
-    def __init__(self, bg_tile_size=400) -> None:
+    def __init__(self, bg_tile_size=400, denoise_str=0.9) -> None:
         self.bg_tile_size = bg_tile_size
+        self.denoise_str=denoise_str
 
         if not torch.cuda.is_available():  # CPU or MPS on M1
             use_half_precision = False
@@ -26,14 +27,16 @@ class ESRGAN():
         from realesrgan import RealESRGANer
 
         model = SRVGGNetCompact(num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type='prelu')
-        model_path = os.path.join(Globals.root,'models/realesrgan/realesr-general-x4v3.pth')
+        model_path = os.path.join(Globals.root, 'models/realesrgan/realesr-general-x4v3.pth')
+        wdn_model_path = os.path.join(Globals.root, 'models/realesrgan/realesr-general-wdn-x4v3.pth')
         scale = 4
 
         bg_upsampler = RealESRGANer(
             scale=scale,
-            model_path=model_path,
+            model_path=[model_path, wdn_model_path],
             model=model,
             tile=self.bg_tile_size,
+            dni_weight=[self.denoise_str, 1 - self.denoise_str],
             tile_pad=10,
             pre_pad=0,
             half=use_half_precision,
@@ -60,7 +63,7 @@ class ESRGAN():
 
         if seed is not None:
             print(
-                f'>> Real-ESRGAN Upscaling seed:{seed} : scale:{upsampler_scale}x'
+                f'>> Real-ESRGAN Upscaling seed:{seed}, scale:{upsampler_scale}x, tile:{self.bg_tile_size}, denoise:{self.denoise_str}'
             )
         # ESRGAN outputs images with partial transparency if given RGBA images; convert to RGB
         image = image.convert("RGB")
