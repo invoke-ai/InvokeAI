@@ -444,7 +444,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
         # compute the previous noisy sample x_t -> x_t-1
-        step_output = self.scheduler.step(noise_pred, timestep, latents,
+        step_output = self.scheduler.step(noise_pred, timestep, latents.to(noise_pred.device),
                                           **conditioning_data.scheduler_args)
 
         # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
@@ -664,7 +664,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     def decode_latents(self, latents):
         # Super ugly kludge to get the vae loaded! (since `decode` isn't the forward method.)
-        self.vae()
+        try:
+            self.vae(tuple())
+        except TypeError:
+            pass  # we didn't expect it to work, just needed its side-effects.
         return super().decode_latents(latents)
 
     def debug_latents(self, latents, msg):
