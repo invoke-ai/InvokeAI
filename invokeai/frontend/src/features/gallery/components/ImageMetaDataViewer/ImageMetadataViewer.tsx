@@ -148,7 +148,6 @@ const ImageMetadataViewer = memo(
       postprocessing,
       prompt,
       sampler,
-      scale,
       seamless,
       seed,
       steps,
