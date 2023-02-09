@@ -276,8 +276,13 @@ export const generationSlice = createSlice({
       } else {
         state.threshold = threshold;
       }
-      if (perlin) state.perlin = perlin;
-      if (typeof perlin === 'undefined') state.perlin = 0;
+      if (typeof perlin === 'undefined') {
+        state.perlin = perlin;
+      }
+      else
+      {
+        state.perlin = 0;
+      }
       if (typeof seamless === 'boolean') state.seamless = seamless;
       // if (typeof hires_fix === 'boolean') state.hiresFix = hires_fix; // TODO: Needs to be fixed after reorg
       if (width) state.width = width;
