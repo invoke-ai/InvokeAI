@@ -278,9 +278,7 @@ export const generationSlice = createSlice({
       }
       if (typeof perlin === 'undefined') {
         state.perlin = 0;
-      }
-      else
-      {
+      } else {
         state.perlin = perlin;
       }
       if (typeof seamless === 'boolean') state.seamless = seamless;
