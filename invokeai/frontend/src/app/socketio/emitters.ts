@@ -93,11 +93,15 @@ const makeSocketIOEmitters = (
       dispatch(setIsProcessing(true));
 
       const {
-        postprocessing: { upscalingLevel, upscalingStrength },
+        postprocessing: {
+          upscalingLevel,
+          upscalingDenoising,
+          upscalingStrength,
+        },
       } = getState();
 
       const esrganParameters = {
-        upscale: [upscalingLevel, upscalingStrength],
+        upscale: [upscalingLevel, upscalingDenoising, upscalingStrength],
       };
       socketio.emit('runPostprocessing', imageToProcess, {
         type: 'esrgan',
