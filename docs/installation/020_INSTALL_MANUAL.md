@@ -109,20 +109,20 @@ manager, please follow these steps:
     === "Windows"
          ```bash
          cd $INVOKEAI_ROOT
-     	 python -m venv create .venv
-     	 ```
+     	   python -m venv create .venv
+     	   ```
 
 4.  Activate the new environment:
 
     === "Linux/Mac"
-    	```bash
+    	  ```bash
         source .venv/bin/activate
-    	```
+    	  ```
 
     === "Windows"
-    	```bash
+    	  ```bash
         .venv\script\activate
-    	```
+    	  ```
 	If you get a permissions error at this point, run the command
 	`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`
 	and try `activate` again.
