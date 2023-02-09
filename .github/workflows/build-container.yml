@@ -100,13 +100,3 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ vars.DOCKERHUB_REPOSITORY }}
           short-description: ${{ github.event.repository.description }}
-
-      - name: Output image, digest and metadata to summary
-        run: |
-          {
-          echo imageid: "${{ steps.docker_build.outputs.imageid }}"
-          echo digest: "${{ steps.docker_build.outputs.digest }}"
-          echo labels: "${{ steps.meta.outputs.labels }}"
-          echo tags: "${{ steps.meta.outputs.tags }}"
-          echo version: "${{ steps.meta.outputs.version }}"
-          } >> "$GITHUB_STEP_SUMMARY"
