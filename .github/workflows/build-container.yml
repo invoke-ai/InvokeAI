@@ -90,7 +90,7 @@ jobs:
           cache-from: |
             type=gha,scope=${{ github.ref_name }}-${{ matrix.flavor }}
             type=gha,scope=main-${{ matrix.flavor }}
-          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.flavor }}
+          cache-to: type=gha,mode=max,scope=main-${{ matrix.flavor }}
 
       - name: Docker Hub Description
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/tags/*' && vars.DOCKERHUB_REPOSITORY != ''
