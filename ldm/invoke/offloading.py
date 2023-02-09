@@ -1,8 +1,10 @@
+import warnings
 import weakref
 from collections.abc import MutableMapping
 from typing import Optional, Callable
 
 import torch
+from accelerate.utils import send_to_device
 from torch.utils.hooks import RemovableHandle
 
 
@@ -29,7 +31,10 @@ class OffloadingDevice:
 
     def _pre_hook(self, module: torch.nn.Module, forward_input):
         self.load(module)
-        return forward_input
+        if len(forward_input) == 0:
+            warnings.warn(f"Hook for {module.__class__.__name__} got no input. "
+                          f"Inputs must be positional, not keywords.", stacklevel=3)
+        return send_to_device(forward_input, self.execution_device)
 
     def load(self, module):
         if not self.is_current_model(module):
@@ -61,3 +66,7 @@ class OffloadingDevice:
 
     def clear_current_model(self):
         self._current_model_ref = lambda: None
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} object at {id(self):x}: " \
+               f"current_model={type(self._current_model_ref()).__name__} >"

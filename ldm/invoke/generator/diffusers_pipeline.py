@@ -468,9 +468,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype)
             ).add_mask_channels(latents)
 
-        return self.unet(sample=latents,
-                         timestep=t,
-                         encoder_hidden_states=text_embeddings,
+        # First three args should be positional, not keywords, so torch hooks can see them.
+        return self.unet(latents, t, text_embeddings,
                          cross_attention_kwargs=cross_attention_kwargs).sample
 
     def img2img_from_embeddings(self,
@@ -662,6 +661,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def submodels(self) -> Sequence[torch.nn.Module]:
         models = self.text_encoder, self.unet, self.vae, self.safety_checker
         return [m for m in models if m is not None]
+
+    def decode_latents(self, latents):
+        # Super ugly kludge to get the vae loaded! (since `decode` isn't the forward method.)
+        self.vae()
+        return super().decode_latents(latents)
 
     def debug_latents(self, latents, msg):
         with torch.inference_mode():

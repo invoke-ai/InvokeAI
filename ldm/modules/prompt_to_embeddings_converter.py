@@ -224,12 +224,12 @@ class WeightedPromptFragmentsToEmbeddingsConverter():
         if token_ids.shape != torch.Size([self.max_length]):
             raise ValueError(f"token_ids has shape {token_ids.shape} - expected [{self.max_length}]")
 
-        z = self.text_encoder(input_ids=token_ids.unsqueeze(0), return_dict=False)[0]
+        z = self.text_encoder(token_ids.unsqueeze(0), return_dict=False)[0]
         empty_token_ids = torch.tensor([self.tokenizer.bos_token_id] +
                                     [self.tokenizer.pad_token_id] * (self.max_length-2) +
-                                    [self.tokenizer.eos_token_id], dtype=torch.int, device=token_ids.device).unsqueeze(0)
-        empty_z = self.text_encoder(input_ids=empty_token_ids).last_hidden_state
-        batch_weights_expanded = per_token_weights.reshape(per_token_weights.shape + (1,)).expand(z.shape)
+                                    [self.tokenizer.eos_token_id], dtype=torch.int, device=z.device).unsqueeze(0)
+        empty_z = self.text_encoder(empty_token_ids).last_hidden_state
+        batch_weights_expanded = per_token_weights.reshape(per_token_weights.shape + (1,)).expand(z.shape).to(z)
         z_delta_from_empty = z - empty_z
         weighted_z = empty_z + (z_delta_from_empty * batch_weights_expanded)
 
