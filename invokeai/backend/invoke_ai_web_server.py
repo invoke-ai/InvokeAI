@@ -680,7 +680,8 @@ class InvokeAIWebServer:
                     image = self.esrgan.process(
                         image=image,
                         upsampler_scale=postprocessing_parameters["upscale"][0],
-                        strength=postprocessing_parameters["upscale"][1],
+                        denoise_str=postprocessing_parameters["upscale"][1],
+                        strength=postprocessing_parameters["upscale"][2],
                         seed=seed,
                     )
                 elif postprocessing_parameters["type"] == "gfpgan":
@@ -1064,6 +1065,7 @@ class InvokeAIWebServer:
                     image = self.esrgan.process(
                         image=image,
                         upsampler_scale=esrgan_parameters["level"],
+                        denoise_str=esrgan_parameters['denoise_str'],
                         strength=esrgan_parameters["strength"],
                         seed=seed,
                     )
@@ -1071,6 +1073,7 @@ class InvokeAIWebServer:
                     postprocessing = True
                     all_parameters["upscale"] = [
                         esrgan_parameters["level"],
+                        esrgan_parameters['denoise_str'],
                         esrgan_parameters["strength"],
                     ]
 
@@ -1287,7 +1290,8 @@ class InvokeAIWebServer:
                     {
                         "type": "esrgan",
                         "scale": int(parameters["upscale"][0]),
-                        "strength": float(parameters["upscale"][1]),
+                        "denoise_str": int(parameters["upscale"][1]),
+                        "strength": float(parameters["upscale"][2]),
                     }
                 )
 
@@ -1361,7 +1365,8 @@ class InvokeAIWebServer:
             if parameters["type"] == "esrgan":
                 postprocessing_metadata["type"] = "esrgan"
                 postprocessing_metadata["scale"] = parameters["upscale"][0]
-                postprocessing_metadata["strength"] = parameters["upscale"][1]
+                postprocessing_metadata["denoise_str"] = parameters["upscale"][1]
+                postprocessing_metadata["strength"] = parameters["upscale"][2]
             elif parameters["type"] == "gfpgan":
                 postprocessing_metadata["type"] = "gfpgan"
                 postprocessing_metadata["strength"] = parameters["facetool_strength"]
