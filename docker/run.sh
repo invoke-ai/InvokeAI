@@ -8,6 +8,9 @@ cd "$SCRIPTDIR" || exit 1
 
 source ./env.sh
 
+# Create outputs directory if it does not exist
+[[ -d ./outputs ]] || mkdir ./outputs
+
 echo -e "You are using these values:\n"
 echo -e "Volumename:\t${VOLUMENAME}"
 echo -e "Invokeai_tag:\t${CONTAINER_IMAGE}"
@@ -21,7 +24,7 @@ docker run \
   --name="${REPOSITORY_NAME,,}" \
   --hostname="${REPOSITORY_NAME,,}" \
   --mount=source="${VOLUMENAME}",target=/data \
-  ${MODELSPATH:+--user "$(id -u):$(id -g)"} \
+  --mount type=bind,source="$(pwd)"/outputs,target=/data/outputs \
   ${MODELSPATH:+--mount="type=bind,source=${MODELSPATH},target=/data/models"} \
   ${HUGGING_FACE_HUB_TOKEN:+--env="HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}"} \
   --publish=9090:9090 \
