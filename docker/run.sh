@@ -31,3 +31,11 @@ docker run \
   --cap-add=sys_nice \
   ${GPU_FLAGS:+--gpus="${GPU_FLAGS}"} \
   "${CONTAINER_IMAGE}" ${@:+$@}
+
+# Remove Trash folder
+for f in outputs/.Trash*; do
+  if [ -e "$f" ]; then
+    rm -Rf "$f"
+    break
+  fi
+done
