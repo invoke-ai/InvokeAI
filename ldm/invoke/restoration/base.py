@@ -31,8 +31,8 @@ class Restoration():
         return CodeFormerRestoration()
 
     # Upscale Models
-    def load_esrgan(self, esrgan_bg_tile=400, denoise_str=0.9):
+    def load_esrgan(self, esrgan_bg_tile=400):
         from ldm.invoke.restoration.realesrgan import ESRGAN
-        esrgan = ESRGAN(esrgan_bg_tile, denoise_str)
+        esrgan = ESRGAN(esrgan_bg_tile)
         print('>> ESRGAN Initialized')
         return esrgan;

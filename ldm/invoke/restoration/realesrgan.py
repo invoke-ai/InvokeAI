@@ -8,16 +8,15 @@ from PIL import Image
 from PIL.Image import Image as ImageType
 
 class ESRGAN():
-    def __init__(self, bg_tile_size=400, denoise_str=0.9) -> None:
+    def __init__(self, bg_tile_size=400) -> None:
         self.bg_tile_size = bg_tile_size
-        self.denoise_str=denoise_str
 
         if not torch.cuda.is_available():  # CPU or MPS on M1
             use_half_precision = False
         else:
             use_half_precision = True
 
-    def load_esrgan_bg_upsampler(self):
+    def load_esrgan_bg_upsampler(self, denoise_str):
         if not torch.cuda.is_available():  # CPU or MPS on M1
             use_half_precision = False
         else:
@@ -36,7 +35,7 @@ class ESRGAN():
             model_path=[model_path, wdn_model_path],
             model=model,
             tile=self.bg_tile_size,
-            dni_weight=[self.denoise_str, 1 - self.denoise_str],
+            dni_weight=[denoise_str, 1 - denoise_str],
             tile_pad=10,
             pre_pad=0,
             half=use_half_precision,
@@ -44,13 +43,13 @@ class ESRGAN():
 
         return bg_upsampler
 
-    def process(self, image: ImageType, strength: float, seed: str = None, upsampler_scale: int = 2):
+    def process(self, image: ImageType, strength: float, seed: str = None, upsampler_scale: int = 2, denoise_str: float = 0.75):
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=DeprecationWarning)
             warnings.filterwarnings('ignore', category=UserWarning)
 
             try:
-                upsampler = self.load_esrgan_bg_upsampler()
+                upsampler = self.load_esrgan_bg_upsampler(denoise_str)
             except Exception:
                 import traceback
                 import sys
@@ -63,7 +62,7 @@ class ESRGAN():
 
         if seed is not None:
             print(
-                f'>> Real-ESRGAN Upscaling seed:{seed}, scale:{upsampler_scale}x, tile:{self.bg_tile_size}, denoise:{self.denoise_str}'
+                f'>> Real-ESRGAN Upscaling seed:{seed}, scale:{upsampler_scale}x, tile:{self.bg_tile_size}, denoise:{denoise_str}'
             )
         # ESRGAN outputs images with partial transparency if given RGBA images; convert to RGB
         image = image.convert("RGB")
