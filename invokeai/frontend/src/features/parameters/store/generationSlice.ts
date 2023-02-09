@@ -268,8 +268,11 @@ export const generationSlice = createSlice({
       if (sampler) state.sampler = sampler;
       if (steps) state.steps = steps;
       if (cfg_scale) state.cfgScale = cfg_scale;
-      if (threshold) state.threshold = threshold;
-      if (typeof threshold === 'undefined') state.threshold = 0;
+      if (typeof threshold === 'undefined') {
+        state.threshold = 0;
+      } else {
+        state.threshold = threshold;
+      }
       if (perlin) state.perlin = perlin;
       if (typeof perlin === 'undefined') state.perlin = 0;
       if (typeof seamless === 'boolean') state.seamless = seamless;
