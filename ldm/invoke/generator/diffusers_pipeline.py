@@ -4,6 +4,7 @@ import dataclasses
 import inspect
 import secrets
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any
 
@@ -656,6 +657,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def channels(self) -> int:
         """Compatible with DiffusionWrapper"""
         return self.unet.in_channels
+
+    @property
+    def submodels(self) -> Sequence[torch.nn.Module]:
+        models = self.text_encoder, self.unet, self.vae, self.feature_extractor, self.safety_checker
+        return [m for m in models if m is not None]
 
     def debug_latents(self, latents, msg):
         with torch.inference_mode():

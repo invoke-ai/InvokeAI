@@ -36,6 +36,7 @@ from ldm.invoke.generator.diffusers_pipeline import \
     StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import (Globals, global_autoscan_dir, global_cache_dir,
                                 global_models_dir)
+from ldm.invoke.offloading import OffloadingDevice
 from ldm.util import (ask_user, download_with_progress_bar,
                       instantiate_from_config)
 
@@ -49,9 +50,10 @@ class ModelManager(object):
     def __init__(
         self,
         config: OmegaConf,
-        device_type: str = "cpu",
+        device_type: str | torch.device = "cpu",
         precision: str = "float16",
         max_loaded_models=DEFAULT_MAX_MODELS,
+        sequential_offload = False
     ):
         """
         Initialize with the path to the models.yaml config file,
@@ -69,6 +71,10 @@ class ModelManager(object):
         self.models = {}
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
+        if sequential_offload:
+            self.offloader = OffloadingDevice(self.device)
+        else:
+            self.offloader = None
 
     def valid_model(self, model_name: str) -> bool:
         """
@@ -92,7 +98,10 @@ class ModelManager(object):
         if self.current_model != model_name:
             if model_name not in self.models:  # make room for a new one
                 self._make_cache_room()
-            self.offload_model(self.current_model)
+            if self.offloader:
+                self.offloader.offload_current()
+            else:
+                self.offload_model(self.current_model)
 
         if model_name in self.models:
             requested_model = self.models[model_name]["model"]
@@ -529,7 +538,10 @@ class ModelManager(object):
         dlogging.set_verbosity(verbosity)
         assert pipeline is not None, OSError(f'"{name_or_path}" could not be loaded')
 
-        pipeline.to(self.device)
+        if self.offloader:
+            self.offloader.install(*pipeline.submodels)
+        else:
+            pipeline.to(self.device)
 
         model_hash = self._diffuser_sha256(name_or_path)
 
@@ -748,7 +760,6 @@ class ModelManager(object):
         into models.yaml.
         """
         new_config = None
-        import transformers
 
         from ldm.invoke.ckpt_to_diffuser import convert_ckpt_to_diffuser
 
@@ -1011,6 +1022,10 @@ class ModelManager(object):
         if self.device == "cpu":
             return model
 
+        if self.offloader and isinstance(model, StableDiffusionGeneratorPipeline):
+            # Offloader handles it on demand.
+            return model
+
         model.to(self.device)
         model.cond_stage_model.device = self.device
 
@@ -1161,7 +1176,7 @@ class ModelManager(object):
         strategy.execute()
 
     @staticmethod
-    def _abs_path(path: Union(str, Path)) -> Path:
+    def _abs_path(path: str | Path) -> Path:
         if path is None or Path(path).is_absolute():
             return path
         return Path(Globals.root, path).resolve()
