@@ -93,7 +93,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.flavor }}
 
       - name: Docker Hub Description
-        if: github.event_name != 'pull_request' && vars.DOCKERHUB_REPOSITORY != ''
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/tags/*' && vars.DOCKERHUB_REPOSITORY != ''
         uses: peter-evans/dockerhub-description@v3
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
