@@ -660,7 +660,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     @property
     def submodels(self) -> Sequence[torch.nn.Module]:
-        models = self.text_encoder, self.unet, self.vae, self.feature_extractor, self.safety_checker
+        models = self.text_encoder, self.unet, self.vae, self.safety_checker
         return [m for m in models if m is not None]
 
     def debug_latents(self, latents, msg):
