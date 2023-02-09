@@ -674,8 +674,8 @@ class Args(object):
         postprocessing_group.add_argument(
             '--esrgan_denoise_str',
             type=float,
-            default=0.9,
-            help='esrgan denoise str. 0 is no denoise, 1 is max denoise.  Default: 0.9',
+            default=0.75,
+            help='esrgan denoise str. 0 is no denoise, 1 is max denoise.  Default: 0.75',
         )
         postprocessing_group.add_argument(
             '--gfpgan_model_path',
