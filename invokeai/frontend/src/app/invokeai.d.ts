@@ -92,6 +92,7 @@ export declare type ESRGANMetadata = CommonPostProcessedImageMetadata & {
   type: 'esrgan';
   scale: 2 | 4;
   strength: number;
+  denoise_str: number;
 };
 
 export declare type FacetoolMetadata = CommonPostProcessedImageMetadata & {
