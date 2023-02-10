@@ -340,6 +340,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if torch_device is None:
             return self
         self._model_group.set_device(torch_device)
+        self._model_group.ready()
 
     @property
     def device(self) -> torch.device:
