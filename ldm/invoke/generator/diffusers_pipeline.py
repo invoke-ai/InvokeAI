@@ -391,9 +391,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 additional_guidance: List[Callable] = None, run_id=None,
                                 callback: Callable[[PipelineIntermediateState], None] = None
                                 ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
-        device = self._model_group.device_for(self.unet)
         if timesteps is None:
-            self.scheduler.set_timesteps(num_inference_steps, device=device)
+            self.scheduler.set_timesteps(num_inference_steps, device=self._model_group.device_for(self.unet))
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(self.generate_latents_from_embeddings, PipelineIntermediateState)
         result: PipelineIntermediateState = infer_latents_from_embeddings(
@@ -423,9 +422,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                             latents=latents)
 
             batch_size = latents.shape[0]
-            device = self._model_group.device_for(self.unet)
             batched_t = torch.full((batch_size,), timesteps[0],
-                                   dtype=timesteps.dtype, device=device)
+                                   dtype=timesteps.dtype, device=self._model_group.device_for(self.unet))
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             attention_map_saver: Optional[AttentionMapSaver] = None
@@ -521,9 +519,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             init_image = einops.rearrange(init_image, 'c h w -> 1 c h w')
 
         # 6. Prepare latent variables
-        device = self._model_group.device_for(self.unet)
-        latents_dtype = self.unet.dtype
-        initial_latents = self.non_noised_latents_from_image(init_image, device=device, dtype=latents_dtype)
+        initial_latents = self.non_noised_latents_from_image(
+            init_image, device=self._model_group.device_for(self.unet),
+            dtype=self.unet.dtype)
         noise = noise_func(initial_latents)
 
         return self.img2img_from_latents_and_embeddings(initial_latents, num_inference_steps,
@@ -653,8 +651,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     def check_for_safety(self, output, dtype):
         with torch.inference_mode():
-            screened_images, has_nsfw_concept = self.run_safety_checker(
-                output.images, device=self._execution_device, dtype=dtype)
+            screened_images, has_nsfw_concept = self.run_safety_checker(output.images, dtype=dtype)
         screened_attention_map_saver = None
         if has_nsfw_concept is None or not has_nsfw_concept:
             screened_attention_map_saver = output.attention_map_saver
@@ -662,6 +659,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                                      has_nsfw_concept,
                                                      # block the attention maps if NSFW content is detected
                                                      attention_map_saver=screened_attention_map_saver)
+
+    def run_safety_checker(self, image, device=None, dtype=None):
+        # overriding to use the model group for device info instead of requiring the caller to know.
+        if self.safety_checker is not None:
+            device = self._model_group.device_for(self.safety_checker)
+        return super().run_safety_checker(image, device, dtype)
 
     @torch.inference_mode()
     def get_learned_conditioning(self, c: List[List[str]], *, return_tokens=True, fragment_weights=None):
