@@ -45,7 +45,20 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 
 </div>
 
-# Getting Started with InvokeAI
+## Table of Contents
+
+1. [Quick Start](#getting-started-with-invokeai)
+2. [Installation](#detailed-installation-instructions)
+3. [Hardware Requirements](#hardware-requirements)
+4. [Features](#features)
+5. [Latest Changes](#latest-changes)
+6. [Troubleshooting](#troubleshooting)
+7. [Contributing](#contributing)
+8. [Contributors](#contributors)
+9. [Support](#support)
+10. [Further Reading](#further-reading)
+
+## Getting Started with InvokeAI
 
 For full installation and upgrade instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
@@ -53,15 +66,43 @@ For full installation and upgrade instructions, please see:
 ## Automatic Installer (suggested for 1st time users)
 
 1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
+
 2. Download the .zip file for your OS (Windows/macOS/Linux).
+
 3. Unzip the file.
-4. If you are on Windows, double-click on the `install.bat` script. On macOS, open a Terminal window, drag the file `install.sh` from Finder into the Terminal, and press return. On Linux, run `install.sh`.
-5. Wait a while, until it is done.
-6. The folder where you ran the installer from will now be filled with lots of files. If you are on Windows, double-click on the `invoke.bat` file. On macOS, open a Terminal window, drag `invoke.sh` from the folder into the Terminal, and press return. On Linux, run `invoke.sh`
-7. Press 2 to open the "browser-based UI", press enter/return, wait a minute or two for Stable Diffusion to start up, then open your browser and go to http://localhost:9090.
-8. Type `banana sushi` in the box on the top left and click `Invoke`
+
+4. If you are on Windows, double-click on the `install.bat` script. On
+macOS, open a Terminal window, drag the file `install.sh` from Finder
+into the Terminal, and press return. On Linux, run `install.sh`.
+
+5. You'll be asked to confirm the location of the folder in which
+to install InvokeAI and its image generation model files. Pick a
+location with at least 15 GB of free memory. More if you plan on
+installing lots of models.
+
+5. Wait while the installer does its thing. After installing the software,
+the installer will launch a script that lets you configure InvokeAI and
+select a set of starting image generaiton models.
+
+6. Find the folder that InvokeAI was installed into (it is not the
+same as the unpacked zip file directory!) The default location of this
+folder (if you didn't change it in step 5) is `~/invokeai` on
+Linux/Mac systems, and `C:\Users\YourName\invokeai` on Windows. This directory will contain launcher scripts named `invoke.sh` and `invoke.bat`.
+
+7. On Windows systems, double-click on the `invoke.bat` file. On
+macOS, open a Terminal window, drag `invoke.sh` from the folder into
+the Terminal, and press return. On Linux, run `invoke.sh`
+
+8. Press 2 to open the "browser-based UI", press enter/return, wait a
+minute or two for Stable Diffusion to start up, then open your browser
+and go to http://localhost:9090.
+
+9. Type `banana sushi` in the box on the top left and click `Invoke`
 
 ## Command-Line Installation (for users familiar with Python)
+
+You must have Python 3.9 or 3.10 installed on your machine. Earlier or later versions are
+not supported.
 
 1. Open a command-line window on your machine. The PowerShell is recommended for Windows.
 2. Create a directory to install InvokeAI into. You'll need at least 15 GB of free space:
@@ -69,49 +110,50 @@ For full installation and upgrade instructions, please see:
    mkdir invokeai
    ````
 3. Create a virtual environment named `.venv` inside this directory and activate it:
+   _All Platforms_
    ```
    cd invokeai
    python -mvenv create .venv
-   .venv/bin/activate         # linux/mac
-   .venv/Scripts/activate     # windows
    ```
+   _For Linux/Mac users:_
+   ```
+   source .venv/bin/activate
+   ```
+   _For Windows users:_
+   ```
+   .venv\Scripts\activate
+   ```
+   
 4. Install the InvokeAI module and its dependencies. Choose the command suited for your platform & GPU.
-   Windows/Linux with an NVIDIA GPU:
-   ```
-   pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
-   ```
-   Linux with an AMD GPU:
-   ```
-   pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
-   ```
-   Macintoshes, either Intel or M1/2:
-   ```
-   pip install InvokeAI --use-pep517
-   ```
-5. Configure InvokeAI and install a starting set of image generation models:
+
+      _For Windows/Linux with an NVIDIA GPU:_
+      ```
+      pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+      ```
+      _For Linux with an AMD GPU:_
+      ```
+      pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
+      ```
+      _For Macintoshes, either Intel or M1/M2:_
+      ```
+      pip install InvokeAI --use-pep517
+      ```
+
+5. Configure InvokeAI and install a starting set of image generation models (you only need to do this once):
    ```
    invokeai-configure
    ```
-6. Launch the web server:
+6. Launch the web server (do it every time you run InvokeAI:
    ```
    invokeai --web
    ```
 7. Point your browser to http://localhost:9090 to bring up the web interface.
 8. Type `banana sushi` in the box on the top left and click `Invoke`.
 
-## Table of Contents
+Be sure to activate the virtual environment each time before re-launching InvokeAI,
+using `source .venv/bin/activate` or `.venv\Scripts\activate`.
 
-1. [Installation](#installation)
-2. [Hardware Requirements](#hardware-requirements)
-3. [Features](#features)
-4. [Latest Changes](#latest-changes)
-5. [Troubleshooting](#troubleshooting)
-6. [Contributing](#contributing)
-7. [Contributors](#contributors)
-8. [Support](#support)
-9. [Further Reading](#further-reading)
-
-## Installation
+## Detailed Installation Instructions
 
 This fork is supported across Linux, Windows and Macintosh. Linux
 users can use either an Nvidia-based card (with CUDA support) or an

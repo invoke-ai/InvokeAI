@@ -170,7 +170,7 @@ manager, please follow these steps:
     === "Windows"
         ```bash
         deactivate
-	.venv\Scripts\activate
+        .venv\Scripts\activate
         ```
 
 8.  Set up the runtime directory
@@ -332,3 +332,27 @@ installation protocol (important!)
 
     Please see [Contributing](/index.md#Contributing) for hints
     on getting started.
+
+### Unsupported Conda Install
+
+Congratulations, you found the "secret" Conda installation
+instructions. If you really **really** want to use Conda with InvokeAI
+you can do so using this unsupported recipe:
+
+```
+mkdir ~/invokeai
+conda create -n invokeai python=3.10
+conda activate invokeai
+pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+invokeai-configure --root ~/invokeai
+invokeai --root ~/invokeai --web
+```
+
+The `pip install` command shown in this recipe is for Linux/Windows
+systems with an NVIDIA GPU. See step (6) above for the command to use
+with other platforms/GPU combinations. If you don't wish to pass the
+`--root` argument to `invokeai` with each launch, you may set the
+environment variable INVOKEAI_ROOT to point to the installation directory.
+
+Note that if you run into problems with the Conda installation, the InvokeAI
+staff will **not** be able to help you out. Caveat Emptor!
