@@ -64,6 +64,7 @@ export const socketioMiddleware = () => {
       emitSearchForModels,
       emitAddNewModel,
       emitDeleteModel,
+      emitConvertToDiffusers,
       emitRequestModelChange,
       emitSaveStagingAreaImageToGallery,
       emitRequestEmptyTempFolder,
@@ -196,6 +197,11 @@ export const socketioMiddleware = () => {
 
       case 'socketio/deleteModel': {
         emitDeleteModel(action.payload);
+        break;
+      }
+
+      case 'socketio/convertToDiffusers': {
+        emitConvertToDiffusers(action.payload);
         break;
       }
 

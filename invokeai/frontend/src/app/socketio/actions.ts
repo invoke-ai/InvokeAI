@@ -38,6 +38,10 @@ export const addNewModel = createAction<
 
 export const deleteModel = createAction<string>('socketio/deleteModel');
 
+export const convertToDiffusers = createAction<string>(
+  'socketio/convertToDiffusers'
+);
+
 export const requestModelChange = createAction<string>(
   'socketio/requestModelChange'
 );

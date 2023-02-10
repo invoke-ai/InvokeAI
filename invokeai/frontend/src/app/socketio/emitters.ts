@@ -178,6 +178,9 @@ const makeSocketIOEmitters = (
     emitDeleteModel: (modelName: string) => {
       socketio.emit('deleteModel', modelName);
     },
+    emitConvertToDiffusers: (modelName: string) => {
+      socketio.emit('convertToDiffusers', modelName);
+    },
     emitRequestModelChange: (modelName: string) => {
       dispatch(modelChangeRequested());
       socketio.emit('requestModelChange', modelName);

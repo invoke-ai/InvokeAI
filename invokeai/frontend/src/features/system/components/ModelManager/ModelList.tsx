@@ -85,6 +85,7 @@ const ModelList = () => {
             name={model.name}
             status={model.status}
             description={model.description}
+            format={model.format}
           />
         );
         if (model.format === isSelectedFilter) {
@@ -94,6 +95,7 @@ const ModelList = () => {
               name={model.name}
               status={model.status}
               description={model.description}
+              format={model.format}
             />
           );
         }
@@ -105,6 +107,7 @@ const ModelList = () => {
             name={model.name}
             status={model.status}
             description={model.description}
+            format={model.format}
           />
         );
       } else {
@@ -114,6 +117,7 @@ const ModelList = () => {
             name={model.name}
             status={model.status}
             description={model.description}
+            format={model.format}
           />
         );
       }
