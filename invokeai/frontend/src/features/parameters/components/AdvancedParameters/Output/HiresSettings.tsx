@@ -4,6 +4,7 @@ import type { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
+import SubItemHook from 'common/components/SubItemHook';
 import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
 import {
   setHiresFix,
@@ -39,23 +40,27 @@ const HiresStrength = () => {
   };
 
   return (
-    <IAISlider
-      label={t('parameters:hiresStrength')}
-      step={0.01}
-      min={0.01}
-      max={0.99}
-      onChange={handleHiresStrength}
-      value={hiresStrength}
-      isInteger={false}
-      withInput
-      withSliderMarks
-      inputWidth="5.5rem"
-      withReset
-      handleReset={handleHiResStrengthReset}
-      isSliderDisabled={!hiresFix}
-      isInputDisabled={!hiresFix}
-      isResetDisabled={!hiresFix}
-    />
+    <Flex>
+      <SubItemHook active={hiresFix} />
+      <IAISlider
+        label={t('parameters:hiresStrength')}
+        step={0.01}
+        min={0.01}
+        max={0.99}
+        onChange={handleHiresStrength}
+        value={hiresStrength}
+        isInteger={false}
+        withInput
+        withSliderMarks
+        inputWidth={'5.5rem'}
+        withReset
+        handleReset={handleHiResStrengthReset}
+        isSliderDisabled={!hiresFix}
+        isInputDisabled={!hiresFix}
+        isResetDisabled={!hiresFix}
+        sliderMarkRightOffset={-7}
+      />
+    </Flex>
   );
 };
 
@@ -75,7 +80,7 @@ const HiresSettings = () => {
     dispatch(setHiresFix(e.target.checked));
 
   return (
-    <Flex gap={2} direction="column">
+    <Flex rowGap="0.8rem" direction={'column'}>
       <IAISwitch
         label={t('parameters:hiresOptim')}
         fontSize="md"

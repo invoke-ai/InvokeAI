@@ -170,6 +170,9 @@ export const frontendToBackendParameters = (
   let esrganParameters: false | BackendEsrGanParameters = false;
   let facetoolParameters: false | BackendFacetoolParameters = false;
 
+  // Multiplying it by 10000 so the Slider can have values between 0 and 1 which makes more sense
+  generationParameters.threshold = threshold * 1000;
+
   if (negativePrompt !== '') {
     generationParameters.prompt = `${prompt} [${negativePrompt}]`;
   }

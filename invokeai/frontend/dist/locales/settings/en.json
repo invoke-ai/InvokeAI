@@ -5,6 +5,7 @@
   "confirmOnDelete": "Confirm On Delete",
   "displayHelpIcons": "Display Help Icons",
   "useCanvasBeta": "Use Canvas Beta Layout",
+  "useSlidersForAll": "Use Sliders For All Options",
   "enableImageDebugging": "Enable Image Debugging",
   "resetWebUI": "Reset Web UI",
   "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",

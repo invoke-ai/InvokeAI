@@ -107,7 +107,7 @@ const InfillAndScalingSettings = () => {
   };
 
   return (
-    <Flex direction="column" gap="1rem">
+    <Flex direction="column" gap={4}>
       <IAISelect
         label={t('parameters:scaleBeforeProcessing')}
         validValues={BOUNDING_BOX_SCALES_DICT}
@@ -130,6 +130,7 @@ const InfillAndScalingSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetScaledWidth}
+        sliderMarkRightOffset={-7}
       />
       <IAISlider
         isInputDisabled={!isManual}
@@ -147,6 +148,7 @@ const InfillAndScalingSettings = () => {
         inputReadOnly
         withReset
         handleReset={handleResetScaledHeight}
+        sliderMarkRightOffset={-7}
       />
       <IAISelect
         label={t('parameters:infillMethod')}
