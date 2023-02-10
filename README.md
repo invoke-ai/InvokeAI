@@ -50,6 +50,8 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 For full installation and upgrade instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
+## Automatic Installer (suggested for 1st time users)
+
 1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
 2. Download the .zip file for your OS (Windows/macOS/Linux).
 3. Unzip the file.
@@ -59,6 +61,43 @@ For full installation and upgrade instructions, please see:
 7. Press 2 to open the "browser-based UI", press enter/return, wait a minute or two for Stable Diffusion to start up, then open your browser and go to http://localhost:9090.
 8. Type `banana sushi` in the box on the top left and click `Invoke`
 
+## Command-Line Installation (for users familiar with Python)
+
+1. Open a command-line window on your machine. The PowerShell is recommended for Windows.
+2. Create a directory to install InvokeAI into. You'll need at least 15 GB of free space:
+   ```
+   mkdir invokeai
+   ````
+3. Create a virtual environment named `.venv` inside this directory and activate it:
+   ```
+   cd invokeai
+   python -mvenv create .venv
+   .venv/bin/activate         # linux/mac
+   .venv/Scripts/activate     # windows
+   ```
+4. Install the InvokeAI module and its dependencies. Choose the command suited for your platform & GPU.
+   Windows/Linux with an NVIDIA GPU:
+   ```
+   pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+   ```
+   Linux with an AMD GPU:
+   ```
+   pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
+   ```
+   Macintoshes, either Intel or M1/2:
+   ```
+   pip install InvokeAI --use-pep517
+   ```
+5. Configure InvokeAI and install a starting set of image generation models:
+   ```
+   invokeai-configure
+   ```
+6. Launch the web server:
+   ```
+   invokeai --web
+   ```
+7. Point your browser to http://localhost:9090 to bring up the web interface.
+8. Type `banana sushi` in the box on the top left and click `Invoke`.
 
 ## Table of Contents
 
