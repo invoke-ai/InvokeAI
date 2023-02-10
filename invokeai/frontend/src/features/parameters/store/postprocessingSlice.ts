@@ -16,6 +16,7 @@ export interface PostprocessingState {
   shouldRunESRGAN: boolean;
   shouldRunFacetool: boolean;
   upscalingLevel: UpscalingLevel;
+  upscalingDenoising: number;
   upscalingStrength: number;
 }
 
@@ -29,6 +30,7 @@ const initialPostprocessingState: PostprocessingState = {
   shouldRunESRGAN: false,
   shouldRunFacetool: false,
   upscalingLevel: 4,
+  upscalingDenoising: 0.75,
   upscalingStrength: 0.75,
 };
 
@@ -46,6 +48,9 @@ export const postprocessingSlice = createSlice({
     },
     setUpscalingLevel: (state, action: PayloadAction<UpscalingLevel>) => {
       state.upscalingLevel = action.payload;
+    },
+    setUpscalingDenoising: (state, action: PayloadAction<number>) => {
+      state.upscalingDenoising = action.payload;
     },
     setUpscalingStrength: (state, action: PayloadAction<number>) => {
       state.upscalingStrength = action.payload;
@@ -88,6 +93,7 @@ export const {
   setShouldRunESRGAN,
   setShouldRunFacetool,
   setUpscalingLevel,
+  setUpscalingDenoising,
   setUpscalingStrength,
 } = postprocessingSlice.actions;
 
