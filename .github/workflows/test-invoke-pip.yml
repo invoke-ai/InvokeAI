@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   matrix:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.repository == 'invoke-ai/InvokeAI'
     strategy:
       matrix:
         python-version:

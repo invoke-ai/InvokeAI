@@ -9,7 +9,7 @@ on:
 
 jobs:
   docker:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.repository == 'invoke-ai/InvokeAI'
     strategy:
       fail-fast: false
       matrix:

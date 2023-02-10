@@ -14,7 +14,7 @@ defaults:
 
 jobs:
   lint-frontend:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.repository == 'invoke-ai/InvokeAI'
     runs-on: ubuntu-22.04
     steps:
       - name: Setup Node 18
