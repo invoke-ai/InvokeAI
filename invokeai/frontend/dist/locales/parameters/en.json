@@ -20,6 +20,7 @@
   "upscaling": "Upscaling",
   "upscale": "Upscale",
   "upscaleImage": "Upscale Image",
+  "denoisingStrength": "Denoising Strength",
   "scale": "Scale",
   "otherOptions": "Other Options",
   "seamlessTiling": "Seamless Tiling",
