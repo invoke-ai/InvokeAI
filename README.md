@@ -1,6 +1,6 @@
 <div align="center">
 
-![project logo](https://github.com/mauwii/InvokeAI/raw/main/docs/assets/invoke_ai_banner.png)
+![project logo](https://github.com/invoke-ai/InvokeAI/raw/main/docs/assets/invoke_ai_banner.png)
 
 # InvokeAI: A Stable Diffusion Toolkit
 
@@ -41,7 +41,7 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 
 <div align="center">
 
-![canvas preview](https://github.com/mauwii/InvokeAI/raw/main/docs/assets/canvas_preview.png)
+![canvas preview](https://github.com/invoke-ai/InvokeAI/raw/main/docs/assets/canvas_preview.png)
 
 </div>
 
@@ -63,7 +63,7 @@ requests. Be sure to use the provided templates. They will help us diagnose issu
 For full installation and upgrade instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
 
-## Automatic Installer (suggested for 1st time users)
+### Automatic Installer (suggested for 1st time users)
 
 1. Go to the bottom of the [Latest Release Page](https://github.com/invoke-ai/InvokeAI/releases/latest)
 
@@ -80,80 +80,97 @@ to install InvokeAI and its image generation model files. Pick a
 location with at least 15 GB of free memory. More if you plan on
 installing lots of models.
 
-5. Wait while the installer does its thing. After installing the software,
+6. Wait while the installer does its thing. After installing the software,
 the installer will launch a script that lets you configure InvokeAI and
 select a set of starting image generaiton models.
 
-6. Find the folder that InvokeAI was installed into (it is not the
+7. Find the folder that InvokeAI was installed into (it is not the
 same as the unpacked zip file directory!) The default location of this
 folder (if you didn't change it in step 5) is `~/invokeai` on
 Linux/Mac systems, and `C:\Users\YourName\invokeai` on Windows. This directory will contain launcher scripts named `invoke.sh` and `invoke.bat`.
 
-7. On Windows systems, double-click on the `invoke.bat` file. On
+8. On Windows systems, double-click on the `invoke.bat` file. On
 macOS, open a Terminal window, drag `invoke.sh` from the folder into
 the Terminal, and press return. On Linux, run `invoke.sh`
 
-8. Press 2 to open the "browser-based UI", press enter/return, wait a
+9. Press 2 to open the "browser-based UI", press enter/return, wait a
 minute or two for Stable Diffusion to start up, then open your browser
 and go to http://localhost:9090.
 
-9. Type `banana sushi` in the box on the top left and click `Invoke`
+10. Type `banana sushi` in the box on the top left and click `Invoke`
 
-## Command-Line Installation (for users familiar with Python)
+### Command-Line Installation (for users familiar with Terminals)
 
 You must have Python 3.9 or 3.10 installed on your machine. Earlier or later versions are
 not supported.
 
 1. Open a command-line window on your machine. The PowerShell is recommended for Windows.
 2. Create a directory to install InvokeAI into. You'll need at least 15 GB of free space:
-   ```
-   mkdir invokeai
-   ````
+
+    ```terminal
+    mkdir invokeai
+    ````
+
 3. Create a virtual environment named `.venv` inside this directory and activate it:
-   _All Platforms_
-   ```
-   cd invokeai
-   python -mvenv create .venv
-   ```
-   _For Linux/Mac users:_
-   ```
-   source .venv/bin/activate
-   ```
-   _For Windows users:_
-   ```
-   .venv\Scripts\activate
-   ```
-   
-4. Install the InvokeAI module and its dependencies. Choose the command suited for your platform & GPU.
 
-      _For Windows/Linux with an NVIDIA GPU:_
-      ```
-      pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
-      ```
-      _For Linux with an AMD GPU:_
-      ```
-      pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
-      ```
-      _For Macintoshes, either Intel or M1/M2:_
-      ```
-      pip install InvokeAI --use-pep517
-      ```
+    ```terminal
+    cd invokeai
+    python -m venv .venv --prompt InvokeAI
+    ```
 
-5. Configure InvokeAI and install a starting set of image generation models (you only need to do this once):
-   ```
-   invokeai-configure
-   ```
-6. Launch the web server (do it every time you run InvokeAI:
-   ```
-   invokeai --web
-   ```
-7. Point your browser to http://localhost:9090 to bring up the web interface.
-8. Type `banana sushi` in the box on the top left and click `Invoke`.
+4. Activate the virtual environment (do it every time you run InvokeAI)
+
+    _For Linux/Mac users:_
+
+    ```sh
+    source .venv/bin/activate
+    ```
+
+    _For Windows users:_
+
+    ```ps
+    .venv\Scripts\activate
+    ```
+
+5. Install the InvokeAI module and its dependencies. Choose the command suited for your platform & GPU.
+
+    _For Windows/Linux with an NVIDIA GPU:_
+
+    ```terminal
+    pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+    ```
+
+    _For Linux with an AMD GPU:_
+
+    ```sh
+    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
+    ```
+
+    _For Macintoshes, either Intel or M1/M2:_
+
+    ```sh
+    pip install InvokeAI --use-pep517
+    ```
+
+6. Configure InvokeAI and install a starting set of image generation models (you only need to do this once):
+
+    ```terminal
+    invokeai-configure
+    ```
+
+7. Launch the web server (do it every time you run InvokeAI):
+
+    ```terminal
+    invokeai --web
+    ```
+
+8. Point your browser to http://localhost:9090 to bring up the web interface.
+9. Type `banana sushi` in the box on the top left and click `Invoke`.
 
 Be sure to activate the virtual environment each time before re-launching InvokeAI,
 using `source .venv/bin/activate` or `.venv\Scripts\activate`.
 
-## Detailed Installation Instructions
+### Detailed Installation Instructions
 
 This fork is supported across Linux, Windows and Macintosh. Linux
 users can use either an Nvidia-based card (with CUDA support) or an
@@ -161,13 +178,13 @@ AMD card (using the ROCm driver). For full installation and upgrade
 instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_SOURCE/)
 
-### Hardware Requirements
+## Hardware Requirements
 
 InvokeAI is supported across Linux, Windows and macOS. Linux
 users can use either an Nvidia-based card (with CUDA support) or an
 AMD card (using the ROCm driver).
 
-#### System
+### System
 
 You will need one of the following:
 
@@ -179,11 +196,11 @@ We do not recommend the GTX 1650 or 1660 series video cards. They are
 unable to run in half-precision mode and do not have sufficient VRAM
 to render 512x512 images.
 
-#### Memory
+### Memory
 
 - At least 12 GB Main Memory RAM.
 
-#### Disk
+### Disk
 
 - At least 12 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
@@ -233,7 +250,7 @@ Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 Please check out our **[Q&A](https://invoke-ai.github.io/InvokeAI/help/TROUBLESHOOT/#faq)** to get solutions for common installation
 problems and other issues.
 
-# Contributing
+## Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
 cleanup, testing, or code reviews, is very much encouraged to do so.
