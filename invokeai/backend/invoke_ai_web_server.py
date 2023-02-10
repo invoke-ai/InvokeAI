@@ -393,6 +393,55 @@ class InvokeAIWebServer:
                 traceback.print_exc()
                 print("\n")
 
+        @socketio.on('convertToDiffusers')
+        def convert_to_diffusers(model_to_convert: str):
+            try:
+                if (model_info := self.generate.model_manager.model_info(model_name=model_to_convert)):
+                    if 'weights' in model_info:
+                        ckpt_path = Path(model_info['weights'])
+                        original_config_file = Path(model_info['config'])
+                        model_name = model_to_convert
+                        model_description = model_info['description']
+                    else:
+                        self.socketio.emit("error", {"message": "Model is not a valid checkpoint file"})
+                else:
+                    self.socketio.emit("error", {"message": "Could not retrieve model info."})
+                
+                if not ckpt_path.is_absolute():
+                    ckpt_path = Path(Globals.root,ckpt_path)
+                
+                if original_config_file and not original_config_file.is_absolute():
+                    original_config_file = Path(Globals.root, original_config_file)
+                
+                diffusers_path = Path(f'{ckpt_path.parent.absolute()}\\{model_name}_diffusers')
+                
+                if diffusers_path.exists():
+                    shutil.rmtree(diffusers_path)
+                
+                self.generate.model_manager.convert_and_import(
+                    ckpt_path,
+                    diffusers_path,
+                    model_name=model_name,
+                    model_description=model_description,
+                    vae = None,
+                    original_config_file = original_config_file,
+                    commit_to_conf=opt.conf,
+                )
+
+                new_model_list = self.generate.model_manager.list_models()
+                socketio.emit(
+                    "newModelAdded",
+                    {"new_model_name": model_name,
+                    "model_list": new_model_list, 'update': True},
+                )
+                print(f">> Model Converted: {model_name}")
+            except Exception as e:
+                self.socketio.emit("error", {"message": (str(e))})
+                print("\n")
+
+                traceback.print_exc()
+                print("\n") 
+
         @socketio.on("requestEmptyTempFolder")
         def empty_temp_folder():
             try:
