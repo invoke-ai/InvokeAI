@@ -672,6 +672,12 @@ class Args(object):
             help='Tile size for background sampler, 0 for no tile during testing. Default: 400.',
         )
         postprocessing_group.add_argument(
+            '--esrgan_denoise_str',
+            type=float,
+            default=0.75,
+            help='esrgan denoise str. 0 is no denoise, 1 is max denoise.  Default: 0.75',
+        )
+        postprocessing_group.add_argument(
             '--gfpgan_model_path',
             type=str,
             default='./models/gfpgan/GFPGANv1.4.pth',

@@ -34,6 +34,7 @@ import {
   setFacetoolStrength,
   setFacetoolType,
   setHiresFix,
+  setUpscalingDenoising,
   setUpscalingLevel,
   setUpscalingStrength,
 } from 'features/parameters/store/postprocessingSlice';
@@ -147,11 +148,11 @@ const ImageMetadataViewer = memo(
       postprocessing,
       prompt,
       sampler,
-      scale,
       seamless,
       seed,
       steps,
       strength,
+      denoise_str,
       threshold,
       type,
       variations,
@@ -183,27 +184,6 @@ const ImageMetadataViewer = memo(
               )}
               {['esrgan', 'gfpgan'].includes(type) && (
                 <MetadataItem label="Original image" value={orig_path} />
-              )}
-              {type === 'gfpgan' && strength !== undefined && (
-                <MetadataItem
-                  label="Fix faces strength"
-                  value={strength}
-                  onClick={() => dispatch(setFacetoolStrength(strength))}
-                />
-              )}
-              {type === 'esrgan' && scale !== undefined && (
-                <MetadataItem
-                  label="Upscaling scale"
-                  value={scale}
-                  onClick={() => dispatch(setUpscalingLevel(scale))}
-                />
-              )}
-              {type === 'esrgan' && strength !== undefined && (
-                <MetadataItem
-                  label="Upscaling strength"
-                  value={strength}
-                  onClick={() => dispatch(setUpscalingStrength(strength))}
-                />
               )}
               {prompt && (
                 <MetadataItem
@@ -331,7 +311,7 @@ const ImageMetadataViewer = memo(
                       i: number
                     ) => {
                       if (postprocess.type === 'esrgan') {
-                        const { scale, strength } = postprocess;
+                        const { scale, strength, denoise_str } = postprocess;
                         return (
                           <Flex
                             key={i}
@@ -354,6 +334,15 @@ const ImageMetadataViewer = memo(
                                 dispatch(setUpscalingStrength(strength))
                               }
                             />
+                            {denoise_str !== undefined && (
+                              <MetadataItem
+                                label="Denoising strength"
+                                value={denoise_str}
+                                onClick={() =>
+                                  dispatch(setUpscalingDenoising(denoise_str))
+                                }
+                              />
+                            )}
                           </Flex>
                         );
                       } else if (postprocess.type === 'gfpgan') {
