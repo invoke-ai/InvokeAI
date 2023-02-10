@@ -1,0 +1,16 @@
+{
+  "generations": "Wygenerowane",
+  "showGenerations": "Pokaż wygenerowane obrazy",
+  "uploads": "Przesłane",
+  "showUploads": "Pokaż przesłane obrazy",
+  "galleryImageSize": "Rozmiar obrazów",
+  "galleryImageResetSize": "Resetuj rozmiar",
+  "gallerySettings": "Ustawienia galerii",
+  "maintainAspectRatio": "Zachowaj proporcje",
+  "autoSwitchNewImages": "Przełączaj na nowe obrazy",
+  "singleColumnLayout": "Układ jednokolumnowy",
+  "pinGallery": "Przypnij galerię",
+  "allImagesLoaded": "Koniec listy",
+  "loadMore": "Wczytaj więcej",
+  "noImagesInGallery": "Brak obrazów w galerii"
+}
