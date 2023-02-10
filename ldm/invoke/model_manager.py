@@ -25,8 +25,6 @@ import torch
 import transformers
 from diffusers import AutoencoderKL
 from diffusers import logging as dlogging
-from diffusers.utils.logging import (get_verbosity, set_verbosity,
-                                     set_verbosity_error)
 from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
@@ -36,7 +34,6 @@ from ldm.invoke.generator.diffusers_pipeline import \
     StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import (Globals, global_autoscan_dir, global_cache_dir,
                                 global_models_dir)
-from ldm.invoke.offloading import OffloadingDevice
 from ldm.util import (ask_user, download_with_progress_bar,
                       instantiate_from_config)
 
@@ -71,10 +68,7 @@ class ModelManager(object):
         self.models = {}
         self.stack = []  # this is an LRU FIFO
         self.current_model = None
-        if sequential_offload:
-            self.offloader = OffloadingDevice(self.device)
-        else:
-            self.offloader = None
+        self.sequential_offload = sequential_offload
 
     def valid_model(self, model_name: str) -> bool:
         """
@@ -98,10 +92,7 @@ class ModelManager(object):
         if self.current_model != model_name:
             if model_name not in self.models:  # make room for a new one
                 self._make_cache_room()
-            if self.offloader:
-                self.offloader.offload_current()
-            else:
-                self.offload_model(self.current_model)
+            self.offload_model(self.current_model)
 
         if model_name in self.models:
             requested_model = self.models[model_name]["model"]
@@ -538,8 +529,8 @@ class ModelManager(object):
         dlogging.set_verbosity(verbosity)
         assert pipeline is not None, OSError(f'"{name_or_path}" could not be loaded')
 
-        if self.offloader:
-            self.offloader.install(*pipeline.submodels)
+        if self.sequential_offload:
+            pipeline.enable_offload_submodels(self.device)
         else:
             pipeline.to(self.device)
 
@@ -1004,12 +995,12 @@ class ModelManager(object):
         if self.device == "cpu":
             return model
 
-        # diffusers really really doesn't like us moving a float16 model onto CPU
-        verbosity = get_verbosity()
-        set_verbosity_error()
+        if isinstance(model, StableDiffusionGeneratorPipeline):
+            model.offload_all()
+            return model
+
         model.cond_stage_model.device = "cpu"
         model.to("cpu")
-        set_verbosity(verbosity)
 
         for submodel in ("first_stage_model", "cond_stage_model", "model"):
             try:
@@ -1022,8 +1013,8 @@ class ModelManager(object):
         if self.device == "cpu":
             return model
 
-        if self.offloader and isinstance(model, StableDiffusionGeneratorPipeline):
-            # Offloader handles it on demand.
+        if isinstance(model, StableDiffusionGeneratorPipeline):
+            model.ready()
             return model
 
         model.to(self.device)

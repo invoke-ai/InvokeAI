@@ -3,40 +3,33 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import secrets
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Callable, Type, TypeVar, Generic, Any
-
-if sys.version_info < (3, 10):
-    from typing_extensions import ParamSpec
-else:
-    from typing import ParamSpec
 
 import PIL.Image
 import einops
 import torch
 import torchvision.transforms as T
-from diffusers.utils.import_utils import is_xformers_available
-
-from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
-from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
-
-
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import StableDiffusionImg2ImgPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
-from diffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
+from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.outputs import BaseOutput
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from typing_extensions import ParamSpec
 
 from ldm.invoke.globals import Globals
 from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, ThresholdSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
+from ..offloading import HotSeatModelGroup, SimpleModelGroup
+from ...models.diffusion.cross_attention_map_saving import AttentionMapSaver
+from ...modules.prompt_to_embeddings_converter import WeightedPromptFragmentsToEmbeddingsConverter
 
 
 @dataclass
@@ -272,7 +265,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: KarrasDiffusionSchedulers,
         safety_checker: Optional[StableDiffusionSafetyChecker],
         feature_extractor: Optional[CLIPFeatureExtractor],
         requires_safety_checker: bool = False,
@@ -303,7 +296,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
         self._enable_memory_efficient_attention()
-
+        self._model_group = SimpleModelGroup(self.unet.device)
+        self._model_group.install(*self._submodels)
 
     def _enable_memory_efficient_attention(self):
         """
@@ -319,6 +313,43 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 pass
             else:
                 self.enable_attention_slicing(slice_size='max')
+
+    def enable_offload_submodels(self, device: torch.device):
+        models = self._submodels
+        if self._model_group is not None:
+            self._model_group.uninstall(*models)
+        group = HotSeatModelGroup(device)
+        group.install(*models)
+        self._model_group = group
+
+    def disable_offload_submodels(self):
+        models = self._submodels
+        if self._model_group is not None:
+            self._model_group.uninstall(*models)
+        group = SimpleModelGroup(self._model_group.execution_device)
+        group.install(*models)
+        self._model_group = group
+
+    def offload_all(self):
+        self._model_group.offload_current()
+
+    def ready(self):
+        self._model_group.ready()
+
+    def to(self, torch_device: Optional[Union[str, torch.device]] = None):
+        if torch_device is None:
+            return self
+        self._model_group.set_device(torch_device)
+
+    @property
+    def device(self) -> torch.device:
+        return self._model_group.execution_device
+
+    @property
+    def _submodels(self) -> Sequence[torch.nn.Module]:
+        module_names, _, _ = self.extract_init_dict(dict(self.config))
+        values = [getattr(self, name) for name in module_names.keys()]
+        return [m for m in values if isinstance(m, torch.nn.Module)]
 
     def image_from_embeddings(self, latents: torch.Tensor, num_inference_steps: int,
                               conditioning_data: ConditioningData,
@@ -360,8 +391,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                 additional_guidance: List[Callable] = None, run_id=None,
                                 callback: Callable[[PipelineIntermediateState], None] = None
                                 ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+        device = self._model_group.device_for(self.unet)
         if timesteps is None:
-            self.scheduler.set_timesteps(num_inference_steps, device=self.unet.device)
+            self.scheduler.set_timesteps(num_inference_steps, device=device)
             timesteps = self.scheduler.timesteps
         infer_latents_from_embeddings = GeneratorToCallbackinator(self.generate_latents_from_embeddings, PipelineIntermediateState)
         result: PipelineIntermediateState = infer_latents_from_embeddings(
@@ -391,8 +423,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                             latents=latents)
 
             batch_size = latents.shape[0]
+            device = self._model_group.device_for(self.unet)
             batched_t = torch.full((batch_size,), timesteps[0],
-                                   dtype=timesteps.dtype, device=self.unet.device)
+                                   dtype=timesteps.dtype, device=device)
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             attention_map_saver: Optional[AttentionMapSaver] = None
@@ -444,7 +477,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
         # compute the previous noisy sample x_t -> x_t-1
-        step_output = self.scheduler.step(noise_pred, timestep, latents.to(noise_pred.device),
+        step_output = self.scheduler.step(noise_pred, timestep, latents,
                                           **conditioning_data.scheduler_args)
 
         # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
@@ -488,7 +521,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             init_image = einops.rearrange(init_image, 'c h w -> 1 c h w')
 
         # 6. Prepare latent variables
-        device = self.unet.device
+        device = self._model_group.device_for(self.unet)
         latents_dtype = self.unet.dtype
         initial_latents = self.non_noised_latents_from_image(init_image, device=device, dtype=latents_dtype)
         noise = noise_func(initial_latents)
@@ -503,7 +536,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                             strength,
                                             noise: torch.Tensor, run_id=None, callback=None
                                             ) -> InvokeAIStableDiffusionPipelineOutput:
-        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength, self.unet.device)
+        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength,
+                                                  device=self._model_group.device_for(self.unet))
         result_latents, result_attention_maps = self.latents_from_embeddings(
             initial_latents, num_inference_steps, conditioning_data,
             timesteps=timesteps,
@@ -542,7 +576,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             run_id=None,
             noise_func=None,
             ) -> InvokeAIStableDiffusionPipelineOutput:
-        device = self.unet.device
+        device = self._model_group.device_for(self.unet)
         latents_dtype = self.unet.dtype
 
         if isinstance(init_image, PIL.Image.Image):
@@ -606,6 +640,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 # TODO remove this workaround once kulinseth#222 is merged to pytorch mainline
                 self.vae.to('cpu')
                 init_image = init_image.to('cpu')
+            else:
+                self._model_group.load(self.vae)
             init_latent_dist = self.vae.encode(init_image).latent_dist
             init_latents = init_latent_dist.sample().to(dtype=dtype)  # FIXME: uses torch.randn. make reproducible!
             if device.type == 'mps':
@@ -636,7 +672,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             text=c,
             fragment_weights=fragment_weights,
             should_return_tokens=return_tokens,
-            device=self.device)
+            device=self._model_group.device_for(self.unet))
 
     @property
     def cond_stage_model(self):
@@ -657,17 +693,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """Compatible with DiffusionWrapper"""
         return self.unet.in_channels
 
-    @property
-    def submodels(self) -> Sequence[torch.nn.Module]:
-        models = self.text_encoder, self.unet, self.vae, self.safety_checker
-        return [m for m in models if m is not None]
-
     def decode_latents(self, latents):
-        # Super ugly kludge to get the vae loaded! (since `decode` isn't the forward method.)
-        try:
-            self.vae(tuple())
-        except TypeError:
-            pass  # we didn't expect it to work, just needed its side-effects.
+        # Explicit call to get the vae loaded, since `decode` isn't the forward method.
+        self._model_group.load(self.vae)
         return super().decode_latents(latents)
 
     def debug_latents(self, latents, msg):
