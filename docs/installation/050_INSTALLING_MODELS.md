@@ -80,6 +80,11 @@ only `.safetensors` and `.ckpt` models, but they can be easily loaded
 into InvokeAI and/or converted into optimized `diffusers` models. Be
 aware that CIVITAI hosts many models that generate NSFW content.
 
+**Note** that InvokeAI 2.3.x does not support directly importing and
+running Stable Diffusion version 2 checkpoint models. You may instead
+convert them into `diffusers` models using the conversion methods
+described below.
+
 ## Installation
 
 There are multiple ways to install and manage models:
