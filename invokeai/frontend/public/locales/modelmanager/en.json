@@ -75,7 +75,11 @@
   "v1": "v1",
   "v2": "v2",
   "inpainting": "v1 Inpainting",
-  "custom": "Custom",
+  "customConfig": "Custom Config",
   "pathToCustomConfig": "Path To Custom Config",
-  "statusConverting": "Converting"
+  "statusConverting": "Converting",
+  "sameFolder": "Same Folder",
+  "invokeRoot": "Invoke Models",
+  "custom": "Custom",
+  "customSaveLocation": "Custom Save Location"
 }
