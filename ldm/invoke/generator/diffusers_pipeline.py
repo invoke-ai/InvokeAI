@@ -34,7 +34,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ldm.invoke.globals import Globals
-from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, ThresholdSettings
+from ldm.models.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent, PostprocessingSettings
 from ldm.modules.textual_inversion_manager import TextualInversionManager
 
 
@@ -199,8 +199,10 @@ class ConditioningData:
     """
     extra: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo] = None
     scheduler_args: dict[str, Any] = field(default_factory=dict)
-    """Additional arguments to pass to scheduler.step."""
-    threshold: Optional[ThresholdSettings] = None
+    """
+    Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
+    """
+    postprocessing_settings: Optional[PostprocessingSettings] = None
 
     @property
     def dtype(self):
@@ -404,8 +406,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                         additional_guidance=additional_guidance)
                 latents = step_output.prev_sample
 
-                if conditioning_data.threshold:
-                    latents = self.invokeai_diffuser.do_thresholding(conditioning_data.threshold.threshold, conditioning_data.threshold.warmup, latents, batched_t, i, len(timesteps))
+                latents = self.invokeai_diffuser.do_latent_postprocessing(
+                    postprocessing_settings=conditioning_data.postprocessing_settings,
+                    latents=latents,
+                    sigma=batched_t,
+                    step_index=i,
+                    total_step_count=len(timesteps)
+                )
 
                 predicted_original = getattr(step_output, 'pred_original_sample', None)
 
@@ -443,7 +450,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
-            threshold=conditioning_data.threshold
         )
 
         # compute the previous noisy sample x_t -> x_t-1

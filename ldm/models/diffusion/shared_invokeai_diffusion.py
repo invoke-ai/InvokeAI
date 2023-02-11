@@ -15,7 +15,7 @@ from ldm.models.diffusion.cross_attention_map_saving import AttentionMapSaver
 
 
 @dataclass(frozen=True)
-class ThresholdSettings:
+class PostprocessingSettings:
     threshold: float
     warmup: float
 
@@ -121,7 +121,6 @@ class InvokeAIDiffuserComponent:
                                 unconditional_guidance_scale: float,
                                 step_index: Optional[int]=None,
                                 total_step_count: Optional[int]=None,
-                                threshold: Optional[ThresholdSettings]=None,
                           ):
         """
         :param x: current latents
@@ -130,7 +129,6 @@ class InvokeAIDiffuserComponent:
         :param conditioning: embeddings for conditioned output. for hybrid conditioning this is a dict of tensors [B x 77 x 768], otherwise a single tensor [B x 77 x 768]
         :param unconditional_guidance_scale: aka CFG scale, controls how much effect the conditioning tensor has
         :param step_index: counts upwards from 0 to (step_count-1) (as passed to setup_cross_attention_control, if using). May be called multiple times for a single step, therefore do not assume that its value will monotically increase. If None, will be estimated by comparing sigma against self.model.sigmas .
-        :param threshold: threshold to apply after each step
         :return: the new latents after applying the model to x using unscaled unconditioning and CFG-scaled conditioning.
         """
 
@@ -155,9 +153,18 @@ class InvokeAIDiffuserComponent:
 
         return combined_next_x
 
-    def do_thresholding(self, threshold, warmup, latents: torch.Tensor, sigma, step_index, total_step_count) -> torch.Tensor:
-        percent_through = self.calculate_percent_through(sigma, step_index, total_step_count)
-        return self._threshold(threshold, warmup, latents, percent_through)
+    def do_latent_postprocessing(
+        self,
+        postprocessing_settings: PostprocessingSettings,
+        latents: torch.Tensor,
+        sigma,
+        step_index,
+        total_step_count
+    ) -> torch.Tensor:
+        if postprocessing_settings is not None:
+            percent_through = self.calculate_percent_through(sigma, step_index, total_step_count)
+            latents = self._threshold(postprocessing_settings.threshold, postprocessing_settings.warmup, latents, percent_through)
+        return latents
 
     def calculate_percent_through(self, sigma, step_index, total_step_count):
         if step_index is not None and total_step_count is not None:
@@ -283,7 +290,7 @@ class InvokeAIDiffuserComponent:
 
     def _threshold(self, threshold, warmup, latents: torch.Tensor, percent_through) -> torch.Tensor:
         if percent_through < warmup:
-            current_threshold = threshold + threshold * (1 - (percent_through / warmup))
+            current_threshold = threshold + threshold * 5 * (1 - (percent_through / warmup))
         else:
             current_threshold = threshold
 
@@ -305,20 +312,23 @@ class InvokeAIDiffuserComponent:
         if maxval < current_threshold and minval > -current_threshold:
             return latents
 
+        num_altered = 0
+
         if maxval > current_threshold:
             latents = torch.clone(latents)
             maxval = np.clip(maxval * scale, 1, current_threshold)
+            num_altered += torch.count_nonzero(latents > maxval)
             latents[latents > maxval] = torch.rand_like(latents[latents > maxval]) * maxval
 
         if minval < -current_threshold:
             latents = torch.clone(latents)
             minval = np.clip(minval * scale, -current_threshold, -1)
+            num_altered += torch.count_nonzero(latents < minval)
             latents[latents < minval] = torch.rand_like(latents[latents < minval]) * minval
 
         if self.debug_thresholding:
-            outside = torch.count_nonzero((latents < minval) | (latents > maxval))
             print(f"  | min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})\n"
-                  f"  | {outside / latents.numel() * 100:.2f}% values will be clamped")
+                  f"  | {num_altered / latents.numel() * 100:.2f}% values altered")
 
         return latents
 
