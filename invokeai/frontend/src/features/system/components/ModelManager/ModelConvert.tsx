@@ -1,10 +1,16 @@
-import { Flex, ListItem, Text, UnorderedList } from '@chakra-ui/react';
+import {
+  Flex,
+  ListItem,
+  Radio,
+  RadioGroup,
+  Text,
+  UnorderedList,
+} from '@chakra-ui/react';
 import { convertToDiffusers } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
-import IAICheckbox from 'common/components/IAICheckbox';
 import IAIInput from 'common/components/IAIInput';
 import { setIsProcessing } from 'features/system/store/systemSlice';
 import { useState, useEffect } from 'react';
@@ -23,9 +29,8 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   const retrievedModel = model_list[model];
 
-  const [isInpainting, setIsInpainting] = useState<boolean>(false);
-  const [customConfig, setIsCustomConfig] = useState<boolean>(false);
   const [pathToConfig, setPathToConfig] = useState<string>('');
+  const [modelType, setModelType] = useState<string>('1');
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -40,8 +45,7 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   // Need to manually handle local state reset because the component does not re-render.
   const stateReset = () => {
-    setIsInpainting(false);
-    setIsCustomConfig(false);
+    setModelType('1');
     setPathToConfig('');
   };
 
@@ -58,8 +62,9 @@ export default function ModelConvert(props: ModelConvertProps) {
   const modelConvertHandler = () => {
     const modelConvertData = {
       name: model,
-      is_inpainting: isInpainting,
-      custom_config: customConfig && pathToConfig !== '' ? pathToConfig : null,
+      model_type: modelType,
+      custom_config:
+        modelType === 'custom' && pathToConfig !== '' ? pathToConfig : null,
     };
 
     dispatch(setIsProcessing(true));
@@ -86,6 +91,7 @@ export default function ModelConvert(props: ModelConvertProps) {
           🧨 {t('modelmanager:convertToDiffusers')}
         </IAIButton>
       }
+      motionPreset="slideInBottom"
     >
       <Flex flexDirection="column" rowGap={4}>
         <Text>{t('modelmanager:convertToDiffusersHelpText1')}</Text>
@@ -96,46 +102,37 @@ export default function ModelConvert(props: ModelConvertProps) {
           <ListItem>{t('modelmanager:convertToDiffusersHelpText5')}</ListItem>
         </UnorderedList>
         <Text>{t('modelmanager:convertToDiffusersHelpText6')}</Text>
-        <Flex flexDir="column" gap={4}>
+        <RadioGroup
+          value={modelType}
+          onChange={(v) => setModelType(v)}
+          defaultValue="1"
+          name="model_type"
+        >
           <Flex gap={4}>
-            <IAICheckbox
-              checked={isInpainting}
-              onChange={() => {
-                setIsInpainting(!isInpainting);
-                setIsCustomConfig(false);
+            <Radio value="1">{t('modelmanager:v1')}</Radio>
+            <Radio value="2">{t('modelmanager:v2')}</Radio>
+            <Radio value="inpainting">{t('modelmanager:inpainting')}</Radio>
+            <Radio value="custom">{t('modelmanager:custom')}</Radio>
+          </Flex>
+        </RadioGroup>
+        {modelType === 'custom' && (
+          <Flex flexDirection="column" rowGap={2}>
+            <Text
+              fontWeight="bold"
+              fontSize="sm"
+              color="var(--text-color-secondary)"
+            >
+              {t('modelmanager:pathToCustomConfig')}
+            </Text>
+            <IAIInput
+              value={pathToConfig}
+              onChange={(e) => {
+                if (e.target.value !== '') setPathToConfig(e.target.value);
               }}
-              label={t('modelmanager:inpaintingModel')}
-              isDisabled={customConfig}
-            />
-            <IAICheckbox
-              checked={customConfig}
-              onChange={() => {
-                setIsCustomConfig(!customConfig);
-                setIsInpainting(false);
-              }}
-              label={t('modelmanager:customConfig')}
-              isDisabled={isInpainting}
+              width="25rem"
             />
           </Flex>
-          {customConfig && (
-            <Flex flexDirection="column" rowGap={2}>
-              <Text
-                fontWeight="bold"
-                fontSize="sm"
-                color="var(--text-color-secondary)"
-              >
-                {t('modelmanager:pathToCustomConfig')}
-              </Text>
-              <IAIInput
-                value={pathToConfig}
-                onChange={(e) => {
-                  if (e.target.value !== '') setPathToConfig(e.target.value);
-                }}
-                width="25rem"
-              />
-            </Flex>
-          )}
-        </Flex>
+        )}
       </Flex>
     </IAIAlertDialog>
   );

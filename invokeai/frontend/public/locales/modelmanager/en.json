@@ -72,8 +72,10 @@
   "convertToDiffusersHelpText4": "This is a one time process only. It might take around 30s-60s depending on the specifications of your computer.",
   "convertToDiffusersHelpText5": "This process will create a Diffusers version of this model in the same directory as your checkpoint. Please make sure you have enough disk space.",
   "convertToDiffusersHelpText6": "Do you wish to convert this model?",
-  "inpaintingModel": "Inpainting Model",
-  "customConfig": "Custom Config",
+  "v1": "v1",
+  "v2": "v2",
+  "inpainting": "v1 Inpainting",
+  "custom": "Custom",
   "pathToCustomConfig": "Path To Custom Config",
   "statusConverting": "Converting"
 }

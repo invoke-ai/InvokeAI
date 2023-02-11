@@ -422,14 +422,21 @@ class InvokeAIWebServer:
                     original_config_file = Path(
                         Globals.root, original_config_file)
 
-                if model_to_convert['is_inpainting']:
+                if model_to_convert['model_type'] == 'inpainting':
                     original_config_file = Path(
                         'configs',
                         'stable-diffusion',
-                        'v1-inpainting-inference.yaml' if model_to_convert['is_inpainting'] else 'v1-inference.yaml'
+                        'v1-inpainting-inference.yaml'
                     )
 
-                if model_to_convert['custom_config'] is not None:
+                if model_to_convert['model_type'] == '2':
+                    original_config_file = Path(
+                        'configs',
+                        'stable-diffusion',
+                        'v2-inference-v.yaml'
+                    )
+
+                if model_to_convert['model_type'] == 'custom' and model_to_convert['custom_config'] is not None:
                     original_config_file = Path(
                         model_to_convert['custom_config'])
 
