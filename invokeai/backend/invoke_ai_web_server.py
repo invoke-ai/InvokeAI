@@ -422,26 +422,10 @@ class InvokeAIWebServer:
                     original_config_file = Path(
                         Globals.root, original_config_file)
 
-                if model_to_convert['model_type'] == 'inpainting':
-                    original_config_file = Path(
-                        'configs',
-                        'stable-diffusion',
-                        'v1-inpainting-inference.yaml'
-                    )
-
-                if model_to_convert['model_type'] == '2':
-                    original_config_file = Path(
-                        'configs',
-                        'stable-diffusion',
-                        'v2-inference-v.yaml'
-                    )
-
-                if model_to_convert['model_type'] == 'custom' and model_to_convert['custom_config'] is not None:
-                    original_config_file = Path(
-                        model_to_convert['custom_config'])
-
                 diffusers_path = Path(
-                    f'{ckpt_path.parent.absolute()}\\{model_name}_diffusers')
+                    ckpt_path.parent.absolute(),
+                    f'{model_name}_diffusers'
+                )
 
                 if diffusers_path.exists():
                     shutil.rmtree(diffusers_path)
