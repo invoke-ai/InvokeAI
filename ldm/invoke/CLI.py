@@ -58,12 +58,9 @@ def main():
     print(f'>> Internet connectivity is {Globals.internet_available}')
 
     if not args.conf:
-        if not os.path.exists(os.path.join(Globals.root,'configs','models.yaml')):
-            report_model_error(opt, e)
-            # print(f"\n** Error. The file {os.path.join(Globals.root,'configs','models.yaml')} could not be found.")
-            # print('** Please check the location of your invokeai directory and use the --root_dir option to point to the correct path.')
-            # print('** This script will now exit.')
-            # sys.exit(-1)
+        config_file = os.path.join(Globals.root,'configs','models.yaml')
+        if not os.path.exists(config_file):
+            report_model_error(opt, FileNotFoundError(f"The file {config_file} could not be found."))
 
     print(f'>> {ldm.invoke.__app_name__}, version {ldm.invoke.__version__}')
     print(f'>> InvokeAI runtime directory is "{Globals.root}"')
@@ -658,7 +655,9 @@ def import_ckpt_model(path_or_url: Union[Path, str], gen, opt, completer) -> Opt
         model_description=default_description
     )
     config_file = None
-    default = Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
+    default = Path(Globals.root,'configs/stable-diffusion/v1-inpainting-inference.yaml') \
+        if re.search('inpaint',default_name, flags=re.IGNORECASE) \
+           else Path(Globals.root,'configs/stable-diffusion/v1-inference.yaml')
 
     completer.complete_extensions(('.yaml','.yml'))
     completer.set_line(str(default))
@@ -709,12 +708,21 @@ def _get_model_name_and_desc(model_manager,completer,model_name:str='',model_des
     model_description = input(f'Description for this model [{model_description}]: ').strip() or model_description
     return model_name, model_description
 
-def optimize_model(model_name_or_path:str, gen, opt, completer):
+def _is_inpainting(model_name_or_path: str)->bool:
+    if re.search('inpaint',model_name_or_path, flags=re.IGNORECASE):
+        return not input('Is this an inpainting model? [y] ').startswith(('n','N'))
+    else:
+        return not input('Is this an inpainting model? [n] ').startswith(('y','Y'))
+
+def optimize_model(model_name_or_path: str, gen, opt, completer):
     manager = gen.model_manager
     ckpt_path = None
     original_config_file = None
 
-    if (model_info := manager.model_info(model_name_or_path)):
+    if model_name_or_path == gen.model_name:
+        print("** Can't convert the active model. !switch to another model first. **")
+        return
+    elif (model_info := manager.model_info(model_name_or_path)):
         if 'weights' in model_info:
             ckpt_path = Path(model_info['weights'])
             original_config_file = Path(model_info['config'])
@@ -731,7 +739,7 @@ def optimize_model(model_name_or_path:str, gen, opt, completer):
             ckpt_path.stem,
             f'Converted model {ckpt_path.stem}'
         )
-        is_inpainting = input('Is this an inpainting model? [n] ').startswith(('y','Y'))
+        is_inpainting = _is_inpainting(model_name_or_path)
         original_config_file = Path(
             'configs',
             'stable-diffusion',
@@ -889,6 +897,7 @@ def do_postprocess (gen, opt, callback):
             codeformer_fidelity = opt.codeformer_fidelity,
             save_original       = opt.save_original,
             upscale             = opt.upscale,
+            upscale_denoise_str = opt.esrgan_denoise_str,
             out_direction       = opt.out_direction,
             outcrop             = opt.outcrop,
             callback            = callback,
@@ -950,7 +959,7 @@ def prepare_image_metadata(
             print(f'** The filename format contains an unknown key \'{e.args[0]}\'. Will use {{prefix}}.{{seed}}.png\' instead')
             filename = f'{prefix}.{seed}.png'
         except IndexError:
-            print(f'** The filename format is broken or complete. Will use \'{{prefix}}.{{seed}}.png\' instead')
+            print("** The filename format is broken or complete. Will use '{prefix}.{seed}.png' instead")
             filename = f'{prefix}.{seed}.png'
 
     if opt.variation_amount > 0:
