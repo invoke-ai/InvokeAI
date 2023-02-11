@@ -3,7 +3,8 @@ on:
   push:
     branches:
       - 'main'
-      - 'update/ci/*'
+      - 'update/ci/docker/*'
+      - 'update/docker/*'
     tags:
       - 'v*.*.*'
 
@@ -20,18 +21,15 @@ jobs:
         include:
           - flavor: amd
             pip-extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
-            dockerfile: docker/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - flavor: cuda
             pip-extra-index-url: ''
-            dockerfile: docker/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - flavor: cpu
             pip-extra-index-url: 'https://download.pytorch.org/whl/cpu'
-            dockerfile: docker/Dockerfile
-            platforms: linux/amd64,linux/arm64
     runs-on: ubuntu-latest
     name: ${{ matrix.flavor }}
+    env:
+      PLATFORMS: 'linux/amd64,linux/arm64'
+      DOCKERFILE: 'docker/Dockerfile'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -41,7 +39,9 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: ghcr.io/${{ github.repository }}
+          images: |
+            ghcr.io/${{ github.repository }}
+            ${{ vars.DOCKERHUB_REPOSITORY }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -52,13 +52,14 @@ jobs:
           flavor: |
             latest=${{ matrix.flavor == 'cuda' && github.ref == 'refs/heads/main' }}
             suffix=-${{ matrix.flavor }},onlatest=false
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
-          platforms: ${{ matrix.platforms }}
+          platforms: ${{ env.PLATFORMS }}
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
@@ -68,25 +69,34 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request' && vars.DOCKERHUB_REPOSITORY != ''
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build container
+        id: docker_build
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
-          push: ${{ github.event_name != 'pull_request' }}
+          file: ${{ env.DOCKERFILE }}
+          platforms: ${{ env.PLATFORMS }}
+          push: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/tags/*' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: PIP_EXTRA_INDEX_URL=${{ matrix.pip-extra-index-url }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=${{ github.ref_name }}-${{ matrix.flavor }}
+            type=gha,scope=main-${{ matrix.flavor }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.flavor }}
 
-      - name: Output image, digest and metadata to summary
-        run: |
-          {
-          echo imageid: "${{ steps.docker_build.outputs.imageid }}"
-          echo digest: "${{ steps.docker_build.outputs.digest }}"
-          echo labels: "${{ steps.meta.outputs.labels }}"
-          echo tags: "${{ steps.meta.outputs.tags }}"
-          echo version: "${{ steps.meta.outputs.version }}"
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Docker Hub Description
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/tags/*' && vars.DOCKERHUB_REPOSITORY != ''
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_REPOSITORY }}
+          short-description: ${{ github.event.repository.description }}
