@@ -125,7 +125,7 @@ manager, please follow these steps:
     === "Windows"
 
         ```ps
-        .venv\script\activate
+        .venv\Scripts\activate
         ```
 
         If you get a permissions error at this point, run this command and try again
