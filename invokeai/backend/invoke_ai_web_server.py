@@ -402,11 +402,11 @@ class InvokeAIWebServer:
         @socketio.on('convertToDiffusers')
         def convert_to_diffusers(model_to_convert: dict):
             try:
-                if (model_info := self.generate.model_manager.model_info(model_name=model_to_convert['name'])):
+                if (model_info := self.generate.model_manager.model_info(model_name=model_to_convert['model_name'])):
                     if 'weights' in model_info:
                         ckpt_path = Path(model_info['weights'])
                         original_config_file = Path(model_info['config'])
-                        model_name = model_to_convert["name"]
+                        model_name = model_to_convert['model_name']
                         model_description = model_info['description']
                     else:
                         self.socketio.emit(
@@ -426,6 +426,12 @@ class InvokeAIWebServer:
                     ckpt_path.parent.absolute(),
                     f'{model_name}_diffusers'
                 )
+
+                if model_to_convert['save_location'] == 'root':
+                    diffusers_path = Path(Globals.root, 'models', 'converted_ckpts', f'{model_name}_diffusers')
+                
+                if model_to_convert['save_location'] == 'custom' and model_to_convert['custom_location'] is not None:
+                    diffusers_path = Path(model_to_convert['custom_location'], f'{model_name}_diffusers')
 
                 if diffusers_path.exists():
                     shutil.rmtree(diffusers_path)
