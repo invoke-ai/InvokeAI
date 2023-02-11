@@ -394,13 +394,14 @@ class InvokeAIWebServer:
                 print("\n")
 
         @socketio.on('convertToDiffusers')
-        def convert_to_diffusers(model_to_convert: str):
+        def convert_to_diffusers(model_to_convert: dict):
             try:
-                if (model_info := self.generate.model_manager.model_info(model_name=model_to_convert)):
+
+                if (model_info := self.generate.model_manager.model_info(model_name=model_to_convert['name'])):
                     if 'weights' in model_info:
                         ckpt_path = Path(model_info['weights'])
                         original_config_file = Path(model_info['config'])
-                        model_name = model_to_convert
+                        model_name = model_to_convert["name"]
                         model_description = model_info['description']
                     else:
                         self.socketio.emit("error", {"message": "Model is not a valid checkpoint file"})
@@ -412,6 +413,13 @@ class InvokeAIWebServer:
                 
                 if original_config_file and not original_config_file.is_absolute():
                     original_config_file = Path(Globals.root, original_config_file)
+
+                if model_to_convert['is_inpainting']:
+                    original_config_file = Path(
+                        'configs',
+                        'stable-diffusion',
+                        'v1-inpainting-inference.yaml' if model_to_convert['is_inpainting'] else 'v1-inference.yaml'
+                    )
                 
                 diffusers_path = Path(f'{ckpt_path.parent.absolute()}\\{model_name}_diffusers')
                 
