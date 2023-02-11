@@ -897,6 +897,7 @@ def do_postprocess (gen, opt, callback):
             codeformer_fidelity = opt.codeformer_fidelity,
             save_original       = opt.save_original,
             upscale             = opt.upscale,
+            upscale_denoise_str = opt.esrgan_denoise_str,
             out_direction       = opt.out_direction,
             outcrop             = opt.outcrop,
             callback            = callback,
