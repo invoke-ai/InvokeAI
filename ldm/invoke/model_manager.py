@@ -806,7 +806,7 @@ class ModelManager(object):
         found_models = []
         for file in files:
             location = str(file.resolve()).replace("\\", "/")
-            if 'diffusers' not in location:
+            if 'model.safetensors' not in location and 'diffusion_pytorch_model.safetensors' not in location:
                 found_models.append(
                     {"name": file.stem, "location": location}
                 )
