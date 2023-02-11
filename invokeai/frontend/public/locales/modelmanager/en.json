@@ -74,5 +74,6 @@
   "convertToDiffusersHelpText6": "Do you wish to convert this model?",
   "inpaintingModel": "Inpainting Model",
   "customConfig": "Custom Config",
-  "pathToCustomConfig": "Path To Custom Config"
+  "pathToCustomConfig": "Path To Custom Config",
+  "statusConverting": "Converting"
 }

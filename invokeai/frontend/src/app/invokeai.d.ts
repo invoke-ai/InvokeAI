@@ -222,6 +222,7 @@ export declare type InvokeDiffusersModelConfigProps = {
 export declare type InvokeModelConversionProps = {
   name: string;
   is_inpainting: boolean;
+  custom_config: string | null;
 };
 
 /**

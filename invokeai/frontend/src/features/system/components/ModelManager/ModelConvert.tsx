@@ -25,6 +25,7 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   const [isInpainting, setIsInpainting] = useState<boolean>(false);
   const [customConfig, setIsCustomConfig] = useState<boolean>(false);
+  const [pathToConfig, setPathToConfig] = useState<string>('');
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -37,20 +38,40 @@ export default function ModelConvert(props: ModelConvertProps) {
     (state: RootState) => state.system.isConnected
   );
 
-  useEffect(() => {
+  // Need to manually handle local state reset because the component does not re-render.
+  const stateReset = () => {
     setIsInpainting(false);
     setIsCustomConfig(false);
+    setPathToConfig('');
+  };
+
+  // Reset local state when model changes
+  useEffect(() => {
+    stateReset();
   }, [model]);
 
+  // Handle local state reset when user cancels input
+  const modelConvertCancelHandler = () => {
+    stateReset();
+  };
+
   const modelConvertHandler = () => {
+    const modelConvertData = {
+      name: model,
+      is_inpainting: isInpainting,
+      custom_config: customConfig && pathToConfig !== '' ? pathToConfig : null,
+    };
+
     dispatch(setIsProcessing(true));
-    dispatch(convertToDiffusers({ name: model, is_inpainting: isInpainting }));
+    dispatch(convertToDiffusers(modelConvertData));
+    stateReset(); // Edge case: Cancel local state when model convert fails
   };
 
   return (
     <IAIAlertDialog
       title={`${t('modelmanager:convert')} ${model}`}
       acceptCallback={modelConvertHandler}
+      cancelCallback={modelConvertCancelHandler}
       acceptButtonText={`${t('modelmanager:convert')}`}
       triggerComponent={
         <IAIButton
@@ -105,7 +126,13 @@ export default function ModelConvert(props: ModelConvertProps) {
               >
                 {t('modelmanager:pathToCustomConfig')}
               </Text>
-              <IAIInput width="25rem" />
+              <IAIInput
+                value={pathToConfig}
+                onChange={(e) => {
+                  if (e.target.value !== '') setPathToConfig(e.target.value);
+                }}
+                width="25rem"
+              />
             </Flex>
           )}
         </Flex>
