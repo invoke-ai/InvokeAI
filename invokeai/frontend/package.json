@@ -34,6 +34,7 @@
     "i18next-browser-languagedetector": "^7.0.1",
     "i18next-http-backend": "^2.1.0",
     "konva": "^8.3.13",
+    "lint": "^0.8.19",
     "lodash": "^4.17.21",
     "re-resizable": "^6.9.9",
     "react": "^18.2.0",
