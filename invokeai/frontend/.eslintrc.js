@@ -31,6 +31,7 @@ module.exports = {
     'space-before-blocks': 'error',
     'import/prefer-default-export': 'off',
     '@typescript-eslint/no-unused-vars': ['warn', { varsIgnorePattern: '_+' }],
+    'prettier/prettier': ['error', { endOfLine: 'auto' }],
   },
   settings: {
     react: {

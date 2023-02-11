@@ -230,7 +230,8 @@ class Args(object):
                     switches = ''
         try:
             self._cmd_switches = self._cmd_parser.parse_args(shlex.split(switches,comments=True))
-            setattr(self._cmd_switches,'prompt',prompt)
+            if not getattr(self._cmd_switches,'prompt'):
+                setattr(self._cmd_switches,'prompt',prompt)
             return self._cmd_switches
         except:
             return None
@@ -669,6 +670,12 @@ class Args(object):
             type=int,
             default=400,
             help='Tile size for background sampler, 0 for no tile during testing. Default: 400.',
+        )
+        postprocessing_group.add_argument(
+            '--esrgan_denoise_str',
+            type=float,
+            default=0.75,
+            help='esrgan denoise str. 0 is no denoise, 1 is max denoise.  Default: 0.75',
         )
         postprocessing_group.add_argument(
             '--gfpgan_model_path',

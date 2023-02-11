@@ -89,7 +89,7 @@ const DeleteImageModal = forwardRef(
       () => {
         shouldConfirmOnDelete ? onOpen() : handleDelete();
       },
-      [image, shouldConfirmOnDelete]
+      [image, shouldConfirmOnDelete, isConnected, isProcessing]
     );
 
     const handleChangeShouldConfirmOnDelete = (

@@ -66,8 +66,7 @@ del /q .tmp1 .tmp2
 
 @rem -------------- Install and Configure ---------------
 
-call python main.py
-
+call python .\lib\main.py
 
 @rem ------------------------ Subroutines ---------------
 @rem routine to do comparison of semantic version numbers

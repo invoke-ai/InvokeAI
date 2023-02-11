@@ -23,9 +23,11 @@ We thank them for all of their time and hard work.
 * @damian0815 - Attention Systems and Gameplay Engineer
 * @mauwii (Matthias Wild) - Continuous integration and product maintenance engineer
 * @Netsvetaev (Artur Netsvetaev) - UI/UX Developer
-* @tildebyte - general gadfly and resident (self-appointed) know-it-all
+* @tildebyte - General gadfly and resident (self-appointed) know-it-all
 * @keturn - Lead for Diffusers port
 * @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
+* @jpphoto (Jonathan Pollack) - Inference and rendering engine optimization
+* @genomancer (Gregg Helt) - Model training and merging
 
 ## **Contributions by**
 
