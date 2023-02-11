@@ -321,6 +321,7 @@ class Generate:
             codeformer_fidelity = None,
             save_original    = False,
             upscale          = None,
+            upscale_denoise_str = 0.75,
             # this is specific to inpainting and causes more extreme inpainting
             inpaint_replace  = 0.0,
             # This controls the size at which inpaint occurs (scaled up for inpaint, then back down for the result)
@@ -560,6 +561,7 @@ class Generate:
             if upscale is not None or facetool_strength > 0:
                 self.upscale_and_reconstruct(results,
                                              upscale        = upscale,
+                                             upscale_denoise_str = upscale_denoise_str,
                                              facetool       = facetool,
                                              strength       = facetool_strength,
                                              codeformer_fidelity = codeformer_fidelity,
@@ -633,6 +635,7 @@ class Generate:
             facetool_strength   = 0.0,
             codeformer_fidelity = 0.75,
             upscale             = None,
+            upscale_denoise_str = 0.75,
             out_direction       = None,
             outcrop             = [],
             save_original       = True, # to get new name
@@ -684,6 +687,7 @@ class Generate:
                 codeformer_fidelity = codeformer_fidelity,
                 save_original = save_original,
                 upscale = upscale,
+                upscale_denoise_str = upscale_denoise_str,
                 image_callback = callback,
                 prefix = prefix,
             )
@@ -952,6 +956,7 @@ class Generate:
                                 image_list,
                                 facetool      = 'gfpgan',
                                 upscale       = None,
+                                upscale_denoise_str = 0.75,
                                 strength      =  0.0,
                                 codeformer_fidelity = 0.75,
                                 save_original = False,
@@ -982,7 +987,7 @@ class Generate:
                         if len(upscale) < 2:
                             upscale.append(0.75)
                         image = self.esrgan.process(
-                            image, upscale[1], seed, int(upscale[0]))
+                            image, upscale[1], seed, int(upscale[0]), denoise_str=upscale_denoise_str)
                     else:
                         print(">> ESRGAN is disabled. Image not upscaled.")
             except Exception as e:
