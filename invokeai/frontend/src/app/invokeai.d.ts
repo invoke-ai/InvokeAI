@@ -220,9 +220,9 @@ export declare type InvokeDiffusersModelConfigProps = {
 };
 
 export declare type InvokeModelConversionProps = {
-  name: string;
-  model_type: string;
-  custom_config: string | null;
+  model_name: string;
+  save_location: string;
+  custom_location: string | null;
 };
 
 /**

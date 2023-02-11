@@ -29,9 +29,6 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   const retrievedModel = model_list[model];
 
-  const [pathToConfig, setPathToConfig] = useState<string>('');
-  const [modelType, setModelType] = useState<string>('1');
-
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -43,33 +40,28 @@ export default function ModelConvert(props: ModelConvertProps) {
     (state: RootState) => state.system.isConnected
   );
 
-  // Need to manually handle local state reset because the component does not re-render.
-  const stateReset = () => {
-    setModelType('1');
-    setPathToConfig('');
-  };
+  const [saveLocation, setSaveLocation] = useState<string>('same');
+  const [customSaveLocation, setCustomSaveLocation] = useState<string>('');
 
-  // Reset local state when model changes
   useEffect(() => {
-    stateReset();
+    setSaveLocation('same');
   }, [model]);
 
-  // Handle local state reset when user cancels input
   const modelConvertCancelHandler = () => {
-    stateReset();
+    setSaveLocation('same');
   };
 
   const modelConvertHandler = () => {
-    const modelConvertData = {
-      name: model,
-      model_type: modelType,
-      custom_config:
-        modelType === 'custom' && pathToConfig !== '' ? pathToConfig : null,
+    const modelToConvert = {
+      model_name: model,
+      save_location: saveLocation,
+      custom_location:
+        saveLocation === 'custom' && customSaveLocation !== ''
+          ? customSaveLocation
+          : null,
     };
-
     dispatch(setIsProcessing(true));
-    dispatch(convertToDiffusers(modelConvertData));
-    stateReset(); // Edge case: Cancel local state when model convert fails
+    dispatch(convertToDiffusers(modelToConvert));
   };
 
   return (
@@ -102,32 +94,34 @@ export default function ModelConvert(props: ModelConvertProps) {
           <ListItem>{t('modelmanager:convertToDiffusersHelpText5')}</ListItem>
         </UnorderedList>
         <Text>{t('modelmanager:convertToDiffusersHelpText6')}</Text>
-        <RadioGroup
-          value={modelType}
-          onChange={(v) => setModelType(v)}
-          defaultValue="1"
-          name="model_type"
-        >
-          <Flex gap={4}>
-            <Radio value="1">{t('modelmanager:v1')}</Radio>
-            <Radio value="2">{t('modelmanager:v2')}</Radio>
-            <Radio value="inpainting">{t('modelmanager:inpainting')}</Radio>
-            <Radio value="custom">{t('modelmanager:custom')}</Radio>
-          </Flex>
-        </RadioGroup>
-        {modelType === 'custom' && (
+      </Flex>
+
+      <Flex flexDir="column" gap={4}>
+        <Flex marginTop="1rem" flexDir="column" gap={2}>
+          <Text fontWeight="bold">Save Location</Text>
+          <RadioGroup value={saveLocation} onChange={(v) => setSaveLocation(v)}>
+            <Flex gap={4}>
+              <Radio value="same">{t('modelmanager:sameFolder')}</Radio>
+              <Radio value="root">{t('modelmanager:invokeRoot')}</Radio>
+              <Radio value="custom">{t('modelmanager:custom')}</Radio>
+            </Flex>
+          </RadioGroup>
+        </Flex>
+
+        {saveLocation === 'custom' && (
           <Flex flexDirection="column" rowGap={2}>
             <Text
               fontWeight="bold"
               fontSize="sm"
               color="var(--text-color-secondary)"
             >
-              {t('modelmanager:pathToCustomConfig')}
+              {t('modelmanager:customSaveLocation')}
             </Text>
             <IAIInput
-              value={pathToConfig}
+              value={customSaveLocation}
               onChange={(e) => {
-                if (e.target.value !== '') setPathToConfig(e.target.value);
+                if (e.target.value !== '')
+                  setCustomSaveLocation(e.target.value);
               }}
               width="25rem"
             />
