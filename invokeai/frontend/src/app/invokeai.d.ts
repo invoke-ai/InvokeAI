@@ -219,6 +219,11 @@ export declare type InvokeDiffusersModelConfigProps = {
   };
 };
 
+export declare type InvokeModelConversionProps = {
+  name: string;
+  is_inpainting: boolean;
+};
+
 /**
  * These types type data received from the server via socketio.
  */

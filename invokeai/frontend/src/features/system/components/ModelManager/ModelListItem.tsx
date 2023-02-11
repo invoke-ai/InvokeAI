@@ -1,27 +1,18 @@
 import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
 import { Box, Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
 import { ModelStatus } from 'app/invokeai';
-import {
-  convertToDiffusers,
-  deleteModel,
-  requestModelChange,
-} from 'app/socketio/actions';
+import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store';
 import { useAppDispatch, useAppSelector } from 'app/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  setIsProcessing,
-  setOpenModel,
-} from 'features/system/store/systemSlice';
+import { setOpenModel } from 'features/system/store/systemSlice';
 import { useTranslation } from 'react-i18next';
-import { MdSwitchLeft } from 'react-icons/md';
 
 type ModelListItemProps = {
   name: string;
   status: ModelStatus;
   description: string;
-  format: string | undefined;
 };
 
 export default function ModelListItem(props: ModelListItemProps) {
@@ -37,7 +28,7 @@ export default function ModelListItem(props: ModelListItemProps) {
 
   const dispatch = useAppDispatch();
 
-  const { name, status, description, format } = props;
+  const { name, status, description } = props;
 
   const handleChangeModel = () => {
     dispatch(requestModelChange(name));
@@ -45,11 +36,6 @@ export default function ModelListItem(props: ModelListItemProps) {
 
   const openModelHandler = () => {
     dispatch(setOpenModel(name));
-  };
-
-  const convertModelHandler = () => {
-    dispatch(setIsProcessing(true));
-    dispatch(convertToDiffusers(name));
   };
 
   const handleModelDelete = () => {
@@ -106,16 +92,6 @@ export default function ModelListItem(props: ModelListItemProps) {
           isDisabled={status === 'active' || isProcessing || !isConnected}
           className=" modal-close-btn"
         />
-        {format !== 'diffusers' && (
-          <IAIIconButton
-            icon={<MdSwitchLeft />}
-            size={'sm'}
-            onClick={convertModelHandler}
-            aria-label="Convert Model"
-            isDisabled={status === 'active' || isProcessing || !isConnected}
-            className=" modal-close-btn"
-          />
-        )}
         <IAIAlertDialog
           title={t('modelmanager:deleteModel')}
           acceptCallback={handleModelDelete}
