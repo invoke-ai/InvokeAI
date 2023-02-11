@@ -125,7 +125,7 @@ manager, please follow these steps:
     === "Windows"
 
         ```ps
-        .venv\script\activate
+        .venv\Scripts\activate
         ```
 
         If you get a permissions error at this point, run this command and try again
@@ -295,13 +295,12 @@ on your system, please see the [Git Installation
 Guide](https://github.com/git-guides/install-git)
 
 1. From the command line, run this command:
-
    ```bash
    git clone https://github.com/invoke-ai/InvokeAI.git
    ```
 
-This will create a directory named `InvokeAI` and populate it with the
-full source code from the InvokeAI repository.
+    This will create a directory named `InvokeAI` and populate it with the
+    full source code from the InvokeAI repository.
 
 2. Activate the InvokeAI virtual environment as per step (4) of the manual
 installation protocol (important!)
@@ -342,7 +341,7 @@ installation protocol (important!)
     repository. You can then use GitHub functions to create and submit
     pull requests to contribute improvements to the project.
 
-    Please see [Contributing](/index.md#Contributing) for hints
+    Please see [Contributing](../index.md#contributing) for hints
     on getting started.
 
 ### Unsupported Conda Install
