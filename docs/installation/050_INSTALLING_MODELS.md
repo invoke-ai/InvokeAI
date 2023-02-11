@@ -95,7 +95,7 @@ There are multiple ways to install and manage models:
    models files.
 
 3. The web interface (WebUI) has a GUI for importing and managing
-models.
+   models.
 
 ### Installation via `invokeai-configure`
 
@@ -111,7 +111,7 @@ confirm that the files are complete.
 You can install a new model, including any of the community-supported ones, via
 the command-line client's `!import_model` command.
 
-#### Installing `.ckpt` and `.safetensors` models
+#### Installing individual `.ckpt` and `.safetensors` models
 
 If the model is already downloaded to your local disk, use
 `!import_model /path/to/file.ckpt` to load it. For example:
@@ -136,15 +136,39 @@ invoke> !import_model https://example.org/sd_models/martians.safetensors
 For this to work, the URL must not be password-protected. Otherwise
 you will receive a 404 error.
 
-When you import a legacy model, the CLI will ask you a few questions
-about the model, including what size image it was trained on (usually
-512x512), what name and description you wish to use for it, what
-configuration file to use for it (usually the default
-`v1-inference.yaml`), whether you'd like to make this model the
-default at startup time, and whether you would like to install a
-custom VAE (variable autoencoder) file for the model. For recent
-models, the answer to the VAE question is usually "no," but it won't
-hurt to answer "yes".
+When you import a legacy model, the CLI will first ask you what type
+of model this is. You can indicate whether it is a model based on
+Stable Diffusion 1.x (1.4 or 1.5), one based on Stable Diffusion 2.x,
+or a 1.x inpainting model. Be careful to indicate the correct model
+type, or it will not load correctly. You can correct the model type
+after the fact using the `!edit_model` command.
+
+The system will then ask you a few other questions about the model,
+including what size image it was trained on (usually 512x512), what
+name and description you wish to use for it, and whether you would
+like to install a custom VAE (variable autoencoder) file for the
+model. For recent models, the answer to the VAE question is usually
+"no," but it won't hurt to answer "yes".
+
+After importing, the model will load. If this is successful, you will
+be asked if you want to keep the model loaded in memory to start
+generating immediately. You'll also be asked if you wish to make this
+the default model on startup. You can change this later using
+`!edit_model`.
+
+#### Importing a batch of `.ckpt` and `.safetensors` models from a directory
+
+You may also point `!import_model` to a directory containing a set of
+`.ckpt` or `.safetensors` files. They will be imported _en masse_.
+
+Example:
+```console
+invoke> !import_model C:/Users/fred/Downloads/civitai_models/
+```
+
+You will be given the option to import all models found in the
+directory, or select which ones to import. If there are subfolders
+within the directory, they will be searched for models to import.
 
 #### Installing `diffusers` models
 
