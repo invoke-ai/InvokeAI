@@ -302,7 +302,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
 
-    def _enable_memory_efficient_attention(self, latents: Torch.tensor):
+    def _adjust_memory_efficient_attention(self, latents: Torch.tensor):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
@@ -392,7 +392,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                          noise: torch.Tensor,
                                          run_id: str = None,
                                          additional_guidance: List[Callable] = None):
-        self._enable_memory_efficient_attention(latents)
+        self._adjust_memory_efficient_attention(latents)
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
         if additional_guidance is None:
