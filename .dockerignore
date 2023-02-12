@@ -3,21 +3,23 @@
 !invokeai
 !ldm
 !pyproject.toml
-!README.md
 
 # Guard against pulling in any models that might exist in the directory tree
 **/*.pt*
 **/*.ckpt
 
 # ignore frontend but whitelist dist
-invokeai/frontend/**
-!invokeai/frontend/dist
+invokeai/frontend/
+!invokeai/frontend/dist/
 
 # ignore invokeai/assets but whitelist invokeai/assets/web
-invokeai/assets
-!invokeai/assets/web
+invokeai/assets/
+!invokeai/assets/web/
 
-# ignore python cache
-**/__pycache__
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
 **/*.py[cod]
-**/*.egg-info
+
+# Distribution / packaging
+*.egg-info/
+*.egg

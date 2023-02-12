@@ -30,25 +30,35 @@ Installation](010_INSTALL_AUTOMATED.md), and in many cases will
 already be installed (if, for example, you have used your system for
 gaming):
 
-* **Python** version 3.9 or 3.10 (3.11 is not recommended).
+* **Python**
 
-* **CUDA Tools** For those with _NVidia GPUs_, you will need to
-  install the [CUDA toolkit and optionally the XFormers library](070_INSTALL_XFORMERS.md).
+    version 3.9 or 3.10 (3.11 is not recommended).
 
-*  **ROCm Tools** For _Linux users with AMD GPUs_, you will need
-   to install the [ROCm toolkit](./030_INSTALL_CUDA_AND_ROCM.md). Note that
-   InvokeAI does not support AMD GPUs on Windows systems due to
-   lack of a Windows ROCm library.
+* **CUDA Tools**
 
-*  **Visual C++ Libraries** _Windows users_ must install the free
-   [Visual C++ libraries from Microsoft](https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+    For those with _NVidia GPUs_, you will need to
+    install the [CUDA toolkit and optionally the XFormers library](070_INSTALL_XFORMERS.md).
 
-* **The Xcode command line tools** for _Macintosh users_. Instructions are
-  available at [Free Code Camp](https://www.freecodecamp.org/news/install-xcode-command-line-tools/)
+* **ROCm Tools**
 
-* _Macintosh users_ may also need to run the `Install Certificates` command
-  if model downloads give lots of certificate errors. Run:
-  `/Applications/Python\ 3.10/Install\ Certificates.command`
+    For _Linux users with AMD GPUs_, you will need
+    to install the [ROCm toolkit](./030_INSTALL_CUDA_AND_ROCM.md). Note that
+    InvokeAI does not support AMD GPUs on Windows systems due to
+    lack of a Windows ROCm library.
+
+* **Visual C++ Libraries**
+
+    _Windows users_ must install the free
+    [Visual C++ libraries from Microsoft](https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+
+* **The Xcode command line tools**
+
+    for _Macintosh users_. Instructions are available at
+    [Free Code Camp](https://www.freecodecamp.org/news/install-xcode-command-line-tools/)
+
+    * _Macintosh users_ may also need to run the `Install Certificates` command
+      if model downloads give lots of certificate errors. Run:
+      `/Applications/Python\ 3.10/Install\ Certificates.command`
 
 ### Installation Walkthrough
 
@@ -75,7 +85,7 @@ manager, please follow these steps:
     === "Linux/Mac"
 
         ```bash
-        export INVOKEAI_ROOT="~/invokeai"
+        export INVOKEAI_ROOT=~/invokeai
         mkdir $INVOKEAI_ROOT
         ```
 
@@ -99,35 +109,30 @@ manager, please follow these steps:
    Windows environment variable using the Advanced System Settings dialogue.
    Refer to your operating system documentation for details.
 
-
-    === "Linux/Mac"
-        ```bash
-        cd $INVOKEAI_ROOT
-        python -m venv create .venv
-        ```
-
-    === "Windows"
-         ```bash
-         cd $INVOKEAI_ROOT
-     	 python -m venv create .venv
-     	 ```
+    ```terminal
+    cd $INVOKEAI_ROOT
+    python -m venv .venv --prompt InvokeAI
+    ```
 
 4.  Activate the new environment:
 
     === "Linux/Mac"
-    	```bash
+
+        ```bash
         source .venv/bin/activate
-    	```
+        ```
 
     === "Windows"
-    	```bash
-        .venv\script\activate
-    	```
-	If you get a permissions error at this point, run the command
-	`Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser`
-	and try `activate` again.
 
-    The command-line prompt should change to to show `(.venv)` at the
+        ```ps
+        .venv\Scripts\activate
+        ```
+
+        If you get a permissions error at this point, run this command and try again
+
+        `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
+    The command-line prompt should change to to show `(InvokeAI)` at the
     beginning of the prompt. Note that all the following steps should be
     run while inside the INVOKEAI_ROOT directory
 
@@ -137,40 +142,47 @@ manager, please follow these steps:
     python -m pip install --upgrade pip
     ```
 
-6.  Install the InvokeAI Package. The `--extra-index-url` option is used to select among CUDA, ROCm and CPU/MPS drivers as shown below:
+6. Install the InvokeAI Package. The `--extra-index-url` option is used to select among
+   CUDA, ROCm and CPU/MPS drivers as shown below:
 
     === "CUDA (NVidia)"
+
         ```bash
         pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
         ```
 
     === "ROCm (AMD)"
+
         ```bash
         pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.2
         ```
 
     === "CPU (Intel Macs & non-GPU systems)"
+
         ```bash
         pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
         ```
 
     === "MPS (M1 and M2 Macs)"
+
         ```bash
-        pip install InvokeAI --use-pep517  --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install InvokeAI --use-pep517
         ```
 
 7.  Deactivate and reactivate your runtime directory so that the invokeai-specific commands
     become available in the environment
 
     === "Linux/Macintosh"
+
         ```bash
         deactivate && source .venv/bin/activate
         ```
 
     === "Windows"
-        ```bash
+
+        ```ps
         deactivate
-	.venv\Scripts\activate
+        .venv\Scripts\activate
         ```
 
 8.  Set up the runtime directory
@@ -179,7 +191,7 @@ manager, please follow these steps:
     models, model config files, directory for textual inversion embeddings, and
     your outputs.
 
-    ```bash
+    ```terminal
     invokeai-configure
     ```
 
@@ -283,13 +295,12 @@ on your system, please see the [Git Installation
 Guide](https://github.com/git-guides/install-git)
 
 1. From the command line, run this command:
-
    ```bash
    git clone https://github.com/invoke-ai/InvokeAI.git
    ```
 
-This will create a directory named `InvokeAI` and populate it with the
-full source code from the InvokeAI repository.
+    This will create a directory named `InvokeAI` and populate it with the
+    full source code from the InvokeAI repository.
 
 2. Activate the InvokeAI virtual environment as per step (4) of the manual
 installation protocol (important!)
@@ -314,7 +325,7 @@ installation protocol (important!)
 
     === "MPS (M1 and M2 Macs)"
         ```bash
-        pip install -e . --use-pep517  --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install -e . --use-pep517
         ```
 
     Be sure to pass `-e` (for an editable install) and don't forget the
@@ -330,5 +341,29 @@ installation protocol (important!)
     repository. You can then use GitHub functions to create and submit
     pull requests to contribute improvements to the project.
 
-    Please see [Contributing](/index.md#Contributing) for hints
+    Please see [Contributing](../index.md#contributing) for hints
     on getting started.
+
+### Unsupported Conda Install
+
+Congratulations, you found the "secret" Conda installation
+instructions. If you really **really** want to use Conda with InvokeAI
+you can do so using this unsupported recipe:
+
+```
+mkdir ~/invokeai
+conda create -n invokeai python=3.10
+conda activate invokeai
+pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+invokeai-configure --root ~/invokeai
+invokeai --root ~/invokeai --web
+```
+
+The `pip install` command shown in this recipe is for Linux/Windows
+systems with an NVIDIA GPU. See step (6) above for the command to use
+with other platforms/GPU combinations. If you don't wish to pass the
+`--root` argument to `invokeai` with each launch, you may set the
+environment variable INVOKEAI_ROOT to point to the installation directory.
+
+Note that if you run into problems with the Conda installation, the InvokeAI
+staff will **not** be able to help you out. Caveat Emptor!
