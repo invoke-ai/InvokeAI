@@ -8,6 +8,7 @@ on:
       - 'ready_for_review'
       - 'opened'
       - 'synchronize'
+  merge_group:
   workflow_dispatch:
 
 concurrency:
