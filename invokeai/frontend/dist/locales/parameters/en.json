@@ -44,6 +44,8 @@
   "toggleLoopback": "Toggle Loopback",
   "invoke": "Invoke",
   "cancel": "Cancel",
+  "scheduleCancel": "Cancel after current iteration",
+  "cancelScheduled": "Canceling",
   "promptPlaceholder": "Type prompt here. [negative tokens], (upweight)++, (downweight)--, swap and blend are available (see docs)",
   "negativePrompts": "Negative Prompts",
   "sendTo": "Send to",

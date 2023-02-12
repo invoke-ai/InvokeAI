@@ -26,3 +26,6 @@ dist-ssr
 
 # build stats
 stats.html
+
+# Yarn
+.yarn
