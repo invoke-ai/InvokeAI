@@ -163,7 +163,7 @@ class InvokeAIDiffuserComponent:
     ) -> torch.Tensor:
         if postprocessing_settings is not None:
             percent_through = self.calculate_percent_through(sigma, step_index, total_step_count)
-            latents = self._threshold(postprocessing_settings.threshold, postprocessing_settings.warmup, latents, percent_through)
+            latents = self.apply_threshold(postprocessing_settings, latents, percent_through)
         return latents
 
     def calculate_percent_through(self, sigma, step_index, total_step_count):
@@ -288,7 +288,15 @@ class InvokeAIDiffuserComponent:
         combined_next_x = unconditioned_next_x + scaled_delta
         return combined_next_x
 
-    def _threshold(self, threshold, warmup, latents: torch.Tensor, percent_through) -> torch.Tensor:
+    def apply_threshold(
+        self,
+        postprocessing_settings: PostprocessingSettings,
+        latents: torch.Tensor,
+        percent_through
+    ) -> torch.Tensor:
+        threshold = postprocessing_settings.threshold
+        warmup = postprocessing_settings.warmup
+
         if percent_through < warmup:
             current_threshold = threshold + threshold * 5 * (1 - (percent_through / warmup))
         else:
@@ -314,7 +322,11 @@ class InvokeAIDiffuserComponent:
 
         num_altered = 0
 
-        # fix for MPS
+        # fix for MPS?
+        # def mps_rand_like(latents: torch.Tensor):
+        #     return torch.rand_like(latents, device='cpu').to(latents.device)
+        # rand_like = mps_rand_like if latents.device.type == 'mps' else torch.rand_like
+
         from ldm.generate import fix_func
         rand_like = fix_func(torch.rand_like)
 
