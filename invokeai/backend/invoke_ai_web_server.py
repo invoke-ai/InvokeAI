@@ -28,7 +28,7 @@ from ldm.invoke.args import Args, APP_ID, APP_VERSION, calculate_init_img_hash
 from ldm.invoke.conditioning import get_tokens_for_prompt, get_prompt_structure
 from ldm.invoke.generator.diffusers_pipeline import PipelineIntermediateState
 from ldm.invoke.generator.inpaint import infill_methods
-from ldm.invoke.globals import Globals
+from ldm.invoke.globals import Globals, global_converted_ckpts_dir
 from ldm.invoke.pngwriter import PngWriter, retrieve_metadata
 from ldm.invoke.prompt_parser import split_weighted_subprompts, Blend
 
@@ -294,7 +294,7 @@ class InvokeAIWebServer:
     def load_socketio_listeners(self, socketio):
         @socketio.on("requestSystemConfig")
         def handle_request_capabilities():
-            print(f">> System config requested")
+            print(">> System config requested")
             config = self.get_system_config()
             config["model_list"] = self.generate.model_manager.list_models()
             config["infill_methods"] = infill_methods()
@@ -428,7 +428,7 @@ class InvokeAIWebServer:
                 )
 
                 if model_to_convert['save_location'] == 'root':
-                    diffusers_path = Path(Globals.root, 'models', 'converted_ckpts', f'{model_name}_diffusers')
+                    diffusers_path = Path(global_converted_ckpts_dir(), f'{model_name}_diffusers')
                 
                 if model_to_convert['save_location'] == 'custom' and model_to_convert['custom_location'] is not None:
                     diffusers_path = Path(model_to_convert['custom_location'], f'{model_name}_diffusers')
@@ -737,7 +737,7 @@ class InvokeAIWebServer:
 
                 try:
                     seed = original_image["metadata"]["image"]["seed"]
-                except (KeyError) as e:
+                except KeyError:
                     seed = "unknown_seed"
                     pass
 
@@ -837,7 +837,7 @@ class InvokeAIWebServer:
 
         @socketio.on("cancel")
         def handle_cancel():
-            print(f">> Cancel processing requested")
+            print(">> Cancel processing requested")
             self.canceled.set()
 
         # TODO: I think this needs a safety mechanism.
@@ -918,9 +918,6 @@ class InvokeAIWebServer:
 
                 So we need to convert each into a PIL Image.
                 """
-
-                truncated_outpaint_image_b64 = generation_parameters["init_img"][:64]
-                truncated_outpaint_mask_b64 = generation_parameters["init_mask"][:64]
 
                 init_img_url = generation_parameters["init_img"]
 
@@ -1096,7 +1093,6 @@ class InvokeAIWebServer:
                 nonlocal facetool_parameters
                 nonlocal progress
 
-                step_index = 1
                 nonlocal prior_variations
 
                 """
@@ -1518,7 +1514,7 @@ class InvokeAIWebServer:
             if step_index:
                 filename += f".{step_index}"
             if postprocessing:
-                filename += f".postprocessed"
+                filename += ".postprocessed"
 
             filename += ".png"
 

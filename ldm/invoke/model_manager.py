@@ -759,7 +759,7 @@ class ModelManager(object):
             return
 
         model_name = model_name or diffusers_path.name
-        model_description = model_description or "Optimized version of {model_name}"
+        model_description = model_description or f"Optimized version of {model_name}"
         print(f">> Optimizing {model_name} (30-60s)")
         try:
             # By passing the specified VAE too the conversion function, the autoencoder
