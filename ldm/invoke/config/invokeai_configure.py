@@ -128,7 +128,7 @@ script do it for you. Manual installation is described at:
 
 https://invoke-ai.github.io/InvokeAI/installation/020_INSTALL_MANUAL/
 
-You may download the recommended models (about 15GB total), install all models (40 GB!!) 
+You may download the recommended models (about 15GB total), install all models (40 GB!!)
 select a customized set, or completely skip this step.
 """
     )
@@ -583,7 +583,7 @@ def new_config_file_contents(successfully_downloaded: dict, config_file: Path, o
         # model is a diffusers (indicated with a path)
         if conf.get(model) and Path(successfully_downloaded[model]).is_dir():
             offer_to_delete_weights(model, conf[model], opt.yes_to_all)
-            
+
         stanza = {}
         mod = Datasets[model]
         stanza["description"] = mod["description"]
@@ -635,7 +635,7 @@ def offer_to_delete_weights(model_name: str, conf_stanza: dict, yes_to_all: bool
             weights.unlink()
         except OSError as e:
             print(str(e))
-    
+
 # ---------------------------------------------
 # this will preload the Bert tokenizer fles
 def download_bert():
@@ -683,10 +683,18 @@ def download_clip():
 def download_realesrgan():
     print("Installing models from RealESRGAN...", file=sys.stderr)
     model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
+    wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
+
     model_dest = os.path.join(
         Globals.root, "models/realesrgan/realesr-general-x4v3.pth"
     )
+
+    wdn_model_dest = os.path.join(
+        Globals.root, "models/realesrgan/realesr-general-wdn-x4v3.pth"
+    )
+
     download_with_progress_bar(model_url, model_dest, "RealESRGAN")
+    download_with_progress_bar(wdn_model_url, wdn_model_dest, "RealESRGANwdn")
 
 
 def download_gfpgan():
