@@ -488,7 +488,7 @@ def select_and_download_models(opt: Namespace):
     else:
         myapplication = AddRemoveModelApplication()
         myapplication.run()
-        models_to_download = dict(map(lambda x: (x, True), myapplication.selected_models))
+        models_to_download = dict(map(lambda x: (x, True), myapplication.selected_models)) if myapplication.selected_models else None
 
     if not models_to_download:
         print(
