@@ -1,43 +1,37 @@
 [build-system]
-requires = ["setuptools~=65.5", "pip~=22.3", "wheel"]
-build-backend = "setuptools.build_meta"
+build-backend="setuptools.build_meta"
+requires=["setuptools ~= 67.1", "wheel"]
 
 [project]
-name = "InvokeAI"
-description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-requires-python = ">=3.9, <3.11"
-readme = { content-type = "text/markdown", file = "README.md" }
-keywords = ["stable-diffusion", "AI"]
-dynamic = ["version"]
-license = { file = "LICENSE" }
-authors = [{ name = "The InvokeAI Project", email = "lincoln.stein@gmail.com" }]
-classifiers = [
-  'Development Status :: 4 - Beta',
-  'Environment :: GPU',
-  'Environment :: GPU :: NVIDIA CUDA',
-  'Environment :: MacOS X',
-  'Intended Audience :: End Users/Desktop',
-  'Intended Audience :: Developers',
-  'License :: OSI Approved :: MIT License',
-  'Operating System :: POSIX :: Linux',
-  'Operating System :: MacOS',
-  'Operating System :: Microsoft :: Windows',
-  'Programming Language :: Python :: 3 :: Only',
-  'Programming Language :: Python :: 3.8',
-  'Programming Language :: Python :: 3.9',
-  'Programming Language :: Python :: 3.10',
-  'Topic :: Artistic Software',
-  'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
-  'Topic :: Internet :: WWW/HTTP :: WSGI :: Server',
-  'Topic :: Multimedia :: Graphics',
-  'Topic :: Scientific/Engineering :: Artificial Intelligence',
-  'Topic :: Scientific/Engineering :: Image Processing',
+authors=[{name="The InvokeAI Project", email="lincoln.stein@gmail.com"}]
+classifiers=[
+  "Development Status :: 4 - Beta",
+  "Environment :: GPU :: NVIDIA CUDA",
+  "Environment :: GPU",
+  "Environment :: MacOS X",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python",
+  "Topic :: Artistic Software",
+  "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+  "Topic :: Internet :: WWW/HTTP :: WSGI :: Server",
+  "Topic :: Multimedia :: Graphics",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Image Processing",
 ]
-dependencies = [
+dependencies=[
   "accelerate",
   "albumentations",
   "click",
-  "clip_anytorch",          # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
+  "clip_anytorch",
   "datasets",
   "diffusers[torch]~=0.11",
   "dnspython==2.2.1",
@@ -53,7 +47,7 @@ dependencies = [
   "huggingface-hub>=0.11.1",
   "imageio",
   "imageio-ffmpeg",
-  "k-diffusion",              # replacing "k-diffusion @ https://github.com/Birch-san/k-diffusion/archive/refs/heads/mps.zip",
+  "k-diffusion",
   "kornia",
   "npyscreen",
   "numpy<1.24",
@@ -61,8 +55,8 @@ dependencies = [
   "opencv-python",
   "picklescan",
   "pillow",
-  "pudb",
   "prompt-toolkit",
+  "pudb",
   "pypatchmatch",
   "pyreadline3",
   "pytorch-lightning==1.7.7",
@@ -74,60 +68,106 @@ dependencies = [
   "streamlit",
   "taming-transformers-rom1504",
   "test-tube>=0.7.5",
-  "torch>=1.13.1",
   "torch-fidelity",
-  "torchvision>=0.14.1",
+  "torch>=1.13.1",
   "torchmetrics",
+  "torchvision>=0.14.1",
   "transformers~=4.25",
   "windows-curses; sys_platform=='win32'",
 ]
+description="An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
+dynamic=["version"]
+keywords=["AI", "stable-diffusion"]
+license={text="MIT"}
+name="InvokeAI"
+readme={content-type="text/markdown", file="README.md"}
+requires-python=">=3.9, <3.11"
 
 [project.optional-dependencies]
-"dist" = ["pip-tools", "pipdeptree", "twine"]
-"docs" = [
-  "mkdocs-material<9.0",
+"dev"=["black", "flake8", "flake8-bugbear", "isort", "pre-commit"]
+"dist"=["pip-tools", "pipdeptree", "twine"]
+"docs"=[
   "mkdocs-git-revision-date-localized-plugin",
+  "mkdocs-material<9.0",
   "mkdocs-redirects==1.2.0",
 ]
-"test" = ["pytest>6.0.0", "pytest-cov"]
-"xformers" = [
-	   "xformers~=0.0.16; sys_platform!='darwin'",
-	   "triton; sys_platform=='linux'",
-]
+"test"=["pytest-cov", "pytest>6.0.0"]
+"xformers"=["triton; sys_platform=='linux'", "xformers~=0.0.16; sys_platform!='darwin'"]
 
 [project.scripts]
 
 # legacy entrypoints; provided for backwards compatibility
-"invoke.py" = "ldm.invoke.CLI:main"
-"configure_invokeai.py" = "ldm.invoke.config.invokeai_configure:main"
-"textual_inversion.py" = "ldm.invoke.training.textual_inversion:main"
-"merge_embeddings.py" = "ldm.invoke.merge_diffusers:main"
+"configure_invokeai.py"="ldm.invoke.config.invokeai_configure:main"
+"invoke.py"="ldm.invoke.CLI:main"
+"merge_embeddings.py"="ldm.invoke.merge_diffusers:main"
+"textual_inversion.py"="ldm.invoke.training.textual_inversion:main"
 
 # modern entrypoints
-"invokeai" = "ldm.invoke.CLI:main"
-"invokeai-configure" = "ldm.invoke.config.invokeai_configure:main"
-"invokeai-merge" = "ldm.invoke.merge_diffusers:main"   # note name munging
-"invokeai-ti" = "ldm.invoke.training.textual_inversion:main"
+"invokeai"="ldm.invoke.CLI:main"
+"invokeai-configure"="ldm.invoke.config.invokeai_configure:main"
+"invokeai-merge"="ldm.invoke.merge_diffusers:main"
+"invokeai-ti"="ldm.invoke.training.textual_inversion:main"
 
 [project.urls]
-"Homepage" = "https://invoke-ai.github.io/InvokeAI/"
-"Documentation" = "https://invoke-ai.github.io/InvokeAI/"
-"Source" = "https://github.com/invoke-ai/InvokeAI/"
-"Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
-"Discord" = "https://discord.gg/ZmtBAhwWhy"
+"Bug Reports"="https://github.com/invoke-ai/InvokeAI/issues"
+"Discord"="https://discord.gg/ZmtBAhwWhy"
+"Documentation"="https://invoke-ai.github.io/InvokeAI/"
+"Homepage"="https://invoke-ai.github.io/InvokeAI/"
+"Source"="https://github.com/invoke-ai/InvokeAI/"
+
+[tool.setuptools]
+license-files=["LICENSE"]
 
 [tool.setuptools.dynamic]
-version = { attr = "ldm.invoke.__version__" }
+version={attr="ldm.invoke.__version__"}
 
 [tool.setuptools.packages.find]
-"where" = ["."]
-"include" = ["invokeai.assets.web*", "invokeai.backend*", "invokeai.frontend.dist*", "invokeai.configs*", "ldm*"]
+"include"=[
+  "invokeai.assets.web*",
+  "invokeai.backend*",
+  "invokeai.configs*",
+  "invokeai.frontend.dist*",
+  "ldm*",
+]
+"where"=["."]
 
 [tool.setuptools.package-data]
-"invokeai.assets.web" = ["**.png"]
-"invokeai.backend" = ["**.png"]
-"invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
-"invokeai.frontend.dist" = ["**"]
+"invokeai.assets.web"=["**.png"]
+"invokeai.configs"=["**.example", "**.txt", "**.yaml"]
+"invokeai.frontend.dist"=["**"]
+
+[tool.black]
+exclude='''
+/(
+    .git
+    | .tox
+    | .venv
+    | _build
+    | build
+    | dist
+    | node_modules
+)/
+'''
+include='.pyi?$'
+line-length=88
+source=['invokeai/backend', 'ldm/invoke']
+target-version=['py39']
+
+[tool.isort]
+extend_ignore=["scripts"]
+profile="black"
+py_version=39
+
+[tool.coverage.run]
+branch=true
+parallel=true
+
+[tool.coverage.report]
+skip_covered=true
+skip_empty=true
+
+[tool.coverage.paths]
+source=["invokeai/backend", "ldm/invoke"]
 
 [tool.pytest.ini_options]
-addopts = "-p pytest_cov --junitxml=junit/test-results.xml --cov-report=term:skip-covered --cov=ldm/invoke --cov=backend --cov-branch"
+addopts=["--cov=invokeai/backend", "--cov=ldm/invoke"]
