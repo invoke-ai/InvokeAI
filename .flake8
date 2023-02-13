@@ -1,0 +1,5 @@
+[flake8]
+max-line-length = 88
+extend-select = C,E,F,W,B,B9
+# B905 should be enabled when we drop support for 3.9
+extend-ignore = E203, E501, B905
