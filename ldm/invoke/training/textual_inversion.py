@@ -439,19 +439,23 @@ def main():
             do_front_end(args)
         else:
             do_textual_inversion_training(**vars(args))
-    except widget.NotEnoughSpaceForWidget as e:
-        if str(e).startswith("Height of 1 allocated"):
-            print(
-                "** You need to have at least one diffusers models defined in models.yaml in order to train"
-            )
-        else:
-            print(f"** A layout error has occurred: {str(e)}")
-        sys.exit(-1)
     except AssertionError as e:
         print(str(e))
         sys.exit(-1)
     except KeyboardInterrupt:
         pass
+    except (widget.NotEnoughSpaceForWidget, Exception) as e:
+        if str(e).startswith("Height of 1 allocated"):
+            print(
+                "** You need to have at least one diffusers models defined in models.yaml in order to train"
+            )
+        elif str(e).startswith('addwstr'):
+            print(
+                '** Not enough window space for the interface. Please make your window larger and try again.'
+            )
+        else:
+            print(f"** A layout error has occurred: {str(e)}")
+        sys.exit(-1)
 
 
 if __name__ == "__main__":
