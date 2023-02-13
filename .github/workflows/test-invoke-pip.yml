@@ -85,6 +85,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
+      
+      - name: install frontend deps
+        run: yarn install --frozen-lockfile
+        working-directory: invokeai/frontend
+      
+      - name: build frontend
+        run: yarn build
+        working-directory: invokeai/frontend
 
       - name: install invokeai
         env:
